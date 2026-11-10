@@ -10849,6 +10849,8 @@ public sealed class Parser
     private ExpressionNode ParseNewExpression()
     {
         var start = Expect(TokenKind.New);
+        if (Check(TokenKind.OpenBrace))
+            return ParseNativeAnonymousObjectCreation(start);
         var type = ParseLispTypeName(out var typeSpan);
         if (SyntaxFactory.ParseTypeName(type) is ArrayTypeSyntax arrayType)
         {
@@ -10950,6 +10952,44 @@ public sealed class Parser
             typeReference?.Span ?? typeSpan, typeReference,
             argumentNames: names.Any(name => name is not null) ? names : null,
             collectionInitializers: collectionInitializers);
+    }
+
+    private AnonymousObjectCreationNode ParseNativeAnonymousObjectCreation(Token start)
+    {
+        Expect(TokenKind.OpenBrace);
+        var initializers = new List<ObjectInitializerAssignment>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+        {
+            string? name = null;
+            var memberStart = Current;
+            if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals)
+            {
+                name = TokenIdentifier(Advance());
+                Advance();
+            }
+            var value = ParseExpression();
+            if (name == null)
+                name = value switch
+                {
+                    ReferenceNode reference when memberStart.Kind == TokenKind.Identifier =>
+                        reference.Name[(reference.Name.LastIndexOf('.') + 1)..].TrimStart('@'),
+                    FieldAccessNode field => field.FieldName.TrimStart('@'),
+                    _ => null
+                };
+            if (name == null)
+                _diagnostics.ReportError(memberStart.Span, DiagnosticCode.UnexpectedToken,
+                    "An anonymous object member requires a name assignment or an identifier/member reference.");
+            else if (!names.Add(name))
+                _diagnostics.ReportError(memberStart.Span, DiagnosticCode.UnexpectedToken,
+                    $"Anonymous object member '{name}' is declared more than once.");
+            else
+                initializers.Add(new ObjectInitializerAssignment(name, value));
+            if (!Match(TokenKind.Comma))
+                break;
+        }
+        var close = Expect(TokenKind.CloseBrace);
+        return new AnonymousObjectCreationNode(start.Span.Union(close.Span), initializers);
     }
 
     private ExpressionNode ParseNativeArrayCreation(Token start, string elementType, TextSpan typeSpan,

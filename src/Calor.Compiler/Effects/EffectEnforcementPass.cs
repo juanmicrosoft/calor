@@ -5497,6 +5497,9 @@ public sealed class EffectEnforcementPass
 
         private string InferExpressionType(ExpressionNode expression)
         {
+            if (_context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, expression.Span)
+                is { Type: not Binding.BoundTypes.UnresolvedBoundType } anonymousProperty)
+                return EffectResolver.NormalizeParameterType(anonymousProperty.Type.DisplayString);
             if (expression is ReferenceNode or FieldAccessNode or NewExpressionNode
                 && _context.CallGraph.MetadataValueType(_context.CurrentFunctionId, expression.Span) is { } metadataType)
                 return EffectResolver.NormalizeParameterType(metadataType.ToDisplayString());
@@ -5586,6 +5589,8 @@ public sealed class EffectEnforcementPass
             var effects = InferFromExpression(target);
             if (_context.CallGraph.IsTupleElementRead(_context.CurrentFunctionId, span))
                 return effects;
+            if (_context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, span) is not null)
+                return effects;
             var targetType = InferExpressionType(target);
             if (memberName == "Length"
                 && InferBoundArrayLength(target.Span, span) is { } arrayEffects)
@@ -5658,6 +5663,8 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromReference(ReferenceNode reference, bool chargeMethodGroup = true)
         {
+            if (_context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, reference.Span) is not null)
+                return EffectSet.Empty;
             if (_context.CallGraph.IsTupleElementRead(_context.CurrentFunctionId, reference.Span))
                 return EffectSet.Empty;
             if (_context.CallGraph.IsResolvedEnumConstant(_context.CurrentFunctionId, reference.Span))
@@ -5670,6 +5677,20 @@ public sealed class EffectEnforcementPass
                 return resolution.Status == EffectResolutionStatus.Unknown
                     ? UnknownResolvedOperation($"{metadata.DisplayString}.get_{metadataMember}", reference.Span)
                     : resolution.Effects;
+            }
+            var separator = reference.Name.LastIndexOf('.');
+            var receiverSpan = new TextSpan(reference.Span.Start, Math.Max(0, separator),
+                reference.Span.Line, reference.Span.Column);
+            if (separator > 0
+                && _context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, receiverSpan)
+                    is { } anonymousReceiver)
+            {
+                var projectedMember = reference.Name[(separator + 1)..];
+                if (projectedMember == "Length"
+                    && InferBoundArrayLength(receiverSpan, reference.Span) is { } projectedArrayEffects)
+                    return projectedArrayEffects;
+                return InferGetterEffects(anonymousReceiver.Type.DisplayString, projectedMember,
+                    reference.Span, reference.Name[..separator]);
             }
             if (!TrySplitMemberReference(reference.Name, out var receiver, out var member))
             {
@@ -6035,7 +6056,7 @@ public sealed class EffectEnforcementPass
                 RecordCreationNode record => record.Fields.Aggregate(
                     EffectSet.Empty, (acc, f) => acc.Union(InferFromExpression(f.Value))),
                 AnonymousObjectCreationNode anonymous => anonymous.Initializers.Aggregate(
-                    EffectSet.Empty, (acc, i) => acc.Union(InferFromExpression(i.Value))),
+                    EffectSet.From("alloc"), (acc, i) => acc.Union(InferFromExpression(i.Value))),
                 StringOperationNode stringOp => InferFromMany(stringOp.Arguments),
                 CharOperationNode charOp => InferFromMany(charOp.Arguments),
                 // Native §SB modification ops mutate the builder (heap write);

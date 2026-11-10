@@ -3026,6 +3026,7 @@ public sealed class Binder
             hasUnknownInferredType: bind.TypeName is null && initializer?.HasUnknownInferredType == true);
         variable.IsImmutableBinding = !bind.IsMutable && !bind.IsCollectionStatementForm; // #1550
         variable.MetadataArrayResultType = initializer?.MetadataArrayResultType;
+        variable.AnonymousObjectMembers = bind.TypeName is null ? initializer?.AnonymousObjectMembers : null;
 
         if (!_scope.TryDeclare(variable))
         {
@@ -4153,6 +4154,21 @@ public sealed class Binder
         }
         if (fieldAccess.FieldName == "Length" && IsArrayReceiver(target))
             return new BoundArrayLength(fieldAccess.Span, target);
+        if (target.AnonymousObjectMembers is { } anonymousMembers
+            && anonymousMembers.Where(member => member.Name == fieldAccess.FieldName).ToArray() is [var anonymousMember])
+        {
+            var value = anonymousMember.Value;
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
+                typeName: null, fieldNameSpan: fieldAccess.FieldNameSpan, resolvedType: value.Type)
+            {
+                IsAnonymousPropertyRead = true,
+                AnonymousObjectMembers = value.AnonymousObjectMembers,
+                MethodInputArrayType = value.MethodInputArrayType,
+                MetadataArrayResultType = value.MetadataArrayResultType,
+                GenericNullabilityType = value.GenericNullabilityType,
+                HasUnknownInferredType = value.HasUnknownInferredType
+            };
+        }
         if (target is BoundVariableExpression { ResolvedSymbols.Count: 1 } tupleVariable
             && tupleVariable.Variable.TypeName.StartsWith('(')
             && SyntaxFactory.ParseTypeName(tupleVariable.Variable.TypeName) is TupleTypeSyntax tupleType
@@ -6090,7 +6106,8 @@ public sealed class Binder
                 var receiverNode = new ReferenceNode(receiverSpan, receiverName, refNode.IsVerbatim);
                 BoundExpression? receiver = TryBindSourceEnumTypeReceiver(receiverNode)
                     ?? TryBindMetadataTypeReceiver(receiverNode);
-                if (receiver is null && _scope.Lookup(receiverName) is VariableSymbol)
+                if (receiver is null && (_scope.Lookup(receiverName) is VariableSymbol
+                    || _scope.Lookup(receiverName.Split('.')[0]) is VariableSymbol { AnonymousObjectMembers: not null }))
                     receiver = BindReferenceExpression(receiverNode);
                 if (receiver is BoundTypeReferenceExpression { ResolvedType.IsEnum: true }
                     || receiver is BoundVariableExpression tupleVariable
@@ -6098,6 +6115,8 @@ public sealed class Binder
                         && SyntaxFactory.ParseTypeName(tupleVariable.Variable.TypeName)
                             is TupleTypeSyntax { ContainsDiagnostics: false }
                     || receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null }
+                    || receiver?.AnonymousObjectMembers is not null
+                    || receiver is BoundFieldAccessExpression { IsAnonymousPropertyRead: true }
                     || receiver is not null && ResolveMetadataArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
                     || refNode.Name[(lastDot + 1)..] == "Length"
                         && receiver is not null && (IsArrayReceiver(receiver)

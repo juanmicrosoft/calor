@@ -94,6 +94,8 @@ public sealed class CallGraphAnalysis
             SourceEnumConstants { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> UnresolvedArgumentCalls { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> TupleElementReads { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), BoundFieldAccessExpression>
+            AnonymousPropertyReads { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.ArrayBoundType>
             ArrayTypes { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
@@ -146,6 +148,9 @@ public sealed class CallGraphAnalysis
 
     internal bool IsTupleElementRead(string callerId, TextSpan span) =>
         _boundValues.TupleElementReads.Contains((callerId, span.Start, span.End));
+
+    internal BoundFieldAccessExpression? AnonymousPropertyRead(string callerId, TextSpan span) =>
+        _boundValues.AnonymousPropertyReads.GetValueOrDefault((callerId, span.Start, span.End));
 
     /// <summary>The declaration span of the variable the binder resolved a bare
     /// value reference (a call target or a <c>ReferenceNode</c>) to, or
@@ -974,6 +979,9 @@ public sealed class CallGraphAnalysis
                         boundValues.SourceEnumConstants.TryAdd((callerId, node.Span.Start, node.Span.End), sourceConstant);
                     if (node is BoundFieldAccessExpression { IsTupleElementRead: true })
                         boundValues.TupleElementReads.Add((callerId, node.Span.Start, node.Span.End));
+                    if (node is BoundFieldAccessExpression { IsAnonymousPropertyRead: true } anonymousProperty)
+                        boundValues.AnonymousPropertyReads.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End), anonymousProperty);
                     if (node is BoundFieldAccessExpression
                         {
                             Target: BoundTypeReferenceExpression,

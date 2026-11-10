@@ -84,6 +84,19 @@ unit. Supplementary Unicode characters require strings; escaped surrogate
 code units remain representable. Character subtraction such as `'4' - '0'`
 produces an `int`.
 
+## Anonymous objects
+
+Use `new { Name = expression }` to create an anonymous object. Identifier and
+member projections can omit the name: `new { count, text.Length }`. Use
+`@class` or another escaped identifier for a keyword property name. Members
+evaluate left to right, and their names must be distinct.
+
+Anonymous construction requires `alloc`; effects of member expressions are
+also charged. Nested anonymous objects use the same syntax. Inferred bindings
+retain their member types across aliases. Reading an anonymous member is
+pure, but further operations on its value keep their own effects: reading
+`value.File.Length` still requires `fs:r` when `File` is a `FileInfo`.
+
 ## Arrays
 
 Sized jagged creation uses the allocated rank first: `new int[2][]` allocates

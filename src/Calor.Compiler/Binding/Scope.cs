@@ -1344,6 +1344,7 @@ public sealed class VariableSymbol : Symbol
     // Inferred references retain the producer's identity, which may not resolve
     // from its display spelling in the local's lexical namespace.
     internal BoundTypes.NominalBoundType? InferredReferenceType { get; init; }
+    internal IReadOnlyList<BoundNamedValue>? AnonymousObjectMembers { get; set; }
     internal bool IsTypeInferred { get; init; }
     // Static type authority belongs to the declaration, not its current value.
     // Assignments cannot recover an unknown var type or erase a known object type.

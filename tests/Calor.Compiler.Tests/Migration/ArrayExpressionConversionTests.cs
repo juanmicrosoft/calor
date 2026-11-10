@@ -1636,6 +1636,226 @@ public class ArrayExpressionConversionTests
     }
 
     [Theory]
+    [InlineData("new { }", "{ }")]
+    [InlineData("new { @class = 1, @default = 2 }", "{ class = 1, default = 2 }")]
+    [InlineData("new { value, @class }", "{ value = 7, class = 3 }")]
+    [InlineData("new { item.Length }", "{ Length = 2 }")]
+    [InlineData("new { A = new { B = 2 } }", "{ A = { B = 2 } }")]
+    [InlineData("new {\n        A = value,\n        B = new { @class = @class },\n      }", "{ A = 7, B = { class = 3 } }")]
+    public void AnonymousObjects_KeepNativeShapeNamesAndAllocation(string expression, string expected)
+    {
+        const string caller = """
+            public static class Probe
+            {
+                public static string Run() => P.Make().ToString();
+            }
+            """;
+        var original = $$"""
+            public static class P
+            {
+                public static object Make()
+                {
+                    int value = 7;
+                    int @class = 3;
+                    string item = "hi";
+                    return {{expression}};
+                }
+            }
+            """;
+        Assert.Equal(expected, Run(original, caller));
+        var source = $$"""
+            module NativeAnonymousObjects
+              module P
+                func Make public () → object
+                  ! alloc
+                  let int:value = 7
+                  let int:@class = 3
+                  let string:item = "hi"
+                  return {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parsing.Parser(
+            new Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        foreach (var calor in new[] { source, new CalorEmitter().Emit(module) })
+        {
+            RawFrameAssertions.AssertFramed(calor, present: false);
+            Assert.DoesNotContain("§ANON", calor);
+            var compiled = Program.Compile(calor, "anonymous-object.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+            Assert.Equal(expected, Run(compiled.GeneratedCode, caller));
+            var pure = Program.Compile(calor.Replace("! alloc", "!", StringComparison.Ordinal), "pure-anonymous.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.Contains(pure.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                && error.Message.Contains("'alloc'", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("new { 1 }")]
+    [InlineData("new { value + 1 }")]
+    [InlineData("new { (value) }")]
+    [InlineData("new { A = 1 A = 2 }")]
+    [InlineData("new { A = 1, A = 2 }")]
+    public void AnonymousObjects_RejectInvalidProjectionAndDuplicateNames(string expression)
+    {
+        var diagnostics = new DiagnosticBag();
+        var source = $"module InvalidAnonymous\n  func Make () → object\n    return {expression}\n";
+        new Parsing.Parser(new Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AnonymousObjects_RetainInitializerEffects(bool declaresRead)
+    {
+        var source = $$"""
+            module AnonymousInitializerEffects
+              func Make public () → object
+                ! alloc{{(declaresRead ? ", cr" : "")}}
+                return new { Text = System.Console.ReadLine() }
+            """;
+        var result = Program.Compile(source, "anonymous-effects.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Equal(!declaresRead, result.HasErrors);
+        Assert.All(result.Diagnostics.Errors, error => Assert.True(error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'cr'", StringComparison.Ordinal), error.ToString()));
+    }
+
+    [Theory]
+    [InlineData(false, "1:2:2|2")]
+    [InlineData(true, "throw:12")]
+    public void AnonymousObjects_ConvertedInitializersKeepOrderSnapshotsAndExceptions(bool throws, string expected)
+    {
+        var source = $$"""
+            public static class P
+            {
+                public static int State = 1;
+                private static int Next() { State = State + 1; return State; }
+                private static int Fail()
+                {
+                    State = State + 10;
+                    throw new System.InvalidOperationException();
+                }
+                public static object Make()
+                {
+                    return new
+                    {
+                        First = State,
+                        Middle = new int[] { Next() },
+                        Last = {{(throws ? "Fail()" : "State")}}{{(throws ? ", Never = Next()" : "")}}
+                    };
+                }
+            }
+            """;
+        const string caller = """
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    try
+                    {
+                        var result = P.Make();
+                        var type = result.GetType();
+                        var first = type.GetProperty("First").GetValue(result);
+                        var middle = (int[])type.GetProperty("Middle").GetValue(result);
+                        var last = type.GetProperty("Last").GetValue(result);
+                        return first + ":" + middle[0] + ":" + last + "|" + P.State;
+                    }
+                    catch (System.InvalidOperationException) { return "throw:" + P.State; }
+                }
+            }
+            """;
+        Assert.Equal(expected, Run(source, caller));
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join(Environment.NewLine, converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parsing.Parser(
+            new Parsing.Lexer(converted.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        foreach (var calor in new[] { converted.CalorSource!, new CalorEmitter().Emit(module) })
+        {
+            var compiled = Program.Compile(calor, "converted-anonymous.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+            Assert.Equal(expected, Run(compiled.GeneratedCode, caller));
+        }
+    }
+
+    [Theory]
+    [InlineData("value.A + \":\" + alias.Nested.B", "1:2")]
+    [InlineData("(value).A + \":\" + (alias.Nested).B", "1:2")]
+    [InlineData("value.Values[0] + \":\" + alias.Values.Length", "3:2")]
+    [InlineData("value.Text.Length + \":\" + (alias).Text.Length", "3:3")]
+    [InlineData("value.@class + \":\" + alias.Nested.B", "6:2")]
+    [InlineData("(new { C = 5 }).C", "5")]
+    public void AnonymousObjects_ConvertedPropertiesRemainUsable(string expression, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    var value = new { A = 1, Nested = new { B = 2 }, Values = new int[] { 3, 4 }, Text = "abc", @class = 6 };
+                    var alias = value;
+                    return "" + ({{expression}});
+                }
+            }
+            """;
+        Assert.Equal(expected, Run(source));
+        var converted = new CSharpToCalorConverter().Convert(source);
+        Assert.True(converted.Success, string.Join(Environment.NewLine, converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parsing.Parser(
+            new Parsing.Lexer(converted.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        foreach (var calor in new[] { converted.CalorSource!, new CalorEmitter().Emit(module) })
+        {
+            var compiled = Program.Compile(calor, "anonymous-properties.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
+            Assert.Equal(expected, Run(compiled.GeneratedCode));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AnonymousObjects_RetainEffectsOfProjectedMemberReads(bool declaresRead)
+    {
+        var source = $$"""
+            module AnonymousProjectedEffects
+              func Read public (System.IO.FileInfo:info) → long
+                ! alloc{{(declaresRead ? ", fs:r" : "")}}
+                let value = new { Box = info }
+                return value.Box.Length
+            """;
+        var result = Program.Compile(source, "anonymous-projected-effects.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Equal(!declaresRead, result.HasErrors);
+        Assert.All(result.Diagnostics.Errors, error => Assert.True(error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'fs:r'", StringComparison.Ordinal), error.ToString()));
+    }
+
+    [Theory]
+    [InlineData("let object:value = new { A = 1 }\n    return value.A")]
+    [InlineData("let value = new { Box = opaque }\n    return value.Box.A")]
+    public void AnonymousObjects_DoNotInventPropertiesOnOpaqueValues(string body)
+    {
+        var source = $"module OpaqueAnonymous\n  func Read (object:opaque) → int\n    ! alloc\n    {body}\n";
+        var result = Program.Compile(source, "opaque-anonymous.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'unknown'", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [InlineData("new int[2][]")]
     [InlineData("new int[0][]")]
     [InlineData("new int[2, 3][]")]

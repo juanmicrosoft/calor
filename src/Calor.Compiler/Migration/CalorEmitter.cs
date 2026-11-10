@@ -3329,20 +3329,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(AnonymousObjectCreationNode node)
     {
-        var indent = new string(' ', _indentLevel * 2);
-        var sb = new System.Text.StringBuilder();
-        sb.Append("§ANON");
-        // Values containing section markers are hoisted. #1541 review: when one is, every
-        // non-literal value is, in order, so none runs ahead of an earlier member's value.
         var values = RenderArrayElements(node.Initializers.Select(init => init.Value), hoistSectionMarkers: true);
-        foreach (var (init, value) in node.Initializers.Zip(values))
-        {
-            // Strip @ prefix from verbatim C# identifiers (e.g., @class, @checked, @Version)
-            var propName = init.PropertyName.StartsWith("@") ? init.PropertyName[1..] : init.PropertyName;
-            sb.Append($"\n{indent}  {propName} = {value}");
-        }
-        sb.Append($"\n{indent}§/ANON");
-        return sb.ToString();
+        return $"new {{ {string.Join(", ", node.Initializers.Zip(values,
+            (init, value) => $"{EscapeCalorIdentifier(init.PropertyName)} = {value}"))} }}";
     }
 
     public string Visit(CallExpressionNode node)

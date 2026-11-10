@@ -242,7 +242,7 @@ public static class FeatureSupport
         {
             Name = "array-element-block",
             Support = SupportLevel.NotSupported,
-            Description = "An array element that Calor writes as a block (a collection initializer, or a multi-line element such as an anonymous object in a rectangular array row) preserves its statement as counted C# interop",
+            Description = "Statement-only array elements require counted C# preservation when inline emission or safe typed hoisting is unavailable. Anonymous objects and ordinary collection initializers use inline native syntax",
             Workaround = "Bind the element to a local first, then use the local in the array"
         },
         ["linq-method"] = new FeatureInfo
@@ -297,7 +297,7 @@ public static class FeatureSupport
         {
             Name = "anonymous-type",
             Support = SupportLevel.Full,
-            Description = "Anonymous types are represented by anonymous-object nodes"
+            Description = "Anonymous objects use native new { Name = expression } syntax and anonymous-object nodes, retaining initializer order and allocation effects"
         },
         ["foreach-index"] = new FeatureInfo
         {

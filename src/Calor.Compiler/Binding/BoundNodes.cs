@@ -43,6 +43,7 @@ public abstract class BoundExpression : BoundNode
     internal bool HasUnknownInferredType { get; init; }
     internal ArrayBoundType? MethodInputArrayType { get; init; }
     internal GenericInstantiationBoundType? GenericNullabilityType { get; init; }
+    internal IReadOnlyList<BoundNamedValue>? AnonymousObjectMembers { get; init; }
     // Effects-only producer identity, independent of nullability and verifier eligibility.
     internal Microsoft.CodeAnalysis.IArrayTypeSymbol? MetadataArrayResultType { get; init; }
 
@@ -219,6 +220,7 @@ public sealed class BoundVariableExpression : BoundExpression
         {
             MethodInputArrayType = variable.MethodInputArrayType;
             GenericNullabilityType = variable.GenericNullabilityType;
+            AnonymousObjectMembers = variable.AnonymousObjectMembers;
             MetadataArrayResultType = variable.StorageIdentity.MetadataArrayResultType;
         }
         if (typeOverride != null)
@@ -1010,7 +1012,11 @@ public sealed class BoundAnonymousObjectCreation : BoundExpression
         Initializers.Select(initializer => initializer.Value).ToArray();
 
     public BoundAnonymousObjectCreation(TextSpan span, IReadOnlyList<BoundNamedValue> initializers)
-        : base(span) => Initializers = initializers;
+        : base(span)
+    {
+        Initializers = initializers;
+        AnonymousObjectMembers = initializers;
+    }
 }
 
 /// <summary>#762 B2: record creation — typed by the record name; field values bound.</summary>
@@ -1755,6 +1761,7 @@ public sealed class BoundBaseExpression : BoundExpression
 public sealed class BoundFieldAccessExpression : BoundExpression
 {
     internal bool IsTupleElementRead { get; init; }
+    internal bool IsAnonymousPropertyRead { get; init; }
     internal Microsoft.CodeAnalysis.ISymbol? ResolvedMetadataMember { get; init; }
     /// <summary>#943: a metadata member whose read is unsupported here (the result stays unresolved).</summary>
     internal Microsoft.CodeAnalysis.ISymbol? UnsupportedMetadataMember { get; init; }
