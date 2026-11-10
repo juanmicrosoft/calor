@@ -4,6 +4,7 @@ using Calor.Compiler.Analysis;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
@@ -848,16 +849,69 @@ public sealed class CanonicalOperatorIndexerTests
     [Fact]
     public void OperatorRows_DoNotAuthorizeUnknownCalls()
     {
-        var compiled = Program.Compile("""
+        const string invalidConversion = """
             module UnknownOperator
               class Box
                 op implicit (Box:value) → object
                   ! alloc, mut, cw, throw
                   return System.Globalization.CultureInfo.InvariantCulture
-            """);
-        Assert.True(compiled.HasErrors);
-        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
-        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+            """;
+        _ = Parse(invalidConversion);
+        var invalid = Program.Compile(invalidConversion);
+        Assert.True(invalid.HasErrors);
+        Assert.Contains(invalid.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.CodeGenCompilationError
+            && diagnostic.Message.Contains("CS0553", StringComparison.Ordinal));
+        Assert.DoesNotContain(invalid.Diagnostics, diagnostic => diagnostic.Code is
+            DiagnosticCode.UnknownExternalCall or DiagnosticCode.ForbiddenEffect);
+
+        const string source = """
+            module UnknownOperator
+              class Box
+                op implicit (Box:value) → System.Globalization.CultureInfo
+                  ! alloc, mut, cw, throw
+                  return System.Globalization.CultureInfo.CurrentCulture
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var parsed = Parse(candidate);
+            var compiled = Program.Compile(candidate);
+            Assert.True(compiled.HasErrors);
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("get_CurrentCulture", StringComparison.Ordinal));
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+            Assert.DoesNotContain(compiled.Diagnostics,
+                diagnostic => diagnostic.Code == DiagnosticCode.CodeGenCompilationError);
+            Assert.Equal(1, Execute(new CSharpEmitter().Emit(parsed), assembly =>
+            {
+                var box = assembly.GetType("Box", throwOnError: true)!;
+                var result = box.GetMethod("op_Implicit")!.Invoke(null, [Activator.CreateInstance(box)]);
+                return ReferenceEquals(System.Globalization.CultureInfo.CurrentCulture, result) ? 1 : 0;
+            }));
+        }
+    }
+
+    [Fact]
+    public void OperatorRows_ExplicitPureGetterContractRetainsItsClrResult()
+    {
+        const string source = """
+            module KnownOperator
+              class Box
+                op implicit (Box:value) → System.Globalization.CultureInfo
+                  !
+                  return System.Globalization.CultureInfo.InvariantCulture
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            _ = Parse(candidate);
+            var compiled = Program.Compile(candidate);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(1, Execute(compiled.GeneratedCode, assembly =>
+            {
+                var box = assembly.GetType("Box", throwOnError: true)!;
+                var result = box.GetMethod("op_Implicit")!.Invoke(null, [Activator.CreateInstance(box)]);
+                return ReferenceEquals(System.Globalization.CultureInfo.InvariantCulture, result) ? 1 : 0;
+            }));
+        }
     }
 
     [Theory]
