@@ -271,7 +271,8 @@ The abstract `Area` declaration has a pure effect row (`!`). Calls through
 that declaration charge its contract, and an override cannot add effects.
 For radius `5.0`, `Demo` returns `"Circle with area 78.53975"`. The explicit
 invariant culture makes the decimal separator independent of the machine's
-locale.
+locale. Its getter has an explicit pure effect contract; that contract does
+not cover other `CultureInfo` members.
 
 ```calor
 module ShapeHierarchy

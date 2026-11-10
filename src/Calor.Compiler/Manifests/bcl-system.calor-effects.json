@@ -90,6 +90,12 @@
       }
     },
     {
+      "type": "System.Globalization.CultureInfo",
+      "getters": {
+        "InvariantCulture": []
+      }
+    },
+    {
       "type": "System.Convert",
       "defaultEffects": [],
       "methods": {

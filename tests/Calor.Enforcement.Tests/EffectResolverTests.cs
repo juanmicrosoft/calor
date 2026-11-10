@@ -109,6 +109,45 @@ public class EffectResolverTests
     }
 
     [Fact]
+    public void InvariantCultureGetter_HasAnExplicitPureContract()
+    {
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        Assert.True(culture.IsReadOnly);
+        Assert.Equal("", culture.Name);
+        Assert.Same(culture, System.Globalization.CultureInfo.InvariantCulture);
+
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(
+            "System.Globalization.CultureInfo", "InvariantCulture", kind: EffectMemberKind.Getter));
+
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+        Assert.True(resolution.Effects.IsEmpty);
+        Assert.Contains("embedded:", resolution.Source);
+        Assert.Contains("bcl-system", resolution.Source);
+    }
+
+    [Theory]
+    [InlineData("System.Globalization.CultureInfo", "CurrentCulture", EffectMemberKind.Getter)]
+    [InlineData("System.Globalization.CultureInfo", "CurrentUICulture", EffectMemberKind.Getter)]
+    [InlineData("System.Globalization.CultureInfo", "InvariantCulture", EffectMemberKind.Setter)]
+    [InlineData("System.Globalization.CultureInfo", "InvariantCulture", EffectMemberKind.Method)]
+    [InlineData("System.Globalization.CultureInfo", "ClearCachedData", EffectMemberKind.Method)]
+    [InlineData("System.Globalization.CultureInfo", ".ctor", EffectMemberKind.Constructor)]
+    [InlineData("System.Globalization.OtherCultureInfo", "InvariantCulture", EffectMemberKind.Getter)]
+    [InlineData("Vendor.CultureInfo", "InvariantCulture", EffectMemberKind.Getter)]
+    public void InvariantCultureGetter_DoesNotAuthorizeOtherMembers(
+        string type, string member, EffectMemberKind kind)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, member, kind: kind));
+
+        Assert.Equal(EffectResolutionStatus.Unknown, resolution.Status);
+        Assert.True(resolution.Effects.IsUnknown);
+    }
+
+    [Fact]
     public void Resolve_ReturnsUnknown_ForUnknownMethod()
     {
         var resolver = new EffectResolver();
