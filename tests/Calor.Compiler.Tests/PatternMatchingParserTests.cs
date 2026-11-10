@@ -10,7 +10,7 @@ namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// Tests for pattern matching syntax support including arrow syntax,
-/// §VAR, §PREL patterns, and exhaustiveness checking.
+/// variable and relational patterns, and exhaustiveness checking.
 /// </summary>
 public class PatternMatchingParserTests
 {
@@ -38,14 +38,12 @@ public class PatternMatchingParserTests
     public void Parse_MatchWithArrowSyntax_CreatesMatchExpression()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K 1 → ""one""
-          §K 2 → ""two""
-          §K _ → ""other""";
+module Test
+  func Test public (int:x) → string
+    return match x
+      case 1 → ""one""
+      case 2 → ""two""
+      case _ → ""other""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -63,17 +61,13 @@ public class PatternMatchingParserTests
     public void Parse_MatchWithBlockSyntax_CreatesMatchExpression()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K 1
-            §R ""one""
-          §/K
-          §K _
-            §R ""other""
-          §/K";
+module Test
+  func Test public (int:x) → string
+    return match x
+      case 1
+        return ""one""
+      case _
+        return ""other""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -88,17 +82,14 @@ public class PatternMatchingParserTests
     public void Parse_MatchMixedSyntax_AllowsBothStyles()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K 1 → ""one""
-          §K 2
-            §P ""two""
-            §R ""two""
-          §/K
-          §K _ → ""other""";
+module Test
+  func Test public (int:x) → string
+    return match x
+      case 1 → ""one""
+      case 2
+        System.Console.WriteLine(""two"")
+        return ""two""
+      case _ → ""other""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -118,18 +109,16 @@ public class PatternMatchingParserTests
 
     #endregion
 
-    #region Parser Tests - §VAR Pattern
+    #region Parser Tests - Variable Pattern
 
     [Fact]
     public void Parse_VarPattern_CreatesVarPatternNode()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K §VAR{n} → ""captured""";
+module Test
+  func Test public (int:x) → string
+    return match x
+      case var n → ""captured""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -145,13 +134,11 @@ public class PatternMatchingParserTests
     public void Parse_VarPatternWithGuard_CreatesVarPatternAndGuard()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K §VAR{n} §WHEN (> n 0) → ""positive""
-          §K _ → ""non-positive""";
+module Test
+  func Test public (int:x) → string
+    return match x
+      case var n when n > 0 → ""positive""
+      case _ → ""non-positive""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -166,20 +153,18 @@ public class PatternMatchingParserTests
 
     #endregion
 
-    #region Parser Tests - §PREL Relational Pattern
+    #region Parser Tests - Relational Pattern
 
     [Fact]
     public void Parse_RelationalPattern_CreatesRelationalPatternNode()
     {
         var source = @"
-§M{Test}
-  §F{Grade:pub}
-      §I{i32:score}
-      §O{str}
-      §R §W score
-          §K §PREL{gte} 90 → ""A""
-          §K §PREL{gte} 80 → ""B""
-          §K _ → ""F""";
+module Test
+  func Grade public (int:score) → string
+    return match score
+      case >= 90 → ""A""
+      case >= 80 → ""B""
+      case _ → ""F""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -195,16 +180,14 @@ public class PatternMatchingParserTests
     public void Parse_AllRelationalOperators_ParsesCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K §PREL{gte} 100 → ""gte100""
-          §K §PREL{gt} 50 → ""gt50""
-          §K §PREL{lte} 10 → ""lte10""
-          §K §PREL{lt} 0 → ""lt0""
-          §K _ → ""other""";
+module Test
+  func Test public (int:x) → string
+    return match x
+      case >= 100 → ""gte100""
+      case > 50 → ""gt50""
+      case <= 10 → ""lte10""
+      case < 0 → ""lt0""
+      case _ → ""other""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -225,13 +208,11 @@ public class PatternMatchingParserTests
     public void Parse_SomeNonePattern_IsRejected()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{bool:opt}
-      §O{i32}
-      §R §W opt
-          §K §SM §VAR{v} → v
-          §K §NN → 0";
+module Test
+  func Test public (bool:opt) → int
+    return match opt
+      case §SM §VAR{v} → v
+      case §NN → 0";
 
         Parse(source, out var diagnostics);
         Assert.True(diagnostics.HasErrors);
@@ -241,13 +222,11 @@ public class PatternMatchingParserTests
     public void Parse_OkErrPattern_IsRejected()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:res}
-      §O{str}
-      §R §W res
-          §K §OK §VAR{v} → ""ok""
-          §K §ERR §VAR{e} → ""err""";
+module Test
+  func Test public (int:res) → string
+    return match res
+      case §OK §VAR{v} → ""ok""
+      case §ERR §VAR{e} → ""err""";
 
         Parse(source, out var diagnostics);
         Assert.True(diagnostics.HasErrors);
@@ -261,14 +240,12 @@ public class PatternMatchingParserTests
     public void Compile_MatchExpression_GeneratesValidCSharp()
     {
         var source = @"
-§M{Test}
-  §F{GetDay:pub}
-      §I{i32:day}
-      §O{str}
-      §R §W day
-          §K 1 → ""Monday""
-          §K 2 → ""Tuesday""
-          §K _ → ""Unknown""";
+module Test
+  func GetDay public (int:day) → string
+    return match day
+      case 1 → ""Monday""
+      case 2 → ""Tuesday""
+      case _ → ""Unknown""";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -282,14 +259,12 @@ public class PatternMatchingParserTests
     public void Compile_RelationalPatterns_GeneratesCSharpOperators()
     {
         var source = @"
-§M{Test}
-  §F{Grade:pub}
-      §I{i32:score}
-      §O{str}
-      §R §W score
-          §K §PREL{gte} 90 → ""A""
-          §K §PREL{lt} 60 → ""F""
-          §K _ → ""C""";
+module Test
+  func Grade public (int:score) → string
+    return match score
+      case >= 90 → ""A""
+      case < 60 → ""F""
+      case _ → ""C""";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -301,14 +276,12 @@ public class PatternMatchingParserTests
     public void Compile_GuardClause_GeneratesWhenExpression()
     {
         var source = @"
-§M{Test}
-  §F{Sign:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K §VAR{n} §WHEN (> n 0) → ""positive""
-          §K §VAR{n} §WHEN (< n 0) → ""negative""
-          §K _ → ""zero""";
+module Test
+  func Sign public (int:x) → string
+    return match x
+      case var n when n > 0 → ""positive""
+      case var n when n < 0 → ""negative""
+      case _ → ""zero""";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -323,13 +296,11 @@ public class PatternMatchingParserTests
     public void Check_WithWildcard_NoExhaustivenessWarning()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K 1 → ""one""
-          §K _ → ""other""";
+module Test
+  func Test public (int:x) → string
+    return match x
+      case 1 → ""one""
+      case _ → ""other""";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors);
@@ -346,13 +317,11 @@ public class PatternMatchingParserTests
     public void Check_BoolWithoutWildcard_BothCases_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{bool:flag}
-      §O{str}
-      §R §W flag
-          §K true → ""yes""
-          §K false → ""no""";
+module Test
+  func Test public (bool:flag) → string
+    return match flag
+      case true → ""yes""
+      case false → ""no""";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Errors.Select(d => d.Message)));
@@ -372,13 +341,11 @@ public class PatternMatchingParserTests
     {
         // Use block syntax to create MatchStatementNode (not wrapped in return)
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{?i32:opt}
-      §O{i32}
-        §W opt
-            §K true
-              §R 0";
+module Test
+  func Test public (int?:opt) → int
+    match opt
+      case true
+        return 0";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Errors.Select(d => d.Message)));
@@ -398,15 +365,13 @@ public class PatternMatchingParserTests
     {
         // Use block syntax to create MatchStatementNode (not wrapped in return)
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W x
-            §K _
-              §R 0
-            §K 1
-              §R 1";
+module Test
+  func Test public (int:x) → int
+    match x
+      case _
+        return 0
+      case 1
+        return 1";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Errors.Select(d => d.Message)));
@@ -427,13 +392,11 @@ public class PatternMatchingParserTests
     public void RoundTrip_MatchExpression_PreservesSemantics()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K 1 → ""one""
-          §K _ → ""other""";
+module Test
+  func Test public (int:x) → string
+    return match x
+      case 1 → ""one""
+      case _ → ""other""";
 
         // Calor → C#
         var csharp = Compile(source, out var diagnostics);
@@ -471,11 +434,9 @@ public class PatternMatchingParserTests
     public void Parse_EmptyMatch_HasNoCases()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x";
+module Test
+  func Test public (int:x) → string
+    return match x";
 
         var module = Parse(source, out var diagnostics);
         // Parse should succeed but match should have no cases
