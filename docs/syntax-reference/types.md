@@ -43,6 +43,10 @@ module RetiredType
     let i32:value = 42
 ```
 
+Native method calls apply string overload and nullability rules to qualified
+names and aliases only when they resolve to the CLR string type. A source
+type with a similar name does not gain those conversions.
+
 Function signatures put the same type-first declarations in parentheses:
 
 ```calor-fragment

@@ -3341,6 +3341,16 @@ public sealed class Binder
         string? namespaceIdentity,
         IEnumerable<string>? typeParameters = null,
         bool allowObject = true)
+        => TryBuildReferenceType(typeName, containingTypeName, namespaceIdentity,
+            typeParameters, allowObject, _currentNamespaceScopeId);
+
+    private BoundTypes.NominalBoundType? TryBuildReferenceType(
+        string typeName,
+        string? containingTypeName,
+        string? namespaceIdentity,
+        IEnumerable<string>? typeParameters,
+        bool allowObject,
+        string? namespaceScopeId)
     {
         var referent = typeName.Trim();
         var annotated = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(referent, out var inner);
@@ -3364,7 +3374,8 @@ public sealed class Binder
             return null;
         if (containingTypeName is not null
             && _classesByQualifiedName.TryGetValue(containingTypeName, out var containingClass)
-            && containingClass.TypeParameters.Any(parameter => parameter.Name == lookupReferent))
+            && ReturnShape.GetCallableTypeParameters(containingClass, _asyncTypeModule)
+                .Any(parameter => parameter.Name == lookupReferent))
             return null;
 
         var annotation = annotated
@@ -3377,7 +3388,7 @@ public sealed class Binder
                 : null;
         var lexicalScope = containingTypeName is not null
             && _classesByQualifiedName.TryGetValue(containingTypeName, out var declaringClass)
-                ? declaringClass.NamespaceScopeId : _currentNamespaceScopeId;
+                ? declaringClass.NamespaceScopeId : namespaceScopeId;
         var source = ResolveSourceType(referent, containingTypeName, namespaceIdentity, lexicalScope);
         if (source.Handled)
             return source.Type is { IsReferenceType: true } declaration
@@ -3448,11 +3459,13 @@ public sealed class Binder
     private BoundTypes.NominalBoundType? TryBuildCallableReference(string typeName, FunctionSymbol function)
     {
         _functionNamespaces.TryGetValue(function.Id, out var namespaceIdentity);
+        var namespaceScopeId = _functionSymbols.FirstOrDefault(pair => pair.Value == function).Key?.NamespaceScopeId;
         if (function.ContainingTypeName is not null
             && _classesByQualifiedName.TryGetValue(function.ContainingTypeName, out var cls))
             namespaceIdentity = cls.NamespaceIdentity;
         return TryBuildReferenceType(
-            typeName, function.ContainingTypeName, namespaceIdentity, function.TypeParameters);
+            typeName, function.ContainingTypeName, namespaceIdentity, function.TypeParameters,
+            allowObject: true, namespaceScopeId);
     }
 
     private static bool TryBuildDeclaredNullabilityShape(string bindTypeName, out BoundTypes.BoundType? target)
@@ -4519,8 +4532,22 @@ public sealed class Binder
             is { IsEnum: true } type ? type : null;
     }
 
-    private string ResolveEnumParameterType(FunctionSymbol function, string typeName) =>
-        ResolveCallableEnumType(function, typeName) is { } type ? "global::" + type.QualifiedName : typeName;
+    private string ResolveCallableParameterType(FunctionSymbol function, string typeName)
+    {
+        if (ResolveCallableEnumType(function, typeName) is { } type)
+            return "global::" + type.QualifiedName;
+        if (!TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(typeName).TrimEnd('?'))
+            && _functionSymbols.Values.Contains(function)
+            && GetResolvedStringOverloadType(TryBuildCallableReference(typeName, function)) is { } stringType)
+            return stringType;
+        return typeName;
+    }
+
+    private static string? GetResolvedStringOverloadType(BoundTypes.BoundType? type) =>
+        type is BoundTypes.NominalBoundType
+            { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } reference
+                ? reference.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated ? "STRING?" : "STRING"
+                : null;
 
     private TypeSymbol? ResolveVariableEnumType(VariableSymbol variable)
     {
@@ -7554,13 +7581,13 @@ public sealed class Binder
         if (argument is not BoundVariableExpression variable
             || argumentModifier is not ("ref" or "out"))
         {
-            return argument.Type.DisplayString;
+            return GetResolvedStringOverloadType(argument.Type) ?? argument.Type.DisplayString;
         }
 
         var storage = variable.Variable;
         while (_flowNarrowingSources.TryGetValue(storage, out var declared))
             storage = declared;
-        return storage.TypeName;
+        return GetResolvedStringOverloadType(TryBuildVariableReference(storage)) ?? storage.TypeName;
     }
 
     private OverloadResolutionResult ResolveAccessibleOverload(
@@ -7627,7 +7654,7 @@ public sealed class Binder
             GetImplicitConversionCost,
             allowNullableStringCompatibility,
             IsBetterNullConversionTarget,
-            ResolveEnumParameterType,
+            ResolveCallableParameterType,
             arguments is null ? null : (index, parameterType, argumentType) =>
                 GetImplicitArgumentConversionCost(parameterType, argumentType, arguments[index]),
             arguments is null ? null : (index, candidateType, otherType) =>

@@ -2,6 +2,8 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -9,12 +11,12 @@ namespace Calor.Compiler.Tests;
 public sealed class NativeStringApplicabilityTests
 {
     private const string NullableProducer =
-        "§C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N4_UNSET\" §/C";
+        "System.Environment.GetEnvironmentVariable(\"CALOR_N4_UNSET\")";
 
     public static IEnumerable<object[]> FormsAndAliases()
     {
         foreach (var expression in new[] { false, true })
-        foreach (var alias in new[] { "str", "string" })
+        foreach (var alias in new[] { "string", "System.String" })
             yield return [expression, alias];
     }
 
@@ -52,7 +54,7 @@ public sealed class NativeStringApplicabilityTests
     {
         foreach (var (target, argument) in new[]
         {
-            (alias, "\"safe\""), ("?" + alias, "\"safe\""), ("?" + alias, NullableProducer)
+            (alias, "\"safe\""), (alias + "?", "\"safe\""), (alias + "?", NullableProducer)
         })
         {
             var source = Source(expression, target, argument);
@@ -72,9 +74,9 @@ public sealed class NativeStringApplicabilityTests
     public void SelectedScalarOverload_ActivatesWithoutInventingPriorRejection(bool expression, string alias)
     {
         var source = Source(expression, alias, NullableProducer, """
-              §F{Take:pub} (object:value) -> i32
-                §E{}
-                §R 2
+              func Take (object:value) → int
+                !
+                return 2
             """);
         var (bound, diagnostics) = Bind(source);
         Assert.Equal(alias, SelectedFunction(bound, expression).Parameters.Single().TypeName);
@@ -91,10 +93,10 @@ public sealed class NativeStringApplicabilityTests
     [MemberData(nameof(FormsAndAliases))]
     public void NativeNullableReturn_ReachesTheSameArgumentPredicate(bool expression, string alias)
     {
-        var source = Source(expression, alias, "§C{Get} §/C", $$"""
-              §F{Get:pub} () -> ?{{alias}}
-                §E{env}
-                §R {{NullableProducer}}
+        var source = Source(expression, alias, "Get()", $$"""
+              func Get () → {{alias}}?
+                ! env
+                return {{NullableProducer}}
             """);
         var (_, diagnostics) = Bind(source);
         var diagnostic = Assert.Single(diagnostics.Errors);
@@ -104,27 +106,148 @@ public sealed class NativeStringApplicabilityTests
     }
 
     [Theory]
+    [InlineData(false, "global::System.String")]
+    [InlineData(true, "global::System.String")]
+    [InlineData(false, "Text")]
+    [InlineData(true, "Text")]
+    public void ResolvedStringAliases_PreserveDeclaredIdentityAndNullableRejection(bool expression, string alias)
+    {
+        foreach (var nullable in new[] { false, true })
+        {
+            var source = Source(expression, alias, nullable ? NullableProducer : "\"safe\"")
+                .Replace("module NativeString", """
+                    module NativeString
+                      using Text = System.String
+                    """, StringComparison.Ordinal);
+            var (bound, diagnostics) = Bind(source);
+            Assert.Equal(alias, SelectedFunction(bound, expression).Parameters.Single().TypeName);
+            if (nullable)
+            {
+                var diagnostic = Assert.Single(diagnostics.Errors);
+                Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
+                Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            }
+            else
+            {
+                Assert.Empty(diagnostics.Errors);
+            }
+            var compiled = Program.Compile(source, "resolved-string.calr");
+            Assert.Equal(nullable, compiled.HasErrors);
+        }
+    }
+
+    [Theory]
+    [InlineData("System.String", false)]
+    [InlineData("@System.String", false)]
+    [InlineData("Text", false)]
+    [InlineData("global::System.String", true)]
+    public void SourceStringLookalikes_RequireTheActualBuiltinIdentity(string target, bool builtin)
+    {
+        var source = $$"""
+            module NativeString Example
+              using Text = Example.System.String
+              class System public
+                class String public
+              func Take ({{target}}:value) → int
+                !
+                return 1
+              func Caller () → int
+                !
+                return Take("safe")
+            """;
+        var (_, diagnostics) = Bind(source);
+        if (builtin)
+            Assert.Empty(diagnostics.Errors);
+        else
+            Assert.Equal(DiagnosticCode.NoMatchingOverload, Assert.Single(diagnostics.Errors).Code);
+        var compiled = Program.Compile(source, "source-string.calr");
+        Assert.Equal(!builtin, compiled.HasErrors);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContainingTypeParameters_ShadowMetadataStringAliases(bool nested)
+    {
+        const string members = """
+            func Take (Text:value) → int
+              !
+              return 1
+            func Caller (Text:value) → int
+              !
+              return Take(value)
+            """;
+        var source = """
+            module GenericStringAlias
+              using Text = System.String
+              class Outer<Text>
+            """ + "\n" + (nested ? "    class Inner\n" : "")
+            + string.Join("\n", members.Split('\n').Select(line =>
+                (nested ? "      " : "    ") + line));
+        var (bound, diagnostics) = Bind(source);
+        Assert.Empty(diagnostics.Errors);
+        var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(
+            Assert.Single(bound.Functions.Single(function =>
+                function.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal)).Body)).Expression);
+        Assert.NotNull(call.ResolvedSymbol);
+        Assert.Equal("Text", call.ResolvedSymbol.Parameters.Single().TypeName);
+        Assert.Equal("Text", Assert.Single(call.Arguments).Type.DisplayString);
+        Assert.False(call.Arguments[0].Type is Binding.BoundTypes.NominalBoundType
+            { RoslynSymbol.SpecialType: SpecialType.System_String });
+        var compiled = Program.Compile(source, "generic-string-alias.calr");
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("ref")]
+    [InlineData("out")]
+    [InlineData("in")]
+    public void QualifiedStringByReferenceInputs_RetainDeclaredAnnotations(string modifier)
+    {
+        foreach (var target in new[] { "System.String", "global::System.String" })
+        foreach (var nullable in new[] { false, true })
+        {
+            var annotation = nullable ? "?" : "";
+            var effects = modifier == "in" ? "!" : "! mut";
+            var source = $$"""
+                module NativeString
+                  func Take ({{modifier}} {{target}}{{annotation}}:value) → int
+                    {{effects}}
+                    {{(modifier == "out" ? "set value \"safe\"" : "")}}
+                    return 1
+                  func Caller ({{modifier}} string{{annotation}}:value) → int
+                    {{effects}}
+                    return Take({{modifier}} value)
+                """;
+            var (_, diagnostics) = Bind(source);
+            Assert.Empty(diagnostics.Errors);
+            var compiled = Program.Compile(source, "reference-string.calr");
+            Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics));
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void NamedInputs_KeepN2LocalTransferAndN3FormalMapping(bool expression)
     {
         var source = $$"""
-            §M{NativeString}
-              §F{Take:pub} (str:required,?str:optional) -> i32
-                §E{}
-                §R 1
-              §F{Caller:pub} (?str:maybe,str:sure) -> i32
-                §E{}
-                §B{first} maybe
-                §B{second} first
-                {{(expression ? "§R " : "")}}§C{Take} §A[optional] sure §A[required] second §/C
-                {{(expression ? "" : "§R 0")}}
+            module NativeString
+              func Take (string:required, string?:optional) → int
+                !
+                return 1
+              func Caller (string?:maybe, string:sure) → int
+                !
+                let first = maybe
+                let second = first
+                {{(expression ? "return " : "")}}Take(optional: sure, required: second)
+                {{(expression ? "" : "return 0")}}
             """;
         var (bound, diagnostics) = Bind(source);
         var body = bound.Functions.Single(function => function.Symbol.Name == "Caller").Body;
         var matches = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(body[2]).Expression).SelectedOverloadMatches
-            : Assert.IsType<BoundCallStatement>(body[2]).SelectedOverloadMatches;
+            : Assert.IsType<BoundCallExpression>(Assert.IsType<BoundExpressionStatement>(body[2]).Expression).SelectedOverloadMatches;
         Assert.Equal(new[] { 1, 0 }, Assert.Single(matches).Arguments.Select(mapping => mapping.ParameterIndex));
         var diagnostic = Assert.Single(diagnostics.Errors);
         Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
@@ -140,7 +263,7 @@ public sealed class NativeStringApplicabilityTests
     {
         foreach (var nullableTarget in new[] { false, true })
         {
-            var source = Source(false, nullableTarget ? "?str" : "str", argument);
+            var source = Source(false, nullableTarget ? "string?" : "string", argument);
             Assert.True(Program.Compile(source, "runtime-option.calr").HasErrors);
         }
     }
@@ -150,15 +273,28 @@ public sealed class NativeStringApplicabilityTests
     [InlineData(true)]
     public void GenuineAmbiguityAndUnknownNames_KeepTheirDiagnostics(bool expression)
     {
-        var ambiguous = Source(expression, "i64", "1", """
-              §F{Take:pub} (f64:value) -> i32
-                §E{}
-                §R 2
+        var csharp = CSharpCompilation.Create("NumericAmbiguity",
+            [CSharpSyntaxTree.ParseText("""
+                public static class NumericAmbiguity
+                {
+                    public static int Take(double value) => 1;
+                    public static int Take(decimal value) => 2;
+                    public static int Caller() => Take(1);
+                }
+                """)],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Equal("CS0121", Assert.Single(csharp.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)).Id);
+        var ambiguous = Source(expression, "double", "1", """
+              func Take (decimal:value) → int
+                !
+                return 2
             """);
         var (_, ambiguousDiagnostics) = Bind(ambiguous);
         Assert.Equal(DiagnosticCode.AmbiguousOverload, Assert.Single(ambiguousDiagnostics.Errors).Code);
-        var unknownName = Source(expression, "str", "\"safe\"")
-            .Replace("§A \"safe\"", "§A[missing] \"safe\"", StringComparison.Ordinal);
+        var unknownName = Source(expression, "string", "\"safe\"")
+            .Replace("Take(\"safe\")", "Take(missing: \"safe\")", StringComparison.Ordinal);
         var (_, nameDiagnostics) = Bind(unknownName);
         Assert.Equal(DiagnosticCode.NoMatchingOverload, Assert.Single(nameDiagnostics.Errors).Code);
     }
@@ -167,13 +303,13 @@ public sealed class NativeStringApplicabilityTests
     public void InvisibleSiblingArgument_DoesNotChangeScalarActivationProvenance()
     {
         const string source = """
-            §M{NativeString}
-              §F{Take:pub} (str:value,Invisible:other) -> i32
-                §E{}
-                §R 1
-              §F{Caller:pub} (?str:value,Invisible:other) -> i32
-                §E{}
-                §R §C{Take} §A value §A other §/C
+            module NativeString
+              func Take (string:value, Invisible:other) → int
+                !
+                return 1
+              func Caller (string?:value, Invisible:other) → int
+                !
+                return Take(value, other)
             """;
         var (_, diagnostics) = Bind(source);
         var diagnostic = Assert.Single(diagnostics.Errors);
@@ -371,15 +507,15 @@ public sealed class NativeStringApplicabilityTests
     }
 
     private static string Source(bool expression, string target, string argument, string extra = "") => $$"""
-        §M{NativeString}
-          §F{Take:pub} ({{target}}:value) -> i32
-            §E{}
-            §R 1
+        module NativeString
+          func Take ({{target}}:value) → int
+            !
+            return 1
         {{extra}}
-          §F{Caller:pub} () -> i32
-            §E{env}
-            {{(expression ? "§R " : "")}}§C{Take} §A {{argument}} §/C
-            {{(expression ? "" : "§R 0")}}
+          func Caller () → int
+            ! env
+            {{(expression ? "return " : "")}}Take({{argument}})
+            {{(expression ? "" : "return 0")}}
         """;
 
     private static (BoundModule Module, DiagnosticBag Diagnostics) Bind(string source)
@@ -396,6 +532,6 @@ public sealed class NativeStringApplicabilityTests
         var body = module.Functions.Single(function => function.Symbol.Name == "Caller").Body;
         return expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(body[0]).Expression).ResolvedSymbol!
-            : Assert.IsType<BoundCallStatement>(body[0]).ResolvedSymbol!;
+            : Assert.IsType<BoundCallExpression>(Assert.IsType<BoundExpressionStatement>(body[0]).Expression).ResolvedSymbol!;
     }
 }
