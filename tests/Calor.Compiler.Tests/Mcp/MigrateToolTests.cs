@@ -195,12 +195,12 @@ public class MigrateToolTests
         Directory.CreateDirectory(tempDir);
         var path = Path.Combine(tempDir, "Names.calr");
         const string source = """
-            §M{Echo}
-              §F{Echo:pub} () -> i32
-                §R 1
-              §F{Use:pub} () -> i32
-                §B{first:i32} §C{Echo} §/C
-                §R §C{Echo} §/C
+            module Echo
+              func Echo public () → int
+                return 1
+              func Use public () → int
+                let int:first = Echo()
+                return Echo()
             """;
         await File.WriteAllTextAsync(path, source);
         try
@@ -509,15 +509,15 @@ public class MigrateToolTests
     public async Task ExecuteAsync_CompilePhase_BindError_CarriesDeclarationId()
     {
         // review of #757 item 2: pin the declarationId capability on the
-        // migrate compile phase — Calor0250 parses to a full AST, so the
-        // entry must resolve to its enclosing function ID.
+        // migrate compile phase. A duplicate native binding reaches a full AST;
+        // an untyped binding without an initializer now fails in the parser.
         var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-declid-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
         try
         {
             File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
-                "§M{Test}\n  §F{Foo:pub} () -> void\n    §B{x}\n");
+                "module Test\n  func Foo public () → void\n    let int:x = 1\n    let int:x = 2\n");
 
             var args = JsonDocument.Parse($$"""{"projectPath": {{JsonSerializer.Serialize(tempDir)}}, "phase": "compile"}""").RootElement;
             var result = await _tool.ExecuteAsync(args);
@@ -526,7 +526,7 @@ public class MigrateToolTests
             var file = root.GetProperty("perFile").EnumerateArray()
                 .Single(f => f.GetProperty("path").GetString()!.EndsWith("BindError.calr"));
             var entry = file.GetProperty("errors").EnumerateArray()
-                .Single(e => e.GetProperty("code").GetString() == "Calor0250");
+                .Single(e => e.GetProperty("code").GetString() == "Calor0258");
 
             var identities = new Calor.Compiler.Ids.DeclarationIdentityStore(tempDir).Sync();
             Assert.Equal(identities.Declarations.Single(d => d.Name == "Foo").Id,

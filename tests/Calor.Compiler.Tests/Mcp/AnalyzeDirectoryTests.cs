@@ -141,7 +141,7 @@ public class AnalyzeDirectoryTests
         var args = JsonDocument.Parse("""
             {
                 "action": "security",
-                "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                "source": "module Test\n  func Add public (int:a, int:b) → int\n    return a + b\n"
             }
             """).RootElement;
 
