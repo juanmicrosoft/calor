@@ -105,7 +105,8 @@ their signatures match. Aliases refer to the declaration they resolve to.
 
 CLR signature compatibility does not grant effect permissions. Passing a lambda
 to a Pure callback parameter still requires a Pure row, including for named
-arguments and overloaded source functions.
+arguments and overloaded source functions. Existing delegate values use the
+same signature and row checks as inline lambdas.
 
 ### Where a row can appear
 

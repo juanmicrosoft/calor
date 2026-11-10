@@ -457,6 +457,132 @@ public sealed class InlineLambdaArgumentBindingTests
         Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.EffectRowMismatch);
     }
 
+    public static IEnumerable<object[]> StandaloneCallbackCases()
+    {
+        foreach (var type in new[] { "Action", "System.Action", "Callback", "NativeCallback" })
+        foreach (var row in new[] { " !", "", " ! unknown" })
+        foreach (var unrelatedLambda in new[] { false, true })
+            yield return [type, row, unrelatedLambda];
+    }
+
+    [Theory]
+    [MemberData(nameof(StandaloneCallbackCases))]
+    public void StandaloneCallbackInvocation_DoesNotDependOnUnrelatedLambda(
+        string callbackType, string callbackRow, bool unrelatedLambda)
+    {
+        var source = $$"""
+            module StandaloneCallbacks
+              using Callback = System.Action
+              delegate NativeCallback () → void
+                !
+              func Invoke public ({{callbackType}}:callback{{callbackRow}}) → void
+                !
+                callback()
+              {{UnrelatedLambda(unrelatedLambda)}}
+            """;
+        var invalid = callbackRow != " !";
+        var compiled = Program.Compile(source);
+        Assert.True(invalid == compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(invalid, compiled.Diagnostics.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.EffectRowUnknown));
+        if (invalid)
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+
+        var ast = Parse(source);
+        var typeDiagnostics = new DiagnosticBag();
+        new TypeChecker(typeDiagnostics).Check(ast);
+        Assert.False(typeDiagnostics.HasErrors, string.Join("\n", typeDiagnostics));
+        var bound = Bind(source);
+        var parameter = Assert.Single(bound.Functions.Single(function =>
+            function.Symbol.Name == "Invoke").Symbol.Parameters);
+        var functionType = Assert.IsType<Calor.Compiler.Binding.BoundTypes.FunctionBoundType>(parameter.FunctionType);
+        Assert.Equal(invalid, functionType.Row.IsUnknown);
+        Assert.Equal("VOID", TypeIdentity.Canonicalize(functionType.ReturnType.DisplayString));
+        Assert.Empty(functionType.ParameterTypes);
+
+        if (invalid)
+            return;
+        using var metadata = MetadataContext.Create();
+        var generated = metadata.HostCompilationForBinder.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(compiled.GeneratedCode));
+        using var stream = new MemoryStream();
+        var emitted = generated.Emit(stream);
+        Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        stream.Position = 0;
+        var context = new AssemblyLoadContext("StandaloneCallbacks", isCollectible: true);
+        try
+        {
+            var method = Assert.Single(context.LoadFromStream(stream).GetTypes(),
+                type => type.GetMethod("Invoke") is { IsStatic: true }).GetMethod("Invoke")!;
+            var calls = 0;
+            Action callback = () => calls++;
+            method.Invoke(null, [Delegate.CreateDelegate(
+                method.GetParameters().Single().ParameterType, callback.Target, callback.Method)]);
+            Assert.Equal(1, calls);
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
+    public static IEnumerable<object[]> StandaloneReceivingCases()
+    {
+        foreach (var type in new[] { "Action", "System.Action", "Callback", "NativeCallback" })
+        foreach (var row in new[] { " !", " ! cw" })
+        foreach (var unrelatedLambda in new[] { false, true })
+        foreach (var memberCall in new[] { false, true })
+            yield return [type, row, unrelatedLambda, memberCall];
+    }
+
+    [Theory]
+    [MemberData(nameof(StandaloneReceivingCases))]
+    public void StandaloneNamedOverloadedReceivingRow_DoesNotDependOnUnrelatedLambda(
+        string callbackType, string callbackRow, bool unrelatedLambda, bool memberCall)
+    {
+        var source = $$"""
+            module StandaloneReceiving
+              using Callback = System.Action
+              delegate NativeCallback () → void
+                !
+              class Receiver
+                func Ignore public ({{callbackType}}:callback !, int:value) → void
+                  !
+                func Ignore public (System.Func<int>:callback ! cw, string:value) → void
+                  !
+              func Ignore public ({{callbackType}}:callback !, int:value) → void
+                !
+              func Ignore public (System.Func<int>:callback ! cw, string:value) → void
+                !
+              func Run public ({{callbackType}}:callback{{callbackRow}}) → void
+                ! cw,alloc
+                {{(memberCall ? "new Receiver()." : "")}}Ignore(value: 1, callback: callback)
+              {{UnrelatedLambda(unrelatedLambda)}}
+            """;
+        var ast = Parse(source);
+        var bound = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(
+            bound.Functions.Single(function => function.Symbol.Name == "Run"))
+            .OfType<BoundCallExpression>().Where(call => call.ResolvedSymbol?.Name.EndsWith("Ignore") == true));
+        var declaration = memberCall
+            ? ast.Classes.Single().Methods[0].IdentifierSpan : ast.Functions[0].IdentifierSpan;
+        Assert.Same(bound.SymbolsById.Values.OfType<FunctionSymbol>()
+            .Single(function => function.DeclarationSpan == declaration), call.ResolvedSymbol);
+        Assert.Equal(new[] { (0, 1), (1, 0) }, Assert.Single(call.SelectedOverloadMatches).Arguments
+            .Select(argument => (argument.ArgumentIndex, argument.ParameterIndex)).ToArray());
+        var compiled = Program.Compile(source);
+        var invalid = callbackRow != " !";
+        Assert.True(invalid == compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(invalid, compiled.Diagnostics.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.EffectRowMismatch));
+    }
+
+    private static string UnrelatedLambda(bool include) => include ? """
+        func Unrelated private () → void
+            !
+            let Func<int>:unused ! = () ! => 1
+        """ : "";
+
     private static BoundModule Bind(string source, bool allowErrors = false)
     {
         var diagnostics = new DiagnosticBag();

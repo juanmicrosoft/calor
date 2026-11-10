@@ -114,7 +114,8 @@ public sealed class CallGraphAnalysis
             for (var index = 0; index < arguments.Count; index++)
                 RegisterArgument(arguments[index], (node.Span, index));
         }
-        if (operators.Length == 0 && !visited.OfType<LambdaExpressionNode>().Any())
+        var bindExpressions = operators.Length > 0 || visited.OfType<LambdaExpressionNode>().Any();
+        if (!bindExpressions && !visited.OfType<ParameterNode>().Any())
             return bindings;
 
         void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
@@ -228,6 +229,9 @@ public sealed class CallGraphAnalysis
                     }
                 }
             }
+
+            if (!bindExpressions)
+                return;
 
             var starts = new Dictionary<int, int>();
             var ranges = new List<(int Start, int End, AstNode Node)>();
