@@ -184,6 +184,48 @@ class TranslatorReplayTests(unittest.TestCase):
 
 
 class RegisteredReplayTests(unittest.TestCase):
+    def test_bound_type_registration_and_original_subjects_are_not_current_mirrors(self):
+        self.assertEqual((
+            "a728e0e2a985d5dd11a092f2d463f24e30f4c66c",
+            "a728e0e2a985d5dd11a092f2d463f24e30f4c66c",
+            "tests/TestData/BoundTypes/displaystring-corpus-golden.json",
+            "Calor.Compiler.Tests.BoundTypeArchitectureTests."
+            "BoundExpressionType_DisplayString_ByteIdenticalToTypeName_AcrossCalorSourceCorpus",
+        ), replay.REPLAYS["bound-types"])
+        self.assertIn("CALOR_REGENERATE_DISPLAYSTRING_GOLDEN", replay.REGENERATION_FLAGS)
+        for fault in (None, "missing", "extra", "renamed", "changed"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "current"
+                source = Path(temporary) / "producer"
+                originals = [f"samples/subject-{i}.calr" for i in range(18)]
+                registry = "tests/TestData/ActiveSyntax/inputs.json"
+                test = "tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeArchitectureTests.cs"
+                mirror = "tests/TestData/ActiveSyntax/" + originals[0]
+                for tree in (root, source):
+                    for relative in (*originals, registry, test, mirror):
+                        path = tree / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_bytes(b"original")
+                (root / mirror).write_bytes(b"native mirror must not replace original replay input")
+                if fault == "missing":
+                    (root / originals[0]).unlink()
+                elif fault == "extra":
+                    (root / "samples/extra.calr").write_bytes(b"extra")
+                elif fault == "renamed":
+                    (root / originals[0]).rename(root / "samples/renamed.calr")
+                elif fault == "changed":
+                    (root / originals[0]).write_bytes(b"changed")
+                with patch.object(replay, "ROOT", root):
+                    if fault is None:
+                        inputs = replay.bound_type_inputs(source)
+                        self.assertEqual(21, len(inputs))
+                        self.assertEqual(b"original", inputs[mirror])
+                        self.assertEqual(b"original", inputs[test])
+                        self.assertEqual(b"original", inputs[registry])
+                    else:
+                        with self.assertRaisesRegex(ValueError, "original 18|frozen bound-type source"):
+                            replay.bound_type_inputs(source)
+
     def test_signature_registration_pins_original_compiler_landing_and_test(self):
         self.assertEqual((
             "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
@@ -219,7 +261,7 @@ class RegisteredReplayTests(unittest.TestCase):
 
     def test_changed_final_ledger_or_repointed_producer_fails_before_build(self):
         for name, (producer, _, ledger, _) in replay.REPLAYS.items():
-            for repoint in ((False,) if name in ("formatter", "binder", "signature") else (False, True)):
+            for repoint in ((False,) if name in ("formatter", "binder", "signature", "bound-types") else (False, True)):
                 with self.subTest(name=name, repoint=repoint), tempfile.TemporaryDirectory() as temporary:
                     root = Path(temporary)
                     field = "MeasuredCommit" if name == "corpus" else "measuredCommit"
@@ -236,7 +278,13 @@ class RegisteredReplayTests(unittest.TestCase):
                                     run.assert_not_called()
 
     def test_signature_replay_requires_original_bytes_actual_execution_and_exact_result(self):
-        producer, _, ledger, test = replay.REPLAYS["signature"]
+        self._assert_frozen_fixture_replay("signature")
+
+    def test_bound_type_replay_requires_original_bytes_actual_execution_and_exact_result(self):
+        self._assert_frozen_fixture_replay("bound-types")
+
+    def _assert_frozen_fixture_replay(self, name):
+        producer, _, ledger, test = replay.REPLAYS[name]
         original = b'{"BindRule":"parsed"}'
         manifests = (
             ".github/z3-binaries-4.15.7.sha256",
@@ -313,18 +361,23 @@ class RegisteredReplayTests(unittest.TestCase):
                         patch.object(replay, "git", side_effect=git), patch.object(replay, "require_commit"), \
                         patch.object(replay, "extract_archive", side_effect=extract), \
                         patch.object(replay, "archive_submodules") as archive, \
+                        patch.object(replay, "bound_type_inputs", return_value={}) as bound_inputs, \
                         patch.object(replay.runpy, "run_path", return_value={"ASSET_PATHS": {}}), \
                         patch.object(replay.subprocess, "run"), \
                         patch.object(replay, "run_dotnet", side_effect=run) as launch:
                     if fault is None:
-                        replay.replay("signature")
+                        replay.replay(name)
                         self.assertEqual(2, launch.call_count)
                         self.assertEqual(original, current.read_bytes())
                     else:
                         with self.assertRaises((ValueError, FileNotFoundError, replay.ET.ParseError)):
-                            replay.replay("signature")
+                            replay.replay(name)
                         self.assertEqual(0 if fault in early else 2, launch.call_count)
-                    if fault in ("missing-current", "changed-current"):
+                    if name == "bound-types":
+                        archive.assert_not_called()
+                        self.assertEqual(0 if fault in ("missing-current", "changed-current") else 1,
+                                         bound_inputs.call_count)
+                    elif fault in ("missing-current", "changed-current"):
                         archive.assert_not_called()
                     else:
                         self.assertEqual(producer, archive.call_args.args[0])

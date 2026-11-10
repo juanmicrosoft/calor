@@ -3228,7 +3228,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0 && !IsElementFieldPath(node.Target))
             target = HoistToTempVar(target);
         var fieldName = EscapeCalorIdentifier(node.FieldName);
-        return $"{target}.{fieldName}";
+        return $"{target} . {fieldName}";
     }
 
     public string Visit(NewExpressionNode node)

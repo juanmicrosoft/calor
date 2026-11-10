@@ -1,69 +1,56 @@
 // Security Benchmark: Path Traversal Detection
 // Tests taint analysis for path traversal vulnerabilities
 
-§M{PathTraversalBenchmark}
-
-  §F{VulnerableFileRead:pub}
+module PathTraversalBenchmark PathTraversalBenchmark
+  func VulnerableFileRead public (string:user_path) → string
     // BUG: Direct file read with user-provided path
     // EXPECTED: Calor0983 Path Traversal
-    §I{string:user_path}
-    §O{string}
-    §E{fs:r}
-    §B{content:string} §C{System.IO.File.ReadAllText} §A user_path §/C
-    §R content
+    ! fs:r
+    let string:content = System.IO.File.ReadAllText(user_path)
+    return content
 
-  §F{SafeWhitelistedPath:pub}
+  func SafeWhitelistedPath public (string:user_input) → string
     // SAFE: Only whitelisted paths allowed
     // EXPECTED: No warnings
-    §I{string:user_input}
-    §O{string}
-    §E{fs:r}
-    §IF (== user_input STR:"index.html")
-      §R §C{System.IO.File.ReadAllText} §A STR:"/app/public/index.html" §/C
-    §IF (== user_input STR:"about.html")
-      §R §C{System.IO.File.ReadAllText} §A STR:"/app/public/about.html" §/C
-    §R STR:""
+    ! fs:r
+    if user_input == "index.html"
+      return System.IO.File.ReadAllText("/app/public/index.html")
+    if user_input == "about.html"
+      return System.IO.File.ReadAllText("/app/public/about.html")
+    return ""
 
-  §F{VulnerablePathJoin:pub}
+  func VulnerablePathJoin public (string:user_path) → string
     // BUG: User input used in path.join
     // EXPECTED: Calor0983 Path Traversal
-    §I{string:user_path}
-    §O{string}
-    §E{fs:r}
-    §B{basePath:string} STR:"/var/data"
-    §B{fullPath:string} §C{System.IO.Path.Combine} §A basePath §A user_path §/C
-    §B{content:string} §C{System.IO.File.ReadAllText} §A fullPath §/C
-    §R content
+    ! fs:r
+    let string:basePath = "/var/data"
+    let string:fullPath = System.IO.Path.Combine(basePath, user_path)
+    let string:content = System.IO.File.ReadAllText(fullPath)
+    return content
 
-  §F{SafeSanitizedPath:pub}
+  func SafeSanitizedPath public (string:user_input) → string
     // SAFE: Path properly sanitized
     // EXPECTED: No warnings
-    §I{string:user_input}
-    §O{string}
-    §E{fs:r}
-    §B{sanitized:string} (?? §C{System.IO.Path.GetFileName} §A user_input §/C STR:"")
-    §IF (|| (== sanitized STR:".") (== sanitized STR:".."))
-      §R STR:""
-    §B{basePath:string} STR:"/safe/directory/"
-    §B{fullPath:string} (+ basePath sanitized)
-    §B{content:string} §C{System.IO.File.ReadAllText} §A fullPath §/C
-    §R content
+    ! fs:r
+    let string:sanitized = System.IO.Path.GetFileName(user_input) ?? ""
+    if sanitized == "." || sanitized == ".."
+      return ""
+    let string:basePath = "/safe/directory/"
+    let string:fullPath = basePath + sanitized
+    let string:content = System.IO.File.ReadAllText(fullPath)
+    return content
 
-  §F{VulnerableFileWrite:pub}
+  func VulnerableFileWrite public (string:user_input, string:content) → void
     // BUG: Writing to user-controlled path
     // EXPECTED: Calor0983 Path Traversal
-    §I{string:user_input}
-    §I{string:content}
-    §O{void}
-    §E{fs:w}
-    §B{path:string} (+ STR:"/uploads/" user_input)
-    §C{System.IO.File.WriteAllText} §A path §A content §/C
+    ! fs:w
+    let string:path = "/uploads/" + user_input
+    System.IO.File.WriteAllText(path, content)
 
-  §F{SafeConstantPath:pub}
+  func SafeConstantPath public () → string
     // SAFE: Path is a constant
     // EXPECTED: No warnings
-    §O{string}
-    §E{fs:r}
-    §B{path:string} STR:"/etc/app/config.json"
-    §B{content:string} §C{System.IO.File.ReadAllText} §A path §/C
-    §R content
+    ! fs:r
+    let string:path = "/etc/app/config.json"
+    let string:content = System.IO.File.ReadAllText(path)
+    return content

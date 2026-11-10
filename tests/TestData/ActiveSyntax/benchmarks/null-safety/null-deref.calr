@@ -1,76 +1,57 @@
 // Current nullable/exception semantics, not a replay of the frozen benchmark.
-§M{NullDerefBenchmark}
-
-  §F{VulnerableNullDeref:pub}
+module NullDerefBenchmark NullDerefBenchmark
+  func VulnerableNullDeref public (string?:maybeNull) → int
     // BUG: Potential null dereference without check
     // EXPECTED: Calor0922 Null Dereference
-    §I{?string:maybeNull}
-    §O{i32}
-    §R maybeNull . Length
+    return maybeNull.Length
 
-  §F{SafeNullCheck:pub}
+  func SafeNullCheck public (string?:maybeNull) → int
     // SAFE: Null check before use
     // EXPECTED: No warnings
-    §I{?string:maybeNull}
-    §O{i32}
-    §IF (!= maybeNull null)
-      §R maybeNull . Length
-    §EL
-      §R INT:0
+    if maybeNull != null
+      return maybeNull.Length
+    else
+      return 0
 
-  §F{VulnerableChainedAccess:pub}
+  func VulnerableChainedAccess public (BenchmarkNode?:obj) → string?
     // BUG: Chained access without null checks
     // EXPECTED: Calor0922 Null Dereference
-    §I{?BenchmarkNode:obj}
-    §O{?string}
-    §B{inner:?BenchmarkNode} obj . Inner
-    §B{value:?string} inner . Value
-    §R value
+    let BenchmarkNode?:inner = obj . Inner
+    let string?:value = inner . Value
+    return value
 
-  §F{SafeCoalesce:pub}
+  func SafeCoalesce public (string?:maybeNull) → string
     // SAFE: Coalesce provides default
     // EXPECTED: No warnings
-    §I{?string:maybeNull}
-    §O{string}
-    §B{safe:string} (?? maybeNull STR:"default")
-    §R safe
+    let string:safe = maybeNull ?? "default"
+    return safe
 
-  §F{RequiredNullableValue:pub}
+  func RequiredNullableValue public (int?:maybeValue) → int
     // SAFE: Absence deliberately throws; it is not an implicit unwrap.
     // EXPECTED: No warnings
-    §I{?i32:maybeValue}
-    §O{i32}
-    §E{alloc,throw}
-    §R (?? maybeValue §TH §NEW{InvalidOperationException} §A "Missing value" §/NEW)
+    ! alloc,throw
+    return maybeValue ?? throw new InvalidOperationException("Missing value")
 
-  §F{SafeNullableCheck:pub}
+  func SafeNullableCheck public (int?:maybeValue) → int
     // SAFE: Guarded nullable value with a fallback
     // EXPECTED: No warnings
-    §I{?i32:maybeValue}
-    §O{i32}
-    §IF (!= maybeValue null)
-      §R (?? maybeValue INT:0)
-    §EL
-      §R INT:0
+    if maybeValue != null
+      return maybeValue ?? 0
+    else
+      return 0
 
-  §F{VulnerableFunctionReturn:pub}
+  func VulnerableFunctionReturn public (int:key, System.Collections.Generic.Dictionary<int,string?>:dict) → int
     // BUG: Function return may be null
     // EXPECTED: Calor0922 Null Dereference
-    §I{i32:key}
-    §I{System.Collections.Generic.Dictionary<i32,?string>:dict}
-    §O{i32}
-    §B{result:?string} §C{System.Collections.Generic.CollectionExtensions.GetValueOrDefault} §A dict §A key §/C
-    §R §C{result.GetHashCode} §/C
+    let string?:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key)
+    return result.GetHashCode()
 
-  §F{SafeOrDefault:pub}
+  func SafeOrDefault public (int:key, System.Collections.Generic.Dictionary<int,string?>:dict) → int
     // SAFE: Using get_or_default
     // EXPECTED: No warnings
-    §I{i32:key}
-    §I{System.Collections.Generic.Dictionary<i32,?string>:dict}
-    §O{i32}
-    §B{result:string} (?? §C{System.Collections.Generic.CollectionExtensions.GetValueOrDefault} §A dict §A key §/C STR:"")
-    §R §C{result.GetHashCode} §/C
+    let string:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key) ?? ""
+    return result.GetHashCode()
 
-  §CL{BenchmarkNode:pub}
-    §FLD{?BenchmarkNode:Inner:pub}
-    §FLD{?string:Value:pub}
+  class BenchmarkNode public
+    field BenchmarkNode?:Inner public
+    field string?:Value public

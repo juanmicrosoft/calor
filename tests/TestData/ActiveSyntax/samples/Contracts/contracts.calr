@@ -1,0 +1,22 @@
+module Contracts Contracts
+  func Main public () → void
+    ! cw
+    Console.WriteLine("=== Calor Contracts Demo ===")
+    Console.WriteLine("")
+    Console.WriteLine("Testing Square(5) - has REQUIRES x >= 0 and ENSURES result >= 0")
+    Console.WriteLine("  If precondition fails, throws ArgumentException")
+    Console.WriteLine("  If postcondition fails, throws InvalidOperationException")
+    Console.WriteLine("")
+    Console.WriteLine("Testing Divide(10, 2) - has REQUIRES b != 0 with custom message")
+    Console.WriteLine("  Custom message: divisor must not be zero")
+    Console.WriteLine("")
+    Console.WriteLine("Contracts are enforced at runtime with clear error messages.")
+
+  func Square public (int:x) → int
+    requires x >= 0
+    => result >= 0
+    return x * x
+
+  func Divide public (int:a, int:b) → int
+    requires b != 0
+    return a / b

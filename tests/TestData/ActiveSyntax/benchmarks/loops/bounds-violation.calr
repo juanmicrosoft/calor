@@ -1,94 +1,70 @@
 // Loop Benchmark: Array Bounds Violation Detection
 // Tests bug pattern analysis for array index out of bounds
 
-§M{BoundsViolationBenchmark}
-
-  §F{VulnerableArrayAccess:pub}
+module BoundsViolationBenchmark BoundsViolationBenchmark
+  func VulnerableArrayAccess public (int:index, int[]:items) → int
     // BUG: Array access with unchecked index
     // EXPECTED: Calor0921 Index Out of Bounds
-    §I{i32:index}
-    §I{i32[]:items}
-    §O{i32}
-    §R §IDX items index
+    return items[index]
 
-  §F{SafeBoundsCheck:pub}
+  func SafeBoundsCheck public (int:index, int[]:items) → int
     // SAFE: Bounds check before access
     // EXPECTED: No warnings
-    §I{i32:index}
-    §I{i32[]:items}
-    §O{i32}
-    §B{len:i32} §LEN items
-    §IF (&& (>= index INT:0) (< index len))
-      §R §IDX items index
-    §EL
-      §R INT:-1
+    let int:len = items.Length
+    if index >= 0 && index < len
+      return items[index]
+    else
+      return -1
 
-  §F{VulnerableLoopBeyondLength:pub}
+  func VulnerableLoopBeyondLength public (int:n, int[]:items) → int
     // BUG: Loop can exceed array bounds
     // EXPECTED: Calor0921 Index Out of Bounds
-    §I{i32:n}
-    §I{i32[]:items}
-    §O{i32}
-    §B{~sum:i32} INT:0
-    §L{i:0:n:1}
-      §B{val:i32} §IDX items i
-      §ASSIGN sum (+ sum val)
-    §R sum
+    var int:sum = 0
+    for i from 0 to n step 1
+      let int:val = items[i]
+      set sum sum + val
+    return sum
 
-  §F{SafeLoopWithinBounds:pub}
+  func SafeLoopWithinBounds public (int[]:items) → int
     // SAFE: Loop bounded by array length
     // EXPECTED: No warnings
-    §I{i32[]:items}
-    §O{i32}
-    §B{len:i32} §LEN items
-    §B{upper:i32} (- len INT:1)
-    §B{~sum:i32} INT:0
-    §L{i:0:upper:1}
-      §B{val:i32} §IDX items i
-      §ASSIGN sum (+ sum val)
-    §R sum
+    let int:len = items.Length
+    let int:upper = len - 1
+    var int:sum = 0
+    for i from 0 to upper step 1
+      let int:val = items[i]
+      set sum sum + val
+    return sum
 
-  §F{VulnerableNegativeIndex:pub}
+  func VulnerableNegativeIndex public (int:offset, int:startIndex, int[]:items) → int
     // BUG: Index can be negative
     // EXPECTED: Calor0921 Index Out of Bounds
-    §I{i32:offset}
-    §I{i32:startIndex}
-    §I{i32[]:items}
-    §O{i32}
-    §B{index:i32} (- startIndex offset)
-    §R §IDX items index
+    let int:index = startIndex - offset
+    return items[index]
 
-  §F{SafeClampedIndex:pub}
+  func SafeClampedIndex public (int:index, int[]:items) → int
     // SAFE: Index clamped to valid range
     // EXPECTED: No warnings
-    §I{i32:index}
-    §I{i32[]:items}
-    §O{i32}
-    §Q (> §LEN items INT:0)
-    §B{len:i32} §LEN items
-    §B{minIdx:i32} §C{System.Math.Max} §A index §A INT:0 §/C
-    §B{safeIdx:i32} §C{System.Math.Min} §A minIdx §A (- len INT:1) §/C
-    §R §IDX items safeIdx
+    requires items.Length > 0
+    let int:len = items.Length
+    let int:minIdx = System.Math.Max(index, 0)
+    let int:safeIdx = System.Math.Min(minIdx, len - 1)
+    return items[safeIdx]
 
-  §F{VulnerableOffByOne:pub}
+  func VulnerableOffByOne public (int[]:items) → int
     // BUG: Classic off-by-one error
     // EXPECTED: Calor0921 Index Out of Bounds
-    §I{i32[]:items}
-    §O{i32}
-    §B{len:i32} §LEN items
-    §B{~sum:i32} INT:0
-    §B{end:i32} (+ len INT:1)
-    §L{i:0:end:1}
-      §B{val:i32} §IDX items i
-      §ASSIGN sum (+ sum val)
-    §R sum
+    let int:len = items.Length
+    var int:sum = 0
+    let int:end = len + 1
+    for i from 0 to end step 1
+      let int:val = items[i]
+      set sum sum + val
+    return sum
 
-  §F{SafeWithPrecondition:pub}
+  func SafeWithPrecondition public (int:index, int[]:items) → int
     // SAFE: Precondition guarantees valid index
     // EXPECTED: No warnings
-    §I{i32:index}
-    §I{i32[]:items}
-    §O{i32}
-    §Q (>= index INT:0)
-    §Q (< index §LEN items)
-    §R §IDX items index
+    requires index >= 0
+    requires index < items.Length
+    return items[index]

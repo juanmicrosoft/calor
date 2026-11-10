@@ -169,7 +169,7 @@ public class ActiveSyntaxInputTests
     public void OrdinaryActiveSource_IsNotTranslatedOrRemapped()
     {
         var root = CliTestHarness.FindRepoRoot();
-        const string source = "samples/FizzBuzz/fizzbuzz.calr";
+        const string source = "unregistered/ordinary.calr";
         Assert.Equal(Path.Combine(root, source), ActiveSyntaxInputs.ForCurrentCompiler(root, source));
         Assert.Throws<ArgumentException>(() =>
             ActiveSyntaxInputs.ForCurrentCompiler(root, "../outside.calr"));

@@ -1494,10 +1494,16 @@ public sealed class CallGraphAnalysis
             map[name] = null;
         }
 
-        // The receiver of a call site, keyed by the receiver path exactly as the
-        // target spells it ("sb" in "sb.Append", "a.b" in "a.b.M"). The pass
-        // looks the receiver path up directly; a bare head also lands in the
-        // same map through RecordValue above.
+        // Native member calls carry an evaluated receiver, not a dotted target.
+        // Only named receiver paths can feed this name-keyed side channel.
+        static string? ReceiverPath(BoundExpression receiver) => receiver switch
+        {
+            BoundVariableExpression variable => variable.Variable.Name,
+            BoundFieldAccessExpression field when ReceiverPath(field.Target) is { } parent
+                => $"{parent}.{field.FieldName}",
+            _ => null
+        };
+
         void RecordReceiver(
             string callerId,
             string target,
@@ -1505,10 +1511,10 @@ public sealed class CallGraphAnalysis
         {
             if (receiverExpression is null)
                 return;
-            var lastDot = target.LastIndexOf('.');
-            if (lastDot <= 0)
-                return;
-            RecordValue(callerId, target[..lastDot], receiverExpression.Type);
+            if (target.LastIndexOf('.') is > 0 and var lastDot)
+                RecordValue(callerId, target[..lastDot], receiverExpression.Type);
+            else if (ReceiverPath(receiverExpression) is { } path)
+                RecordValue(callerId, path, receiverExpression.Type);
         }
 
         try

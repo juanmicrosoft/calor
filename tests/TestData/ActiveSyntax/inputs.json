@@ -1,6 +1,17 @@
 {
   "purpose": "Active migration/semantic checks, not replays or remeasurements of historical raw inputs.",
   "originalPaths": [
+    "samples/Collections/collections.calr",
+    "samples/Contracts/contracts.calr",
+    "samples/FizzBuzz/fizzbuzz.calr",
+    "samples/Generics/generics.calr",
+    "samples/HelloWorld/hello.calr",
+    "samples/PatternMatching/matching.calr",
+    "samples/SdkSample/program.calr",
+    "samples/TypeSystem/typesystem.calr",
+    "samples/Verification/mixed-contracts.calr",
+    "samples/Verification/proven-contracts.calr",
+    "samples/Verification/violation-detected.calr",
     "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-001-string-utils/calor+0.15.0/run-1/final-src/TextUtils.calr",
     "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-001-string-utils/calor+0.15.0/run-2/final-src/TextUtils.calr",
     "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-001-string-utils/calor+0.15.0/run-3/final-src/TextUtils.calr",

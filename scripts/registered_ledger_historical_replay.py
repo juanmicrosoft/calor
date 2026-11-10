@@ -21,6 +21,13 @@ from ppe1_historical_replay import ROOT, git, run_dotnet
 
 
 REPLAYS = {
+    "bound-types": (
+        "a728e0e2a985d5dd11a092f2d463f24e30f4c66c",
+        "a728e0e2a985d5dd11a092f2d463f24e30f4c66c",
+        "tests/TestData/BoundTypes/displaystring-corpus-golden.json",
+        "Calor.Compiler.Tests.BoundTypeArchitectureTests."
+        "BoundExpressionType_DisplayString_ByteIdenticalToTypeName_AcrossCalorSourceCorpus",
+    ),
     "binder": (
         "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
         "7daf2bc99ec98937d489cf2b8bb69388fcb930d5",
@@ -59,6 +66,7 @@ REPLAYS = {
     ),
 }
 REGENERATION_FLAGS = (
+    "CALOR_REGENERATE_DISPLAYSTRING_GOLDEN",
     "CALOR_UPDATE_BINDER_BASELINE",
     "CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER",
     "CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER",
@@ -316,7 +324,7 @@ def replay(name: str) -> None:
     final_ledger = git("show", f"{landing}:{ledger_path}")
     if (ROOT / ledger_path).read_bytes() != final_ledger:
         raise ValueError(f"{ledger_path}: immutable final ledger differs from original landing {landing}")
-    if name not in ("formatter", "binder", "signature"):
+    if name not in ("formatter", "binder", "signature", "bound-types"):
         recorded = json.loads(final_ledger)
         identity_field = "MeasuredCommit" if name == "corpus" else "measuredCommit"
         if recorded[identity_field] != producer:
@@ -341,7 +349,10 @@ def replay(name: str) -> None:
         extract_archive(archive, source)
         if name == "formatter":
             index_original_tree(producer, source)
-        archive_submodules(producer, source, scratch)
+        if name != "bound-types":
+            archive_submodules(producer, source, scratch)
+        else:
+            artifacts.update(bound_type_inputs(source))
         for manifest in (
             ".github/z3-binaries-4.15.7.sha256",
             "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
@@ -356,9 +367,9 @@ def replay(name: str) -> None:
             [sys.executable, str(source / "scripts/verify-z3-assets.py")], check=True, timeout=60,
         )
         for relative, expected in artifacts.items():
-            if name in ("binder", "signature") and (source / relative).read_bytes() != expected:
+            if name in ("binder", "signature", "bound-types") and (source / relative).read_bytes() != expected:
                 raise ValueError(f"{relative}: original producer artifact differs from final landing")
-            if name != "signature":
+            if name not in ("signature", "bound-types"):
                 (source / relative).write_bytes(expected)
         environment = os.environ.copy()
         environment["LC_ALL"] = "C"
@@ -375,10 +386,38 @@ def replay(name: str) -> None:
             ],
             source, environment, timeout=600,
         )
-        verify_result(scratch / "results/historical.trx", test, strict=name == "signature")
+        verify_result(scratch / "results/historical.trx", test, strict=name in ("signature", "bound-types"))
         for relative, expected in artifacts.items():
-            if (source / relative).read_bytes() != expected or (ROOT / relative).read_bytes() != expected:
+            current_may_differ = name == "bound-types" and (
+                relative.startswith("tests/TestData/ActiveSyntax/")
+                or relative == "tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeArchitectureTests.cs")
+            if (source / relative).read_bytes() != expected or (
+                not current_may_differ and (ROOT / relative).read_bytes() != expected):
                 raise ValueError(f"{relative}: historical replay changed its immutable input")
+
+
+def bound_type_inputs(source: Path) -> dict[str, bytes]:
+    originals = sorted(str(path.relative_to(source)) for folder in ("samples", "benchmarks")
+                       for path in (source / folder).rglob("*.calr"))
+    current = sorted(str(path.relative_to(ROOT)) for folder in ("samples", "benchmarks")
+                     for path in (ROOT / folder).rglob("*.calr"))
+    if len(originals) != 18 or originals != current:
+        raise ValueError("bound-type replay requires exactly the original 18 subjects")
+    inputs = {}
+    for relative in originals:
+        original = (source / relative).read_bytes()
+        if (ROOT / relative).read_bytes() != original:
+            raise ValueError(f"{relative}: frozen bound-type source changed")
+        inputs[relative] = original
+        mirror = "tests/TestData/ActiveSyntax/" + relative
+        if (source / mirror).exists():
+            inputs[mirror] = (source / mirror).read_bytes()
+    for relative in (
+        "tests/TestData/ActiveSyntax/inputs.json",
+        "tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeArchitectureTests.cs",
+    ):
+        inputs[relative] = (source / relative).read_bytes()
+    return inputs
 
 
 if __name__ == "__main__":

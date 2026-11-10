@@ -1,0 +1,234 @@
+{
+  "benchmarks/arithmetic/div-by-zero.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 2,
+      "BoundBinaryExpression|INT": 11,
+      "BoundIntLiteral|INT": 13,
+      "BoundVariableExpression|int": 24
+    },
+    "functions": ["VulnerableDivision", "SafeDivisionWithGuard", "VulnerableModulo", "SafeDivisionByLiteral", "VulnerableDivisionInLoop", "SafeDivisionInLoopFromOne", "VulnerableDivisionAfterDecrement", "SafeDivisionWithContract"]
+  },
+  "benchmarks/arithmetic/overflow.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 4,
+      "BoundBinaryExpression|INT": 7,
+      "BoundIntLiteral|INT": 14,
+      "BoundVariableExpression|int": 22
+    },
+    "functions": ["VulnerableAddition", "SafeCheckedAddition", "VulnerableMultiplication", "SafeSmallValues", "VulnerableLeftShift", "SafeBoundedShift", "VulnerableAccumulator", "SafeBoundedAccumulator"]
+  },
+  "benchmarks/loops/bounds-violation.calr": {
+    "histogram": {
+      "BoundArrayAccess|int": 8,
+      "BoundArrayLength|INT": 6,
+      "BoundBinaryExpression|BOOL": 6,
+      "BoundBinaryExpression|INT": 7,
+      "BoundCallExpression|int": 2,
+      "BoundIntLiteral|INT": 17,
+      "BoundTypeReferenceExpression|System.Math": 2,
+      "BoundVariableExpression|int": 35,
+      "BoundVariableExpression|int[]": 14
+    },
+    "functions": ["VulnerableArrayAccess", "SafeBoundsCheck", "VulnerableLoopBeyondLength", "SafeLoopWithinBounds", "VulnerableNegativeIndex", "SafeClampedIndex", "VulnerableOffByOne", "SafeWithPrecondition"]
+  },
+  "benchmarks/null-safety/null-deref.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 2,
+      "BoundCallExpression|int": 2,
+      "BoundCallExpression|string?": 2,
+      "BoundFieldAccessExpression|INT": 2,
+      "BoundFieldAccessExpression|OBJECT": 2,
+      "BoundIntLiteral|INT": 3,
+      "BoundNewExpression|InvalidOperationException": 1,
+      "BoundNullLiteral|NULL": 2,
+      "BoundStringLiteral|STRING": 3,
+      "BoundStructuralExpression|INT": 2,
+      "BoundStructuralExpression|STRING": 2,
+      "BoundThrowExpression|NEVER": 1,
+      "BoundTypeReferenceExpression|System.Collections.Generic.CollectionExtensions": 2,
+      "BoundVariableExpression|BenchmarkNode": 2,
+      "BoundVariableExpression|System.Collections.Generic.Dictionary<int,string?>": 2,
+      "BoundVariableExpression|int": 2,
+      "BoundVariableExpression|int?": 3,
+      "BoundVariableExpression|string": 3,
+      "BoundVariableExpression|string?": 5
+    },
+    "functions": ["VulnerableNullDeref", "SafeNullCheck", "VulnerableChainedAccess", "SafeCoalesce", "RequiredNullableValue", "SafeNullableCheck", "VulnerableFunctionReturn", "SafeOrDefault"]
+  },
+  "benchmarks/security/command-injection.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 2,
+      "BoundBinaryExpression|STRING": 14,
+      "BoundBoolLiteral|BOOL": 1,
+      "BoundCallExpression|OBJECT": 2,
+      "BoundCallExpression|System.Diagnostics.Process": 7,
+      "BoundCallExpression|System.Diagnostics.Process?": 1,
+      "BoundCallExpression|string": 9,
+      "BoundFieldAccessExpression|<unresolved: The member result is outside supported scalar reads.>": 2,
+      "BoundFieldAccessExpression|BOOL": 1,
+      "BoundIntLiteral|INT": 7,
+      "BoundNewExpression|System.Diagnostics.ProcessStartInfo": 1,
+      "BoundStringLiteral|STRING": 42,
+      "BoundTypeReferenceExpression|System.Diagnostics.Process": 8,
+      "BoundVariableExpression|System.Diagnostics.ProcessStartInfo": 4,
+      "BoundVariableExpression|int": 2,
+      "BoundVariableExpression|string": 19
+    },
+    "functions": ["VulnerableShellExec", "SafeWhitelistedCommand", "VulnerablePopen", "SafeEscapedCommand", "VulnerableSystemCall", "SafeArrayExec"]
+  },
+  "benchmarks/security/path-traversal.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 5,
+      "BoundBinaryExpression|STRING": 2,
+      "BoundCallExpression|string": 7,
+      "BoundCallExpression|string?": 1,
+      "BoundCallExpression|void": 1,
+      "BoundStringLiteral|STRING": 13,
+      "BoundStructuralExpression|STRING": 1,
+      "BoundTypeReferenceExpression|System.IO.File": 7,
+      "BoundTypeReferenceExpression|System.IO.Path": 2,
+      "BoundVariableExpression|string": 20
+    },
+    "functions": ["VulnerableFileRead", "SafeWhitelistedPath", "VulnerablePathJoin", "SafeSanitizedPath", "VulnerableFileWrite", "SafeConstantPath"]
+  },
+  "benchmarks/security/sql-injection.calr": {
+    "histogram": {
+      "BoundBinaryExpression|STRING": 11,
+      "BoundCallExpression|string": 2,
+      "BoundCallExpression|void": 6,
+      "BoundStringLiteral|STRING": 14,
+      "BoundTypeReferenceExpression|SqlInjectionBenchmark.SqlEscaping": 1,
+      "BoundVariableExpression|db": 6,
+      "BoundVariableExpression|string": 37
+    },
+    "functions": ["VulnerableQuery", "SafeParameterizedQuery", "VulnerableMultipleConcatenation", "SafeEscapedInput", "VulnerableIndirectTaint", "SafeConstantQuery", "SqlInjectionBenchmark.SqlEscaping.Escape"]
+  },
+  "samples/Collections/collections.calr": {
+    "histogram": {
+      "BoundArrayAccess|int": 3,
+      "BoundCallExpression|bool": 4,
+      "BoundCallExpression|void": 26,
+      "BoundIntLiteral|INT": 12,
+      "BoundNewExpression|Dictionary<string,int>": 1,
+      "BoundNewExpression|HashSet<string>": 1,
+      "BoundNewExpression|List<int>": 1,
+      "BoundStringLiteral|STRING": 27,
+      "BoundTypeReferenceExpression|Console": 19,
+      "BoundVariableExpression|Dictionary<string,int>": 2,
+      "BoundVariableExpression|HashSet<string>": 2,
+      "BoundVariableExpression|List<int>": 3
+    },
+    "functions": ["Main"]
+  },
+  "samples/Contracts/contracts.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 3,
+      "BoundBinaryExpression|INT": 2,
+      "BoundCallExpression|void": 10,
+      "BoundIntLiteral|INT": 3,
+      "BoundStringLiteral|STRING": 10,
+      "BoundTypeReferenceExpression|Console": 10,
+      "BoundVariableExpression|int": 7
+    },
+    "functions": ["Main", "Square", "Divide"]
+  },
+  "samples/FizzBuzz/fizzbuzz.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 3,
+      "BoundBinaryExpression|INT": 3,
+      "BoundCallExpression|void": 4,
+      "BoundIntLiteral|INT": 9,
+      "BoundStringLiteral|STRING": 3,
+      "BoundTypeReferenceExpression|Console": 4,
+      "BoundVariableExpression|int": 4
+    },
+    "functions": ["Main"]
+  },
+  "samples/Generics/generics.calr": {
+    "histogram": {
+      "BoundCallExpression|void": 8,
+      "BoundFieldAccessExpression|OBJECT": 2,
+      "BoundNewExpression|List<T>": 1,
+      "BoundStringLiteral|STRING": 7,
+      "BoundTypeReferenceExpression|Console": 7,
+      "BoundVariableExpression|List<T>": 5,
+      "BoundVariableExpression|T": 4,
+      "BoundVariableExpression|U": 2
+    },
+    "functions": ["Identity", "GetCount", "Main", "Generics.Pair`2..ctor", "Generics.Repository`1.Add", "Generics.Repository`1.GetAll", "Generics.Repository`1.Count", "Generics.Repository`1..ctor"]
+  },
+  "samples/HelloWorld/hello.calr": {
+    "histogram": {
+      "BoundCallExpression|void": 1,
+      "BoundStringLiteral|STRING": 1,
+      "BoundTypeReferenceExpression|Console": 1
+    },
+    "functions": ["Main"]
+  },
+  "samples/PatternMatching/matching.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 3,
+      "BoundBinaryExpression|STRING": 5,
+      "BoundCallExpression|void": 5,
+      "BoundIntLiteral|INT": 30,
+      "BoundMatchExpression|STRING": 5,
+      "BoundStringLiteral|STRING": 35,
+      "BoundTypeReferenceExpression|Console": 5,
+      "BoundVariableExpression|INT": 8,
+      "BoundVariableExpression|STRING": 5
+    },
+    "functions": ["Main"]
+  },
+  "samples/SdkSample/program.calr": {
+    "histogram": {
+      "BoundCallExpression|void": 6,
+      "BoundStringLiteral|STRING": 6,
+      "BoundTypeReferenceExpression|Console": 6
+    },
+    "functions": ["Main"]
+  },
+  "samples/TypeSystem/typesystem.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 1,
+      "BoundBinaryExpression|INT": 1,
+      "BoundCallExpression|int": 2,
+      "BoundCallExpression|void": 6,
+      "BoundIntLiteral|INT": 5,
+      "BoundNewExpression|ArgumentException": 1,
+      "BoundNullLiteral|NULL": 1,
+      "BoundStringLiteral|STRING": 6,
+      "BoundStructuralExpression|STRING": 2,
+      "BoundTypeReferenceExpression|Console": 5,
+      "BoundVariableExpression|int": 4,
+      "BoundVariableExpression|string?": 2
+    },
+    "functions": ["Main", "TestNullable", "Divide"]
+  },
+  "samples/Verification/mixed-contracts.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 6,
+      "BoundBinaryExpression|INT": 3,
+      "BoundIntLiteral|INT": 9,
+      "BoundVariableExpression|int": 11
+    },
+    "functions": ["SafeDivide", "SumArray", "Increment", "ClampPositive"]
+  },
+  "samples/Verification/proven-contracts.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 16,
+      "BoundBinaryExpression|INT": 4,
+      "BoundIntLiteral|INT": 12,
+      "BoundVariableExpression|int": 31
+    },
+    "functions": ["Square", "AbsoluteValue", "Max", "AddPositive", "Identity"]
+  },
+  "samples/Verification/violation-detected.calr": {
+    "histogram": {
+      "BoundBinaryExpression|BOOL": 4,
+      "BoundBinaryExpression|INT": 5,
+      "BoundIntLiteral|INT": 4,
+      "BoundVariableExpression|int": 12
+    },
+    "functions": ["BadPostcondition", "ImpossibleContract", "DivisionBug"]
+  }
+}

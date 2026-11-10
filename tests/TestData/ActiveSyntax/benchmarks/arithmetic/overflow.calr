@@ -1,74 +1,57 @@
 // Arithmetic Benchmark: Integer Overflow Detection
 // Tests bug pattern analysis for integer overflow vulnerabilities
 
-§M{OverflowBenchmark}
-
-  §F{VulnerableAddition:pub}
+module OverflowBenchmark OverflowBenchmark
+  func VulnerableAddition public (int:a, int:b) → int
     // BUG: Unchecked addition may overflow
     // EXPECTED: Calor0923 Integer Overflow
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+    return a + b
 
-  §F{SafeCheckedAddition:pub}
+  func SafeCheckedAddition public (int:a, int:b) → int
     // SAFE: Addition with overflow check
     // EXPECTED: No warnings
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §B{result:i32} §CS{checked(a + b)}
-    §R result
+    var int:result = 0
+    raw member:checked-block:Other:checked%20overflow%20block%20preserved%20verbatim 36
+        checked { result = a + b; }
 
-  §F{VulnerableMultiplication:pub}
+    return result
+
+  func VulnerableMultiplication public (int:x, int:y) → int
     // BUG: Unchecked multiplication may overflow
     // EXPECTED: Calor0923 Integer Overflow
-    §I{i32:x}
-    §I{i32:y}
-    §O{i32}
-    §R (* x y)
+    return x * y
 
-  §F{SafeSmallValues:pub}
+  func SafeSmallValues public (int:x) → int
     // SAFE: Values known to be small
     // EXPECTED: No warnings
-    §I{i32:x}
-    §O{i32}
-    §Q (< x INT:1000)
-    §Q (> x INT:0)
-    §R (* x INT:100)
+    requires x < 1000
+    requires x > 0
+    return x * 100
 
-  §F{VulnerableLeftShift:pub}
+  func VulnerableLeftShift public (int:x, int:n) → int
     // BUG: Left shift may overflow
     // EXPECTED: Calor0923 Integer Overflow
-    §I{i32:x}
-    §I{i32:n}
-    §O{i32}
-    §R (<< x n)
+    return x << n
 
-  §F{SafeBoundedShift:pub}
+  func SafeBoundedShift public (int:x) → int
     // SAFE: Both the operand and shift amount are bounded
     // EXPECTED: No warnings
-    §I{i32:x}
-    §O{i32}
-    §Q (>= x INT:-536870912)
-    §Q (<= x INT:536870911)
-    §R (<< x INT:2)
+    requires x >= -536870912
+    requires x <= 536870911
+    return x << 2
 
-  §F{VulnerableAccumulator:pub}
+  func VulnerableAccumulator public (int:n) → int
     // BUG: Accumulator in loop may overflow
     // EXPECTED: Calor0923 Integer Overflow
-    §I{i32:n}
-    §O{i32}
-    §B{~sum:i32} INT:0
-    §L{i:1:n:1}
-      §ASSIGN sum (+ sum i)
-    §R sum
+    var int:sum = 0
+    for i from 1 to n step 1
+      set sum sum + i
+    return sum
 
-  §F{SafeBoundedAccumulator:pub}
+  func SafeBoundedAccumulator public () → int
     // SAFE: Loop bound prevents overflow
     // EXPECTED: No warnings
-    §O{i32}
-    §B{~sum:i32} INT:0
-    §L{i:1:100:1}
-      §ASSIGN sum (+ sum i)
-    §R sum
+    var int:sum = 0
+    for i from 1 to 100 step 1
+      set sum sum + i
+    return sum

@@ -119,7 +119,7 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     private static TaintAnalysisOptions SqlContracts(BoundModule module)
     {
         var escape = Assert.Single(module.Functions.Where(function =>
-            function.ContainingTypeName == "SqlEscaping" && function.Symbol.Name.EndsWith(".Escape", StringComparison.Ordinal)));
+            function.ContainingTypeName == "SqlInjectionBenchmark.SqlEscaping" && function.Symbol.Name.EndsWith(".Escape", StringComparison.Ordinal)));
         return new TaintAnalysisOptions
         {
             AdditionalSanitizers =
