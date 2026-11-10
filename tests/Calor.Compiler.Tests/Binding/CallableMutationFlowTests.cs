@@ -1,4 +1,6 @@
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -31,227 +33,212 @@ public sealed class CallableMutationFlowTests
     public void CapturedCallableFlow_TracksInvocationTimeEffects(
         string scenario, string modifier, bool array)
     {
-        var nullableType = array ? "?[str]" : "?str";
-        var nonNullableType = array ? "[str]" : "str";
-        var mutator = $"§LAM{{}} §C{{Mutate}} §A{{{modifier}}} value §/C §/LAM";
+        var nullableType = array ? "string[]?" : "string?";
+        var nonNullableType = array ? "string[]" : "string";
+        var mutator = $"() => Mutate({modifier} value)";
         var body = scenario switch
         {
             "call-before-reset" => $$"""
-                §B{~later:Action} {{mutator}}
-                §B{wrapper:Action} §LAM{}
-                  §C{later} §/C
-                  §ASSIGN later Noop
-                §/LAM
-                §C{wrapper} §/C
+                var Action:later = {{mutator}}
+                let Action:wrapper = () =>
+                  later()
+                  set later Noop
+                wrapper()
                 """,
             "block-local-alias" => $$"""
-                §B{later:Action} {{mutator}}
-                §B{wrapper:Action} §LAM{}
-                  §IF flag
-                    §B{alias:Action} later
-                    §C{alias} §/C
-                §/LAM
-                §C{wrapper} §/C
+                let Action:later = {{mutator}}
+                let Action:wrapper = () =>
+                  if flag
+                    let Action:alias = later
+                    alias()
+                wrapper()
                 """,
             "expression-call-before-reset" => $$"""
-                §B{~later:Func<bool>} §LAM{} §C{MutateBool} §A{ {{modifier}} } value §/C §/LAM
-                §B{wrapper:Func<bool>} §LAM{}
-                  §B{result:bool} §C{later} §/C
-                  §ASSIGN later NoopBool
-                  §R result
-                §/LAM
-                §B{result:bool} §C{wrapper} §/C
+                var Func<bool>:later = () => MutateBool({{modifier}} value)
+                let Func<bool>:wrapper = () =>
+                  let bool:result = later()
+                  set later NoopBool
+                  return result
+                let bool:result = wrapper()
                 """,
             "late-target" => $$"""
-                §B{~later:Action} Noop
-                §B{wrapper:Action} §LAM{} §C{later} §/C §/LAM
-                §ASSIGN later {{mutator}}
-                §C{wrapper} §/C
+                var Action:later = Noop
+                let Action:wrapper = () => later()
+                set later {{mutator}}
+                wrapper()
                 """,
             "branch-retains-target" => $$"""
-                §B{~later:Action} {{mutator}}
-                §IF flag
-                  §ASSIGN later Noop
-                §C{later} §/C
+                var Action:later = {{mutator}}
+                if flag
+                  set later Noop
+                later()
                 """,
             "branch-isolation" => $$"""
-                §B{~later:Action} {{mutator}}
-                §IF flag
-                  §ASSIGN later Noop
-                §EL
-                  §B{wrapper:Action} §LAM{} §C{later} §/C §/LAM
-                  §C{wrapper} §/C
+                var Action:later = {{mutator}}
+                if flag
+                  set later Noop
+                else
+                  let Action:wrapper = () => later()
+                  wrapper()
                 """,
             "mutable-rebind" => $$"""
-                §B{~later:Action} Noop
-                §B{~later} {{mutator}}
-                §C{later} §/C
+                var Action:later = Noop
+                var later = {{mutator}}
+                later()
                 """,
             "deferred-setter" => $$"""
-                §B{~later:Action} Noop
-                §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{}
-                  §ASSIGN later mutator
-                §/LAM
-                §C{setter} §/C
-                §C{later} §/C
+                var Action:later = Noop
+                let Action:mutator = {{mutator}}
+                let Action:setter = () =>
+                  set later mutator
+                setter()
+                later()
                 """,
             "nested-deferred-setter" => $$"""
-                §B{~later:Action} Noop
-                §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{}
-                  §ASSIGN later mutator
-                §/LAM
-                §B{wrapper:Action} §LAM{} §C{setter} §/C §/LAM
-                §C{wrapper} §/C
-                §C{later} §/C
+                var Action:later = Noop
+                let Action:mutator = {{mutator}}
+                let Action:setter = () =>
+                  set later mutator
+                let Action:wrapper = () => setter()
+                wrapper()
+                later()
                 """,
             "deferred-rebind" => $$"""
-                §B{~later:Action} Noop
-                §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{}
-                  §B{~later} mutator
-                §/LAM
-                §C{setter} §/C
-                §C{later} §/C
+                var Action:later = Noop
+                let Action:mutator = {{mutator}}
+                let Action:setter = () =>
+                  var later = mutator
+                setter()
+                later()
                 """,
             "late-write-source" => $$"""
-                §B{~later:Action} Noop
-                §B{~mutator:Action} Noop
-                §B{setter:Action} §LAM{}
-                  §ASSIGN later mutator
-                §/LAM
-                §ASSIGN mutator {{mutator}}
-                §C{setter} §/C
-                §C{later} §/C
+                var Action:later = Noop
+                var Action:mutator = Noop
+                let Action:setter = () =>
+                  set later mutator
+                set mutator {{mutator}}
+                setter()
+                later()
                 """,
             "write-source-fixed-point" => $$"""
-                §B{~later:Action} Noop
-                §B{~source:Action} Noop
-                §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{}
-                  §ASSIGN source mutator
-                §/LAM
-                §B{wrapper:Action} §LAM{}
-                  §C{setter} §/C
-                  §ASSIGN later source
-                §/LAM
-                §C{wrapper} §/C
-                §C{later} §/C
+                var Action:later = Noop
+                var Action:source = Noop
+                let Action:mutator = {{mutator}}
+                let Action:setter = () =>
+                  set source mutator
+                let Action:wrapper = () =>
+                  setter()
+                  set later source
+                wrapper()
+                later()
                 """,
             "setter-does-not-invoke-value" => $$"""
-                §B{~later:Action} Noop
-                §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{}
-                  §ASSIGN later mutator
-                §/LAM
-                §C{setter} §/C
+                var Action:later = Noop
+                let Action:mutator = {{mutator}}
+                let Action:setter = () =>
+                  set later mutator
+                setter()
                 """,
             "alias-initializer" => $$"""
-                §B{later:Action} {{mutator}}
-                §B{alias:Action} later
-                §C{alias} §/C
+                let Action:later = {{mutator}}
+                let Action:alias = later
+                alias()
                 """,
             "alias-assignment" => $$"""
-                §B{later:Action} {{mutator}}
-                §B{~alias:Action} Noop
-                §ASSIGN alias later
-                §C{alias} §/C
+                let Action:later = {{mutator}}
+                var Action:alias = Noop
+                set alias later
+                alias()
                 """,
             "invoke-member" => $$"""
-                §B{later:Action} {{mutator}}
-                §B{wrapper:Action} §LAM{} §C{later.Invoke} §/C §/LAM
-                §C{wrapper.Invoke} §/C
+                let Action:later = {{mutator}}
+                let Action:wrapper = () => later.Invoke()
+                wrapper.Invoke()
                 """,
             "direct-write" => """
-                §B{later:Action} §LAM{}
-                  §ASSIGN value null
-                §/LAM
-                §C{later} §/C
+                let Action:later = () =>
+                  set value null
+                later()
                 """,
             "nested-guard" => $$"""
-                §B{later:Action} §LAM{}
-                  §IF (!= value null)
-                    §C{Mutate} §A{ {{modifier}} } value §/C
-                §/LAM
-                §C{later} §/C
+                let Action:later = () =>
+                  if value != null
+                    Mutate({{modifier}} value)
+                later()
                 """,
             "repeat-invocation" => $$"""
-                §B{later:Action} {{mutator}}
-                §C{later} §/C
-                §IF (!= value null)
-                  §C{later} §/C
-                  §C{Take} §A value §/C
+                let Action:later = {{mutator}}
+                later()
+                if value != null
+                  later()
+                  Take(value)
                 """,
             "recursive-dependencies" => $$"""
-                §B{~first:Action} Noop
-                §B{~second:Action} Noop
-                §B{mutator:Action} {{mutator}}
-                §ASSIGN first §LAM{} §C{second} §/C §/LAM
-                §ASSIGN second §LAM{}
-                  §C{first} §/C
-                  §C{mutator} §/C
-                §/LAM
-                §C{first} §/C
+                var Action:first = Noop
+                var Action:second = Noop
+                let Action:mutator = {{mutator}}
+                set first () => second()
+                set second () =>
+                  first()
+                  mutator()
+                first()
                 """,
             "pure-cycle" => """
-                §B{~first:Action} Noop
-                §B{~second:Action} Noop
-                §ASSIGN first §LAM{} §C{second} §/C §/LAM
-                §ASSIGN second §LAM{} §C{first} §/C §/LAM
-                §C{first} §/C
+                var Action:first = Noop
+                var Action:second = Noop
+                set first () => second()
+                set second () => first()
+                first()
                 """,
             "uninvoked-setter" => $$"""
-                §B{~later:Action} Noop
-                §B{mutator:Action} {{mutator}}
-                §B{setter:Action} §LAM{}
-                  §ASSIGN later mutator
-                §/LAM
-                §C{later} §/C
+                var Action:later = Noop
+                let Action:mutator = {{mutator}}
+                let Action:setter = () =>
+                  set later mutator
+                later()
                 """,
             "uninvoked-mutator" => $$"""
-                §B{later:Action} {{mutator}}
+                let Action:later = {{mutator}}
                 """,
             "uninvoked-reset" => $$"""
-                §B{~later:Action} {{mutator}}
-                §B{setter:Action} §LAM{}
-                  §ASSIGN later Noop
-                §/LAM
-                §C{later} §/C
+                var Action:later = {{mutator}}
+                let Action:setter = () =>
+                  set later Noop
+                later()
                 """,
             "alias-is-value-copy" => $$"""
-                §B{~later:Action} Noop
-                §B{alias:Action} §E{} later
-                §ASSIGN later {{mutator}}
-                §C{alias} §/C
+                var Action:later = Noop
+                let Action:alias ! = later
+                set later {{mutator}}
+                alias()
                 """,
             "all-branches-reset" => $$"""
-                §B{~later:Action} {{mutator}}
-                §IF flag
-                  §ASSIGN later Noop
-                §EL
-                  §ASSIGN later Noop
-                §C{later} §/C
+                var Action:later = {{mutator}}
+                if flag
+                  set later Noop
+                else
+                  set later Noop
+                later()
                 """,
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
         var source = $$"""
-            §M{CallableMutationFlow}
-              §F{Noop:pub} () -> void
-                §E{}
-              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
-                §ASSIGN value null
-              §F{NoopBool:pub} () -> bool
-                §R true
-              §F{MutateBool:pub} ({{nullableType}}:value:{{modifier}}) -> bool
-                §ASSIGN value null
-                §R true
-              §F{Take:pub} ({{nonNullableType}}:value) -> void
-                §E{}
-              §F{Probe:pub} ({{nullableType}}:value, bool:flag) -> void
-                §IF (!= value null)
+            module CallableMutationFlow
+              func Noop public () → void
+                !
+              func Mutate public ({{modifier}} {{nullableType}}:value) → void
+                set value null
+              func NoopBool public () → bool
+                return true
+              func MutateBool public ({{modifier}} {{nullableType}}:value) → bool
+                set value null
+                return true
+              func Take public ({{nonNullableType}}:value) → void
+                !
+              func Probe public ({{nullableType}}:value, bool:flag) → void
+                if value != null
             {{Indent(body, 6)}}
-                  §C{Take} §A value §/C
+                  Take(value)
             """;
         var result = Program.Compile(source, "callable-mutation-flow.calr");
         Assert.DoesNotContain(result.Diagnostics, diagnostic =>
@@ -279,21 +266,22 @@ public sealed class CallableMutationFlowTests
     public void LambdaParameterShadowingField_DoesNotMutateField(
         string modifier, string nullableType, string nonNullableType)
     {
+        var nativeNullableType = nullableType == "?[str]" ? "string[]?" : "string?";
+        var nativeNonNullableType = nonNullableType == "[str]" ? "string[]" : "string";
         var source = $$"""
-            §M{CallableShadow}
-              §F{Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
-                §ASSIGN value null
-              §F{Take:pub} ({{nonNullableType}}:value) -> void
-                §E{}
-              §CL{holder:Holder:pub}
-                §FLD{ {{nullableType}} :value:pub}
-                §MT{Probe:pub} () -> void
-                  §IF (!= value null)
-                    §B{later:Action<{{nullableType}}>} §LAM{value:{{nullableType}}}
-                      §C{Mutate} §A{ {{modifier}} } value §/C
-                    §/LAM
-                    §C{later} §A value §/C
-                    §C{Take} §A value §/C
+            module CallableShadow
+              func Mutate public ({{modifier}} {{nativeNullableType}}:value) → void
+                set value null
+              func Take public ({{nativeNonNullableType}}:value) → void
+                !
+              class Holder
+                field {{nativeNullableType}}:value public
+                func Probe public () → void
+                  if value != null
+                    let Action<{{nativeNullableType}}>:later = ({{nativeNullableType}}:value) =>
+                      Mutate({{modifier}} value)
+                    later(value)
+                    Take(value)
             """;
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
@@ -559,11 +547,11 @@ public sealed class CallableMutationFlowTests
     public void ProductionLoopDiscovery_DoesNotConsumeMisplacedRowDiagnostic(
         string kind, bool valid, string mode)
     {
-        var binding = $"§B{{x:i32}} {(valid ? "" : "§E{} ")}1";
+        var binding = valid ? "let int:x = 1" : "let int:x = 1\n!";
         var body = LoopBody(kind, binding);
         var source = $$"""
-            §M{LoopDiagnostics}
-              §F{Probe:pub} () -> void
+            module LoopDiagnostics
+              func Probe public () → void
             {{Indent(body, 4)}}
             """;
         var result = CompileInMode(source, mode);
@@ -578,7 +566,7 @@ public sealed class CallableMutationFlowTests
             var diagnostic = Assert.Single(result.Diagnostics.Errors);
             Assert.Equal(DiagnosticCode.EffectRowMisplaced, diagnostic.Code);
             Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-            Assert.Equal("§E", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+            Assert.Equal("!", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
             Assert.Empty(result.GeneratedCode);
         }
     }
@@ -599,39 +587,89 @@ public sealed class CallableMutationFlowTests
     public void LoopDiscovery_PreservesIncompleteAnalysisDiagnosticDeduplication(
         string kind, bool previouslyReported)
     {
-        var body = LoopBody(kind, "§B{x:i32} §CS{2}");
+        var body = LoopBody(kind, "let int:x = 2");
         var source = $$"""
-            §M{LoopIncompleteAnalysis}
-              §F{Probe:pub} () -> void
-            {{(previouslyReported ? "    §B{before:i32} §CS{1}" : "")}}
+            module LoopIncompleteAnalysis
+              func Probe public () → void
+            {{(previouslyReported ? "    let int:before = 1" : "")}}
             {{Indent(body, 4)}}
-                §B{after:i32} §CS{3}
+                let int:after = 3
             """;
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
         var module = new Parser(tokens, diagnostics).Parse();
-        new Binder(diagnostics).Bind(module);
+        Assert.Empty(diagnostics.Errors);
+
+        // Raw expressions remain internal AST nodes, not an accepted source spelling.
+        var function = Assert.Single(module.Functions);
+        var opaqueFunction = new FunctionNode(function.Span, function.Id, function.Name,
+            function.Visibility, function.Parameters, function.Output, function.Effects,
+            function.Body.Select(WithOpaqueBindingInitializers).ToArray(), function.Attributes);
+        var opaqueModule = new ModuleNode(module.Span, module.Id, module.Name,
+            module.Usings, [opaqueFunction], module.Attributes);
+        new Binder(diagnostics).Bind(opaqueModule);
         Assert.Empty(diagnostics.Errors);
         var diagnostic = Assert.Single(diagnostics.Where(item =>
             item.Code == DiagnosticCode.AnalysisUnsupportedNode));
         Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
-        Assert.Equal(source.IndexOf("§CS", StringComparison.Ordinal), diagnostic.Span.Start);
+        var firstInitializer = source.IndexOf(previouslyReported ? "= 1" : "= 2", StringComparison.Ordinal) + 2;
+        Assert.Equal(firstInitializer, diagnostic.Span.Start);
+        Assert.Equal(previouslyReported ? "1" : "2",
+            source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        Assert.Contains(nameof(RawCSharpExpressionNode), diagnostic.Message);
+        var emitted = new CSharpEmitter().Emit(opaqueModule);
+        Assert.Contains("int x = 2;", emitted);
+        Assert.Contains("int after = 3;", emitted);
+        if (previouslyReported)
+            Assert.Contains("int before = 1;", emitted);
+
+        var retired = source.Replace("= 1", "= §CS{1}", StringComparison.Ordinal)
+            .Replace("= 2", "= §CS{2}", StringComparison.Ordinal)
+            .Replace("= 3", "= §CS{3}", StringComparison.Ordinal);
         foreach (var mode in new[] { "default", "type-off", "effects-off", "transpile", "verify" })
         {
             var result = CompileInMode(source, mode);
             Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
             Assert.NotEmpty(result.GeneratedCode);
+            Assert.DoesNotContain(result.Diagnostics, item =>
+                item.Code == DiagnosticCode.AnalysisUnsupportedNode);
+            var rejected = CompileInMode(retired, mode);
+            Assert.True(rejected.HasErrors);
+            Assert.Empty(rejected.GeneratedCode);
+            Assert.Contains(rejected.Diagnostics.Errors, item =>
+                item.Code == DiagnosticCode.UnknownSectionMarker);
         }
     }
+
+    private static StatementNode WithOpaqueBindingInitializers(StatementNode statement) => statement switch
+    {
+        BindStatementNode { Initializer: IntLiteralNode literal } binding =>
+            new BindStatementNode(binding.Span, binding.Name, binding.TypeName, binding.IsMutable,
+                new RawCSharpExpressionNode(literal.Span,
+                    literal.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                binding.Attributes, binding.IdentifierSpan, binding.TypeNameSpan, binding.Row),
+        ForStatementNode loop => new ForStatementNode(loop.Span, loop.Id, loop.VariableName,
+            loop.From, loop.To, loop.Step, loop.Body.Select(WithOpaqueBindingInitializers).ToArray(),
+            loop.Attributes, loop.VariableSpan),
+        WhileStatementNode loop => new WhileStatementNode(loop.Span, loop.Id, loop.Condition,
+            loop.Body.Select(WithOpaqueBindingInitializers).ToArray(), loop.Attributes),
+        ForeachStatementNode loop => new ForeachStatementNode(loop.Span, loop.Id, loop.VariableName,
+            loop.VariableType, loop.Collection, loop.Body.Select(WithOpaqueBindingInitializers).ToArray(),
+            loop.Attributes, loop.IndexVariableName, loop.VariableSpan, loop.IndexVariableSpan,
+            loop.VariableTypeSpan),
+        DoWhileStatementNode loop => new DoWhileStatementNode(loop.Span, loop.Id,
+            loop.Body.Select(WithOpaqueBindingInitializers).ToArray(), loop.Condition, loop.Attributes),
+        _ => throw new InvalidOperationException($"Unexpected deduplication control node: {statement.GetType().Name}")
+    };
 
     private static string LoopBody(string kind, string body) => kind switch
     {
         "outside" => body,
-        "for" => "§L{i:1:2:1}\n" + Indent(body, 2),
-        "while" => "§WH false\n" + Indent(body, 2),
-        "foreach" => "§EACH{item} \"ab\"\n" + Indent(body, 2),
-        "do" => "§DO\n" + Indent(body, 2) + "\nfalse",
-        "nested" => "§L{i:1:2:1}\n  §WH false\n" + Indent(body, 4),
+        "for" => "for i from 1 to 2 step 1\n" + Indent(body, 2),
+        "while" => "while false\n" + Indent(body, 2),
+        "foreach" => "each item in \"ab\"\n" + Indent(body, 2),
+        "do" => "do\n" + Indent(body, 2) + "\nwhile false",
+        "nested" => "for i from 1 to 2 step 1\n  while false\n" + Indent(body, 4),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -659,169 +697,162 @@ public sealed class CallableMutationFlowTests
         {
             var requiredType = shape switch
             {
-                "string" => "str",
-                "array" => "[str]",
+                "string" => "string",
+                "array" => "string[]",
                 _ => "Foo"
             };
             var receive = $$"""
-                §IF (!= value null)
-                  §C{later} §/C
-                {{(safe ? "  §IF (!= value null)\n    §C{Take} §A value §/C" : "  §C{Take} §A value §/C")}}
+                if value != null
+                  later()
+                {{(safe ? "  if value != null\n    Take(value)" : "  Take(value)")}}
                 """;
             var filterWrite = scenario.StartsWith("filter-write", StringComparison.Ordinal);
             if (filterWrite)
-                receive = safe ? "§IF (!= value null)\n  §C{Take} §A value §/C"
-                    : "§C{Take} §A value §/C";
+                receive = safe ? "if value != null\n  Take(value)"
+                    : "Take(value)";
             var initialNoop = scenario is "try-prefix" or "try-call-prefix" or "finally-prefix"
                 or "catch-prefix-finally" or "filter-fallthrough" or "filter-wrapper" or "filter-unused";
             var receiveInside = scenario is "catch-isolation" or "try-prefix" or "try-call-prefix"
                 or "finally-prefix" or "catch-prefix-finally" or "filter-fallthrough" || filterWrite;
             var body = scenario switch
             {
-                "conditional" => "§B{selected:bool} (? flag §C{resetter} §/C false)",
-                "coalesce" => "§B{selected:?str} (?? text §C{resetString} §/C)",
-                "and" => "§B{selected:bool} (&& flag §C{resetter} §/C)",
-                "or" => "§B{selected:bool} (|| flag §C{resetter} §/C)",
+                "conditional" => "let bool:selected = flag ? resetter() : false",
+                "coalesce" => "let string?:selected = text ?? resetString()",
+                "and" => "let bool:selected = flag && resetter()",
+                "or" => "let bool:selected = flag || resetter()",
                 "try-reset" => """
-                    §TR
-                      §C{MayThrow} §A flag §/C
-                      §ASSIGN later noopAction
-                    §CA{Exception:ex}
-                      §C{Noop} §/C
+                    try
+                      MayThrow(flag)
+                      set later noopAction
+                    catch Exception:ex
+                      Noop()
                     """,
                 "catch-reset" => """
-                    §TR
-                      §C{MayThrow} §A flag §/C
-                    §CA{Exception:ex}
-                      §ASSIGN later noopAction
+                    try
+                      MayThrow(flag)
+                    catch Exception:ex
+                      set later noopAction
                     """,
                 "catch-isolation" => $$"""
-                    §TR
-                      §C{MayThrow} §A flag §/C
-                    §CA{ArgumentException:ex}
-                      §ASSIGN later noopAction
-                    §CA{Exception:other}
+                    try
+                      MayThrow(flag)
+                    catch ArgumentException:ex
+                      set later noopAction
+                    catch Exception:other
                     {{Indent(receive, 2)}}
                     """,
                 "try-prefix" or "try-call-prefix" => $$"""
-                    §TR
-                      {{(scenario == "try-prefix" ? "§ASSIGN later mutator" : "§B{installed:bool} §C{setter} §/C")}}
-                      §C{MayThrow} §A flag §/C
-                      §ASSIGN later noopAction
-                    §CA{Exception:ex}
+                    try
+                      {{(scenario == "try-prefix" ? "set later mutator" : "let bool:installed = setter()")}}
+                      MayThrow(flag)
+                      set later noopAction
+                    catch Exception:ex
                     {{Indent(receive, 2)}}
                     """,
                 "finally-prefix" => $$"""
-                    §TR
-                      §ASSIGN later mutator
-                      §C{MayThrow} §A flag §/C
-                      §ASSIGN later noopAction
-                    §FI
+                    try
+                      set later mutator
+                      MayThrow(flag)
+                      set later noopAction
+                    finally
                     {{Indent(receive, 2)}}
                     """,
                 "catch-prefix-finally" => $$"""
-                    §TR
-                      §C{MayThrow} §A flag §/C
-                    §CA{Exception:ex}
-                      §ASSIGN later mutator
-                      §C{MayThrow} §A flag §/C
-                      §ASSIGN later noopAction
-                    §FI
+                    try
+                      MayThrow(flag)
+                    catch Exception:ex
+                      set later mutator
+                      MayThrow(flag)
+                      set later noopAction
+                    finally
                     {{Indent(receive, 2)}}
                     """,
                 "filter-fallthrough" => $$"""
-                    §TR
-                      §C{MayThrow} §A flag §/C
-                    §CA{Exception:ex} §WHEN (&& (!= ex null) §C{setter} §/C)
-                      §C{Noop} §/C
-                    §CA{Exception:ex} §WHEN (!= ex null)
+                    try
+                      MayThrow(flag)
+                    catch Exception:ex when ex != null && setter()
+                      Noop()
+                    catch Exception:ex when ex != null
                     {{Indent(receive, 2)}}
                     """,
                 "filter-write" => $$"""
-                    §IF (!= value null)
-                      §TR
-                        §C{MayThrow} §A flag §/C
-                      §CA{Exception:ex} §WHEN (&& (!= ex null) §C{writeFilter} §/C)
-                        §C{Noop} §/C
-                      §CA{Exception:ex} §WHEN (!= ex null)
+                    if value != null
+                      try
+                        MayThrow(flag)
+                      catch Exception:ex when ex != null && writeFilter()
+                        Noop()
+                      catch Exception:ex when ex != null
                     {{Indent(receive, 4)}}
                     """,
                 "filter-write-wrapper" or "filter-write-unused" => $$"""
-                    §B{wrapper:Action} §LAM{}
-                      §TR
-                        §C{MayThrow} §A flag §/C
-                      §CA{Exception:ex} §WHEN (&& (!= ex null) §C{writeFilter} §/C)
-                        §C{Noop} §/C
-                      §CA{Exception:ex} §WHEN (!= ex null)
-                        §C{Noop} §/C
-                    §/LAM
-                    §IF (!= value null)
-                      {{(scenario == "filter-write-wrapper" ? "§C{wrapper} §/C" : "§C{Noop} §/C")}}
+                    let Action:wrapper = () =>
+                      try
+                        MayThrow(flag)
+                      catch Exception:ex when ex != null && writeFilter()
+                        Noop()
+                      catch Exception:ex when ex != null
+                        Noop()
+                    if value != null
+                      {{(scenario == "filter-write-wrapper" ? "wrapper()" : "Noop()")}}
                     {{Indent(receive, 2)}}
                     """,
                 "filter-wrapper" or "filter-unused" => $$"""
-                    §B{wrapper:Action} §LAM{}
-                      §TR
-                        §C{MayThrow} §A flag §/C
-                      §CA{Exception:ex} §WHEN §C{setter} §/C
-                        §C{Noop} §/C
-                      §CA{Exception:other}
-                        §C{Noop} §/C
-                    §/LAM
-                    {{(scenario == "filter-wrapper" ? "§C{wrapper} §/C" : "")}}
+                    let Action:wrapper = () =>
+                      try
+                        MayThrow(flag)
+                      catch Exception:ex when setter()
+                        Noop()
+                      catch Exception:other
+                        Noop()
+                    {{(scenario == "filter-wrapper" ? "wrapper()" : "")}}
                     """,
                 "unused-try" => """
-                    §B{unused:Action} §LAM{}
-                      §TR
-                        §C{MayThrow} §A flag §/C
-                      §CA{Exception:ex}
-                        §ASSIGN later noopAction
-                    §/LAM
+                    let Action:unused = () =>
+                      try
+                        MayThrow(flag)
+                      catch Exception:ex
+                        set later noopAction
                     """,
                 "finally-reset" => """
-                    §TR
-                      §C{MayThrow} §A flag §/C
-                    §CA{Exception:ex}
-                      §C{Noop} §/C
-                    §FI
-                      §ASSIGN later noopAction
+                    try
+                      MayThrow(flag)
+                    catch Exception:ex
+                      Noop()
+                    finally
+                      set later noopAction
                     """,
                 _ => throw new ArgumentOutOfRangeException(nameof(scenario))
             };
             var source = $$"""
-                §M{ExceptionalCallableFlow}
-                {{(shape == "nominal" ? "  §CL{Foo:pub}\n    §MT{Marker:pub} () -> i32\n      §R 0" : "")}}
-                  §F{Noop:pub} () -> void
-                    §E{}
-                  §F{MayThrow:pub} (bool:flag) -> void
-                    §E{throw}
-                    §IF flag
-                      §TH §CS{new Exception()}
-                  §F{Mutate:pub} (?{{requiredType}}:value:{{modifier}}) -> void
-                    §ASSIGN value null
-                  §F{Take:pub} ({{requiredType}}:value) -> void
-                    §E{}
-                  §F{Probe:pub} (?{{requiredType}}:value, bool:flag, ?str:text) -> void
-                    §E{throw}
-                    §B{noopAction:Action} §LAM{} §C{Noop} §/C §/LAM
-                    §B{mutator:Action} §LAM{} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM
-                    §B{~later:Action} {{(initialNoop ? "noopAction" : "mutator")}}
-                    §B{resetter:Func<bool>} §LAM{}
-                      §ASSIGN later noopAction
-                      §R false
-                    §/LAM
-                    §B{resetString:Func<str>} §LAM{}
-                      §ASSIGN later noopAction
-                      §R "done"
-                    §/LAM
-                    §B{setter:Func<bool>} §LAM{}
-                      §ASSIGN later mutator
-                      §R false
-                    §/LAM
-                    §B{writeFilter:Func<bool>} §LAM{}
-                      §C{Mutate} §A{ {{modifier}} } value §/C
-                      §R false
-                    §/LAM
+                module ExceptionalCallableFlow
+                {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      return 0" : "")}}
+                  func Noop public () → void
+                    !
+                  func MayThrow public (bool:flag) → void
+                    ! throw, alloc
+                    if flag
+                      throw new Exception()
+                  func Mutate public ({{modifier}} {{requiredType}}?:value) → void
+                    set value null
+                  func Take public ({{requiredType}}:value) → void
+                    !
+                  func Probe public ({{requiredType}}?:value, bool:flag, string?:text) → void
+                    ! throw, alloc
+                    let Action:noopAction = () => Noop()
+                    let Action:mutator = () => Mutate({{modifier}} value)
+                    var Action:later = {{(initialNoop ? "noopAction" : "mutator")}}
+                    let Func<bool>:resetter = () =>
+                      set later noopAction
+                      return false
+                    let Func<string>:resetString = () =>
+                      set later noopAction
+                      return "done"
+                    let Func<bool>:setter = () =>
+                      set later mutator
+                      return false
+                    let Func<bool>:writeFilter = () =>
+                      Mutate({{modifier}} value)
+                      return false
                 {{Indent(body, 4)}}
                 {{(receiveInside ? "" : Indent(receive, 4))}}
                 """;
@@ -864,6 +895,123 @@ public sealed class CallableMutationFlowTests
         Assert.Collection(filtered.ChildNodes,
             child => Assert.Same(filter, child),
             child => Assert.Same(statement, child));
+    }
+
+    [Theory]
+    [InlineData("!", "!", true)]
+    [InlineData("! cw", "! cw", true)]
+    [InlineData("! cw", "!", false)]
+    [InlineData("", "!", false)]
+    public void NativeDelegateInvoke_ChargesTheDeclaredValueRow(
+        string valueRow, string callerRow, bool accepted)
+    {
+        var source = $$"""
+            module DelegateInvoke
+              func Probe (Action:callback {{valueRow}}) → void
+                {{callerRow}}
+                callback.Invoke()
+            """;
+        var result = Program.Compile(source);
+        Assert.Equal(!accepted, result.HasErrors);
+        if (accepted)
+        {
+            Assert.NotEmpty(result.GeneratedCode);
+            Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+                diagnostic.Code is DiagnosticCode.UnknownExternalCall or DiagnosticCode.ForbiddenEffect);
+        }
+        else
+        {
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+            if (valueRow.Length == 0)
+                Assert.Contains(result.Diagnostics, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.EffectRowUnknown);
+        }
+    }
+
+    [Theory]
+    [InlineData("default")]
+    [InlineData("type-off")]
+    [InlineData("effects-off")]
+    [InlineData("transpile")]
+    [InlineData("verify")]
+    public void NativeDelegateInvoke_InvalidatesCapturedGuardsInEveryMode(string mode)
+    {
+        foreach (var safe in new[] { false, true })
+        {
+            var source = $$"""
+                module CapturedInvoke
+                  func Take (string:value) → void
+                    !
+                  func Probe (string?:value) → void
+                    if value != null
+                      let Action:callback = () =>
+                        set value null
+                      callback.Invoke()
+                {{(safe ? "      if value != null\n        Take(value)" : "      Take(value)")}}
+                """;
+            var result = CompileInMode(source, mode);
+            Assert.True(result.HasErrors != safe, string.Join("\n", result.Diagnostics));
+            if (safe)
+                Assert.NotEmpty(result.GeneratedCode);
+            else
+            {
+                Assert.Empty(result.GeneratedCode);
+                var error = Assert.Single(result.Diagnostics.Errors);
+                Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, error.Code);
+                Assert.Equal("value", source.Substring(error.Span.Start, error.Span.Length));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeDelegateInvoke_UsesTheBoundSiblingDeclaration(bool effectful)
+    {
+        var source = $$"""
+            module SiblingDelegateInvoke
+              func Noop () → void
+                !
+              func Probe (bool:flag) → void
+                !
+                if flag
+                  let Action:callback {{(effectful ? "!" : "! cw")}} = () => Noop()
+                else
+                  let Action:callback {{(effectful ? "! cw" : "!")}} = () => Noop()
+                  callback.Invoke()
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors == effectful, string.Join("\n", result.Diagnostics));
+        if (effectful)
+        {
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        }
+        else
+            Assert.NotEmpty(result.GeneratedCode);
+    }
+
+    [Fact]
+    public void NativeDelegateInvoke_DoesNotMistakeASourceActionClassForADelegate()
+    {
+        const string source = """
+            module NonDelegateInvoke
+              class Action
+                func Invoke public () → void
+                  ! cw
+                  System.Console.WriteLine("effectful")
+              func Probe (Action:callback) → void
+                !
+                callback.Invoke()
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect);
     }
 
     public static IEnumerable<object[]> HiddenCapturedGuardCases()

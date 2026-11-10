@@ -15,6 +15,31 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativeMetadataClosureTests
 {
+    [Fact]
+    public void NativeDelegateInvoke_PreservesCapturedMutationAndReturnValuesAtRuntime()
+    {
+        const string authored = """
+            module CapturedDelegateInvoke
+              func Probe public () → int
+                ! mut
+                var int:count = 0
+                let Func<int>:callback = () =>
+                  set count count + 1
+                  return count
+                let int:first = callback.Invoke()
+                return first * 10 + callback.Invoke()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Program.Compile(source);
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var assembly = CompileAssembly(result.GeneratedCode);
+            var method = assembly.GetTypes().SelectMany(type => type.GetMethods())
+                .Single(method => method.Name == "Probe");
+            Assert.Equal(12, method.Invoke(null, null));
+        }
+    }
+
     [Theory]
     [InlineData("", "", "StringComparison.Ordinal")]
     [InlineData(" Demo", "", "StringComparison.Ordinal")]

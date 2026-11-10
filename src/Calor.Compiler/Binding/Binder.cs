@@ -6765,8 +6765,12 @@ public sealed class Binder
         ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(callExpr.Target, receiverSymbol, args, resolution, bclResolution);
         InvalidateMutatingCallArguments(args, argumentModifiers, resolution, bclResolution);
-        var callable = ResolveCallableStorage(callExpr.Target, receiverSymbol);
-        var callableEffects = InvalidateDeferredCallTarget(callable);
+        var callable = computedMethodName == "Invoke"
+            ? receiverSymbol?.StorageIdentity
+            : ResolveCallableStorage(callExpr.Target, receiverSymbol);
+        var callableEffects = computedMethodName == "Invoke" && computedReceiver is not null
+            ? InvalidateDeferredCallTarget(computedReceiver)
+            : InvalidateDeferredCallTarget(callable);
 
         var boundCall = new BoundCallExpression(
             callExpr.Span,

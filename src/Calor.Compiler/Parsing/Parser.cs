@@ -6944,6 +6944,7 @@ public sealed class Parser
         else if (type == null)
             _diagnostics.ReportError(start.Span, DiagnosticCode.UnexpectedToken,
                 "An inferred binding requires '= expression'.");
+        TryRecoverTrailingEffectRow(name, "binding");
         return new BindStatementNode(start.Span.Union(initializer?.Span ?? identifierSpan),
             name, type, start.Kind == TokenKind.Var, initializer, attributes, identifierSpan, typeSpan, row);
     }

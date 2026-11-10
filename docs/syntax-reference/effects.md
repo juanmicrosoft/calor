@@ -71,6 +71,11 @@ The `! cw` beside `transform` belongs to the callback type. The `! cw` on
 its own line belongs to `Apply`. Calling `transform` charges its `cw` effect to
 `Apply`, so both rows are required here.
 
+For a delegate value, `transform.Invoke(value)` charges the same row as
+`transform(value)`. The compiler uses the delegate's declaration, not just the
+method name `Invoke`. A missing callback row still follows the unknown-effect
+rules; `.Invoke()` does not make it pure.
+
 Rows are part of the type. `Func<int,int> !` and
 `Func<int,int> ! cw` have the same inputs and output, but different effect
 permissions.

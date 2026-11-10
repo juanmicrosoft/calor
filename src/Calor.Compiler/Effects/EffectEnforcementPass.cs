@@ -6120,6 +6120,19 @@ public sealed class EffectEnforcementPass
             if (call.TargetExpression is FieldAccessNode member)
             {
                 var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
+                if (member.FieldName == "Invoke"
+                    && bound?.Receiver is { } delegateReceiver
+                    && (IsFunctionBoundType(delegateReceiver.Type)
+                        || delegateReceiver.Type is Binding.BoundTypes.NominalBoundType { Declaration: null } nominal
+                        && (nominal.RoslynSymbol?.TypeKind == Microsoft.CodeAnalysis.TypeKind.Delegate
+                            || nominal.RoslynSymbol is null
+                            && member.Target is ReferenceNode reference
+                            && IsFunctionValued(reference.Name, nominal.DisplayString))))
+                {
+                    return InferFromExpressionCall(new ExpressionCallNode(
+                        call.Span, member.Target, call.Arguments,
+                        call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments));
+                }
                 if (bound is not null && _context.CrossModuleFunctionNames.Contains(bound.Target))
                     return InferFromCallTarget(bound.Target, call.Span, call.Arguments)
                         .Union(InferFromCallArguments(bound.Target, call.Arguments, call.ArgumentModifiers));
