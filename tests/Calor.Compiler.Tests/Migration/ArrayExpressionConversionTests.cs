@@ -21,7 +21,7 @@ namespace Calor.Compiler.Tests;
 /// converted on every surface, compiled, run, and compared with the original C#. The
 /// witnesses log every side effect, so a reordered, duplicated, skipped or eagerly
 /// evaluated subexpression changes the result. Nothing may be preserved as C# (no rescue,
-/// no §CS) on a native row. Narrowed (PR 2): array members are unknown calls, as on main,
+/// no raw preservation) on a native row. Narrowed (PR 2): array members are unknown calls, as on main,
 /// so a row that calls one compiles only with effects relaxed; with default options it
 /// reports Calor0410 for the effect 'unknown' and nothing else.
 /// </summary>
@@ -130,14 +130,12 @@ public class ArrayExpressionConversionTests
             Assert.Contains("'Configuration'", issue.Message);
         });
         Assert.Empty(result.Losses);
-        Assert.DoesNotContain("§CS", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
         var binding = Assert.Single(result.CalorSource!.Split('\n')
-            .Where(line => line.TrimStart().StartsWith("§B{", StringComparison.Ordinal)
-                && (line.Contains(":assembliesToScan}", StringComparison.Ordinal)
-                    || line.TrimStart().StartsWith("§B{assembliesToScan}", StringComparison.Ordinal))));
+            .Where(line => Regex.IsMatch(line, @"^\s*let (?:\S+:)?assembliesToScan = ")));
         Assert.StartsWith(resolveCompanion
-                ? $"§B{{{(list ? "List<int>" : "int[]")}:assembliesToScan}}"
-                : "§B{assembliesToScan}",
+                ? $"let {(list ? "List<int>" : "int[]")}:assembliesToScan = "
+                : "let assembliesToScan = ",
             binding.TrimStart());
         Assert.DoesNotContain(list ? "List<TSource>" : "TSource[]", result.CalorSource);
         var generated = ParseInferredCollectionSource(result.CalorSource!);
@@ -176,8 +174,8 @@ public class ArrayExpressionConversionTests
         var result = new CSharpToCalorConverter().Convert(source, "Probe.cs");
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
         Assert.Empty(result.Losses);
-        Assert.DoesNotContain("§CS", result.CalorSource);
-        Assert.Contains($"§B{{{(list ? "List<TSource>" : "TSource[]")}:values}}", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
+        Assert.Contains($"let {(list ? "List<TSource>" : "TSource[]")}:values = ", result.CalorSource);
         var generated = ParseInferredCollectionSource(result.CalorSource!);
         Assert.Equal("3,7", Run(source, caller));
         Assert.Equal("3,7", Run(generated, caller));
@@ -243,9 +241,9 @@ public class ArrayExpressionConversionTests
         const string expected = "3:7:2:x:0:sn";
         Assert.Equal(expected, Run(source));
         var calor = await ConvertNativeWithRealCliAsync(source, surface);
-        Assert.DoesNotContain("§CS", calor);
-        Assert.Contains("§ARR{T:count}", calor);
-        Assert.Contains("§ARR{int:0}", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
+        Assert.Contains("new T[count]", calor);
+        Assert.Contains("new int[0]", calor);
         var compilation = Program.Compile(calor, "sized-array.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
@@ -381,7 +379,7 @@ public class ArrayExpressionConversionTests
         Assert.Equal(expected, Run(source));
         var (calor, losses) = await ConvertWithRealCliAsync(source, surface);
         Assert.Contains("conditional-expression-hoisting", losses);
-        Assert.Contains("§CS", calor);
+        RawFrameAssertions.AssertFramed(calor, present: true);
         var compilation = Program.Compile(calor, "preserved-array-update.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
@@ -574,7 +572,8 @@ public class ArrayExpressionConversionTests
         var (calor, losses) = await ConvertWithRealCliAsync(source, surface);
         var feature = rebinds ? modifier + "-parameter" : "compound-assignment-order";
         Assert.Equal(new[] { feature }, losses);
-        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp);
+        // The converter may preserve the enclosing member rather than only the statement.
+        RawFrameAssertions.AssertFramed(calor, present: true);
         var compilation = Program.Compile(calor, "eager-array-address.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
@@ -1186,9 +1185,10 @@ public class ArrayExpressionConversionTests
         // name the C# never declared (CS0103 arr2d005) plus a bare `new …;` (CS0201).
         var result = new CSharpToCalorConverter().Convert(R0Fixture("F5-ARRAY-01"));
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Matches(@"§R §ARR2D\{Cell\} §ROW §NEW\{Cell\} V = 1 §/NEW", result.CalorSource!);
-        Assert.DoesNotContain("§B{~_hoist", result.CalorSource);
-        Assert.Contains("(§IDX2D cells 0 1).V", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
+        Assert.Contains("return new Cell[,] { { new Cell() { V = 1 }", result.CalorSource);
+        Assert.DoesNotMatch(@"(?m)^\s*(?:let|var) (?:\S+:)?_hoist", result.CalorSource);
+        Assert.Contains("(cells[0, 1]).V", result.CalorSource);
     }
 
     [Fact]
@@ -1200,8 +1200,9 @@ public class ArrayExpressionConversionTests
         var result = new CSharpToCalorConverter().Convert(R0Fixture("F5-ARRAY-04"));
         Assert.True(result.Success, string.Join("\n", result.Issues));
         var calor = result.CalorSource!;
-        Assert.Single(Regex.Matches(calor, @"§B\{[^}]*\b_hoist000\}"));
-        Assert.DoesNotMatch(@"§ARR2D\{arr2d00[56]\b", calor);
+        Assert.Single(Regex.Matches(calor, @"(?m)^\s*(?:let|var) (?:\S+:)?_hoist000\s*="));
+        Assert.Contains("(int:arr2d005, int:arr2d006)", calor);
+        Assert.DoesNotMatch(@"(?m)^\s*(?:let|var) (?:\S+:)?arr2d00[56]\s*=", calor);
 
         var context = new ConversionContext { OriginalSource = "int arr001 = 0; var _hoist000 = arr002;" };
         Assert.Equal("arr003", context.GenerateId("arr"));
@@ -1231,8 +1232,12 @@ public class ArrayExpressionConversionTests
         var escaped = new CSharpToCalorConverter(new ConversionOptions { AdditionalSemanticSyntaxTrees = [baseTree], ValidateRoundTripCSharp = false })
             .Convert(probe);
         Assert.True(escaped.Success, string.Join("\n", escaped.Issues));
-        Assert.DoesNotMatch(@"§B\{~_hoist00[012]\}", escaped.CalorSource!);
-        Assert.Matches(@"§B\{~_hoist003\}", escaped.CalorSource!);
+        Assert.DoesNotMatch(@"(?m)^\s*(?:let|var) (?:\S+:)?_hoist00[012]\s*=", escaped.CalorSource!);
+        foreach (var reserved in new[] { "_hoist000", "_hoist001", "_hoist002" })
+            Assert.True(escaped.Context.IsReservedName(reserved), reserved);
+        var freshName = escaped.Context.GenerateId("_hoist");
+        Assert.DoesNotContain(freshName, new[] { "_hoist000", "_hoist001", "_hoist002" });
+        Assert.NotEqual(freshName, escaped.Context.GenerateId("_hoist"));
 
         // Codex round 2: a name inside an #if branch that is active only under the
         // conversion's own symbols is reserved too (it was parsed without them).
@@ -1248,7 +1253,7 @@ public class ArrayExpressionConversionTests
             """;
         var withSymbols = new CSharpToCalorConverter(new ConversionOptions { DefinedSymbols = ["FOO"] }).Convert(conditional);
         Assert.True(withSymbols.Success, string.Join("\n", withSymbols.Issues));
-        Assert.DoesNotMatch(@"§B\{~_hoist000\}", withSymbols.CalorSource!);
+        Assert.DoesNotMatch(@"(?m)^\s*(?:let|var) (?:\S+:)?_hoist000\s*=", withSymbols.CalorSource!);
     }
 
     [Fact]
@@ -1258,14 +1263,23 @@ public class ArrayExpressionConversionTests
         var baseline = File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(CliTestHarness.FindRepoRoot(),
             "tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt",
             ActiveSyntaxInputs.InputKind.CalorText));
-        var (calor, _) = await ConvertAsync(R0Fixture("F5-ARRAY-03"), Surface.McpDefault);
+        var (calor, losses) = await ConvertAsync(R0Fixture("F5-ARRAY-03"), Surface.McpDefault);
+        Assert.Empty(losses);
+        RawFrameAssertions.AssertFramed(calor, present: false);
         var old = Program.Compile(baseline, "arrays.calr");
         var current = Program.Compile(calor, "arrays.calr");
         Assert.False(old.HasErrors, string.Join("\n", old.Diagnostics.Errors));
         Assert.False(current.HasErrors, string.Join("\n", current.Diagnostics.Errors));
         Assert.Equal(old.GeneratedCode, current.GeneratedCode);
-        Assert.Contains("§M{Probe:pub}", calor);
-        Assert.Contains("§F{Run:pub}", calor);
+        Assert.Contains("module Probe", calor);
+        var probe = Assert.Single(CSharpSyntaxTree.ParseText(current.GeneratedCode).GetRoot()
+            .DescendantNodes().OfType<ClassDeclarationSyntax>(), declaration => declaration.Identifier.ValueText == "Probe");
+        Assert.Contains(probe.Modifiers, modifier => modifier.IsKind(SyntaxKind.PublicKeyword));
+        Assert.Contains(probe.Modifiers, modifier => modifier.IsKind(SyntaxKind.StaticKeyword));
+        var run = Assert.Single(probe.Members.OfType<MethodDeclarationSyntax>(),
+            method => method.Identifier.ValueText == "Run");
+        Assert.Contains(run.Modifiers, modifier => modifier.IsKind(SyntaxKind.PublicKeyword));
+        Assert.Contains(run.Modifiers, modifier => modifier.IsKind(SyntaxKind.StaticKeyword));
     }
 
     [Fact]
@@ -1465,7 +1479,7 @@ public class ArrayExpressionConversionTests
         var result = new CSharpToCalorConverter().Convert(source);
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Empty(result.Losses);
-        Assert.Contains("§B{object[]:xs}", result.CalorSource);
+        Assert.Contains("let object[]:xs = ", result.CalorSource);
         var compilation = Program.Compile(result.CalorSource!, "declared.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
@@ -1486,7 +1500,7 @@ public class ArrayExpressionConversionTests
             """;
         var converted = new CSharpToCalorConverter().Convert(effect);
         Assert.True(converted.Success, string.Join("\n", converted.Issues));
-        Assert.Contains("§B{object[]:xs}", converted.CalorSource);
+        Assert.Contains("let object[]:xs = ", converted.CalorSource);
 
         // PR 2 Codex round 3: a nullable declared type (`object[]?`) is not the created
         // string[] either; the block form (`§ARR{zs:str}`) would declare string[].
@@ -1504,11 +1518,17 @@ public class ArrayExpressionConversionTests
                 }
             }
             """;
-        // These bindings fail the round trip on main too (`object[]? zs = F();` alone does):
-        // loud, never a silently retyped local.
         var annotated = new CSharpToCalorConverter().Convert(nullable);
-        Assert.DoesNotContain("§ARR{zs:", annotated.CalorSource ?? "");
-        Assert.DoesNotContain("§ARR{js:", annotated.CalorSource ?? "");
+        Assert.True(annotated.Success, string.Join("\n", annotated.Issues));
+        var annotatedCompilation = Program.Compile(annotated.CalorSource!, "nullable-declared.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
+        Assert.False(annotatedCompilation.HasErrors, string.Join("\n", annotatedCompilation.Diagnostics));
+        var declarations = CSharpSyntaxTree.ParseText(annotatedCompilation.GeneratedCode).GetRoot()
+            .DescendantNodes().OfType<VariableDeclarationSyntax>().ToArray();
+        Assert.Equal("object[]?", Assert.Single(declarations,
+            declaration => declaration.Variables.Any(variable => variable.Identifier.ValueText == "zs")).Type.ToString());
+        Assert.Equal("object[][,]", Assert.Single(declarations,
+            declaration => declaration.Variables.Any(variable => variable.Identifier.ValueText == "js")).Type.ToString());
     }
 
     [Fact]
@@ -1539,9 +1559,11 @@ public class ArrayExpressionConversionTests
         var result = new CSharpToCalorConverter().Convert(source);
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Empty(result.Losses);
-        Assert.Matches(@"§ARR\{guid:2\} §/ARR", result.CalorSource!);
-        Assert.Matches(@"§ARR\{datetime:3\}", result.CalorSource!);
-        Assert.Matches(@"§ARR\{int:4\}", result.CalorSource!);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
+        Assert.Contains("new Guid[2]", result.CalorSource);
+        Assert.Contains("new DateTime[3]", result.CalorSource);
+        Assert.Contains("new TimeSpan[1]", result.CalorSource);
+        Assert.Contains("new int[4]", result.CalorSource);
         var compilation = Program.Compile(result.CalorSource!, "lowercase.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
@@ -1552,24 +1574,43 @@ public class ArrayExpressionConversionTests
     [Fact]
     public void EmptyJaggedArray_KeepsItsElementRank()
     {
-        // PR 2 Codex round 3: an empty §ARR of i32[] is Array.Empty<int[]>(), not Array.Empty<int>().
-        const string calor = "§M{T}\n  §M{P:pub}\n    §MT{Make:pub:stat} () -> i32[][]\n      §E{alloc}\n      §R §ARR{i32[]} §/ARR\n";
-        var compilation = Program.Compile(calor, "empty.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
-        Assert.Contains("Array.Empty<int[]>()", compilation.GeneratedCode);
+        const string caller = """
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    var value = P.Make();
+                    return value.GetType() + "|" + value.Length + "|" + value.GetType().GetElementType();
+                }
+            }
+            """;
+        foreach (var expression in new[] { "new int[][] {}", "System.Array.Empty<int[]>()" })
+        {
+            var calor = $$"""
+                module T
+                  module P
+                    func Make public () → int[][]
+                      ! alloc
+                      return {{expression}}
+                """;
+            var compilation = Program.Compile(calor, "empty.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+            Assert.Contains(expression.StartsWith("new", StringComparison.Ordinal)
+                ? "new int[][] { }" : "Array.Empty<int[]>()", compilation.GeneratedCode);
+            Assert.Equal("System.Int32[][]|0|System.Int32[]", Run(compilation.GeneratedCode, caller));
+        }
     }
 
     [Fact]
     public void ElementAccessMember_ParsesAsAGroup()
     {
-        // `(§IDX2D g 0 1).V` is g[0, 1].V; written bare, `.V` belonged to the last index.
         const string calor = """
-            §M{T}
-              §CL{Cell:pub}
-                §FLD{i32:V:pub}
-              §M{G:pub}
-                §MT{Get:pub:stat} (Cell[,]:g, [Cell]:xs) -> i32
-                  §R (+ (§IDX2D g 0 1).V (§IDX{xs} 0).V)
+            module T
+              class Cell public
+                field int:V public
+              module G
+                func Get public (Cell[,]:g, Cell[]:xs) → int
+                  return g[0, 1].V + xs[0].V
             """;
         var compilation = Program.Compile(calor, "group.calr", new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
@@ -1586,7 +1627,22 @@ public class ArrayExpressionConversionTests
         // Rank 3+ and sized initializers: the rows are innermost vectors, regrouped by
         // the sizes. A row count that disagrees with the sizes is rejected (CS0847),
         // never padded or truncated.
-        var calor = $"§M{{T}}\n  §M{{G:pub}}\n    §MT{{Make:pub:stat}} () -> {type}\n      §E{{alloc}}\n      §R {array}\n";
+        var expression = array switch
+        {
+            "§ARR2D{i32:2:1:2} §ROW 1 2 §ROW 3 4 §/ARR2D" =>
+                "new int[2, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }",
+            "§ARR2D{i32:2:2} §ROW 1 2 §ROW 3 4 §/ARR2D" =>
+                "new int[2, 2] { { 1, 2 }, { 3, 4 } }",
+            "§ARR2D{i32:2:2} §ROW 1 2 §/ARR2D" => "new int[2, 2] { { 1, 2 } }",
+            _ => throw new ArgumentOutOfRangeException(nameof(array), array, null)
+        };
+        var calor = $$"""
+            module T
+              module G
+                func Make public () → {{TypeMapper.ToSurfaceType(type)}}
+                  ! alloc
+                  return {{expression}}
+            """;
         var compilation = Program.Compile(calor, "sized.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(csharp, compilation.GeneratedCode ?? "");
         Assert.Equal(!compiles, compilation.HasErrors);
@@ -1597,11 +1653,25 @@ public class ArrayExpressionConversionTests
     [InlineData("§B{x} §ARR2D{str} §ROW \"r\" §/ARR2D", false)]
     public void RowElements_AreCharged(string statement, bool undeclaredEffect)
     {
-        // The elements of §ARR2D rows are effect-inferred (they were not, so a row could
-        // carry an effect its function did not declare).
-        var calor = $"§M{{T}}\n  §M{{G:pub}}\n    §MT{{Go:pub:stat}} () -> void\n      §E{{alloc}}\n      {statement}\n";
+        var nativeStatement = statement switch
+        {
+            "§B{x} §ARR2D{str} §ROW §C{Console.ReadLine} §/C §/ARR2D" =>
+                "let x = new string?[,] { { System.Console.ReadLine() } }",
+            "§B{x} §ARR2D{str} §ROW \"r\" §/ARR2D" => "let x = new string?[,] { { \"r\" } }",
+            _ => throw new ArgumentOutOfRangeException(nameof(statement), statement, null)
+        };
+        var calor = $$"""
+            module T
+              module G
+                func Go public () → void
+                  ! alloc
+                  {{nativeStatement}}
+            """;
         var compilation = Program.Compile(calor, "effects.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Equal(undeclaredEffect, compilation.Diagnostics.Errors.Any(d => d.Code == "Calor0410"));
+        Assert.All(compilation.Diagnostics.Errors, diagnostic =>
+            Assert.True(diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cr'", StringComparison.Ordinal), diagnostic.ToString()));
     }
 
     // Narrowed (PR 2): elements Calor writes as a block. The extra verification pass's
@@ -1660,8 +1730,7 @@ public class ArrayExpressionConversionTests
         // and reported; none is written natively with a lost or misplaced element.
         Assert.NotEmpty(losses);
         Assert.All(losses, loss => Assert.Equal("array-element-block", loss));
-        Assert.DoesNotContain("§ROW §ANON", calor);
-        Assert.DoesNotContain("§LIST", calor);
+        RawFrameAssertions.AssertFramed(calor, present: true);
         var compilation = Program.Compile(calor, "block.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);

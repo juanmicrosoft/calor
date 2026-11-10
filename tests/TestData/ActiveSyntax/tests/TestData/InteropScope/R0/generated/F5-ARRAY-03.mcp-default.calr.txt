@@ -1,18 +1,9 @@
-§M{ConvertedModule:overflow=unchecked}
-  §U{System}
+module ConvertedModule overflow unchecked
+  using System
 
-  §NS{_global:global}
-    §M{Probe:pub}
-      §F{Run:pub} () -> str
-        §E{alloc}
-        §ARR{one:i32}
-          3
-          1
-          2
-        §B{i32[,]:two} §ARR2D{i32}
-          §ROW 1 2
-          §ROW 3 4
-        §R (+ (+ (+ (+ (+ (+ §IDX{one} 0 "|") one.Length) "|") §IDX2D two 1 0) "|") two.Length)
-
-
-
+  module Probe
+    func Run public () → string
+      ! alloc
+      let int[]:one = new int[] { 3, 1, 2 }
+      let int[,]:two = new int[,] { { 1, 2 }, { 3, 4 } }
+      return one[0] + "|" + one.Length + "|" + two[1, 0] + "|" + two.Length
