@@ -7,402 +7,206 @@ nav_order: 7
 
 # String Operations
 
-Calor provides native string manipulation operations that compile directly to efficient C# code. These operations follow the same prefix notation as other expressions.
+Use ordinary .NET string members, postfix calls and indexing. Calor strings use
+the same UTF-16 representation as C# strings; `Length` counts code units, not
+displayed characters.
 
----
+<a id="basic-string-operations"></a>
 
-## Basic String Operations
+## Core operations
 
-| Operation | Syntax | C# Equivalent | Description |
-|:----------|:-------|:--------------|:------------|
-| Length | `(len s)` | `s.Length` | Get string length |
-| Upper | `(upper s)` | `s.ToUpper()` | Convert to uppercase |
-| Lower | `(lower s)` | `s.ToLower()` | Convert to lowercase |
-| Trim | `(trim s)` | `s.Trim()` | Remove leading/trailing whitespace |
-| Contains | `(contains s sub)` | `s.Contains(sub)` | Check if string contains substring |
-| Starts | `(starts s prefix)` | `s.StartsWith(prefix)` | Check if string starts with prefix |
-| Ends | `(ends s suffix)` | `s.EndsWith(suffix)` | Check if string ends with suffix |
-| IndexOf | `(indexof s sub)` | `s.IndexOf(sub)` | Find index of substring (-1 if not found) |
-| IndexOf from | `(indexof s sub start)`, `(indexof s sub start count)` | `s.IndexOf(sub, start)`, `s.IndexOf(sub, start, count)` | Search from `start`, optionally within `count` characters |
-| Substring | `(substr s start len)` | `s.Substring(start, len)` | Extract substring |
-| Replace | `(replace s old new)` | `s.Replace(old, new)` | Replace all occurrences |
-| Concat | `(concat a b)` | `a + b` | Concatenate strings |
-| Equals | `(equals a b)` | `a.Equals(b)` | String equality check |
+| Operation | Native Calor |
+|:----------|:-------------|
+| Length | `text.Length` |
+| Case | `text.ToUpperInvariant()`, `text.ToLowerInvariant()` |
+| Trim | `text.Trim()` |
+| Search | `text.Contains(part, System.StringComparison.Ordinal)` |
+| Prefix and suffix | `text.StartsWith(prefix, System.StringComparison.Ordinal)`, `text.EndsWith(suffix, System.StringComparison.Ordinal)` |
+| Index | `text.IndexOf(part, System.StringComparison.Ordinal)` |
+| Index from a position | `text.IndexOf(part, start, System.StringComparison.Ordinal)` |
+| Index in a segment | `text.IndexOf(part, start, count, System.StringComparison.Ordinal)` |
+| Slice | `text.Substring(start, length)` |
+| Replace | `text.Replace(oldValue, newValue)` |
+| Concatenate | `left + right` |
+| Equality | `System.String.Equals(left, right, System.StringComparison.Ordinal)` |
+| Character access | `text[index]` |
 
-### Examples
-
-```
-// Get string length
-§B{length} (len "hello")        // 5
-
-// Convert case
-§B{upper} (upper "hello")       // "HELLO"
-§B{lower} (lower "WORLD")       // "world"
-
-// Trim whitespace
-§B{trimmed} (trim "  hello  ")  // "hello"
-
-// Check contents
-§B{hasWorld} (contains "hello world" "world")  // true
-§B{startsH} (starts "hello" "he")              // true
-§B{endsO} (ends "hello" "lo")                  // true
-
-// Find and extract
-§B{idx} (indexof "hello" "ll")  // 2
-§B{sub} (substr "hello" 1 3)    // "ell"
-
-// Transform
-§B{replaced} (replace "hello" "l" "L")  // "heLLo"
-§B{full} (concat "hello" " world")      // "hello world"
+```calor
+module StringBasics
+  func Main () → string
+    !
+    let string:text = "  hello world  ".Trim()
+    return "${text.Length}:${text.ToUpperInvariant()}:${text.Substring(1, 3)}:${text.Replace("world", "Calor")}"
 ```
 
----
+`Main()` returns `11:HELLO WORLD:ell:hello Calor`. Strings are immutable:
+methods such as `Trim` and `Replace` return a value rather than changing `text`.
+Arguments and overloads are checked as ordinary .NET calls. There is no separate
+prefix-string-operation syntax or operand-count convention.
 
-## String Comparison Modes
+<a id="string-comparison-modes"></a>
 
-String operations that compare text support optional comparison modes via keyword arguments:
+## Comparison modes
 
-| Mode | Keyword | C# Equivalent |
-|:-----|:--------|:--------------|
-| Ordinal | `:ordinal` | `StringComparison.Ordinal` |
-| Ignore Case | `:ignore-case` | `StringComparison.OrdinalIgnoreCase` |
-| Invariant | `:invariant` | `StringComparison.InvariantCulture` |
-| Invariant Ignore Case | `:invariant-ignore-case` | `StringComparison.InvariantCultureIgnoreCase` |
+Pass a `System.StringComparison` value when the comparison must not depend on
+the current culture.
 
-### Supported Operations
+| Value | Meaning |
+|:------|:--------|
+| `Ordinal` | Compare without linguistic culture rules |
+| `OrdinalIgnoreCase` | Ordinal comparison, ignoring case |
+| `InvariantCulture` | Use invariant linguistic culture rules |
+| `InvariantCultureIgnoreCase` | Invariant linguistic comparison, ignoring case |
 
-- `contains`, `starts`, `ends`, `indexof`, `equals`
+The overloads without a comparison argument do not all behave alike.
+`Contains(string)` and instance `Equals(string)` are ordinal; `StartsWith(string)`,
+`EndsWith(string)` and `IndexOf(string)` use the current culture.
+`ToUpperInvariant` and `ToLowerInvariant` also avoid the current culture.
 
-### Omitting the mode does NOT mean ordinal
-
-This is the part that surprises people, and it is .NET's behaviour, not Calor's invention:
-
-| Written without a mode | .NET overload it becomes | Comparison |
-|:--|:--|:--|
-| `(contains s "x")` | `s.Contains("x")` | **ordinal** |
-| `(equals a b)` | `a.Equals(b)` | **ordinal** |
-| `(starts s "x")` | `s.StartsWith("x")` | **current culture** |
-| `(ends s "x")` | `s.EndsWith("x")` | **current culture** |
-| `(indexof s "x")` | `s.IndexOf("x")` | **current culture** |
-
-Culture-sensitive comparison is not a rounding error. Under `hu-HU`, where the `dzs` digraph collates
-as a single unit, **the same two strings give opposite answers in one expression**:
-
-```
-"dzsx".Contains("zsx")   -> True    (Contains is ordinal)
-"dzsx".IndexOf("zsx")    -> -1      (IndexOf is culture-sensitive)
+```calor
+module StringComparisons
+  func Main () → string
+    !
+    let string:text = "hello world"
+    return "${text.Contains("WORLD", System.StringComparison.OrdinalIgnoreCase)}:${text.StartsWith("hello", System.StringComparison.Ordinal)}:${text.IndexOf("world", System.StringComparison.Ordinal)}:${System.String.Equals("I", "i", System.StringComparison.OrdinalIgnoreCase)}"
 ```
 
-And under any culture, `"abc".StartsWith("\u200dabc")` is **true** — a zero-width joiner has no
-collation weight — while the ordinal comparison is **false**.
+`Main()` returns `True:True:6:True`.
 
-If you want ordinal behaviour from `starts`, `ends` or `indexof`, **say `:ordinal`**.
+The distinction is observable, not just a stylistic preference. For example,
+under `hu-HU`, ordinal membership in `"dzsx"` can find `"zsx"` while the
+culture-sensitive `IndexOf` cannot. Do not remove an explicit comparison
+argument while porting a program.
 
-### In contracts, only ordinal comparison is verifiable
+Choosing `Ordinal` defines runtime behavior; it does not by itself establish a
+verification proof. Read the verifier's actual outcome. Only an assumption-free,
+non-vacuous `proven` postcondition is eligible for proof-based guard removal.
+Inconclusive outcomes do not authorize removal. Runtime checks require an enabled
+contract mode and supported lowering. See
+[verification guarantees](https://calor.dev/docs/guides/verification-guarantees/).
 
-The modes behave exactly as documented at **runtime**. But inside a `§Q` or `§S` the verifier
-**refuses** anything it cannot model ordinally — it reports `Unsupported` and the runtime check is
-**kept** rather than proved away. Two cases are refused:
+<a id="regex-operations"></a>
+<a id="character-operations"></a>
+<a id="stringbuilder-operations"></a>
 
-- any mode other than `:ordinal`, on any operation;
-- `starts`, `ends`, `indexof` with **no mode**, per the table above.
+## Regex, characters and StringBuilder
 
-This is deliberate. Until v0.12 the verifier translated both cases as ordinal, which could mint a
-false `Proven` and delete a check that was genuinely failing (divergence D4,
-`docs/verification-modeled-forms.md`).
+Use `System.Text.RegularExpressions.Regex` for regular expressions, `char`
+methods for character classification and `System.Text.StringBuilder` for a
+mutable buffer. Backslashes in a regex pattern must also be escaped in the
+Calor string: regex `\d` is written as `"\\d"`.
 
-Practical consequence: `§S (equals result STR:"OK" :ignore-case)` and `§S (starts result STR:"OK")`
-are both enforced at runtime and never elided. To get a *proved* contract, state `:ordinal`.
-
-### Examples
-
-```
-// Case-insensitive contains
-§B{found} (contains "Hello World" "HELLO" :ignore-case)  // true
-
-// Case-insensitive equals
-§B{same} (equals "YES" "yes" :ignore-case)  // true
-
-// Ordinal comparison (exact match)
-§B{exact} (contains "Hello" "hello" :ordinal)  // false
-
-// Case-insensitive startsWith
-§B{starts} (starts "Hello World" "HELLO" :ignore-case)  // true
-
-// Find index ignoring case
-§B{idx} (indexof "Hello World" "WORLD" :ignore-case)  // 6
+```calor
+module TextTools
+  func Main () → string
+    ! alloc, mut
+    let bool:digits = System.Text.RegularExpressions.Regex.IsMatch("42", "^[0-9]+$")
+    let char:letter = "Cat"[0]
+    let System.Text.StringBuilder:builder = new System.Text.StringBuilder()
+    builder.Append(letter)
+    builder.Append("at")
+    return "${digits}:${char.IsDigit('4')}:${builder.ToString()}"
 ```
 
----
+`Main()` returns `True:True:Cat`. The effect row declares allocation (`alloc`)
+and mutation (`mut`) for the buffer.
 
-## Regex Operations
+| Purpose | Ordinary .NET operation |
+|:--------|:------------------------|
+| First regex match | `Regex.Match(text, pattern)`; inspect the match's `Success` and `Value` |
+| Regex replacement | `Regex.Replace(text, pattern, replacement)` |
+| Regex split | `Regex.Split(text, pattern)` |
+| Character code | `(int)letter` |
+| Character from code | `(char)code` |
+| Classification | `char.IsLetter(c)`, `char.IsWhiteSpace(c)`, `char.IsUpper(c)`, `char.IsLower(c)` |
+| Character case | `char.ToUpperInvariant(c)`, `char.ToLowerInvariant(c)` |
+| Buffer append | `builder.Append(value)`, `builder.AppendLine(value)` |
+| Buffer edits | `builder.Insert(index, value)`, `builder.Remove(start, count)`, `builder.Clear()` |
+| Buffer size and result | `builder.Length`, `builder.ToString()` |
 
-Calor provides native regular expression support via the `regex-*` operations.
+These are API calls, not special expression operators. Preserve the actual
+receiver type, overload, arguments and effects when composing them.
+`Append` returns the same mutable builder; chaining does not turn mutation
+into an immutable string operation.
 
-| Operation | Syntax | C# Equivalent | Description |
-|:----------|:-------|:--------------|:------------|
-| Test | `(regex-test s pattern)` | `Regex.IsMatch(s, pattern)` | Test if pattern matches |
-| Match | `(regex-match s pattern)` | `Regex.Match(s, pattern)` | Get first match |
-| Replace | `(regex-replace s pattern replacement)` | `Regex.Replace(s, pattern, replacement)` | Replace matches |
-| Split | `(regex-split s pattern)` | `Regex.Split(s, pattern)` | Split by pattern |
+## Error handling
 
-### Pattern Escaping
+`Substring` and indexing throw for invalid bounds. Validate `start >= 0`,
+`count >= 0`, and `start <= text.Length - count` before slicing when those
+values come from untrusted input. Guard nullable receivers before reading
+members; `text != null && text.Length > 0` short circuits, while a non-null
+annotation alone is not a runtime check on .NET callers.
 
-In Calor strings, backslashes must be escaped. For regex patterns:
-- `\d` (digit) becomes `"\\d"` in Calor
-- `\s` (whitespace) becomes `"\\s"` in Calor
-- `\w` (word char) becomes `"\\w"` in Calor
+Regex patterns can be invalid or expensive. Use a valid pattern and an
+appropriate timeout for untrusted text; an effect row is not a complexity
+bound. In contracts, use only supported runtime lowering and read the actual
+verifier status rather than assuming every string or regex operation is
+modeled.
 
-### Examples
+## Interpolated strings
 
-```
-// Test if string contains digits
-§B{hasDigits} (regex-test "hello123" "\\d+")  // true
+A `${...}` hole inside a string holds an expression. It can include alignment
+(`,10`) and a format specifier (`:F2`), as in C#. Holes are evaluated from left
+to right. Formatting normally uses the current .NET culture.
 
-// Test email format (simplified)
-§B{isEmail} (regex-test email "^[^@]+@[^@]+$")
+```calor
+module Receipt
+  func Line (string:item, double:amount) → string
+    !
+    return "${item,-8}|${amount,10:F2}|${amount * 2:F1}"
 
-// Replace whitespace with dashes
-§B{slugified} (regex-replace "hello world" "\\s+" "-")  // "hello-world"
-
-// Replace all digits with X
-§B{masked} (regex-replace "abc123xyz" "\\d" "X")  // "abcXXXxyz"
-
-// Split by comma
-§B{parts} (regex-split "a,b,c" ",")  // ["a", "b", "c"]
-
-// Split by any whitespace
-§B{words} (regex-split "hello   world\ttab" "\\s+")
-```
-
----
-
-## Character Operations
-
-Calor provides operations for working with individual characters.
-
-| Operation | Syntax | C# Equivalent | Description |
-|:----------|:-------|:--------------|:------------|
-| Char At | `(char-at s index)` | `s[index]` | Get character at index |
-| Char Code | `(char-code c)` | `(int)c` | Get Unicode code point |
-| Char From Code | `(char-from-code n)` | `(char)n` | Create char from code point |
-| Is Letter | `(is-letter c)` | `char.IsLetter(c)` | Check if letter |
-| Is Digit | `(is-digit c)` | `char.IsDigit(c)` | Check if digit |
-| Is Whitespace | `(is-whitespace c)` | `char.IsWhiteSpace(c)` | Check if whitespace |
-| Is Upper | `(is-upper c)` | `char.IsUpper(c)` | Check if uppercase |
-| Is Lower | `(is-lower c)` | `char.IsLower(c)` | Check if lowercase |
-| Char Upper | `(char-upper c)` | `char.ToUpper(c)` | Convert to uppercase |
-| Char Lower | `(char-lower c)` | `char.ToLower(c)` | Convert to lowercase |
-
-### Examples
-
-```
-// Get first character
-§B{first} (char-at "hello" 0)  // 'h'
-
-// Check character properties
-§B{isLetter} (is-letter 'A')      // true
-§B{isDigit} (is-digit '5')        // true
-§B{isSpace} (is-whitespace ' ')   // true
-§B{isUpper} (is-upper 'A')        // true
-§B{isLower} (is-lower 'a')        // true
-
-// Convert character case
-§B{upper} (char-upper 'a')  // 'A'
-§B{lower} (char-lower 'Z')  // 'z'
-
-// Character code conversions
-§B{code} (char-code 'A')       // 65
-§B{char} (char-from-code 65)   // 'A'
-
-// Check if first char is uppercase letter
-§B{startsWithUpper} (&& (is-letter (char-at s 0)) (is-upper (char-at s 0)))
+  func Main () → string
+    !
+    return Line("coffee", 3.5) + ":\${x}"
 ```
 
----
+Under the invariant or `en-US` culture, `Main()` returns
+`coffee  |      3.50|7.0:${x}`. Under `de-DE`, it returns
+`coffee  |      3,50|7,0:${x}`. For culture-independent numeric text, pass
+`System.Globalization.CultureInfo.InvariantCulture` to an appropriate numeric
+`ToString` overload.
 
-## Operand counts
+Escape the dollar sign to write a literal hole: `"\${x}"` contains the four
+characters `${x}` and does not read a variable named `x`.
 
-Every built-in operation checks its operand count. Too many or too few operands
-is error `Calor0110`, which names the allowed count. Before 0.27, extra operands
-to `contains`, `starts`, `ends`, `equals`, `indexof` and `str` were accepted and
-silently dropped, so `(indexof s "@" 3)` compiled to `s.IndexOf("@")`. Comparison
-operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) and `**` take exactly two operands;
-`(< a b c)` is `Calor0110` rather than `(a < b) < c`.
+### Holes are ordinary expressions
 
-## StringBuilder Operations
+Names, calls, indexing and operators in a hole use normal binding and effect
+checking. Named arguments are ordinary call syntax, not an instruction to treat
+the hole as raw C#. An undefined name still reports `Calor0200` at its source
+location:
 
-For building strings efficiently, Calor provides StringBuilder operations that compile to `System.Text.StringBuilder`.
-
-| Operation | Syntax | C# Equivalent | Description |
-|:----------|:-------|:--------------|:------------|
-| New | `(sb-new)` | `new StringBuilder()` | Create empty builder |
-| New with init | `(sb-new "text")` | `new StringBuilder("text")` | Create with initial value |
-| New with capacity | `(sb-new 64)`, `(sb-new "text" 64)` | `new StringBuilder(64)`, `new StringBuilder("text", 64)` | Every operand is passed to the constructor |
-| Append | `(sb-append sb text)` | `sb.Append(text)` | Append text |
-| Append Line | `(sb-appendline sb text)` | `sb.AppendLine(text)` | Append text with newline |
-| Insert | `(sb-insert sb index text)` | `sb.Insert(index, text)` | Insert at position |
-| Remove | `(sb-remove sb start length)` | `sb.Remove(start, length)` | Remove characters |
-| Clear | `(sb-clear sb)` | `sb.Clear()` | Clear all content |
-| To String | `(sb-tostring sb)` | `sb.ToString()` | Get final string |
-| Length | `(sb-length sb)` | `sb.Length` | Get current length |
-
-### Functional Chaining Pattern
-
-StringBuilder operations return the builder, enabling functional chaining:
-
-```
-// Build a string with multiple appends
-§B{result} (sb-tostring
-             (sb-append
-               (sb-append
-                 (sb-new)
-                 "Hello")
-               " World"))
-// Result: "Hello World"
+```calor expect=Calor0200
+module MissingInterpolationName
+  func Main () → string
+    !
+    return "hello ${missing}"
 ```
 
-### Examples
+Calls must also fit the enclosing function's effect row. For example,
+`System.Console.ReadLine()` needs `cr`, the console-read effect, even inside a
+hole.
 
-```
-// Simple string building
-§B{sb1} (sb-new)
-§B{sb2} (sb-append sb1 "Hello")
-§B{sb3} (sb-append sb2 " World")
-§B{result} (sb-tostring sb3)  // "Hello World"
+<a id="c-migration"></a>
 
-// Initialize with value
-§B{sb} (sb-new "Start: ")
-§B{sb} (sb-append sb "End")
-§B{result} (sb-tostring sb)  // "Start: End"
+## Converting C# interpolation
 
-// Build with newlines
-§B{sb1} (sb-new)
-§B{sb2} (sb-appendline sb1 "Line 1")
-§B{sb3} (sb-appendline sb2 "Line 2")
-§B{multiline} (sb-tostring sb3)
+The C# target type can change overload selection. The converter uses its
+semantic context to retain that choice.
 
-// Insert and remove
-§B{sb} (sb-append (sb-new) "HelloWorld")
-§B{sb} (sb-insert sb 5 " ")          // "Hello World"
-§B{sb} (sb-remove sb 5 1)            // "HelloWorld"
+| C# target | Conversion behavior |
+|:----------|:--------------------|
+| `string` or `object` | Native interpolation when the expression is representable |
+| `FormattableString` or `IFormattable`, with holes | An explicit target-type cast retains the selected overload |
+| A custom interpolated-string handler | Preserve the enclosing C# statement or member; report `string-interpolation-handler` |
+| `FormattableString` with no holes | Preserve the enclosing C# boundary because a plain Calor string cannot express that conversion |
 
-// Get length
-§B{len} (sb-length (sb-append (sb-new) "test"))  // 4
+Unsupported holes and special raw/verbatim format clauses can also require
+preservation. Converter-owned C# payloads are not native Calor expressions and
+do not establish native effect or verification acceptance. With fallback
+disabled, an unsupported conversion fails instead of producing that payload.
 
-// Clear and reuse
-§B{sb} (sb-append (sb-new) "temporary")
-§B{sb} (sb-clear sb)
-§B{len} (sb-length sb)  // 0
-```
-
----
-
-## Composing Operations
-
-String operations can be freely composed with each other and with other Calor expressions.
-
-### String + Char Operations
-
-```
-// Check if first character is a letter
-§B{firstIsLetter} (is-letter (char-at name 0))
-
-// Get uppercase first character
-§B{firstUpper} (char-upper (char-at name 0))
-
-// Capitalize: uppercase first char + lowercase rest
-§B{sb1} (sb-new)
-§B{sb2} (sb-append sb1 (str (char-upper (char-at s 0))))
-§B{sb3} (sb-append sb2 (lower (substr s 1)))
-§B{capitalized} (sb-tostring sb3)
-```
-
-### String + Regex Operations
-
-```
-// Check if trimmed input has digits
-§B{hasDigits} (regex-test (trim input) "\\d")
-
-// Normalize whitespace then check pattern
-§B{normalized} (regex-replace (trim s) "\\s+" " ")
-§B{isValid} (regex-test normalized "^[a-z ]+$")
-```
-
-### In Conditions
-
-```
-// Validate input
-§IF (== (len input) 0)
-  §R "Input required"
-§EI (! (regex-test input "^[a-zA-Z]+$"))
-  §R "Letters only"
-§EL
-  §R (concat "Valid: " input)
-```
-
-### In Contracts
-
-```
-§F{ProcessName:pub}
-  §I{string:name}
-  §O{string}
-  §Q (> (len name) 0)                    // Requires: non-empty
-  §Q (is-letter (char-at name 0))        // Requires: starts with letter
-  §S (== (len result) (len name))        // Ensures: same length
-  §R (upper name)
-```
-
----
-
-## Error Handling
-
-String operations can throw exceptions at runtime:
-
-| Error | Cause | Example |
-|:------|:------|:--------|
-| `IndexOutOfRangeException` | Invalid index in `char-at` | `(char-at "hi" 10)` |
-| `ArgumentOutOfRangeException` | Invalid range in `substr`, `sb-remove` | `(substr "hi" 10 5)` |
-| `RegexParseException` | Invalid regex pattern | `(regex-test s "[invalid")` |
-
-### Safe Patterns
-
-```
-// Check length before accessing
-§IF (> (len s) 0)
-  §B{first} (char-at s 0)
-
-// Check index before substring
-§IF (&& (>= start 0) (<= (+ start len) (len s)))
-  §B{sub} (substr s start len)
-```
-
----
-
-## C# Migration
-
-When converting C# code to Calor, string operations are automatically recognized:
-
-| C# | Calor |
-|:---|:------|
-| `s.ToUpper()` | `(upper s)` |
-| `s.ToLower()` | `(lower s)` |
-| `s.Trim()` | `(trim s)` |
-| `s.Contains("x")` | `(contains s "x")` |
-| `s.Contains("x", StringComparison.OrdinalIgnoreCase)` | `(contains s "x" :ignore-case)` |
-| `s[i]` | `(char-at s i)` |
-| `char.IsLetter(c)` | `(is-letter c)` |
-| `(int)c` | `(char-code c)` |
-| `(char)n` | `(char-from-code n)` |
-| `Regex.IsMatch(s, p)` | `(regex-test s p)` |
-| `Regex.Replace(s, p, r)` | `(regex-replace s p r)` |
-| `new StringBuilder()` | `(sb-new)` |
-| `sb.Append(x)` | `(sb-append sb x)` |
-| `sb.ToString()` | `(sb-tostring sb)` |
-
----
-
-## Next
-
-- [Control Flow](/calor/syntax-reference/control-flow/) - Loops and conditionals
-- [Contracts](/calor/syntax-reference/contracts/) - Pre/post conditions
+`calor feature-check string-interpolation` reports
+the installed compiler's conversion support level. Inspect the conversion
+report and supply the original references and parse context; a missing target
+type is not evidence that the original overload choice was recovered.

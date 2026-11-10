@@ -7,422 +7,252 @@ nav_order: 3
 
 # Expressions
 
-## Operator spelling
+Calor expressions use infix operators with C# precedence, ordinary postfix calls
+and indexing. Write `a + b`, `items[index]` and `value.Method(argument)`.
+Parentheses group an expression; they do not introduce a prefix operation.
 
-Arithmetic, comparison, logical and bitwise expressions use symbols:
-`+ - * / % ** == != < <= > >= && || ! & | ^ << >> ~`.
-Word aliases such as `add`, `and`, `eq` and `negate` are errors; diagnostics
-name the replacement symbol. Built-in expression heads are case-sensitive:
-write `len`, `cast` and `is-letter`, not `LEN`, `Cast` or `IS-LETTER`.
-The pattern grammar's `and`, `or` and `not` combinators are not expression
-operators.
+Keywords and operators are case-sensitive. Use the symbolic operators below,
+not word aliases such as `add` or `eq`. Pattern combinators `and`, `or` and
+`not` belong to patterns, not ordinary Boolean expressions.
 
-Quantifiers use `forall` and `exists`; the Unicode spellings are errors.
-Function bodies are delimited by indentation, not explicit body markers.
-Generic types and parameters use inline angle brackets (`List<i32>`, `<T>`).
+## Precedence and grouping
 
-Declaration visibility is also exact-case: `pub`, `int`, `prot`, `priv`,
-`prot-int`, or `priv-prot`. Long forms such as `public` and older short
-forms such as `pri` are errors. Omitting visibility keeps the declaration's
-existing default.
+The table runs from strongest to weakest binding.
 
-## Integer literals
+| Category | Operators or forms |
+|:---------|:-------------------|
+| Postfix | Calls, member access, indexing |
+| Unary | `!`, `~`, unary `+` and `-` |
+| Multiplicative | `*`, `/`, `%` |
+| Additive | `+`, `-` |
+| Shift | `<<`, `>>` |
+| Relational | `<`, `<=`, `>`, `>=` |
+| Equality | `==`, `!=` |
+| Bitwise AND | `&` |
+| Bitwise XOR | `^` |
+| Bitwise OR | `\|` |
+| Logical AND | `&&` |
+| Logical OR | `\|\|` |
+| Null coalescing | `??` |
+| Conditional | `condition ? whenTrue : whenFalse` |
 
-Integer literals preserve sign, base, width, and signedness through compilation.
-Decimal and hexadecimal forms accept `_` separators:
-
-```calor
-INT:-0x8000_0000
-LONG:9_223_372_036_854_775_807
-UINT:4_294_967_295
-ULONG:18_446_744_073_709_551_615
-0xFFFF_FFFFU
-```
-
-`INT:` and unsuffixed literals infer 32- or 64-bit signed width from their
-value. `LONG:`, `UINT:`, and `ULONG:` request an explicit width/signedness.
-Negative `UINT:`/`ULONG:` literals and negative literals with a `U` suffix are
-rejected with `Calor0010`.
-
-Negative hexadecimal minimum values are supported and emitted without changing
-their runtime value.
-
-An explicit signed `L` suffix must remain signed. Values above
-`9223372036854775807L` (or below `-9223372036854775808L`) are rejected with
-`Calor0012`; they are never reinterpreted as `ulong`. The exact
-`-9223372036854775808L` boundary remains valid, and `UL` continues to request
-unsigned 64-bit semantics explicitly.
-
-## String literals and interpolation
-
-Ordinary and triple-quoted strings use `${expression}` interpolation. The
-lexer records literal and expression parts structurally; code generation does
-not reparse expression text from a decoded string.
+Binary operators associate to the left, except `??`, which associates to the
+right. Conditional expressions also associate to the right.
+Use parentheses when grouping would otherwise be hard to read.
 
 ```calor
-"Value: ${value,-10:N2}"
-"""
-Name: ${name}
-Value: ${value:N2}
-"""
+module ExpressionPrecedence
+  func Main () → string
+    !
+    let int?:missing = null
+    let int:coalesced = missing ?? 3 + 4 * 2
+    let int:conditional = false ? 1 : true ? 2 : 3
+    return "${2 + 3 * 4}:${(2 + 3) * 4}:${12 - 5 - 2}:${32 / 4 / 2}:${1 << 2 + 1}:${6 & 3}:${6 ^ 3}:${4 | 1}:${!false && true || false}:${coalesced}:${conditional}"
 ```
 
-`\${` keeps interpolation literal. Escaped braces remain literal braces.
-Named and numeric interpolation expressions, alignment, and format clauses are
-preserved. Unknown escapes retain their backslash and character rather than
-silently dropping the backslash.
+`Main()` returns `14:20:5:4:8:2:5:5:True:11:2`. For example, `1 << 2 + 1`
+means `1 << (2 + 1)`, and `32 / 4 / 2` means `(32 / 4) / 2`.
 
-Every unescaped hole is a runtime expression: `${0}` evaluates to `0`, and
-`${-1}` evaluates to `-1`. Use `\${0}` for literal placeholder text. Alignment
-and format clauses work for numeric holes too: `${1,4:D2}` produces `  01`.
+## Arithmetic operators
 
-Interpolated UTF-8 literals are rejected with `Calor0011`. Use interpolation
-to produce a string and encode it explicitly; Calor never emits invalid
-interpolated C# such as `$"..."u8`.
+| Operator | Meaning |
+|:---------|:--------|
+| `+`, `-` | Addition and subtraction |
+| `*` | Multiplication |
+| `/` | Division |
+| `%` | Remainder |
 
-Binary expression emission preserves the AST evaluation tree. In particular,
-equal-precedence right operands in subtraction, division, shifts, and
-comparisons are parenthesized when required.
+Integer division truncates toward zero. A nonzero integer remainder has the
+dividend's sign; it is not always a positive mathematical modulo.
+Integer arithmetic is checked by default. Overflow and integer division by zero
+throw exceptions rather than produce a successful result.
 
-Calor uses Lisp-style prefix notation for all operations. This eliminates operator precedence ambiguity.
+```calor
+module ArithmeticBehavior
+  func Increment (int:value) → int
+    !
+    return value + 1
+
+  func Divide (int:numerator, int:denominator) → int
+    !
+    return numerator / denominator
+
+  func Remainder (int:numerator, int:denominator) → int
+    !
+    return numerator % denominator
+
+  func Main () → string
+    !
+    return "${Increment(41)}:${Divide(-7, 3)}:${Remainder(-7, 3)}"
+```
+
+`Main()` returns `42:-2:-1`. `Increment(2147483647)` throws
+`OverflowException`, `Divide(1, 0)` throws `DivideByZeroException`, and
+`Divide(-2147483648, -1)` throws `OverflowException`.
+These are body exceptions, not failed runtime contract checks.
+
+## Comparison and logical operators
+
+Comparisons use two operands: `a == b`, `a != b`, `a < b`, `a <= b`,
+`a > b` and `a >= b`. Write null explicitly: `value != null`.
+Logical operators are `&&`, `||` and unary `!`.
+
+Combine two comparisons for a range check. `minimum <= value <= maximum`
+is not a chained comparison.
+
+```calor
+module ComparisonExpressions
+  func InRange (int:value, int:minimum, int:maximum) → bool
+    !
+    return value >= minimum && value <= maximum
+
+  func Recognized (int:value) → bool
+    !
+    return value == 1 || value == 2 || value == 3
+
+  func HasValue (string?:value) → bool
+    !
+    return value != null
+
+  func Main () → string
+    !
+    return "${InRange(5, 0, 10)}:${InRange(11, 0, 10)}:${Recognized(2)}:${Recognized(4)}:${HasValue(null)}:${HasValue("")}"
+```
+
+`Main()` returns `True:False:True:False:False:True`. An empty string is not null.
+
+## Evaluation order and short circuiting
+
+Operands and call arguments evaluate left to right. `&&` evaluates its right
+operand only when the left is true; `||` evaluates it only when the left is false.
+`??` evaluates its fallback only when the left value is null. A conditional
+expression evaluates only its selected branch.
+
+This program records the expressions that actually run. Its helper's `mut` row
+declares the list mutation; the caller also declares the list allocation.
+
+```calor
+module ExpressionEvaluation
+  func Record (List<int>:trace, int:value) → int
+    ! mut
+    trace.Add(value)
+    return value
+
+  func Pair (int:left, int:right) → int
+    !
+    return left * 10 + right
+
+  func Main () → string
+    ! alloc, mut
+    let List<int>:trace = new List<int>()
+    let bool:andSkipped = false && Record(trace, 1) > 0
+    let bool:orSkipped = true || Record(trace, 2) > 0
+    let bool:andTaken = true && Record(trace, 3) > 0
+    let bool:orTaken = false || Record(trace, 4) > 0
+    let int:chosen = true ? Record(trace, 5) : Record(trace, 6)
+    let int?:present = 7
+    let int?:missing = null
+    let int:a = present ?? Record(trace, 7)
+    let int:b = missing ?? Record(trace, 8)
+    let int:pair = Pair(Record(trace, 9), Record(trace, 10))
+    return "${andSkipped}:${orSkipped}:${andTaken}:${orTaken}:${chosen}:${a}:${b}:${pair}:${trace.Count}:${trace[0]}:${trace[1]}:${trace[2]}:${trace[3]}:${trace[4]}:${trace[5]}"
+```
+
+`Main()` returns `False:True:True:True:5:7:8:100:6:3:4:5:8:9:10`.
+The trace is exactly `3, 4, 5, 8, 9, 10`: skipped branches contribute nothing,
+and each selected expression runs once.
+
+## Using expressions
+
+Expressions can appear in bindings, returns, call arguments, conditions,
+contracts and loop bounds.
+
+| Position | Example fragment |
+|:---------|:-----------------|
+| Binding | `let int:sum = a + b` |
+| Return | `return (x - 1) * 2` |
+| Call argument | `Console.WriteLine(x * x)` |
+| Condition | `if value > 0` |
+| Precondition | `requires divisor != 0` |
+| Postcondition | `=> result >= 0` |
+| Range bound | `for i from 0 to count - 1 step 1` |
+
+A console call needs `cw` in its caller's effect row. Snapshot range bounds
+evaluate once; the semicolon loop form reevaluates its condition.
+See [control flow](/calor/syntax-reference/control-flow/) and
+[contracts](/calor/syntax-reference/contracts/).
+
+### Expression-valued allocation sizes
+
+Array dimensions are expressions at the allocation site, not quoted source
+text. Their calls retain normal order and short-circuit behavior:
+
+```calor
+module ArrayDimensions
+  func Size (int:n) → int
+    !
+    return n + 1
+
+  func Main () → int
+    ! alloc
+    let int[]:values = new int[Size(2)]
+    return values.Length
+```
+
+`Main()` returns `3`. Moving `Size(2)` ahead of a conditional branch would
+change the program if that helper had effects; syntax migration must not do so.
+
+## Collection expressions
+
+Collections use ordinary .NET members, not dedicated query tags.
+
+| Expression | Meaning |
+|:-----------|:--------|
+| `items.Contains(value)` | Membership in a list or set |
+| `mapping.ContainsKey(key)` | Dictionary key lookup |
+| `mapping.ContainsValue(value)` | Dictionary value lookup |
+| `items.Count` | Collection count |
+| `array.Length` | Array length |
+| `items[index]` | Indexed element |
+
+```calor
+module CollectionExpressions
+  func NonEmptyCount (List<int>:items) → int
+    !
+    requires items.Count > 0
+    => result > 0
+    return items.Count
+
+  func Main () → string
+    ! alloc, mut
+    let List<int>:items = new List<int>()
+    items.Add(5)
+    let Dictionary<string,int>:ages = new Dictionary<string,int>()
+    ages.Add("alice", 30)
+    return "${items.Contains(5)}:${ages.ContainsKey("alice")}:${ages.ContainsValue(30)}:${NonEmptyCount(items)}:${items[0]}"
+```
+
+`Main()` returns `True:True:True:1:5`.
+Use an ordinary property read for `Count` or `Length`, not a zero-argument call.
+See [types](/calor/syntax-reference/types/) for collection construction and
+[calls](/calor/syntax-reference/calls/) for metadata overload resolution.
 
 ## Native computed member reads
 
-Native syntax supports scalar metadata property reads on computed receivers
-whose type identity is resolved. For example, `(value ?? "none").Length`
-selects the actual `System.String.Length` property when `value` is declared
-`string?`. Conditional receivers and resolved string-returning calls retain
-their identity too.
-
-The receiver runs once. A coalescing fallback runs only when its left operand
-is null; a conditional evaluates only its selected branch. Effect enforcement
-still checks all potentially evaluated receiver and fallback operations.
-Nullable fallbacks retain nullable result annotations. Unknown types, opaque
-calls, type parameters and unsupported generic member shapes do not gain
-string metadata or getter purity merely from a matching name.
-
-## Expression-valued allocation sizes
-
-Array and stack-allocation dimensions accept quoted embedded expressions:
-
-```calor
-§ARR{a:i32:"(+ n 1)"}
-§SALLOC{i32:"§C{Size} §/C"}
-```
-
-The quoted attribute is parsed as an expression, not a string value. Its
-evaluation remains at the allocation site, including inside a conditional
-operand; pretty-printing must not run it ahead of an earlier operand.
-
----
-
-## Prefix Notation
-
-Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
-
-| Infix | Calor Prefix |
-|:------|:------------|
-| `a + b` | `(+ a b)` |
-| `a * b + c` | `(+ (* a b) c)` |
-| `a + b * c` | `(+ a (* b c))` |
-| `(a + b) * c` | `(* (+ a b) c)` |
-
----
-
-## Arithmetic Operators
-
-| Operator | Meaning | Example |
-|:---------|:--------|:--------|
-| `+` | Addition | `(+ a b)` |
-| `-` | Subtraction | `(- a b)` |
-| `*` | Multiplication | `(* a b)` |
-| `/` | Division | `(/ a b)` |
-| `%` | Modulo | `(% a b)` |
-
-### Examples
-
-```
-(+ 1 2)           // 3
-(- 10 3)          // 7
-(* 4 5)           // 20
-(/ 15 3)          // 5
-(% 17 5)          // 2
-```
-
-### Nested Expressions
-
-```
-// (1 + 2) * 3 = 9
-(* (+ 1 2) 3)
-
-// 1 + (2 * 3) = 7
-(+ 1 (* 2 3))
-
-// ((a + b) * c) - d
-(- (* (+ a b) c) d)
-```
-
----
-
-## Comparison Operators
-
-| Operator | Meaning | Example |
-|:---------|:--------|:--------|
-| `==` | Equal | `(== a b)` |
-| `!=` | Not equal | `(!= a b)` |
-| `<` | Less than | `(< a b)` |
-| `<=` | Less or equal | `(<= a b)` |
-| `>` | Greater than | `(> a b)` |
-| `>=` | Greater or equal | `(>= a b)` |
-
-### Examples
-
-```
-(== x 0)          // x equals 0
-(!= y "")         // y is not empty string
-(< age 18)        // age less than 18
-(>= score 70)     // score at least 70
-```
-
-Each comparison takes exactly two operands. `(== x)` and `(!= x)` are
-`Calor0110`: they used to compare `x` with `null` silently. Write the null
-explicitly, `(== x null)`. The same rule holds for the other two short forms
-the parser used to accept: `(?? x)` is `Calor0110` (it was read as `x`, dropping
-the fallback), and so is `(? c a)` (it was read as `c ? a : null`). The
-conditional `(? c a b)` takes exactly three operands and `(?? a b)` exactly two.
-
----
-
-## Logical Operators
-
-| Operator | Meaning | Example |
-|:---------|:--------|:--------|
-| `&&` | Logical AND | `(&& a b)` |
-| `\|\|` | Logical OR | `(\|\| a b)` |
-| `!` | Logical NOT | `(! a)` |
-
-### Examples
-
-```
-(&& (> x 0) (< x 100))      // x > 0 AND x < 100
-(|| (== a 1) (== a 2))      // a == 1 OR a == 2
-(! (== x 0))                // NOT (x == 0)
-```
-
-### Complex Conditions
-
-```
-// (x > 0 && x < 100) || y == 0
-(|| (&& (> x 0) (< x 100)) (== y 0))
-
-// !(a == b && c == d)
-(! (&& (== a b) (== c d)))
-```
-
----
-
-## Call expressions
-
-Calls in bindings, returns, and other expressions accept multi-line `§A`
-arguments, just like statement calls. Indent the arguments beneath the
-containing statement and align `§/C` with that statement:
-
-```calor
-§M{CallExpressions}
-  §F{ClampScore:pub} (i32:score) -> i32
-    §E{}
-    §B{value:i32} §C{Math.Clamp}
-      §A[value] score
-      §A[min] 0
-      §A[max] 100
-    §/C
-    §R value
-```
-
-The closer may also follow the last argument. An indented argument list can
-end at a dedent without `§/C`; the dedent does not end the surrounding function
-or loop. For nested calls, indent the inner argument list another level.
-An equally indented `§A` after an elided nested call remains an outer argument.
-
-The shorthand `§C{target} value` accepts only one unmarked argument on the
-same line. Multi-line arguments need `§A`. In the binding above, replacing
-an argument marker with a bare value reports the missing `§A` at that value,
-without blaming the following valid return statement.
-
-## Using Expressions
-
-### In Return Statements
-
-```
-§R (+ a b)
-§R (* (- x 1) 2)
-§R (>= score 70)
-```
-
-### In Bindings
-
-```
-§B{sum} (+ a b)
-§B{product} (* x y)
-§B{isValid} (&& (> x 0) (< x 100))
-```
-
-### In Print Statements
-
-```
-§P (+ 1 2)          // prints 3
-§P (* x x)          // prints x squared
-```
-
-### In Conditions
-
-```
-§IF (> x 0)
-  §P "positive"
-§EI (< x 0)
-  §P "negative"
-§EL
-  §P "zero"
-```
-
-### In Contracts
-
-```
-§Q (>= x 0)                      // Requires: x >= 0
-§Q (!= divisor 0)                // Requires: divisor not zero
-§S (>= result 0)                 // Ensures: result >= 0
-§S (<= result (* x x))           // Ensures: result <= x²
-```
-
-### In Loop Bounds
-
-Loop bounds can be expressions:
-
-```
-§L{i:0:(- n 1):1}    // i from 0 to n-1
-§L{j:1:(* 2 n):2}    // j from 1 to 2n, step 2
-```
-
----
-
-## Collection Expressions
-
-Calor provides expressions for querying collections.
-
-### Contains Check (`§HAS`)
-
-Check if a collection contains an element.
-
-| Syntax | Description | C# Equivalent |
-|:-------|:------------|:--------------|
-| `§HAS{coll} value` | Element in list/set | `coll.Contains(value)` |
-| `§HAS{dict} §KEY key` | Key in dictionary | `dict.ContainsKey(key)` |
-| `§HAS{dict} §VAL value` | Value in dictionary | `dict.ContainsValue(value)` |
-
-**Examples:**
-```
-// Check if list contains element
-§IF §HAS{numbers} 5
-  §P "Found 5"
-
-// Check if key exists in dictionary
-§IF §HAS{ages} §KEY "alice"
-  §P "Alice found"
-
-// Use in binding
-§B{hasItem} §HAS{inventory} "sword"
-```
-
-### Collection Count (`§CNT`)
-
-Get the number of elements in a collection.
-
-| Syntax | Returns | C# Equivalent |
-|:-------|:--------|:--------------|
-| `§CNT{coll}` | `i32` | `coll.Count` |
-
-**Examples:**
-```
-// Get count
-§B{size} §CNT{items}
-
-// Use in condition
-§IF (> §CNT{queue} 0)
-  §P "Queue not empty"
-
-// Use in loop bound
-§L{for1:i:0:(- §CNT{list} 1):1}
-  §P list[i]
-```
-
-### Using Collection Expressions in Contracts
-
-```
-§F{ProcessItems:pub}
-  §I{List<i32>:items}
-  §O{i32}
-  §Q (> §CNT{items} 0)           // Requires: items not empty
-  §S (>= result 0)
-  // ...
-```
-
----
-
-## Why Prefix Notation?
-
-### 1. No Precedence Ambiguity
-
-Infix:
-```javascript
-a + b * c    // Is this (a+b)*c or a+(b*c)?
-```
-
-Calor:
-```
-(+ a (* b c))    // Clearly a + (b * c)
-(* (+ a b) c)    // Clearly (a + b) * c
-```
-
-### 2. Easy AST Manipulation
-
-The structure `(op arg1 arg2)` directly represents the AST node.
-
-### 3. Uniform Syntax
-
-Every operation follows the same pattern: `(operator arguments...)`
-
----
-
-## Common Patterns
-
-### FizzBuzz Check
-
-```
-(== (% i 15) 0)    // i divisible by 15
-(== (% i 3) 0)     // i divisible by 3
-(== (% i 5) 0)     // i divisible by 5
-```
-
-### Range Check
-
-```
-(&& (>= x min) (<= x max))    // min <= x <= max
-```
-
-### Null Check
-
-```
-(!= value null)    // value is not null
-```
-
-### Equality with Multiple Values
-
-```
-(|| (== x 1) (|| (== x 2) (== x 3)))    // x is 1, 2, or 3
-```
-
----
+The compiler resolves `(value ?? "none").Length` using the actual
+`System.String` property identity when `value` is a `string?` parameter.
+The same bounded resolution covers conditional string receivers and resolved
+string-returning calls. It does not infer a property's type or purity merely
+from the spelling `Length`.
+
+The receiver runs once. A coalescing fallback or conditional branch runs only
+when selected, and its effects still contribute to the enclosing callable.
+Nullable annotations remain attached to resolved values. Unknown, source,
+foreign, opaque or type-parameter receivers do not acquire a string purity
+contract by using the same member name.
 
 ## Next
 
-- [Control Flow](/calor/syntax-reference/control-flow/) - Loops and conditionals
+- [Current language](/calor/syntax-reference/current-language/) — generated syntax catalog
+- [String operations](/calor/syntax-reference/string-operations/) — interpolation and string members
+- [Control flow](/calor/syntax-reference/control-flow/) — loops, conditionals and matching

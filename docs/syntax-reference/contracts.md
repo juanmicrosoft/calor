@@ -7,20 +7,130 @@ nav_order: 5
 
 # Contracts
 
-Contracts are first-class citizens in Calor. They define what a function requires (preconditions) and guarantees (postconditions).
+Contracts state what a function requires from its caller and what it guarantees
+on a normal return. Write preconditions with `requires` and postconditions with
+`=>`, before the first body statement.
+
+```calor
+module ContractDivide
+  func Divide (int:dividend, int:divisor) → int
+    !
+    requires divisor > 0
+    requires dividend >= 0
+    => result >= 0
+    => result <= dividend
+    return dividend / divisor
+```
+
+`Divide(9, 2)` returns `4`. Both input conditions are needed: allowing a negative
+divisor would contradict the promised non-negative result.
+
+## Preconditions
+
+Each `requires` line is an ordinary Boolean expression over the function's
+inputs. Multiple lines must all hold. With runtime checks enabled, a failed
+precondition throws `Calor.Runtime.ContractViolationException` before the body
+runs. For example, `Divide(9, 0)` fails its precondition rather than reaching
+integer division.
+
+Contracts do not replace the implementation or automatically prove every call
+safe. A runtime test that exercises a guard is not a verifier proof.
+
+## Postconditions and `result`
+
+In a postcondition, `result` denotes the value the body returns, not a local
+variable to declare or assign. A postcondition is checked on a normal return
+when its runtime guard is enabled. It does not promise that the body cannot
+throw.
+
+```calor
+module AbsoluteValue
+  func Abs (int:x) → int
+    !
+    => result >= 0
+    if x >= 0
+      return x
+    return 0 - x
+```
+
+`Abs(-5)` returns `5`. The default checked integer arithmetic throws
+`OverflowException` for `Abs(int.MinValue)`; that execution does not reach a
+normal return or establish the postcondition.
+
+## Range validation
+
+Separate a valid input range from the promised result range.
+
+```calor
+module ContractClamp
+  func Clamp (int:value, int:min, int:max) → int
+    !
+    requires min <= max
+    => result >= min
+    => result <= max
+    if value < min
+      return min
+    if value > max
+      return max
+    return value
+
+  func Main () → int
+    !
+    return Clamp(-3, 0, 10) + Clamp(15, 0, 10) + Clamp(5, 0, 10)
+```
+
+`Main()` returns `15`. An inverted range violates the precondition; it is not
+silently repaired.
+
+## Non-empty collections
+
+Use the actual collection type and its members in the contract.
+
+```calor
+module NonEmptyCollection
+  func First (int[]:items) → int
+    !
+    requires items.Length > 0
+    => result == items[0]
+    return items[0]
+```
+
+`First(new int[] { 42 })` returns `42`. With checks enabled, an empty array
+fails the precondition before indexing. The declared input is non-null; a
+nullable input would need its own null guard before reading `Length`.
+
+<a id="runtime-contract-enforcement"></a>
+<a id="contract-modes"></a>
+<a id="runtime-vs-static-verification"></a>
+
+## Runtime modes and verification
+
+`--contract-mode debug` emits detailed runtime checks. `release` emits leaner
+checks; `off` emits none. Turning checks off does not make invalid inputs valid,
+prove a contract or prevent exceptions from the body.
+
+The verifier reports `proven`, `refuted`, `assumed`, `unknown`, `timeout`,
+`unsupported` or `unavailable`. Only a clean, non-vacuous, assumption-free
+`proven` postcondition is eligible for proof-based runtime-guard removal with
+`--verify`. Pass `--keep-proven-guards` to retain otherwise-emitted guards.
+An inconclusive result does not authorize removal.
+
+Runtime lowering has its own support boundary. Requested unsupported lowering,
+including uncertified quantified checks, fails rather than silently dropping a
+guard. See [verification guarantees and limits](https://calor.dev/docs/guides/verification-guarantees/).
 
 ## Source predicates
 
-A contract can call a source function that returns `bool`, including a selected
-static member such as `Predicates.Positive(x)`. Calls use ordinary overload
-resolution, accessibility and argument checking. A static declaration is not a
-value reference; actual value receivers and arguments still need valid bindings.
+A contract can call a source function that returns `bool`, including a
+selected static member such as `Predicates.Positive(x)`. Normal overload
+resolution, accessibility and argument checking still apply.
 
 ```calor
 module FunctionCallBoundary
   func Positive (int:value) → bool
     !
     return value > 0
+
   func Identity (int:x) → int
     !
     requires Positive(x)
@@ -28,505 +138,129 @@ module FunctionCallBoundary
     return x
 ```
 
-Contract calls contribute their selected effects, including receiver and argument
-evaluation, to the enclosing callable. A pure callable cannot hide console output
-(`cw`) in a predicate. This check also applies when runtime contracts are off.
-Methods account for the inherited contracts that will actually execute, including
-their selected predicate calls.
-With runtime contracts enabled, receivers and arguments execute once in source
-order. Turning contracts off removes those checks and their evaluation, not the
-function body.
+`Identity(1)` returns `1`. With checks enabled, `Identity(0)` fails its
+precondition. Predicate receiver and argument expressions run once, in source
+order. Turning contracts off removes their runtime evaluation, not the body.
+Their effects must still fit the enclosing function even when runtime guards
+are off; an effectful predicate cannot hide behind an omitted guard.
+Inherited contracts contribute the calls that will actually execute.
 
-Runtime support does **not** make source-function calls provable by Z3. Such
-contracts remain unsupported by static verification and retain their runtime
-guards when verification is enabled.
+Runtime support does not make a source-function call provable by Z3. Such
+contracts remain unsupported for static verification and retain runtime
+guards with verification enabled.
 
----
+## Quantified contracts
 
-## Preconditions (`§Q`)
+`forall` checks every value in a range; `exists` checks whether at least one
+value satisfies the predicate. Ranges are **half-open**: `start..end` means
+`start <= i && i < end`, unlike the inclusive counted-loop range.
+An empty range is true for `forall` and false for `exists`.
 
-Preconditions specify what must be true when calling a function.
-
-### Syntax
-
-```
-§Q condition
-§Q{message="error text"} condition
-```
-
-### Examples
-
-```
-§Q (>= x 0)                              // x must be non-negative
-§Q (!= divisor 0)                        // divisor must not be zero
-§Q{message="Age must be positive"} (> age 0)
+```calor-fragment
+forall int:i in 0..n : items[i] >= 0
+exists int:i in 0..n : items[i] == target
+forall int:i in 0..n, int:j in 0..n : matrix[i,j] == matrix[j,i]
+forall int:i where i >= 0 && i < n : items[i] >= 0
 ```
 
-### Multiple Preconditions
+Keep the quantified bindings, guard and predicate on one physical line.
+Multiple bindings are comma-separated; an inner bound may depend on an
+earlier variable. Express implication as `!condition || consequence`, not a
+special arrow operator. Quantifier variables are lexical bindings, not IDs.
 
-Functions can have multiple preconditions:
+The matrix line demonstrates the quantified expression, not a complete
+matrix-symmetry API. The natural complete program must first check the
+matrix's dimensions. Under normal enforcement, `int[,].GetLength` currently
+reports unknown-call warnings (`Calor0411`) and the pure caller fails with
+`Calor0410`. Do not omit the dimension checks, invent a reference context or
+turn effects off to count that program as native coverage.
 
-```
-§F{CreateUser:pub}
-  §I{str:name}
-  §I{i32:age}
-  §O{User}
-  §Q (!= name "")                        // name not empty
-  §Q (> (len name) 2)                    // name at least 3 chars
-  §Q (>= age 0)                          // age non-negative
-  §Q (<= age 150)                        // age reasonable
-  // ...
-```
+### All array elements non-negative
 
----
-
-## Postconditions (`§S`)
-
-Postconditions specify what the function guarantees when it returns.
-
-### Syntax
-
-```
-§S condition
-§S{message="error text"} condition
+```calor
+module NonNegativeArray
+  func ProcessArray (int[]:arr, int:n) → bool
+    !
+    requires n >= 0 && n == arr.Length
+    requires forall int:i in 0..n : arr[i] >= 0
+    return true
 ```
 
-### The `result` Variable
+`ProcessArray(new int[] { 0, 3 }, 2)` returns `true`. A negative element
+fails the second precondition with checks enabled, before the body runs.
 
-In postconditions, `result` refers to the return value:
+### Search precondition
 
-```
-§S (>= result 0)                         // result is non-negative
-§S (!= result null)                      // result is not null
-§S (== result (* x x))                   // result equals x squared
-```
-
-### Examples
-
-```
-§F{Abs:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (>= result 0)                       // absolute value is non-negative
-  §IF (>= x 0)
-    §R x
-  §EL
-    §R (- 0 x)
+```calor
+module ArraySearch
+  func Find (int[]:arr, int:target) → int
+    !
+    requires exists int:i in 0..arr.Length : arr[i] == target
+    => result >= 0 && result < arr.Length
+    => arr[result] == target
+    for i from 0 to arr.Length - 1 step 1
+      if arr[i] == target
+        return i
+    return -1
 ```
 
----
+`Find(new int[] { 4, 9 }, 9)` returns `1`. This is a linear search, not a
+claim that an unsorted input supports binary search. With checks enabled,
+an absent target fails the precondition; with guards off, the body returns
+`-1`.
 
-## Complete Contract Example
+### Runtime and static limits
 
-```
-§F{Divide:pub}
-  §I{i32:dividend}
-  §I{i32:divisor}
-  §O{i32}
+Certified finite domains lower to `ContractQuantifier.Range(...).All(...)`
+or `.Any(...)`. The compiler preserves guard order and short-circuiting;
+potentially throwing bounds stay behind their guards. `Calor0326` rejects a
+requested runtime guard whose finite domain cannot be lowered faithfully.
+It is not silently replaced by a comment.
 
-  // Preconditions
-  §Q (!= divisor 0)                      // can't divide by zero
-  §Q{message="Dividend must be non-negative"} (>= dividend 0)
+Signed and unsigned primitive integer domains retain their own bounds.
+Nested quantifiers cost the product of their domain sizes at runtime:
+two ranges of lengths `n` and `m` may require `n * m` predicate evaluations.
+A proof result does not make unsupported requested runtime lowering valid.
 
-  // Postconditions
-  §S (>= result 0)                       // result is non-negative
-  §S (<= result dividend)                // result doesn't exceed dividend
+## Typed .NET calls in verified contracts
 
-  §R (/ dividend divisor)
-```
-
----
-
-## Contract Patterns
-
-### Typed .NET calls in verified contracts
-
-The verifier recognizes ordinary .NET string calls through the existing call AST.
-For example, the current syntax accepts:
-
-```
-§Q §C{s.Contains} §A "b" §/C
-§S (== result §C{s.StartsWith} §A "a" §A System.StringComparison.Ordinal §/C)
-```
-
-Receiver identities come from the binder. String overloads must resolve against
-.NET metadata with exact parameter types. Supported calls are `s.Contains(value)`,
-`s.Equals(value)`, `s.Substring(start[, count])`, `string.IsNullOrEmpty(s)`,
-`string.Equals(a, b)`, and `string.Concat` with two to four string arguments.
+The verifier recognizes a bounded set of ordinary string calls after exact
+receiver and overload resolution: `Contains`, `Equals`, `Substring`,
+`string.IsNullOrEmpty`, and `string.Concat` with two to four string arguments.
 `StartsWith`, `EndsWith` and `IndexOf` require an explicit
-`StringComparison.Ordinal`; the ordinal overloads of `Contains` and `Equals`
-are also supported. Culture-sensitive, named, by-reference, generic and other
-overloads remain unverifiable, with runtime checks retained.
+`System.StringComparison.Ordinal`; ordinal `Contains` and `Equals` overloads
+are also modeled. Culture-sensitive, named, by-reference, generic and other
+unsupported overloads retain their runtime checks.
 
-`s.Length`, integer-array `.Length` and metadata-resolvable `List<T>.Count` are
-recognized through receiver types, including inside integer quantifiers. Their results are signed `int`
-values bounded between zero and `Int32.MaxValue`. Lists use a count function
-on their reference sort; list element access is not added. The legacy length
-nodes retain their existing unsigned model.
+String and integer-array `Length`, and metadata-resolvable `List<T>.Count`,
+can be modeled as signed integers from zero through `Int32.MaxValue`,
+including inside integer quantifiers. Modeling a list's count does not model
+its element reads or make an arbitrary producer pure.
+Verification lowering does not change the executable AST or evaluation order.
 
-These forms lower to existing verifier operations before the whitelist is
-applied. String/reference assumptions, substring range conditions, result binding
-and conditional-position refusals are unchanged. Lowering affects verification
-only, not the executable AST, effects or evaluation order. This adds no grammar
-for computed callees or indexed assignment.
-The converter still emits legacy string built-ins during this staged migration;
-recognizing ordinary calls in contracts does not remove that vocabulary.
+## State preservation
 
-Ordinary array `Length` effect resolution also retains exact metadata result
-types through inferred locals and generated receiver temporaries. This bounded
-channel covers zero-argument, non-generic instance methods and array-valued
-properties. It does not mark the producing call or property pure, change
-verification eligibility, or infer a type from a member name. Rebinding a
-mutable local invalidates its inferred result identity.
+`=> result == x + 1` can describe an increment's result. It does not snapshot
+arbitrary heap state. There is no native `old` expression on this page: a
+balance-transfer precondition is not a proof of total-balance conservation.
+Choose explicit state representation and postconditions rather than inventing
+an old-value syntax.
 
-When single-file conversion leaves a receiver with a nameless inference-error
-type, the converter retains the previous length form. That is legacy
-preservation, not metadata proof. Complete removal of this fallback requires
-project semantic context, including cross-file declarations and inferred lambda
-parameter types. Declared custom `Length` members remain ordinary properties.
+<a id="contract-ordering"></a>
+<a id="custom-error-messages"></a>
 
-### Range Validation
+## Declaration order and failure messages
 
-```
-§F{Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
-  §Q (<= min max)                        // valid range
-  §S (>= result min)                     // result at least min
-  §S (<= result max)                     // result at most max
-  // ...
-```
+Put the signature first, followed by effect and contract lines, then the body.
+Keep contracts above the first statement; they are declaration clauses, not
+statements to execute in the middle of a function.
 
-### Non-Empty Collection
+The native `requires` form does not have a custom-message clause. When an API
+needs a particular exception type and message, use an explicit condition and
+exception in the body rather than inventing a contract attribute.
 
-```
-§F{First:pub}
-  §I{List:items}
-  §O{?Item}
-  §Q (> (count items) 0)                 // list not empty
-  §S (!= result null)                    // result exists
-  // ...
-```
+## Related references
 
-### State Preservation
-
-```
-§F{Increment:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (== result (+ x 1))                 // result is exactly x + 1
-  §R (+ x 1)
-```
-
-### Balance Transfers
-
-```
-§F{Transfer:pub}
-  §I{Account:from}
-  §I{Account:to}
-  §I{i32:amount}
-  §O{void}
-  §E{db:rw}
-  §Q (> amount 0)                        // positive amount
-  §Q (>= from.balance amount)            // sufficient funds
-  // Balance conservation would be expressed if Calor supported old_ values
-  // ...
-```
-
----
-
-## Quantified Contracts
-
-Calor supports universal (`forall`) and existential (`exists`) quantifiers for expressing properties about collections and ranges.
-
-### Universal Quantification (`forall`)
-
-Express that a property holds for all elements in a range:
-
-```
-§Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= arr{i} INT:0)))
-```
-
-This reads: "For all integers i, if i is in range [0, n), then arr[i] is non-negative."
-
-**Syntax:**
-```
-(forall ((var type)) body)
-(forall ((var1 type1) (var2 type2)) body)  // Multiple variables
-```
-
-### Existential Quantification (`exists`)
-
-Express that at least one element satisfies a property:
-
-```
-§Q (exists ((i i32)) (&& (>= i INT:0) (< i n) (== arr{i} target)))
-```
-
-This reads: "There exists an integer i in range [0, n) where arr[i] equals target."
-
-**Syntax:**
-```
-(exists ((var type)) body)
-```
-
-### Implication (`->`)
-
-Use implication to guard quantified expressions:
-
-```
-§Q (-> (> n INT:0) (exists ((i i32)) (&& (>= i INT:0) (< i n) (> arr{i} INT:0))))
-```
-
-This reads: "If n > 0, then there exists a positive element in the array."
-
-**Syntax:**
-```
-(-> antecedent consequent)
-```
-
-Implication `p -> q` is equivalent to `!p || q`.
-
-### Complete Examples
-
-#### All Array Elements Non-Negative
-
-```
-§F{ProcessArray:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= arr{i} INT:0)))
-  §R true
-```
-
-#### Array Contains Target (Search Precondition)
-
-```
-§F{BinarySearch:pub}
-  §I{i32:n}
-  §I{i32:target}
-  §O{i32}
-  §Q (exists ((i i32)) (&& (>= i INT:0) (< i n) (== arr{i} target)))
-  §S (>= result INT:0)
-  §S (< result n)
-  // ...
-```
-
-#### Matrix Symmetry (Multiple Variables)
-
-```
-§F{CheckSymmetric:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32) (j i32))
-  (-> (&& (>= i INT:0) (< i n) (>= j INT:0) (< j n))
-  (== matrix{i}{j} matrix{j}{i})))
-  §R true
-```
-
-### Runtime vs Static Verification
-
-Quantifiers with certified finite ranges generate runtime checks:
-- `forall` uses `Calor.Runtime.ContractQuantifier.Range(...).All(...)`.
-- `exists` uses `Calor.Runtime.ContractQuantifier.Range(...).Any(...)`.
-
-A certified prefix is a leading sequence of primitive guards and bounds whose
-reads are stable and whose evaluation order the compiler can preserve.
-Potentially throwing bounds stay behind their guards. An empty partial domain
-prevents evaluation of later bounds. Inner bounds may depend on already-bound
-outer variables.
-
-The remaining predicate keeps its original short-circuit structure and observable
-evaluations. The compiler reports `Calor0326` when it cannot produce a faithful
-finite runtime check—for example, when discovering a range would require moving
-an unknown getter ahead of another condition. It does not silently replace that
-check with a static-only comment.
-
-Z3 can also analyze quantified formulas statically. A proof result does not make
-an unsupported requested runtime lowering valid.
-
-### Supported Variable Types
-
-Quantifier bound variables should use integer types for finite range iteration:
-- `i8`, `i16`, `i32`, `i64`
-- `u8`, `u16`, `u32`, `u64`
-
-The runtime enumerator preserves each listed type's domain, including its minimum
-and maximum values. Other types are not supported by this finite-domain enumerator.
-
-### Performance Considerations
-
-Nested quantifiers with multiple bound variables result in O(n^k) runtime checks where k is the number of variables. For example:
-- Single variable: O(n)
-- Two variables: O(n*m)
-- Three variables: O(n*m*p)
-
-The verifier emits an informational diagnostic for nested quantifiers to help identify potential performance issues.
-
----
-
-## Why First-Class Contracts?
-
-### 1. For Agent Comprehension
-
-An agent can understand function behavior without reading implementation:
-
-```
-§F{SquareRoot:pub}
-  §I{f64:x}
-  §O{f64}
-  §Q (>= x 0)                            // Only works for non-negative
-  §S (>= result 0)                       // Result is non-negative
-  §S (<= (- (* result result) x) 0.0001) // result² ≈ x
-  // ...
-```
-
-### 2. For Bug Detection
-
-Contracts surface violations at call sites:
-
-```
-// If an agent sees this call:
-§C{SquareRoot} §A -5 §/C
-
-// It can immediately flag: violates §Q (>= x 0)
-```
-
-### 3. For Test Generation
-
-Contracts provide test oracle:
-
-- Generate inputs satisfying preconditions
-- Verify outputs satisfy postconditions
-
----
-
-## Custom Error Messages
-
-Add context to failures:
-
-```
-§Q{message="User ID must be positive"} (> userId 0)
-§Q{message="Email cannot be empty"} (!= email "")
-§S{message="Password hash must be 64 chars"} (== (len hash) 64)
-```
-
----
-
-## Contract Ordering
-
-Recommended order in function definition:
-
-```
-§F{name:vis}
-  §I{...}           // 1. Inputs
-  §O{...}           // 2. Output
-  §E{...}           // 3. Effects (optional)
-  §Q ...            // 4. Preconditions (0 or more)
-  §S ...            // 5. Postconditions (0 or more)
-  // body           // 6. Implementation
-```
-
----
-
-## Runtime Contract Enforcement
-
-Contracts aren't just documentation - they're **executable verification**.
-
-### ContractViolationException
-
-When a contract fails at runtime, Calor throws `ContractViolationException` with rich diagnostic information:
-
-```csharp
-public class ContractViolationException : Exception
-{
-    public string FunctionId { get; }         // e.g., "f001"
-    public ContractKind Kind { get; }         // Requires, Ensures, or Invariant
-    public int StartOffset { get; }           // Source position
-    public int Length { get; }
-    public string? SourceFile { get; }
-    public int Line { get; }
-    public int Column { get; }
-}
-```
-
-This enables:
-- **Precise debugging**: Know exactly which contract failed and where
-- **Agent feedback**: Function ID allows agents to locate and fix issues
-- **Production monitoring**: Structured exceptions for observability
-
-### Contract Modes
-
-Control how contracts are emitted with `--contract-mode`:
-
-| Mode | Behavior | Use Case |
-|:-----|:---------|:---------|
-| `debug` (default) | Full diagnostics: condition text, source location | Development |
-| `release` | Minimal: exception type + function ID only | Production |
-| `off` | No contract checks emitted | Performance-critical paths |
-
-```bash
-# Development (default)
-calor -i myprogram.calr -o myprogram.g.cs --contract-mode=debug
-
-# Production
-calor -i myprogram.calr -o myprogram.g.cs --contract-mode=release
-
-# Disable (not recommended)
-calor -i myprogram.calr -o myprogram.g.cs --contract-mode=off
-```
-
-There is no `calor compile` subcommand — compilation is the default command, taking
-`--input`/`-i` and `--output`/`-o`. See [compile (default)](../cli/compile.md).
-
-### Why Runtime Enforcement Works
-
-In traditional languages, contract libraries exist (Code Contracts for .NET, JSR-303 for Java), but they're:
-- **Optional**: Developers skip them under time pressure
-- **Verbose**: Annotation overhead discourages use
-- **Unmaintained**: Contracts rot as code evolves
-
-Calor solves this because agents:
-- Generate contracts automatically (no overhead)
-- Maintain contract-implementation consistency
-- Never skip verification for convenience
-
-[Learn more: Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/)
-
----
-
-## Contracts Don't Require Effect Declarations
-
-A common question: Do contracts count as effects?
-
-**No.** Contract checks are verification mechanisms, not operational effects:
-
-```
-§F{Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)       // No §E needed
-  §R (/ a b)
-```
-
-This function is pure (no `§E` declaration) even though the precondition might throw. The `throw` effect in `§E` is only for intentional `§TH` statements in business logic, not contract violations.
-
----
-
-## See Also: Refinement Types
-
-Contracts define what a function requires and guarantees. **Refinement types** extend this idea to the type level — instead of writing `§Q (>= x 0)` at the function, you declare `§I{i32:x} | (>= # INT:0)` on the parameter itself. The constraint becomes part of the type, and the obligation engine verifies it automatically.
-
-- [Refinement Types](/calor/syntax-reference/refinement-types/) — Type-level constraints with `§RTYPE`, inline `|`, and `§PROOF`
-- [Dependent Types Tutorial](/calor/guides/dependent-types-tutorial/) — Progressive walkthrough
-
----
-
-## Next
-
-- [Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/) - Why this matters
-- [Effects](/calor/syntax-reference/effects/) - Declaring side effects
-- [Enforcement Details](/calor/effects-and-contracts-enforcement/) - Technical specification
+- [Types](/calor/syntax-reference/types/) — arrays, nullable inputs and exceptions
+- [Effects](/calor/syntax-reference/effects/) — declarations for side effects
+- [Verification guarantees](https://calor.dev/docs/guides/verification-guarantees/) — proof outcomes and guard removal

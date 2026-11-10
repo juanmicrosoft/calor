@@ -7,317 +7,156 @@ nav_order: 4
 
 # Calls
 
-The `§C` tag invokes a function or method. Calls work in **statement**
-context (the call's result is discarded) and **expression** context
-(the call's result is used by the surrounding expression — typically as
-the initializer of a `§B`, an argument to another call, or the right
-side of an operation).
-
-> **Reference for RFC** `v0.6-call-closer-elision`. The behavior on
-> this page is what the parser does today and is pinned by
-> `tests/Calor.Compiler.Tests/CallStatementImplicitCloseTests.cs` and
-> `tests/Calor.Compiler.Tests/CallExpressionImplicitCloseTests.cs`.
-
----
+Call functions and methods with parentheses and comma-separated arguments, as in
+C#. A call can be a statement that discards its result, or an expression used by
+a binding, another call, a return, or an operator.
 
 ## Syntax
 
-```
-§C{target}                           // (1) zero arguments, implicit close
-§C{target} arg                       // (2) one inline argument, implicit close
-§C{target} §A arg1 §A arg2 §/C       // (3) explicit form, any arity
-§C{target} §A arg1 §A arg2           // (4) explicit form, no §/C (closes at dedent)
-```
-
-`target` is a dotted name or a generic invocation:
-`Console.WriteLine`, `Math.Max`, `items.Cast<i32>`.
-
-The argument in form (2) is any **primary expression** — a literal,
-identifier, dotted reference, member access, indexer access, or a
-parenthesized expression. It is **not** a `§A`-list; for two or more
-arguments use form (3) or (4).
-
-Calls retain C# argument modifiers with `§A{ref}`,
-`§A{out}`, or `§A{in}`. A named argument can combine both forms:
-
-```
-§C{Update} §A{ref} value §/C
-§C{TryRead} §A{out}[result] value §/C
+```calor-fragment
+Flush()
+Identity(value)
+Add(left, right)
+Add(right: second, left: first)
+items.ConvertAll<string>(convert)
+factory.Create().Compute(argument())
 ```
 
-Modifier braces must touch the marker: `§A{ref}`. A space before the brace
-instead starts a collection argument, as in `§A {1, 2}`.
-The modifier belongs to that argument, not the call. It must keep its
-explicit `§A` marker even for a single argument. These modifiers are not
-supported on constructor/collection argument lists; those contexts
-report an invalid-modifier diagnostic rather than
-silently dropping the modifier.
+Always write `()` for a zero-argument call. There are no implicit arguments,
+argument tags, or call-closing tags. Generic type arguments use C# type names.
 
-### Expression targets
+The callee can be an expression, including a member chain or a delegate value.
+Arguments are evaluated in source order, even when named arguments refer to
+parameters in a different order. A receiver or argument with side effects is
+not evaluated twice. Calls on the right of `&&`, `||`, `??`, or a conditional
+expression run only when that branch is selected.
 
-The existing expression-target form accepts a computed receiver or delegate:
-
-```
-§C §C{GetHandler} §/C §A value §/C
-§C §C{GetReceiver} §/C.Update §A{ref}[value] value §/C
-```
-
-The target evaluates once, before the arguments. Arguments retain source order,
-including named arguments and `ref`, `out`, or `in` modifiers. Calls inside a
-conditional or short-circuit operand stay inside that operand.
-
-### Native postfix calls
-
-Native calls, member access, and indexing can now chain:
-
-```
-GetHandler()(value)
-GetReceiver().Update(value: ref value)
-GetReceiver().Echo<int>(value)
-receivers[NextIndex()].Update(value: out value)
-(chooseFirst ? first : second)(value)
-```
-
-`f()` invokes `f`; `(f)` only groups it; `(f, x)` creates a tuple. Calls accept
-C# type argument lists, named arguments, and `ref`, `out`, or `in`. Their
-receivers and arguments evaluate once, in source order. Native `?.` calls and
-`?[...]` indexing report errors rather than assuming ordinary call semantics.
-The existing conditional-call compatibility lowering remains staged.
-
-Computed-call serialization uses these native postfix forms, including explicit
-generic arguments. Ordinary named-call serialization still uses `§C`; existing
-sources do not need rewriting. Creation and lambda syntax are unchanged.
-In legacy prefix and positional operand slots, keep call parentheses adjacent
-(`f(x)`): a spaced `(x)` there remains the next legacy operand. Ordinary native
-expressions also accept `f (x)`.
-
-Existing assignment-target, counted-loop, and lambda staging remains unchanged.
-The experimental CNF lowering rejects expression-target calls explicitly.
-
-C# migration lowers string methods to native string operations only when the
-selected metadata method and receiver prove the built-in operation. Zero-argument
-`ToString()` on CLR scalar types also retains its native lowering. Custom,
-foreign, and unresolved same-spelled methods remain calls, preserving their
-declaration identity and conservative effect analysis.
-
-Property and field receivers remain explicit reads, so a call cannot erase an
-unsupported member-result diagnostic. Named instance calls also retain selected
-metadata return annotations: `ToString()` on an `object` receiver returns nullable
-`string`, while a resolved source override uses its own declared return type.
-
----
-
-## Rules
-
-1. **A call without arguments needs no `§/C`.** Both
-   `§C{Logger.Flush}` and `§C{Logger.Flush} §/C` parse to the same
-   `CallExpressionNode`.
-2. **A call with exactly one argument supplied inline (no `§A`) needs
-   no `§/C`.** Both `§C{Identity} x` and `§C{Identity} §A x §/C` parse
-   to the same `CallExpressionNode` (form (2) vs (3)).
-3. **A call with two or more arguments must use `§A`.** The inline-arg
-   form (2) is limited to a single primary expression by construction.
-4. **Trailing member access attaches to the argument, not to the call
-   result.** After `§C{Identity} obj?.Length`, the `?.Length` belongs
-   to `obj` because the inline-arg parser greedily consumes a full
-   primary expression including its trailing member chain. See
-   [Disambiguation](#disambiguation) for the corner cases.
-5. **Trailing member access after a zero-arg call attaches to the call
-   result.** `§C{Maybe}?.Length` parses as
-   `NullConditional(Call("Maybe"), "Length")`, because the parser sees
-   `?.`, takes the zero-arg implicit-close path, then runs trailing
-   member access on the call result.
-6. **The inline argument must start on the same source line as
-   `§C{target}`.** A candidate argument that begins on a later line is
-   treated as a sibling statement / expression, not as the call's
-   argument. Without this rule, a `§IF` / `§W` / `§NEW` on the next
-   line at the same indent would be silently absorbed as the argument
-   (because each of those tokens is also an expression-start). Writing
-   `§C{Foo}` on one line and `§IF ... §EL → ...` on the next always
-   parses as two siblings — zero-arg call, then a separate `§IF`.
-7. **Both `§/C` and abbreviated `§/C{id}` are still accepted** for
-   forms (1), (2), (3), and (4) — no source file needs to be rewritten.
-
----
-
-## Disambiguation
-
-The implicit-close forms introduce two parser decisions. The
-disambiguation rules below match RFC §3.2.
-
-### Case A — trailing member on an inline argument
-
-```
-§B{n} §C{Identity} obj?.Length
-```
-
-Reads as `Identity(obj?.Length)`, not `Identity(obj)?.Length`. The
-inline-arg branch calls the same expression parser used everywhere
-else, which greedily consumes `?.Length` as part of the primary
-expression `obj?.Length`.
-
-If you intended `Identity(obj)?.Length` instead, write either:
-
-```
-§B{n} §C{Identity} §A obj §/C ?.Length     // explicit form
-§B{n} §C{Identity}.Length                  // zero-arg call + access
-```
-
-### Case B — two consecutive expression-start tokens (Calor0150)
-
-```
-§B{n} §C{Identity} a b           // ambiguous — second expression-start follows inline arg
-```
-
-This is **ambiguous** — once the inline form has consumed one positional
-argument, any second expression-start token (a literal, identifier,
-nested `§C` call, `§NEW`, etc.) cannot be unambiguously attributed to
-the call. Calor0150 also fires if the next token is `§A`, signalling
-the user mixed the inline and explicit forms. The parser reports
-
-```
-Calor0150  AmbiguousCallContinuation
-Closer-less call '§C{Identity}' already took one inline argument; a
-second positional argument is ambiguous. Use the explicit form
-'§C{Identity} §A a §A b §/C' instead.
-```
-
-and stops consuming tokens at the second expression, leaving it for
-the surrounding statement parser. To fix, rewrite using the explicit
-form:
-
-```
-§B{n} §C{Identity} §A a §A b §/C
-```
-
-### Case C — nested implicit-close calls
-
-```
-§B{x} §C{Foo.bar} §C{Baz.qux} y
-```
-
-Reads right-to-left as `Foo.bar(Baz.qux(y))`. The parser disambiguates
-nested implicit-close calls by counting the number of consecutive
-`§/C` closers after the deepest inline argument and comparing to the
-depth of enclosing `§A`-style calls. When all calls in the chain use
-the inline form, no closers are required.
-
-The mixed case
-`§B{x} §C{Foo.bar} §A §C{Baz.qux} y §/C §/C`
-also works: the inner `§C{Baz.qux} y §/C` is a standard
-one-inline-arg-plus-closer form, and the outer `§A ... §/C` is the
-explicit form for `Foo.bar`.
-
----
-
-## Examples
-
-### Statement context
-
-```
-§F{Greet:pub}
-  §I{name:string}
-  §O{void}
-  §E{cw}
-
-  §C{Console.WriteLine} (concat "Hello, " name)   // implicit close
-```
-
-### Expression context — zero-arg
-
-```
-§F{Count:pub}
-  §O{i32}
-
-  §B{n:i32} §C{items.Count}            // zero-arg, implicit close
-  §R n
-```
-
-### Expression context — one inline arg
-
-```
-§F{Doubled:pub}
-  §I{x:i32}
-  §O{i32}
-
-  §B{y:i32} §C{Math.Abs} x             // one inline arg, implicit close
-  §R (* y 2)
-```
-
-### Expression context — two or more args (explicit form)
-
-```
-§F{Clamp:pub}
-  §I{x:i32}
-  §O{i32}
-
-  §B{lo:i32} INT:0
-  §B{hi:i32} INT:100
-  §B{r:i32} §C{Math.Clamp} §A x §A lo §A hi §/C
-  §R r
-```
-
-### Trailing member access
-
-```
-§B{len} §C{GetMessage}.Length          // zero-arg call, then .Length
-§B{up}  §C{GetMessage}?.ToUpper        // zero-arg call, then ?.ToUpper
-§B{tag} §C{Identity} obj?.Tag          // inline arg = obj?.Tag
-```
-
----
-
-## By-reference arguments (`ref`, `out`, `in`)
-
-Mark an argument for a `(T:name:ref|out|in)` parameter with the same modifier:
-`§A{ref} x`, `§A{out} x`, `§A{in} x`, or `§A{out}[name] x` for a named argument. The
-generated C# passes the caller's storage, never a copy. Contract:
-`docs/plans/v0.25-refout-contract.md` (#1427); implementation #943.
+## Complete example
 
 ```calor
-§M{RefOutDemo}
-  §F{Bump:pub} (i32:x:ref) -> void
-    §ASSIGN x (+ x 1)
+module CallExamples
+  func Identity (int:value) → int
+    !
+    return value
 
-  §F{ParseOr:pub} (str:text, i32:fallback) -> i32
-    §B{~n:i32} 0
-    §IF §C{Int32.TryParse} §A text §A{out} n §/C
-      §R n
-    §R fallback
+  func Add (int:left, int:right) → int
+    !
+    return left + right
 
-  §F{Main:pub} () -> i32
-    §B{~count:i32} 1
-    §C{Bump} §A{ref} count §/C
-    §R (+ count §C{ParseOr} §A "40" §A 0 §/C)
+  func Main () → int
+    !
+    let int:first = Identity(2)
+    let int:second = Add(right: 4, left: 3)
+    return Add(first, second)
 ```
 
-- A modifier that does not match the parameter is `Calor0208`.
-- An operand C# cannot pass by reference (literal, computed value, call result, property,
-  indexer element, `this`, readonly field outside its constructor, `in` parameter passed as
-  `ref`/`out`) is `Calor0212`, reported by the binder before C# generation.
-- `§A{out} _` is a discard; it is `Calor0212` when a symbol named `_` is in scope.
-- `ref`/`out` to an array element, receiver field or dotted path charges `mut`, like `§ASSIGN`.
-- Narrowing and contract facts about a `ref`/`out` operand end at the call; by-reference
-  parameters that may alias lose narrowing on any write to one of them or any heap-changing step.
-- The converter lowers C# `out var x` only in an expression statement, local declaration,
-  `return` or `if` condition directly in a block; other placements are preserved as C#.
+`Main()` returns `9`. Nested calls use the same syntax:
+`Add(Identity(2), Add(3, 4))`.
 
----
+## Member access and nullable inputs
 
-## Diagnostics
+Parentheses identify exactly which result receives a member access. These
+fragments assume an `Identity` overload for each nullable input type and a
+nullable string return from `GetMessage`:
 
-| Code | Name | Description |
-|:-----|:-----|:------------|
-| `Calor0150` | AmbiguousCallContinuation | Two consecutive expression-start tokens follow a closer-less `§C{target} arg` — second positional argument is ambiguous. Use the explicit `§A` / `§/C` form. |
-| `Calor0212` | InvalidByReferenceOperand | A `§A{ref}`/`§A{out}`/`§A{in}` operand C# cannot pass by reference, or an `out _` discard that would bind to a declared `_`. |
+```calor-fragment
+let length = Identity(message?.Length)
+let otherLength = Identity(message)?.Length
+let upper = GetMessage()?.ToUpper()
+```
 
----
+The first call receives `message?.Length`; the second reads `Length` from the
+call result. A nullable receiver does not become non-null merely because its
+value passed through a call.
+
+Supported possibly-null method arguments produce `Calor0274` in statement and
+expression calls alike. Named arguments are checked against the parameter they
+name, not their source position. An otherwise applicable native overload is
+not rejected solely for nullable string input with `Calor0208`; it reports the
+nullability error instead. Genuine overload mismatches still use `Calor0208`.
+
+This is bounded receiving-boundary enforcement, not whole-program null safety.
+It does not implicitly unwrap library generic types or enforce constructor
+inputs. See [Nullability and .NET Interop](https://calor.dev/docs/guides/nullability-and-dotnet-interop/#calor0274-method-input).
+
+## By-reference arguments
+
+Declare parameters as `ref T:name`, `out T:name`, or `in T:name`. Mark the
+argument with the corresponding modifier: `Bump(ref count)`,
+`TryParse(text, out result)`, or `Twice(in count)`. A named argument puts its
+name before the modifier: `TryParse(text, result: out number)`.
+
+The callee receives the caller's storage, not a copy. Writes through `ref` or
+`out` are visible after the call.
+
+```calor
+module RefOutDemo
+  func Bump (ref int:x) → void
+    set x x + 1
+
+  func Twice (in int:x) → int
+    return x * 2
+
+  func ParseOr (string:text, int:fallback) → int
+    var int:n = 0
+    if System.Int32.TryParse(text, out n)
+      return n
+    return fallback
+
+  func IsNumber (string:text) → bool
+    return System.Int32.TryParse(text, out _)
+
+  func Main () → int
+    var int:count = 1
+    Bump(ref count)
+    return count + ParseOr("40", 0)
+```
+
+`Main()` returns `42`: `Bump` updates `count` to `2` and `ParseOr` returns
+`40`. Calling `Twice(in count)` with that updated count returns `4` without
+changing the caller's storage.
+
+The modifier must match the selected parameter. A by-reference argument does
+not fall back to a by-value overload. A mismatch is `Calor0208`.
+
+The operand must identify permitted storage: a local, parameter, writable field,
+array element, or a field path through value-type fields. Literals, computed
+values, call results, properties, indexer properties, `this`, readonly fields
+outside their constructor, and an `in` parameter passed as `ref` or `out` are
+rejected with `Calor0212` before C# generation. An `out _` discard is also
+rejected with `Calor0212` when a variable named `_` is in scope.
+
+Passing an array element or a field through a receiver as `ref` or `out`
+charges `mut`, like assignment to the same storage. Passing a local does not
+add that storage effect. The callee's own declared effects still apply.
+
+Null checks, preconditions, and refinements about a variable passed as `ref`
+or `out` no longer hold after the call. Inside a function, by-reference
+parameters can alias the same storage; a call or field access can invalidate
+facts about another such parameter.
+
+Declare and initialize an `out` binding before the call; Calor does not have
+inline `out var` declarations. The converter introduces a binding for supported
+C# placements and preserves unsupported placements. See the
+[C# interoperability guide](https://calor.dev/docs/guides/csharp-interoperability/#call-tryparse-trygetvalue-and-other-ref-out-in-methods).
+
+### Rejected computed operand
+
+This example reports `Calor0212`: `v + 1` is a value, not writable storage.
+
+```calor expect=Calor0212
+module RefOutRejected
+  func Bump (ref int:x) → void
+    set x x + 1
+
+  func Main () → int
+    var int:v = 1
+    Bump(ref (v + 1))
+    return v
+```
 
 ## Related
 
-- [Bindings](/calor/syntax-reference/binding/) — the most common
-  expression-call context (`§B{name} §C{...}`).
-- [Expressions](/calor/syntax-reference/expressions/) — Lisp-style
-  operations that frequently embed `§C` calls as arguments.
-- [Structure Tags](/calor/syntax-reference/structure-tags/) — block
-  closer rules in general.
+- [Bindings](/calor/syntax-reference/binding/) — inferred and explicitly typed locals.
+- [Expressions](/calor/syntax-reference/expressions/) — precedence and expression-valued calls.
+- [Effects](/calor/syntax-reference/effects/) — call effects and receiving boundaries.
