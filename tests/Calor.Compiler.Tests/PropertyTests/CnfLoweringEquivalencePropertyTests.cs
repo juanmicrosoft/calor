@@ -148,9 +148,9 @@ public sealed class CnfLoweringEquivalencePropertyTests
 
     private static IReadOnlyList<CnfStatement> Lower(Term term)
     {
-        var source = "§M{BooleanProperties}\n"
-            + "  §F{Evaluate:pub} (bool:a, bool:b, bool:c) -> bool\n"
-            + $"    §R {Render(term)}\n";
+        var source = "module BooleanProperties\n"
+            + "  func Evaluate public (bool:a, bool:b, bool:c) → bool\n"
+            + $"    return {Render(term)}\n";
         var (module, diagnostics) = GeneratedProductionPipelinePropertyTests.Parse(source);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors));
         var function = Assert.Single(new CnfLowering().LowerModule(module).Functions);
@@ -162,13 +162,13 @@ public sealed class CnfLoweringEquivalencePropertyTests
     private static string Render(Term term) => term.Operation switch
     {
         "a" or "b" or "c" => term.Operation,
-        "true" or "false" => $"BOOL:{term.Operation}",
-        "not" => $"(! {Render(term.Left!)})",
-        "if" => $"(? {Render(term.Left!)} {Render(term.Right!)} {Render(term.Third!)})",
-        "and" => $"(&& {Render(term.Left!)} {Render(term.Right!)})",
-        "or" => $"(|| {Render(term.Left!)} {Render(term.Right!)})",
+        "true" or "false" => term.Operation,
+        "not" => $"(!{Render(term.Left!)})",
+        "if" => $"({Render(term.Left!)} ? {Render(term.Right!)} : {Render(term.Third!)})",
+        "and" => $"({Render(term.Left!)} && {Render(term.Right!)})",
+        "or" => $"({Render(term.Left!)} || {Render(term.Right!)})",
         "==" or "!=" =>
-            $"({term.Operation} {Render(term.Left!)} {Render(term.Right!)})",
+            $"({Render(term.Left!)} {term.Operation} {Render(term.Right!)})",
         _ => throw new NotSupportedException(term.Operation)
     };
 
