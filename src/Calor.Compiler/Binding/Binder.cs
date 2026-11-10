@@ -1039,6 +1039,14 @@ public sealed class Binder
         foreach (var cls in module.Classes)
             RegisterClassTree(cls, _moduleSymbolId, null);
 
+        foreach (var variable in _symbolsById.Values.OfType<VariableSymbol>().Where(variable =>
+                     (variable.IsField || variable.IsProperty) && variable.MethodInputArrayType is not null))
+        {
+            if (TryBuildMethodInputArrayType(variable.TypeName, out var array,
+                    declaringTypeName: variable.DeclaringTypeName))
+                variable.MethodInputArrayType = array;
+        }
+
         // v0.15 E2 slice b, pin P6.
         CheckEffectRowPlacement(module);
 
@@ -3147,14 +3155,15 @@ public sealed class Binder
     private bool TryBuildMethodInputArrayType(
         string declaredType,
         out BoundTypes.ArrayBoundType? array,
-        FunctionSymbol? declaringFunction = null)
+        FunctionSymbol? declaringFunction = null,
+        string? declaringTypeName = null)
     {
         array = null;
         if (!TrySplitArrayTypeSpelling(declaredType, out var elementName, out var rank, out var annotation))
             return false;
 
         BoundTypes.BoundType element;
-        if (TryBuildMethodInputArrayType(elementName, out var nested, declaringFunction))
+        if (TryBuildMethodInputArrayType(elementName, out var nested, declaringFunction, declaringTypeName))
             element = nested!;
         else if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
             || IsBuiltInValueTypeName(elementName))
@@ -3163,7 +3172,9 @@ public sealed class Binder
                     ? TypeIdentity.Canonicalize(elementName) : elementName);
         else if ((declaringFunction is not null
                 ? TryBuildCallableReference(elementName, declaringFunction)
-                : TryBuildReferenceType(elementName, _currentClassName, _currentNamespaceIdentity,
+                : TryBuildReferenceType(elementName, declaringTypeName ?? _currentClassName,
+                    declaringTypeName is not null && _classesByQualifiedName.TryGetValue(declaringTypeName, out var owner)
+                        ? owner.NamespaceIdentity : _currentNamespaceIdentity,
                     _currentMemberTypeParameters?.Select(parameter => parameter.Name)))
             is { } reference)
             element = reference;

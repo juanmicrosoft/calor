@@ -244,6 +244,31 @@ public sealed class NativeArrayDimensionTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
     }
 
+    [Theory]
+    [InlineData("@String", "class String", false)]
+    [InlineData("@String", "class @String", false)]
+    [InlineData("int", "", true)]
+    public void FieldArrayElements_UseCompletedDeclarationRegistration(
+        string element, string declaration, bool resolved)
+    {
+        var source = $$"""
+            module FieldArrayIdentity
+              class Holder
+                field {{element}}[,]:matrix private
+                func Read public () → int
+                  !
+                  return matrix.GetLength(0)
+              {{declaration}}
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal(resolved, call.ResolvedMetadataMethod is not null);
+        var compiled = Program.Compile(source);
+        Assert.Equal(!resolved, compiled.HasErrors);
+        if (!resolved)
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
     [Fact]
     public void SameNamedSourceMethod_KeepsItsOwnIdentityAndEffects()
     {
