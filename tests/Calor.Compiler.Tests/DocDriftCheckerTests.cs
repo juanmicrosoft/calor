@@ -897,6 +897,75 @@ public class DocDriftCheckerTests
         }
     }
 
+    [Fact]
+    public void MarkdownBackend_CompilesAndExecutesNativeSurfaceExamples()
+    {
+        const string path = "docs/semantics/dotnet-backend.md";
+        var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
+        Assert.DoesNotContain("§", content);
+        var coverage = new WebsiteExampleChecker.Coverage();
+        Assert.Empty(WebsiteExampleChecker.Check([new DocFile(path, content)], coverage));
+        Assert.Equal(9, coverage.CompletePrograms);
+        Assert.Equal(0, coverage.NegativePrograms);
+        var programs = ExemplarCompileChecker.ExtractCompletePrograms(content);
+        var expectations = new (string Module, string Expression, string Expected)[]
+        {
+            ("BackendOverflow", "GlobalModule.Increment(41)", "42"),
+            ("BackendContracts", "GlobalModule.Positive(1)", "1"),
+            ("BackendMatch",
+                "GlobalModule.Describe(200) + \":\" + GlobalModule.Describe(404) + \":\" + GlobalModule.Describe(0)",
+                "OK:Not Found:Unknown"),
+            ("BackendCatch", "GlobalModule.Read(false) + \":\" + GlobalModule.Read(true)", "42:-1"),
+            ("BackendAsync", "GlobalModule.Read().GetAwaiter().GetResult()", "42"),
+            ("BackendConfiguredAwait", "GlobalModule.Read().GetAwaiter().GetResult()", "42"),
+            ("BackendClasses", "GlobalModule.Main()", "78.53975"),
+            ("BackendRecords", "GlobalModule.Create().Name + \":\" + GlobalModule.Create().Age", "Alice:30"),
+            ("BackendRecordCopy",
+                "GlobalModule.WithAge(new Person(\"Alice\", 20)).Age + \":\" + new Person(\"Alice\", 20).Age",
+                "30:20")
+        };
+        Assert.Equal(expectations.Length, programs.Count);
+        for (var index = 0; index < programs.Count; index++)
+        {
+            var compiled = Program.Compile(programs[index].Source, path);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(expectations[index].Module, Assert.IsType<Ast.ModuleNode>(compiled.Ast).Name);
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expectations[index].Expression}};
+                }
+                """);
+            Assert.Equal(expectations[index].Expected, observed);
+        }
+    }
+
+    [Theory]
+    [InlineData("BackendOverflow", "GlobalModule.Increment(int.MaxValue)", "!OverflowException", "!OverflowException")]
+    [InlineData("BackendContracts", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    public void MarkdownBackend_PreservesArithmeticAndContractModeBoundaries(
+        string module, string expression, string enabled, string disabled)
+    {
+        const string path = "docs/semantics/dotnet-backend.md";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module " + module + "\n", StringComparison.Ordinal)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Release, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => {{expression}};
+                }
+                """);
+            Assert.Equal(mode == ContractMode.Off ? disabled : enabled, observed);
+        }
+    }
+
     [Theory]
     [InlineData("FunctionCallBoundary", "Identity")]
     [InlineData("FloatingProofBoundary", "Square")]

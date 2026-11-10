@@ -220,11 +220,13 @@ public int MyFunction(int x)
 |:-----|:---------|
 | `debug` | Detailed supported runtime checks |
 | `release` | The same supported checks, with leaner exceptions |
-| `off` | No contract guards |
+| `off` | No precondition or postcondition guards |
 
 With optional verification, only eligible clean proven postcondition guards
 may be removed; use `--keep-proven-guards` to retain them. Unsupported runtime
 lowering fails rather than silently dropping a requested guard.
+Explicit `proof` statements retain their separate runtime guards unless
+eligible obligation verification discharges them, including in `off` mode.
 
 ---
 

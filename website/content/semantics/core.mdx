@@ -282,7 +282,9 @@ module CoreEnsures
 3. All ENSURES clauses (in declaration order)
 
 `debug` and `release` both emit supported precondition and postcondition
-checks; `release` uses leaner exceptions. `off` emits no guards. Optional
+checks; `release` uses leaner exceptions. `off` emits no precondition or
+postcondition guards. Explicit `proof` statements retain their separate
+runtime checks unless eligible obligation verification discharges them. Optional
 verification may remove only eligible clean proven postcondition guards;
 it never removes preconditions based on satisfiability. Unsupported runtime
 lowering fails compilation instead of silently omitting requested checks.
