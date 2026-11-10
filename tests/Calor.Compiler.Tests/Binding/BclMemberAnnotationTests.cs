@@ -6,6 +6,7 @@ using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Binding.Metadata;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -64,7 +65,10 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         var hasActiveNullability = nullable;
         var hasUnmodeledEffect = receivingType != "str"
             && (expression.EndsWith(".Root", StringComparison.Ordinal) || boundary == "argument");
-        Assert.Equal(hasUnmodeledEffect || hasActiveNullability, result.HasErrors);
+        var hasEnvironmentRead = expression.EndsWith("Environment.CurrentDirectory", StringComparison.Ordinal)
+            || expression.EndsWith("Environment.ProcessPath", StringComparison.Ordinal);
+        Assert.True(result.HasErrors == (hasUnmodeledEffect || hasActiveNullability || hasEnvironmentRead),
+            string.Join("\n", result.Diagnostics));
         Assert.All(result.Diagnostics.Errors, d => Assert.Contains(
             d.Code, new[] { DiagnosticCode.ForbiddenEffect, Code(boundary) }));
         Assert.Equal(hasActiveNullability,
@@ -78,6 +82,47 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         {
             var validation = GeneratedCSharpCompiler.Validate(withoutEffects.GeneratedCode);
             Assert.True(validation.CompilationSuccess, string.Join("; ", validation.CompilationErrors));
+        }
+        if (hasEnvironmentRead)
+        {
+            if (!hasActiveNullability)
+                Assert.Contains(result.Diagnostics.Errors,
+                    diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'env:r'", StringComparison.Ordinal));
+            var declared = Program.Compile(Source(expression, parameters, receivingType, boundary, "env:r"),
+                "bcl-members.calr");
+            Assert.Equal(hasActiveNullability, declared.HasErrors);
+            Assert.DoesNotContain(declared.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        }
+    }
+
+    [Theory]
+    [InlineData("System.Environment.CurrentDirectory", "string")]
+    [InlineData("Environment.CurrentDirectory", "string")]
+    [InlineData("Env.CurrentDirectory", "string")]
+    [InlineData("System.Environment.ProcessPath", "string?")]
+    [InlineData("Environment.ProcessPath", "string?")]
+    [InlineData("Env.ProcessPath", "string?")]
+    public void NativeQualifiedMetadataGetter_ChargesItsBoundEnvironmentRow(string expression, string returnType)
+    {
+        foreach (var row in new[] { "", "!", "! env:r" })
+        {
+            var source = $$"""
+                module GetterEffects
+                  using Env = System.Environment
+                  func Probe public () → {{returnType}}
+                    {{row}}
+                    return {{expression}}
+                """;
+            var result = Program.Compile(source, "getter-effects.calr");
+            if (row == "! env:r")
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+            else
+            {
+                var diagnostic = Assert.Single(result.Diagnostics.Errors);
+                Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code);
+                Assert.Contains("'env:r'", diagnostic.Message);
+                Assert.True(string.IsNullOrEmpty(result.GeneratedCode));
+            }
         }
     }
 
@@ -140,13 +185,20 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
     public void GuardedObliviousMetadataReference_NarrowsAcrossReceivingBoundaries(
         string boundary, string statement)
     {
+        var nativeStatement = statement switch
+        {
+            "§B{copy:System.IO.DirectoryInfo} legacy" => "let System.IO.DirectoryInfo:copy = legacy",
+            "§R legacy" => "return legacy",
+            "§R §C{Take} §A legacy §/C" => "return Take(legacy)",
+            _ => throw new ArgumentOutOfRangeException(nameof(statement))
+        };
         string Source(bool guarded) => $$"""
-            §M{GuardedLegacy}
-              §F{Take:pub} (System.IO.DirectoryInfo:value) -> System.IO.DirectoryInfo
-                §R value
-              §F{Probe:pub} (N5Fixture.Legacy:value) -> System.IO.DirectoryInfo
-                §B{legacy} value.DirectoryField
-                {{(guarded ? "§IF (!= legacy null)\n      " : "")}}{{statement}}
+            module GuardedLegacy
+              func Take public (System.IO.DirectoryInfo:value) → System.IO.DirectoryInfo
+                return value
+              func Probe public (N5Fixture.Legacy:value) → System.IO.DirectoryInfo
+                let legacy = value.DirectoryField
+                {{(guarded ? "if legacy != null\n      " : "")}}{{nativeStatement}}
             """;
 
         var (_, guardedDiagnostics, _) = Bind(Source(guarded: true), FixtureContext.Value);
@@ -171,6 +223,26 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
     {
         var (module, diagnostics, _) = Bind(Source(expression, parameters, "str", "binding"), FixtureContext.Value);
         var member = Member(module, "binding");
+        if (expression == "value.ValueField")
+        {
+            var numeric = Assert.IsType<NominalBoundType>(member.Type);
+            Assert.Equal(SpecialType.System_Int32, numeric.RoslynSymbol!.SpecialType);
+            Assert.Equal("N5Fixture.Members", member.ResolvedMetadataMember!.ContainingType.ToDisplayString());
+            Assert.Equal("CalorN5AnnotatedFixture", member.ResolvedMetadataMember.ContainingAssembly.Name);
+            Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.SignatureUnresolved);
+            Assert.Empty(diagnostics.Errors);
+            var parseDiagnostics = new DiagnosticBag();
+            var ast = new Parser(new Lexer(Source(expression, parameters, "str", "binding"), parseDiagnostics)
+                .TokenizeAllForParser(), parseDiagnostics).Parse();
+            Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Errors));
+            var validation = CSharpCompilation.Create("N5NumericReceivingBoundary",
+                [CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(ast))],
+                FixtureContext.Value.HostCompilationForBinder.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.Equal("CS0029", Assert.Single(validation.GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)).Id);
+            return;
+        }
         Assert.IsType<UnresolvedBoundType>(member.Type);
         Assert.Null(member.ResolvedMetadataMember);
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
@@ -345,22 +417,24 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         _ => throw new ArgumentOutOfRangeException(nameof(boundary))
     };
 
-    private static string Source(string expression, string parameters, string receivingType, string boundary)
+    private static string Source(string expression, string parameters, string receivingType, string boundary,
+        string? effects = null)
     {
         var consumer = receivingType == "str"
             ? "System.Int32.Parse"
             : "System.IO.FileSystemAclExtensions.GetAccessControl";
+        var nativeType = TypeMapper.ToSurfaceType(receivingType);
         var body = boundary switch
         {
-            "binding" => $"§B{{value:{receivingType}}} {expression}",
-            "return" => $"§R {expression}",
-            "argument" => $"§B{{result}} §C{{{consumer}}} §A {expression} §/C",
+            "binding" => $"let {nativeType}:received = {expression}",
+            "return" => $"return {expression}",
+            "argument" => $"let result = {consumer}({expression})",
             _ => throw new ArgumentOutOfRangeException(nameof(boundary))
         };
         return $$"""
-            §M{BclMembers}
-              §F{Probe:pub} ({{parameters}}) -> {{(boundary == "return" ? receivingType : "void")}}
-                {{body}}
+            module BclMembers
+              func Probe public ({{parameters}}) → {{(boundary == "return" ? nativeType : "void")}}
+                {{(effects is null ? "" : $"! {effects}\n    ")}}{{body}}
             """;
     }
 

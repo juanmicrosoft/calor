@@ -181,6 +181,11 @@ boundary.
 
 ## Effect Codes
 
+Metadata property reads charge the getter's effect row whether the receiver is
+fully qualified, imported, or aliased. Reading
+`System.Environment.CurrentDirectory`, for example, requires `env:r`; spelling
+the type's full name does not make the read pure.
+
 | Code | Effect | Description | C# Examples |
 |:-----|:-------|:------------|:------------|
 | `cw` | Console write | Output to console | `Console.WriteLine()` |

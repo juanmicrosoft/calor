@@ -5662,6 +5662,15 @@ public sealed class EffectEnforcementPass
                 return EffectSet.Empty;
             if (_context.CallGraph.IsResolvedEnumConstant(_context.CurrentFunctionId, reference.Span))
                 return EffectSet.Empty;
+            if (_context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, reference.Span) is { } metadata)
+            {
+                var metadataMember = reference.Name[(reference.Name.LastIndexOf('.') + 1)..];
+                var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                    metadata, metadataMember, null, EffectMemberKind.Getter));
+                return resolution.Status == EffectResolutionStatus.Unknown
+                    ? UnknownResolvedOperation($"{metadata.DisplayString}.get_{metadataMember}", reference.Span)
+                    : resolution.Effects;
+            }
             if (!TrySplitMemberReference(reference.Name, out var receiver, out var member))
             {
                 if (!chargeMethodGroup
@@ -5679,15 +5688,6 @@ public sealed class EffectEnforcementPass
                 return (topLevel.Length > 0 ? topLevel : candidates)
                     .Aggregate(EffectSet.Empty, (effects, function) =>
                         effects.Union(MethodGroupEffects(function.Effects, function.EffectParameters.Count)));
-            }
-
-            if (_context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, reference.Span) is { } metadata)
-            {
-                var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
-                    metadata, member, null, EffectMemberKind.Getter));
-                return resolution.Status == EffectResolutionStatus.Unknown
-                    ? UnknownResolvedOperation($"{metadata.DisplayString}.get_{member}", reference.Span)
-                    : resolution.Effects;
             }
 
             // #1176: `this.` and `self.` resolve to the enclosing class, the same way the
