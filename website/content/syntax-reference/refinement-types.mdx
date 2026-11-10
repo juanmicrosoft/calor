@@ -110,6 +110,33 @@ If your API needs distinct domain types, use an ordinary class or record and
 design its construction and mutation rules explicitly. A precondition on one
 function is not a substitute for that type's whole lifecycle.
 
+## Explicit proof statements
+
+Native `proof condition` states a Boolean obligation at that point in a
+function. It is not a named refinement type or a permanent constraint on a
+mutable local.
+
+```calor
+module TransferProof
+  func Transfer (int:balance, int:amount) → int
+    !
+    requires balance >= 0
+    requires amount > 0
+    proof balance >= amount
+    return balance - amount
+```
+
+`Transfer(10, 3)` returns `7`. Without a discharged verifier obligation, the
+statement emits a runtime check: `Transfer(3, 5)` throws
+`InvalidOperationException`. This is distinct from a failed `requires` guard,
+which throws `ContractViolationException`.
+
+The proof-statement check remains even with `--contract-mode off`; that switch
+disables precondition and postcondition guards, not this explicit statement.
+A successful execution is not a static proof. Optional obligation verification
+and its actual status must be inspected separately before claiming discharge
+or guard removal.
+
 ## Runtime checks and verification
 
 The [contracts reference](/docs/syntax-reference/contracts/) explains enabled and
@@ -126,9 +153,9 @@ vacuous results are not clean proofs. Only an eligible proof from the relevant
 compilation can authorize proof-based guard removal; running a program or seeing
 a successful C# build does not do so.
 
-This page replaces the retired refinement authoring guide. It does not promise
-the old named-type distinction, per-assignment refinement guards or a standalone
-proof-statement replacement.
+This page replaces the retired refinement authoring guide. Native proof
+statements remain available, but the old named-type distinction and
+per-assignment refinement guards are not current source guarantees.
 
 ## See also
 

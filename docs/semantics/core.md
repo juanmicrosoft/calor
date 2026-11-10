@@ -338,7 +338,10 @@ does not claim complete class-invariant enforcement.
 2. Function body
 3. All ENSURES clauses (in declaration order)
 
-Both `debug` and `release` emit supported checks; `off` emits no guards.
+Both `debug` and `release` emit supported precondition and postcondition checks;
+`off` emits no precondition or postcondition guards. An explicit `proof`
+statement retains its separate runtime check unless eligible verification
+discharges it.
 Optional verification may remove only eligible clean proven postcondition
 guards. It does not remove preconditions based on satisfiability. Unsupported
 requested runtime lowering must fail rather than silently omit checks.

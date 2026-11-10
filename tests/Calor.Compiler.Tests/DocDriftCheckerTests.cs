@@ -130,10 +130,11 @@ public class DocDriftCheckerTests
             "False:True:True:True:5:7:8:100:6:3:4:5:8:9:10", "True:True:True:1:5" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()" })]
-    [InlineData("refinement-types.mdx", 4, 0,
-        new[] { "PortConstraint", "TextConstraint", "TransferConstraint", "ConstraintBoundary" },
-        new[] { "443", "5", "7", "-1" },
-        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("refinement-types.mdx", 5, 0,
+        new[] { "PortConstraint", "TextConstraint", "TransferConstraint", "ConstraintBoundary", "TransferProof" },
+        new[] { "443", "5", "7", "-1", "7" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
+            "GlobalModule.Transfer(10, 3)" })]
     [InlineData("cli/convert.mdx", 4, 0,
         new[] { "Counter", "Probe", "Countdown", "Grids" }, new[] { "1", "3", "3,2,1", "13" },
         new[] { "new Counter().Next()", "Probe.UseShadow()", "System.String.Join(\",\", new Countdown().Steps)",
@@ -774,6 +775,33 @@ public class DocDriftCheckerTests
             }
             """);
         Assert.Equal(expected, observed);
+    }
+
+    [Theory]
+    [InlineData(10, 3, "7")]
+    [InlineData(3, 5, "!InvalidOperationException")]
+    public void PublicConstraintProof_RetainsItsExplicitGuardAcrossContractModes(
+        int balance, int amount, string expected)
+    {
+        const string path = "website/content/syntax-reference/refinement-types.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module TransferProof\n", StringComparison.Ordinal)).Source;
+        foreach (var mode in new[] { ContractMode.Debug, ContractMode.Release, ContractMode.Off })
+        {
+            var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Single(Assert.Single(Assert.IsType<Ast.ModuleNode>(compiled.Ast).Functions)
+                .Body.OfType<Ast.ProofObligationNode>());
+            var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+                public static class Probe
+                {
+                    public static object? Run() => GlobalModule.Transfer({{balance}}, {{amount}});
+                }
+                """);
+            Assert.Equal(expected, observed);
+        }
     }
 
     [Theory]
