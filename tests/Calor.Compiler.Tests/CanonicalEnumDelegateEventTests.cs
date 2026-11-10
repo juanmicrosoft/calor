@@ -5,6 +5,7 @@ using Calor.Compiler.Analysis;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
@@ -791,7 +792,13 @@ public sealed class CanonicalEnumDelegateEventTests
                 Extensions.Update(answer: out answer, increment: in increment, value: ref value)
                 return Extensions.Choose<int>(other: answer, value: value)
             """;
-        var ast = Parse(source);
+        var admitted = source
+            .Replace("func Update (ref Color:value, in int:increment, out int:answer) → void\n      !",
+                "func Update (ref Color:value, in int:increment, out int:answer) → void\n      ! mut",
+                StringComparison.Ordinal)
+            .Replace("func Main () → int\n    !", "func Main () → int\n    ! mut", StringComparison.Ordinal);
+        Assert.NotEqual(source, admitted);
+        var ast = Parse(admitted);
         var bound = BindNativeEnums(ast);
         var main = bound.Functions.Single(function => function.Symbol.Name == "Main");
         var update = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(main).OfType<BoundCallExpression>()
@@ -804,9 +811,40 @@ public sealed class CanonicalEnumDelegateEventTests
         Assert.Equal(new[] { 1, 0 }, Assert.Single(choose.SelectedOverloadMatches).Arguments
             .Select(mapping => mapping.ParameterIndex));
         Assert.Equal("INT", TypeIdentity.Canonicalize(choose.Type.DisplayString));
-        var compiled = Program.Compile(source);
-        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
-        Execute(compiled.GeneratedCode, assembly =>
+        foreach (var input in new[] { admitted, new CalorEmitter().Emit(ast) })
+        {
+            _ = Parse(input);
+            var compiled = Program.Compile(input);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Execute(compiled.GeneratedCode, assembly =>
+                Assert.Equal(4, assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, null)));
+        }
+
+        foreach (var (missing, expectedFunctions) in new[]
+        {
+            (source, new[] { "Update", "Main" }),
+            (admitted.Replace("! mut\n      set value", "!\n      set value", StringComparison.Ordinal),
+                new[] { "Update" }),
+            (admitted.Replace("! mut\n    var Color:value", "!\n    var Color:value", StringComparison.Ordinal),
+                new[] { "Main" }),
+        })
+        {
+            Assert.NotEqual(admitted, missing);
+            foreach (var input in new[] { missing, new CalorEmitter().Emit(Parse(missing)) })
+            {
+                _ = Parse(input);
+                var rejected = Program.Compile(input, filePath: null,
+                    options: new CompilationOptions { StrictEffects = true });
+                Assert.True(rejected.HasErrors);
+                var errors = rejected.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+                Assert.Equal(expectedFunctions.Select(function =>
+                    $"Function '{function}' uses effect 'mut' but does not declare it").Order(),
+                    errors.Select(error => error.Message).Order());
+                Assert.DoesNotContain(rejected.Diagnostics, diagnostic => diagnostic.Code is
+                    DiagnosticCode.UnknownExternalCall or DiagnosticCode.AssumedEffects);
+            }
+        }
+        Execute(new CSharpEmitter().Emit(Parse(source)), assembly =>
             Assert.Equal(4, assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, null)));
     }
 
