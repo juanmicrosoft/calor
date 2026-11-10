@@ -18,6 +18,186 @@ namespace Calor.Compiler.Tests;
 
 public sealed class CanonicalControlFlowTests
 {
+    [Theory]
+    [InlineData("int", "7", "7")]
+    [InlineData("long", "7", "7")]
+    [InlineData("string", "\"seven\"", "seven")]
+    [InlineData("int[]", "new int[1]", "System.Int32[]")]
+    [InlineData("object", "new object()", "System.Object")]
+    public void SourceStaticFieldRead_UsesSelectedDeclarationAcrossNativeRoundTrip(
+        string type, string initializer, string expected)
+    {
+        var source = $$"""
+            module StaticRead
+              class Holder
+                field {{type}}:Value public static = {{initializer}}
+              class Sink
+                property {{type}}:Observed public
+                  get
+                ctor ({{type}}:value)
+                  set Observed value
+              func Probe public () → Sink
+                ! alloc
+                return new Sink(Holder . Value)
+            """;
+        var oracle = $$"""
+            public class Holder { public static {{type}} Value = {{initializer}}; }
+            public class Sink { public {{type}} Observed { get; } public Sink({{type}} value) { Observed = value; } }
+            public static class Reader { public static Sink Probe() { return new Sink(Holder.Value); } }
+            """;
+        Assert.Equal(expected, Observe(Load(oracle)));
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var module = Parse(candidate);
+            var creationNode = Assert.IsType<NewExpressionNode>(
+                Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]).Expression);
+            var memberNode = Assert.IsType<FieldAccessNode>(Assert.Single(creationNode.Arguments));
+            Assert.Equal("Holder", Assert.IsType<ReferenceNode>(memberNode.Target).Name);
+            var diagnostics = new DiagnosticBag();
+            var binder = new Calor.Compiler.Binding.Binder(diagnostics);
+            var bound = binder.Bind(module);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var creation = Assert.IsType<BoundNewExpression>(
+                Assert.IsType<BoundReturnStatement>(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body[0]).Expression);
+            var member = Assert.IsType<BoundFieldAccessExpression>(Assert.Single(creation.Arguments));
+            Assert.Same(memberNode, Assert.Single(binder.BoundSourceStaticFieldReads).Key);
+            Assert.Same(member, Assert.Single(binder.BoundSourceStaticFieldReads).Value);
+            Assert.Empty(binder.BoundSourceEnumConstants);
+            var field = Assert.Single(member.ResolvedFields);
+            Assert.Same(field, member.ResolvedField);
+            Assert.True(field.IsField && field.IsStatic);
+            Assert.False(field.IsProperty);
+            Assert.Null(field.ConditionalAlternative);
+            var receiver = Assert.IsType<BoundTypeReferenceExpression>(member.Target);
+            Assert.Equal("Holder", receiver.ResolvedType!.QualifiedName);
+            Assert.Same(receiver.ResolvedType,
+                Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(receiver.Type).Declaration);
+            Assert.Same(module.Classes.Single(declaration => declaration.Name == "Holder"), member.SourceStaticFieldOwner);
+            Assert.Same(Assert.Single(creation.ResolvedConstructors), creation.ResolvedConstructor);
+            Assert.Equal(TypeIdentity.Canonicalize(type),
+                TypeIdentity.Canonicalize(Assert.Single(creation.ResolvedConstructor!.Parameters).TypeName));
+            Assert.Equal(expected, Observe(Load(Compile(candidate).GeneratedCode)));
+        }
+
+        static string? Observe(Type reader)
+        {
+            var sink = reader.GetMethod("Probe")!.Invoke(null, null)!;
+            return Convert.ToString(sink.GetType().GetProperty("Observed")!.GetValue(sink),
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    [Theory]
+    [InlineData("private-field", "CS0122")]
+    [InlineData("instance-field", "CS0120")]
+    [InlineData("static-property", null)]
+    [InlineData("value-shadow", "CS0176")]
+    [InlineData("unknown-receiver", "CS0103")]
+    [InlineData("wrong-arity", "CS0305")]
+    [InlineData("conditional-pair", null)]
+    [InlineData("conditional-access", "CS0122")]
+    [InlineData("conditional-single", "CS0117")]
+    public void SourceStaticFieldRead_DoesNotManufactureSelectedTypingAuthority(string kind, string? csharpError)
+    {
+        var (declaration, parameters, receiver, oracleDeclaration) = kind switch
+        {
+            "private-field" => ("class Holder\n    field long:Value private static = 7", "", "Holder",
+                "public class Holder { private static long Value = 7; }"),
+            "instance-field" => ("class Holder\n    field long:Value public = 7", "", "Holder",
+                "public class Holder { public long Value = 7; }"),
+            "static-property" => ("class Holder\n    property long:Value public static\n      get\n        return 7", "", "Holder",
+                "public class Holder { public static long Value { get { return 7; } } }"),
+            "value-shadow" => ("class Holder\n    field long:Value public static = 7\n  class Other\n    field long:Value public static = 99",
+                "Other:Holder", "Holder", "public class Holder { public static long Value = 7; } public class Other { public static long Value = 99; }"),
+            "unknown-receiver" => ("class Holder\n    field long:Value public static = 7", "", "Missing",
+                "public class Holder { public static long Value = 7; }"),
+            "wrong-arity" => ("class Holder<T>\n    field long:Value public static = 7", "", "Holder",
+                "public class Holder<T> { public static long Value = 7; }"),
+            "conditional-pair" => ("class Holder\n    pp AVAILABLE\n      field long:Value public static = 7\n    pp else\n      field long:Value public static = 9", "", "Holder",
+                "public class Holder {\n#if AVAILABLE\npublic static long Value = 7;\n#else\npublic static long Value = 9;\n#endif\n}"),
+            "conditional-access" => ("class Holder\n    pp AVAILABLE\n      field long:Value public static = 7\n    pp else\n      field long:Value private static = 9", "", "Holder",
+                "public class Holder {\n#if AVAILABLE\npublic static long Value = 7;\n#else\nprivate static long Value = 9;\n#endif\n}"),
+            "conditional-single" => ("class Holder\n    pp AVAILABLE\n      field long:Value public static = 7", "", "Holder",
+                "public class Holder {\n#if AVAILABLE\npublic static long Value = 7;\n#endif\n}"),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+        var source = $$"""
+            module StaticBoundary
+              {{declaration}}
+              class Sink
+                ctor (long:value)
+                  return
+              func Probe public ({{parameters}}) → Sink
+                ! alloc
+                return new Sink({{receiver}} . Value)
+            """;
+        var oracle = $$"""
+            {{oracleDeclaration}}
+            public class Sink { public Sink(long value) { } }
+            public static class Reader {
+                public static Sink Probe({{(parameters.Length == 0 ? "" : "Other Holder")}}) { return new Sink({{receiver}}.Value); }
+            }
+            """;
+        var oracleCompilation = CSharpCompilation.Create("StaticBoundaryOracle",
+            [CSharpSyntaxTree.ParseText(oracle)], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var errors = oracleCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity
+            == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+        if (csharpError is null)
+            Assert.Empty(errors);
+        else
+            Assert.Equal(csharpError, Assert.Single(errors).Id);
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var module = Parse(candidate);
+            var node = Assert.IsType<NewExpressionNode>(
+                Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]).Expression);
+            Assert.IsType<FieldAccessNode>(Assert.Single(node.Arguments));
+            var binder = new Calor.Compiler.Binding.Binder(new DiagnosticBag());
+            var bound = binder.Bind(module);
+            Assert.Empty(binder.BoundSourceStaticFieldReads);
+            var creation = Assert.IsType<BoundNewExpression>(
+                Assert.IsType<BoundReturnStatement>(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body[0]).Expression);
+            var member = Assert.IsType<BoundFieldAccessExpression>(Assert.Single(creation.Arguments));
+            if (kind == "conditional-single")
+            {
+                Assert.NotNull(Assert.Single(member.ResolvedFields).ConditionalAlternative);
+                Assert.Single(creation.ResolvedConstructors);
+            }
+            else
+            {
+                Assert.Empty(member.ResolvedFields);
+                Assert.Empty(creation.ResolvedConstructors);
+            }
+            if (kind == "value-shadow")
+            {
+                var target = Assert.IsType<BoundVariableExpression>(member.Target);
+                Assert.Same(Assert.Single(bound.Functions.Single(function => function.Symbol.Name == "Probe").Symbol.Parameters), target.Variable);
+                Assert.Equal("Other", target.Variable.TypeName);
+            }
+            var result = Program.Compile(candidate, "static-boundary.calr",
+                new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null });
+            Assert.True(result.HasErrors, candidate);
+        }
+    }
+
+    [Fact]
+    public void SourceStaticFieldRead_ClearsSelectedTypingAuthorityWhenBinderIsReused()
+    {
+        var binder = new Calor.Compiler.Binding.Binder(new DiagnosticBag());
+        var module = Parse("""
+            module StaticRead
+              module Holder
+                field int:Value static = 7
+              func Probe public () → int
+                return Holder . Value
+            """);
+        binder.Bind(module);
+        Assert.Single(binder.BoundSourceStaticFieldReads);
+        binder.Bind(Parse("module Empty\n  func Probe public () → int\n    return 0"));
+        Assert.Empty(binder.BoundSourceStaticFieldReads);
+    }
+
     [Fact]
     public void DictionaryForeach_QualifiedNativeParameterPreservesElementTypes()
     {

@@ -99,6 +99,10 @@ public sealed class Binder
         new(ReferenceEqualityComparer.Instance);
     internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundSourceEnumConstants =>
         _boundSourceEnumConstants;
+    private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundSourceStaticFieldReads =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundSourceStaticFieldReads =>
+        _boundSourceStaticFieldReads;
     private readonly Dictionary<ExpressionNode, BoundExpression> _boundContractExpressions = new();
     internal IReadOnlyDictionary<ExpressionNode, BoundExpression> BoundContractExpressions =>
         _boundContractExpressions;
@@ -1010,6 +1014,7 @@ public sealed class Binder
         _functionSymbols.Clear();
         _boundAwaits.Clear();
         _boundSourceEnumConstants.Clear();
+        _boundSourceStaticFieldReads.Clear();
         _boundContractExpressions.Clear();
         CrossModuleCallTargets.Clear();
         SourceExtensionCallTargets.Clear();
@@ -4026,6 +4031,19 @@ public sealed class Binder
                 Type: BoundTypes.NominalBoundType { Declaration: { } resultOwner }
             } constant && ReferenceEquals(owner, resultOwner))
             _boundSourceEnumConstants[expr] = constant;
+        if (bound is BoundFieldAccessExpression
+            {
+                ResolvedField: { IsField: true, IsStatic: true, ConditionalAlternative: null } selected,
+                ResolvedFields: [var field],
+                SourceStaticFieldOwner: not null,
+                Target: BoundTypeReferenceExpression
+                {
+                    ResolvedType: { } receiver,
+                    Type: BoundTypes.NominalBoundType { Declaration: { } receiverDeclaration }
+                }
+            } staticField && ReferenceEquals(selected, field)
+                && ReferenceEquals(receiver, receiverDeclaration))
+            _boundSourceStaticFieldReads[expr] = staticField;
         return bound;
     }
 
@@ -4253,14 +4271,6 @@ public sealed class Binder
                 ResolveReadableInstanceProperties(instanceOwner, fieldAccess.FieldName),
             _ => ResolveStructFieldPath(target.Type.DisplayString, fieldAccess.FieldName),
         };
-        if (_asyncTypeModule != null
-            && resolvedFields.OfType<VariableSymbol>().ToArray() is [var nativeMember]
-            && (isPatternMember || nativeMember.IsProperty)
-            && TypeIdentity.TryResolveNativeInstanceMemberType(
-                _asyncTypeModule, target.Type.DisplayString, fieldAccess.FieldName, out var nativeMemberType))
-            return new BoundFieldAccessExpression(
-                fieldAccess.Span, target, fieldAccess.FieldName, nativeMemberType, nativeMember,
-                fieldAccess.FieldNameSpan, resolvedFields.OfType<VariableSymbol>().ToArray());
         var fields = resolvedFields.OfType<VariableSymbol>().ToArray();
         var fieldTypes = fields
             .Select(field => TypeIdentity.Canonicalize(field.TypeName))
@@ -4278,6 +4288,19 @@ public sealed class Binder
                 resolvedType = new BoundTypes.NominalBoundType(
                     field.TypeName, field.NullableAnnotation, identity?.Declaration, identity?.RoslynSymbol);
         }
+
+        if (_asyncTypeModule != null
+            && fields is [var nativeMember]
+            && (isPatternMember || nativeMember.IsProperty)
+            && TypeIdentity.TryResolveNativeInstanceMemberType(
+                _asyncTypeModule, target.Type.DisplayString, fieldAccess.FieldName, out var nativeMemberType))
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, nativeMemberType, nativeMember,
+                fieldAccess.FieldNameSpan, fields,
+                nativeMember.IsProperty && resolvedType is BoundTypes.NominalBoundType nominal
+                    ? new BoundTypes.NominalBoundType(nativeMemberType, nominal.NullableAnnotation,
+                        nominal.Declaration, nominal.RoslynSymbol)
+                    : null);
 
         if (fields.Length == 0
             && ResolveMetadataArrayProperty(target, fieldAccess.FieldName) is { } arrayProperty)

@@ -119,6 +119,17 @@ it does not claim support for compound restricted-accessor syntax.
 The generic getter control proves binding and independently compiled emitted C#,
 not the separate closed-generic getter effect-closure boundary.
 Struct storage-path handling and existing `this`/`base` policies stay separate.
+Native property result substitution retains the selected declaration's reference
+identity and nullability, including aliases and inherited `base` reads, without
+changing its display spelling or getter-access rules.
 The fixed Money converter control requires native operator/property conversion
 with zero interop, substitution, or drop, and preserves its original C# runtime
 oracle after a second native round trip.
+
+Spaced source static-field reads use the binder's selected declaration in the AST
+checker. The separate typing map requires one unconditional static field and an
+actual source type receiver; it cannot infer a type receiver from a name, a value
+shadow, an inaccessible or instance member, a property, or conditional candidates.
+Primitive, array, and object results use ordinary declared-type resolution, not
+the enum-only `ExternalType` path. Native round trips and independent C# probes
+retain the original instrumentation operand-order and single-evaluation oracles.
