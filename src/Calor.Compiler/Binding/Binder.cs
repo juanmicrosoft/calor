@@ -6743,10 +6743,14 @@ public sealed class Binder
         {
             if (!bindings.ForeignSourceCallSites.Contains(call.Span))
                 return null;
+            var evaluatedReceiver = BindExpression(member.Target);
             var arguments = BindCallArguments(call.Arguments, call.ArgumentModifiers);
             return new BoundCallExpression(call.Span, "<expression-call>", arguments, "OBJECT",
-                calleeSpan: member.FieldNameSpan, receiverSpan: member.Target.Span)
+                argumentNames: call.ArgumentNames, argumentModifiers: call.ArgumentModifiers,
+                typeArguments: call.TypeArguments, calleeSpan: member.FieldNameSpan,
+                receiverSpan: member.Target.Span, receiver: evaluatedReceiver)
             {
+                EvaluatedReceiver = evaluatedReceiver,
                 HasOpaqueOverloads = true,
                 HasUnknownInferredType = true
             };

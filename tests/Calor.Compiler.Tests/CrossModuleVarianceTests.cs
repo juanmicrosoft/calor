@@ -15,8 +15,13 @@ public sealed class CrossModuleVarianceTests : IDisposable
 {
     private readonly string _directory = Path.Combine(
         Path.GetTempPath(), "calor-variance-" + Guid.NewGuid().ToString("N"));
+    private readonly Xunit.Abstractions.ITestOutputHelper _output;
 
-    public CrossModuleVarianceTests() => Directory.CreateDirectory(_directory);
+    public CrossModuleVarianceTests(Xunit.Abstractions.ITestOutputHelper output)
+    {
+        _output = output;
+        Directory.CreateDirectory(_directory);
+    }
 
     private const string NativeLibrary = """
         module Library Contracts block
@@ -507,6 +512,217 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Assert.All(index.EffectRows, row => Assert.Equal("fits", row.Verdict));
         var (_, compiledDiagnostics) = Compile(cache: true);
         Assert.False(compiledDiagnostics.HasErrors, string.Join("\n", compiledDiagnostics));
+    }
+
+    [Theory]
+    [InlineData(false, "cw")]
+    [InlineData(true, "cw")]
+    [InlineData(false, "mut")]
+    [InlineData(true, "mut")]
+    public void NativeCrossFileRefusedCallsRetainKnownReceiverEffectsAndEdges(bool extension, string effect)
+    {
+        Write("library", extension ? """
+            module Library Contracts block
+              class Receiver public
+              module Extensions public
+                func Touch public (this Receiver:receiver, int:value) → int
+                  !
+                  return value
+            """ : """
+            module Library Contracts block
+              class Receiver public
+                func Touch public (int:value) → int
+                  !
+                  return value
+            """);
+        Write("caller", $$"""
+            module Caller Consumer block
+              using Contracts
+              module Entry public
+                func Make public (Contracts.Receiver:receiver, int[]:visits) → Contracts.Receiver
+                  ! {{effect}}
+                  {{(effect == "cw" ? "System.Console.WriteLine(1)" : "set visits[0] (visits[0] + 1)")}}
+                  return receiver
+                func Argument public () → int
+                  !
+                  return 7
+                func Probe public (Contracts.Receiver:receiver, int[]:visits) → int
+                  !
+                  return Entry.Make(receiver, visits).Touch(Entry.Argument())
+            """);
+        var symbols = Refactoring.ProjectSymbolIndex.Build(
+            Directory.GetFiles(_directory, "*.calr"), out var skipped);
+        Assert.Empty(skipped);
+        var caller = Assert.Single(symbols.Documents, document => document.FilePath.EndsWith("caller.calr", StringComparison.Ordinal));
+        Assert.False(caller.BindHadErrors);
+        var probe = Assert.Single(caller.BoundModule.Functions, function => function.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal));
+        var outer = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(Assert.Single(probe.Body)).Expression);
+        var calls = BoundNodeHelpers.DescendantsAndSelf(probe).OfType<BoundCallExpression>().ToArray();
+        var diagnostics = new DiagnosticBag();
+        var pass = new EffectEnforcementPass(diagnostics, UnknownCallPolicy.Permissive)
+        {
+            CrossModuleTypes = symbols.SourceTypes,
+            SourcePath = caller.FilePath
+        };
+        pass.Enforce(caller.Ast);
+        var fact = Assert.Single(pass.DeclarationFacts.Values, fact => fact.Name == "Probe");
+        var targets = symbols.CallEdges.Where(edge => edge.CallerSymbolId == probe.SymbolId)
+            .Select(edge => caller.BoundModule.SymbolsById[edge.CalleeSymbolId].Name).ToArray();
+        _output.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            extension, effect,
+            BoundCalls = calls.Select(call => new { call.Target, Symbol = call.ResolvedSymbol?.Name, call.Span.Start }),
+            ReceiverRetained = outer.EvaluatedReceiver is not null,
+            Targets = targets,
+            Inferred = fact.InferredRow.ToString(),
+            fact.Forbidden,
+            Diagnostics = diagnostics.Select(diagnostic => diagnostic.ToString())
+        }));
+        Assert.Null(outer.ResolvedSymbol);
+        Assert.Null(outer.ResolvedMetadataMethod);
+        Assert.Null(outer.SelectedSourceMethod);
+        Assert.True(outer.HasOpaqueOverloads);
+        Assert.True(outer.HasUnknownInferredType);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'" + effect + "'", StringComparison.Ordinal));
+        Assert.Equal(new[] { effect }, fact.Forbidden);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        var receiverCall = Assert.IsType<BoundCallExpression>(outer.EvaluatedReceiver);
+        Assert.Same(receiverCall, outer.Receiver);
+        Assert.Equal("Consumer.Entry.Make", receiverCall.ResolvedSymbol!.Name);
+        Assert.Equal(new[] { receiverCall, Assert.Single(outer.Arguments) }, outer.Children);
+        Assert.Equal(3, calls.Length);
+        Assert.Single(calls, call => call.ResolvedSymbol?.Name == "Consumer.Entry.Make");
+        Assert.Single(calls, call => call.ResolvedSymbol?.Name == "Consumer.Entry.Argument");
+        Assert.Equal(new[] { "Consumer.Entry.Argument", "Consumer.Entry.Make" }, targets.Order(StringComparer.Ordinal));
+        var index = ProjectIndexBuilder.Build(new(_directory, "native",
+            ProjectIndexBuilder.DiscoverSources(_directory)));
+        Assert.Equal(targets.Order(StringComparer.Ordinal), index.CallEdges
+            .Select(edge => Assert.Single(index.Declarations, declaration => declaration.SymbolId == edge.CalleeSymbolId).Name)
+            .Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void NativeCrossFileRefusedReceiverMutationPrecedesArgumentBinding()
+    {
+        Write("library", """
+            module Library Contracts block
+              class Receiver public
+                func Touch public (int:value) → int
+                  !
+                  return value
+            """);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Make public (Contracts.Receiver:receiver, ref string?:text) → Contracts.Receiver
+                  ! mut
+                  set text null
+                  return receiver
+                func Argument public (string:text) → int
+                  !
+                  return 7
+                func Probe public (Contracts.Receiver:receiver, string?:text) → int
+                  ! mut
+                  var string?:value = text
+                  if value != null
+                    return Entry.Make(receiver, ref value).Touch(Entry.Argument(value))
+                  return 0
+            """);
+        var files = Directory.GetFiles(_directory, "*.calr").Select(path => new FileInfo(path)).ToArray();
+        CompilationDriver.BuildCrossModuleFunctionMap(files, out var types);
+        var path = Path.Combine(_directory, "caller.calr");
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer(File.ReadAllText(path), diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binder(diagnostics, path) { CrossModuleTypes = types }.Bind(ast);
+        _output.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Diagnostics = diagnostics.Select(diagnostic => diagnostic.ToString()),
+            Calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+                .Select(call => new { call.Target, Symbol = call.ResolvedSymbol?.Name, call.Span.Start })
+        }));
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        var make = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => call.ResolvedSymbol?.Name == "Consumer.Entry.Make");
+        Assert.Equal("ref", make.ArgumentModifiers![1]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeCrossFileRefusedReceiverEvaluatesOnceBeforeArguments(bool extension)
+    {
+        Write("library", extension ? """
+            module Library Contracts block
+              class Receiver public
+              module Extensions public
+                func Touch public (this Receiver:receiver, int:value) → int
+                  !
+                  return value
+            """ : """
+            module Library Contracts block
+              class Receiver public
+                func Touch public (int:value) → int
+                  !
+                  return value
+            """);
+        Write("caller", """
+            module Caller Consumer block
+              using Contracts
+              module Entry public
+                func Make public (Contracts.Receiver:receiver, int[]:visits) → Contracts.Receiver
+                  ! mut
+                  set visits[0] (visits[0] * 10 + 1)
+                  return receiver
+                func Argument public (int[]:visits) → int
+                  ! mut
+                  set visits[0] (visits[0] * 10 + 2)
+                  return 7
+                func Probe public (Contracts.Receiver:receiver, int[]:visits) → int
+                  ! mut
+                  return Entry.Make(receiver, visits).Touch(value:Entry.Argument(visits))
+            """);
+        var symbols = Refactoring.ProjectSymbolIndex.Build(
+            Directory.GetFiles(_directory, "*.calr"), out var skipped);
+        Assert.Empty(skipped);
+        var caller = Assert.Single(symbols.Documents, document => document.FilePath.EndsWith("caller.calr", StringComparison.Ordinal));
+        Assert.False(caller.BindHadErrors);
+        var probe = Assert.Single(caller.BoundModule.Functions, function => function.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal));
+        var outer = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(Assert.Single(probe.Body)).Expression);
+        Assert.Null(outer.ResolvedSymbol);
+        Assert.Null(outer.ResolvedMetadataMethod);
+        Assert.Null(outer.SelectedSourceMethod);
+        Assert.True(outer.HasOpaqueOverloads);
+        Assert.True(outer.HasUnknownInferredType);
+        Assert.Equal(new[] { "value" }, outer.ArgumentNames);
+        var receiver = Assert.IsType<BoundCallExpression>(outer.EvaluatedReceiver);
+        Assert.Same(receiver, outer.Receiver);
+        Assert.Equal(new[] { receiver, Assert.Single(outer.Arguments) }, outer.Children);
+        Assert.Equal(new[] { "Consumer.Entry.Make", "Consumer.Entry.Argument" },
+            BoundNodeHelpers.DescendantsAndSelf(probe).OfType<BoundCallExpression>()
+                .Where(call => call.ResolvedSymbol is not null).Select(call => call.ResolvedSymbol!.Name));
+        var diagnostics = new DiagnosticBag();
+        new EffectEnforcementPass(diagnostics, UnknownCallPolicy.Permissive)
+        {
+            CrossModuleTypes = symbols.SourceTypes,
+            SourcePath = caller.FilePath
+        }.Enforce(caller.Ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+
+        var compilation = CSharpCompilation.Create("RefusedReceiver_" + Guid.NewGuid().ToString("N"),
+            symbols.Documents.Select(document => CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(document.Ast))),
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var image = new MemoryStream();
+        var emitted = compilation.Emit(image);
+        Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        var visits = new[] { 0 };
+        var result = assembly.GetType("Consumer.Entry")!.GetMethod("Probe")!
+            .Invoke(null, [Activator.CreateInstance(assembly.GetType("Contracts.Receiver")!), visits]);
+        Assert.Equal(7, result);
+        Assert.Equal(12, visits[0]);
+        _output.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { extension, Result = result, Trace = visits[0] }));
     }
 
     [Theory]
