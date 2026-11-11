@@ -18,6 +18,7 @@ namespace Calor.Conversion.Tests;
 /// PP-S4's fixture registry (A-1.5.7; roadmap v0.13 §2.5 gate 6). Every entry under
 /// bench/phase0-agent-native/fixtures/d-s1.5/ must be structurally complete, its C# input
 /// must convert to exactly the expected Calor, and both Calor files must compile.
+/// Explicit current project projections compare ordered outputs and compile their C# together.
 /// Indeterminate (a fixture that will not build) counts as FAILING, per the registration —
 /// which these tests implement by failing on any defect rather than skipping.
 /// The registry is legitimately empty until the first SupportLevel promotion; the
@@ -26,7 +27,8 @@ namespace Calor.Conversion.Tests;
 public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     private static readonly HashSet<string> CurrentExpectationFixtures =
-        ["local-function", "conditional-expression-hoisting", "conditional-declaration", "string-interpolation-hole"];
+        ["local-function", "conditional-expression-hoisting", "conditional-declaration", "string-interpolation-hole",
+            "namespace-topology"];
 
     private static string CurrentManifestPath(string repoRoot, string name, string original) =>
         name == "conditional-declaration"
@@ -220,9 +222,11 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
 
     [Fact]
     public void NamespaceTopology_CurrentProjectPartsRetainBothClrOwners()
+        => ValidateFixture(Path.Combine(RegistryPath(), "namespace-topology"), "namespace-topology");
+
+    private void ValidateNamespaceTopology(string repoRoot, string inputPath, CSharpToCalorConverter converter)
     {
         const string name = "namespace-topology";
-        var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
         var original = $"bench/phase0-agent-native/fixtures/d-s1.5/{name}/fixture.json";
         using var doc = JsonDocument.Parse(File.ReadAllText(CurrentManifestPath(repoRoot, name, original)));
         var historicalManifest = JsonNode.Parse(File.ReadAllText(Path.Combine(repoRoot, original)));
@@ -232,6 +236,7 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             "Topology projection must retain every original field, including zero-Interop certification.");
         var observation = doc.RootElement.GetProperty("currentObservation");
         Assert.Equal("current-compiler-active-syntax", observation.GetProperty("inputContract").GetString());
+        Assert.Equal("lossless-project", observation.GetProperty("conversionMode").GetString());
         Assert.False(string.IsNullOrWhiteSpace(observation.GetProperty("reason").GetString()));
         var parts = observation.GetProperty("outputs").EnumerateArray().ToArray();
         Assert.Equal(new[] { "namespace-topology.namespace1.calr", "namespace-topology.namespace2.calr" },
@@ -240,19 +245,59 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
         Assert.Equal(new[] { "Alpha.Marker", "Beta.Value" }, parts.Select(part => part.GetProperty("clrType").GetString()));
         var entryPoint = doc.RootElement.GetProperty("runtimeEntryPoint").GetString()!;
         var expected = doc.RootElement.GetProperty("runtimeExpectedInt").GetInt32();
-        var originalAssembly = AssertValueTestPasses(name,
-            new[] { File.ReadAllText(Path.Combine(RegistryPath(), name, "input.cs")) },
+        var source = File.ReadAllText(inputPath);
+        var project = converter.ConvertProject(source, $"{name}.cs");
+        Assert.True(project.Success,
+            string.Join("; ", project.Outputs.SelectMany(part => part.Conversion.Issues).Select(issue => issue.Message)));
+        Assert.True(project.IsSplit);
+        Assert.Equal(parts.Select(part => part.GetProperty("fileName").GetString()),
+            project.Outputs.Select(part => part.FileName));
+        Assert.True(observation.GetProperty("fullyNative").GetBoolean());
+        Assert.Equal(observation.GetProperty("nativeConversionCount").GetInt32(),
+            project.Outputs.Sum(part => part.Conversion.NativeConversionCount));
+        foreach (var (part, index) in project.Outputs.Select((part, index) => (part, index)))
+        {
+            var conversion = part.Conversion;
+            Assert.Empty(conversion.Losses);
+            Assert.Equal(0, conversion.InteropPreservationCount);
+            Assert.Equal(ConversionRoundTrip.Verified, conversion.Context.RoundTrip);
+            Assert.Equal(parts[index].GetProperty("nativeConversionCount").GetInt32(), conversion.NativeConversionCount);
+            var issue = Assert.Single(conversion.Issues);
+            Assert.Equal("namespace-topology", issue.Feature);
+            Assert.Equal(observation.GetProperty("requiredIssueMessage").GetString(), issue.Message);
+            Assert.NotNull(conversion.CalorSource);
+            Assert.NotNull(conversion.Ast);
+            AssertNative(conversion.Ast);
+        }
+        output.WriteLine(JsonSerializer.Serialize(new
+        {
+            fixture = name, conversionMode = "lossless-project", project.IsSplit,
+            outputs = project.Outputs.Select(part => new
+            {
+                part.FileName, part.Conversion.NativeConversionCount,
+                losses = part.Conversion.Losses,
+                issues = part.Conversion.Issues.Select(issue => new { issue.Feature, issue.Message })
+            })
+        }));
+        var originalAssembly = AssertValueTestPasses(name, new[] { source },
             entryPoint, expected, expectedOwner: "Beta.Value");
-        foreach (var projection in new[] { "expectedPath", "testPath" })
+        foreach (var projection in new[] { "converted", "expectedPath", "testPath" })
         {
             var generated = new List<string>();
-            foreach (var part in parts)
+            for (var index = 0; index < parts.Length; index++)
             {
-                var path = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot,
-                    part.GetProperty(projection).GetString()!);
-                var source = File.ReadAllText(path);
-                Calor.Compiler.Tests.RawFrameAssertions.AssertFramed(source, present: false);
-                var result = Program.Compile(source, Path.GetFileName(path),
+                var part = parts[index];
+                var path = projection == "converted"
+                    ? project.Outputs[index].FileName
+                    : Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot,
+                        part.GetProperty(projection).GetString()!);
+                var calor = projection == "converted"
+                    ? project.Outputs[index].Conversion.CalorSource!
+                    : File.ReadAllText(path);
+                if (projection == "expectedPath")
+                    Assert.Equal(Normalize(calor), Normalize(project.Outputs[index].Conversion.CalorSource!));
+                Calor.Compiler.Tests.RawFrameAssertions.AssertFramed(calor, present: false);
+                var result = Program.Compile(calor, Path.GetFileName(path),
                     new Calor.Compiler.CompilationOptions
                     {
                         EnforceEffects = false,
@@ -260,12 +305,13 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
                     });
                 Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
                 AssertNative(result.Ast!);
+                Assert.Equal(part.GetProperty("namespace").GetString(),
+                    Assert.Single(result.Ast!.NamespaceScopes).FullName);
                 var scope = Assert.Single(CSharpSyntaxTree.ParseText(result.GeneratedCode).GetRoot()
                     .DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>());
                 Assert.Equal(part.GetProperty("namespace").GetString(), scope.Name.ToString());
                 generated.Add(result.GeneratedCode);
             }
-            // Fixture projection proof is separate from the pending project-converter admission.
             var assembly = AssertValueTestPasses(name, generated, entryPoint, expected, expectedOwner: "Beta.Value");
             Assert.Equal(Shape(originalAssembly), Shape(assembly));
         }
@@ -373,16 +419,21 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             doc.RootElement,
             "allowedLossKinds");
 
-        // 3. Conversion match: input.cs converts to exactly expected.calr.
+        // 3. Compare the single output or the explicit current project projection.
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
-            Fidelity = ConversionFidelity.Lossy,
+            Fidelity = name == "namespace-topology" ? ConversionFidelity.Lossless : ConversionFidelity.Lossy,
             ModuleName = "Fixture",
             GracefulFallback = true,
             AutoGenerateIds = true,
             PreprocessorMode =
                 PreprocessorConversionMode.PreserveAllBranches
         });
+        if (name == "namespace-topology")
+        {
+            ValidateNamespaceTopology(repoRoot, inputPath, converter);
+            return;
+        }
         var converted = converter.Convert(File.ReadAllText(inputPath), $"{name}.cs");
         Assert.True(
             converted.Success,
