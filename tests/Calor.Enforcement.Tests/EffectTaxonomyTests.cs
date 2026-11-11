@@ -21,11 +21,19 @@ public class EffectTaxonomyTests
         Assert.False(EffectCodes.TryParseCompact(code, out _, out _, out _));
         Assert.Throws<ArgumentException>(() => EffectSet.From(code));
 
-        var result = TestHarness.Compile(
+        // Retain the frozen input separately from its explicit native representation.
+        var retiredSource =
             $$"""
             §M{Test}
               §F{Run:pub} () -> void
                 §E{{{code}}}
+            """;
+        _ = retiredSource;
+        var result = TestHarness.Compile(
+            $$"""
+            module Test Test
+              func Run public () → void
+                ! {{code}}
             """);
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics.Errors,
