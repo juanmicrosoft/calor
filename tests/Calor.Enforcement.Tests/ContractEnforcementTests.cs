@@ -9,10 +9,59 @@ namespace Calor.Enforcement.Tests;
 /// </summary>
 public class ContractEnforcementTests
 {
+    // Keep the retired scenario loads and inline source intact below.
+    // These explicit native programs preserve their contracts, absent effect
+    // declarations, checked arithmetic, and Test.TestModule CLR owner.
+    private const string RequiresCurrentNativeProgram = """
+        module Test Test
+          func Divide public (int:a, int:b) → int
+            requires b != 0
+            return a / b
+        """;
+
+    private const string EnsuresCurrentNativeProgram = """
+        module Test Test
+          func GetPositive public (int:n) → int
+            => result > 0
+            return n
+        """;
+
+    private const string ModeOffCurrentNativeProgram = """
+        module Test Test
+          func Divide public (int:a, int:b) → int
+            requires b != 0
+            return a / b
+        """;
+
+    private const string MultipleReturnsCurrentNativeProgram = """
+        module Test Test
+          func Abs public (int:n) → int
+            => result >= 0
+            if n < 0
+              return 0 - n
+            return n
+        """;
+
+    private const string FunctionIdCurrentNativeProgram = """
+        module Test Test
+          func RequirePositive public (int:n) → int
+            requires n > 0
+            return n
+        """;
+
+    private const string NoEffectsCurrentNativeProgram = """
+        module Test Test
+          func SafeAdd public (int:a, int:b) → int
+            requires a >= 0
+            => result >= a
+            return a + b
+        """;
+
     [Fact]
     public void C1_RequiresFails_ThrowsContractViolation()
     {
         var source = TestHarness.LoadScenario("Contracts/C1_requires_throws.calr");
+        source = RequiresCurrentNativeProgram;
 
         // Call Divide with b=0, should throw ContractViolationException
         var result = TestHarness.Execute(source, "Divide", new object[] { 10, 0 });
@@ -29,6 +78,7 @@ public class ContractEnforcementTests
     public void C1_RequiresPasses_ReturnsNormally()
     {
         var source = TestHarness.LoadScenario("Contracts/C1_requires_throws.calr");
+        source = RequiresCurrentNativeProgram;
 
         // Call Divide with valid arguments
         var result = TestHarness.Execute(source, "Divide", new object[] { 10, 2 });
@@ -41,6 +91,7 @@ public class ContractEnforcementTests
     public void C2_EnsuresFails_ThrowsContractViolation()
     {
         var source = TestHarness.LoadScenario("Contracts/C2_ensures_throws.calr");
+        source = EnsuresCurrentNativeProgram;
 
         // Call GetPositive with n=-5, postcondition fails
         var result = TestHarness.Execute(source, "GetPositive", new object[] { -5 });
@@ -56,6 +107,7 @@ public class ContractEnforcementTests
     public void C2_EnsuresPasses_ReturnsNormally()
     {
         var source = TestHarness.LoadScenario("Contracts/C2_ensures_throws.calr");
+        source = EnsuresCurrentNativeProgram;
 
         // Call GetPositive with n=5, postcondition passes
         var result = TestHarness.Execute(source, "GetPositive", new object[] { 5 });
@@ -68,6 +120,7 @@ public class ContractEnforcementTests
     public void C3_ModeOff_NoExceptionEvenOnViolation()
     {
         var source = TestHarness.LoadScenario("Contracts/C3_mode_off.calr");
+        source = ModeOffCurrentNativeProgram;
         var options = new CompilationOptions
         {
             EnforceEffects = false,
@@ -91,6 +144,7 @@ public class ContractEnforcementTests
     public void C4_MultipleReturns_EnsuresCheckedOnAllPaths()
     {
         var source = TestHarness.LoadScenario("Contracts/C4_multiple_returns.calr");
+        source = MultipleReturnsCurrentNativeProgram;
 
         // Test positive path
         var result1 = TestHarness.Execute(source, "Abs", new object[] { 5 });
@@ -112,6 +166,7 @@ public class ContractEnforcementTests
     public void C5_FunctionId_MatchesDefinedId()
     {
         var source = TestHarness.LoadScenario("Contracts/C5_function_id.calr");
+        source = FunctionIdCurrentNativeProgram;
 
         // Call with invalid input to trigger contract violation
         var result = TestHarness.Execute(source, "RequirePositive", new object[] { -1 });
@@ -127,6 +182,7 @@ public class ContractEnforcementTests
     public void DebugMode_IncludesDetailedInfo()
     {
         var source = TestHarness.LoadScenario("Contracts/C1_requires_throws.calr");
+        source = RequiresCurrentNativeProgram;
         var options = new CompilationOptions
         {
             EnforceEffects = false,
@@ -148,6 +204,7 @@ public class ContractEnforcementTests
     public void ReleaseMode_HasMinimalInfo()
     {
         var source = TestHarness.LoadScenario("Contracts/C1_requires_throws.calr");
+        source = RequiresCurrentNativeProgram;
         var options = new CompilationOptions
         {
             EnforceEffects = false,
@@ -181,6 +238,7 @@ public class ContractEnforcementTests
       §S (>= result a)
       §R (+ a b)
 ";
+        source = NoEffectsCurrentNativeProgram;
         var result = TestHarness.Compile(source);
 
         // Should compile - contracts don't require throw effect
