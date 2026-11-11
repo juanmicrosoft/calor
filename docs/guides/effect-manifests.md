@@ -125,6 +125,9 @@ not an instance method on `IEnumerable<int>`. A name match alone cannot authoriz
 an unresolved overload such as `values.Where()`. Receiver and argument evaluation
 effects still count; delegate arguments also contribute their own effect rows.
 An unknown callback row remains unknown even when the provider has a contract.
+Contextual lambda calls can reuse the selected invocation from Calor's annotated
+C# emission only when its native origin and all active configurations are valid.
+The compiler does not guess a `Func` signature to choose a lambda overload.
 
 ## Manifest Search Locations
 

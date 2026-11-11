@@ -255,7 +255,8 @@ public sealed class Binder
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
         BoundExpression? computedReceiver = null,
-        IReadOnlyList<string>? typeArguments = null)
+        IReadOnlyList<string>? typeArguments = null,
+        ExpressionCallNode? contextualCall = null)
     {
         if (args.Where((argument, index) => argument.HasUnknownInferredType
                 || argument is BoundVariableExpression { Variable: { Id.IsNone: true, Name: var name } }
@@ -302,7 +303,7 @@ public sealed class Binder
         if (receiverType is null && computedReceiver is not null
             && NullabilityChecker.GetMethodInputArrayType(computedReceiver) is null)
             receiverType = ResolveComputedMetadataType(ctx, computedReceiver.Type.DisplayString);
-        if (receiverType is null) return null;
+        if (receiverType is null) return ResolveContextualCall();
 
         // Argument types: use each BoundExpression's Type.DisplayString to
         // find a Roslyn type. The Calor short names (STRING/INT/BOOL/…) are
@@ -330,7 +331,7 @@ public sealed class Binder
                 ? GetMetadataArrayInputType(ctx, arrayType)
                 : (computedReceiver is null ? ResolveBclArgumentType(ctx, trimmed) : ResolveComputedMetadataType(ctx, display))
                     ?? (computedReceiver is null ? ctx.TryResolveType("System.Object") : null);
-            if (t is null) return null;
+            if (t is null) return ResolveContextualCall();
             var modifier = argumentModifiers != null && i < argumentModifiers.Count
                 ? argumentModifiers[i]
                 : null;
@@ -356,7 +357,7 @@ public sealed class Binder
         var result = computedReceiver is null ? binder.ResolveCall(receiverType, methodName, metaArgs)
             : binder.ResolveExpressionCall(receiverType, methodName, metaArgs, explicitTypes,
                 computedReceiver is BoundTypeReferenceExpression);
-        if (!result.IsResolved) return null;
+        if (!result.IsResolved) return ResolveContextualCall();
 
         if (result.Symbol!.IsGenericMethod && metaArgs.Any(argument => argument.Type is Microsoft.CodeAnalysis.IArrayTypeSymbol))
         {
@@ -370,6 +371,19 @@ public sealed class Binder
             result = preserved with { LegacyReturnType = result.GetReturnBoundTypeEx() };
         }
         return result;
+
+        Metadata.MetadataBinderResult? ResolveContextualCall()
+        {
+            if (contextualCall is null || !ResolveSourceCallConversions || _asyncTypeModule is null
+                || !args.Any(argument => argument.Type is BoundTypes.FunctionBoundType
+                    || argument is BoundVariableExpression
+                        { Variable: { IsTypeInferred: true, FunctionType: not null } }))
+                return null;
+            _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
+                _asyncTypeModule, _diagnostics, ProjectionContractMode);
+            return _sourceCallConversions.ContextualMetadataCalls.TryGetValue(contextualCall, out var selected)
+                ? selected : null;
+        }
     }
 
     private Microsoft.CodeAnalysis.ITypeSymbol? ResolveComputedMetadataType(
@@ -6448,7 +6462,7 @@ public sealed class Binder
                 receiver = BuildCallReceiver(sourceTarget, member.Target.Span, inferred.Variable, null, null);
             return BindCallExpression(new CallExpressionNode(call.Span,
                 "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
-                call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName);
+                call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call);
         }
         var target = BindExpression(call.TargetExpression);
         var arguments = BindCallArguments(call.Arguments, call.ArgumentModifiers);
@@ -7081,7 +7095,8 @@ public sealed class Binder
     }
 
     private BoundCallExpression BindCallExpression(CallExpressionNode callExpr,
-        BoundExpression? computedReceiver = null, string? computedMethodName = null)
+        BoundExpression? computedReceiver = null, string? computedMethodName = null,
+        ExpressionCallNode? contextualCall = null)
     {
         var args = BindCallArguments(callExpr.Arguments, callExpr.ArgumentModifiers);
         var argumentNames = callExpr.ArgumentNames;
@@ -7158,8 +7173,9 @@ public sealed class Binder
         var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
             ? metadataReceiver is not null
                 ? TryResolveBclCall($"{metadataReceiver.Type.FullyQualifiedName}.{resolvedMethodName}", args,
-                    callExpr.ArgumentNames, callExpr.ArgumentModifiers, metadataReceiver, callExpr.TypeArguments)
-                : TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers)
+                    callExpr.ArgumentNames, callExpr.ArgumentModifiers, metadataReceiver, callExpr.TypeArguments, contextualCall)
+                : TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers,
+                    contextualCall: contextualCall)
             : null;
         var metadataScalarReturn = bclResolution?.Symbol?.ReturnType.SpecialType
             is Microsoft.CodeAnalysis.SpecialType.System_String

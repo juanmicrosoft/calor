@@ -81,6 +81,7 @@ public sealed class CallGraphAnalysis
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
         internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<ExpressionCallNode, Binding.Metadata.MetadataBinderResult> ContextualMetadataCalls { get; } = new(ReferenceEqualityComparer.Instance);
         internal HashSet<BinaryOperationNode> BuiltInNullGuardOperations { get; } = new(ReferenceEqualityComparer.Instance);
         internal HashSet<BinaryOperationNode> TerminatingNullGuardConditions { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<ExpressionNode, StableMemberSelection> StableMemberReads { get; } = new(ReferenceEqualityComparer.Instance);
@@ -152,6 +153,7 @@ public sealed class CallGraphAnalysis
         var conflictingMembers = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
         var conflictingGetters = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
         var conflictingMethodGroupCalls = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
+        var conflictingMetadataCalls = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
         var conflictingConstructorInitializers = new HashSet<ConstructorNode>(ReferenceEqualityComparer.Instance);
         var conflictingSourceConstructors = new HashSet<NewExpressionNode>(ReferenceEqualityComparer.Instance);
         var argumentOwners = new Dictionary<AstNode, (TextSpan Call, int Index)>(ReferenceEqualityComparer.Instance);
@@ -417,6 +419,7 @@ public sealed class CallGraphAnalysis
             var selectedMembersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
             var selectedGettersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
             var selectedMethodGroupCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
+            var selectedMetadataCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
 
             foreach (var declaration in root.DescendantNodes().Where(node =>
                          node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax
@@ -440,7 +443,10 @@ public sealed class CallGraphAnalysis
                     {
                         AddMetadataMemberType(operation);
                         if (operation is IInvocationOperation metadataInvocation)
+                        {
                             AddMetadataMethodGroupCall(metadataInvocation);
+                            AddContextualMetadataCall(metadataInvocation);
+                        }
                     }
                     if (bindNullGuards && operation is IConditionalOperation
                             { Syntax: IfStatementSyntax conditionalSyntax }
@@ -581,6 +587,12 @@ public sealed class CallGraphAnalysis
             {
                 conflictingMethodGroupCalls.Add(call);
                 bindings.MetadataMethodGroupCalls.Remove(call);
+            }
+            foreach (var call in ranges.Select(range => range.Node).OfType<ExpressionCallNode>()
+                         .Where(call => !selectedMetadataCallsInTree.Contains(call)))
+            {
+                conflictingMetadataCalls.Add(call);
+                bindings.ContextualMetadataCalls.Remove(call);
             }
             if (!bindExpressions)
                 return;
@@ -748,6 +760,72 @@ public sealed class CallGraphAnalysis
                 else
                     bindings.MetadataMethodGroupCalls[origin] = selection;
             }
+
+            void AddContextualMetadataCall(IInvocationOperation invocation)
+            {
+                if (invocation.IsImplicit || invocation.Syntax is not InvocationExpressionSyntax syntax
+                    || Origin(invocation) is not ExpressionCallNode { TargetExpression: FieldAccessNode member } origin
+                    || model.GetSymbolInfo(syntax).Symbol is not IMethodSymbol
+                        { IsExtensionMethod: true } method
+                    || method.ReducedFrom is null && !method.IsStatic
+                    || method.Locations.Any(location => location.IsInSource)
+                    || !method.Parameters.Any(parameter => parameter.Type.TypeKind == TypeKind.Delegate)
+                    || HasErrorType(method.ReturnType) || method.Parameters.Any(parameter => HasErrorType(parameter.Type))
+                    || conflictingMetadataCalls.Contains(origin))
+                    return;
+
+                var mappings = new List<Binding.Metadata.MetadataCallArgument>();
+                foreach (var argument in invocation.Arguments)
+                {
+                    if (argument.ArgumentKind != ArgumentKind.Explicit || argument.Parameter is not { } parameter
+                        || HasUserDefinedConversion(argument.Value)
+                        || Origin(argument.Value) is not ExpressionNode supplied
+                        || !argumentOwners.TryGetValue(supplied, out var owner) || owner.Call != origin.Span)
+                        return;
+                    if (owner.Index == -1)
+                    {
+                        if (method.ReducedFrom is null || parameter.Ordinal != 0
+                            || !ReferenceEquals(member.Target, supplied))
+                            return;
+                        continue;
+                    }
+                    if (owner.Index < 0 || owner.Index >= origin.Arguments.Count
+                        || !ReferenceEquals(origin.Arguments[owner.Index], supplied))
+                        return;
+                    mappings.Add(new Binding.Metadata.MetadataCallArgument(
+                        owner.Index, parameter, parameter.Type, IsExpandedParams: false));
+                }
+                if (mappings.Count != origin.Arguments.Count
+                    || mappings.Select(mapping => mapping.ArgumentIndex).Distinct().Count() != origin.Arguments.Count)
+                    return;
+                var selection = Binding.Metadata.MetadataBinderResult.CreateResolved(method,
+                    mappings.OrderBy(mapping => mapping.ArgumentIndex).ToArray());
+                selectedMetadataCallsInTree.Add(origin);
+                if (bindings.ContextualMetadataCalls.TryGetValue(origin, out var previous)
+                    && (!SymbolEqualityComparer.IncludeNullability.Equals(previous.Symbol, method)
+                        || !SameContextualType(previous.Symbol!.ReturnType, method.ReturnType)
+                        || !previous.Symbol.Parameters.Zip(method.Parameters).All(pair =>
+                            SameContextualType(pair.First.Type, pair.Second.Type))
+                        || !previous.Arguments.Zip(selection.Arguments).All(pair =>
+                            pair.First.ArgumentIndex == pair.Second.ArgumentIndex
+                            && pair.First.Parameter.Ordinal == pair.Second.Parameter.Ordinal
+                            && SameContextualType(pair.First.TargetType, pair.Second.TargetType))))
+                {
+                    conflictingMetadataCalls.Add(origin);
+                    bindings.ContextualMetadataCalls.Remove(origin);
+                }
+                else
+                    bindings.ContextualMetadataCalls[origin] = selection;
+            }
+
+            static bool SameContextualType(ITypeSymbol left, ITypeSymbol right) =>
+                SymbolEqualityComparer.IncludeNullability.Equals(left, right)
+                && left.NullableAnnotation == right.NullableAnnotation
+                && (left is not INamedTypeSymbol named || right is INamedTypeSymbol other
+                    && named.TypeArguments.Zip(other.TypeArguments).All(pair =>
+                        SameContextualType(pair.First, pair.Second)))
+                && (left is not IArrayTypeSymbol array || right is IArrayTypeSymbol otherArray
+                    && SameContextualType(array.ElementType, otherArray.ElementType));
 
             void BindInitializations()
             {

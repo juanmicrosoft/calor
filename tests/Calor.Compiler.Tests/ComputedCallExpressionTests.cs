@@ -18,6 +18,180 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ContextualMetadataExtension_PreservesTheActuallySelectedLambdaOverload(bool indexed, bool lifted)
+    {
+        var lambda = indexed ? "(value, index) ! => value.Length + index" : "(value) ! => value.Length";
+        if (lifted)
+            lambda = indexed ? "(string:value, int:index) ! => value.Length + index" : "(string:value) ! => value.Length";
+        var source = $$"""
+            module ContextualSelections
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<string>:values) → IEnumerable<int>
+                !
+                {{(lifted ? $"let projection = {lambda}" : "")}}
+                return values.Select({{(lifted ? "projection" : lambda)}})
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.NotNull(selected.ReducedFrom);
+        Assert.Equal("System.Linq.Enumerable", selected.ContainingType.ToDisplayString());
+        Assert.Equal(new[] { "string", "int" }, selected.TypeArguments.Select(type => type.ToDisplayString()));
+        var callback = Assert.IsAssignableFrom<INamedTypeSymbol>(Assert.Single(selected.Parameters).Type);
+        Assert.Equal(indexed ? 2 : 1, callback.DelegateInvokeMethod!.Parameters.Length);
+        Assert.Equal(new[] { 0 }, call.ArgumentParameterIndices);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    [Fact]
+    public void ContextualMetadataExtension_PreservesTheStaticNamedArgumentMap()
+    {
+        const string source = """
+            module ContextualNamedArguments
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<string>:values) → IEnumerable<int>
+                !
+                let projection = (string:value) ! => value.Length
+                return Enumerable.Select(selector: projection, source: values)
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.True(call.ResolvedMetadataMethod?.IsStatic);
+        Assert.Equal(new[] { 1, 0 }, call.ArgumentParameterIndices);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    [Fact]
+    public void ContextualMetadataExtension_PreservesTheSelectedNullableResult()
+    {
+        const string source = """
+            module ContextualNullableResult
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<string>:values) → IEnumerable<string?>
+                !
+                return values.Select((string:value) ! => value.Length == 0 ? null : value)
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(Microsoft.CodeAnalysis.NullableAnnotation.Annotated, selected.TypeArguments[1].NullableAnnotation);
+        var callback = Assert.IsAssignableFrom<INamedTypeSymbol>(Assert.Single(selected.Parameters).Type);
+        Assert.Equal(Microsoft.CodeAnalysis.NullableAnnotation.Annotated, callback.DelegateInvokeMethod!.ReturnType.NullableAnnotation);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContextualMetadataExtension_StillChargesItsEffectfulCallback(bool lifted)
+    {
+        const string lambda = "(string:value) ! cw => Loud(value)";
+        var source = $$"""
+            module ContextualEffects
+              using System.Linq
+              using System.Collections.Generic
+              func Loud (string:value) → int
+                ! cw
+                System.Console.WriteLine(value)
+                return value.Length
+              func Use (IEnumerable<string>:values) → IEnumerable<int>
+                !
+                {{(lifted ? $"let projection = {lambda}" : "")}}
+                return values.Select({{(lifted ? "projection" : lambda)}})
+            """;
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("values.Where((string:value) ! => 1)", "IEnumerable<string>")]
+    [InlineData("values.Select((string:value) ! => value)", "IEnumerable<int>")]
+    [InlineData("values.Select((string:value, int:index, int:extra) ! => index)", "IEnumerable<int>")]
+    public void ContextualMetadataExtension_InvalidNativeContextCannotAuthorizeACall(string expression, string output)
+    {
+        var source = $$"""
+            module InvalidContextualSelection
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<string>:values) → {{output}}
+                !
+                return {{expression}}
+            """;
+        var (_, bound, _) = Bind(source);
+        Assert.All(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => Assert.Null(call.ResolvedMetadataMethod));
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void ContextualMetadataExtension_DoesNotReselectAnExpressionTreeAsADelegate()
+    {
+        const string source = """
+            module ExpressionTreeBoundary
+              using System.Linq
+              func Use (IQueryable<string>:values) → IQueryable<int>
+                !
+                return values.Select((string:value) ! => value.Length)
+            """;
+        var ast = Parse(source);
+        var tree = CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(ast));
+        var image = CSharpCompilation.Create("ExpressionTreeBoundary", [tree],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(image.GetDiagnostics(), item => item.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var invocation = Assert.Single(tree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>());
+        var actual = Assert.IsAssignableFrom<IMethodSymbol>(image.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol);
+        Assert.Equal("System.Linq.Queryable", actual.ContainingType.ToDisplayString());
+        Assert.Empty(CallGraphAnalysis.ResolveOperatorCalls(ast).ContextualMetadataCalls);
+        var (_, bound, _) = Bind(source);
+        Assert.Null(Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound)
+            .OfType<BoundCallExpression>()).ResolvedMetadataMethod);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContextualMetadataExtension_RequiresAValidImageInEveryActiveConfiguration(bool valid)
+    {
+        var source = $$"""
+            module ContextualConfigurations
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<string>:values) → IEnumerable<int>
+                !
+                pp FEATURE
+                  let marker = {{(valid ? "1" : "Missing()")}}
+                pp else
+                  let marker = 0
+                return values.Select((string:value) ! => value.Length)
+            """;
+        var (_, bound, _) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => call.ResolvedMethodName == "Select");
+        Assert.Equal(valid, call.ResolvedMetadataMethod is not null);
+        var compiled = Program.Compile(source);
+        Assert.Equal(!valid, compiled.HasErrors);
+    }
+
+    [Theory]
     [InlineData("values.Count()")]
     [InlineData("values.Skip(1).Count()")]
     [InlineData("values.Concat(values).Count()")]
