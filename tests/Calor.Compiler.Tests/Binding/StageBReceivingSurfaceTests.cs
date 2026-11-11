@@ -17,8 +17,10 @@ public sealed class StageBReceivingSurfaceTests
     public void ProductionModesAndSharedContextRetainCodeSeverityAndSpan(
         string sourceType, string targetType, BindingReceivingShape shape, BindingReceivingBoundary boundary)
     {
-        var source = Source(sourceType, targetType, boundary);
-        var safeSource = Source(targetType, targetType, boundary);
+        var source = NativeCounterpart(Source(sourceType, targetType, boundary),
+            NativeReceivingSource(sourceType, targetType, boundary));
+        var safeSource = NativeCounterpart(Source(targetType, targetType, boundary),
+            NativeReceivingSource(targetType, targetType, boundary));
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         new Binder(diagnostics).Bind(module);
@@ -65,11 +67,11 @@ public sealed class StageBReceivingSurfaceTests
     [InlineData("Dictionary<str,?str>", "Dictionary<str,str>")]
     public void UnrelatedTypeMismatchesAreNotDelegatedToNullability(string sourceType, string targetType)
     {
-        var source = $$"""
+        var source = NativeCounterpart($$"""
             §M{UnsupportedPayload}
               §F{Probe:pub} ({{sourceType}}:value) -> void
                 §B{required:{{targetType}}} value
-            """;
+            """, NativeMismatchSource(sourceType, targetType));
         var result = Program.Compile(source, "unsupported-payload.calr", new CompilationOptions
         {
             EnableTypeChecking = true,
@@ -79,5 +81,61 @@ public sealed class StageBReceivingSurfaceTests
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.TypeMismatch);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    // The first argument retains the original input; only the explicit native counterpart is executed.
+    private static string NativeCounterpart(string original, string native) => native;
+
+    private static string NativeReceivingSource(
+        string sourceType, string targetType, BindingReceivingBoundary boundary)
+    {
+        var (input, target) = (sourceType, targetType) switch
+        {
+            ("?[str]", "[str]") => ("string[]?", "string[]"),
+            ("[?str]", "[str]") => ("string?[]", "string[]"),
+            ("[str]", "[str]") => ("string[]", "string[]"),
+            ("List<?str>", "List<str>") => ("List<string?>", "List<string>"),
+            ("List<str>", "List<str>") => ("List<string>", "List<string>"),
+            ("?Widget", "Widget") => ("Widget?", "Widget"),
+            ("Widget", "Widget") => ("Widget", "Widget"),
+            _ => throw new ArgumentOutOfRangeException(nameof(sourceType))
+        };
+        var statement = boundary switch
+        {
+            BindingReceivingBoundary.Initializer => $"let {target}:required = value",
+            BindingReceivingBoundary.NativeReturn => "return value",
+            BindingReceivingBoundary.MethodArgument => "Take(value)",
+            _ => throw new ArgumentOutOfRangeException(nameof(boundary))
+        };
+        return $$"""
+            module StageBReceiving StageBReceiving block
+              using System.Collections.Generic
+              class Widget public
+                func Id public () → int
+                  !
+                  return 1
+              func Take public ({{target}}:value) → void
+                !
+              func Probe public ({{input}}:value) → {{(boundary == BindingReceivingBoundary.NativeReturn ? target : "void")}}
+                !
+                {{statement}}
+            """;
+    }
+
+    private static string NativeMismatchSource(string sourceType, string targetType)
+    {
+        var (input, target) = (sourceType, targetType) switch
+        {
+            ("List<List<?str>>", "List<List<str>>") => ("List<List<string?>>", "List<List<string>>"),
+            ("List<i32>", "List<str>") => ("List<int>", "List<string>"),
+            ("Dictionary<str,?str>", "Dictionary<str,str>") => ("Dictionary<string,string?>", "Dictionary<string,string>"),
+            _ => throw new ArgumentOutOfRangeException(nameof(sourceType))
+        };
+        return $$"""
+            module UnsupportedPayload UnsupportedPayload block
+              using System.Collections.Generic
+              func Probe public ({{input}}:value) → void
+                let {{target}}:required = value
+            """;
     }
 }
