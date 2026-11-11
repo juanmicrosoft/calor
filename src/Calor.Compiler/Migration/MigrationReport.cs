@@ -34,6 +34,8 @@ public enum MigrationDirection
 /// </summary>
 public sealed class MigrationSummary
 {
+    /// <summary>Number of distinct original inputs; TotalFiles counts output/result rows.</summary>
+    public int SourceFiles { get; set; }
     public int TotalFiles { get; set; }
     public int SuccessfulFiles { get; set; }
     public int PartialFiles { get; set; }
@@ -55,6 +57,8 @@ public sealed class MigrationSummary
 /// </summary>
 public sealed class FileMigrationResult
 {
+    /// <summary>Zero-based source namespace ordinal for an explicitly split output.</summary>
+    public int? NamespaceIndex { get; init; }
     public required string SourcePath { get; init; }
     public required string? OutputPath { get; set; }
     public required FileMigrationStatus Status { get; set; }

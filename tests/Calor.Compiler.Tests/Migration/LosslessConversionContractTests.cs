@@ -9,6 +9,556 @@ namespace Calor.Compiler.Tests;
 public sealed class LosslessConversionContractTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NamespaceSplitting_ProjectOutputsCompileAndRunWithOriginalOwners(bool parallel)
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-native-split-").FullName;
+        const string original = """
+            namespace Alpha
+            {
+                public class Item { public int V() => 11; }
+                public static class Probe { public static int Run() => new Item().V(); }
+            }
+            namespace Beta
+            {
+                public class Item { public int V() => 22; }
+                public class Item<T> { public T V(T value) => value; }
+                public static class Probe { public static int Run() => new Item().V(); }
+            }
+            """;
+        var source = Path.Combine(directory, "Owners.cs");
+        await File.WriteAllTextAsync(source, original);
+        var migrator = new ProjectMigrator(new MigrationPlanOptions
+        {
+            SplitNamespaces = true, Parallel = parallel, MergePartialClasses = false
+        });
+        try
+        {
+            var report = await migrator.ExecuteAsync(SplitPlan(directory, source));
+            Assert.Equal(1, report.Summary.SourceFiles);
+            Assert.Equal(2, report.Summary.TotalFiles);
+            Assert.All(report.FileResults, result =>
+            {
+                Assert.Equal(FileMigrationStatus.Partial, result.Status);
+                Assert.True(result.OutputWritten);
+                Assert.Empty(result.Losses);
+                Assert.Equal("verified", result.ConversionPaths!.RoundTrip);
+                Assert.True(File.Exists(result.OutputPath + ".conversion.json"));
+                var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+                var parsed = new Calor.Compiler.Parsing.Parser(
+                    new Calor.Compiler.Parsing.Lexer(File.ReadAllText(result.OutputPath!), diagnostics)
+                        .TokenizeAllForParser(), diagnostics).Parse();
+                Assert.False(diagnostics.HasErrors);
+                Assert.Single(parsed.NamespaceScopes);
+                var probe = parsed.Classes.Single(type => type.Name == "Probe");
+                var run = probe.Methods.Single(method => method.Name == "Run");
+                var nodes = new Stack<Calor.Compiler.Ast.AstNode>();
+                nodes.Push(run);
+                var creations = new List<Calor.Compiler.Ast.NewExpressionNode>();
+                while (nodes.TryPop(out var node))
+                {
+                    if (node is Calor.Compiler.Ast.NewExpressionNode creation)
+                        creations.Add(creation);
+                    foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+                        nodes.Push(child);
+                }
+                var graph = Calor.Compiler.Analysis.CallGraphAnalysis.Build(parsed);
+                Assert.Same(parsed.Classes.Single(type => type.Name == "Item" && type.TypeParameters.Count == 0),
+                    graph.SourceCreationType($"{probe.Name}.{run.Id}", Assert.Single(creations).Span));
+                Assert.Equal(File.ReadAllText(result.OutputPath!), new CalorEmitter().Emit(parsed));
+            });
+            Assert.Equal([0, 1], report.FileResults.Select(result => result.NamespaceIndex));
+            var files = report.FileResults.Select(result => new FileInfo(result.OutputPath!)).ToArray();
+            Assert.False(File.Exists(Path.ChangeExtension(source, ".calr")));
+            var expected = SplitRuntime([original]);
+            Assert.Equal(new[] { "Alpha.Item|0|False|False", "Alpha.Probe|0|True|True", "Beta.Item|0|False|False",
+                "Beta.Item`1|1|False|False", "Beta.Probe|0|True|True",
+                "Alpha.Probe.Run=11", "Beta.Probe.Run=22" }, expected);
+            foreach (var typed in new[] { false, true })
+            {
+                var generated = new List<string>();
+                var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+                var result = CompilationDriver.CompileAll(files,
+                    _ => new CompilationOptions { EnableTypeChecking = typed, StatusWriter = TextWriter.Null },
+                    crossModuleEnforcement: true, crossModulePolicy: Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+                    onCompiled: (_, compiled) => generated.Add(compiled.GeneratedCode),
+                    diagnosticSink: diagnostics);
+                Assert.False(result.AnyErrors, string.Join("\n", diagnostics.Errors));
+                Assert.Equal(expected, SplitRuntime(generated));
+            }
+            var repeated = await migrator.ExecuteAsync(SplitPlan(directory, source));
+            Assert.All(repeated.FileResults, result => Assert.Equal(FileMigrationStatus.Partial, result.Status));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData("namespace A { class C {} } namespace A { class D {} }")]
+    [InlineData("namespace A { class C {} } namespace \\u0041 { class D {} }")]
+    [InlineData("namespace A { namespace B { class C {} } } namespace Z { class D {} }")]
+    [InlineData("namespace A { using X = System.String; class C {} } namespace B { class D {} }")]
+    [InlineData("using X = System.String; namespace A { class C {} } namespace B { class D {} }")]
+    [InlineData("#if true\nnamespace A { class C {} }\n#endif\nnamespace B { class D {} }")]
+    [InlineData("namespace A { class C { int x = System.Math.Abs(-1); } } namespace B { class D {} }")]
+    [InlineData("namespace A { class C : System.Exception {} } namespace B { class D {} }")]
+    public void NamespaceSplitting_UnsupportedTopologiesKeepTheExactWholeFile(string original)
+    {
+        var result = new CSharpToCalorConverter().ConvertProject(original, "Boundary.cs");
+        Assert.True(result.Success, string.Join("\n", result.Outputs.SelectMany(output => output.Conversion.Issues)));
+        Assert.False(result.IsSplit);
+        var output = Assert.Single(result.Outputs).Conversion;
+        Assert.True(output.InteropPreservationCount > 0);
+        var compiled = Program.Compile(output.CalorSource!, null);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(original, compiled.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData("namespace A { class C { Missing Value; } } namespace B { class D {} }")]
+    [InlineData("namespace A { class C { int V() => \"invalid\"; } } namespace B { class D {} }")]
+    [InlineData("namespace A { class C { } namespace B { class D {} }")]
+    public void NamespaceSplitting_InvalidSourceNeverGainsSuccessfulSemanticContext(string original)
+    {
+        var project = new CSharpToCalorConverter().ConvertProject(original, "Invalid.cs");
+        Assert.False(project.Success);
+        Assert.False(project.IsSplit);
+        Assert.Contains(project.Outputs.SelectMany(output => output.Conversion.Issues),
+            issue => issue.Severity == ConversionIssueSeverity.Error);
+    }
+
+    [Fact]
+    public void NamespaceSplitting_MissingSuppliedReferenceIsNotSilentlyDropped()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "Missing.dll");
+        var converter = new CSharpToCalorConverter(new()
+        {
+            References = [new ConversionReference(missing, [])]
+        });
+        var result = converter.ConvertProject("namespace A { class C {} } namespace B { class D {} }", "Missing.cs");
+        Assert.False(result.Success);
+        Assert.False(result.IsSplit);
+        Assert.Contains(result.Outputs.SelectMany(output => output.Conversion.Issues),
+            issue => issue.Severity == ConversionIssueSeverity.Error && issue.Message.Contains(missing));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NamespaceSplitting_CollisionsAndUnwritableDestinationsCommitNothing(bool destinationDirectory)
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-split-collision-").FullName;
+        var source = Path.Combine(directory, "Owners.cs");
+        await File.WriteAllTextAsync(source, "namespace A { public class C {} } namespace B { public class D {} }");
+        var plan = SplitPlan(directory, source);
+        if (destinationDirectory)
+            Directory.CreateDirectory(Path.Combine(directory, "Owners.namespace2.calr"));
+        else
+        {
+            var other = Path.Combine(directory, "Other.cs");
+            await File.WriteAllTextAsync(other, "public class Other {}");
+            plan.Entries.Add(new MigrationPlanEntry
+            {
+                SourcePath = other, OutputPath = Path.Combine(directory, "Owners.namespace2.calr"),
+                Convertibility = FileConvertibility.Full
+            });
+        }
+        try
+        {
+            var report = await new ProjectMigrator(new() { SplitNamespaces = true, Parallel = false })
+                .ExecuteAsync(plan);
+            Assert.True(report.Summary.FailedFiles > 0);
+            Assert.All(report.FileResults, result => Assert.False(result.OutputWritten));
+            Assert.Empty(Directory.GetFiles(directory, "*.calr"));
+            Assert.Empty(Directory.GetFiles(directory, "*.conversion.json"));
+            Assert.False(Directory.Exists(Path.Combine(directory, ".calor")));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task NamespaceSplitting_CancellationAfterConversionCommitsNothing()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-split-cancel-").FullName;
+        var source = Path.Combine(directory, "Owners.cs");
+        await File.WriteAllTextAsync(source, "namespace A { public class C {} } namespace B { public class D {} }");
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                new ProjectMigrator(new() { SplitNamespaces = true, Parallel = false })
+                    .ExecuteAsync(SplitPlan(directory, source), progress: new SplitProgress(_ => cancellation.Cancel()),
+                        cancellationToken: cancellation.Token));
+            Assert.Empty(Directory.GetFiles(directory, "*.calr"));
+            Assert.Empty(Directory.GetFiles(directory, "*.conversion.json"));
+            Assert.False(Directory.Exists(Path.Combine(directory, ".calor")));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task NamespaceSplitting_EvaluatedProjectIncludesEveryOutputAndKeepsSiblingContext()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-split-context-").FullName;
+        var project = Path.Combine(directory, "Context.csproj");
+        var source = Path.Combine(directory, "Owners.cs");
+        const string original = """
+            namespace Alpha
+            {
+                public static class Probe
+                {
+                    public static int Run() => 11;
+                    public static SharedContext.Dependency Echo(SharedContext.Dependency value) => value;
+                }
+            }
+            namespace Beta { public static class Probe { public static int Run() => 22; } }
+            """;
+        const string sibling = "namespace SharedContext; public sealed class Dependency {}";
+        await File.WriteAllTextAsync(project, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>disable</ImplicitUsings></PropertyGroup>
+              <ItemGroup><Compile Remove="Excluded.cs" /></ItemGroup>
+            </Project>
+            """);
+        await File.WriteAllTextAsync(source, original);
+        await File.WriteAllTextAsync(Path.Combine(directory, "Sibling.cs"), sibling);
+        await File.WriteAllTextAsync(Path.Combine(directory, "Excluded.cs"), "this is deliberately invalid C#");
+        try
+        {
+            Assert.False(new CSharpToCalorConverter().ConvertProject(original, source).Success);
+            await RestoreAsync(project);
+            var migrator = new ProjectMigrator(new() { SplitNamespaces = true, Parallel = false });
+            var plan = await migrator.CreatePlanAsync(project, MigrationDirection.CSharpToCalor);
+            Assert.Equal(2, plan.Entries.Count);
+            var report = await migrator.ExecuteAsync(plan);
+            Assert.Equal(2, report.Summary.SourceFiles);
+            Assert.Equal(3, report.Summary.TotalFiles);
+            Assert.Equal(0, report.Summary.FailedFiles);
+            Assert.All(report.FileResults, result =>
+            {
+                Assert.True(result.OutputWritten, string.Join("\n", result.Issues));
+                Assert.Empty(result.Losses);
+                Assert.Equal("verified", result.ConversionPaths!.RoundTrip);
+            });
+            Assert.Equal(SplitRuntime([original, sibling]),
+                SplitRuntime(report.FileResults.Select(result => result.GeneratedCSharp!).ToArray()));
+            var generated = report.FileResults.Select(result =>
+                new Calor.Compiler.CodeGen.GeneratedCSharpSource(result.GeneratedCSharp!, result.OutputPath!));
+            var context = await Calor.Compiler.CodeGen.GeneratedCSharpCompiler.ResolveProjectContextAsync(project);
+            var validation = Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(generated,
+                context with { AdditionalSources = null });
+            Assert.True(validation.CompilationSuccess, string.Join("\n", validation.CompilationErrors));
+            foreach (var typed in new[] { false, true })
+            {
+                var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+                var projectSources = new List<Calor.Compiler.CodeGen.GeneratedCSharpSource>();
+                var compiled = CompilationDriver.CompileAll(
+                    report.FileResults.Select(result => new FileInfo(result.OutputPath!)).ToArray(),
+                    _ => new CompilationOptions { EnableTypeChecking = typed, StatusWriter = TextWriter.Null },
+                    crossModuleEnforcement: true, crossModulePolicy: Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+                    onCompiled: (file, result) => projectSources.Add(new(result.GeneratedCode, file.FullName)),
+                    diagnosticSink: diagnostics);
+                Assert.False(compiled.AnyErrors, string.Join("\n", diagnostics.Errors));
+                var checkedProject = Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(projectSources,
+                    context with { AdditionalSources = null });
+                Assert.True(checkedProject.CompilationSuccess, string.Join("\n", checkedProject.CompilationErrors));
+                Assert.Equal(SplitRuntime([original, sibling]),
+                    SplitRuntime(projectSources.Select(source => source.Text).ToArray()));
+            }
+            var bytes = report.FileResults.Select(result => File.ReadAllBytes(result.OutputPath!)).ToArray();
+            await File.WriteAllTextAsync(report.FileResults.Last().OutputPath!, "edited output");
+            var refused = await migrator.ExecuteAsync(plan);
+            Assert.Equal(0, refused.FileResults.Count(result => result.OutputWritten));
+            Assert.True(refused.Summary.FailedFiles > 0);
+            Assert.Equal(bytes[0], File.ReadAllBytes(report.FileResults[0].OutputPath!));
+            Assert.Equal("edited output", File.ReadAllText(report.FileResults.Last().OutputPath!));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData("int value = System.Math.Abs(-1);")]
+    [InlineData("int Value { get; } = System.Math.Abs(-1);")]
+    [InlineData("static int value = System.Math.Abs(-1);")]
+    [InlineData("static int Value { get; } = System.Math.Abs(-1);")]
+    [InlineData("public Item() { System.Console.WriteLine(\"constructor\"); }")]
+    public void NamespaceSplitting_ConstructorEffectsCannotBorrowAnEqualNameOrGenericArity(string declaration)
+    {
+        var original = $$"""
+            namespace Alpha
+            {
+                public class Item { {{declaration}} }
+                public class Item<T> {}
+                public static class Probe { public static Item Run() => new Item(); }
+            }
+            namespace Beta { public class Marker {} }
+            """;
+        var project = new CSharpToCalorConverter().ConvertProject(original, "Constructors.cs");
+        Assert.True(project.Success);
+        Assert.False(project.IsSplit);
+        var preserved = Assert.Single(project.Outputs).Conversion;
+        Assert.True(preserved.InteropPreservationCount > 0);
+        Assert.Equal(original, Program.Compile(preserved.CalorSource!, null).GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData("int value = System.Math.Abs(-1);")]
+    [InlineData("int Value { get; } = System.Math.Abs(-1);")]
+    [InlineData("static int value = System.Math.Abs(-1);")]
+    [InlineData("static int Value { get; } = System.Math.Abs(-1);")]
+    [InlineData("public Item() { System.Console.WriteLine(\"constructor\"); }")]
+    public void NamespaceSplitting_SelectedConstructorFailsClosedOnRealParsedNativeCalor(string declaration)
+    {
+        var source = $$"""
+            namespace Alpha
+            {
+                public class Item { {{declaration}} }
+                public class Item<T> {}
+                public static class Probe { public static Item Run() => new Item(); }
+            }
+            """;
+        var native = new CSharpToCalorConverter(new() { ValidateRoundTripCSharp = false }).Convert(source);
+        Assert.True(native.Success);
+        Assert.Equal(0, native.InteropPreservationCount);
+        foreach (var typed in new[] { false, true })
+        {
+            var compiled = Program.Compile(native.CalorSource!, null,
+                new CompilationOptions { EnableTypeChecking = typed, DeferGeneratedOutputValidation = true });
+            Assert.True(compiled.HasErrors);
+            Assert.Contains(compiled.Diagnostics.Errors,
+                error => error.Code is Calor.Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+                    or Calor.Compiler.Diagnostics.DiagnosticCode.ConstructorEffectContractUnavailable);
+        }
+    }
+
+    [Fact]
+    public void NamespaceSplitting_StaticConstructorCannotBeOmittedWhenNamesHaveDifferentArities()
+    {
+        const string original = """
+            namespace Alpha
+            {
+                public class Item { static Item() { System.Console.WriteLine("static constructor"); } }
+                public class Item<T> {}
+                public static class Probe { public static Item Run() => new Item(); }
+            }
+            namespace Beta { public class Marker {} }
+            """;
+        var result = new CSharpToCalorConverter().ConvertProject(original, "StaticConstructor.cs");
+        Assert.True(result.Success);
+        Assert.False(result.IsSplit);
+        var preserved = Assert.Single(result.Outputs).Conversion;
+        Assert.True(preserved.InteropPreservationCount > 0);
+        Assert.Equal(original, Program.Compile(preserved.CalorSource!, null).GeneratedCode);
+    }
+
+    [Fact]
+    public void NamespaceSplitting_ExactDs15InputRetainsEmptyStaticOwnerAndRuntime42()
+    {
+        const string relative = "bench/phase0-agent-native/fixtures/d-s1.5/namespace-topology/input.cs";
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, relative)))
+            directory = directory.Parent;
+        Assert.NotNull(directory);
+        var original = File.ReadAllText(Path.Combine(directory.FullName, relative));
+        var result = new CSharpToCalorConverter().ConvertProject(original, "input.cs");
+        Assert.True(result.Success);
+        Assert.True(result.IsSplit);
+        Assert.Equal(2, result.Outputs.Count);
+        var generated = new List<string>();
+        foreach (var output in result.Outputs)
+        {
+            Assert.Empty(output.Conversion.Losses);
+            Assert.Equal(0, output.Conversion.InteropPreservationCount);
+            var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+            var module = new Calor.Compiler.Parsing.Parser(
+                new Calor.Compiler.Parsing.Lexer(output.Conversion.CalorSource!, diagnostics)
+                    .TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors);
+            Assert.Single(module.NamespaceScopes);
+            var reemitted = new CalorEmitter().Emit(module);
+            foreach (var source in new[] { output.Conversion.CalorSource!, reemitted })
+            foreach (var typed in new[] { false, true })
+            {
+                var compiled = Program.Compile(source, null,
+                    new CompilationOptions { EnableTypeChecking = typed, DeferGeneratedOutputValidation = true });
+                Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+            }
+            generated.Add(Program.Compile(reemitted, null,
+                new CompilationOptions { DeferGeneratedOutputValidation = true }).GeneratedCode);
+        }
+        var expected = SplitRuntime([original], ["Beta.Value"], "Get");
+        Assert.Equal(new[] { "Alpha.Marker|0|True|True", "Beta.Value|0|True|True", "Beta.Value.Get=42" }, expected);
+        Assert.Equal(expected, SplitRuntime(generated, ["Beta.Value"], "Get"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NamespaceSplitting_ChangedInputOrCombinedOwnerConflictCommitsNothing(bool conflictingOwners)
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-split-validation-").FullName;
+        var source = Path.Combine(directory, "Owners.cs");
+        await File.WriteAllTextAsync(source, "namespace A { public class C {} } namespace B { public class D {} }");
+        var plan = SplitPlan(directory, source);
+        if (conflictingOwners)
+        {
+            var other = Path.Combine(directory, "Other.cs");
+            await File.WriteAllTextAsync(other, "namespace A { public class C {} } namespace Z { public class E {} }");
+            plan.Entries.Add(new MigrationPlanEntry
+            {
+                SourcePath = other, OutputPath = Path.ChangeExtension(other, ".calr"),
+                Convertibility = FileConvertibility.Full
+            });
+        }
+        try
+        {
+            var report = await new ProjectMigrator(new() { SplitNamespaces = true, Parallel = false })
+                .ExecuteAsync(plan, progress: new SplitProgress(progress =>
+                {
+                    if (!conflictingOwners && progress.ProcessedFiles == progress.TotalFiles)
+                        File.WriteAllText(source, "namespace Changed { public class Retained {} }");
+                }));
+            Assert.True(report.Summary.FailedFiles > 0);
+            Assert.All(report.FileResults, result => Assert.False(result.OutputWritten));
+            Assert.Empty(Directory.GetFiles(directory, "*.calr"));
+            Assert.Empty(Directory.GetFiles(directory, "*.conversion.json"));
+            Assert.False(Directory.Exists(Path.Combine(directory, ".calor")));
+            if (!conflictingOwners)
+                Assert.Equal("namespace Changed { public class Retained {} }", File.ReadAllText(source));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData("receipt")]
+    [InlineData("lock")]
+    [InlineData("input")]
+    [InlineData("ancestor")]
+    public async Task NamespaceSplitting_AllArtifactAndOriginalInputCollisionsAreCheckedBeforeWriting(string collision)
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-split-artifacts-").FullName;
+        var source = Path.Combine(directory, "Owners.cs");
+        var other = Path.Combine(directory, "Other.cs");
+        await File.WriteAllTextAsync(source, "namespace A { class C {} } namespace B { class D {} }");
+        await File.WriteAllTextAsync(other, "public class Other {}");
+        var plan = SplitPlan(directory, source);
+        var secondOutput = Path.Combine(directory, "Owners.namespace2.calr");
+        plan.Entries.Add(new MigrationPlanEntry
+        {
+            SourcePath = other, Convertibility = FileConvertibility.Full,
+            OutputPath = collision switch
+            {
+                "receipt" => secondOutput + ".conversion.json",
+                "lock" => secondOutput + ".conversion.lock",
+                "input" => source,
+                _ => Path.Combine(secondOutput, "Nested.calr")
+            }
+        });
+        try
+        {
+            var report = await new ProjectMigrator(new() { SplitNamespaces = true, Parallel = true })
+                .ExecuteAsync(plan);
+            Assert.True(report.Summary.FailedFiles > 0);
+            Assert.All(report.FileResults, result => Assert.False(result.OutputWritten));
+            Assert.Empty(Directory.GetFiles(directory, "*.calr"));
+            Assert.Empty(Directory.GetFiles(directory, "*.conversion.json"));
+            Assert.False(Directory.Exists(secondOutput));
+            Assert.Equal("public class Other {}", File.ReadAllText(other));
+            Assert.Equal("namespace A { class C {} } namespace B { class D {} }", File.ReadAllText(source));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task NamespaceSplitting_RefreshDoesNotLeaveObsoleteNativeOutputsActive()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-split-membership-").FullName;
+        var source = Path.Combine(directory, "Owners.cs");
+        var firstOutput = Path.Combine(directory, "Owners.namespace1.calr");
+        var secondOutput = Path.Combine(directory, "Owners.namespace2.calr");
+        const string two = "namespace A { class C {} } namespace B { class D {} }";
+        await File.WriteAllTextAsync(source, two);
+        var migrator = new ProjectMigrator(new() { SplitNamespaces = true, Parallel = false });
+        try
+        {
+            var initial = await migrator.ExecuteAsync(SplitPlan(directory, source));
+            Assert.Equal(0, initial.Summary.FailedFiles);
+            var first = File.ReadAllBytes(firstOutput);
+            var second = File.ReadAllBytes(secondOutput);
+            await File.WriteAllTextAsync(source, "namespace A { class C {} }");
+            var refused = await migrator.ExecuteAsync(SplitPlan(directory, source));
+            Assert.True(refused.Summary.FailedFiles > 0);
+            Assert.Equal(first, File.ReadAllBytes(firstOutput));
+            Assert.Equal(second, File.ReadAllBytes(secondOutput));
+            Assert.False(File.Exists(Path.ChangeExtension(source, ".calr")));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task NamespaceSplitting_DryRunAndCliUseTheSameOptInOutputSet()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-split-cli-").FullName;
+        var source = Path.Combine(directory, "Owners.cs");
+        await File.WriteAllTextAsync(source, "namespace A { public class C {} } namespace B { public class D {} }");
+        try
+        {
+            var dry = await new ProjectMigrator(new() { SplitNamespaces = true })
+                .ExecuteAsync(SplitPlan(directory, source), dryRun: true);
+            Assert.Equal(2, dry.FileResults.Count);
+            Assert.Equal(0, dry.Summary.FailedFiles);
+            Assert.Equal(new[] { "Owners.cs" }, Directory.GetFiles(directory).Select(Path.GetFileName));
+            var cli = CliTestHarness.RunCli(directory, "migrate", directory, "--split-namespaces", "--skip-analyze",
+                "--skip-verify", "--parallel", "false");
+            Assert.True(cli.ExitCode == 0, cli.StdOut + cli.StdErr);
+            Assert.Equal(2, Directory.GetFiles(directory, "*.calr").Length);
+            Assert.Equal(2, Directory.GetFiles(directory, "*.conversion.json").Length);
+            Assert.False(File.Exists(Path.ChangeExtension(source, ".calr")));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    private sealed class SplitProgress(Action<MigrationProgress> action) : IProgress<MigrationProgress>
+    {
+        public void Report(MigrationProgress value) => action(value);
+    }
+
+    private static MigrationPlan SplitPlan(string directory, string source) => new()
+    {
+        ProjectPath = directory, Direction = MigrationDirection.CSharpToCalor,
+        Entries = [new MigrationPlanEntry
+        {
+            SourcePath = source, OutputPath = Path.ChangeExtension(source, ".calr"),
+            Convertibility = FileConvertibility.Full
+        }]
+    };
+
+    private static string[] SplitRuntime(
+        IReadOnlyList<string> sources, IReadOnlyList<string>? owners = null, string method = "Run")
+    {
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+            "Split" + Guid.NewGuid().ToString("N"),
+            sources.Select(source => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source)),
+            Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        stream.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext(Guid.NewGuid().ToString(), isCollectible: true);
+        try
+        {
+            var assembly = context.LoadFromStream(stream);
+            return assembly.GetExportedTypes().OrderBy(type => type.FullName, StringComparer.Ordinal)
+                .Select(type => $"{type.FullName}|{type.GetGenericArguments().Length}|{type.IsAbstract}|{type.IsSealed}")
+                .Concat((owners ?? ["Alpha.Probe", "Beta.Probe"]).Select(owner =>
+                    $"{owner}.{method}={assembly.GetType(owner)!.GetMethod(method)!.Invoke(null, null)}")).ToArray();
+        }
+        finally { context.Unload(); }
+    }
+
+    [Theory]
     [InlineData("#nullable enable\npublic static class Scalar { public static int Take(string value) => 1; public static int Call(string? value) => Take(value); }")]
     [InlineData("#nullable enable\npublic static class Arrays { public static int Take(string[,] values) => 1; public static int Call(string[,]? values) => Take(values); }")]
     [InlineData("#nullable enable\npublic class Box { public Box(string? value) { } public static Box Create(string value) => new Box(value); }")]

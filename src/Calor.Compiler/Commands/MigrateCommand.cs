@@ -69,6 +69,8 @@ public static class MigrateCommand
 
         var noImplicitSystemOption = new Option<bool>(
             "--no-implicit-system", "Validate without the implicit System project import");
+        var splitNamespacesOption = new Option<bool>(
+            "--split-namespaces", "Opt in to separate native files for split-safe top-level namespaces");
         var defineOption = new Option<string[]>(
             aliases: new[] { "--define" },
             description: "Additional conditional-compilation symbol. Repeat for multiple symbols.")
@@ -111,6 +113,7 @@ public static class MigrateCommand
             verificationTimeoutOption,
             explicitCallClosersOption,
             noImplicitSystemOption,
+            splitNamespacesOption,
             defineOption,
             configurationOption,
             targetFrameworkOption,
@@ -146,7 +149,8 @@ public static class MigrateCommand
                 explicitCallClosers, definedSymbols,
                 configuration, targetFramework, languageVersion,
                 documentationMode, parseFeatures,
-                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
+                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption),
+                ctx.ParseResult.GetValueForOption(splitNamespacesOption));
         });
 
         return command;
@@ -170,7 +174,8 @@ public static class MigrateCommand
         string? languageVersion,
         string documentationMode,
         IReadOnlyCollection<string> parseFeatures,
-        bool includeImplicitSystemUsing)
+        bool includeImplicitSystemUsing,
+        bool splitNamespaces)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("migrate");
@@ -198,6 +203,7 @@ public static class MigrateCommand
         var options = new MigrationPlanOptions
         {
             IncludeImplicitSystemUsing = includeImplicitSystemUsing,
+            SplitNamespaces = splitNamespaces,
             Parallel = parallel,
             IncludeBenchmark = benchmark,
             SkipAnalyze = skipAnalyze,
@@ -311,7 +317,7 @@ public static class MigrateCommand
                         .Sum(f => f.Metrics!.OriginalLines);
                     if (totalInputLines == 0)
                     {
-                        foreach (var fileResult in report.FileResults)
+                        foreach (var fileResult in report.FileResults.DistinctBy(result => result.SourcePath))
                         {
                             try
                             {

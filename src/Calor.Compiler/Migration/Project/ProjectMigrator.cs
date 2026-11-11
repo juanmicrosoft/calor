@@ -6,6 +6,7 @@ using Calor.Compiler.Effects;
 using Calor.Compiler.Incremental;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Verification.Z3;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Calor.Compiler.Migration.Project;
 
@@ -71,6 +72,9 @@ public sealed class ProjectMigrator
         SemaphoreSlim validationGate,
         CancellationToken cancellationToken)
     {
+        if (_options.SplitNamespaces && (_options.Fidelity != ConversionFidelity.Lossless
+            || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches))
+            throw new InvalidOperationException("Namespace splitting requires lossless, all-branches project migration.");
         _manifestProjectDirectory = ResolveManifestProjectDirectory(plan);
         var projectFilePath = plan.ProjectFilePath
             ?? (File.Exists(plan.ProjectPath)
@@ -120,23 +124,94 @@ public sealed class ProjectMigrator
             .SetDirection(plan.Direction)
             .IncludeBenchmark(_options.IncludeBenchmark);
 
-        var collisionPaths = new HashSet<string>(
-            BuildStateCache.GetPathComparer());
-        foreach (var collision in plan.Entries
-                     .Where(entry =>
-                         entry.Convertibility
-                             != FileConvertibility.Skip)
-                     .GroupBy(
-                         entry => Path.GetFullPath(
-                             entry.OutputPath),
-                         BuildStateCache.GetPathComparer())
+        var collisionPaths = new HashSet<string>(BuildStateCache.GetPathComparer());
+        var executionEntries = new List<MigrationPlanEntry>();
+        foreach (var entry in plan.Entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_options.SplitNamespaces || plan.Direction != MigrationDirection.CSharpToCalor
+                || entry.Convertibility == FileConvertibility.Skip || !File.Exists(entry.SourcePath))
+            {
+                executionEntries.Add(entry);
+                continue;
+            }
+            var source = await CSharpToCalorConverter.ReadSourceFileAsync(entry.SourcePath, cancellationToken);
+            var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                source, cancellationToken: cancellationToken).GetCompilationUnitRoot(cancellationToken);
+            var namespaces = CSharpToCalorConverter.GetSplittableNamespaces(root);
+            var outputDirectory = Path.GetDirectoryName(Path.GetFullPath(entry.OutputPath))!;
+            var prefix = Path.GetFileNameWithoutExtension(entry.OutputPath) + ".namespace";
+            var expectedOutputs = Enumerable.Range(0, namespaces.Count)
+                .SelectMany(index => new[]
+                {
+                    Path.GetFullPath(CSharpToCalorConverter.GetNamespaceOutputPath(entry.OutputPath, index)),
+                    Path.GetFullPath(CSharpToCalorConverter.GetNamespaceOutputPath(entry.OutputPath, index)) + ".conversion.json"
+                }).ToHashSet(BuildStateCache.GetPathComparer());
+            if (Directory.Exists(outputDirectory) && Directory.EnumerateFiles(outputDirectory)
+                .Any(path => Path.GetFileName(path).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                    && (path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase)
+                        || path.EndsWith(".calr.conversion.json", StringComparison.OrdinalIgnoreCase))
+                    && !expectedOutputs.Contains(path)))
+            {
+                collisionPaths.Add(Path.GetFullPath(entry.SourcePath));
+                reportBuilder.AddFileResult(new FileMigrationResult
+                {
+                    SourcePath = entry.SourcePath, OutputPath = null, Status = FileMigrationStatus.Failed,
+                    Issues = [new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Error, Feature = "migration-output-collision",
+                        Message = "An existing namespace output is outside the new output set. Retain it and choose a fresh destination."
+                    }]
+                });
+                continue;
+            }
+            if (namespaces.Count == 0)
+                executionEntries.Add(entry);
+            else
+            {
+                if (File.Exists(entry.OutputPath) || Directory.Exists(entry.OutputPath)
+                    || File.Exists(entry.OutputPath + ".conversion.json"))
+                {
+                    collisionPaths.Add(Path.GetFullPath(entry.SourcePath));
+                    reportBuilder.AddFileResult(new FileMigrationResult
+                    {
+                        SourcePath = entry.SourcePath, OutputPath = null, Status = FileMigrationStatus.Failed,
+                        Issues = [new ConversionIssue
+                        {
+                            Severity = ConversionIssueSeverity.Error, Feature = "migration-output-collision",
+                            Message = "An existing single-output destination cannot coexist with native split outputs. Choose a fresh destination."
+                        }]
+                    });
+                    continue;
+                }
+                for (var index = 0; index < namespaces.Count; index++)
+                    executionEntries.Add(new MigrationPlanEntry
+                    {
+                        SourcePath = entry.SourcePath,
+                        OutputPath = CSharpToCalorConverter.GetNamespaceOutputPath(entry.OutputPath, index),
+                        NamespaceIndex = index,
+                        Convertibility = entry.Convertibility,
+                        AnalysisScore = entry.AnalysisScore,
+                        FileSizeBytes = entry.FileSizeBytes
+                    });
+            }
+        }
+        var outputArtifacts = executionEntries
+                     .Where(entry => entry.Convertibility != FileConvertibility.Skip)
+                     .SelectMany(entry => (_options.SplitNamespaces
+                             ? new[] { entry.OutputPath, entry.OutputPath + ".conversion.json", entry.OutputPath + ".conversion.lock" }
+                             : [entry.OutputPath])
+                         .Select(path => (Entry: entry, Path: CanonicalPath.Resolve(path))))
+                     .ToArray();
+        foreach (var collision in outputArtifacts
+                     .GroupBy(item => item.Path, BuildStateCache.GetPathComparer())
                      .Where(group => group.Count() > 1))
         {
             var sources = collision
-                .Select(entry => entry.SourcePath)
+                .Select(item => item.Entry.SourcePath)
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .ToArray();
-            foreach (var entry in collision)
+            foreach (var entry in collision.Select(item => item.Entry).Distinct())
             {
                 collisionPaths.Add(
                     Path.GetFullPath(entry.SourcePath));
@@ -164,7 +239,55 @@ public sealed class ProjectMigrator
             }
         }
 
-        var entriesToProcess = plan.Entries
+        if (_options.SplitNamespaces)
+        {
+            var inputPaths = plan.Entries.Select(entry => CanonicalPath.Resolve(entry.SourcePath))
+                .ToHashSet(BuildStateCache.GetPathComparer());
+            foreach (var entry in executionEntries.Where(entry => new[]
+                         { entry.OutputPath, entry.OutputPath + ".conversion.json", entry.OutputPath + ".conversion.lock" }
+                     .Any(path => inputPaths.Contains(CanonicalPath.Resolve(path)))))
+            {
+                collisionPaths.Add(Path.GetFullPath(entry.SourcePath));
+                reportBuilder.AddFileResult(new FileMigrationResult
+                {
+                    SourcePath = entry.SourcePath, OutputPath = null, Status = FileMigrationStatus.Failed,
+                    Issues = [new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Error, Feature = "migration-output-collision",
+                        Message = $"Conversion artifacts for '{entry.OutputPath}' would overwrite an original input."
+                    }]
+                });
+            }
+            var artifactLookup = outputArtifacts.ToLookup(item => item.Path, BuildStateCache.GetPathComparer());
+            foreach (var artifact in outputArtifacts)
+            {
+                var directory = Path.GetDirectoryName(artifact.Path);
+                while (!string.IsNullOrEmpty(directory))
+                {
+                    var ancestors = artifactLookup[directory].Select(item => item.Entry).ToArray();
+                    if (ancestors.Length != 0 || inputPaths.Contains(directory))
+                    {
+                        foreach (var entry in ancestors.Append(artifact.Entry).Distinct())
+                        {
+                            collisionPaths.Add(Path.GetFullPath(entry.SourcePath));
+                            reportBuilder.AddFileResult(new FileMigrationResult
+                            {
+                                SourcePath = entry.SourcePath, OutputPath = null, Status = FileMigrationStatus.Failed,
+                                Issues = [new ConversionIssue
+                                {
+                                    Severity = ConversionIssueSeverity.Error, Feature = "migration-output-collision",
+                                    Message = $"Conversion artifact '{artifact.Path}' requires file destination '{directory}' to be a directory."
+                                }]
+                            });
+                        }
+                        break;
+                    }
+                    directory = Path.GetDirectoryName(directory);
+                }
+            }
+        }
+
+        var entriesToProcess = executionEntries
             .Where(e => e.Convertibility != FileConvertibility.Skip)
             .Where(entry => !collisionPaths.Contains(
                 Path.GetFullPath(entry.SourcePath)))
@@ -233,7 +356,7 @@ public sealed class ProjectMigrator
         }
 
         // Add skipped files
-        foreach (var entry in plan.Entries.Where(e => e.Convertibility == FileConvertibility.Skip))
+        foreach (var entry in executionEntries.Where(e => e.Convertibility == FileConvertibility.Skip))
         {
             reportBuilder.AddFileResult(new FileMigrationResult
             {
@@ -566,7 +689,7 @@ public sealed class ProjectMigrator
         ConversionGeneration? generation = null;
         if (_options.Fidelity == ConversionFidelity.Lossless)
         {
-            generation = converter.CreateGeneration(entry.SourcePath, entry.OutputPath, dryRun);
+            generation = converter.CreateGeneration(entry.SourcePath, entry.OutputPath, dryRun, entry.NamespaceIndex);
             if (!generations.TryAdd(Path.GetFullPath(entry.OutputPath), generation))
             {
                 generation.Dispose();
@@ -576,7 +699,9 @@ public sealed class ProjectMigrator
         var result = generation != null
             ? await generation.ConvertAsync(cancellationToken)
             : await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
-        if (selectionError != null && _options.Fidelity == ConversionFidelity.Lossless)
+        if (selectionError != null && entry.NamespaceIndex.HasValue)
+            result.Context.AddError(selectionError, "namespace-split-project-selection");
+        if (selectionError != null && !entry.NamespaceIndex.HasValue && _options.Fidelity == ConversionFidelity.Lossless)
             result = generation!.PreserveOriginal(cancellationToken,
                 [new ConversionIssue
                 {
@@ -599,9 +724,15 @@ public sealed class ProjectMigrator
         {
             var originalSource = await File.ReadAllTextAsync(entry.SourcePath, cancellationToken);
             metrics = BenchmarkIntegration.CalculateMetrics(originalSource, result.CalorSource);
+            if (entry.NamespaceIndex is > 0)
+            {
+                metrics.OriginalLines = 0;
+                metrics.OriginalTokens = 0;
+                metrics.OriginalCharacters = 0;
+            }
         }
 
-        var status = GetMigrationStatus(result);
+        var status = result.HasErrors ? FileMigrationStatus.Failed : GetMigrationStatus(result);
 
         // Validate: parse and compile the generated Calor to catch false-positive "success"
         var issues = result.Issues.ToList();
@@ -628,7 +759,7 @@ public sealed class ProjectMigrator
                     Line = diagnostic.Span.Line,
                     Column = diagnostic.Span.Column
                 }).ToList();
-                if (_options.Fidelity == ConversionFidelity.Lossless)
+                if (_options.Fidelity == ConversionFidelity.Lossless && !entry.NamespaceIndex.HasValue)
                 {
                     result = generation!.PreserveOriginal(cancellationToken, failures);
                     status = GetMigrationStatus(result);
@@ -726,6 +857,7 @@ public sealed class ProjectMigrator
 
         return new FileMigrationResult
         {
+            NamespaceIndex = entry.NamespaceIndex,
             SourcePath = entry.SourcePath,
             OutputPath = status is FileMigrationStatus.Success or FileMigrationStatus.Partial
                 ? entry.OutputPath
@@ -770,6 +902,14 @@ public sealed class ProjectMigrator
         var converted = report.FileResults
             .Where(result => result.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial)
             .ToList();
+
+        if (_options.SplitNamespaces && report.FileResults.Any(result =>
+                result.Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut))
+        {
+            MarkProjectValidationFailure(converted,
+                "Namespace-split project was not written because another output failed.");
+            return;
+        }
 
         IReadOnlyList<ProjectCompilationInputs> projectInputs;
         try
@@ -897,6 +1037,12 @@ public sealed class ProjectMigrator
         }).ToList();
         if (errors.Count > 0)
         {
+            if (converted.Any(result => result.NamespaceIndex.HasValue))
+            {
+                MarkProjectValidationFailure(converted, errors.Take(20).Select(error =>
+                    $"Namespace-split project C# validation failed ({error.Id}): {error.GetMessage()}").ToArray());
+                return;
+            }
             if (_options.Fidelity == ConversionFidelity.Lossless)
             {
                 var failingPaths = errors
@@ -996,6 +1142,12 @@ public sealed class ProjectMigrator
             return;
         }
 
+        if (converted.Any(result => result.NamespaceIndex.HasValue)
+            && converted.Any(result => result.OutputPath != null && Directory.Exists(result.OutputPath)))
+        {
+            MarkProjectValidationFailure(converted, "Namespace-split destination is a directory; no outputs were written.");
+            return;
+        }
         foreach (var result in converted.Where(result => result.OutputPath != null))
             if (Directory.Exists(result.OutputPath))
             {
@@ -1240,6 +1392,8 @@ public sealed class ProjectMigrator
     private static void RefreshSummary(MigrationReport report)
     {
         var summary = report.Summary;
+        summary.SourceFiles = report.FileResults.Select(result => Path.GetFullPath(result.SourcePath))
+            .Distinct(BuildStateCache.GetPathComparer()).Count();
         var allIssues = report.FileResults.SelectMany(result => result.Issues).ToList();
 
         summary.SuccessfulFiles = report.FileResults.Count(result => result.Status == FileMigrationStatus.Success);

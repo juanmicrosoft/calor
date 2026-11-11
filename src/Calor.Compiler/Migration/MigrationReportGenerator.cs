@@ -463,6 +463,8 @@ public sealed class MigrationReportBuilder
 
         return new MigrationSummary
         {
+            SourceFiles = _fileResults.Select(result => Path.GetFullPath(result.SourcePath))
+                .Distinct(Incremental.BuildStateCache.GetPathComparer()).Count(),
             TotalFiles = _fileResults.Count,
             SuccessfulFiles = _fileResults.Count(f => f.Status == FileMigrationStatus.Success),
             PartialFiles = _fileResults.Count(f => f.Status == FileMigrationStatus.Partial),

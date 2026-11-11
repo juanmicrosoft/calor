@@ -120,6 +120,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// Converts a C# compilation unit to an Calor ModuleNode.
     /// </summary>
     public ModuleNode Convert(CompilationUnitSyntax root, string moduleName)
+        => Convert(root, moduleName, null);
+
+    internal ModuleNode Convert(
+        CompilationUnitSyntax root, string moduleName, NamespaceDeclarationSyntax? selectedNamespace)
     {
         var moduleAttributes = new AttributeCollection();
         var checkOverflow = (_semanticModel?.Compilation.Options as CSharpCompilationOptions)?.CheckOverflow ?? false;
@@ -260,7 +264,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _cancellationToken.ThrowIfCancellationRequested();
 
         // Visit all nodes
-        Visit(root);
+        if (selectedNamespace == null)
+            Visit(root);
+        else
+        {
+            foreach (var directive in root.Usings)
+                Visit(directive);
+            Visit(selectedNamespace);
+        }
         PreserveModuleCompilerDirectives(root);
         NormalizeNamespaceMetadata();
         if (_typePreprocessorBlocks.Count > 0 && _moduleItems.Count == 0)

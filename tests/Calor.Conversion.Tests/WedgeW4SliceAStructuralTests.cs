@@ -129,45 +129,28 @@ public class WedgeW4SliceAStructuralTests
             namespace B { public class Foo { public int V() => 2; } }
             """;
 
-        var result = Convert(csharp);
-        Assert.True(result.Success);
-        _output.WriteLine(result.CalorSource);
-
+        var outputs = AssertNativeNamespaceSplit(csharp);
+        var classes = outputs.SelectMany(result => result.Ast!.Classes).ToArray();
+        Assert.Equal(2, classes.Length);
         Assert.Contains(
-            "namespace-topology",
-            result.Context.GetExplanation().PartialFeatures);
-        Assert.Empty(result.Context.Losses);
-        Assert.Equal(2, result.Ast!.Classes.Count);
-        Assert.Contains(
-            result.Ast.Classes,
+            classes,
             type => type.FullyQualifiedSymbolIdentity == "global::A.Foo");
         Assert.Contains(
-            result.Ast.Classes,
+            classes,
             type => type.FullyQualifiedSymbolIdentity == "global::B.Foo");
-        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
-        Assert.Contains("§CL{", result.CalorSource);
+        Assert.All(outputs, result => Assert.Contains("class Foo", result.CalorSource));
     }
 
     [Fact]
     public void D2_UniqueNamesAcrossNamespaces_StayNative_AndRoundTrip()
     {
-        // Flattening carries no identity-merge risk when the bare names are unique,
-        // so these may remain native — and must round-trip to compilable C#.
+        // Distinct owners stay in separate native files, even when bare names differ.
         var csharp = """
             namespace A { public class Foo { public int V() => 1; } }
             namespace B { public class Bar { public int V() => 2; } }
             """;
 
-        var result = Convert(csharp);
-        Assert.True(result.Success);
-        Assert.DoesNotContain(result.Context.Losses,
-            l => l.Feature == "namespace-collision");
-        Assert.Empty(result.Context.Losses);
-
-        var roundTrip = TestHelpers.FullRoundTrip(csharp, "W4SliceA");
-        Assert.True(roundTrip.RoslynSuccess,
-            "Unique cross-namespace types kept native must round-trip to compilable C#:\n"
-            + string.Join("\n", roundTrip.RoslynErrors));
+        AssertNativeNamespaceSplit(csharp);
     }
 
     [Fact]
@@ -181,15 +164,89 @@ public class WedgeW4SliceAStructuralTests
             namespace B { public class Foo<T> { public T V(T x) => x; } }
             """;
 
-        var result = Convert(csharp);
-        Assert.True(result.Success);
-        Assert.DoesNotContain(result.Context.Losses,
-            l => l.Feature == "namespace-collision");
+        AssertNativeNamespaceSplit(csharp);
+    }
 
-        var roundTrip = TestHelpers.FullRoundTrip(csharp, "W4SliceA");
-        Assert.True(roundTrip.RoslynSuccess,
-            "Same-name-different-arity cross-namespace types must stay native and compile:\n"
-            + string.Join("\n", roundTrip.RoslynErrors));
+    private IReadOnlyList<ConversionResult> AssertNativeNamespaceSplit(string csharp)
+    {
+        var project = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "W4SliceA" })
+            .ConvertProject(csharp, "W4SliceA.cs");
+        Assert.True(project.Success);
+        Assert.True(project.IsSplit);
+        Assert.Equal(["W4SliceA.namespace1.calr", "W4SliceA.namespace2.calr"],
+            project.Outputs.Select(output => output.FileName));
+        var generated = new List<string>();
+        foreach (var output in project.Outputs)
+        {
+            var result = output.Conversion;
+            _output.WriteLine(result.CalorSource);
+            Assert.Empty(result.Losses);
+            Assert.Equal(0, result.InteropPreservationCount);
+            Assert.Contains("namespace-topology", result.Context.GetExplanation().PartialFeatures);
+            TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+            Assert.DoesNotContain('§', result.CalorSource!);
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser(),
+                diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors);
+            Assert.Single(module.NamespaceScopes);
+            Assert.Equal(output == project.Outputs[0] ? "A" : "B",
+                module.NamespaceScopes.Single().FullName);
+            var emitted = new CalorEmitter().Emit(module);
+            string? generatedSource = null;
+            foreach (var source in new[] { result.CalorSource!, emitted })
+            {
+                var compiled = Calor.Compiler.Program.Compile(source, null,
+                    new Calor.Compiler.CompilationOptions
+                    {
+                        EnableTypeChecking = true,
+                        DeferGeneratedOutputValidation = true,
+                        StatusWriter = TextWriter.Null
+                    });
+                Assert.False(compiled.HasErrors,
+                    string.Join("\n", compiled.Diagnostics.Errors.Select(error => error.Message)));
+                generatedSource = compiled.GeneratedCode;
+            }
+            generated.Add(generatedSource!);
+        }
+        AssertEquivalentOwnersAndRuntime([csharp], generated);
+        return project.Outputs.Select(output => output.Conversion).ToArray();
+    }
+
+    private static void AssertEquivalentOwnersAndRuntime(
+        IReadOnlyList<string> original, IReadOnlyList<string> generated)
+    {
+        var expected = Observe(original);
+        var actual = Observe(generated);
+        Assert.Equal(expected, actual);
+
+        static string[] Observe(IReadOnlyList<string> sources)
+        {
+            var compilation = CSharpCompilation.Create(Guid.NewGuid().ToString(),
+                sources.Select(source => CSharpSyntaxTree.ParseText(source)),
+                Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            stream.Position = 0;
+            var context = new AssemblyLoadContext(Guid.NewGuid().ToString(), isCollectible: true);
+            try
+            {
+                var assembly = context.LoadFromStream(stream);
+                return assembly.GetExportedTypes().OrderBy(type => type.FullName, StringComparer.Ordinal)
+                    .Select(type =>
+                    {
+                        var arity = type.GetGenericArguments().Length;
+                        var concrete = arity == 0 ? type : type.MakeGenericType(typeof(string));
+                        var method = concrete.GetMethod("V")!;
+                        var value = method.Invoke(Activator.CreateInstance(concrete),
+                            arity == 0 ? [] : ["witness"]);
+                        return $"{type.FullName}|{arity}|{method}|{value}";
+                    }).ToArray();
+            }
+            finally { context.Unload(); }
+        }
     }
 
     [Fact]

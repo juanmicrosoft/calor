@@ -39,6 +39,19 @@ public sealed class ConversionResult
     public ConversionPathSummary Paths => ConversionPathSummary.From(this);
 }
 
+/// <summary>One output of an explicitly multi-file conversion, in source namespace order.</summary>
+public sealed record ConversionOutput(string FileName, ConversionResult Conversion);
+
+/// <summary>
+/// Project conversion outputs. Unsupported topologies retain the ordinary single-file result;
+/// a failed split never exposes a partially converted output set.
+/// </summary>
+public sealed record ProjectConversionResult(IReadOnlyList<ConversionOutput> Outputs)
+{
+    public bool Success => Outputs.Count > 0 && Outputs.All(output => output.Conversion.Success);
+    public bool IsSplit => Outputs.Count > 1;
+}
+
 /// <summary>
 /// Fidelity contract for C# to Calor conversion.
 /// </summary>
@@ -335,6 +348,159 @@ public sealed class CSharpToCalorConverter
         CancellationToken cancellationToken)
         => ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext: false);
 
+    /// <summary>
+    /// Explicitly allows distinct top-level namespace blocks to become separate native files.
+    /// Each visitor uses the complete original syntax tree and project semantic context.
+    /// Other topologies and non-native conversions retain the single-result fidelity contract.
+    /// </summary>
+    public ProjectConversionResult ConvertProject(
+        string csharpSource, string? sourceFile = null, CancellationToken cancellationToken = default)
+        => ConvertProjectCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext: false);
+
+    internal ProjectConversionResult ConvertProjectCore(
+        string csharpSource, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        var tree = CSharpSyntaxTree.ParseText(
+            csharpSource, parseOptions, sourceFile ?? "", cancellationToken: cancellationToken);
+        var namespaces = GetSplittableNamespaces(tree.GetCompilationUnitRoot(cancellationToken));
+        if (namespaces.Count == 0)
+            return Single();
+        if (_options.Fidelity != ConversionFidelity.Lossless
+            || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches)
+            return Single("Native namespace splitting requires lossless, all-branches conversion.");
+        var missingReferences = _options.References.Where(reference => !File.Exists(reference.Path)).ToArray();
+        if (missingReferences.Length > 0)
+        {
+            var context = CreateContext(sourceFile);
+            foreach (var reference in missingReferences)
+                context.AddError($"Namespace splitting requires the supplied reference: {reference.Path}",
+                    "namespace-split-source-validation");
+            return new([new(Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr"),
+                new ConversionResult { Success = false, Context = context })]);
+        }
+
+        // A missing sibling/reference is not authority to guess a selected source symbol.
+        var original = CSharpCompilation.Create("NamespaceSplitAnalysis",
+            GeneratedCSharpCompiler.AddImplicitUsings(
+                new[] { tree }.Concat(_options.AdditionalSemanticSyntaxTrees
+                    .Where(sibling => !IsSameSyntaxTree(sibling, tree))),
+                _options.IncludeImplicitSystemUsing),
+            GetSemanticMetadataReferences(),
+            new CSharpCompilationOptions(_options.OutputKind, allowUnsafe: true)
+                .WithNullableContextOptions(_options.NullableContextOptions ?? NullableContextOptions.Disable));
+        var originalErrors = original.GetDiagnostics(cancellationToken)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (originalErrors.Length > 0)
+        {
+            var context = CreateContext(sourceFile);
+            foreach (var error in originalErrors)
+                context.AddError($"Original C# cannot be split ({error.Id}): {error.GetMessage()}",
+                    "namespace-split-source-validation");
+            return new([new(Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr"),
+                new ConversionResult { Success = false, Context = context })]);
+        }
+
+        var outputs = new List<ConversionOutput>();
+        var originalSemanticModel = original.GetSemanticModel(tree);
+        for (var index = 0; index < namespaces.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = ConvertCore(csharpSource, sourceFile, cancellationToken,
+                capturePreservationContext, namespaces[index].SpanStart, originalSemanticModel);
+            if (!result.Success || result.Losses.Count != 0)
+                return Single("A namespace did not convert entirely natively.");
+            outputs.Add(new(GetNamespaceOutputPath(Path.GetFileName(sourceFile ?? "input.cs"), index), result));
+        }
+
+        var generated = new List<GeneratedCSharpSource>();
+        var modules = new List<ModuleNode>();
+        foreach (var output in outputs)
+        {
+            if (output.Conversion.CalorSource is not { } source || TryParseModule(source) is not { } module)
+                return Single("An emitted namespace module could not be parsed.");
+            modules.Add(module);
+        }
+        var registry = CrossModuleTypeRegistry.Build(modules);
+        foreach (var output in outputs)
+        {
+            var compiled = Program.Compile(output.Conversion.CalorSource!, null, new CompilationOptions
+            {
+                CrossModuleTypes = registry,
+                ProjectDirectory = _options.ProjectDirectory,
+                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+                DeferGeneratedOutputValidation = true,
+                CancellationToken = cancellationToken
+            });
+            if (compiled.HasErrors)
+                return Single("Native split Calor failed compilation: "
+                    + string.Join("; ", compiled.Diagnostics.Errors.Select(error => error.Message)));
+            generated.Add(new(compiled.GeneratedCode, output.FileName));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        var validation = GeneratedCSharpCompiler.Validate(generated, new GeneratedCSharpCompilationContext
+        {
+            IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+            LanguageVersion = parseOptions.LanguageVersion,
+            DocumentationMode = parseOptions.DocumentationMode,
+            Features = parseOptions.Features,
+            PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
+            References = _options.References.Select(reference =>
+                new GeneratedCSharpReference(reference.Path, reference.Aliases)),
+            AdditionalSources = _options.AdditionalSemanticSyntaxTrees
+                .Where(sibling => !IsSameSyntaxTree(sibling, tree))
+                .Select(sibling => new GeneratedCSharpSource(
+                    sibling.GetText(cancellationToken).ToString(), sibling.FilePath)),
+            OutputKind = _options.OutputKind,
+            NullableContextOptions = _options.NullableContextOptions ?? NullableContextOptions.Disable
+        });
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!validation.CompilationSuccess)
+            return Single("The complete split output set failed C# validation: "
+                + string.Join("; ", validation.CompilationErrors.Select(error => error.GetMessage())));
+        foreach (var output in outputs)
+            output.Conversion.Context.RoundTrip = ConversionRoundTrip.Verified;
+        return new(outputs);
+
+        ProjectConversionResult Single(string? reason = null)
+        {
+            var result = ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+            if (reason != null)
+                result.Context.AddWarning(reason + " Retaining the single-file fidelity boundary.", "namespace-split-refused");
+            return new([new(Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr"), result)]);
+        }
+    }
+
+    internal static IReadOnlyList<NamespaceDeclarationSyntax> GetSplittableNamespaces(CompilationUnitSyntax root)
+    {
+        var namespaces = root.Members.OfType<NamespaceDeclarationSyntax>().ToArray();
+        if (root.SyntaxTree.Options.Kind != SourceCodeKind.Regular
+            || root.ContainsDiagnostics || root.ContainsDirectives
+            || root.AttributeLists.Count != 0 || root.Externs.Count != 0
+            || root.Usings.Any(directive => directive.Alias != null
+                || !directive.GlobalKeyword.IsKind(SyntaxKind.None))
+            || namespaces.Length < 2 || namespaces.Length != root.Members.Count
+            || namespaces.Any(scope => scope.Usings.Count != 0 || scope.Externs.Count != 0
+                || scope.Members.Count == 0
+                || scope.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>().Any())
+            || root.DescendantNodes().OfType<TypeDeclarationSyntax>().Any(type => type.BaseList != null)
+            || root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>()
+                .Any(type => type.Parent is TypeDeclarationSyntax)
+            || root.DescendantNodes().OfType<EqualsValueClauseSyntax>().Any(initializer =>
+                initializer.Parent is VariableDeclaratorSyntax { Parent.Parent: BaseFieldDeclarationSyntax }
+                    or PropertyDeclarationSyntax
+                && initializer.Value is not LiteralExpressionSyntax and not DefaultExpressionSyntax)
+            || namespaces.Select(scope => string.Concat(scope.Name.DescendantTokens().Select(token => token.ValueText)))
+                .Distinct(StringComparer.Ordinal).Count() != namespaces.Length)
+            return [];
+        return namespaces;
+    }
+
+    internal static string GetNamespaceOutputPath(string outputPath, int namespaceIndex)
+        => Path.Combine(Path.GetDirectoryName(outputPath) ?? "",
+            $"{Path.GetFileNameWithoutExtension(outputPath)}.namespace{namespaceIndex + 1}.calr");
+
     internal ConversionResult ConvertWithPreservationContext(
         string csharpSource, string? sourceFile = null, CancellationToken cancellationToken = default)
         => ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext: true);
@@ -508,7 +674,9 @@ public sealed class CSharpToCalorConverter
         string csharpSource,
         string? sourceFile,
         CancellationToken cancellationToken,
-        bool capturePreservationContext)
+        bool capturePreservationContext,
+        int? namespaceStart = null,
+        SemanticModel? originalSemanticModel = null)
     {
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
@@ -630,9 +798,10 @@ public sealed class CSharpToCalorConverter
             }
 
             // Step 1: Parse C# with Roslyn using the caller/project configuration.
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var syntaxTree = originalSemanticModel?.SyntaxTree ?? CSharpSyntaxTree.ParseText(
                 csharpSource,
                 parseOptions,
+                path: sourceFile ?? "",
                 cancellationToken: cancellationToken);
             var root = syntaxTree.GetCompilationUnitRoot();
             if (context.CapturePreservationContext
@@ -685,7 +854,7 @@ public sealed class CSharpToCalorConverter
             if (namespaceFeature != null)
                 context.RecordFeatureUsage(namespaceFeature);
 
-            if (RequiresWholeFileNamespaceInterop(root))
+            if (namespaceStart == null && RequiresWholeFileNamespaceInterop(root))
             {
                 if (!context.PreservesCSharp)
                 {
@@ -703,21 +872,24 @@ public sealed class CSharpToCalorConverter
             }
 
             // Step 2: Create semantic model for type inference (best-effort)
-            SemanticModel? semanticModel = null;
+            SemanticModel? semanticModel = originalSemanticModel;
             try
             {
-                var semanticTrees = new[] { syntaxTree }
-                    .Concat(_options.AdditionalSemanticSyntaxTrees.Where(tree =>
-                        !IsSameSyntaxTree(tree, syntaxTree)));
-                var compilation = CSharpCompilation.Create("ConversionAnalysis",
-                    GeneratedCSharpCompiler.AddImplicitUsings(
-                        semanticTrees, _options.IncludeImplicitSystemUsing),
-                    GetSemanticMetadataReferences(),
-                    new CSharpCompilationOptions(effectiveOutputKind)
-                        .WithNullableContextOptions(
-                            _options.NullableContextOptions
-                            ?? NullableContextOptions.Disable));
-                semanticModel = compilation.GetSemanticModel(syntaxTree);
+                if (semanticModel == null)
+                {
+                    var semanticTrees = new[] { syntaxTree }
+                        .Concat(_options.AdditionalSemanticSyntaxTrees.Where(tree =>
+                            !IsSameSyntaxTree(tree, syntaxTree)));
+                    var compilation = CSharpCompilation.Create("ConversionAnalysis",
+                        GeneratedCSharpCompiler.AddImplicitUsings(
+                            semanticTrees, _options.IncludeImplicitSystemUsing),
+                        GetSemanticMetadataReferences(),
+                        new CSharpCompilationOptions(effectiveOutputKind)
+                            .WithNullableContextOptions(
+                                _options.NullableContextOptions
+                                ?? NullableContextOptions.Disable));
+                    semanticModel = compilation.GetSemanticModel(syntaxTree);
+                }
             }
             catch
             {
@@ -734,7 +906,11 @@ public sealed class CSharpToCalorConverter
                     semanticModel,
                     cancellationToken,
                     _options.NullableContextOptions.HasValue);
-                calorAst = visitor.Convert(root, moduleName);
+                calorAst = visitor.Convert(root, moduleName,
+                    namespaceStart.HasValue
+                        ? root.Members.OfType<NamespaceDeclarationSyntax>()
+                            .Single(scope => scope.SpanStart == namespaceStart)
+                        : null);
             }
             catch (OperationCanceledException)
             {
@@ -800,7 +976,7 @@ public sealed class CSharpToCalorConverter
             // standalone compile also fails when the file only depends on a sibling
             // file, and under PassthroughOnError a rescue that cannot recover would
             // refuse a conversion lossy mode used to complete.
-            var roundTripGate = _options.ValidateRoundTripCSharp
+            var roundTripGate = namespaceStart == null && _options.ValidateRoundTripCSharp
                 && (_options.Fidelity == ConversionFidelity.Lossless
                     || _options.PreprocessorMode
                         == PreprocessorConversionMode.SelectActiveBranchLossy);
@@ -897,7 +1073,7 @@ public sealed class CSharpToCalorConverter
             ValidateLosslessRoundTrip(
                 calorSource,
                 context,
-                _options.ValidateRoundTripCSharp,
+                namespaceStart == null && _options.ValidateRoundTripCSharp,
                 parseOptions,
                 effectiveOutputKind,
                 _options.NullableContextOptions
@@ -1027,8 +1203,9 @@ public sealed class CSharpToCalorConverter
         return result;
     }
 
-    internal ConversionGeneration CreateGeneration(string sourcePath, string outputPath, bool dryRun = false)
-        => new(this, _options, sourcePath, outputPath, dryRun);
+    internal ConversionGeneration CreateGeneration(
+        string sourcePath, string outputPath, bool dryRun = false, int? namespaceIndex = null)
+        => new(this, _options, sourcePath, outputPath, dryRun, namespaceIndex);
 
     /// <summary>
     /// Detects the direction of conversion based on file extension.
@@ -2226,7 +2403,7 @@ public enum ConversionDirection
 /// <summary>Owns one prepared generation base and its cooperating writer lock; conversion never writes output.</summary>
 internal sealed class ConversionGeneration(
     CSharpToCalorConverter converter, ConversionOptions options, string sourcePath, string outputPath,
-    bool dryRun) : IDisposable
+    bool dryRun, int? namespaceIndex = null) : IDisposable
 {
     private readonly string _sourcePath = Path.GetFullPath(sourcePath);
     private readonly string _outputPath = Path.GetFullPath(outputPath);
@@ -2282,7 +2459,24 @@ internal sealed class ConversionGeneration(
             throw new IOException("Conversion artifacts must not overwrite original source or reference inputs.");
         var original = await CSharpToCalorConverter.ReadSourceFileAsync(_sourcePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        var result = converter.ConvertWithPreservationContext(original, _sourcePath, cancellationToken);
+        ConversionResult result;
+        if (namespaceIndex.HasValue)
+        {
+            var project = converter.ConvertProjectCore(
+                original, _sourcePath, cancellationToken, capturePreservationContext: true);
+            if (!project.IsSplit || namespaceIndex.Value >= project.Outputs.Count)
+            {
+                var refused = project.Outputs[0].Conversion;
+                refused.Context.AddError(
+                    "Native namespace splitting was refused. No partial split output may be committed.",
+                    "namespace-split-refused");
+                result = new ConversionResult { Success = false, Context = refused.Context };
+            }
+            else
+                result = project.Outputs[namespaceIndex.Value].Conversion;
+        }
+        else
+            result = converter.ConvertWithPreservationContext(original, _sourcePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return _result = result;
     }

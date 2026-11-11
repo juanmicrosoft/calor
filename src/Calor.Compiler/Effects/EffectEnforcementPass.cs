@@ -6501,9 +6501,12 @@ public sealed class EffectEnforcementPass
         {
             var effects = EffectSet.From("alloc").Union(InferFromMany(newExpr.Arguments));
             var constructorTarget = $"{newExpr.TypeName}..ctor";
+            var sourceType = _context.CallGraph.SourceCreationType(_context.CurrentFunctionId, newExpr.Span);
+            if (sourceType != null)
+                effects = effects.Union(InferStaticFieldInitialization(sourceType, newExpr.Span));
             var resolvedInternalIds = _context.CallGraph.ResolvedConstructorCalls(
                 _context.CurrentFunctionId, newExpr.Span);
-            if (resolvedInternalIds.Count == 0)
+            if (resolvedInternalIds.Count == 0 && sourceType == null)
                 resolvedInternalIds = _context.CallGraph.ResolveCallSites(
                 _context.CurrentFunctionId,
                 constructorTarget,
@@ -6512,6 +6515,22 @@ public sealed class EffectEnforcementPass
             if (resolvedInternalIds.Count > 0)
             {
                 effects = effects.Union(InferFromInternalFunctions(resolvedInternalIds));
+            }
+            else if (sourceType != null)
+            {
+                // Only the binder-selected declaration can establish an implicit source constructor.
+                var initializers = sourceType.Fields.Where(field => !field.IsStatic && field.DefaultValue != null)
+                    .Select(field => (field.TypeName, Value: field.DefaultValue!))
+                    .Concat(sourceType.Properties.Where(property => !property.IsStatic && property.DefaultValue != null)
+                        .Select(property => (property.TypeName, Value: property.DefaultValue!)));
+                if (newExpr.Arguments.Count != 0 || sourceType.IsPartial
+                    || sourceType.BaseClass != null || sourceType.InteropBlocks.Count != 0
+                    || sourceType.PreprocessorBlocks.Count != 0
+                    || CallGraphAnalysis.EnumerateConstructors(sourceType).Any(constructor => !constructor.IsStatic)
+                    || initializers.Any(initializer =>
+                        !IsIntrinsicInitializerType(initializer.TypeName) || !IsIntrinsicInitializer(initializer.Value)))
+                    effects = effects.Union(UnknownResolvedOperation(
+                        $"{sourceType.FullyQualifiedSymbolIdentity ?? sourceType.Name}..ctor", newExpr.TypeNameSpan));
             }
             else
             {

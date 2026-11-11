@@ -30,6 +30,7 @@ public sealed class MigrationPlan
 /// </summary>
 public sealed class MigrationPlanEntry
 {
+    internal int? NamespaceIndex { get; init; }
     public required string SourcePath { get; init; }
     public required string OutputPath { get; set; }
     public required FileConvertibility Convertibility { get; init; }
@@ -65,6 +66,12 @@ public enum FileConvertibility
 /// </summary>
 public sealed class MigrationPlanOptions
 {
+    /// <summary>
+    /// Opt in to one native output per distinct, split-safe top-level namespace.
+    /// Requires lossless, all-branches conversion. The default remains one output per source.
+    /// </summary>
+    public bool SplitNamespaces { get; set; }
+
     /// <summary>Whether to include test files.</summary>
     public bool IncludeTests { get; set; } = true;
 

@@ -71,6 +71,48 @@ Loose directories can lack references: exact preserved sources are still written
 with failed compilation reported as `unverified`, not a passed build.
 Writing, native fraction, project compilation, and test execution are distinct results.
 
+### Opt-in native namespace splitting
+
+`calor migrate ./src --split-namespaces` can split a C# file containing distinct
+top-level namespace blocks into `File.namespace1.calr`, `File.namespace2.calr`,
+and so on, in source order. Each file uses the existing `module M N block`
+header: `M` remains a file label, and `N` is the original CLR namespace.
+There are no namespace blocks in the converted Calor.
+
+The bounded native subset excludes repeated or nested namespaces, nested types,
+scoped imports, alias/global imports, directives, compilation-unit attributes,
+extern aliases, inheritance, and nonliteral field/property initializers.
+Ordinary compilation-unit imports keep their original scope in each output.
+The complete original Roslyn tree and evaluated sibling/reference context remain
+the authority during conversion; missing or invalid source context is refused.
+Every output must remain native and compile, and the complete generated C# set
+is validated with the original project context. This does not add general
+constructed-generic member substitution.
+
+Unsupported topologies retain the ordinary single-file preservation boundary.
+If an otherwise split-safe input cannot produce the complete native set, the
+project migration fails without committing partial outputs. Any conversion,
+collision, cancellation or validation failure before commit prevents the entire
+opt-in batch from being written. Output, receipt and lock paths participate in
+collision checks. Existing single-output files are not deleted or replaced by
+split outputs; choose a fresh destination instead.
+Refresh also refuses obsolete split files outside the new output set, rather
+than leaving their declarations active. Constructor bodies and initialization
+must pass the existing effect checks; an unproved constructor is not native
+split success.
+
+The report contains one result row per output, with the original `sourcePath`
+and zero-based `namespaceIndex`. `summary.sourceFiles` counts distinct inputs;
+`summary.totalFiles` counts result rows. Native split rows still carry the
+existing Partial namespace-topology registry warning; no registry support level
+is promoted.
+
+Library callers opt in with `CSharpToCalorConverter.ConvertProject(source,
+sourceFile, cancellationToken)`. Its ordered `Outputs` contain `FileName` and
+`Conversion` (the ordinary `ConversionResult`). Check `IsSplit` and each output's
+losses before claiming native splitting. Existing `Convert` and `ConvertFileAsync`
+remain single-result APIs with unchanged preservation/refusal behavior.
+
 ### Safe refresh of generated Calor
 
 Lossless C# migration saves `<output>.conversion.json` beside each generated
@@ -106,6 +148,7 @@ validation do not use these receipts yet.
 | `--benchmark` | `-b` | `false` | Include before/after metrics comparison |
 | `--direction` | `-d` | `cs-to-calor` | Migration direction |
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
+| `--split-namespaces` | — | `false` | Opt in to one native file per split-safe top-level namespace; requires lossless, all-branches migration. |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--define` | — | — | Add a conditional-compilation symbol. |

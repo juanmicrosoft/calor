@@ -780,6 +780,9 @@ public sealed class CallGraphAnalysis
         internal Dictionary<(string CallerId, int Start, int End), IReadOnlyList<string>>
             ConstructorCalls
         { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), ClassDefinitionNode>
+            SourceCreationTypes
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.ITypeSymbol>
             MetadataValueTypes
         { get; } = new();
@@ -836,6 +839,9 @@ public sealed class CallGraphAnalysis
 
     internal IReadOnlyList<string> ResolvedConstructorCalls(string callerId, TextSpan span) =>
         _boundValues.ConstructorCalls.GetValueOrDefault((callerId, span.Start, span.End)) ?? [];
+
+    internal ClassDefinitionNode? SourceCreationType(string callerId, TextSpan span) =>
+        _boundValues.SourceCreationTypes.GetValueOrDefault((callerId, span.Start, span.End));
 
     internal Microsoft.CodeAnalysis.INamedTypeSymbol? MetadataCreationType(string callerId, TextSpan span) =>
         MetadataValueType(callerId, span) as Microsoft.CodeAnalysis.INamedTypeSymbol;
@@ -1659,6 +1665,7 @@ public sealed class CallGraphAnalysis
                 .ToLookup(symbol => (symbol.DefinitionSpan, symbol.DeclarationSpan));
             var callableDeclarations = boundModule.SymbolsById.Values.OfType<FunctionSymbol>()
                 .ToLookup(symbol => (symbol.ContainingTypeName, symbol.DefinitionSpan, symbol.DeclarationSpan));
+            var sourceClasses = new Dictionary<SymbolId, ClassDefinitionNode>();
             // Abstract and empty members have declaration symbols but no BoundFunction body.
             foreach (var cls in EnumerateClasses(ast))
             {
@@ -1666,6 +1673,7 @@ public sealed class CallGraphAnalysis
                     .Where(symbol => symbol.Name == cls.Name).Take(2).ToArray();
                 if (owners is not [var owner])
                     continue;
+                sourceClasses[owner.Id] = cls;
                 foreach (var method in EnumerateMethods(cls))
                 {
                     var declarations = callableDeclarations[(owner.QualifiedName, method.Span, method.IdentifierSpan)]
@@ -1838,6 +1846,9 @@ public sealed class CallGraphAnalysis
                             break;
                         case BoundNewExpression creation:
                             target = $"{creation.Type.DisplayString}..ctor";
+                            if (creation.ResolvedType is { } sourceType
+                                && sourceClasses.TryGetValue(sourceType.Id, out var sourceClass))
+                                boundValues.SourceCreationTypes[(callerId, node.Span.Start, node.Span.End)] = sourceClass;
                             callees = creation.ResolvedConstructor == null
                                 ? Array.Empty<FunctionSymbol>()
                                 : [creation.ResolvedConstructor];
