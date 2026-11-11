@@ -1,7 +1,6 @@
-§M{Test_11_04:overflow=unchecked}
-  §PP{NET6_0_OR_GREATER}
-    §CL{NetSixFeature:pub}
-      §PROP{Name:string:pub:get,set}
-
-
-  §/PP{NET6_0_OR_GREATER}
+module Test_11_04 Test_11_04 overflow unchecked
+  pp NET6_0_OR_GREATER
+    class NetSixFeature public
+      property string:Name public
+        get
+        set

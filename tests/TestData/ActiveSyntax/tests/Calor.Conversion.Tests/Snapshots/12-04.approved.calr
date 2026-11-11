@@ -1,11 +1,9 @@
-§M{Test_12_04:overflow=unchecked}
-  §U{System}
+module Test_12_04 Test_12_04 overflow unchecked
+  using System
 
-  §CL{Utf8Example:pub}
-    §MT{GetGreeting:pub} () -> ReadOnlySpan<byte>
-      §R "hello"u8
+  class Utf8Example public
+    func GetGreeting public () → ReadOnlySpan<byte>
+      return "hello"u8
 
-    §MT{GetHeader:pub} () -> ReadOnlySpan<byte>
-      §R "Content-Type"u8
-
-
+    func GetHeader public () → ReadOnlySpan<byte>
+      return "Content-Type"u8

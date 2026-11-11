@@ -1,6 +1,5 @@
-§M{Test_07_01:overflow=unchecked}
-  §DEL{MyHandler}
-    §I{int:x}
+module Test_07_01 Test_07_01 overflow unchecked
+  delegate MyHandler public (int:x)
 
   raw member:delegate-semantics:Other:Unsupported%20Other%3A%20public%20delegate%20bool%20Predicate%3CT%3E%28T%20item%29%3B 42
 public delegate bool Predicate<T>(T item);

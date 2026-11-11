@@ -1,8 +1,7 @@
-§M{Test_01_04:overflow=unchecked}
-  §M{MathUtils:pub}
-    §F{Square:pub} (double:x) -> double
-      §R (* x x)
+module Test_01_04 Test_01_04 overflow unchecked
+  module MathUtils public
+    func Square public (double:x) → double
+      return x * x
 
-    §F{Cube:pub} (double:x) -> double
-      §R (* (* x x) x)
-
+    func Cube public (double:x) → double
+      return (x * x) * x

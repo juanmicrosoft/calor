@@ -1,9 +1,8 @@
-§M{Test_06_01:overflow=unchecked}
-  §CL{Grader:pub}
-    §MT{GetGrade:pub} (int:score) -> string
-      §R §W score
-        §K §PREL{gte} 90 → "A"
-        §K §PREL{gte} 80 → "B"
-        §K §PREL{gte} 70 → "C"
-        §K _ → "F"
-
+module Test_06_01 Test_06_01 overflow unchecked
+  class Grader public
+    func GetGrade public (int:score) → string
+      return match score
+        case >= 90 → "A"
+        case >= 80 → "B"
+        case >= 70 → "C"
+        case _ → "F"

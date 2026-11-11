@@ -1,21 +1,14 @@
-§M{Test_13_10:overflow=unchecked}
-  §U{System.Collections.Generic}
+module Test_13_10 Test_13_10 overflow unchecked
+  using System.Collections.Generic
 
-  §CL{MatchListDemo:pub}
-    §MT{GetItems:pub} (int:category) -> List<string>
-      §E{alloc}
-      §R §W category
-        §K 1
-          §LIST{_listStr005:string}
-            "a"
-            "b"
-          §R _listStr005
-        §/K
-        §K 2
-          §LIST{_listStr007:string}
-            "c"
-            "d"
-            "e"
-          §R _listStr007
-        §/K
-        §K _ → §NEW{List<string>} §/NEW
+  class MatchListDemo public
+    func GetItems public (int:category) → List<string>
+      ! alloc
+      return match category
+        case 1
+          let List<string>:_listStr005 = new List<string>() {"a", "b"}
+          return _listStr005
+        case 2
+          let List<string>:_listStr007 = new List<string>() {"c", "d", "e"}
+          return _listStr007
+        case _ → new List<string>()

@@ -1,15 +1,12 @@
-§M{Test_11_05:overflow=unchecked}
-  §U{System.Collections.Generic}
-  §U{System.Collections.Immutable}
+module Test_11_05 Test_11_05 overflow unchecked
+  using System.Collections.Generic
+  using System.Collections.Immutable
 
-  §CL{DictExample:pub}
-    §MT{GetScores:pub} () -> Dict<string, int>
-      §E{alloc}
-      §DICT{dict003:string:int}
-        §KV "Alice" 95
-        §KV "Bob" 87
-        §KV "Charlie" 92
-      §R dict003
+  class DictExample public
+    func GetScores public () → Dictionary<string,int>
+      ! alloc
+      let Dictionary<string,int>:dict003 = new Dictionary<string,int>() {{"Alice", 95}, {"Bob", 87}, {"Charlie", 92}}
+      return dict003
 
-    §MT{GetImmutableScores:pub} () -> ImmutableDictionary<string, int>
-      §R ImmutableDictionary<string, int>.Empty
+    func GetImmutableScores public () → ImmutableDictionary<string,int>
+      return ImmutableDictionary<@str,@i32>.Empty

@@ -1,13 +1,11 @@
-§M{Test_13_02:overflow=unchecked}
-  §CL{VerbatimDemo:pub}
-    §FLD{int:object:priv}
-    §FLD{string:`class`:priv}
+module Test_13_02 Test_13_02 overflow unchecked
+  class VerbatimDemo public
+    field int:@object private
+    field string:@class private
 
-    §CTOR{pub} (int:object, string:`class`)
-      §ASSIGN this.object object
-      §ASSIGN this.class `class`
+    ctor public (int:@object, string:@class)
+      set this.@object @object
+      set this.@class @class
 
-    §MT{Process:pub} (string:`namespace`, int:`event`)
-      §B{result} (+ `namespace` (str `event`))
-
-
+    func Process public (string:@namespace, int:@event)
+      let result = @namespace + @event.ToString()

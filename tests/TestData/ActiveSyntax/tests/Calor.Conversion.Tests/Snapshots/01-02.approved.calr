@@ -1,7 +1,10 @@
-§M{Test_01_02:overflow=unchecked}
-  §CL{Person:pub}
-    §PROP{Name:string:pub:get,set}
-    §PROP{Age:int:pub:get}
-    §PROP{Email:string:pub:get,set} = ""
-
-
+module Test_01_02 Test_01_02 overflow unchecked
+  class Person public
+    property string:Name public
+      get
+      set
+    property int:Age public
+      get
+    property string:Email public = ""
+      get
+      set

@@ -1,6 +1,4 @@
-§M{Test_08_04:overflow=unchecked}
-  §CL{NullDemo:pub}
-    §MT{GetValue:pub} (string?:input) -> string
-      §R (?? input "default")
-
-
+module Test_08_04 Test_08_04 overflow unchecked
+  class NullDemo public
+    func GetValue public (string?:input) → string
+      return input ?? "default"

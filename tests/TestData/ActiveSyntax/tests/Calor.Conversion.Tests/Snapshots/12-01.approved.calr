@@ -1,9 +1,7 @@
-§M{Test_12_01:overflow=unchecked}
-  §CL{Formatter:pub}
-    §MT{Format:priv} (int:value) -> string
-      §R (str value)
+module Test_12_01 Test_12_01 overflow unchecked
+  class Formatter public
+    func Format private (int:value) → string
+      return value.ToString()
 
-    §MT{Describe:pub} (int:x, string[]:labels) -> string
-      §R "The value is ${Format(x)} with label ${§CS{labels[0]}}"
-
-
+    func Describe public (int:x, string[]:labels) → string
+      return "The value is ${Format(x)} with label ${labels[0]}"

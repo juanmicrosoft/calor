@@ -1,9 +1,7 @@
-§M{Test_05_01:overflow=unchecked}
-  §U{System.Threading.Tasks}
+module Test_05_01 Test_05_01 overflow unchecked
+  using System.Threading.Tasks
 
-  §CL{DataService:pub}
-    §AMT{FetchDataAsync:pub} () -> string
-      §B{_} §AWAIT §C{Task.Delay} 100
-      §R "data"
-
-
+  class DataService public
+    func FetchDataAsync public async () → string
+      let _ = await Task.Delay(100)
+      return "data"

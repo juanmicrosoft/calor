@@ -1,7 +1,11 @@
-§M{Test_08_01:overflow=unchecked}
-  §CL{UserDto:pub}
-    §PROP{Name:string:pub:req:get,set}
-    §PROP{Age:int:pub:req:get,set}
-    §PROP{Email:string?:pub:get,set}
-
-
+module Test_08_01 Test_08_01 overflow unchecked
+  class UserDto public
+    property string:Name public required
+      get
+      set
+    property int:Age public required
+      get
+      set
+    property string?:Email public
+      get
+      set

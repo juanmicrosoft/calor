@@ -1,13 +1,13 @@
-§M{Test_13_11:overflow=unchecked}
-  §CL{ArrayDemo:pub}
-    §MT{CreateSized:pub} (int:n) -> int[]
-      §E{alloc}
-      §R §ARR{int:n} §/ARR
+module Test_13_11 Test_13_11 overflow unchecked
+  class ArrayDemo public
+    func CreateSized public (int:n) → int[]
+      ! alloc
+      return new int[n]
 
-    §MT{CreateEmpty:pub} () -> string[]
-      §E{alloc}
-      §R §ARR{string:0} §/ARR
+    func CreateEmpty public () → string[]
+      ! alloc
+      return new string[0]
 
-    §MT{Wrap:pub} (string:value) -> object[]
-      §E{alloc}
-      §R §ARR{object} value §ARR{int} 1 2 §/ARR §/ARR
+    func Wrap public (string:value) → object[]
+      ! alloc
+      return new object[] {value, new int[] {1, 2}}

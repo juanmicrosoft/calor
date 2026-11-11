@@ -1,27 +1,27 @@
-§M{Test_13_04:overflow=unchecked}
-  §CL{Result<T>:pub:abs}
+module Test_13_04 Test_13_04 overflow unchecked
+  class Result<T> public abstract
 
-  §CL{Ok<T>:pub}
-    §EXT{Result<T>}
+  class Ok<T> public
+    extends Result<T>
 
-    §PROP{Value:T:pub:get}
+    property T:Value public
+      get
 
-    §CTOR{pub} (T:value)
-      §ASSIGN Value value
+    ctor public (T:value)
+      set Value value
 
+  class Error<T> public
+    extends Result<T>
 
-  §CL{Error<T>:pub}
-    §EXT{Result<T>}
+    property string:Message public
+      get
 
-    §PROP{Message:string:pub:get}
+    ctor public (string:message)
+      set Message message
 
-    §CTOR{pub} (string:message)
-      §ASSIGN Message message
-
-
-  §M{ResultExtensions:pub}
-    §F{Describe<T>:pub} (Result<T>:result) -> string
-      §R §W result
-        §K §PTYPE{Ok<T>:ok} → "Success: ${ok.Value}"
-        §K §PTYPE{Error<T>:err} → "Error: ${err.Message}"
-        §K _ → "Unknown"
+  module ResultExtensions public
+    func Describe<T> public (Result<T>:result) → string
+      return match result
+        case Ok<T> ok → "Success: ${ok.Value}"
+        case Error<T> err → "Error: ${err.Message}"
+        case _ → "Unknown"

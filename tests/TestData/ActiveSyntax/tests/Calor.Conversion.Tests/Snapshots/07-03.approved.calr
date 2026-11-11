@@ -1,8 +1,6 @@
-§M{Test_07_03:overflow=unchecked}
-  §U{System}
+module Test_07_03 Test_07_03 overflow unchecked
+  using System
 
-  §CL{StaticLambdaDemo:pub}
-    §MT{Test:pub}
-      §B{Func<int, int>:doubler} §LAM{static:x:int} (* x 2) §/LAM
-
-
+  class StaticLambdaDemo public
+    func Test public ()
+      let Func<int,int>:doubler = static (int:x) => x * 2

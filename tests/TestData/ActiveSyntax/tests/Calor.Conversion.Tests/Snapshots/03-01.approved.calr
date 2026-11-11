@@ -1,11 +1,9 @@
-§M{Test_03_01:overflow=unchecked}
-  §CL{Guard:pub}
-    §MT{Classify:pub} (int:value) -> string
-      §IF (> value 0)
-        §R "positive"
-      §EI (< value 0)
-        §R "negative"
-      §EL
-        §R "zero"
-
-
+module Test_03_01 Test_03_01 overflow unchecked
+  class Guard public
+    func Classify public (int:value) → string
+      if value > 0
+        return "positive"
+      else if value < 0
+        return "negative"
+      else
+        return "zero"

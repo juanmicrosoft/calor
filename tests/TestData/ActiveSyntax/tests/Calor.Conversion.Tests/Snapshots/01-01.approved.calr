@@ -1,9 +1,7 @@
-§M{Test_01_01:overflow=unchecked}
-  §CL{Calculator:pub}
-    §MT{Add:pub} (int:a, int:b) -> int
-      §R (+ a b)
+module Test_01_01 Test_01_01 overflow unchecked
+  class Calculator public
+    func Add public (int:a, int:b) → int
+      return a + b
 
-    §MT{Subtract:pub} (int:a, int:b) -> int
-      §R (- a b)
-
-
+    func Subtract public (int:a, int:b) → int
+      return a - b

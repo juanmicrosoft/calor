@@ -1,6 +1,4 @@
-§M{Test_09_01:overflow=unchecked}
-  §CL{RangeDemo:pub}
-    §MT{Slice:pub} (int[]:array) -> int[]
-      §R §IDX{array} §RANGE 0 5
-
-
+module Test_09_01 Test_09_01 overflow unchecked
+  class RangeDemo public
+    func Slice public (int[]:array) → int[]
+      return array[0..5]

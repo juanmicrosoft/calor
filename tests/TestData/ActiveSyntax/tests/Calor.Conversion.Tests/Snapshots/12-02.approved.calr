@@ -1,13 +1,11 @@
-§M{Test_12_02:overflow=unchecked}
-  §CL{Parser:pub}
-    §MT{TryParse:pub} (string:input, int:result:out) -> bool
-      §ASSIGN result 0
-      §IF (isempty input)
-        §R false
-      §ASSIGN result §C{int.Parse} input
-      §R true
+module Test_12_02 Test_12_02 overflow unchecked
+  class Parser public
+    func TryParse public (string:input, out int:result) → bool
+      set result 0
+      if string.IsNullOrEmpty(input)
+        return false
+      set result int.Parse(input)
+      return true
 
-    §MT{Increment:pub} (int:value:ref)
-      §ASSIGN value (+ value 1)
-
-
+    func Increment public (ref int:value)
+      set value value + 1

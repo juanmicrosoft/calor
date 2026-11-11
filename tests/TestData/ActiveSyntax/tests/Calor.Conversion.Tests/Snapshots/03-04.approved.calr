@@ -1,14 +1,12 @@
-§M{Test_03_04:overflow=unchecked}
-  §CL{Router:pub}
-    §MT{Route:pub} (int:code) -> string
-      §W code
-        §K 200
-          §R "OK"
-        §K 404
-          §R "Not Found"
-        §K 500
-          §R "Server Error"
-        §K _
-          §R "Unknown"
-
-
+module Test_03_04 Test_03_04 overflow unchecked
+  class Router public
+    func Route public (int:code) → string
+      match code
+        case 200
+          return "OK"
+        case 404
+          return "Not Found"
+        case 500
+          return "Server Error"
+        case _
+          return "Unknown"

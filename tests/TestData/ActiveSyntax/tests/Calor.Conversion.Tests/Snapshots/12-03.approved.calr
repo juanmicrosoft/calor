@@ -1,13 +1,11 @@
-§M{Test_12_03:overflow=unchecked}
-  §CL{Vector2:pub:struct}
-    §FLD{float:X:pub}
-    §FLD{float:Y:pub}
+module Test_12_03 Test_12_03 overflow unchecked
+  class Vector2 public struct
+    field float:X public
+    field float:Y public
 
-    §CTOR{pub} (float:x, float:y)
-      §ASSIGN X x
-      §ASSIGN Y y
+    ctor public (float:x, float:y)
+      set X x
+      set Y y
 
-    §OP{+:pub} (Vector2:a, Vector2:b) -> Vector2
-      §R §NEW{Vector2} §A (+ a.X b.X) §A (+ a.Y b.Y) §/NEW
-
-
+    op + (Vector2:a, Vector2:b) → Vector2
+      return new Vector2(a.X + b.X, a.Y + b.Y)

@@ -1,13 +1,11 @@
-§M{Test_01_03:overflow=unchecked}
-  §CL{Account:pub}
-    §FLD{string:_id:priv:readonly}
-    §FLD{decimal:_balance:priv}
+module Test_01_03 Test_01_03 overflow unchecked
+  class Account public
+    field string:_id private readonly
+    field decimal:_balance private
 
-    §CTOR{pub} (string:id, decimal:initialBalance)
-      §ASSIGN _id id
-      §ASSIGN _balance initialBalance
+    ctor public (string:id, decimal:initialBalance)
+      set _id id
+      set _balance initialBalance
 
-    §MT{GetBalance:pub} () -> decimal
-      §R _balance
-
-
+    func GetBalance public () → decimal
+      return _balance

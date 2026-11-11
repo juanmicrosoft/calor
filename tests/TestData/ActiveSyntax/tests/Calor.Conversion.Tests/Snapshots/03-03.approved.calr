@@ -1,10 +1,8 @@
-§M{Test_03_03:overflow=unchecked}
-  §CL{Loops:pub}
-    §MT{CountDown:pub} (int:start) -> int
-      §B{~count:int} 0
-      §WH (> start 0)
-        §ASSIGN start (- start 1)
-        §ASSIGN count (+ count 1)
-      §R count
-
-
+module Test_03_03 Test_03_03 overflow unchecked
+  class Loops public
+    func CountDown public (int:start) → int
+      var int:count = 0
+      while start > 0
+        set start start - 1
+        set count count + 1
+      return count

@@ -1,8 +1,6 @@
-§M{Test_06_03:overflow=unchecked}
-  §CL{PatternDemo:pub}
-    §MT{GetLength:pub} (object:value) -> int
-      §IF (is value string text)
-        §R (len text)
-      §R 0
-
-
+module Test_06_03 Test_06_03 overflow unchecked
+  class PatternDemo public
+    func GetLength public (object:value) → int
+      if value is string text
+        return text.Length
+      return 0

@@ -1,17 +1,15 @@
-§M{Test_07_04:overflow=unchecked}
-  §U{System}
-  §U{System.Linq}
+module Test_07_04 Test_07_04 overflow unchecked
+  using System
+  using System.Linq
 
-  §M{BlockLambdaDemo:pub}
-    §F{Run:pub}
-      §B{_lam005} §LAM{}
-        §B{_chainRange004} §C{Enumerable.Range} §A 1 §A 5 §/C
-        §B{nums} §C{_chainRange004.ToArray}
-        §B{int:total} §C{nums.Sum}
-        §R total
-      §/LAM
-      §C{Handle} §A "/x" §A _lam005 §/C
+  module BlockLambdaDemo public
+    func Run public ()
+      let _lam005 = () =>
+        let _chainRange004 = Enumerable.Range(1, 5)
+        let nums = _chainRange004.ToArray()
+        let int:total = nums.Sum()
+        return total
+      Handle("/x", _lam005)
 
-    §F{Handle:pub} (string:route, Func<int>:handler)
-      §R
-
+    func Handle public (string:route, Func<int>:handler)
+      return

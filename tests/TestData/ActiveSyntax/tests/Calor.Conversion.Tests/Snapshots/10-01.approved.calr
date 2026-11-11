@@ -1,5 +1,4 @@
-§M{Test_10_01:overflow=unchecked}
-  §M{SizeTest:pub}
-    §F{GetSizeOfInt:pub} () -> int
-      §R §SIZEOF{int}
-
+module Test_10_01 Test_10_01 overflow unchecked
+  module SizeTest public
+    func GetSizeOfInt public () → int
+      return sizeof(int)

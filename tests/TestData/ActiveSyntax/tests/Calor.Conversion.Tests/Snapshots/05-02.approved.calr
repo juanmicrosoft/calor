@@ -1,11 +1,9 @@
-§M{Test_05_02:overflow=unchecked}
-  §U{System.Linq}
-  §U{System.Collections.Generic}
+module Test_05_02 Test_05_02 overflow unchecked
+  using System.Linq
+  using System.Collections.Generic
 
-  §CL{Filter:pub}
-    §MT{GetPositive:pub} (List<int>:items) -> List<int>
-      §B{_lamWhere004} §LAM{x:int} (> x 0) §/LAM
-      §B{_chainWhere005} §C{items.Where} _lamWhere004
-      §R §C{_chainWhere005.ToList}
-
-
+  class Filter public
+    func GetPositive public (List<int>:items) → List<int>
+      let _lamWhere004 = (int:x) => x > 0
+      let _chainWhere005 = items.Where(_lamWhere004)
+      return _chainWhere005.ToList()

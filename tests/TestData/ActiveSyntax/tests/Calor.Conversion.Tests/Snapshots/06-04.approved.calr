@@ -1,8 +1,6 @@
-§M{Test_06_04:overflow=unchecked}
-  §CL{Combinators:pub}
-    §MT{Check:pub} (object:obj) -> string
-      §IF (!= obj null)
-        §R "has value"
-      §R "null"
-
-
+module Test_06_04 Test_06_04 overflow unchecked
+  class Combinators public
+    func Check public (object:obj) → string
+      if obj != null
+        return "has value"
+      return "null"

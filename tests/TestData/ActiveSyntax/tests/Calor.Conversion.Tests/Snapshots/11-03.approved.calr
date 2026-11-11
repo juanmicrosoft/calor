@@ -1,14 +1,13 @@
-§M{Test_11_03:overflow=unchecked}
-  §CL{Container:pub}
-    §MT{GetStatus:pub} () -> Status
-      §R Status.Active
+module Test_11_03 Test_11_03 overflow unchecked
+  class Container public
+    func GetStatus public () → Status
+      return Status.Active
 
-    §CL{Inner:priv}
-      §PROP{Value:int:pub:get,set}
+    class Inner private
+      property int:Value public
+        get
+        set
 
-
-    §EN{Status:priv}
+    enum Status private
       Active
       Inactive
-
-
