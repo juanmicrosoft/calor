@@ -770,7 +770,6 @@ var x = 1;
     [Fact]
     public void C4_MethodGroupArgument_ChargesCalleeDeclaredEffects()
     {
-        // Native ConvertAll does not establish this generic call's authority yet.
         // Review C4: a method-group argument (bare reference to an internal
         // function) charges that function's declared effects at the passing
         // site — ConvertAll and friends can no longer launder it.
@@ -788,12 +787,89 @@ var x = 1;
       §E{}
       §B{r} §C{items.ConvertAll} §A LoudMap §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                !
+                let r = items.ConvertAll(LoudMap)
+            """));
 
         Assert.True(result.HasErrors, "Method-group argument effects must be charged");
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.ForbiddenEffect
                 && d.Message.Contains("Go") && d.Message.Contains("cw"));
+    }
+
+    [Fact]
+    public void NativeMethodGroupArgument_SelectedClrCallRejectsUndeclaredAndAcceptsDeclaredCw()
+    {
+        const string undeclared = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                !
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string declared = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                ! cw
+                let r = items.ConvertAll(LoudMap)
+            """;
+        var rejected = Calor.Compiler.Program.Compile(NativeSource(undeclared, undeclared));
+        Assert.True(rejected.HasErrors);
+        var error = Assert.Single(rejected.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.ForbiddenEffect, error.Code);
+        Assert.Equal("Function 'Go' uses effect 'cw' but does not declare it", error.Message);
+
+        var accepted = Calor.Compiler.Program.Compile(NativeSource(declared, declared));
+        Assert.False(accepted.HasErrors, string.Join("; ", accepted.Diagnostics));
+        Assert.Equal(SelectedClrCall(rejected), SelectedClrCall(accepted));
+
+        static (string Call, string Callback) SelectedClrCall(CompilationResult result)
+        {
+            var generated = new Calor.Compiler.CodeGen.CSharpEmitter().Emit(result.Ast!);
+            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                "using System;\nusing System.Collections.Generic;\n" + generated);
+            var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "StrictnessMethodGroup", [tree], TestHarness.CompilationReferences,
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                   Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+            Assert.DoesNotContain(compilation.GetDiagnostics(),
+                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            var invocation = Assert.Single(tree.GetRoot().DescendantNodes()
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>(),
+                syntax => syntax.Expression is Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax
+                   { Name.Identifier.ValueText: "ConvertAll" });
+            var model = compilation.GetSemanticModel(tree);
+            var call = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(
+                Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model, invocation).Symbol);
+            Assert.Equal(
+                "System.Collections.Generic.List<int>.ConvertAll<int>(System.Converter<int, int>)",
+                call.ToDisplayString());
+            Assert.False(call.IsStatic);
+            var callback = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(
+                Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model,
+                   invocation.ArgumentList.Arguments.Single().Expression).Symbol);
+            Assert.Equal("HigherOrder.HigherOrderModule.LoudMap(int)", callback.ToDisplayString());
+            Assert.True(callback.IsStatic);
+            Assert.False(callback.ReturnsByRef);
+            Assert.False(callback.ReturnsByRefReadonly);
+            Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_Int32, callback.ReturnType.SpecialType);
+            Assert.Equal(Microsoft.CodeAnalysis.RefKind.None, callback.Parameters.Single().RefKind);
+            return (call.ToDisplayString(), callback.ToDisplayString());
+        }
     }
 
     [Fact]
