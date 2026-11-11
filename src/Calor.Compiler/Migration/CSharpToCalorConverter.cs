@@ -1526,9 +1526,12 @@ public sealed class CSharpToCalorConverter
     ///
     /// <para>Best-effort by design: a row that is missing or too narrow is a
     /// diagnostic on a later compile, never a reason to throw away a conversion
-    /// that otherwise succeeded. Synthesis only ever WIDENS a row, so a run that
+    /// that otherwise succeeded. Own-row synthesis only ever WIDENS a row, so a run that
     /// stops early — cap reached, unparseable probe, or an exception — leaves rows
     /// that are sound but possibly incomplete, and says so in the context.</para>
+    /// <para>Callback contracts use bound native parameter identities and strict
+    /// lambda body facts. Effect binders and position rows travel back through the
+    /// same declaration offsets; unproven returned rows are never copied as proof.</para>
     /// </summary>
     private void SynthesizeEffectRows(
         ModuleNode? module,
@@ -1558,7 +1561,7 @@ public sealed class CSharpToCalorConverter
                 return;
             }
 
-            var converged = EffectEnforcementPass.SynthesizeDeclaredRows(reparsed, resolver);
+            var converged = EffectEnforcementPass.SynthesizeConvertedRows(reparsed, resolver);
             CopyEffectRows(reparsed, module, declarationOffsets);
 
             if (!converged)
@@ -1615,8 +1618,8 @@ public sealed class CSharpToCalorConverter
         ModuleNode source, ModuleNode target, IReadOnlyDictionary<AstNode, int> declarationOffsets)
     {
         var rows = EnumerateRowSites(source)
-            .ToDictionary(site => site.Declaration.Span.Start, site => site.Effects);
-        var assignments = new List<(Action<EffectsNode> Assign, EffectsNode Effects)>();
+            .ToDictionary(site => site.Declaration.Span.Start);
+        var assignments = new List<Action>();
 
         foreach (var (declaration, _, assign) in EnumerateRowSites(target))
         {
@@ -1626,11 +1629,46 @@ public sealed class CSharpToCalorConverter
                 throw new InvalidOperationException(
                     $"Effect-row declaration at {declaration.Span} did not survive the probe emit/reparse.");
             }
-            if (synthesized != null)
-                assignments.Add((assign, synthesized));
+            if (synthesized.Effects != null)
+                assignments.Add(() => assign(synthesized.Effects));
+            var sourceParameters = synthesized.Declaration switch
+            {
+                FunctionNode function => function.Parameters,
+                MethodNode method => method.Parameters,
+                _ => null
+            };
+            var targetParameters = declaration switch
+            {
+                FunctionNode function => function.Parameters,
+                MethodNode method => method.Parameters,
+                _ => null
+            };
+            if (sourceParameters == null || targetParameters == null)
+                continue;
+            if (sourceParameters.Count != targetParameters.Count
+                || !sourceParameters.Zip(targetParameters).All(pair => pair.First.Name == pair.Second.Name))
+                throw new InvalidOperationException("Callback parameters did not survive the probe emit/reparse.");
+            for (var index = 0; index < sourceParameters.Count; index++)
+            {
+                var sourceParameter = sourceParameters[index];
+                var targetParameter = targetParameters[index];
+                assignments.Add(() => targetParameter.Row = sourceParameter.Row);
+            }
+            if (synthesized.Declaration is FunctionNode sourceFunction && declaration is FunctionNode targetFunction)
+            {
+                assignments.Add(() => targetFunction.SetSynthesizedEffectParameters(sourceFunction.EffectParameters));
+                if (sourceFunction.Output != null && targetFunction.Output != null)
+                    assignments.Add(() => targetFunction.Output.Row = sourceFunction.Output.Row);
+            }
+            if (synthesized.Declaration is MethodNode sourceMethod && declaration is MethodNode targetMethod)
+            {
+                assignments.Add(() => targetMethod.SetSynthesizedEffectParameters(sourceMethod.EffectParameters));
+                if (sourceMethod.Output != null && targetMethod.Output != null)
+                    assignments.Add(() => targetMethod.Output.Row = sourceMethod.Output.Row);
+            }
         }
-        foreach (var (assign, effects) in assignments)
-            assign(effects);
+        foreach (var assign in assignments)
+            assign();
     }
 
     /// <summary>

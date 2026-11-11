@@ -61,6 +61,17 @@ Mixed `#nullable` contexts, unresolved source context, or an uncertified native
 replacement retain the preservation boundary; raw C# is not native recovery.
 Conversion options and the default compilation context do not change.
 
+For directly invoked delegate parameters, conversion can synthesize existing
+effect placeholders (`<! callback0>`) instead of assuming callbacks are pure.
+Each parameter gets its own row variable; invocation charges that row and the
+effects of evaluating its arguments. Effect binders erase without changing CLR
+signatures or generic arity. Returned lambdas receive a concrete row only when
+strict native inference verifies every return, including conditional branches.
+Unknown or assumed facts cannot establish a concrete return contract.
+Aliases, stored or captured callbacks, non-lambda returns, and dispatch contracts
+are outside this synthesis unit and retain their existing fail-closed behavior.
+These contracts do not establish whole-program equivalence.
+
 ### Generated output and refresh
 
 C#→Calor conversion saves an adjacent `<output>.conversion.json` receipt containing

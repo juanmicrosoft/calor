@@ -260,6 +260,8 @@ public sealed class EffectEnforcementPass
     internal void Enforce(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance)
     {
         _chargedVariables.Clear();
+        _returnedRows.Clear();
+        _incompleteRowWalks.Clear();
         if (contractInheritance is null)
         {
             using var checker = new Verification.ContractInheritanceChecker(_diagnostics, useZ3: false);
@@ -1034,11 +1036,24 @@ public sealed class EffectEnforcementPass
         ModuleNode module,
         EffectResolver? resolver = null,
         int maxRounds = DefaultRowSynthesisRounds)
+        => SynthesizeDeclaredRowsCore(module, resolver, maxRounds, synthesizeCallbackContracts: false);
+
+    /// <summary>
+    /// Converter-only contracts over the emitted native tree. Callback identities
+    /// come from binding; returned rows come from strict inference, never syntax.
+    /// </summary>
+    internal static bool SynthesizeConvertedRows(ModuleNode module, EffectResolver resolver)
+        => SynthesizeDeclaredRowsCore(module, resolver, DefaultRowSynthesisRounds, synthesizeCallbackContracts: true);
+
+    private static bool SynthesizeDeclaredRowsCore(
+        ModuleNode module, EffectResolver? resolver, int maxRounds, bool synthesizeCallbackContracts)
     {
         ArgumentNullException.ThrowIfNull(module);
         if (maxRounds < 1)
             throw new ArgumentOutOfRangeException(nameof(maxRounds), maxRounds, "At least one round is required.");
 
+        var synthesizedOutputs = new HashSet<OutputNode>(ReferenceEqualityComparer.Instance);
+        var blockedOutputs = new HashSet<OutputNode>(ReferenceEqualityComparer.Instance);
         for (var round = 0; round < maxRounds; round++)
         {
             // The diagnostics of a synthesis round are scratch: the rows are being
@@ -1049,11 +1064,167 @@ public sealed class EffectEnforcementPass
                 UnknownCallPolicy.Permissive,
                 resolver);
             pass.Enforce(module);
-            if (!pass.WidenDeclaredRows(module))
+            var changed = pass.WidenDeclaredRows(module);
+            if (synthesizeCallbackContracts)
+            {
+                // Permissive inference is not proof of a callable value's row.
+                var strict = new EffectEnforcementPass(new DiagnosticBag(), UnknownCallPolicy.Strict, resolver);
+                strict.Enforce(module);
+                changed |= strict.SynthesizeCallbackContracts(module, synthesizedOutputs, blockedOutputs);
+            }
+            if (!changed)
                 return true;
         }
 
+        foreach (var output in synthesizedOutputs)
+            output.Row = null;
         return false;
+    }
+
+    private readonly Dictionary<string, PolyRow> _returnedRows = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _incompleteRowWalks = new(StringComparer.Ordinal);
+
+    private PolyRow ReturnedLambdaRow(ExpressionNode expression) => expression switch
+    {
+        LambdaExpressionNode lambda => LambdaBodyRow(lambda),
+        ConditionalExpressionNode conditional => PolyRow.Join(
+            ReturnedLambdaRow(conditional.WhenTrue), ReturnedLambdaRow(conditional.WhenFalse)),
+        _ => PolyRow.Unknown
+    };
+
+    private bool SynthesizeCallbackContracts(
+        ModuleNode module, HashSet<OutputNode> synthesizedOutputs, HashSet<OutputNode> blockedOutputs)
+    {
+        if (!_callGraphAnalysis.IsBoundResolutionComplete
+            || _diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.EffectInferenceDidNotConverge)
+            || _callGraphAnalysis.SourceConstructionErrors.Count > 0
+            || _callGraphAnalysis.OperatorBindingFailures.Count > 0)
+        {
+            var invalidated = false;
+            foreach (var output in synthesizedOutputs)
+            {
+                invalidated |= output.Row != null;
+                output.Row = null;
+                blockedOutputs.Add(output);
+            }
+            return invalidated;
+        }
+
+        var changed = false;
+        foreach (var function in module.Functions)
+            changed |= SynthesizeCallbackContract(function, function.SetSynthesizedEffectParameters,
+                row => function.Effects = row, synthesizedOutputs, blockedOutputs);
+        foreach (var owner in CallGraphAnalysis.EnumerateClasses(module))
+        {
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(owner))
+            {
+                // Dispatch contracts need coordinated binders on every declaration.
+                if (method.IsVirtual || method.IsOverride || method.IsAbstract
+                    || owner.ImplementedInterfaces.Count > 0)
+                    continue;
+                if (_callGraphAnalysis.Functions.TryGetValue($"{owner.Name}.{method.Id}", out var function))
+                    changed |= SynthesizeCallbackContract(function, method.SetSynthesizedEffectParameters,
+                        row => method.Effects = row, synthesizedOutputs, blockedOutputs);
+            }
+        }
+        return changed;
+    }
+
+    private bool SynthesizeCallbackContract(
+        FunctionNode function,
+        Action<IReadOnlyList<EffectParameterInfo>> assignParameters,
+        Action<EffectsNode> assignOwnRow,
+        HashSet<OutputNode> synthesizedOutputs,
+        HashSet<OutputNode> blockedOutputs)
+    {
+        // Only direct bound invocations are in scope. Any other use (including an
+        // alias or capture) keeps the parameter's existing Unknown boundary.
+        var invoked = new HashSet<ParameterNode>(ReferenceEqualityComparer.Instance);
+        var escaped = new HashSet<ParameterNode>(ReferenceEqualityComparer.Instance);
+        var pending = new Stack<(AstNode Node, bool Nested)>(
+            function.Body.Select(statement => ((AstNode)statement, false)));
+        var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var hasNestedCallable = false;
+        while (pending.TryPop(out var entry))
+        {
+            if (!seen.Add(entry.Node))
+                continue;
+            var nested = entry.Nested || entry.Node is LambdaExpressionNode or LocalFunctionStatementNode;
+            hasNestedCallable |= nested;
+            var call = entry.Node is CallExpressionNode or CallStatementNode;
+            if ((call || entry.Node is ReferenceNode)
+                && _callGraphAnalysis.BoundValueDeclaration(function.Id, entry.Node.Span) is { } declaration)
+            {
+                var parameter = function.Parameters.SingleOrDefault(parameter =>
+                    parameter.IdentifierSpan.Equals(declaration));
+                if (parameter != null && BoundFunctionType(function.Id, parameter.Name) == null)
+                    parameter = null;
+                if (parameter != null)
+                {
+                    if (call && !nested)
+                        invoked.Add(parameter);
+                    else
+                        escaped.Add(parameter);
+                }
+            }
+            foreach (var child in RecursiveAstWalker.GetAllChildren(entry.Node))
+                pending.Push((child, nested));
+        }
+
+        var binders = function.EffectParameters.ToList();
+        var own = PolyRow.FromDeclaration(function.Effects);
+        var names = function.TypeParameters.Select(parameter => parameter.Name)
+            .Concat(binders.Select(parameter => parameter.Name)).ToHashSet(StringComparer.Ordinal);
+        var changed = false;
+        foreach (var parameter in function.Parameters)
+        {
+            if (parameter.Row != null || parameter.Modifier != ParameterModifier.None
+                || hasNestedCallable || !invoked.Contains(parameter) || escaped.Contains(parameter))
+                continue;
+            var suffix = 0;
+            string name;
+            do { name = $"callback{suffix++}"; } while (!names.Add(name));
+            var ordinal = binders.Count;
+            binders.Add(new EffectParameterInfo(name, function.TypeParameters.Count + ordinal, parameter.Span));
+            parameter.Row = new EffectsNode(parameter.Span, new Dictionary<string, string>(), [name], [ordinal]);
+            own = PolyRow.Join(own, PolyRow.From(parameter.Row));
+            changed = true;
+        }
+        if (changed)
+        {
+            assignParameters(binders);
+            assignOwnRow(new EffectsNode(function.Effects?.Span ?? function.Span,
+                function.Effects?.Effects ?? new Dictionary<string, string>(),
+                own.Variables.Values.ToArray(), own.Variables.Keys.ToArray()));
+        }
+
+        if (function.Output is { } output && !blockedOutputs.Contains(output)
+            && (output.Row == null || synthesizedOutputs.Contains(output))
+            && BoundReturnFunctionType(function.Id) != null)
+        {
+            if (!_incompleteRowWalks.Contains(function.Id)
+                && _declarationFacts.TryGetValue(function.Id, out var fact)
+                && fact.InferredRow.IsConcrete
+                && fact.InferredVariables.Count == 0
+                && _returnedRows.TryGetValue(function.Id, out var returned)
+                && returned.Row.IsConcrete && !returned.IsPolymorphic)
+            {
+                var required = returned.Row.ToEffectSet().Union(GetDeclaredEffects(output.Row));
+                if (output.Row == null || !required.Equals(GetDeclaredEffects(output.Row)))
+                {
+                    output.Row = ToEffectsNode(required, null, output.Span);
+                    synthesizedOutputs.Add(output);
+                    changed = true;
+                }
+            }
+            else if (synthesizedOutputs.Contains(output))
+            {
+                output.Row = null;
+                blockedOutputs.Add(output);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     /// <summary>
@@ -1100,12 +1271,9 @@ public sealed class EffectEnforcementPass
         // PolyRow.Fits, which also compares `eff` VARIABLES by ordinal; this repair
         // widens with EffectSet.Except, which sees only concrete codes. An override
         // binding an `eff` its base does not would therefore still report Calor0420
-        // after this loop reports convergence. Unreachable through the converter,
-        // which never emits an `eff` binder — but SynthesizeDeclaredRows is public,
-        // so the limit belongs in writing rather than in the caller's luck. Widening
-        // a base's BINDER list is not the same kind of edit as widening its code set:
-        // it changes the declaration's arity, and that is a decision for whoever
-        // wants polymorphic rows synthesised, not a detail to slip in here.
+        // after this loop reports convergence. Converter callback synthesis excludes
+        // dispatch contracts for precisely this reason: widening a base's BINDER
+        // list is not the same edit as widening its concrete code set.
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
@@ -2155,7 +2323,12 @@ public sealed class EffectEnforcementPass
 
         private void Walk(AstNode node, int depth)
         {
-            if (depth > MaxWalkDepth || !_walked.Add(node))
+            if (depth > MaxWalkDepth)
+            {
+                _pass._incompleteRowWalks.Add(_function.Id);
+                return;
+            }
+            if (!_walked.Add(node))
                 return;
 
             // A §LAM's interior is the LAMBDA's body, not this callable's: its §R
@@ -2563,6 +2736,12 @@ public sealed class EffectEnforcementPass
                 return;
 
             var source = SourceRow(returned);
+            if (_pass.BoundReturnFunctionType(_function.Id) != null)
+            {
+                var row = _pass.ReturnedLambdaRow(returned);
+                _pass._returnedRows[_function.Id] = _pass._returnedRows.TryGetValue(_function.Id, out var previous)
+                    ? PolyRow.Join(previous, row) : row;
+            }
             if (source == null)
                 return;
 

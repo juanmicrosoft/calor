@@ -744,14 +744,21 @@ public sealed class MethodNode : AstNode
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
+    private IReadOnlyList<EffectParameterInfo> _effectParameters = Array.Empty<EffectParameterInfo>();
 
     /// <summary>
     /// Effect variables this method binds with an <c>eff</c> modifier in its
     /// type-parameter list — <c>§MT{mt001:Handle:pub}&lt;eff e&gt;</c>. Kept out of
     /// <see cref="TypeParameters"/> so codegen erases them by construction.
     /// </summary>
-    public IReadOnlyList<EffectParameterInfo> EffectParameters { get; init; }
-        = Array.Empty<EffectParameterInfo>();
+    public IReadOnlyList<EffectParameterInfo> EffectParameters
+    {
+        get => _effectParameters;
+        init => _effectParameters = value;
+    }
+
+    internal void SetSynthesizedEffectParameters(IReadOnlyList<EffectParameterInfo> parameters)
+        => _effectParameters = parameters;
 
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }

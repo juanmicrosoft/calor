@@ -29,7 +29,7 @@ public sealed class OutputNode : AstNode
     /// Position 6 of docs/design/effect-rows-in-the-type-system.md §3.3.
     /// A <c>§E</c> on a later line is the declaration's own row, not this.
     /// </summary>
-    public EffectsNode? Row { get; }
+    public EffectsNode? Row { get; internal set; }
 
     public OutputNode(TextSpan span, string typeName, TextSpan? typeNameSpan = null, EffectsNode? row = null) : base(span)
     {
@@ -115,6 +115,7 @@ public sealed class FunctionNode : AstNode
     public TextSpan IdentifierSpan { get; }
     public Visibility Visibility { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
+    private IReadOnlyList<EffectParameterInfo> _effectParameters = Array.Empty<EffectParameterInfo>();
 
     /// <summary>
     /// Effect variables this declaration binds with an <c>eff</c> modifier in its
@@ -122,8 +123,14 @@ public sealed class FunctionNode : AstNode
     /// binders are erased at codegen by construction — see
     /// <see cref="EffectParameterInfo"/> and design-doc §7.2.
     /// </summary>
-    public IReadOnlyList<EffectParameterInfo> EffectParameters { get; init; }
-        = Array.Empty<EffectParameterInfo>();
+    public IReadOnlyList<EffectParameterInfo> EffectParameters
+    {
+        get => _effectParameters;
+        init => _effectParameters = value;
+    }
+
+    internal void SetSynthesizedEffectParameters(IReadOnlyList<EffectParameterInfo> parameters)
+        => _effectParameters = parameters;
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
     /// <summary>
@@ -353,7 +360,7 @@ public sealed class ParameterNode : AstNode
     /// <c>(Func&lt;i32,i32&gt;:f §E{cw}, i32:v)</c> (inline form, position 5).
     /// See docs/design/effect-rows-in-the-type-system.md §3.3.
     /// </summary>
-    public EffectsNode? Row { get; }
+    public EffectsNode? Row { get; internal set; }
 
     public ParameterNode(
         TextSpan span,
