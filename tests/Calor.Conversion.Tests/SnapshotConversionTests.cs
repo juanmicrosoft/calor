@@ -230,6 +230,81 @@ public class SnapshotConversionTests
         }
     }
 
+    [Theory]
+    [InlineData("List")]
+    [InlineData("HashSet")]
+    public void NativeProducer_CollectionSwitchArmsStayLazyAndSingleValued(string collection)
+    {
+        var source = $$"""
+            using System;
+            using System.Collections.Generic;
+            public static class ArmProbe
+            {
+                public static int Trace;
+                private static int Next(int value) { Trace = Trace * 10 + value; return value; }
+                public static {{collection}}<int> Run(int category)
+                {
+                    Trace = 0;
+                    return Next(category) switch
+                    {
+                        1 => new {{collection}}<int> { Next(2), Next(3) },
+                        2 => new {{collection}}<int> { Next(4), Next(5) },
+                        _ => new {{collection}}<int>()
+                    };
+                }
+            }
+            """;
+        const string moduleName = "CollectionSwitch";
+        var conversion = TestHelpers.ConvertCSharp(source, moduleName);
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        Assert.Empty(conversion.Losses);
+        Assert.NotNull(conversion.CalorSource);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(conversion.CalorSource, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Empty(diagnostics);
+        foreach (var native in new[] { conversion.CalorSource, new CalorEmitter().Emit(module) })
+        {
+            foreach (var typeChecking in new[] { false, true })
+            {
+                var compiled = Calor.Compiler.Program.Compile(native, "collection-switch.calr",
+                    new Calor.Compiler.CompilationOptions { EnableTypeChecking = typeChecking });
+                Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+                foreach (var (category, expected) in new[] { (0, "0:"), (1, "123:2,3"), (2, "245:4,5"), (-1, "-1:") })
+                {
+                    var driver = $"var values = $N$ArmProbe.Run({category}); return $N$ArmProbe.Trace + \":\" + System.String.Join(\",\", values);";
+                    Assert.Equal(expected, RunSnapshotProbe(source, driver, ""));
+                    Assert.Equal(expected, RunSnapshotProbe(compiled.GeneratedCode, driver, moduleName + "."));
+                }
+            }
+        }
+    }
+
+    private static string RunSnapshotProbe(string source, string driver, string ownerPrefix)
+    {
+        var probe = "public static class CurrentSnapshotProbe { public static string Run() { "
+            + driver.Replace("$N$", ownerPrefix, StringComparison.Ordinal) + " } }";
+        var compilation = CSharpCompilation.Create("SnapshotRuntime_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble),
+                CSharpSyntaxTree.ParseText(source), CSharpSyntaxTree.ParseText(probe)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
+        using var stream = new MemoryStream();
+        var emission = compilation.Emit(stream);
+        Assert.True(emission.Success, string.Join("; ", emission.Diagnostics));
+        var context = new System.Runtime.Loader.AssemblyLoadContext(compilation.AssemblyName, isCollectible: true);
+        try
+        {
+            stream.Position = 0;
+            var type = context.LoadFromStream(stream).GetType("CurrentSnapshotProbe");
+            Assert.NotNull(type);
+            return Assert.IsType<string>(type.GetMethod("Run")!.Invoke(null, null));
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
     [Fact]
     public void NativeProducer_RejectsDuplicateListSlicesAtTheirSourceSpan()
     {

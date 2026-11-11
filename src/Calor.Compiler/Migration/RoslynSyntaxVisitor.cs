@@ -10550,9 +10550,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             try
             {
                 var armExpr = ConvertExpression(arm.Expression);
-                // Hoist block-level nodes (§ARR, §LIST, §NEW with initializers) from arm expression
-                // so they become bindings in the arm body rather than inline constructs
-                armExpr = HoistIfComplex(armExpr, GetTextSpan(arm.Expression));
+                // Native collection initializers can stay in their selected expression arm.
+                armExpr = IsInlineCollection(armExpr)
+                    ? ConvertBlockLevelCollectionToNew(armExpr, ExtractTypeHint(arm.Expression))
+                    : HoistIfComplex(armExpr, GetTextSpan(arm.Expression));
                 body = new List<StatementNode>(_pendingStatements);
                 body.Add(new ReturnStatementNode(GetTextSpan(arm.Expression), armExpr));
             }
