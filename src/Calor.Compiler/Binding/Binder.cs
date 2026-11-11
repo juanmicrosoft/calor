@@ -2816,15 +2816,7 @@ public sealed class Binder
                     byReferenceWrites.UnionWith(ByReferenceWrittenNames(expressionModifiers, expressionArguments));
                 else if (node is BoundCallStatement { ArgumentModifiers: { } statementModifiers, Arguments: var statementArguments })
                     byReferenceWrites.UnionWith(ByReferenceWrittenNames(statementModifiers, statementArguments));
-                var writtenTarget = node switch
-                {
-                    BoundAssignmentStatement assignment => assignment.Target,
-                    BoundCompoundAssignment compound => compound.Target,
-                    BoundUnaryExpression { Operator: UnaryOperator.PreIncrement or UnaryOperator.PostIncrement
-                        or UnaryOperator.PreDecrement or UnaryOperator.PostDecrement } unary => unary.Operand,
-                    _ => null
-                };
-                if (writtenTarget is not null)
+                if (node.DirectWriteTarget is { } writtenTarget)
                     memberReceiverWrites.Add(writtenTarget);
             }
             // Every aliased-storage change the body binds (calls, stores, using, foreach, events) was
@@ -4131,7 +4123,8 @@ public sealed class Binder
             : ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
             ? binder(this, expr)
             : BindUnsupportedExpression(expr);
-        if (TryGetStableMemberStorage(expr, bound, out var memberStorage, out _, requireNonNullFlow: true)
+        if (bound is IBoundStorageExpression storageExpression
+            && TryGetStableMemberStorage(expr, bound, out var memberStorage, out _, requireNonNullFlow: true)
             && _scope.Lookup(memberStorage.Name) is VariableSymbol narrowedMember
             && _flowNarrowingSources.ContainsKey(narrowedMember)
             && bound.Type is BoundTypes.NominalBoundType memberType)
@@ -4139,16 +4132,7 @@ public sealed class Binder
             var nonNull = new BoundTypes.NominalBoundType(
                 memberType.QualifiedName, BoundTypes.NullableAnnotation.NotAnnotated,
                 memberType.Declaration, memberType.RoslynSymbol);
-            bound = bound switch
-            {
-                BoundVariableExpression variable => new BoundVariableExpression(
-                    variable.Span, variable.Variable, variable.ResolvedSymbols,
-                    typeOverride: nonNull),
-                BoundFieldAccessExpression access => new BoundFieldAccessExpression(
-                    access.Span, access.Target, access.FieldName, null, access.ResolvedField,
-                    access.FieldNameSpan, access.ResolvedFields, nonNull),
-                _ => bound
-            };
+            bound = storageExpression.WithFlowType(nonNull);
         }
         if (_bindingContract)
             _boundContractExpressions[expr] = bound;
@@ -5048,14 +5032,10 @@ public sealed class Binder
         if (_sourceCallConversions?.StableMemberReads.GetValueOrDefault(expression) is not { } selected
             || requireNonNullFlow && !selected.HasNonNullFlow)
             return false;
-        var member = bound switch
-        {
-            BoundVariableExpression { ResolvedSymbols: [VariableSymbol variable] }
-                when variable.StorageIdentity.IsProperty => variable.StorageIdentity,
-            BoundFieldAccessExpression { ResolvedFields: [var field] } => field.StorageIdentity,
-            _ => null
-        };
-        if (member is null || !ReferenceEquals(
+        if (bound is not IBoundStorageExpression { ResolvedStorageCandidates: [var candidate] })
+            return false;
+        var member = candidate.StorageIdentity;
+        if (!member.IsProperty || !ReferenceEquals(
                 _classScopes[selected.Owner].LookupLocal(selected.Property.Name), member))
             return false;
         if (bound is BoundFieldAccessExpression access)
@@ -9441,13 +9421,7 @@ public sealed class Binder
     {
         if (_byReferenceParameters.Count == 0)
             return false;
-        var target = bound switch
-        {
-            BoundAssignmentStatement assignment => assignment.Target,
-            BoundCompoundAssignment compound => compound.Target,
-            _ => null,
-        };
-        if (target != null)
+        if (bound?.DirectWriteTarget is { } target)
             return AssignsAliasedStorage(target);
         return statement is not (IfStatementNode or WhileStatementNode or ForStatementNode or DoWhileStatementNode
             or TryStatementNode or MatchStatementNode or BindStatementNode or ReturnStatementNode or BreakStatementNode
@@ -9900,13 +9874,7 @@ public sealed class Binder
         var value = BindExpression(compound.Value);
         ReportWriteToReadOnlyLocal(target, compound.Target.Span, "assign to {0}");
         InvalidateMemberFlowNarrowing(target);
-        var storage = target switch
-        {
-            BoundVariableExpression variable => variable.Variable.StorageIdentity,
-            BoundFieldAccessExpression { ResolvedFields: [var field] } => field,
-            _ => null
-        };
-        if (storage?.EventDeclaration is not null)
+        if (target is IBoundStorageExpression { ReferencedStorage: { EventDeclaration: not null } storage })
         {
             InvalidateMutableFlowNarrowing(storage, requireRebindable: false);
             SetCallableState(storage, value);

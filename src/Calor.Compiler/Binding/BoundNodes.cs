@@ -11,6 +11,8 @@ public abstract class BoundNode
 {
     public TextSpan Span { get; }
     public virtual IEnumerable<BoundNode> ChildNodes => Array.Empty<BoundNode>();
+    // Only this node's direct write; writes inside children are found by traversal.
+    internal virtual BoundExpression? DirectWriteTarget => null;
 
     protected BoundNode(TextSpan span)
     {
@@ -52,6 +54,15 @@ public abstract class BoundExpression : BoundNode
     public override IEnumerable<BoundNode> ChildNodes => Children;
 
     protected BoundExpression(TextSpan span) : base(span) { }
+}
+
+// Computed values never borrow storage identity from their children. Flow retyping
+// preserves the direct reference, its selected symbols, and all side-band metadata.
+internal interface IBoundStorageExpression
+{
+    VariableSymbol? ReferencedStorage { get; }
+    IReadOnlyList<VariableSymbol> ResolvedStorageCandidates { get; }
+    BoundExpression WithFlowType(NominalBoundType type);
 }
 
 /// <summary>
@@ -179,14 +190,24 @@ public sealed class BoundBindStatement : BoundStatement
 /// <summary>
 /// Bound variable reference.
 /// </summary>
-public sealed class BoundVariableExpression : BoundExpression
+public sealed class BoundVariableExpression : BoundExpression, IBoundStorageExpression
 {
+    private BoundType _type;
     public VariableSymbol Variable { get; }
     public SymbolId SymbolId => Variable.Id;
     public IReadOnlyList<VariableSymbol> ResolvedSymbols { get; }
     public IReadOnlyList<SymbolId> ResolvedSymbolIds =>
         ResolvedSymbols.Select(symbol => symbol.Id).ToArray();
-    public override BoundType Type { get; }
+    public override BoundType Type => _type;
+    VariableSymbol IBoundStorageExpression.ReferencedStorage => Variable.StorageIdentity;
+    IReadOnlyList<VariableSymbol> IBoundStorageExpression.ResolvedStorageCandidates => ResolvedSymbols;
+
+    BoundExpression IBoundStorageExpression.WithFlowType(NominalBoundType type)
+    {
+        var copy = (BoundVariableExpression)MemberwiseClone();
+        copy._type = type;
+        return copy;
+    }
 
     /// <param name="typeOverride">v0.15 E1 slice 2a. When the binder knows the
     /// symbol's type string is not a type it can vouch for — today only the
@@ -230,7 +251,7 @@ public sealed class BoundVariableExpression : BoundExpression
             // TypeIdentity.Canonicalize throws on an empty/whitespace type
             // string, and a symbol with no recorded type is precisely a case a
             // caller passes an UnresolvedBoundType for.
-            Type = typeOverride;
+            _type = typeOverride;
             return;
         }
 
@@ -246,12 +267,12 @@ public sealed class BoundVariableExpression : BoundExpression
         var resolvedTypeName = singleResolvedType ? variable.TypeName : "OBJECT";
         // Keep the legacy display projection. Resolved reference identity and
         // annotation are carried separately; ambiguous names do not supply one.
-        Type = singleResolvedType
+        _type = singleResolvedType
             ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
             : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
         referenceIdentity ??= ResolvedSymbols.Count == 1 ? variable.InferredReferenceType : null;
         if (singleResolvedType && referenceIdentity is not null && Type is NominalBoundType nominal)
-            Type = new NominalBoundType(
+            _type = new NominalBoundType(
                 nominal.QualifiedName,
                 referenceIdentity.IsKnownReferenceType ? variable.NullableAnnotation : nominal.NullableAnnotation,
                 referenceIdentity.Declaration, referenceIdentity.RoslynSymbol);
@@ -750,6 +771,9 @@ public sealed class BoundUnaryExpression : BoundExpression
     public BoundExpression Operand { get; }
     public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
+    internal override BoundExpression? DirectWriteTarget =>
+        Operator is UnaryOperator.PreIncrement or UnaryOperator.PostIncrement
+            or UnaryOperator.PreDecrement or UnaryOperator.PostDecrement ? Operand : null;
 
     public BoundUnaryExpression(TextSpan span, Ast.UnaryOperator op, BoundExpression operand, string resultType)
         : base(span)
@@ -1612,6 +1636,7 @@ public sealed class BoundAssignmentStatement : BoundStatement
     public BoundExpression Target { get; }
     public BoundExpression Value { get; }
     public override IEnumerable<BoundNode> ChildNodes => [Target, Value];
+    internal override BoundExpression DirectWriteTarget => Target;
 
     public BoundAssignmentStatement(TextSpan span, BoundExpression target, BoundExpression value)
         : base(span)
@@ -1630,6 +1655,7 @@ public sealed class BoundCompoundAssignment : BoundStatement
     public Ast.CompoundAssignmentOperator Operator { get; }
     public BoundExpression Value { get; }
     public override IEnumerable<BoundNode> ChildNodes => [Target, Value];
+    internal override BoundExpression DirectWriteTarget => Target;
 
     public BoundCompoundAssignment(TextSpan span, BoundExpression target, Ast.CompoundAssignmentOperator op, BoundExpression value)
         : base(span)
@@ -1762,8 +1788,9 @@ public sealed class BoundBaseExpression : BoundExpression
 /// <summary>
 /// Bound field access expression: target.fieldName.
 /// </summary>
-public sealed class BoundFieldAccessExpression : BoundExpression
+public sealed class BoundFieldAccessExpression : BoundExpression, IBoundStorageExpression
 {
+    private BoundType _type;
     internal bool IsTupleElementRead { get; init; }
     internal bool IsAnonymousPropertyRead { get; init; }
     internal ClassDefinitionNode? SourceStaticFieldOwner { get; init; }
@@ -1776,8 +1803,18 @@ public sealed class BoundFieldAccessExpression : BoundExpression
     public VariableSymbol? ResolvedField { get; }
     public IReadOnlyList<VariableSymbol> ResolvedFields { get; }
     public SymbolId? ResolvedSymbolId => ResolvedField?.Id;
-    public override BoundType Type { get; }
+    public override BoundType Type => _type;
     public override IReadOnlyList<BoundExpression> Children { get; }
+    VariableSymbol? IBoundStorageExpression.ReferencedStorage =>
+        ResolvedFields is [var member] ? member : null;
+    IReadOnlyList<VariableSymbol> IBoundStorageExpression.ResolvedStorageCandidates => ResolvedFields;
+
+    BoundExpression IBoundStorageExpression.WithFlowType(NominalBoundType type)
+    {
+        var copy = (BoundFieldAccessExpression)MemberwiseClone();
+        copy._type = type;
+        return copy;
+    }
 
     public BoundFieldAccessExpression(
         TextSpan span,
@@ -1796,7 +1833,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
         // v0.15 E1 slice 2a: resolvedType lets the binder say "I cannot type this
         // member" with an UnresolvedBoundType instead of the OBJECT guess. Null
         // (the default) keeps every pre-existing construction byte-identical.
-        Type = resolvedType ?? new NominalBoundType(typeName ?? "OBJECT");
+        _type = resolvedType ?? new NominalBoundType(typeName ?? "OBJECT");
         ResolvedField = resolvedField;
         ResolvedFields = resolvedFields
             ?? (resolvedField == null ? Array.Empty<VariableSymbol>() : [resolvedField]);

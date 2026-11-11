@@ -1,8 +1,13 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using Binder = Calor.Compiler.Binding.Binder;
+using NullableAnnotation = Calor.Compiler.Binding.BoundTypes.NullableAnnotation;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
 namespace Calor.Compiler.Tests;
@@ -169,6 +174,69 @@ public class BinderCoreFamilyTests
             new BoundWithExpression(S, i, [new BoundNamedValue("x", j, S)])));
         Assert.Equal([i], BoundChildren.Of(new BoundThrowExpression(S, i)));
         Assert.Empty(BoundChildren.Of(i));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StorageFlowRetyping_PreservesSelectedMetadataWithoutMutatingOriginal(bool memberAccess)
+    {
+        var compilation = CSharpCompilation.Create("StorageMetadata", references:
+            [MetadataReference.CreateFromFile(typeof(string).Assembly.Location)]);
+        var stringType = compilation.GetSpecialType(SpecialType.System_String);
+        var metadataMember = Assert.Single(stringType.GetMembers("Length"));
+        var arrayType = compilation.CreateArrayTypeSymbol(stringType);
+        var selected = new VariableSymbol(SymbolId.Create("test", "Value"), "Value", "STRING",
+            isMutable: false, isProperty: true, nullableAnnotation: NullableAnnotation.Annotated);
+        var originalType = new NominalBoundType(
+            "STRING", NullableAnnotation.Annotated, roslynSymbol: stringType);
+        var receiver = new BoundThisExpression(S, "Owner");
+        BoundExpression original = memberAccess
+            ? new BoundFieldAccessExpression(S, receiver, "Value", null, selected,
+                resolvedType: originalType)
+            {
+                ResolvedMetadataMember = metadataMember,
+                UnsupportedMetadataMember = metadataMember,
+                IsTupleElementRead = true,
+                IsAnonymousPropertyRead = true,
+                HasUnknownInferredType = true,
+                MetadataArrayResultType = arrayType
+            }
+            : new BoundVariableExpression(S, selected, typeOverride: originalType)
+            {
+                HasUnknownInferredType = true,
+                MetadataArrayResultType = arrayType
+            };
+        var reference = Assert.IsAssignableFrom<IBoundStorageExpression>(original);
+        var narrowedType = new NominalBoundType(
+            "STRING", NullableAnnotation.NotAnnotated, roslynSymbol: stringType);
+
+        var copy = reference.WithFlowType(narrowedType);
+
+        Assert.NotSame(original, copy);
+        Assert.Same(originalType, original.Type);
+        Assert.Same(narrowedType, copy.Type);
+        Assert.Equal(original.Span, copy.Span);
+        Assert.Same(original.Children, copy.Children);
+        Assert.True(copy.HasUnknownInferredType);
+        Assert.Same(arrayType, copy.MetadataArrayResultType);
+        var copiedReference = Assert.IsAssignableFrom<IBoundStorageExpression>(copy);
+        Assert.Same(reference.ReferencedStorage, copiedReference.ReferencedStorage);
+        Assert.Same(reference.ResolvedStorageCandidates, copiedReference.ResolvedStorageCandidates);
+        if (memberAccess)
+        {
+            var member = Assert.IsType<BoundFieldAccessExpression>(copy);
+            Assert.Same(receiver, member.Target);
+            Assert.Same(selected, member.ResolvedField);
+            Assert.Same(metadataMember, member.ResolvedMetadataMember);
+            Assert.Same(metadataMember, member.UnsupportedMetadataMember);
+            Assert.True(member.IsTupleElementRead);
+            Assert.True(member.IsAnonymousPropertyRead);
+        }
+        else
+        {
+            Assert.Same(selected, Assert.IsType<BoundVariableExpression>(copy).Variable);
+        }
     }
 
     [Fact]
