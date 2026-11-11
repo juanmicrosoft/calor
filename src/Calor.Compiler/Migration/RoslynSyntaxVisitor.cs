@@ -4978,7 +4978,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private string GetCurrentNamespaceIdentity()
         => _context.CurrentNamespace
-           ?? _context.ModuleName
            ?? "";
 
     private string GetCurrentNamespaceScopeId()

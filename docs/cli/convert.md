@@ -33,6 +33,8 @@ Malformed input encodings fail explicitly rather than using replacement text.
 When no C# namespace supplies a module label, the converter derives one from the
 filename and normalizes it to a valid Calor name. This file label does not change
 CLR namespaces, type names, or static containers.
+The API's `ConversionOptions.ModuleName` overrides only this file label.
+Original global and named CLR namespace owners remain unchanged.
 
 ### Compilation context
 

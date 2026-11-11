@@ -393,6 +393,56 @@ public sealed class CanonicalNamespaceTests
     }
 
     [Theory]
+    [InlineData("", "", "")]
+    [InlineData("namespace Source.Owners;", "", "Source.Owners")]
+    [InlineData("namespace Source.Owners {", "}", "Source.Owners")]
+    public void ExplicitModuleLabelsPreserveSourceDeclarationOwners(
+        string opening, string closing, string expectedNamespace)
+    {
+        var source = $$"""
+            {{opening}}
+            public class Node
+            {
+                public int Id;
+                public class Nested { }
+            }
+            public class Demo
+            {
+                public static Node Echo(Node value) => value;
+            }
+            {{closing}}
+            """;
+        var original = Compile(source);
+        var originalTree = original.SyntaxTrees.Single();
+        var expectedMetadata = CSharpToCalorConverter.DeclaredTypeMetadata(
+            original.GetSemanticModel(originalTree), originalTree.GetCompilationUnitRoot());
+        var conversion = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "ReviewFile" })
+            .Convert(source, "Input.cs");
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        Assert.Equal(0, conversion.InteropPreservationCount);
+
+        foreach (var native in new[] { conversion.CalorSource!, new CalorEmitter().Emit(Parse(conversion.CalorSource!)) })
+        {
+            var module = Parse(native);
+            Assert.Equal("ReviewFile", module.Name);
+            Assert.Equal(expectedNamespace, Assert.Single(module.NamespaceScopes).FullName);
+            Assert.All(module.Classes, type => Assert.Equal(expectedNamespace, type.NamespaceIdentity));
+            var node = module.Classes.Single(type => type.Name == "Node");
+            var prefix = expectedNamespace.Length == 0 ? "" : expectedNamespace + ".";
+            Assert.Equal($"global::{prefix}Node+Nested",
+                Assert.Single(node.NestedClasses).FullyQualifiedSymbolIdentity);
+
+            var compiled = Program.Compile(native, "ReviewFile.calr");
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+            var generated = Compile(compiled.GeneratedCode);
+            var generatedTree = generated.SyntaxTrees.Single();
+            Assert.Equal(expectedMetadata, CSharpToCalorConverter.DeclaredTypeMetadata(
+                generated.GetSemanticModel(generatedTree), generatedTree.GetCompilationUnitRoot()));
+        }
+    }
+
+    [Theory]
     [InlineData("namespace A { class C {} } namespace A { class D {} }")]
     [InlineData("namespace A { namespace B { class C {} } }")]
     [InlineData("namespace A { using System; class C {} }")]
