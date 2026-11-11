@@ -238,11 +238,12 @@ public class WedgeW4SliceAStructuralTests
                     .Select(type =>
                     {
                         var arity = type.GetGenericArguments().Length;
+                        var definition = type.GetMethod("V")!;
                         var concrete = arity == 0 ? type : type.MakeGenericType(typeof(string));
                         var method = concrete.GetMethod("V")!;
                         var value = method.Invoke(Activator.CreateInstance(concrete),
                             arity == 0 ? [] : ["witness"]);
-                        return $"{type.FullName}|{arity}|{method}|{value}";
+                        return $"{type.FullName}|{arity}|definition={definition}|static={definition.IsStatic}|{method}|{value}";
                     }).ToArray();
             }
             finally { context.Unload(); }
