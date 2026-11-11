@@ -5726,14 +5726,22 @@ public sealed class EffectEnforcementPass
             if (_context.CurrentConstructor is { Constructor.IsStatic: true } current
                 && ReferenceEquals(current.Owner, owner))
                 return EffectSet.Empty;
-            if (_context.CallGraph.Initialization(owner) != null)
-                return InferSourceInitialization(owner, isStatic: true, span);
+            var selection = _context.CallGraph.Initialization(owner);
             // A read may initialize the entire declaring type, not just this field.
-            // Only self-contained primitives or an explicitly bound constructor
-            // with contract authority can prove that no hidden invocation is omitted.
-            if (owner.IsPartial || owner.InteropBlocks.Any(CallGraphAnalysis.PreservedMemberMayInitializeType)
-                || owner.PreprocessorBlocks.Count != 0)
+            // Selected construction facts do not close a partial, conditional or
+            // opaque owner for an ordinary static-field read.
+            // A preserved accessor body is not itself a static initializer.
+            if (owner.IsPartial || owner.PreprocessorBlocks.Count != 0
+                || owner.InteropBlocks.Any(CallGraphAnalysis.PreservedMemberMayInitializeType)
+                    && (selection?.Static == null || selection.Static.Any(initializer => initializer.Preserved)))
                 return UnknownResolvedOperation($"{owner.Name}..cctor", span);
+            if (selection != null)
+            {
+                var initialization = InferSourceInitialization(owner, isStatic: true, span);
+                return initialization.IsUnknown
+                    ? initialization.Union(UnknownResolvedOperation($"{owner.Name}..cctor", span))
+                    : initialization;
+            }
             var initializers = owner.Fields.Where(field => field.IsStatic && field.DefaultValue != null)
                 .Select(field => (field.TypeName, Value: field.DefaultValue!))
                 .Concat(owner.Properties.Where(property => property.IsStatic && property.DefaultValue != null)
@@ -5760,6 +5768,9 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferSourceInitialization(ClassDefinitionNode owner, bool isStatic, TextSpan span)
         {
+            if (isStatic && _context.CurrentConstructor is { Constructor.IsStatic: true } current
+                && ReferenceEquals(current.Owner, owner))
+                return EffectSet.Empty;
             var selection = _context.CallGraph.Initialization(owner);
             var operations = isStatic ? selection?.Static : selection?.Instance;
             if (operations == null)
@@ -5796,9 +5807,10 @@ public sealed class EffectEnforcementPass
                     effects = InferInitializationMethod(call.TargetMethod, preserved, span);
                     break;
                 case IObjectCreationOperation { Constructor: { } constructor }:
+                    // The operation selects the constructor; its effects still
+                    // require a source declaration or an authoritative contract.
                     effects = EffectSet.From("alloc").Union(InferInitializationMethod(
-                        constructor, preserved || constructor.ContainingType.SpecialType
-                            == CS.SpecialType.System_Object, span));
+                        constructor, metadataAllowed: true, span));
                     break;
                 case IConversionOperation { OperatorMethod: { } conversion }:
                     effects = InferInitializationMethod(conversion, preserved, span);
@@ -5813,7 +5825,7 @@ public sealed class EffectEnforcementPass
                     if (_context.CallGraph.InitializationClass(field.Field.ContainingType) is not { } fieldOwner)
                         return UnknownResolvedOperation(field.Field.ToDisplayString(), span);
                     if (field.Field.IsStatic && !field.Field.IsConst)
-                        effects = InferStaticFieldInitialization(fieldOwner, span);
+                        effects = InferSourceInitialization(fieldOwner, isStatic: true, span);
                     break;
                 case IPropertyReferenceOperation { Property.GetMethod: { } getter }:
                     effects = InferInitializationMethod(getter, preserved, span);
@@ -5851,7 +5863,7 @@ public sealed class EffectEnforcementPass
             if (method.MethodKind == CS.MethodKind.Constructor
                 && _context.CallGraph.InitializationClass(method.ContainingType) is { } owner)
             {
-                var initialization = InferStaticFieldInitialization(owner, span);
+                var initialization = InferSourceInitialization(owner, isStatic: true, span);
                 if (_context.CallGraph.InitializationFunction(method) is { } constructorId)
                     return initialization.Union(InferFromInternalFunctions([constructorId]));
                 if (!method.IsImplicitlyDeclared || method.Parameters.Length != 0)
@@ -5863,7 +5875,7 @@ public sealed class EffectEnforcementPass
                 var effects = InferFromInternalFunctions([id]);
                 return method.IsStatic
                     && _context.CallGraph.InitializationClass(method.ContainingType) is { } methodOwner
-                        ? effects.Union(InferStaticFieldInitialization(methodOwner, span))
+                        ? effects.Union(InferSourceInitialization(methodOwner, isStatic: true, span))
                         : effects;
             }
             if (!metadataAllowed || method.Locations.Any(location => location.IsInSource))
@@ -6676,7 +6688,7 @@ public sealed class EffectEnforcementPass
             var constructorTarget = $"{newExpr.TypeName}..ctor";
             var sourceType = _context.CallGraph.SourceCreationType(_context.CurrentFunctionId, newExpr.Span);
             if (sourceType != null)
-                effects = effects.Union(InferStaticFieldInitialization(sourceType, newExpr.Span));
+                effects = effects.Union(InferSourceInitialization(sourceType, isStatic: true, newExpr.Span));
             var resolvedInternalIds = _context.CallGraph.ResolvedConstructorCalls(
                 _context.CurrentFunctionId, newExpr.Span);
             if (resolvedInternalIds.Count == 0 && sourceType == null)
