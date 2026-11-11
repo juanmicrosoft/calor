@@ -50,6 +50,8 @@ borrow another source or metadata contract. Foreign instance methods and
 owners with static initialization are not closed by this source-call path.
 Refused calls retain receiver evaluation before argument evaluation. Known
 receiver and argument effects remain enforced under `--permissive-effects`.
+Explicit `ref` and `out` arguments also invalidate pre-call nullability
+narrowing, even when the foreign call remains unresolved.
 
 ---
 

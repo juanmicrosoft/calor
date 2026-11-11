@@ -6745,6 +6745,7 @@ public sealed class Binder
                 return null;
             var evaluatedReceiver = BindExpression(member.Target);
             var arguments = BindCallArguments(call.Arguments, call.ArgumentModifiers);
+            InvalidateMutatingCallArguments(arguments, call.ArgumentModifiers, OverloadResolutionResult.NotFound(), null);
             return new BoundCallExpression(call.Span, "<expression-call>", arguments, "OBJECT",
                 argumentNames: call.ArgumentNames, argumentModifiers: call.ArgumentModifiers,
                 typeArguments: call.TypeArguments, calleeSpan: member.FieldNameSpan,

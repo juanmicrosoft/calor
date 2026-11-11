@@ -455,6 +455,87 @@ public sealed class CrossModuleVarianceTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, "ref")]
+    [InlineData(true, "ref")]
+    [InlineData(false, "out")]
+    [InlineData(true, "out")]
+    [InlineData(false, "")]
+    [InlineData(true, "")]
+    public void NativeCrossFileRefusedOuterCallInvalidatesOnlyByRefLocalNarrowing(bool extension, string modifier)
+    {
+        var parameter = string.IsNullOrEmpty(modifier) ? "string?:text" : $"{modifier} string?:text";
+        Write("library", $$"""
+            module Library Contracts block
+              class Receiver public
+            {{(extension ? "  module Extensions public" : "")}}
+                func Touch public ({{(extension ? "this Receiver:receiver, " : "")}}{{parameter}}) → void
+                  ! mut
+                  set text null
+            """);
+        Write("caller", $$"""
+            module Caller Consumer block
+              using Contracts
+              module Entry public
+                func Take public (string:text) → int
+                  !
+                  return 7
+                func Probe public (Contracts.Receiver:receiver, string?:text) → int
+                  ! mut
+                  var string?:value = text
+                  if value != null
+                    Entry.Take(value)
+                    receiver.Touch({{(string.IsNullOrEmpty(modifier) ? "" : modifier + " ")}}value)
+                    return Entry.Take(value)
+                  return 0
+            """);
+        var files = Directory.GetFiles(_directory, "*.calr").Select(path => new FileInfo(path)).ToArray();
+        CompilationDriver.BuildCrossModuleFunctionMap(files, out var types);
+        var path = Path.Combine(_directory, "caller.calr");
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer(File.ReadAllText(path), diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binder(diagnostics, path) { CrossModuleTypes = types }.Bind(ast);
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().ToArray();
+        var outer = Assert.Single(calls, call => call.HasOpaqueOverloads);
+        var takes = calls.Where(call => call.ResolvedSymbol?.Name == "Consumer.Entry.Take")
+            .OrderBy(call => call.Span.Start).ToArray();
+        Assert.Equal(2, takes.Length);
+        Assert.Null(outer.ResolvedSymbol);
+        Assert.Null(outer.ResolvedMetadataMethod);
+        Assert.Null(outer.SelectedSourceMethod);
+        Assert.True(outer.HasUnknownInferredType);
+        Assert.Equal(string.IsNullOrEmpty(modifier) ? null : modifier, outer.ArgumentModifiers?.Single());
+        Assert.Same(outer.Receiver, outer.EvaluatedReceiver);
+
+        var compilationDiagnostics = new DiagnosticBag();
+        var compiled = CompilationDriver.CompileAll(files,
+            _ => new CompilationOptions { EnforceEffects = true, UnknownCallPolicy = UnknownCallPolicy.Permissive },
+            crossModuleEnforcement: true, crossModulePolicy: UnknownCallPolicy.Permissive,
+            diagnosticSink: compilationDiagnostics);
+        _output.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            extension, modifier,
+            BeforeType = Assert.Single(takes[0].Arguments).Type.DisplayString,
+            AfterType = Assert.Single(takes[1].Arguments).Type.DisplayString,
+            OuterModifier = outer.ArgumentModifiers,
+            CompiledOutputs = compiled.Compiled.Count,
+            BinderDiagnostics = diagnostics.Select(diagnostic => diagnostic.ToString()),
+            PermissiveDiagnostics = compilationDiagnostics.Select(diagnostic => diagnostic.ToString())
+        }));
+        var expected = string.IsNullOrEmpty(modifier) ? 0 : 1;
+        var nullable = diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        Assert.Equal(expected, nullable.Length);
+        Assert.Equal(expected, compilationDiagnostics.Count(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        if (expected != 0)
+            Assert.Equal(Assert.Single(takes[1].Arguments).Span, Assert.Single(nullable).Span);
+        Assert.DoesNotContain(compilationDiagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.All(compilationDiagnostics.Errors, diagnostic =>
+            Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.InvalidByReferenceOperand);
+    }
+
+    [Theory]
     [InlineData("", true)]
     [InlineData("cw", false)]
     public void NativeCrossFileOverrideVarianceRetainsTheOriginalBaseDeclaration(string row, bool violation)
