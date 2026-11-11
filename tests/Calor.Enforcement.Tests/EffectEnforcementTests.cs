@@ -28,7 +28,12 @@ public class EffectEnforcementTests
         // Function uses §P (print) and declares cw effect
         var source = TestHarness.LoadScenario("Effects/E2_declared_effect.calr");
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func PrintHello public () → void
+                ! cw
+                System.Console.WriteLine("Hello, World!")
+            """));
 
         Assert.False(result.HasErrors, $"Should compile successfully. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
@@ -79,7 +84,13 @@ public class EffectEnforcementTests
         // Test that diagnostic points at the §P statement
         var source = TestHarness.LoadScenario("Effects/E6_span_accuracy.calr");
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func SpanTest public (int:x) → int
+                let int:result = x * 2
+                System.Console.WriteLine("The result is: ")
+                return result
+            """));
 
         Assert.True(result.HasErrors, "Should have compilation errors");
 
@@ -98,7 +109,11 @@ public class EffectEnforcementTests
         var source = TestHarness.LoadScenario("Effects/E1_missing_effect.calr");
         var options = new CompilationOptions { EnforceEffects = false };
 
-        var result = TestHarness.Compile(source, options);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func PrintHello public () → void
+                System.Console.WriteLine("Hello, World!")
+            """), options);
 
         Assert.False(result.HasErrors, "Should compile successfully with enforcement disabled");
     }
@@ -379,7 +394,13 @@ public class EffectEnforcementTests
         §ASSIGN §THIS._name name
       §/CTOR
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Person
+                field string:_name private
+                ctor public (string:name)
+                  set this._name name
+            """));
 
         Assert.False(result.HasErrors,
             $"Constructor field assignment should not fail enforcement. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -662,7 +683,18 @@ public class EffectEnforcementTests
             §A STR:""hello""
           §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Printer
+                func PrintMessage public (string:msg) → void
+                  ! cw
+                  System.Console.WriteLine(msg)
+              class App
+                field Printer:_printer private
+                func Run public () → void
+                  ! cw
+                  _printer.PrintMessage("hello")
+            """));
 
         Assert.False(result.HasErrors,
             $"Cross-class method-to-method call should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -688,7 +720,17 @@ public class EffectEnforcementTests
             §A STR:""hello""
           §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Printer
+                func PrintMessage public (string:msg) → void
+                  ! cw
+                  System.Console.WriteLine(msg)
+              class App
+                field Printer:_printer private
+                func Run public () → void
+                  _printer.PrintMessage("hello")
+            """));
 
         Assert.True(result.HasErrors,
             "Cross-class call without declaring effect should fail");
@@ -722,7 +764,23 @@ public class EffectEnforcementTests
           §C{_b.Process}
           §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class ServiceC
+                func WriteOutput public () → void
+                  ! cw
+                  System.Console.WriteLine("output")
+              class ServiceB
+                field ServiceC:_c private
+                func Process public () → void
+                  ! cw
+                  _c.WriteOutput()
+              class ServiceA
+                field ServiceB:_b private
+                func Execute public () → void
+                  ! cw
+                  _b.Process()
+            """));
 
         Assert.False(result.HasErrors,
             $"Chained cross-class calls with declared effects should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
