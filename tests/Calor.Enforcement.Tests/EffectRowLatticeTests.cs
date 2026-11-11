@@ -42,11 +42,15 @@ public class EffectRowLatticeTests
         // §3.5 row 1, unchanged from 0.14: a §F with no §E declares no effects,
         // and that is a PROMISE, not an absence of information. 390 of the 886
         // committed files rely on it.
-        var compiled = TestHarness.Compile("""
+        var compiled = TestHarness.Compile(NativeSource("""
             §M{M}
               §F{Pure:pub} () -> i32
                 §R INT:1
-            """);
+            """, """
+            module M M
+              func Pure public () → int
+                return 1
+            """));
 
         Assert.DoesNotContain(compiled.Diagnostics, d => d.IsError);
     }
@@ -58,12 +62,17 @@ public class EffectRowLatticeTests
         // parameter's row is Unknown — never Concrete(∅). Defaulting to pure is
         // exactly the laundering rows exist to close: the caller could hand in a
         // printing callback and the pure declaration would still compile.
-        var parameter = BindSingleParameter("""
+        var parameter = BindSingleParameter(NativeSource("""
             §M{M}
               §F{Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
                 §E{}
                 §R value
-            """);
+            """, """
+            module M M
+              func Apply public (Func<int,int>:transform, int:value) → int
+                !
+                return value
+            """));
 
         // v0.15 E3 slice a widened §8.2: EVERY function-typed position now gets a
         // FunctionBoundType, rowed or not. What P6 actually asserts — the ROW is
@@ -82,12 +91,17 @@ public class EffectRowLatticeTests
         // §3.5 row 3, CHANGED from Draft v1. `§B{f} §LAM …` must not become
         // Unknown, or §5's inferred-lambda rule is dead on arrival — Y9a is that
         // exact shape. The initializer's row is known, so it is used.
-        var binding = BindSingleLocal("""
+        var binding = BindSingleLocal(NativeSource("""
             §M{M}
               §F{Main:pub} () -> void
                 §E{cw}
                 §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
-            """);
+            """, """
+            module M M
+              func Main public () → void
+                ! cw
+                let f = (int:x) ! cw => x + 1
+            """));
 
         Assert.NotNull(binding.FunctionType);
         Assert.Equal(Concrete(Cw), binding.FunctionType!.Row);
@@ -101,12 +115,17 @@ public class EffectRowLatticeTests
         // Concrete(∅) — a promise — and not Unknown. Renamed in review round 1
         // (MAJOR 2): it was called _OnABindingWithNoInitializer_IsUnknown while
         // plainly having one, which left §3.5's bare-binding row unpinned.
-        var binding = BindSingleLocal("""
+        var binding = BindSingleLocal(NativeSource("""
             §M{M}
               §F{Main:pub} () -> void
                 §E{}
                 §B{f:Func<i32,i32>} §LAM{x:i32} §E{} x §/LAM
-            """);
+            """, """
+            module M M
+              func Main public () → void
+                !
+                let Func<int,int>:f = (int:x) ! => x
+            """));
 
         Assert.NotNull(binding.FunctionType);
         Assert.Equal(EffectRow.Pure, binding.FunctionType!.Row);
@@ -126,12 +145,17 @@ public class EffectRowLatticeTests
         // every function-typed position does), carrying EffectRow.Unknown. Slice
         // b read "Unknown" off the ABSENCE of a type; the row itself is the
         // durable assertion and is what this pins now.
-        var binding = BindSingleLocal("""
+        var binding = BindSingleLocal(NativeSource("""
             §M{M}
               §F{Main:pub} () -> void
                 §E{}
                 §B{~f:Func<i32,i32>}
-            """);
+            """, """
+            module M M
+              func Main public () → void
+                !
+                var Func<int,int>:f
+            """));
 
         Assert.NotNull(binding.FunctionType);
         Assert.True(binding.FunctionType!.Row.IsUnknown);
@@ -192,12 +216,17 @@ public class EffectRowLatticeTests
         // Position 7's half of the same rule. A §B nests arbitrarily deep inside
         // a body, so it is checked at BindBindStatement rather than in the
         // declaration sweep; this pins that the rule reaches it.
-        var compiled = TestHarness.Compile("""
+        var compiled = TestHarness.Compile(NativeSource("""
             §M{M}
               §F{Main:pub} () -> void
                 §E{}
                 §B{n:i32} §E{cw} INT:1
-            """);
+            """, """
+            module M M
+              func Main public () → void
+                !
+                let int:n ! cw = 1
+            """));
 
         var misplaced = compiled.Diagnostics
             .Where(d => d.Code == DiagnosticCode.EffectRowMisplaced)
@@ -210,11 +239,15 @@ public class EffectRowLatticeTests
     {
         // Position 8's half. X9b proves the FORM parses since slice a; this
         // proves the row still has to land somewhere a row can go.
-        var compiled = TestHarness.Compile("""
+        var compiled = TestHarness.Compile(NativeSource("""
             §M{M}
               §CL{Holder:pub}
                 §FLD{i32:count:priv} §E{cw}
-            """);
+            """, """
+            module M M
+              class Holder public
+                field int:count private ! cw
+            """));
 
         Assert.Single(compiled.Diagnostics.Where(d => d.Code == DiagnosticCode.EffectRowMisplaced));
     }
@@ -558,12 +591,17 @@ public class EffectRowLatticeTests
         // …and the boundary is where a §LAM's §E acts. §5: the lambda's TYPE
         // carries ρ_decl, the declaration being the contract. Slice a parsed the
         // annotation and threw it away; here it reaches the type.
-        var binding = BindSingleLocal("""
+        var binding = BindSingleLocal(NativeSource("""
             §M{M}
               §F{Main:pub} () -> void
                 §E{cw}
                 §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
-            """);
+            """, """
+            module M M
+              func Main public () → void
+                ! cw
+                let f = (int:x) ! cw => x + 1
+            """));
 
         Assert.Equal(EffectRowKind.Concrete, binding.FunctionType!.Row.Kind);
         Assert.Equal(Concrete(Cw), binding.FunctionType.Row);
@@ -577,12 +615,17 @@ public class EffectRowLatticeTests
         // not on, so slice b leaves it Unknown and E3 replaces it. Unknown is the
         // sound placeholder: it fits nothing, so no check can pass on the
         // strength of a row that has not been computed.
-        var binding = BindSingleLocal("""
+        var binding = BindSingleLocal(NativeSource("""
             §M{M}
               §F{Main:pub} () -> void
                 §E{cw}
                 §B{f} §LAM{x:i32} (+ x INT:1) §/LAM
-            """);
+            """, """
+            module M M
+              func Main public () → void
+                ! cw
+                let f = (int:x) => x + 1
+            """));
 
         Assert.True(binding.FunctionType!.Row.IsUnknown);
     }
@@ -686,13 +729,37 @@ public class EffectRowLatticeTests
                 §R §C{Apply} §A Shout §A INT:1 §/C
             """;
 
-        var declared = TestHarness.Compile(withE);
+        var declared = TestHarness.Compile(NativeSource(withE, """
+            module M M
+              func Apply public (Func<int,int>:transform !, int:value) → int
+                !
+                return value
+              func Shout public (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func Main public () → int
+                !
+                return Apply(Shout, 1)
+            """));
         Assert.Contains(declared.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch && d.Message.Contains("Shout"));
 
         // The same program with the source's §E deleted. It does NOT compile:
         // the row now fits, and the BODY check rejects it instead.
-        var deleted = TestHarness.Compile(withE.Replace("    §E{cw}\n", "    §E{}\n"));
+        var deleted = TestHarness.Compile(NativeSource(withE.Replace("    §E{cw}\n", "    §E{}\n"), """
+            module M M
+              func Apply public (Func<int,int>:transform !, int:value) → int
+                !
+                return value
+              func Shout public (int:x) → int
+                !
+                System.Console.WriteLine(x)
+                return x
+              func Main public () → int
+                !
+                return Apply(Shout, 1)
+            """));
         Assert.True(deleted.HasErrors);
         Assert.Contains(deleted.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("Shout"));
@@ -785,7 +852,7 @@ public class EffectRowLatticeTests
         // Discriminating revert: make the unresolved branch return Concrete(∅)
         // and this fixture goes SILENT — no Calor0425, no Calor0424, a clean
         // compile of a program nothing was ever known about.
-        var result = TestHarness.Compile("""
+        var result = TestHarness.Compile(NativeSource("""
             §M{M}
               §F{Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
                 §E{}
@@ -793,7 +860,15 @@ public class EffectRowLatticeTests
               §F{Main:pub} (Func<i32,i32>:opaque) -> i32
                 §E{}
                 §R §C{Apply} §A opaque §A INT:1 §/C
-            """);
+            """, """
+            module M M
+              func Apply public (Func<int,int>:transform !, int:value) → int
+                !
+                return value
+              func Main public (Func<int,int>:opaque) → int
+                !
+                return Apply(opaque, 1)
+            """));
 
         var unknown = result.Diagnostics
             .Where(d => d.Code == DiagnosticCode.EffectRowUnknown)
@@ -810,7 +885,7 @@ public class EffectRowLatticeTests
         // The control. Give the very same argument a row it can be judged on and
         // the site goes quiet — without this half, a checker that emitted
         // Calor0425 unconditionally would pass every assertion above.
-        var rowed = TestHarness.Compile("""
+        var rowed = TestHarness.Compile(NativeSource("""
             §M{M}
               §F{Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
                 §E{}
@@ -818,7 +893,15 @@ public class EffectRowLatticeTests
               §F{Main:pub} (Func<i32,i32>:opaque §E{}) -> i32
                 §E{}
                 §R §C{Apply} §A opaque §A INT:1 §/C
-            """);
+            """, """
+            module M M
+              func Apply public (Func<int,int>:transform !, int:value) → int
+                !
+                return value
+              func Main public (Func<int,int>:opaque !) → int
+                !
+                return Apply(opaque, 1)
+            """));
         Assert.DoesNotContain(rowed.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowUnknown
               || d.Code == DiagnosticCode.EffectRowMismatch);
@@ -878,7 +961,7 @@ public class EffectRowLatticeTests
         //
         // Discriminating revert: report at both the source and the destination
         // of a hop and this reads 4.
-        var result = TestHarness.Compile("""
+        var result = TestHarness.Compile(NativeSource("""
             §M{M}
               §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
                 §E{cw}
@@ -887,7 +970,16 @@ public class EffectRowLatticeTests
                 §E{cw}
                 §B{used:i32} §C{Apply} §A a §A INT:1 §/C
                 §R a
-            """);
+            """, """
+            module M M
+              func Apply public (Func<int,int>:transform ! cw, int:value) → int
+                ! cw
+                return value
+              func Pick public (Func<int,int>:a) → Func<int,int> ! cw
+                ! cw
+                let int:used = Apply(a, 1)
+                return a
+            """));
 
         Assert.Equal(2, result.Diagnostics.Count(d => d.Code == DiagnosticCode.EffectRowUnknown));
     }
@@ -902,6 +994,17 @@ public class EffectRowLatticeTests
     // reaches it is a lambda whose ρ_body is Assumed, which is slice b's.
 
     // ------------------------------------------------------------ helpers ---
+
+    private static string NativeSource(string original, string native)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(original));
+        var diagnostics = new DiagnosticBag();
+        _ = new Calor.Compiler.Parsing.Parser(
+            new Calor.Compiler.Parsing.Lexer(native, diagnostics).TokenizeAllForParser(),
+            diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return native;
+    }
 
     private static FunctionBoundType FunctionOf(
         EffectRow? ownRow = null,
