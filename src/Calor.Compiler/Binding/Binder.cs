@@ -124,6 +124,8 @@ public sealed class Binder
     private readonly Dictionary<SymbolId, IReadOnlyList<VariableSymbol>> _enumMembers = new();
     private readonly Dictionary<string, DelegateDefinitionNode> _delegateDefinitions = new(StringComparer.Ordinal);
     private readonly Dictionary<VariableSymbol, VariableSymbol> _flowNarrowingSources = new();
+    private readonly Dictionary<(VariableSymbol? Receiver, VariableSymbol Member), VariableSymbol>
+        _memberFlowStorages = new();
     private readonly Dictionary<VariableSymbol, CallableMutationSummary> _callableState =
         new(ReferenceEqualityComparer.Instance);
     private List<CallableMutationWrite>? _deferredCallableWrites;
@@ -1035,6 +1037,7 @@ public sealed class Binder
         _classesBySimpleName.Clear();
         _delegateDefinitions.Clear();
         _flowNarrowingSources.Clear();
+        _memberFlowStorages.Clear();
         _topLevelFunctionLookupNames.Clear();
         _symbolsById.Clear();
         _metadataTypeParameterScopes.Clear();
@@ -2737,6 +2740,7 @@ public sealed class Binder
         _isDiscoveringLoopCallables = true;
         CallableMutationSummary summary;
         HashSet<string> byReferenceWrites = new(StringComparer.Ordinal);
+        var memberReceiverWrites = new List<BoundExpression>();
         var aliasInvalidationsBefore = _aliasInvalidations;
         var loopMayWriteAliases = false;
         try
@@ -2758,6 +2762,16 @@ public sealed class Binder
                     byReferenceWrites.UnionWith(ByReferenceWrittenNames(expressionModifiers, expressionArguments));
                 else if (node is BoundCallStatement { ArgumentModifiers: { } statementModifiers, Arguments: var statementArguments })
                     byReferenceWrites.UnionWith(ByReferenceWrittenNames(statementModifiers, statementArguments));
+                var writtenTarget = node switch
+                {
+                    BoundAssignmentStatement assignment => assignment.Target,
+                    BoundCompoundAssignment compound => compound.Target,
+                    BoundUnaryExpression { Operator: UnaryOperator.PreIncrement or UnaryOperator.PostIncrement
+                        or UnaryOperator.PreDecrement or UnaryOperator.PostDecrement } unary => unary.Operand,
+                    _ => null
+                };
+                if (writtenTarget is not null)
+                    memberReceiverWrites.Add(writtenTarget);
             }
             // Every aliased-storage change the body binds (calls, stores, using, foreach, events) was
             // seen by the statement and expression hooks during this discovery pass.
@@ -2798,6 +2812,8 @@ public sealed class Binder
         // installed on a preceding iteration. Bind receiving sites only after
         // this state is available; fresh guards in the body still narrow normally.
         ApplyCallableMutationSummary(summary);
+        foreach (var target in memberReceiverWrites)
+            InvalidateMemberFlowNarrowing(target);
         foreach (var name in byReferenceWrites)
         {
             if (_scope.Lookup(name) is VariableSymbol visible)
@@ -4041,6 +4057,25 @@ public sealed class Binder
             : ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
             ? binder(this, expr)
             : BindUnsupportedExpression(expr);
+        if (TryGetStableMemberStorage(expr, bound, out var memberStorage, out _, requireNonNullFlow: true)
+            && _scope.Lookup(memberStorage.Name) is VariableSymbol narrowedMember
+            && _flowNarrowingSources.ContainsKey(narrowedMember)
+            && bound.Type is BoundTypes.NominalBoundType memberType)
+        {
+            var nonNull = new BoundTypes.NominalBoundType(
+                memberType.QualifiedName, BoundTypes.NullableAnnotation.NotAnnotated,
+                memberType.Declaration, memberType.RoslynSymbol);
+            bound = bound switch
+            {
+                BoundVariableExpression variable => new BoundVariableExpression(
+                    variable.Span, variable.Variable, variable.ResolvedSymbols,
+                    typeOverride: nonNull),
+                BoundFieldAccessExpression access => new BoundFieldAccessExpression(
+                    access.Span, access.Target, access.FieldName, null, access.ResolvedField,
+                    access.FieldNameSpan, access.ResolvedFields, nonNull),
+                _ => bound
+            };
+        }
         if (_bindingContract)
             _boundContractExpressions[expr] = bound;
         if (MayChangeHeap(bound))
@@ -4904,6 +4939,82 @@ public sealed class Binder
             && variable.Variable.StorageIdentity is { IsField: false, IsProperty: false }
             && excludedNarrowings?.Contains(local.Name) != true)
             DeclareNarrowedNonNullVariable(local, variable.Variable);
+        else if (reference is not null && bound is not null
+            && TryGetStableMemberStorage(reference, bound, out var storage, out var receiver)
+            && excludedNarrowings?.Contains(storage.Name) != true
+            && (receiver is null || excludedNarrowings?.Contains(receiver.Name) != true))
+            DeclareNarrowedNonNullVariable(new ReferenceNode(reference.Span, storage.Name), storage);
+    }
+
+    private bool TryGetStableMemberStorage(
+        ExpressionNode expression, BoundExpression bound,
+        out VariableSymbol storage, out VariableSymbol? receiver, bool requireNonNullFlow = false)
+    {
+        storage = null!;
+        receiver = null;
+        if (_sourceCallConversions?.StableMemberReads.GetValueOrDefault(expression) is not { } selected
+            || requireNonNullFlow && !selected.HasNonNullFlow)
+            return false;
+        var member = bound switch
+        {
+            BoundVariableExpression { ResolvedSymbols: [VariableSymbol variable] }
+                when variable.StorageIdentity.IsProperty => variable.StorageIdentity,
+            BoundFieldAccessExpression { ResolvedFields: [var field] } => field.StorageIdentity,
+            _ => null
+        };
+        if (member is null || !ReferenceEquals(
+                _classScopes[selected.Owner].LookupLocal(selected.Property.Name), member))
+            return false;
+        if (bound is BoundFieldAccessExpression access)
+        {
+            if (access.Target is BoundVariableExpression { HasUnknownInferredType: false } variable
+                && variable.Variable.StorageIdentity is { IsField: false, IsProperty: false }
+                && variable.Type is BoundTypes.NominalBoundType { Declaration: { } owner }
+                && ReferenceEquals(owner, _classSymbols[selected.Owner]))
+                receiver = variable.Variable.StorageIdentity;
+            else if (access.Target is not BoundThisExpression
+                || !ReferenceEquals(_currentClass, selected.Owner))
+                return false;
+        }
+        else if (!ReferenceEquals(_currentClass, selected.Owner))
+            return false;
+
+        var key = (receiver, member);
+        if (!_memberFlowStorages.TryGetValue(key, out storage!))
+        {
+            // These scoped flow slots retain the real member/receiver pair; they are
+            // not source declarations or dotted-name aliases for user storage.
+            storage = new VariableSymbol(
+                member.Id.Append("member-flow", receiver?.Id.Value ?? "this"),
+                $"\0member-flow:{_memberFlowStorages.Count}", member.TypeName,
+                isMutable: true, nullableAnnotation: member.NullableAnnotation);
+            _memberFlowStorages.Add(key, storage);
+        }
+        return true;
+    }
+
+    private void InvalidateMemberFlowNarrowing(VariableSymbol variable)
+    {
+        foreach (var (key, storage) in _memberFlowStorages)
+        {
+            if ((ReferenceEquals(key.Receiver, variable.StorageIdentity)
+                    || ReferenceEquals(key.Member, variable.StorageIdentity))
+                && _scope.Lookup(storage.Name) is VariableSymbol narrowed
+                && _flowNarrowingSources.ContainsKey(narrowed))
+                InvalidateMutableFlowNarrowing(narrowed, requireRebindable: false);
+        }
+    }
+
+    private void InvalidateMemberFlowNarrowing(BoundExpression target)
+    {
+        if (target is BoundVariableExpression variable)
+            InvalidateMemberFlowNarrowing(variable.Variable);
+        else if (target is BoundFieldAccessExpression field)
+            foreach (var member in field.ResolvedFields)
+                InvalidateMemberFlowNarrowing(member);
+        else if (target is BoundTupleLiteral tuple)
+            foreach (var element in tuple.Elements)
+                InvalidateMemberFlowNarrowing(element);
     }
 
     private void DeclareNarrowedNonNullVariable(
@@ -4960,6 +5071,7 @@ public sealed class Binder
         VariableSymbol variable,
         bool requireRebindable = true)
     {
+        InvalidateMemberFlowNarrowing(variable);
         variable.StorageIdentity.MetadataArrayResultType = null;
         variable.MetadataArrayResultType = null;
         var source = variable;
@@ -6955,6 +7067,9 @@ public sealed class Binder
             ReportWriteToReadOnlyLocal(operand, unaryOp.Operand.Span, "increment {0}");
         else if (unaryOp.Operator is UnaryOperator.PreDecrement or UnaryOperator.PostDecrement)
             ReportWriteToReadOnlyLocal(operand, unaryOp.Operand.Span, "decrement {0}");
+        if (unaryOp.Operator is UnaryOperator.PreIncrement or UnaryOperator.PostIncrement
+            or UnaryOperator.PreDecrement or UnaryOperator.PostDecrement)
+            InvalidateMemberFlowNarrowing(operand);
         var resultType = unaryOp.Operator switch
         {
             UnaryOperator.Not => "BOOL",
@@ -9045,6 +9160,7 @@ public sealed class Binder
         _aliasInvalidations++;
         foreach (var parameter in _byReferenceParameters)
         {
+            InvalidateMemberFlowNarrowing(parameter);
             if (_scope.Lookup(parameter.Name) is VariableSymbol visible
                 && !ReferenceEquals(visible, parameter) && ReferenceEquals(RootOf(visible), parameter))
             {
@@ -9411,6 +9527,7 @@ public sealed class Binder
         var value = BindExpression(assign.Value);
         CheckMetadataArrayToCollection(value, target.Type.DisplayString, assign.Span, "Assignment");
         ReportWriteToReadOnlyLocal(target, assign.Target.Span, "assign to {0}");
+        InvalidateMemberFlowNarrowing(target);
         if (target is BoundVariableExpression variable)
         {
             var restored = InvalidateMutableFlowNarrowing(variable.Variable);
@@ -9447,6 +9564,7 @@ public sealed class Binder
         var target = BindExpression(compound.Target);
         var value = BindExpression(compound.Value);
         ReportWriteToReadOnlyLocal(target, compound.Target.Span, "assign to {0}");
+        InvalidateMemberFlowNarrowing(target);
         return new BoundCompoundAssignment(compound.Span, target, compound.Operator, value);
     }
 

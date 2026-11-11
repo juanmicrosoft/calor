@@ -178,11 +178,17 @@ aliases, callbacks, and repeated member reads make arbitrary narrowing unsafe.
 Do not assume that a prior null test proves every later use safe. See
 [working migration controls (#1398)](https://github.com/juanmicrosoft/calor/issues/1398).
 
-An early return after a null test does not currently narrow a later method
-argument. For an unchanged local, an explicit coalescing throw at that boundary
-can preserve the earlier return behavior: the throw is unreachable because the
-guard already returned on null. This is a manual migration, not an automatic
-converter rewrite.
+A built-in `== null` guard can establish non-null local or parameter facts when
+its guarded branch actually returns or throws. A false `||` guard can establish
+facts for each checked value. Overloaded or unresolved comparisons do not
+provide this proof.
+
+Scalar string property reads also qualify when the compiler certifies a
+nonvirtual, getter-only auto-property with a readonly backing field in a complete
+native declaring type. Facts follow the exact receiver storage, not a member's
+name. Constructors, partial types, mutable properties, custom or virtual getters,
+and uncertified member chains remain outside this support. These flow facts do not change
+declaration metadata or grant permission for effects.
 
 Calling a tracked callback that may write a guarded reference invalidates the
 guard fact. This conservative invalidation is not assignment/rebinding

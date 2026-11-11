@@ -57,6 +57,9 @@ public sealed class CallGraphAnalysis
     internal sealed record MetadataGetterSelection(
         IPropertySymbol Property, INamedTypeSymbol ReceiverType);
 
+    internal sealed record StableMemberSelection(
+        ClassDefinitionNode Owner, PropertyNode Property, bool HasNonNullFlow);
+
     internal sealed record MetadataMethodGroupCallSelection(
         IMethodSymbol Method, INamedTypeSymbol ReceiverType, IReadOnlyList<FunctionNode> Callbacks);
 
@@ -80,6 +83,7 @@ public sealed class CallGraphAnalysis
         internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
         internal HashSet<BinaryOperationNode> BuiltInNullGuardOperations { get; } = new(ReferenceEqualityComparer.Instance);
         internal HashSet<BinaryOperationNode> TerminatingNullGuardConditions { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<ExpressionNode, StableMemberSelection> StableMemberReads { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<ExpressionNode, EffectResolverKey> StaticInitializerConstructors { get; } = new(ReferenceEqualityComparer.Instance);
         // Typing evidence only: neither bound-member identity nor getter-effect permission.
         internal Dictionary<FieldAccessNode, MetadataMemberTypeSelection> MetadataMemberTypes { get; } = new(ReferenceEqualityComparer.Instance);
@@ -143,6 +147,7 @@ public sealed class CallGraphAnalysis
         var conflictingLambdas = new HashSet<LambdaExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingNullGuards = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
         var conflictingGuardTerminations = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
+        var conflictingStableMembers = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingCalls = new HashSet<TextSpan>();
         var conflictingMembers = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
         var conflictingGetters = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
@@ -408,6 +413,7 @@ public sealed class CallGraphAnalysis
             var selectedInTree = new HashSet<TextSpan>();
             var selectedNullGuardsInTree = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
             var terminatingGuardsInTree = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
+            var stableMembersInTree = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
             var selectedMembersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
             var selectedGettersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
             var selectedMethodGroupCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
@@ -428,6 +434,8 @@ public sealed class CallGraphAnalysis
                         continue;
                     foreach (var child in operation.ChildOperations)
                         pending.Push(child);
+                    if (validProofContext && bindNullGuards)
+                        AddStableMemberRead(operation);
                     if (validMemberContext)
                     {
                         AddMetadataMemberType(operation);
@@ -555,6 +563,13 @@ public sealed class CallGraphAnalysis
                 conflictingMembers.Add(member);
                 bindings.MetadataMemberTypes.Remove(member);
             }
+            foreach (var member in ranges.Select(range => range.Node).OfType<ExpressionNode>()
+                         .Where(member => member is ReferenceNode or FieldAccessNode)
+                         .Where(member => !stableMembersInTree.Contains(member)))
+            {
+                conflictingStableMembers.Add(member);
+                bindings.StableMemberReads.Remove(member);
+            }
             foreach (var member in ranges.Select(range => range.Node).OfType<FieldAccessNode>()
                          .Where(member => !selectedGettersInTree.Contains(member)))
             {
@@ -617,6 +632,71 @@ public sealed class CallGraphAnalysis
                     operand = conversion.Operand;
                 }
                 return false;
+            }
+
+            void AddStableMemberRead(IOperation operation)
+            {
+                if (operation is not IPropertyReferenceOperation
+                    {
+                        Property:
+                        {
+                            IsStatic: false, IsIndexer: false, SetMethod: null,
+                            ReturnsByRef: false, ReturnsByRefReadonly: false,
+                            Type.SpecialType: SpecialType.System_String,
+                            GetMethod: { IsVirtual: false, IsOverride: false, IsAbstract: false }
+                        } property,
+                        Instance: { Type: INamedTypeSymbol { IsReferenceType: true } receiver }
+                    } read
+                    || Origin(read) is not ExpressionNode origin
+                    || conflictingStableMembers.Contains(origin)
+                    || !SymbolEqualityComparer.Default.Equals(receiver, property.ContainingType)
+                    || !bindings.InitializationClasses.TryGetValue(
+                        property.ContainingType.OriginalDefinition, out var owner)
+                    || owner.IsPartial || owner.PreprocessorBlocks.Count != 0
+                    || bindings.Initializations.GetValueOrDefault(owner)?.Instance is null
+                    || property.ContainingType.DeclaringSyntaxReferences.Length != 1
+                    || property.DeclaringSyntaxReferences is not [var declaration]
+                    || declaration.GetSyntax() is not PropertyDeclarationSyntax
+                    {
+                        Parent: TypeDeclarationSyntax containing,
+                        AccessorList.Accessors: [ { Body: null, ExpressionBody: null } ]
+                    } syntax
+                    || property.ContainingType.GetMembers().OfType<IFieldSymbol>()
+                        .SingleOrDefault(field => SymbolEqualityComparer.Default.Equals(
+                            field.AssociatedSymbol, property)) is not
+                        { IsImplicitlyDeclared: true, IsReadOnly: true }
+                    || read.Instance is not (IInstanceReferenceOperation
+                            { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance }
+                        or IParameterReferenceOperation or ILocalReferenceOperation)
+                    || read.Syntax.Ancestors().Any(ancestor =>
+                        ancestor is ConstructorDeclarationSyntax or AnonymousFunctionExpressionSyntax
+                            or LocalFunctionStatementSyntax)
+                    || origin is not (ReferenceNode or FieldAccessNode
+                        { Target: ReferenceNode or ThisExpressionNode }))
+                    return;
+
+                var properties = containing.Members.OfType<PropertyDeclarationSyntax>().ToArray();
+                var index = Array.IndexOf(properties, syntax);
+                if (properties.Length != owner.Properties.Count || index < 0
+                    || owner.Properties[index] is not
+                        { IsAutoProperty: true, Getter: not null, Setter: null, Initer: null } native
+                    || native.Name != property.Name)
+                    return;
+
+                var selection = new StableMemberSelection(owner, native,
+                    read.Syntax is ExpressionSyntax expression
+                        && model.GetTypeInfo(expression).Nullability.FlowState == NullableFlowState.NotNull);
+                if (bindings.StableMemberReads.TryGetValue(origin, out var previous)
+                    && previous != selection)
+                {
+                    conflictingStableMembers.Add(origin);
+                    bindings.StableMemberReads.Remove(origin);
+                }
+                else
+                {
+                    stableMembersInTree.Add(origin);
+                    bindings.StableMemberReads[origin] = selection;
+                }
             }
 
             void AddMetadataMethodGroupCall(IInvocationOperation invocation)

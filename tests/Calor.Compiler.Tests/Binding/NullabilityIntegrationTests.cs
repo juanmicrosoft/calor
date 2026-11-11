@@ -796,13 +796,349 @@ public class NullabilityIntegrationTests
             module NullGuardMember
               class Holder public
                 property string?:Value
-                  get public
+                  {{(setter ? "get public" : "get public\n        return null")}}
                   {{(setter ? "set public" : "")}}
                 func Take public (string:value) → void
                   !
                 func Probe public () → void
                   if Value == null
                     return
+                  Take(Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Fact]
+    public void StableMemberGuard_UninitializedReadonlyAutoPropertyHasSelectedStability()
+    {
+        var source = $$"""
+            module NullGuardMember
+              class Holder public
+                property string?:Value
+                  get public
+                  {{""}}
+                func Take public (string:value) → void
+                  !
+                func Probe public () → void
+                  if Value == null
+                    return
+                  Take(Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+    }
+
+    [Theory]
+    [InlineData("Value", false)]
+    [InlineData("this . Value", true)]
+    [InlineData("other . Value", false)]
+    [InlineData("other . Value", true)]
+    public void StableMemberGuard_ReadonlyAutoPropertyNarrowsReceivingBoundaries(
+        string value, bool initialized)
+    {
+        var source = $$"""
+            module StableMember
+              class Holder public
+                property string?:Value
+                  get public
+                {{(initialized ? "ctor (string?:value)\n      set Value value" : "")}}
+                func Take public (string:value) → void
+                  !
+                func Probe public (Holder:other) → string
+                  if {{value}} == null
+                    return "fallback"
+                  let string:copy = {{value}}
+                  Take({{value}})
+                  return {{value}}
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+    }
+
+    [Fact]
+    public void StableMemberGuard_OrFactsRetainDistinctActualReceiverStorage()
+    {
+        const string source = """
+            module StableReceiverIdentity
+              class Holder public
+                property string?:Value
+                  get public
+                func Take public (string:value) → void
+                  !
+                func Probe public (Holder:left, Holder:right, Holder:uncheckedReceiver) → void
+                  if (Value == null) || ((left . Value == null) || (right . Value == null))
+                    return
+                  Take(Value)
+                  Take(left . Value)
+                  Take(right . Value)
+                  Take(uncheckedReceiver . Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diagnostic = Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(source.LastIndexOf("uncheckedReceiver", StringComparison.Ordinal), diagnostic.Span.Start);
+    }
+
+    [Theory]
+    [InlineData("set candidate replacement")]
+    [InlineData("Mutate(ref candidate, replacement)")]
+    [InlineData("MutateOut(out candidate, replacement)")]
+    [InlineData("change()")]
+    [InlineData("if flag\n      set candidate replacement")]
+    public void StableMemberGuard_ReceiverMutationInvalidatesOnlyDependentFacts(string mutation)
+    {
+        var source = $$"""
+            module StableMemberInvalidation
+              class Holder public
+                property string?:Value
+                  get public
+              func Take public (string:value) → void
+                !
+              func Mutate public (ref Holder:target, Holder:replacement) → bool
+                set target replacement
+                return false
+              func MutateOut public (out Holder:target, Holder:replacement) → bool
+                set target replacement
+                return false
+              func Probe public (Holder:value, Holder:replacement, Holder:other, bool:flag) → void
+                var candidate = value
+                let Func<bool>:change = () => Mutate(ref candidate, replacement)
+                if (candidate . Value == null) || (other . Value == null)
+                  return
+                Take(candidate . Value)
+                {{mutation}}
+                Take(other . Value)
+                Take(candidate . Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diagnostic = Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(source.LastIndexOf("candidate", StringComparison.Ordinal), diagnostic.Span.Start);
+    }
+
+    [Theory]
+    [InlineData("Mutate(ref candidate, replacement)", 1)]
+    [InlineData("(Mutate(ref candidate, replacement) || (candidate . Value == null))", 0)]
+    [InlineData("((other . Value == null) || Mutate(ref candidate, replacement))", 1)]
+    public void StableMemberGuard_OrMutationDoesNotResurrectInvalidatedReceiverFacts(
+        string right, int expectedDiagnostics)
+    {
+        var source = $$"""
+            module StableMemberOrMutation
+              class Holder public
+                property string?:Value
+                  get public
+              func Take public (string:value) → void
+                !
+              func Mutate public (ref Holder:target, Holder:replacement) → bool
+                set target replacement
+                return false
+              func Probe public (Holder:value, Holder:replacement, Holder:other) → void
+                var candidate = value
+                if (candidate . Value == null) || {{right}}
+                  return
+                Take(candidate . Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Equal(expectedDiagnostics, diagnostics.Count(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Theory]
+    [InlineData("", "property string?:Value\n      get public\n      set public")]
+    [InlineData("", "property string?:Value virtual\n      get public")]
+    [InlineData("", "property string?:Value\n      get public\n        return null")]
+    [InlineData("partial", "property string?:Value\n      get public")]
+    [InlineData("", "field string?:Value public")]
+    public void StableMemberGuard_UncertifiedMemberDeclarationsRemainNullable(
+        string modifier, string member)
+    {
+        var source = $$"""
+            module UncertifiedStableMember
+              class Holder public {{modifier}}
+                {{member}}
+                func Take public (string:value) → void
+                  !
+                func Probe public () → void
+                  if Value == null
+                    return
+                  Take(Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void StableMemberGuard_RequiresTerminatingAndAvailableSelectedContext(
+        bool terminates, bool resolveSourceCallConversions)
+    {
+        var source = $$"""
+            module UnprovenStableMember
+              class Holder public
+                property string?:Value
+                  get public
+                func Take public (string:value) → void
+                  !
+                func Probe public () → void
+                  if Value == null
+                    {{(terminates ? "return" : "let bool:observed = true")}}
+                  Take(Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source, resolveSourceCallConversions);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Fact]
+    public void StableMemberGuard_ConstructorWriteAndMemberChainsRemainUncertified()
+    {
+        const string source = """
+            module UnstableConstruction
+              class Holder public
+                property string?:Value
+                  get public
+                property Holder:Child
+                  get public
+                func Take public (string:value) → void
+                  !
+                ctor (Holder:child, string?:value)
+                  set Child child
+                  set Value value
+                  if Value == null
+                    return
+                  set Value null
+                  Take(Value)
+                func Probe public () → void
+                  if (Child . Value == null)
+                    return
+                  Take(Child . Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Equal(2, diagnostics.Count(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Fact]
+    public void StableMemberGuard_ByReferenceAliasesCannotRetainReceiverFacts()
+    {
+        const string source = """
+            module StableMemberAliases
+              class Holder public
+                property string?:Value
+                  get public
+              func Take public (string:value) → void
+                !
+              func Mutate public (ref Holder:target, Holder:replacement) → void
+                set target replacement
+              func Probe public (ref Holder:first, ref Holder:second, Holder:replacement) → void
+                if (first . Value == null)
+                  return
+                Mutate(ref second, replacement)
+                Take(first . Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void StableMemberGuard_RequiresValidSelectionInEveryConfiguration(bool missingWhenDefined)
+    {
+        var source = $$"""
+            module StableMemberConfigurations
+              class Holder public
+                property string?:Value
+                  get public
+                func Take public (string:value) → void
+                  !
+                func Probe public () → void
+                  pp FEATURE
+                    {{(missingWhenDefined ? "Missing()" : "let bool:observed = true")}}
+                  pp else
+                    {{(missingWhenDefined ? "let bool:observed = true" : "Missing()")}}
+                  if Value == null
+                    return
+                  Take(Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Theory]
+    [InlineData("set candidate replacement")]
+    [InlineData("Mutate(ref candidate, replacement)")]
+    public void StableMemberGuard_LoopWritesInvalidateIncomingReceiverFacts(string mutation)
+    {
+        var source = $$"""
+            module StableMemberLoop
+              class Holder public
+                property string?:Value
+                  get public
+              func Take public (string:value) → void
+                !
+              func Mutate public (ref Holder:target, Holder:replacement) → void
+                set target replacement
+              func Probe public (Holder:value, Holder:replacement, bool:flag) → void
+                var candidate = value
+                if (candidate . Value == null)
+                  return
+                while flag
+                  Take(candidate . Value)
+                  {{mutation}}
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Fact]
+    public void StableMemberGuard_GotoBypassingGuardDoesNotEstablishReachability()
+    {
+        const string source = """
+            module StableMemberGoto
+              class Holder public
+                property string?:Value
+                  get public
+                func Take public (string:value) → void
+                  !
+                func Probe public (bool:flag) → void
+                  if flag
+                    goto after
+                  if Value == null
+                    return
+                  after:
                   Take(Value)
             """;
 
