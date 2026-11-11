@@ -114,7 +114,13 @@ public class EffectEnforcementTests
       §B{str:name} STR:""placeholder""
       §R name
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func PrintAndRead public () → string
+                System.Console.WriteLine("Enter your name: ")
+                let string:name = "placeholder"
+                return name
+            """));
 
         Assert.True(result.HasErrors, "Should have compilation errors");
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
@@ -131,7 +137,11 @@ public class EffectEnforcementTests
       §O{i32}
       §R (+ a b)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func Add public (int:a, int:b) → int
+                return a + b
+            """));
 
         Assert.False(result.HasErrors, $"Pure function should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
@@ -145,7 +155,11 @@ public class EffectEnforcementTests
       §O{void}
       §P ""test""
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func TestPrint public () → void
+                System.Console.WriteLine("test")
+            """));
 
         Assert.True(result.HasErrors, "Should require cw effect");
         TestHarness.AssertDiagnostic(result.Diagnostics.Errors, DiagnosticCode.ForbiddenEffect, "TestPrint");
@@ -391,7 +405,11 @@ public class EffectEnforcementTests
             EnforceEffects = true,
             StrictEffects = true
         };
-        var result = TestHarness.Compile(source, options);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func UseDelegate public () → void
+                callback()
+            """), options);
 
         Assert.True(result.HasErrors, "Unresolvable bare-name invocation must be an error in strict mode");
         Assert.Contains(result.Diagnostics.Errors,
@@ -419,7 +437,16 @@ public class EffectEnforcementTests
       §R §C{Work} §A INT:1 §/C
 ";
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func Work public (int:value) → int
+                return value
+              func Work public (string:value) → void
+                ! cw
+                System.Console.WriteLine(value)
+              func Caller public () → int
+                return Work(1)
+            """));
 
         Assert.False(
             result.HasErrors,
@@ -446,7 +473,16 @@ public class EffectEnforcementTests
       §C{Work} §A BOOL:true §/C
 ";
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func Work public (int:value) → int
+                return value
+              func Work public (string:value) → void
+                ! cw
+                System.Console.WriteLine(value)
+              func Caller public () → void
+                Work(true)
+            """));
 
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.NoMatchingOverload);
@@ -875,7 +911,14 @@ public class EffectEnforcementTests
                 §R (* n §C{Fact} (- n 1))
             """;
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Rec Rec
+              func Fact public (int:n) → int
+                !
+                if n <= 1
+                  return 1
+                return n * Fact(n - 1)
+            """));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
@@ -899,7 +942,14 @@ public class EffectEnforcementTests
                   §C{Countdown} (- n 1)
             """;
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module RecUndecl RecUndecl
+              func Countdown public (int:n) → void
+                !
+                System.Console.WriteLine(n)
+                if n > 0
+                  Countdown(n - 1)
+            """));
 
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
     }
@@ -920,7 +970,14 @@ public class EffectEnforcementTests
                   §C{Countdown} (- n 1)
             """;
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module RecEff RecEff
+              func Countdown public (int:n) → void
+                ! cw
+                System.Console.WriteLine(n)
+                if n > 0
+                  Countdown(n - 1)
+            """));
 
         Assert.False(result.HasErrors);
     }
@@ -1200,5 +1257,16 @@ public class EffectEnforcementTests
             result.Diagnostics.Warnings.Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
         Assert.Contains("parameter 'make' of 'Go'", rowUnknown.Message);
         Assert.Contains("Func<", rowUnknown.Message);
+    }
+
+    private static string NativeSource(string original, string native)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(original));
+        var diagnostics = new DiagnosticBag();
+        _ = new Calor.Compiler.Parsing.Parser(
+            new Calor.Compiler.Parsing.Lexer(native, diagnostics).TokenizeAllForParser(),
+            diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return native;
     }
 }
