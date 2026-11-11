@@ -765,6 +765,8 @@ public sealed class BoundUnaryExpression : BoundExpression
 public class BoundCallExpression : BoundExpression
 {
     internal Microsoft.CodeAnalysis.IMethodSymbol? ResolvedMetadataMethod { get; init; }
+    // The actual receiver used for metadata overload selection, before any boxing.
+    internal Microsoft.CodeAnalysis.ITypeSymbol? ResolvedMetadataReceiverType { get; init; }
     internal Microsoft.CodeAnalysis.IMethodSymbol? CollectionMethodDefinition { get; init; }
     internal bool MutatesOnlyFreshCollectionReceiver { get; init; }
     internal VariableSymbol? CallableStorageIdentity { get; init; }

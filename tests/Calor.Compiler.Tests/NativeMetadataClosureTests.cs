@@ -2716,6 +2716,239 @@ public sealed class NativeMetadataClosureTests
         Assert.Contains(pure.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
     }
 
+    [Theory]
+    [InlineData("object")]
+    [InlineData("System.Version")]
+    public void NativeNonvirtualMetadata_UsesTheSelectedReferenceDeclarationContract(string receiverType)
+    {
+        var authored = $$"""
+            module Nonvirtual nullable oblivious
+              func Read public ({{receiverType}}:value) → System.Type
+                !
+                return value.GetType()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(source));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.Equal(SpecialType.System_Object, method.ContainingType.SpecialType);
+            Assert.Equal("GetType", method.Name);
+            Assert.False(method.IsVirtual);
+            Assert.Empty(method.Parameters);
+            Assert.DoesNotContain(method.Locations, location => location.IsInSource);
+            Assert.False(call.IsInaccessibleCall || call.HasOpaqueOverloads || call.HasUnresolvedArguments);
+            var resolver = new Calor.Compiler.Effects.EffectResolver();
+            Assert.Equal(Calor.Compiler.Effects.EffectResolutionStatus.Unknown, resolver.Resolve(
+                Calor.Compiler.Effects.EffectResolverKey.FromBoundReceiver(
+                    call.Receiver!.Type, method.Name, call.ResolvedParameterTypes)).Status);
+            Assert.Equal(Calor.Compiler.Effects.EffectResolutionStatus.PureExplicit, resolver.Resolve(
+                Calor.Compiler.Effects.EffectResolverKey.FromBoundReceiver(
+                    Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType),
+                    method.Name, call.ResolvedParameterTypes)).Status);
+            var graph = Calor.Compiler.Analysis.CallGraphAnalysis.Build(Parse(source));
+            var indexed = graph.ComputedMemberCall(Assert.Single(graph.Functions).Key, call.Span);
+            Assert.Equal(method.ToDisplayString(), indexed!.ResolvedMetadataMethod!.ToDisplayString());
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            var read = CompileAssembly(result.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
+                .Single(candidate => candidate.Name == "Read");
+            object value = receiverType == "object" ? new object() : new Version(1, 2);
+            Assert.Equal(value.GetType(), read.Invoke(null, [value]));
+            Assert.IsType<NullReferenceException>(
+                Assert.Throws<TargetInvocationException>(() => read.Invoke(null, [null])).InnerException);
+        }
+    }
+
+    [Fact]
+    public void NativeNonvirtualMetadata_ConstructorUsesTheSameSelectedContract()
+    {
+        const string authored = """
+            module Nonvirtual nullable oblivious
+              class Box public
+                ctor public (object:value)
+                  value.GetType()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        {
+            var result = Compile(source);
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            var box = CompileAssembly(result.GeneratedCode).GetTypes().Single(type => type.Name == "Box");
+            Assert.NotNull(Activator.CreateInstance(box, [new object()]));
+            Assert.IsType<NullReferenceException>(
+                Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(box, [null])).InnerException);
+        }
+    }
+
+    [Fact]
+    public void NativeNonvirtualMetadata_StillChargesAndEvaluatesTheReceiverOnce()
+    {
+        const string source = """
+            module Nonvirtual nullable oblivious
+              class Probe public
+                field int:Calls public static = 0
+                func Receiver private static (object:value) → object
+                  ! mut
+                  set Calls Calls + 1
+                  return value
+                func Read public static (object:value) → System.Type
+                  ! mut
+                  return Receiver(value).GetType()
+            """;
+        var result = Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        var pure = Compile(source.Replace("func Read public static (object:value) → System.Type\n      ! mut",
+            "func Read public static (object:value) → System.Type\n      !", StringComparison.Ordinal));
+        Assert.Contains(pure.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'mut'", StringComparison.Ordinal));
+        Assert.DoesNotContain(pure.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        var type = CompileAssembly(result.GeneratedCode).GetTypes().Single(candidate => candidate.Name == "Probe");
+        var read = type.GetMethod("Read")!;
+        Assert.Equal(typeof(object), read.Invoke(null, [new object()]));
+        Assert.Equal(1, type.GetField("Calls")!.GetValue(null));
+        Assert.IsType<NullReferenceException>(
+            Assert.Throws<TargetInvocationException>(() => read.Invoke(null, [null])).InnerException);
+        Assert.Equal(2, type.GetField("Calls")!.GetValue(null));
+    }
+
+    [Theory]
+    [InlineData("cw", "System.Console.WriteLine(1)")]
+    [InlineData("mut", "set Count Count + 1")]
+    [InlineData("", "Missing()")]
+    public void NativeNonvirtualMetadata_DoesNotReplaceASourceGetType(string effect, string body)
+    {
+        var source = $$"""
+            module Nonvirtual nullable oblivious
+              class Shadow public
+                field int:Count
+                func GetType public () → int
+                  {{(effect.Length == 0 ? "" : "! " + effect)}}
+                  {{body}}
+                  return 7
+              func Read (Shadow:value) → int
+                !
+                return value.GetType()
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(candidate => candidate.ResolvedSymbol?.Name == "Shadow.GetType");
+        Assert.Null(call.ResolvedMetadataMethod);
+        var result = Compile(source);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains($"'{(effect.Length == 0 ? "unknown" : effect)}'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NativeNonvirtualMetadata_RetainsSourceOverloadAndArgumentEffects()
+    {
+        const string source = """
+            module Nonvirtual nullable oblivious
+              class Shadow public
+                func GetType public (int:value) → int
+                  ! cw
+                  System.Console.WriteLine(value)
+                  return value
+              func Argument () → int
+                ! cw
+                System.Console.WriteLine(1)
+                return 1
+              func Read (Shadow:value) → int
+                !
+                return value.GetType(Argument())
+            """;
+        var result = Compile(source);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'Read'", StringComparison.Ordinal)
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+        Assert.False(Compile(source.Replace("func Read (Shadow:value) → int\n    !",
+            "func Read (Shadow:value) → int\n    ! cw", StringComparison.Ordinal)).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("object", "Equals(value)", "bool")]
+    [InlineData("object", "GetHashCode()", "int")]
+    [InlineData("System.Collections.IEnumerable", "GetType()", "System.Type")]
+    [InlineData("System.DayOfWeek", "GetType()", "System.Type")]
+    [InlineData("Missing", "GetType()", "System.Type")]
+    [InlineData("object", "Missing()", "System.Type")]
+    [InlineData("object", "MemberwiseClone()", "object")]
+    [InlineData("System.Type", "Name", "string")]
+    public void NativeNonvirtualMetadata_DoesNotAuthorizeDispatchBoxingOrUnknownTargets(
+        string type, string expression, string resultType)
+    {
+        var source = $$"""
+            module Nonvirtual nullable oblivious
+              func Read ({{type}}:value) → {{resultType}}
+                !
+                return value.{{expression}}
+            """;
+        var result = Compile(source);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Theory]
+    [InlineData("", "GetType()", "System.Type")]
+    [InlineData("class", "GetType()", "System.Type")]
+    [InlineData("struct", "GetType()", "System.Type")]
+    [InlineData("", "Equals(value)", "bool")]
+    [InlineData("class", "Equals(value)", "bool")]
+    [InlineData("System.IComparable", "Equals(value)", "bool")]
+    public void NativeNonvirtualMetadata_DoesNotTransferObjectContractsToTypeParameters(
+        string constraint, string expression, string resultType)
+    {
+        var source = $$"""
+            module Nonvirtual nullable oblivious
+              func Read<T> (T:value) → {{resultType}}
+                {{(constraint.Length == 0 ? "" : "where T : " + constraint)}}
+                !
+                return value.{{expression}}
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal(SpecialType.System_Object, call.ResolvedMetadataMethod!.ContainingType.SpecialType);
+        var result = Compile(source);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NativeNonvirtualMetadata_DoesNotRepairAmbiguousSourceCalls()
+    {
+        const string source = """
+            module Nonvirtual nullable oblivious
+              class Shadow public
+                func GetType public (string:value) → int
+                  return 1
+                func GetType public (System.Version:value) → int
+                  return 2
+              func Read (Shadow:value) → int
+                !
+                return value.GetType(null)
+            """;
+        Assert.Contains(Compile(source).Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+    }
+
+    [Fact]
+    public void NativeNonvirtualMetadata_DoesNotAuthorizeAnUnboundUnsafeCall()
+    {
+        const string source = """
+            module Nonvirtual nullable oblivious
+              func Read (object:value) → System.Type
+                !
+                unsafe
+                  return value.GetType()
+            """;
+        var result = Compile(source);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
     private static void AssertSelectedLiteralOverload(string source, string expected)
     {
         var diagnostics = new DiagnosticBag();

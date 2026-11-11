@@ -6562,6 +6562,20 @@ public sealed class EffectEnforcementPass
                     }
                     var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
                         effectReceiver, method.Name, parameterTypes));
+                    if (resolution.Status == EffectResolutionStatus.Unknown
+                        && !bound.IsInaccessibleCall && !bound.HasOpaqueOverloads && !bound.HasUnresolvedArguments
+                        && method is { MethodKind: CS.MethodKind.Ordinary, IsStatic: false,
+                            IsVirtual: false, IsAbstract: false, IsOverride: false, IsExtensionMethod: false }
+                        && !method.Locations.Any(location => location.IsInSource)
+                        && bound.ResolvedMetadataReceiverType is CS.INamedTypeSymbol
+                            { IsReferenceType: true, TypeKind: CS.TypeKind.Class or CS.TypeKind.Delegate })
+                    {
+                        // A nonvirtual reference call executes the selected declaration.
+                        // Do not transfer its contract across boxing or generic/interface dispatch.
+                        resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                            Binding.Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType),
+                            method.Name, parameterTypes));
+                    }
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                         return evaluated.Union(resolution.Effects);
                 }

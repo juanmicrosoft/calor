@@ -71,10 +71,11 @@ internal sealed class MetadataBinder
         if (scopes.Length > 1)
             return MetadataBinderResult.CreateUnresolved("Call contains type parameters from incompatible lexical scopes.");
         var scope = scopes.SingleOrDefault();
-        return QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations, scope,
+        var result = QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations, scope,
                 useArgumentLocals: true),
                 out var reason, requireValidSource: true)
             ?? MetadataBinderResult.CreateUnresolved(reason ?? "Expression call resolution failed.");
+        return result with { ReceiverType = result.IsResolved ? receiverType : null };
     }
 
     internal AwaitExpressionInfo? ResolveAwait(ITypeSymbol awaitedType)
@@ -534,6 +535,7 @@ internal readonly struct MetadataBinderResult
     public string? UnresolvedReason { get; }
     public bool IsResolved => Symbol is not null;
     public IReadOnlyList<MetadataCallArgument> Arguments { get; }
+    internal ITypeSymbol? ReceiverType { get; init; }
     internal BoundType? LegacyReturnType { get; init; }
 
     private MetadataBinderResult(

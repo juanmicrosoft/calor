@@ -7418,6 +7418,7 @@ public sealed class Binder
             IsSourceExtensionCall = isSourceExtensionCall,
             ResolvedMetadataMethod = instanceArrayResolution?.Symbol
                 ?? (metadataReceiver is not null || metadataScalarReturn ? bclResolution?.Symbol : null),
+            ResolvedMetadataReceiverType = bclResolution?.ReceiverType,
             MetadataArrayResultType = (instanceArrayResolution?.Symbol
                 ?? (metadataReceiver is not null ? bclResolution?.Symbol : null))?.ReturnType as Microsoft.CodeAnalysis.IArrayTypeSymbol,
             CallableStorageIdentity = callable,
