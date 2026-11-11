@@ -25,13 +25,15 @@ internal sealed class BuildState
         BuildStateCache.CurrentCompilerSemanticsVersion;
 
     /// <summary>
-    /// Fingerprint of the cross-module function map and declared type contracts
-    /// under (G3/#809): emission qualifies cross-module calls from this map, so
-    /// a changed map (module added/removed/renamed, ambiguity introduced) must
-    /// invalidate every warm skip — a cached .g.cs may carry stale
-    /// qualification or stale effect-variance results. Null/empty when single-module.
+    /// Fingerprint of the cross-module function map and complete source snapshot.
+    /// Target-map changes invalidate every warm skip; source-only changes require
+    /// an independence proof before reusing a cached output and effect summary.
+    /// Null/empty when single-module.
     /// </summary>
     public string? CrossModuleMapHash { get; set; }
+    // Source-only changes can spare proven-independent outputs; changed targets
+    // or source paths must still discard every cached qualification.
+    public string? CrossModuleFunctionMapHash { get; set; }
     public string CompilerHash { get; set; } = "";
     public string OptionsHash { get; set; } = "";
     public string ManifestHash { get; set; } = "";

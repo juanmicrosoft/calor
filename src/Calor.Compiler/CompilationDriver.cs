@@ -410,23 +410,55 @@ internal static class CompilationDriver
         IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap = null;
         CrossModuleTypeRegistry? crossModuleTypes = null;
         string? crossModuleMapHash = null;
+        string? crossModuleFunctionMapHash = null;
+        Dictionary<string, string>? previousProjectOutputs = null;
         if (sources.Count > 1)
         {
             crossModuleMap = BuildCrossModuleFunctionMap(sources, out crossModuleTypes);
             crossModuleMapHash = ComputeCrossModuleMapHash(crossModuleMap, crossModuleTypes);
+            crossModuleFunctionMapHash = ComputeCrossModuleMapHash(crossModuleMap,
+                sourcePaths: sources.Select(file => file.FullName));
         }
         if (newState != null)
         {
             newState.CrossModuleMapHash = crossModuleMapHash;
+            newState.CrossModuleFunctionMapHash = crossModuleFunctionMapHash;
         }
         // Compared UNCONDITIONALLY (#823 review m1): a single-file rebuild of a
         // formerly-multi project (hash → null) must also invalidate — its cached
         // output may carry qualification against modules no longer in the build.
         if (priorFiles != null && priorState?.CrossModuleMapHash != crossModuleMapHash)
         {
-            // Map changed (module added/removed/renamed or ambiguity introduced):
-            // every cached output may carry stale qualification — full re-emit.
-            priorFiles = null;
+            // A changed emitted target still invalidates globally. Source-only
+            // changes may spare outputs proven independent of old AND new
+            // companion declarations; missing evidence remains a cache miss.
+            if (priorState?.CrossModuleFunctionMapHash != crossModuleFunctionMapHash
+                || crossModuleTypes is null || priorFiles.Count != sources.Count
+                || cache is null || fullStateDir is null)
+                priorFiles = null;
+            else
+            {
+                previousProjectOutputs = new(BuildStateCache.GetPathComparer());
+                foreach (var source in sources)
+                {
+                    var (key, _) = BuildStateCache.ComputeRelativePathFromFullProjectDir(
+                        source.FullName, fullStateDir);
+                    var outputPath = cache.OutputPathFor(source);
+                    if (!priorFiles.TryGetValue(key, out var entry)
+                        || entry.OutputContentHash is null || !File.Exists(outputPath))
+                    {
+                        priorFiles = null;
+                        break;
+                    }
+                    var bytes = File.ReadAllBytes(outputPath);
+                    if (BuildStateCache.ComputeContentHash(bytes) != entry.OutputContentHash)
+                    {
+                        priorFiles = null;
+                        break;
+                    }
+                    previousProjectOutputs[source.FullName] = DecodeSource(bytes);
+                }
+            }
         }
 
         var compilationOptions = sources.ToDictionary(
@@ -459,18 +491,23 @@ internal static class CompilationDriver
                     // the producing compile observed: a corrupted, truncated, or
                     // manually edited .g.cs must be a miss, not "Up-to-date".
                     var outputPath = cache.OutputPathFor(file);
-                    if (cachedEntry.OutputContentHash != null
-                        && File.Exists(outputPath)
-                        && BuildStateCache.ComputeFileHash(outputPath) == cachedEntry.OutputContentHash)
+                    if (cachedEntry.OutputContentHash != null && File.Exists(outputPath))
                     {
-                        newState.Files[relativeKey] = cachedEntry;
-                        skipped.Add(file);
-                        skippedGeneratedSources.Add(new GeneratedCSharpSource(
-                            File.ReadAllText(outputPath),
-                            outputPath,
-                            file.FullName));
-                        moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
-                        continue;
+                        var outputBytes = File.ReadAllBytes(outputPath);
+                        var generated = DecodeSource(outputBytes);
+                        if (BuildStateCache.ComputeContentHash(outputBytes) == cachedEntry.OutputContentHash
+                            && (previousProjectOutputs is null
+                                || crossModuleTypes?.CanReuseIndependentOutput(
+                                    file.FullName, generated, previousProjectOutputs,
+                                    compilationOptions[file.FullName].ContractMode) == true))
+                        {
+                            newState.Files[relativeKey] = cachedEntry;
+                            skipped.Add(file);
+                            skippedGeneratedSources.Add(new GeneratedCSharpSource(
+                                generated, outputPath, file.FullName));
+                            moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
+                            continue;
+                        }
                     }
                 }
             }
@@ -935,13 +972,16 @@ internal static class CompilationDriver
 
     internal static string ComputeCrossModuleMapHash(
         IReadOnlyDictionary<string, CrossModuleFunctionTarget> map,
-        CrossModuleTypeRegistry? types = null)
+        CrossModuleTypeRegistry? types = null,
+        IEnumerable<string>? sourcePaths = null)
     {
         var canonical = string.Join(";", map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
             .Select(kv =>
                 $"{kv.Key}={kv.Value.ModuleName}|{kv.Value.NamespaceIdentity}|{kv.Value.ModuleClassName}"));
-        if (types is { HasTypes: true })
+        if (types is not null)
             canonical += "\ntypes:" + types.Fingerprint;
+        if (sourcePaths is not null)
+            canonical += "\npaths:" + string.Join("\n", sourcePaths.Order(StringComparer.Ordinal));
         var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(bytes);
     }

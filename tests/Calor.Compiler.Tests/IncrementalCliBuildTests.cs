@@ -815,3 +815,304 @@ public class IncrementalCliEndToEndTests : IDisposable
         Assert.All(summary.Callers, caller => Assert.Single(caller.Calls));
     }
 }
+
+public sealed class NativeProjectCacheTests : IDisposable
+{
+    private string _root = Path.Combine(Path.GetTempPath(), "calor-native-cache-" + Guid.NewGuid().ToString("N"));
+    private readonly Xunit.Abstractions.ITestOutputHelper _output;
+
+    public NativeProjectCacheTests(Xunit.Abstractions.ITestOutputHelper output)
+    {
+        _output = output;
+        Directory.CreateDirectory(_root);
+    }
+
+    private const string Library = """
+        module Library Contracts block
+          module Arithmetic public
+            func Pick public (int:value) → int
+              !
+              return (value + 1)
+            func Name public () → string
+              !
+              return "Ada"
+        """;
+
+    private const string Caller = """
+        module Caller Consumer block
+          module Entry public
+            func Probe public () → int
+              !
+              return Contracts.Arithmetic.Pick(41)
+            func Read public () → string
+              !
+              return Contracts.Arithmetic.Name()
+        """;
+
+    private static string Independent(string name, int value) =>
+        $"module {name}\n  module {name}\n    func Answer public () → int\n      !\n      return {value}\n";
+
+    private void Write(string name, string source) => File.WriteAllText(Path.Combine(_root, name + ".calr"), source);
+
+    private (CompilationDriver.DriverResult Result, DiagnosticBag Diagnostics) Run(
+        bool clear = false, string token = "native-cache", bool enforceEffects = true)
+    {
+        var diagnostics = new DiagnosticBag();
+        var attempted = new List<string>();
+        var result = CompilationDriver.CompileAll(
+            Directory.GetFiles(_root, "*.calr").Order(StringComparer.Ordinal).Select(path => new FileInfo(path)).ToArray(),
+            _ => new CompilationOptions
+            {
+                EnforceEffects = enforceEffects,
+                ContractMode = ContractMode.Off,
+                StatusWriter = TextWriter.Null
+            },
+            crossModuleEnforcement: true, crossModulePolicy: UnknownCallPolicy.Strict,
+            onCompiled: (file, compiled) =>
+                File.WriteAllText(Path.ChangeExtension(file.FullName, ".g.cs"), compiled.GeneratedCode),
+            diagnosticSink: diagnostics,
+            cache: new(_root, token + ":effects=" + enforceEffects, clear,
+                file => Path.ChangeExtension(file.FullName, ".g.cs")),
+            onFileResult: (file, _) => attempted.Add(file.Name));
+        var statePath = BuildStateCache.GetCachePath(_root);
+        _output.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Recompiled = attempted,
+            Compiled = result.Compiled.Select(item => item.File.Name),
+            Skipped = result.Skipped.Select(file => file.Name),
+            result.AnyErrors,
+            Diagnostics = Snapshot(diagnostics),
+            CacheStateExists = File.Exists(statePath),
+            State = File.Exists(statePath) ? File.ReadAllText(statePath) : null
+        }));
+        return (result, diagnostics);
+    }
+
+    private static string[] Snapshot(DiagnosticBag diagnostics) => diagnostics.Select(diagnostic =>
+        $"{diagnostic.FilePath}|{diagnostic.Code}|{diagnostic.Severity}|{diagnostic.Span}|{diagnostic.Message}")
+        .Order(StringComparer.Ordinal).ToArray();
+
+    [Fact]
+    public void IndependentBodiesKeepRealHitsForSingleAndBatchedEdits()
+    {
+        Write("a", Independent("Alpha", 1));
+        Write("b", Independent("Beta", 2));
+        Write("c", Independent("Gamma", 3));
+        Assert.Equal(3, Run().Result.Compiled.Count);
+        Assert.Equal(3, Run().Result.Skipped.Count);
+        var unchanged = File.ReadAllText(Path.Combine(_root, "c.g.cs"));
+        Write("a", Independent("Alpha", 11));
+        var one = Run();
+        Assert.Equal("a.calr", Assert.Single(one.Result.Compiled).File.Name);
+        Assert.Equal(2, one.Result.Skipped.Count);
+        Write("a", Independent("Alpha", 12));
+        Write("b", Independent("Beta", 22));
+        var two = Run();
+        Assert.Equal(2, two.Result.Compiled.Count);
+        Assert.Equal("c.calr", Assert.Single(two.Result.Skipped).Name);
+        Assert.Equal(unchanged, File.ReadAllText(Path.Combine(_root, "c.g.cs")));
+        Assert.False(two.Result.AnyErrors, string.Join("\n", two.Diagnostics));
+    }
+
+    [Fact]
+    public void RelocatedProjectsDoNotReuseOldSourceLocations()
+    {
+        Write("a", Independent("Alpha", 1));
+        Write("b", Independent("Beta", 2));
+        Assert.Equal(2, Run().Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var oldRoot = _root;
+        var movedRoot = _root + "-moved";
+        Directory.Move(_root, movedRoot);
+        _root = movedRoot;
+        var moved = Run();
+        Assert.False(moved.Result.AnyErrors, string.Join("\n", moved.Diagnostics));
+        Assert.Equal(2, moved.Result.Compiled.Count);
+        Assert.Empty(moved.Result.Skipped);
+        Assert.DoesNotContain(oldRoot + Path.DirectorySeparatorChar,
+            File.ReadAllText(Path.Combine(_root, "a.g.cs")));
+    }
+
+    [Theory]
+    [InlineData("body")]
+    [InlineData("return")]
+    [InlineData("nullable")]
+    [InlineData("row")]
+    [InlineData("unsafe-body")]
+    [InlineData("owner")]
+    [InlineData("namespace")]
+    [InlineData("parameter")]
+    [InlineData("alias")]
+    public void SourceEditsInvalidateRealConsumersAndMatchColdDiagnostics(string edit)
+    {
+        Write("library", Library);
+        Write("caller", Caller);
+        var cold = Run();
+        Assert.False(cold.Result.AnyErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Equal(2, cold.Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var changed = edit switch
+        {
+            "body" => Library.Replace("(value + 1)", "(value + 2)", StringComparison.Ordinal),
+            "return" => Library.Replace("→ int", "→ string", StringComparison.Ordinal)
+                .Replace("(value + 1)", "\"answer\"", StringComparison.Ordinal),
+            "nullable" => Library.Replace("→ string", "→ string?", StringComparison.Ordinal)
+                .Replace("\"Ada\"", "null", StringComparison.Ordinal),
+            "row" => Library.Replace("(int:value) → int\n      !", "(int:value) → int\n      ! cw", StringComparison.Ordinal),
+            "unsafe-body" => Library.Replace("return (value + 1)",
+                "System.Console.WriteLine(value)\n      return (value + 1)", StringComparison.Ordinal),
+            "owner" => Library.Replace("module Arithmetic public", "module Renamed public", StringComparison.Ordinal),
+            "namespace" => Library.Replace("Contracts block", "Moved block", StringComparison.Ordinal),
+            "parameter" => Library.Replace("int:value", "bool:value", StringComparison.Ordinal)
+                .Replace("(value + 1)", "42", StringComparison.Ordinal),
+            "alias" => Library.Replace("module Library Contracts block",
+                    "module Library Contracts block\n  namespace using Input = System.Boolean", StringComparison.Ordinal)
+                .Replace("int:value", "Input:value", StringComparison.Ordinal)
+                .Replace("(value + 1)", "42", StringComparison.Ordinal),
+            _ => throw new ArgumentOutOfRangeException(nameof(edit))
+        };
+        Write("library", changed);
+        var warm = Run();
+        Assert.Empty(warm.Result.Skipped);
+        Assert.Equal(edit != "body", warm.Result.AnyErrors);
+        if (edit == "body")
+            Assert.Equal(2, warm.Result.Compiled.Count);
+        var fresh = Run(clear: true);
+        Assert.Equal(Snapshot(fresh.Diagnostics), Snapshot(warm.Diagnostics));
+        Assert.Equal(fresh.Result.AnyErrors, warm.Result.AnyErrors);
+    }
+
+    [Theory]
+    [InlineData("instance")]
+    [InlineData("partial")]
+    [InlineData("field")]
+    [InlineData("extension")]
+    [InlineData("generic")]
+    [InlineData("global-alias")]
+    [InlineData("constant")]
+    public void UnprovenSourceContextsRetainFullSnapshotInvalidation(string kind)
+    {
+        var source = kind switch
+        {
+            "instance" => Library.Replace("module Arithmetic public", "class Arithmetic public", StringComparison.Ordinal),
+            "partial" => Library.Replace("module Arithmetic public", "module Arithmetic public partial", StringComparison.Ordinal),
+            "field" => Library.Replace("module Arithmetic public",
+                "module Arithmetic public\n    field int:Seed public static = 1", StringComparison.Ordinal),
+            "extension" => Library.Replace("int:value", "this int:value", StringComparison.Ordinal),
+            "generic" => Library.Replace("module Arithmetic public", "class Arithmetic<T> public", StringComparison.Ordinal),
+            "global-alias" => Library.Replace("module Library Contracts block",
+                "module Library Contracts block\n  global using Text = System.String", StringComparison.Ordinal),
+            "constant" => Library.Replace("module Arithmetic public",
+                "module Arithmetic public\n    field int:Seed public const = 1", StringComparison.Ordinal),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+        Write("library", source);
+        Write("peer", Independent("Peer", 7));
+        var cold = Run();
+        Assert.False(cold.Result.AnyErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        Write("library", kind == "constant"
+            ? source.Replace("Seed public const = 1", "Seed public const = 2", StringComparison.Ordinal)
+            : source.Replace("(value + 1)", "(value + 2)", StringComparison.Ordinal));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal(2, changed.Result.Compiled.Count);
+        Assert.Empty(changed.Result.Skipped);
+    }
+
+    [Theory]
+    [InlineData("output")]
+    [InlineData("missing-output")]
+    [InlineData("summary")]
+    [InlineData("manifest")]
+    [InlineData("options")]
+    public void GenuineCacheHitsStillRequireAllExistingIntegrityEvidence(string change)
+    {
+        Write("a", Independent("Alpha", 1));
+        Write("b", Independent("Beta", 2));
+        Assert.Equal(2, Run().Result.Compiled.Count);
+        if (change == "output")
+            File.AppendAllText(Path.Combine(_root, "a.g.cs"), "\n// external modification\n");
+        else if (change == "missing-output")
+            File.Delete(Path.Combine(_root, "a.g.cs"));
+        else if (change == "summary")
+        {
+            var state = BuildStateCache.Load(_root)!;
+            state.Files["a.calr"].EffectSummary = null;
+            BuildStateCache.Save(state, _root);
+        }
+        else if (change == "manifest")
+            File.WriteAllText(Path.Combine(_root, "local.calor-effects.json"), "{}");
+        var result = Run(token: change == "options" ? "changed-options" : "native-cache");
+        Assert.False(result.Result.AnyErrors, string.Join("\n", result.Diagnostics));
+        var global = change is "manifest" or "options";
+        Assert.Equal(global ? 2 : 1, result.Result.Compiled.Count);
+        Assert.Equal(global ? 0 : 1, result.Result.Skipped.Count);
+    }
+
+    [Fact]
+    public void CallerBodyEditsKeepTheUnchangedLibraryAsARealHit()
+    {
+        Write("library", Library);
+        Write("caller", Caller);
+        Assert.False(Run().Result.AnyErrors);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        Write("caller", Caller.Replace("Pick(41)", "Pick(42)", StringComparison.Ordinal));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal("caller.calr", Assert.Single(changed.Result.Compiled).File.Name);
+        Assert.Equal("library.calr", Assert.Single(changed.Result.Skipped).Name);
+    }
+
+    [Fact]
+    public void FullySkippedOutputsStillEnforceTheirCachedDeclaredEffectRows()
+    {
+        Write("library", """
+            module Store Storage
+              func Write public () → void
+                !
+            """);
+        Write("caller", """
+            module Caller Client
+              func Main public () → void
+                Store.Write()
+            """);
+        var cold = Run(enforceEffects: false);
+        Assert.False(cold.Result.AnyErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Equal(2, cold.Result.Compiled.Count);
+        Assert.Contains(cold.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndeclaredPublicFunction);
+        var warm = Run(enforceEffects: false);
+        Assert.False(warm.Result.AnyErrors, string.Join("\n", warm.Diagnostics));
+        Assert.Empty(warm.Result.Compiled);
+        Assert.Equal(2, warm.Result.Skipped.Count);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(warm.Diagnostics));
+    }
+
+    [Fact]
+    public void CrossModuleViolationNeverPublishesOrCreatesAReusableState()
+    {
+        Write("library", """
+            module Store Storage
+              func Write public () → void
+                ! db:w
+            """);
+        Write("caller", """
+            module Caller Client
+              func Main public () → void
+                Store.Write()
+            """);
+        var cold = Run(enforceEffects: false);
+        Assert.True(cold.Result.AnyErrors);
+        Assert.Contains(cold.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.Empty(cold.Result.Compiled);
+        Assert.Null(BuildStateCache.Load(_root));
+        var warm = Run(enforceEffects: false);
+        Assert.True(warm.Result.AnyErrors);
+        Assert.Empty(warm.Result.Skipped);
+        Assert.Empty(warm.Result.Compiled);
+        Assert.Null(BuildStateCache.Load(_root));
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(warm.Diagnostics));
+    }
+
+    public void Dispose() => Directory.Delete(_root, recursive: true);
+}

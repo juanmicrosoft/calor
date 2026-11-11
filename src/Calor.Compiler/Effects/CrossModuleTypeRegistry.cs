@@ -8,6 +8,9 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Incremental;
 using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Calor.Compiler.Effects;
 
@@ -141,6 +144,77 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
         }
         return binding.Diagnostics.HasErrors ? null
             : new(method, owner, binding.Binder.FunctionSymbols[method], binding.Binder.ClassSymbols[owner]);
+    }
+
+    internal bool CanReuseIndependentOutput(string sourcePath, string output,
+        IReadOnlyDictionary<string, string> previousOutputs, ContractMode mode)
+    {
+        if (_sourceHashes is null || _sourceHashes.Count != _sourcePaths.Count
+            || _sourcePaths.Count != previousOutputs.Count
+            || !_sourcePaths.Values.Contains(Path.GetFullPath(sourcePath), BuildStateCache.GetPathComparer())
+            || !_sourcePaths.Values.All(previousOutputs.ContainsKey))
+            return false;
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in CompanionSources(sourcePath, mode))
+        {
+            if (!CollectContainerNames(source.Source, names)
+                || !CollectContainerNames(previousOutputs[source.Path], names))
+                return false;
+        }
+        var root = CSharpSyntaxTree.ParseText(output).GetRoot();
+        if (root.ContainsDiagnostics)
+            return false;
+        // Type declarations count too: a new companion can complete or collide
+        // with a cached partial owner even without an explicit member access.
+        return !root.DescendantNodes().OfType<SimpleNameSyntax>()
+                   .Any(name => names.Contains(name.Identifier.ValueText))
+            && !root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>()
+                   .Any(type => names.Contains(type.Identifier.ValueText))
+            && !root.DescendantNodes().OfType<DelegateDeclarationSyntax>()
+                   .Any(type => names.Contains(type.Identifier.ValueText));
+
+        static bool CollectContainerNames(string source, HashSet<string> names)
+        {
+            var root = CSharpSyntaxTree.ParseText(source,
+                new CSharpParseOptions(LanguageVersion.Preview)).GetCompilationUnitRoot();
+            if (root.ContainsDiagnostics || root.AttributeLists.Count != 0
+                || root.DescendantNodes().OfType<UsingDirectiveSyntax>()
+                    .Any(directive => directive.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword))
+                || root.DescendantTrivia(descendIntoTrivia: true).Any(trivia =>
+                    trivia.IsDirective && trivia.GetStructure() is not
+                        (NullableDirectiveTriviaSyntax or LineDirectiveTriviaSyntax)))
+                return false;
+            return root.Members.All(Collect);
+
+            bool Collect(MemberDeclarationSyntax member)
+            {
+                switch (member)
+                {
+                    case BaseNamespaceDeclarationSyntax ns:
+                        foreach (var name in ns.Name.DescendantNodesAndSelf().OfType<SimpleNameSyntax>())
+                            names.Add(name.Identifier.ValueText);
+                        return ns.Members.All(Collect);
+                    case ClassDeclarationSyntax type when type.Modifiers.Any(SyntaxKind.StaticKeyword)
+                        && !type.Modifiers.Any(SyntaxKind.PartialKeyword)
+                        && type.TypeParameterList is null && type.BaseList is null
+                        && type.AttributeLists.Count == 0:
+                        names.Add(type.Identifier.ValueText);
+                        return type.Members.All(Collect);
+                    case MethodDeclarationSyntax method when method.Modifiers.Any(SyntaxKind.StaticKeyword)
+                        && method.AttributeLists.Count == 0
+                        && !method.ParameterList.Parameters.Any(parameter =>
+                            parameter.Modifiers.Any(SyntaxKind.ThisKeyword)):
+                        names.Add(method.Identifier.ValueText);
+                        return true;
+                    default:
+                        // Instance/partial types, initialization, constants,
+                        // operators and implicit extension lookup retain the
+                        // complete source fingerprint's conservative invalidation.
+                        return false;
+                }
+            }
+        }
     }
 
     internal bool MatchesSourceHash(string path, string hash) =>
