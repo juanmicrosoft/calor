@@ -16,7 +16,11 @@ public class EffectEnforcementTests
         var source = TestHarness.LoadScenario("Effects/E1_missing_effect.calr");
         var expected = TestHarness.LoadExpected("Effects/E1_missing_effect.expected.json");
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func PrintHello public () → void
+                System.Console.WriteLine("Hello, World!")
+            """, DiagnosticCode.ForbiddenEffect, "Function 'PrintHello' uses effect 'cw'"));
 
         Assert.True(result.HasErrors, "Should have compilation errors");
         TestHarness.AssertDiagnosticsMatch(result.Diagnostics, expected);
@@ -46,7 +50,14 @@ public class EffectEnforcementTests
         var source = TestHarness.LoadScenario("Effects/E3_call_chain.calr");
         var expected = TestHarness.LoadExpected("Effects/E3_call_chain.expected.json");
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func Caller public () → void
+                Callee()
+              func Callee public () → void
+                ! cw
+                System.Console.WriteLine("Hello from Callee")
+            """, DiagnosticCode.ForbiddenEffect, "Function 'Caller' uses effect 'cw'"));
 
         Assert.True(result.HasErrors, "Should have compilation errors");
         TestHarness.AssertDiagnosticsMatch(result.Diagnostics, expected);
@@ -59,7 +70,11 @@ public class EffectEnforcementTests
         var source = TestHarness.LoadScenario("Effects/E4_unknown_external.calr");
         var expected = TestHarness.LoadExpected("Effects/E4_unknown_external.expected.json");
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func CallUnknown public () → void
+                MyCustomLib.DoSomething()
+            """, DiagnosticCode.UnknownExternalCall, "Unknown external call to 'MyCustomLib.DoSomething'"));
 
         Assert.True(result.HasErrors, "Should have compilation errors");
         TestHarness.AssertDiagnosticsMatch(result.Diagnostics, expected);
@@ -72,7 +87,13 @@ public class EffectEnforcementTests
         var source = TestHarness.LoadScenario("Effects/E5_recursion.calr");
         var expected = TestHarness.LoadExpected("Effects/E5_recursion.expected.json");
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func RecursivePrint public (int:n) → void
+                if n > 0
+                  System.Console.WriteLine(n)
+                  RecursivePrint(n - 1)
+            """, DiagnosticCode.ForbiddenEffect, "Function 'RecursivePrint' uses effect 'cw'"));
 
         Assert.True(result.HasErrors, "Should have compilation errors");
         TestHarness.AssertDiagnosticsMatch(result.Diagnostics, expected);
@@ -1419,7 +1440,8 @@ public class EffectEnforcementTests
         Assert.Contains("Func<", rowUnknown.Message);
     }
 
-    private static string NativeSource(string original, string native)
+    private static string NativeSource(
+        string original, string native, string? requiredDiagnostic = null, string? requiredMessage = null)
     {
         Assert.False(string.IsNullOrWhiteSpace(original));
         var diagnostics = new DiagnosticBag();
@@ -1427,6 +1449,13 @@ public class EffectEnforcementTests
             new Calor.Compiler.Parsing.Lexer(native, diagnostics).TokenizeAllForParser(),
             diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        if (requiredDiagnostic != null)
+        {
+            var compiled = TestHarness.Compile(native);
+            Assert.Contains(compiled.Diagnostics, diagnostic =>
+                diagnostic.Code == requiredDiagnostic &&
+                (requiredMessage == null || diagnostic.Message.Contains(requiredMessage, StringComparison.Ordinal)));
+        }
         return native;
     }
 }
