@@ -24,7 +24,7 @@ public sealed class S2ImplicationProverDefinednessTests
                 §R INT:1
             """;
         var diagnostics = new DiagnosticBag();
-        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        var tokens = new Lexer(NativeSource(source), diagnostics).TokenizeAllForParser();
         var module = new Parser(tokens, diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         return Assert.Single(module.Functions).Postconditions;
@@ -89,7 +89,7 @@ public sealed class S2ImplicationProverDefinednessTests
                 §R INT:1
             """;
         var diagnostics = new DiagnosticBag();
-        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        var tokens = new Lexer(NativeSource(source), diagnostics).TokenizeAllForParser();
         var module = new Parser(tokens, diagnostics).Parse();
         var pres = Assert.Single(module.Functions).Preconditions;
         using var ctx = Z3ContextFactory.Create();
@@ -116,7 +116,7 @@ public sealed class S2ImplicationProverDefinednessTests
                 §R INT:1
             """;
         var diagnostics = new DiagnosticBag();
-        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var module = new Parser(new Lexer(NativeSource(source), diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         var pre = Assert.Single(Assert.Single(module.Functions).Preconditions);
         using var ctx = Z3ContextFactory.Create();
@@ -125,4 +125,98 @@ public sealed class S2ImplicationProverDefinednessTests
             [("arr", "i32[]"), ("s", "str")], pre.Condition, new BoolLiteralNode(pre.Span, false));
         Assert.NotEqual(ImplicationStatus.Disproven, result.Status);
     }
+
+    // These are exact counterparts of the retained witnesses, not a legacy-syntax translator.
+    private static string NativeSource(string source) => source switch
+    {
+        """
+        §M{M}
+          §F{P:pub} (i32:x, i32:y) -> i32
+            §E{}
+            §S (>= result INT:0)
+            §S (>= (/ INT:100 result) INT:-1)
+            §R INT:1
+        """ => """
+        module M
+          func P public (int:x, int:y) → int
+            !
+            => result >= 0
+            => 100 / result >= -1
+            return 1
+        """,
+        """
+        §M{M}
+          §F{P:pub} (i32:x, i32:y) -> i32
+            §E{}
+            §S (>= result INT:1)
+            §S (>= (/ INT:100 result) INT:0)
+            §R INT:1
+        """ => """
+        module M
+          func P public (int:x, int:y) → int
+            !
+            => result >= 1
+            => 100 / result >= 0
+            return 1
+        """,
+        """
+        §M{M}
+          §F{P:pub} (i32:x, i32:y) -> i32
+            §E{}
+            §S (>= x INT:1)
+            §S (|| (> x INT:0) (> (/ INT:1 y) INT:0))
+            §R INT:1
+        """ => """
+        module M
+          func P public (int:x, int:y) → int
+            !
+            => x >= 1
+            => x > 0 || 1 / y > 0
+            return 1
+        """,
+        // Refusing this native BCL call is a product blocker, not the original Assumed outcome.
+        """
+        §M{M}
+          §F{P:pub} (str:s, i32:x) -> i32
+            §E{}
+            §Q (&& (isempty s) (!= s STR:""))
+            §Q (> x INT:0)
+            §R INT:1
+        """ => """
+        module M
+          func P public (string:s, int:x) → int
+            !
+            requires string.IsNullOrEmpty(s) && s != ""
+            requires x > 0
+            return 1
+        """,
+        """
+        §M{M}
+          §F{P:pub} (i32[]:arr, str:s) -> i32
+            §E{}
+            §Q (== §IDX arr INT:-1 INT:0)
+            §R INT:1
+        """ => """
+        module M
+          func P public (int[]:arr, string:s) → int
+            !
+            requires arr[-1] == 0
+            return 1
+        """,
+        // A translation refusal alone does not establish that the substring definedness query ran.
+        """
+        §M{M}
+          §F{P:pub} (i32[]:arr, str:s) -> i32
+            §E{}
+            §Q (== (substr s INT:-1 INT:1) STR:"")
+            §R INT:1
+        """ => """
+        module M
+          func P public (int[]:arr, string:s) → int
+            !
+            requires s.Substring(-1, 1) == ""
+            return 1
+        """,
+        _ => throw new ArgumentException("Unregistered definedness fixture.", nameof(source))
+    };
 }
