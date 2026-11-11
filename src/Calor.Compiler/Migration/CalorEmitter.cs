@@ -344,7 +344,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var namespaceName = namespaceScope?.FullName
             ?? node.NamespaceIdentity ?? declarationNamespaces.FirstOrDefault() ?? "";
         if (declarationNamespaces.Any(name => name != namespaceName)
-            || node.Usings.Any(directive => directive.NamespaceScopeId != null))
+            || node.Usings.Any(directive => directive.NamespaceScopeId != null
+                && (namespaceScope == null || namespaceScope.IsGlobal
+                    || directive.NamespaceScopeId != namespaceScope.Id
+                    || directive.NamespaceIdentity != namespaceName || directive.IsGlobal)))
             throw new InvalidOperationException("Native module headers cannot flatten distinct namespace or using scopes; preserve the original C#.");
         var namespaceHeader = namespaceName.Length == 0 ? "" : " " + EscapeNamespaceName(namespaceName);
         var origin = namespaceScope is { IsGlobal: false, IsFileScoped: false } ? " block" : "";
@@ -781,7 +784,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(UsingDirectiveNode node)
     {
-        var globalPrefix = node.IsGlobal ? "global " : "";
+        var globalPrefix = !string.IsNullOrEmpty(node.NamespaceScopeId) && !string.IsNullOrEmpty(node.NamespaceIdentity)
+            ? "namespace " : node.IsGlobal ? "global " : "";
         if (node.IsStatic)
         {
             AppendLine($"{globalPrefix}using static {node.Namespace}");

@@ -70,8 +70,10 @@ module StructureModules Demo
 
 ### Namespace and import scope
 
-Imports appear inside the file module. They are compilation-unit imports,
-even when indented under a header that names a namespace.
+Imports appear inside the file module. Ordinary `using` directives are
+compilation-unit imports, even under a header that names a namespace.
+`namespace using` places an import inside that named namespace; it is not a
+namespace declaration or block. It requires a named namespace in the module header.
 
 ```calor
 module BlockNamespace Demo.Tools block
@@ -88,14 +90,23 @@ module BlockNamespace Demo.Tools block
 The class is `Demo.Tools.Box`, and `new Demo.Tools.Box().Read()` returns `42`.
 The alias names `System.Text`; `Builder` is a nullable `StringBuilder` field.
 Other import forms include `using System.Text` and `global using System`.
+For namespace-local lookup, write `namespace using System.Text`,
+`namespace using static System.Math`, or `namespace using Text = System.Text`.
+Local aliases can shadow compilation-unit aliases without changing either target.
 
 **Namespace preservation boundary:** the native header represents one
-namespace scope. Multiple namespace declarations, nested namespaces, and
-namespace-scoped imports are not native authoring forms here. Conversion
-preserves those original C# compilation units rather than flattening their
-scope or moving imports. Do not replace such output with a single native
-header and claim equivalent lookup behavior. Converter-preserved C# is not
-native language coverage, and raw payloads are not handwritten examples.
+namespace scope. `ConvertProject` and `migrate --split-namespaces` can retain
+resolved imports in their original compilation-unit or namespace-local scope.
+Single-result `Convert` and `convert` retain the whole-file preservation boundary
+for namespace-local imports. Multiple namespace declarations,
+nested namespaces, and conditional or unsupported scoped-import topology still
+require preservation. Missing original names or references also prevent native
+scoped-import conversion; implicit generated imports are not a repair.
+A projection that changes declared type or nullability metadata also stays
+preserved, rather than receiving native credit.
+Do not flatten these boundaries and claim equivalent lookup behavior.
+Converter-preserved C# is not native language coverage, and raw payloads are not
+handwritten examples.
 
 ## Functions
 

@@ -79,7 +79,17 @@ and so on, in source order. Each file uses the existing `module M N block`
 header: `M` remains a file label, and `N` is the original CLR namespace.
 There are no namespace blocks in the converted Calor.
 
-The bounded native subset excludes repeated or nested namespaces, nested types,
+For a single named namespace, the same opt-in can convert resolved local imports
+without splitting the file. The output remains `File.calr`, `IsSplit` is false in
+the API, and no `namespaceIndex` is assigned. `namespace using` retains local
+ordinary, alias and static imports; compilation-unit and global imports stay
+outside the C# namespace. Default single-file conversion still preserves local
+import topology as whole-file C#.
+Normal effect and nullability checks still apply; resolving an import does not
+prove that a call is pure. A scoped projection that changes declared types or
+nullable annotations stays as whole-file C#, with an explicit refusal reason.
+
+The bounded multi-namespace subset excludes repeated or nested namespaces, nested types,
 scoped imports, alias/global imports, directives, compilation-unit attributes,
 extern aliases, inheritance, and nonliteral field/property initializers.
 Ordinary compilation-unit imports keep their original scope in each output.

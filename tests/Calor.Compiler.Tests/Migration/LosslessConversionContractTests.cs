@@ -8,6 +8,66 @@ namespace Calor.Compiler.Tests;
 
 public sealed class LosslessConversionContractTests
 {
+    [Fact]
+    public async Task NamespaceSplitting_SingleScopedImportUsesOneEvaluatedOutputAndRefreshes()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-scoped-import-project-").FullName;
+        var project = Path.Combine(directory, "Context.csproj");
+        var source = Path.Combine(directory, "Imports.cs");
+        const string original = """
+            using Choice = Picks.Item;
+            namespace Witness
+            {
+                using Choice = Picks.Item;
+                public static class Probe
+                {
+                    public static Choice Echo(Choice value) { return value; }
+                }
+            }
+            """;
+        const string siblings = """
+            namespace Picks { public class Item { public const int Value = 7; } }
+            namespace Witness.Picks { public class Item { public const int Value = 42; } }
+            """;
+        await File.WriteAllTextAsync(project, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>disable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+            </Project>
+            """);
+        await File.WriteAllTextAsync(source, original);
+        await File.WriteAllTextAsync(Path.Combine(directory, "Sibling.cs"), siblings);
+        try
+        {
+            await RestoreAsync(project);
+            var migrator = new ProjectMigrator(new() { SplitNamespaces = true, Parallel = false });
+            var plan = await migrator.CreatePlanAsync(project, MigrationDirection.CSharpToCalor);
+            foreach (var run in new[] { 0, 1 })
+            {
+                var report = await migrator.ExecuteAsync(plan);
+                Assert.Equal(2, report.Summary.SourceFiles);
+                Assert.Equal(3, report.Summary.TotalFiles);
+                Assert.Equal(0, report.Summary.FailedFiles);
+                var imported = Assert.Single(report.FileResults.Where(result => result.SourcePath == source));
+                Assert.True(imported.OutputWritten, string.Join("\n", imported.Issues));
+                Assert.Null(imported.NamespaceIndex);
+                Assert.Equal(Path.ChangeExtension(source, ".calr"), imported.OutputPath);
+                Assert.True(imported.Losses.Count == 0,
+                    string.Join("\n", imported.Issues.Concat<object>(imported.Losses)));
+                Assert.Equal("verified", imported.ConversionPaths!.RoundTrip);
+                Assert.Contains("namespace using Choice = Picks.Item", File.ReadAllText(imported.OutputPath!));
+                Assert.True(File.Exists(imported.OutputPath + ".conversion.json"));
+                Assert.Equal(original, File.ReadAllText(source));
+                var generated = report.FileResults.Select(result =>
+                    new Calor.Compiler.CodeGen.GeneratedCSharpSource(result.GeneratedCSharp!, result.OutputPath!));
+                var validation = Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(generated,
+                    new Calor.Compiler.CodeGen.GeneratedCSharpCompilationContext());
+                Assert.True(validation.CompilationSuccess,
+                    string.Join("\n", validation.CompilationErrors.Select(error => error.ToString())));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

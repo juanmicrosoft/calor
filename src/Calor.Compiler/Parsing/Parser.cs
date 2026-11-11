@@ -1187,9 +1187,21 @@ public sealed class Parser
                 }
             }
             else if (Check(TokenKind.Using)
-                || Current.Text == "global" && Peek(1).Kind == TokenKind.Using)
+                || Current.Text == "global" && Peek(1).Kind == TokenKind.Using
+                || IsCanonicalDeclaration(startToken) && Current.Text == "namespace"
+                    && Peek(1).Kind == TokenKind.Using && Peek(1).Span.Line == Current.Span.Line)
             {
+                Token? namespacePrefix = Current.Text == "namespace" ? Advance() : null;
                 var node = ParseUsingDirective();
+                if (namespacePrefix is { } prefix)
+                {
+                    var scope = namespaceScopes.Single();
+                    if (scope.IsGlobal)
+                        _diagnostics.ReportError(prefix.Span, DiagnosticCode.UnexpectedToken,
+                            "'namespace using' requires a named namespace in the module header.");
+                    else
+                        ApplyNamespaceMetadata(node, scope.FullName, scope.Id);
+                }
                 usings.Add(node);
                 moduleItems.Add(node);
             }

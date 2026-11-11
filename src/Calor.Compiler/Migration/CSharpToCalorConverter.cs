@@ -349,7 +349,7 @@ public sealed class CSharpToCalorConverter
         => ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext: false);
 
     /// <summary>
-    /// Explicitly allows distinct top-level namespace blocks to become separate native files.
+    /// Explicitly allows native scoped imports and separate files for distinct top-level namespace blocks.
     /// Each visitor uses the complete original syntax tree and project semantic context.
     /// Other topologies and non-native conversions retain the single-result fidelity contract.
     /// </summary>
@@ -364,8 +364,10 @@ public sealed class CSharpToCalorConverter
         var parseOptions = GetEffectiveParseOptions(sourceFile);
         var tree = CSharpSyntaxTree.ParseText(
             csharpSource, parseOptions, sourceFile ?? "", cancellationToken: cancellationToken);
-        var namespaces = GetSplittableNamespaces(tree.GetCompilationUnitRoot(cancellationToken));
-        if (namespaces.Count == 0)
+        var root = tree.GetCompilationUnitRoot(cancellationToken);
+        var namespaces = GetSplittableNamespaces(root);
+        var scopedImports = CanConvertScopedNamespaceImports(root);
+        if (namespaces.Count == 0 && !scopedImports)
             return Single();
         if (_options.Fidelity != ConversionFidelity.Lossless
             || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches)
@@ -404,14 +406,17 @@ public sealed class CSharpToCalorConverter
 
         var outputs = new List<ConversionOutput>();
         var originalSemanticModel = original.GetSemanticModel(tree);
-        for (var index = 0; index < namespaces.Count; index++)
+        for (var index = 0; index < (scopedImports ? 1 : namespaces.Count); index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var result = ConvertCore(csharpSource, sourceFile, cancellationToken,
-                capturePreservationContext, namespaces[index].SpanStart, originalSemanticModel);
+                capturePreservationContext, scopedImports ? null : namespaces[index].SpanStart,
+                originalSemanticModel, allowScopedNamespaceImports: scopedImports);
             if (!result.Success || result.Losses.Count != 0)
                 return Single("A namespace did not convert entirely natively.");
-            outputs.Add(new(GetNamespaceOutputPath(Path.GetFileName(sourceFile ?? "input.cs"), index), result));
+            outputs.Add(new(scopedImports
+                ? Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr")
+                : GetNamespaceOutputPath(Path.GetFileName(sourceFile ?? "input.cs"), index), result));
         }
 
         var generated = new List<GeneratedCSharpSource>();
@@ -459,6 +464,19 @@ public sealed class CSharpToCalorConverter
         if (!validation.CompilationSuccess)
             return Single("The complete split output set failed C# validation: "
                 + string.Join("; ", validation.CompilationErrors.Select(error => error.GetMessage())));
+        if (scopedImports)
+        {
+            var generatedTree = CSharpSyntaxTree.ParseText(
+                generated.Single().Text, parseOptions, cancellationToken: cancellationToken);
+            var generatedCompilation = original.ReplaceSyntaxTree(tree, generatedTree);
+            var before = DeclaredTypeMetadata(original.GetSemanticModel(tree), root);
+            var after = DeclaredTypeMetadata(generatedCompilation.GetSemanticModel(generatedTree),
+                generatedTree.GetCompilationUnitRoot(cancellationToken));
+            if (!before.SequenceEqual(after, StringComparer.Ordinal))
+                return Single("Native scoped imports changed declared type/nullability metadata. Original: "
+                    + string.Join("; ", before.Except(after, StringComparer.Ordinal))
+                    + ". Generated: " + string.Join("; ", after.Except(before, StringComparer.Ordinal)));
+        }
         foreach (var output in outputs)
             output.Conversion.Context.RoundTrip = ConversionRoundTrip.Verified;
         return new(outputs);
@@ -496,6 +514,64 @@ public sealed class CSharpToCalorConverter
             return [];
         return namespaces;
     }
+
+    private static bool CanConvertScopedNamespaceImports(CompilationUnitSyntax root)
+        => root.SyntaxTree.Options.Kind == SourceCodeKind.Regular
+           && !root.ContainsDiagnostics && !root.ContainsDirectives
+           && root.AttributeLists.Count == 0 && root.Externs.Count == 0
+           && root.Members.Count == 1
+           && root.Members[0] is BaseNamespaceDeclarationSyntax scope
+           && scope.Usings.Count > 0 && scope.Externs.Count == 0
+           && !scope.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>().Any()
+           && scope.Usings.All(directive => directive.UnsafeKeyword.IsKind(SyntaxKind.None)
+               && directive.NamespaceOrType is NameSyntax);
+
+    private static string[] DeclaredTypeMetadata(SemanticModel model, CompilationUnitSyntax root)
+        => root.DescendantNodes()
+            .Where(node => node is MemberDeclarationSyntax or VariableDeclaratorSyntax)
+            .Select(node => model.GetDeclaredSymbol(node))
+            .Where(symbol => symbol is INamedTypeSymbol or IMethodSymbol or IPropertySymbol or IFieldSymbol or IEventSymbol)
+            .Select(symbol => $"{symbol!.Kind} {symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)} "
+                + $"{symbol.DeclaredAccessibility} static={symbol.IsStatic}: "
+                + (symbol switch
+                {
+                    INamedTypeSymbol type => TypeParameterMetadata(type.TypeParameters)
+                        + $"|{type.TypeKind}:{type.IsAbstract}:{type.IsSealed}|"
+                        + (type.BaseType is { } baseType ? DeclaredTypeKey(baseType) : "")
+                        + "|" + string.Join(",", type.Interfaces.Select(DeclaredTypeKey))
+                        + (type.DelegateInvokeMethod is { } invoke ? MethodTypes(invoke) : ""),
+                    IMethodSymbol method => MethodTypes(method),
+                    IPropertySymbol property => DeclaredTypeKey(property.Type) + Parameters(property.Parameters),
+                    IFieldSymbol field => DeclaredTypeKey(field.Type),
+                    IEventSymbol @event => DeclaredTypeKey(@event.Type),
+                    _ => ""
+                }))
+            .OrderBy(value => value, StringComparer.Ordinal).ToArray();
+
+    private static string MethodTypes(IMethodSymbol method)
+        => $"{method.RefKind}:{DeclaredTypeKey(method.ReturnType)}{Parameters(method.Parameters)}"
+           + TypeParameterMetadata(method.TypeParameters);
+
+    private static string TypeParameterMetadata(IEnumerable<ITypeParameterSymbol> parameters)
+        => string.Join(",", parameters.Select(parameter =>
+            $"{parameter.Name}:{parameter.HasReferenceTypeConstraint}:{parameter.ReferenceTypeConstraintNullableAnnotation}:"
+            + string.Join(",", parameter.ConstraintTypes.Select(DeclaredTypeKey))));
+
+    private static string Parameters(IEnumerable<IParameterSymbol> parameters)
+        => "(" + string.Join(",", parameters.Select(parameter =>
+            $"{parameter.RefKind}:{DeclaredTypeKey(parameter.Type)}")) + ")";
+
+    private static string DeclaredTypeKey(ITypeSymbol type)
+        => $"{type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}[{type.NullableAnnotation}]"
+           + (type switch
+           {
+               IArrayTypeSymbol array => DeclaredTypeKey(array.ElementType),
+               INamedTypeSymbol named => "<" + string.Join(",", named.TypeArguments.Select(DeclaredTypeKey)) + ">"
+                   + (named.ContainingType is { } containing ? DeclaredTypeKey(containing) : ""),
+               IPointerTypeSymbol pointer => DeclaredTypeKey(pointer.PointedAtType),
+               IFunctionPointerTypeSymbol pointer => MethodTypes(pointer.Signature),
+               _ => ""
+           });
 
     internal static string GetNamespaceOutputPath(string outputPath, int namespaceIndex)
         => Path.Combine(Path.GetDirectoryName(outputPath) ?? "",
@@ -676,7 +752,8 @@ public sealed class CSharpToCalorConverter
         CancellationToken cancellationToken,
         bool capturePreservationContext,
         int? namespaceStart = null,
-        SemanticModel? originalSemanticModel = null)
+        SemanticModel? originalSemanticModel = null,
+        bool allowScopedNamespaceImports = false)
     {
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
@@ -854,7 +931,8 @@ public sealed class CSharpToCalorConverter
             if (namespaceFeature != null)
                 context.RecordFeatureUsage(namespaceFeature);
 
-            if (namespaceStart == null && RequiresWholeFileNamespaceInterop(root))
+            if (namespaceStart == null && RequiresWholeFileNamespaceInterop(root)
+                && !(allowScopedNamespaceImports && CanConvertScopedNamespaceImports(root)))
             {
                 if (!context.PreservesCSharp)
                 {
@@ -976,7 +1054,7 @@ public sealed class CSharpToCalorConverter
             // standalone compile also fails when the file only depends on a sibling
             // file, and under PassthroughOnError a rescue that cannot recover would
             // refuse a conversion lossy mode used to complete.
-            var roundTripGate = namespaceStart == null && _options.ValidateRoundTripCSharp
+            var roundTripGate = namespaceStart == null && !allowScopedNamespaceImports && _options.ValidateRoundTripCSharp
                 && (_options.Fidelity == ConversionFidelity.Lossless
                     || _options.PreprocessorMode
                         == PreprocessorConversionMode.SelectActiveBranchLossy);
@@ -1073,7 +1151,7 @@ public sealed class CSharpToCalorConverter
             ValidateLosslessRoundTrip(
                 calorSource,
                 context,
-                namespaceStart == null && _options.ValidateRoundTripCSharp,
+                namespaceStart == null && !allowScopedNamespaceImports && _options.ValidateRoundTripCSharp,
                 parseOptions,
                 effectiveOutputKind,
                 _options.NullableContextOptions
@@ -1204,8 +1282,9 @@ public sealed class CSharpToCalorConverter
     }
 
     internal ConversionGeneration CreateGeneration(
-        string sourcePath, string outputPath, bool dryRun = false, int? namespaceIndex = null)
-        => new(this, _options, sourcePath, outputPath, dryRun, namespaceIndex);
+        string sourcePath, string outputPath, bool dryRun = false, int? namespaceIndex = null,
+        bool projectConversion = false)
+        => new(this, _options, sourcePath, outputPath, dryRun, namespaceIndex, projectConversion);
 
     /// <summary>
     /// Detects the direction of conversion based on file extension.
@@ -2403,7 +2482,7 @@ public enum ConversionDirection
 /// <summary>Owns one prepared generation base and its cooperating writer lock; conversion never writes output.</summary>
 internal sealed class ConversionGeneration(
     CSharpToCalorConverter converter, ConversionOptions options, string sourcePath, string outputPath,
-    bool dryRun, int? namespaceIndex = null) : IDisposable
+    bool dryRun, int? namespaceIndex = null, bool projectConversion = false) : IDisposable
 {
     private readonly string _sourcePath = Path.GetFullPath(sourcePath);
     private readonly string _outputPath = Path.GetFullPath(outputPath);
@@ -2460,11 +2539,13 @@ internal sealed class ConversionGeneration(
         var original = await CSharpToCalorConverter.ReadSourceFileAsync(_sourcePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         ConversionResult result;
-        if (namespaceIndex.HasValue)
+        if (namespaceIndex.HasValue || projectConversion)
         {
             var project = converter.ConvertProjectCore(
                 original, _sourcePath, cancellationToken, capturePreservationContext: true);
-            if (!project.IsSplit || namespaceIndex.Value >= project.Outputs.Count)
+            if (namespaceIndex.HasValue
+                    && (!project.IsSplit || namespaceIndex.Value >= project.Outputs.Count)
+                || !namespaceIndex.HasValue && project.IsSplit)
             {
                 var refused = project.Outputs[0].Conversion;
                 refused.Context.AddError(
@@ -2473,7 +2554,7 @@ internal sealed class ConversionGeneration(
                 result = new ConversionResult { Success = false, Context = refused.Context };
             }
             else
-                result = project.Outputs[namespaceIndex.Value].Conversion;
+                result = project.Outputs[namespaceIndex ?? 0].Conversion;
         }
         else
             result = converter.ConvertWithPreservationContext(original, _sourcePath, cancellationToken);

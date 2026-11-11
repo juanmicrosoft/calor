@@ -69,6 +69,268 @@ public sealed class CanonicalNamespaceTests
     }
 
     [Theory]
+    [InlineData("")]
+    [InlineData(" block")]
+    public void NamespaceUsingReemissionKeepsEveryImportKindAndPlacement(string origin)
+    {
+        var source = $$"""
+            module Imports Witness{{origin}}
+              global using System
+              using Text = System.Text
+              namespace using System.Collections.Generic
+              namespace using static System.Math
+              namespace using Text = System.Int32
+              module Probe
+                func Read () → int
+                  !
+                  return Abs(-42)
+            """;
+        foreach (var native in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var module = Parse(native);
+            var scope = Assert.Single(module.NamespaceScopes);
+            Assert.Equal(origin.Length == 0, scope.IsFileScoped);
+            Assert.Equal(5, module.Usings.Count);
+            Assert.All(module.Usings.Take(2), directive => Assert.Null(directive.NamespaceScopeId));
+            Assert.All(module.Usings.Skip(2), directive =>
+            {
+                Assert.Equal(scope.Id, directive.NamespaceScopeId);
+                Assert.Equal("Witness", directive.NamespaceIdentity);
+                Assert.False(directive.IsGlobal);
+            });
+            Assert.True(module.Usings[0].IsGlobal);
+            Assert.True(module.Usings[3].IsStatic);
+            Assert.Equal(["Text", "Text"], module.Usings.Where(item => item.Alias != null).Select(item => item.Alias));
+            var strict = Program.Compile(native);
+            Assert.Contains(strict.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                && error.Message.Contains("unknown"));
+            var generated = Compile(new CSharpEmitter().Emit(module));
+            var tree = generated.SyntaxTrees.Single();
+            var root = (CompilationUnitSyntax)tree.GetRoot();
+            Assert.Equal(["global using System;", "using Text = System.Text;"],
+                root.Usings.Where(item => item.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword) || item.Alias != null)
+                    .Select(item => item.ToString()));
+            var ns = Assert.IsAssignableFrom<BaseNamespaceDeclarationSyntax>(Assert.Single(root.Members));
+            Assert.Equal(["using System.Collections.Generic;", "using static System.Math;", "using Text = int;"],
+                ns.Usings.Select(item => item.ToString()));
+            var call = Assert.Single(root.DescendantNodes().OfType<InvocationExpressionSyntax>());
+            var selected = Assert.IsAssignableFrom<IMethodSymbol>(generated.GetSemanticModel(tree).GetSymbolInfo(call).Symbol);
+            Assert.Equal("System.Math.Abs(int)", selected.ToDisplayString());
+            Assert.Equal(SpecialType.System_Int32, selected.ReturnType.SpecialType);
+            Assert.Equal(42, Invoke(Load(generated).GetType("Witness.Probe")!, "Read"));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, "using Picks;", "Item", "Witness.Picks.Item", "Picks.Item")]
+    [InlineData(true, "using Picks;", "Item", "Witness.Picks.Item", "Picks.Item")]
+    [InlineData(false, "using Choice = Picks.Item;", "Choice", "Witness.Picks.Item", "Picks.Item")]
+    [InlineData(true, "using Choice = Picks.Item;", "Choice", "Witness.Picks.Item", "Picks.Item")]
+    [InlineData(false, "using static Helpers;", "Item", "Witness.Helpers.Item", "Helpers.Item")]
+    [InlineData(true, "using static Helpers;", "Item", "Witness.Helpers.Item", "Helpers.Item")]
+    public void ProjectScopedImportsKeepResolvedSiblingLookupInsteadOfHoisting(
+        bool fileScoped, string import, string typeName, string localType, string outerType)
+    {
+        const string companions = """
+            namespace Picks { public class Item {} }
+            namespace Witness.Picks { public class Item {} }
+            public static class Helpers { public class Item {} }
+            namespace Witness { public static class Helpers { public class Item {} } }
+            """;
+        string Source(string placement) => $$"""
+            {{(placement == "namespace" ? "" : (placement == "global" ? "global " : "") + import)}}
+            namespace Witness{{(fileScoped ? ";" : " {")}}
+            {{(placement == "namespace" ? import : "")}}
+            public static class Probe { public static {{typeName}} Echo({{typeName}} value) { return value; } }
+            {{(fileScoped ? "" : "}")}}
+            """;
+        var converter = new CSharpToCalorConverter(new()
+        {
+            NullableContextOptions = NullableContextOptions.Enable,
+            AdditionalSemanticSyntaxTrees = [CSharpSyntaxTree.ParseText(companions, new CSharpParseOptions(LanguageVersion.Preview))]
+        });
+        var project = converter.ConvertProject(Source("namespace"), "Imports.cs");
+        Assert.True(project.Success, string.Join("\n", project.Outputs.SelectMany(output => output.Conversion.Issues)));
+        Assert.False(project.IsSplit);
+        var output = Assert.Single(project.Outputs);
+        Assert.Equal("Imports.calr", output.FileName);
+        Assert.True(output.Conversion.Losses.Count == 0,
+            string.Join("\n", output.Conversion.Issues.Concat<object>(output.Conversion.Losses)));
+        Assert.Equal("native", output.Conversion.Paths.Outcome);
+        Assert.Equal("verified", output.Conversion.Paths.RoundTrip);
+        foreach (var native in new[] { output.Conversion.CalorSource!,
+                     new CalorEmitter().Emit(Parse(output.Conversion.CalorSource!)) })
+        {
+            var module = Parse(native);
+            var directive = Assert.Single(module.Usings);
+            Assert.Equal(module.NamespaceScopes.Single().Id, directive.NamespaceScopeId);
+            Assert.False(directive.IsGlobal);
+            var compiled = Program.Compile(native, null, new CompilationOptions { DeferGeneratedOutputValidation = true });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            AssertEchoTypeAndRuntime(CompileWithCompanions(compiled.GeneratedCode, companions), localType);
+        }
+        foreach (var placement in new[] { "namespace", "file", "global" })
+            AssertEchoTypeAndRuntime(CompileWithCompanions(Source(placement), companions),
+                placement == "namespace" ? localType : outerType);
+
+        static void AssertEchoTypeAndRuntime(CSharpCompilation compilation, string expectedType)
+        {
+            var echo = Assert.Single(compilation.GetTypeByMetadataName("Witness.Probe")!.GetMembers("Echo").OfType<IMethodSymbol>());
+            Assert.Equal(expectedType, echo.ReturnType.ToDisplayString());
+            Assert.Equal(expectedType, echo.Parameters.Single().Type.ToDisplayString());
+            var tree = compilation.SyntaxTrees.First();
+            var parameter = tree.GetRoot().DescendantNodes().OfType<ParameterSyntax>().Single();
+            Assert.Equal(expectedType, compilation.GetSemanticModel(tree).GetTypeInfo(parameter.Type!).Type!.ToDisplayString());
+            var method = Load(compilation).GetType("Witness.Probe")!.GetMethod("Echo")!;
+            var value = Activator.CreateInstance(method.GetParameters().Single().ParameterType);
+            Assert.Same(value, method.Invoke(null, [value]));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ProjectLocalAliasShadowsOuterAliasWithoutLosingGlobalVisibility(bool global)
+    {
+        var original = $$"""
+            {{(global ? "global " : "")}}using Choice = System.Int16;
+            namespace Witness
+            {
+                using Choice = System.Int32;
+                public static class Probe
+                {
+                    public static Choice Echo(Choice value) { return value; }
+                }
+            }
+            """;
+        var consumer = global ? "public class Consumer { public Choice Value; }" : "public class Consumer { }";
+        var project = new CSharpToCalorConverter(new()
+        {
+            NullableContextOptions = NullableContextOptions.Enable,
+            AdditionalSemanticSyntaxTrees = [CSharpSyntaxTree.ParseText(consumer, new CSharpParseOptions(LanguageVersion.Preview))]
+        }).ConvertProject(original);
+        Assert.True(project.Success);
+        Assert.False(project.IsSplit);
+        var conversion = Assert.Single(project.Outputs).Conversion;
+        Assert.Empty(conversion.Losses);
+        var module = Parse(conversion.CalorSource!);
+        Assert.Equal(2, module.Usings.Count);
+        Assert.Null(module.Usings[0].NamespaceScopeId);
+        Assert.Equal(global, module.Usings[0].IsGlobal);
+        Assert.Equal(module.NamespaceScopes.Single().Id, module.Usings[1].NamespaceScopeId);
+        foreach (var source in new[] { original, new CSharpEmitter().Emit(module),
+                     new CSharpEmitter().Emit(Parse(new CalorEmitter().Emit(module))) })
+        {
+            var compilation = CompileWithCompanions(source, consumer);
+            var echo = Assert.Single(compilation.GetTypeByMetadataName("Witness.Probe")!.GetMembers("Echo").OfType<IMethodSymbol>());
+            Assert.Equal(SpecialType.System_Int32, echo.ReturnType.SpecialType);
+            Assert.Equal(SpecialType.System_Int32, echo.Parameters.Single().Type.SpecialType);
+            if (global)
+                Assert.Equal(SpecialType.System_Int16,
+                    Assert.Single(compilation.GetTypeByMetadataName("Consumer")!.GetMembers("Value").OfType<IFieldSymbol>()).Type.SpecialType);
+            Assert.Equal(42, Load(compilation).GetType("Witness.Probe")!.GetMethod("Echo")!.Invoke(null, [42]));
+        }
+    }
+
+    [Theory]
+    [InlineData("namespace Witness { using System;\n#if true\nclass C {}\n#endif\n}")]
+    [InlineData("namespace Witness { using Pair = (int X, int Y); class C {} }")]
+    [InlineData("namespace Witness { using System; class C {} } namespace Other { class D {} }")]
+    public void ProjectScopedImportUnsupportedTopologyKeepsTheWholeFile(string source)
+    {
+        var project = new CSharpToCalorConverter().ConvertProject(source);
+        Assert.True(project.Success);
+        Assert.False(project.IsSplit);
+        var conversion = Assert.Single(project.Outputs).Conversion;
+        Assert.Equal("namespace-topology", Assert.Single(conversion.Losses).Feature);
+        Assert.Equal(source, new CSharpEmitter().Emit(Parse(conversion.CalorSource!)));
+    }
+
+    [Theory]
+    [InlineData(NullableContextOptions.Disable, false)]
+    [InlineData(NullableContextOptions.Enable, true)]
+    public void ProjectScopedImportsRequireExactDeclaredNullability(
+        NullableContextOptions nullableContext, bool native)
+    {
+        const string source = """
+            namespace Witness
+            {
+                using System.Text;
+                public class Probe { public string Echo(string value) { return value; } }
+            }
+            """;
+        var result = new CSharpToCalorConverter(new() { NullableContextOptions = nullableContext })
+            .ConvertProject(source);
+        Assert.True(result.Success);
+        Assert.False(result.IsSplit);
+        var output = Assert.Single(result.Outputs).Conversion;
+        if (!native)
+        {
+            Assert.Equal("namespace-topology", Assert.Single(output.Losses).Feature);
+            Assert.Equal(source, new CSharpEmitter().Emit(Parse(output.CalorSource!)));
+            Assert.Contains(output.Issues, issue => issue.Feature == "namespace-split-refused"
+                && issue.Message.Contains("declared type/nullability metadata")
+                && issue.Message.Contains("[None]") && issue.Message.Contains("[Annotated]"));
+        }
+        else
+        {
+            Assert.Empty(output.Losses);
+            var original = Compile(source).WithOptions(new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: nullableContext));
+            var generated = Compile(new CSharpEmitter().Emit(Parse(output.CalorSource!)));
+            foreach (var compilation in new[] { original, generated })
+            {
+                var echo = Assert.Single(compilation.GetTypeByMetadataName("Witness.Probe")!.GetMembers("Echo").OfType<IMethodSymbol>());
+                Assert.Equal(NullableAnnotation.NotAnnotated, echo.ReturnNullableAnnotation);
+                Assert.Equal(NullableAnnotation.NotAnnotated, echo.Parameters.Single().NullableAnnotation);
+            }
+        }
+    }
+
+    [Fact]
+    public void ProjectScopedImportsRequireOriginalContextAndKeepStrictEffects()
+    {
+        const string source = """
+            namespace Witness
+            {
+                using System.Threading.Tasks;
+                public static class Probe { public static void Read() { Console.WriteLine("not pure"); } }
+            }
+            """;
+        var standalone = new CSharpToCalorConverter().ConvertProject(source);
+        Assert.False(standalone.Success);
+        Assert.False(standalone.IsSplit);
+        Assert.Contains(Assert.Single(standalone.Outputs).Conversion.Issues,
+            issue => issue.Feature == "namespace-split-source-validation" && issue.Message.Contains("CS0103"));
+        var evaluated = new CSharpToCalorConverter(new() { IncludeImplicitSystemUsing = true }).ConvertProject(source);
+        Assert.True(evaluated.Success);
+        var conversion = Assert.Single(evaluated.Outputs).Conversion;
+        Assert.Empty(conversion.Losses);
+        Assert.True(conversion.Metadata.IncludeImplicitSystemUsing);
+        Assert.Equal("verified", conversion.Paths.RoundTrip);
+        var native = conversion.CalorSource!;
+        Assert.Contains("! cw", native);
+        var rejected = Program.Compile(native.Replace("! cw", "!", StringComparison.Ordinal));
+        Assert.Contains(rejected.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect);
+        var unknown = Program.Compile("module Imports Witness\n  namespace using System\n  func Read () → void\n    !\n    Missing.Run()");
+        Assert.Contains(unknown.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("unknown"));
+    }
+
+    [Theory]
+    [InlineData("module Imports\n  namespace using System")]
+    [InlineData("module Imports Witness\n  namespace global using System")]
+    [InlineData("module Imports Witness\n  namespace\n  using System")]
+    [InlineData("module Imports Witness\n  namespace using\n  class Probe")]
+    [InlineData("module Imports Witness\n  class Probe\n    namespace using System")]
+    public void NamespaceUsingRejectsMissingNamedScopeAndMalformedPlacement(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
+    }
+
+    [Theory]
     [InlineData("internal interface ISource { int Get(); }", "", "ISource", Accessibility.Internal)]
     [InlineData("namespace Contoso.Tools; internal interface ISource { int Get(); }",
         "Contoso.Tools", "ISource", Accessibility.Internal)]
@@ -401,6 +663,17 @@ public sealed class CanonicalNamespaceTests
             ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
                 .Select(path => MetadataReference.CreateFromFile(path)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Empty(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        return compilation;
+    }
+
+    private static CSharpCompilation CompileWithCompanions(string source, string companions)
+    {
+        var compilation = Compile("").RemoveAllSyntaxTrees()
+            .WithOptions(new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(source), CSharpSyntaxTree.ParseText(companions));
         Assert.Empty(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         return compilation;

@@ -537,13 +537,15 @@ Complete example: [TryDouble](#example-task_6).
 
 ## using statement
 
-At compilation-unit scope, imports a namespace or declares an alias. In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.
+Ordinary using imports a namespace or declares an alias at compilation-unit scope. Under a named module header, namespace using retains namespace-local lookup; it is an import marker, not a namespace block. Global using applies across compilation units. Resolved imports do not establish the effects of calls. Native scoped-import conversion requires ConvertProject or migrate --split-namespaces; default single-file conversion preserves that topology as whole-file C#.
+
+In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.
 
 Typed resource headers preserve nullable annotations: `using System.IDisposable?:handle = input` keeps `handle` nullable inside the body.
 
 Generated C# already imports `System`, so names such as `StringComparison` do not need an explicit `using System`. Source declarations, parameters, type parameters and aliases still participate in name lookup; the import does not override them.
 
-Syntax: `using System.Text; using Text = System.Text; using type:name = resource`
+Syntax: `using System.Text; using Text = System.Text; namespace using Text = System.Text; using type:name = resource`
 
 C# equivalents (fragments):
 

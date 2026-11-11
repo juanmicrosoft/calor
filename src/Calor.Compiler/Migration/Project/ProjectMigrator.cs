@@ -689,7 +689,8 @@ public sealed class ProjectMigrator
         ConversionGeneration? generation = null;
         if (_options.Fidelity == ConversionFidelity.Lossless)
         {
-            generation = converter.CreateGeneration(entry.SourcePath, entry.OutputPath, dryRun, entry.NamespaceIndex);
+            generation = converter.CreateGeneration(entry.SourcePath, entry.OutputPath, dryRun, entry.NamespaceIndex,
+                projectConversion: _options.SplitNamespaces);
             if (!generations.TryAdd(Path.GetFullPath(entry.OutputPath), generation))
             {
                 generation.Dispose();
