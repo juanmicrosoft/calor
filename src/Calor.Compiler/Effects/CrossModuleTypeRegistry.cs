@@ -163,7 +163,8 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
                 return false;
         }
         var root = CSharpSyntaxTree.ParseText(output).GetRoot();
-        if (root.ContainsDiagnostics)
+        // Inactive branches are disabled trivia, not syntax names.
+        if (root.ContainsDiagnostics || HasUnprovenTrivia(root))
             return false;
         // Type declarations count too: a new companion can complete or collide
         // with a cached partial owner even without an explicit member access.
@@ -174,6 +175,12 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
             && !root.DescendantNodes().OfType<DelegateDeclarationSyntax>()
                    .Any(type => names.Contains(type.Identifier.ValueText));
 
+        static bool HasUnprovenTrivia(SyntaxNode root) =>
+            root.DescendantTrivia(descendIntoTrivia: true).Any(trivia =>
+                trivia.IsKind(SyntaxKind.DisabledTextTrivia)
+                || trivia.IsDirective && trivia.GetStructure() is not
+                    (NullableDirectiveTriviaSyntax or LineDirectiveTriviaSyntax));
+
         static bool CollectContainerNames(string source, HashSet<string> names)
         {
             var root = CSharpSyntaxTree.ParseText(source,
@@ -181,9 +188,7 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
             if (root.ContainsDiagnostics || root.AttributeLists.Count != 0
                 || root.DescendantNodes().OfType<UsingDirectiveSyntax>()
                     .Any(directive => directive.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword))
-                || root.DescendantTrivia(descendIntoTrivia: true).Any(trivia =>
-                    trivia.IsDirective && trivia.GetStructure() is not
-                        (NullableDirectiveTriviaSyntax or LineDirectiveTriviaSyntax)))
+                || HasUnprovenTrivia(root))
                 return false;
             return root.Members.All(Collect);
 

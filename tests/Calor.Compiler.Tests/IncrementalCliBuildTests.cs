@@ -1114,5 +1114,64 @@ public sealed class NativeProjectCacheTests : IDisposable
         Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(warm.Diagnostics));
     }
 
+    [Fact]
+    public void ConditionalCallerRebindsAliasChangesAndMatchesColdRejection()
+    {
+        const string library = """
+            module Library Contracts block
+              namespace using Result = System.Int32
+              module Arithmetic public
+                func Pick public (int:value) → Result
+                  !
+                  return 0
+            """ + "\n";
+        Write("library", library);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Value public () → int
+                  !
+                  pp NEVER
+                    return Contracts.Arithmetic.Pick(41)
+                  return 7
+            """ + "\n");
+        var initial = Run();
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var statePath = BuildStateCache.GetCachePath(_root);
+        var callerOutput = File.ReadAllText(Path.Combine(_root, "caller.g.cs"));
+
+        Write("library", library.Replace("System.Int32", "System.Int64", StringComparison.Ordinal));
+        var warm = Run();
+        Assert.True(warm.Result.AnyErrors, string.Join("\n", warm.Diagnostics));
+        Assert.Equal("library.calr", Assert.Single(warm.Result.Compiled).File.Name);
+        Assert.Empty(warm.Result.Skipped);
+        Assert.Equal(new[] { "Calor0410", "Calor0411", "Calor0411" },
+            warm.Diagnostics.Select(diagnostic => diagnostic.Code).Order(StringComparer.Ordinal));
+        Assert.Equal("library.calr", Assert.Single(BuildStateCache.Load(_root)!.Files).Key);
+        Assert.Equal(callerOutput, File.ReadAllText(Path.Combine(_root, "caller.g.cs")));
+        var state = File.ReadAllText(statePath);
+        var outputs = Directory.GetFiles(_root, "*.g.cs").ToDictionary(path => path, File.ReadAllText);
+
+        var repeated = Run();
+        Assert.True(repeated.Result.AnyErrors);
+        Assert.Empty(repeated.Result.Compiled);
+        Assert.Equal("library.calr", Assert.Single(repeated.Result.Skipped).Name);
+
+        var cold = Run(clear: true);
+        Assert.True(cold.Result.AnyErrors);
+        Assert.Equal("library.calr", Assert.Single(cold.Result.Compiled).File.Name);
+        Assert.Empty(cold.Result.Skipped);
+        Assert.Equal(state, File.ReadAllText(statePath));
+        Assert.All(outputs, output => Assert.Equal(output.Value, File.ReadAllText(output.Key)));
+        var warmFields = System.Text.Json.JsonSerializer.Serialize(warm.Diagnostics.ToArray());
+        var coldFields = System.Text.Json.JsonSerializer.Serialize(cold.Diagnostics.ToArray());
+        _output.WriteLine("ConditionalWarmDiagnostics:" + warmFields);
+        _output.WriteLine("ConditionalColdDiagnostics:" + coldFields);
+        Assert.Equal(coldFields, warmFields);
+        Assert.Equal(coldFields, System.Text.Json.JsonSerializer.Serialize(repeated.Diagnostics.ToArray()));
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }
