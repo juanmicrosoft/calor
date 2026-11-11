@@ -120,6 +120,173 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     }
 
     [Theory]
+    [InlineData("text.ToCharArray()", true)]
+    [InlineData("new char[2]", false)]
+    public void ObliviousArrayInitializerEstablishesOnlyContainerFlow(string initializer, bool metadataCall)
+    {
+        var source = $$"""
+            module InitializedArray nullable oblivious
+              func Probe public (string:text) → void
+                ! alloc, mut
+                let char[]:values = {{initializer}}
+                System.Array.Reverse(values)
+            """;
+        var (bound, diagnostics) = Bind(source);
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        var probe = Assert.Single(bound.Functions);
+        var declaration = Assert.IsType<BoundBindStatement>(probe.Body[0]);
+        var declared = Assert.IsType<ArrayBoundType>(declaration.Variable.MethodInputArrayType);
+        Assert.Equal(NullableAnnotation.Oblivious, declared.NullableAnnotation);
+        if (metadataCall)
+        {
+            var call = Assert.IsType<BoundCallExpression>(declaration.Initializer);
+            Assert.NotNull(call.ResolvedMetadataMethod);
+            Assert.Equal("ToCharArray", call.ResolvedMetadataMethod.Name);
+            Assert.Equal(Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated,
+                Assert.IsAssignableFrom<IArrayTypeSymbol>(call.ResolvedMetadataMethod.ReturnType).NullableAnnotation);
+        }
+        var receiving = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundExpressionStatement>(probe.Body[1]).Expression);
+        var argument = Assert.IsType<BoundVariableExpression>(Assert.Single(receiving.Arguments));
+        var flow = Assert.IsType<ArrayBoundType>(NullabilityChecker.GetMethodInputArrayType(argument));
+        Assert.Equal(NullableAnnotation.NotAnnotated, flow.NullableAnnotation);
+        Assert.Same(declared.ElementType, flow.ElementType);
+        Assert.Same(declaration.Variable, argument.Variable.StorageIdentity);
+
+        var compiled = Program.Compile(source, "initialized-array.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        using var context = MetadataContext.Create();
+        var tree = CSharpSyntaxTree.ParseText(compiled.GeneratedCode);
+        var generated = context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var local = tree.GetRoot().DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .Single(node => node.Identifier.ValueText == "values");
+        var symbol = Assert.IsAssignableFrom<ILocalSymbol>(generated.GetSemanticModel(tree).GetDeclaredSymbol(local));
+        Assert.Equal(Microsoft.CodeAnalysis.NullableAnnotation.None, symbol.NullableAnnotation);
+        using var image = new MemoryStream();
+        Assert.True(generated.Emit(image).Success);
+    }
+
+    [Theory]
+    [InlineData("nullable", false)]
+    [InlineData("legacy", false)]
+    [InlineData("NullableProducer(nullable)", false)]
+    [InlineData("LegacyProducer()", false)]
+    [InlineData("unknown.ToCharArray()", true)]
+    public void ObliviousArrayInitializerRequiresActualNonNullProducer(string initializer, bool unselected)
+    {
+        var source = $$"""
+            module UnprovenArray nullable oblivious
+              func NullableProducer public (char[]?:value) → char[]?
+                !
+                return value
+              func LegacyProducer public () → char[]
+                ! alloc
+                return new char[1]
+              func Probe public (char[]?:nullable, char[]:legacy, object:unknown) → void
+                ! alloc, mut
+                let char[]:values = {{initializer}}
+                System.Array.Reverse(values)
+            """;
+        var (bound, diagnostics) = Bind(source);
+        var probe = bound.Functions.Single(function => function.Symbol.Name == "Probe");
+        var declaration = Assert.IsType<BoundBindStatement>(probe.Body[0]);
+        if (unselected)
+        {
+            var call = Assert.IsType<BoundCallExpression>(declaration.Initializer);
+            Assert.Null(call.ResolvedMetadataMethod);
+            Assert.Empty(call.SelectedOverloadMatches);
+        }
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && diagnostic.Message.Contains("container", StringComparison.Ordinal));
+        Assert.True(Program.Compile(source, "unproven-array.calr").HasErrors);
+    }
+
+    [Theory]
+    [InlineData("string", NullableAnnotation.Oblivious)]
+    [InlineData("string?", NullableAnnotation.Annotated)]
+    public void InitializedArrayContainerDoesNotStrengthenDeclaredElements(
+        string elementType, NullableAnnotation annotation)
+    {
+        var source = $$"""
+            module ArrayElements nullable oblivious
+              func Probe public () → void
+                ! alloc, fw
+                let {{elementType}}[]:values = new {{elementType}}[1]
+                System.IO.File.WriteAllLines("unused", values)
+            """;
+        var (bound, diagnostics) = Bind(source);
+        var probe = Assert.Single(bound.Functions);
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundExpressionStatement>(probe.Body[1]).Expression);
+        var array = Assert.IsType<ArrayBoundType>(
+            NullabilityChecker.GetMethodInputArrayType(call.Arguments[1]));
+        Assert.Equal(NullableAnnotation.NotAnnotated, array.NullableAnnotation);
+        Assert.Equal(annotation, Assert.IsType<NominalBoundType>(array.ElementType).NullableAnnotation);
+        var mismatch = Assert.Single(diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Contains("element", mismatch.Message);
+        Assert.DoesNotContain("requires non-null array container", mismatch.Message);
+        Assert.True(Program.Compile(source, "array-elements.calr").HasErrors);
+    }
+
+    [Theory]
+    [InlineData("set values null", true)]
+    [InlineData("var char[]:values = other", true)]
+    [InlineData("Change(ref values)", true)]
+    [InlineData("Replace(out values)", true)]
+    [InlineData("if flag\n  set values null", true)]
+    [InlineData("if flag\n  System.Array.Reverse(values)", false)]
+    [InlineData("while flag\n  System.Array.Reverse(values)\n  set values null", true)]
+    [InlineData("while flag\n  System.Array.Reverse(values)\n  Change(ref values)", true)]
+    [InlineData("for i from 0 to 1 step 1\n  System.Array.Reverse(values)\n  set values null", true)]
+    [InlineData("let System.Action:later ! mut = () ! mut => Change(ref values)\nlater()", true)]
+    [InlineData("let System.Action:later ! mut = () ! mut => Change(ref values)", false)]
+    public void InitializedArrayContainerFlowUsesStorageInvalidation(string operation, bool rejected)
+    {
+        var source = """
+            module ArrayWrites nullable oblivious
+              func Change public (ref char[]:value) → void
+                ! mut
+                set value null
+              func Replace public (out char[]:value) → void
+                ! mut
+                set value null
+              func Probe public (bool:flag, char[]:other) → void
+                ! alloc, mut
+                var char[]:values = new char[1]
+            """ + "\n" + string.Join("\n", operation.Split('\n').Select(line => "    " + line))
+            + "\n    System.Array.Reverse(values)";
+        var compiled = Program.Compile(source, "array-writes.calr");
+        var findings = compiled.Diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        Assert.Equal(rejected, findings.Length != 0);
+        Assert.Equal(rejected, compiled.HasErrors);
+        if (operation.StartsWith("while", StringComparison.Ordinal) || operation.StartsWith("for", StringComparison.Ordinal))
+            Assert.Equal(2, findings.Length);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InitializedArrayContainerProofCannotOutliveMutableCapture(bool mutable)
+    {
+        var source = $$"""
+            module CapturedArray nullable oblivious
+              func Probe public () → void
+                ! alloc, mut
+                {{(mutable ? "var" : "let")}} char[]:values = new char[1]
+                let System.Action:later ! mut = () ! mut => System.Array.Reverse(values)
+                {{(mutable ? "set values null" : "")}}
+                later()
+            """;
+        var compiled = Program.Compile(source, "captured-array.calr");
+        Assert.Equal(mutable, compiled.Diagnostics.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(mutable, compiled.HasErrors);
+    }
+
+    [Theory]
     [InlineData("ref", false)]
     [InlineData("out", false)]
     [InlineData("ref", true)]

@@ -2792,6 +2792,12 @@ public sealed class Binder
             loopMayWriteAliases = _aliasInvalidations != aliasInvalidationsBefore;
             summary = new CallableMutationSummary
             {
+                Mutations = GetDeferredMutations(boundCondition, body)
+                    .Select(variable => variable.StorageIdentity)
+                    .Where(variable => variable is
+                        { IsField: false, IsProperty: false, MethodInputArrayType: not null })
+                    .Distinct<VariableSymbol>(ReferenceEqualityComparer.Instance)
+                    .ToArray(),
                 Alternatives = GetDeferredCallEffects(boundCondition, body).ToArray(),
                 Writes = _deferredCallableWrites.ToArray()
             };
@@ -3103,6 +3109,20 @@ public sealed class Binder
         }
         if (initializer is not null)
             SetCallableState(variable, initializer);
+
+        if (variable.MethodInputArrayType is
+                { NullableAnnotation: BoundTypes.NullableAnnotation.Annotated or BoundTypes.NullableAnnotation.Oblivious } declaredArray
+            && initializer is { HasUnknownInferredType: false }
+            && NullabilityChecker.GetMethodInputArrayType(initializer) is
+                { NullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated } initializedArray
+            && initializedArray.Rank == declaredArray.Rank
+            && (initializer is not BoundCallExpression call
+                || !call.HasUnresolvedArguments && !call.HasOpaqueOverloads && !call.IsInaccessibleCall
+                    && (call.ResolvedMetadataMethod is not null || call.SelectedOverloadMatches.Count == 1)))
+        {
+            // The declaration keeps its annotations; only the current container value is non-null.
+            DeclareNarrowedNonNullVariable(new ReferenceNode(bind.IdentifierSpan, bind.Name), variable);
+        }
 
         // v0.14 §S3 nullability check (issue #875, D2 predicate). Fires when
         // an explicit :string / :str target is initialized with a value whose
@@ -5961,6 +5981,17 @@ public sealed class Binder
         foreach (var (variable, _) in mutableArrayResults)
             variable.MetadataArrayResultType = null;
         var outerFlowNarrowings = _flowNarrowingSources.ToArray();
+        // A rebindable captured array may change before the deferred body runs.
+        foreach (var (narrowed, _) in outerFlowNarrowings)
+        {
+            if (narrowed.MethodInputArrayType is not null
+                && narrowed.StorageIdentity is { IsField: false, IsProperty: false } storage
+                && CanRebind(storage)
+                && ReferenceEquals(_scope.Lookup(narrowed.Name), narrowed))
+            {
+                InvalidateMutableFlowNarrowing(narrowed, requireRebindable: false);
+            }
+        }
         var outerCallableState = CaptureCallableState();
         var outerCallableWrites = _deferredCallableWrites;
         _deferredCallableWrites = [];

@@ -61,7 +61,12 @@ its C# metadata has `NullableAnnotation.None`. Explicit `string?` still has
 `Annotated` metadata. The policy also applies inside arrays and generic arguments;
 it does not change CLR types or turn an unknown value into a non-null value.
 Passing an oblivious value to a non-null receiving parameter still requires
-an explicit check. This is a file-wide annotation context, not a way to disable
+a genuine non-null proof, such as an explicit check. An array initializer can
+establish that proof for the container through a selected non-null return or
+array creation. It does not strengthen element annotations or change declared
+metadata. Reassignment or a call that may rebind the array invalidates the proof.
+A deferred body cannot rely on its creation-time proof for a captured mutable binding.
+This is a file-wide annotation context, not a way to disable
 Calor's receiving, type, or effect checks.
 
 Generated C# disables only nullable **annotations**, while enabling nullable
