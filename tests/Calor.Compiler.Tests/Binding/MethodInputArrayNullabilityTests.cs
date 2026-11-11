@@ -14,6 +14,176 @@ namespace Calor.Compiler.Tests;
 
 public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelper output)
 {
+    public static IEnumerable<object[]> NestedMetadataArrayDeclarations()
+    {
+        foreach (var type in new[]
+        {
+            "System.Collections.Generic.List<string[]>[]",
+            "System.Collections.Generic.List<string?[]>[]",
+            "System.Collections.Generic.List<string[]?>[]",
+            "System.Collections.Generic.List<string[]>?[]",
+            "System.Collections.Generic.List<string[]>[]?",
+            "System.Collections.Generic.List<string?[]?>?[]?",
+            "System.Collections.Generic.List<System.String?[,]?[]?>[,][]?",
+            "System.Collections.Generic.List<System.Collections.Generic.List<string?[]>?[]>[]",
+            "System.Collections.Generic.List<Text?[]>[]",
+            "System.Collections.Generic.List<string?>[]"
+        })
+        foreach (var oblivious in new[] { false, true })
+            yield return [type, oblivious];
+    }
+
+    [Theory]
+    [MemberData(nameof(NestedMetadataArrayDeclarations))]
+    public void MetadataArrayDeclaration_PreservesNestedAnnotationsAndSelectedSymbols(string type, bool oblivious)
+    {
+        var source = $$"""
+            module NestedMetadataArray{{(oblivious ? " nullable oblivious" : "")}}
+              using Text = System.String
+              func Echo public ({{type}}:value) → {{type}}
+                !
+                return value
+            """;
+        var (bound, diagnostics) = Bind(source);
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        var parameter = Assert.Single(Assert.Single(bound.Functions).Symbol.Parameters);
+        var actual = Assert.IsType<ArrayBoundType>(parameter.MethodInputArrayType);
+
+        using var context = MetadataContext.Create();
+        var tree = CSharpSyntaxTree.ParseText($$"""
+            #nullable {{(oblivious ? "disable" : "enable")}}
+            using Text = System.String;
+            public static class Oracle {
+                public static {{type}} Echo({{type}} value) => value;
+            }
+            """);
+        var oracle = context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        Assert.DoesNotContain(oracle.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var method = Assert.IsAssignableFrom<IMethodSymbol>(
+            Assert.Single(oracle.GetTypeByMetadataName("Oracle")!.GetMembers("Echo")));
+        var expected = Assert.IsAssignableFrom<IArrayTypeSymbol>(Assert.Single(method.Parameters).Type);
+        AssertDeclarationGraph(expected, actual, "value");
+
+        var compiled = Program.Compile(source, "nested-metadata-array.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var emitted = AssertEmittedArrayParameter(compiled.GeneratedCode, "Echo", expected.Rank);
+        Assert.True(SymbolEqualityComparer.IncludeNullability.Equals(expected, emitted),
+            $"Expected {expected.ToDisplayString()}, emitted {emitted.ToDisplayString()}");
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void NestedMetadataArrayRead_KeepsDeclaredLeafAndDiagnosticSite(
+        bool oblivious, bool nullableElement, bool local)
+    {
+        var expression = $"{(local ? "copy" : "value")}[0][0][0]";
+        var source = $$"""
+            module NestedMetadataRead{{(oblivious ? " nullable oblivious" : "")}}
+              func Probe public (System.Collections.Generic.List<System.String{{(nullableElement ? "?" : "")}}[]>[]:value) → int
+                !
+                {{(local ? "let copy = value" : "")}}
+                return System.Int32.Parse({{expression}})
+            """;
+        var (bound, diagnostics) = Bind(source);
+        var function = Assert.Single(bound.Functions);
+        var outer = Assert.IsType<ArrayBoundType>(Assert.Single(function.Symbol.Parameters).MethodInputArrayType);
+        var generic = Assert.IsType<GenericInstantiationBoundType>(outer.ElementType);
+        var inner = Assert.IsType<ArrayBoundType>(Assert.Single(generic.TypeArguments));
+        var leaf = Assert.IsType<NominalBoundType>(inner.ElementType);
+        Assert.Equal(nullableElement ? NullableAnnotation.Annotated
+            : oblivious ? NullableAnnotation.Oblivious : NullableAnnotation.NotAnnotated, leaf.NullableAnnotation);
+        Assert.Equal(SpecialType.System_String, leaf.RoslynSymbol!.SpecialType);
+        var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(function.Body[^1]).Expression);
+        var argument = Assert.IsType<BoundArrayAccess>(Assert.Single(call.Arguments));
+        var innerRead = Assert.IsType<BoundArrayAccess>(argument.Array);
+        var genericRead = Assert.IsType<BoundArrayAccess>(innerRead.Array);
+        Assert.Same(generic, genericRead.Type);
+        Assert.Same(inner, innerRead.Type);
+        Assert.Same(leaf, argument.Type);
+
+        var rejected = nullableElement || oblivious;
+        var findings = diagnostics.Where(diagnostic => BindingDiagnosticPolicy.IsCompilationError(diagnostic)).ToArray();
+        Assert.Equal(rejected ? 1 : 0, findings.Length);
+        if (rejected)
+        {
+            var finding = Assert.Single(findings);
+            Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, finding.Code);
+            Assert.Equal(argument.Span, finding.Span);
+            Assert.Equal(expression, source.Substring(finding.Span.Start, finding.Span.Length));
+            Assert.Contains(leaf.NullableAnnotation.ToString(), finding.Message);
+        }
+        var compiled = Program.Compile(source, "nested-metadata-read.calr");
+        Assert.Equal(rejected, compiled.HasErrors);
+        if (rejected)
+        {
+            var finding = Assert.Single(compiled.Diagnostics.Errors);
+            Assert.Equal(Assert.Single(findings).Code, finding.Code);
+            Assert.Equal(argument.Span, finding.Span);
+            Assert.Equal(Assert.Single(findings).Message, finding.Message);
+            Assert.Empty(compiled.GeneratedCode);
+        }
+        else
+        {
+            using var context = MetadataContext.Create();
+            var tree = CSharpSyntaxTree.ParseText(compiled.GeneratedCode);
+            using var image = new MemoryStream();
+            var emitted = context.HostCompilationForBinder.AddSyntaxTrees(tree).Emit(image);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            var probe = System.Reflection.Assembly.Load(image.ToArray()).GetTypes()
+                .SelectMany(type => type.GetMethods()).Single(method => method.Name == "Probe");
+            Assert.Equal(123, probe.Invoke(null, [new List<string[]>[] { new() { new[] { "123" } } }]));
+        }
+    }
+
+    private void AssertDeclarationGraph(ITypeSymbol expected, BoundType actual, string path)
+    {
+        output.WriteLine($"{path}: Roslyn {expected.Kind} {expected.ToDisplayString()} {expected.NullableAnnotation}; "
+            + $"bound {actual.GetType().Name} {actual.DisplayString} {NullabilityChecker.GetAnnotation(actual)}");
+        Assert.Equal(MetadataBinderResult.MapAnnotation(expected.NullableAnnotation),
+            NullabilityChecker.GetAnnotation(actual));
+        switch (expected)
+        {
+            case IArrayTypeSymbol array:
+                var boundArray = Assert.IsType<ArrayBoundType>(actual);
+                Assert.Equal(array.Rank, boundArray.Rank);
+                AssertDeclarationGraph(array.ElementType, boundArray.ElementType, path + ".element");
+                if (boundArray.RoslynSymbol is { } selectedArray)
+                    Assert.True(SymbolEqualityComparer.IncludeNullability.Equals(array, selectedArray));
+                break;
+            case INamedTypeSymbol { IsGenericType: true } generic:
+                var boundGeneric = Assert.IsType<GenericInstantiationBoundType>(actual);
+                var selected = Assert.IsAssignableFrom<INamedTypeSymbol>(boundGeneric.RoslynSymbol);
+                Assert.Null(boundGeneric.Definition.Declaration);
+                Assert.Equal(generic.ContainingAssembly.Identity, selected.ContainingAssembly.Identity);
+                Assert.True(SymbolEqualityComparer.Default.Equals(generic.OriginalDefinition, selected.OriginalDefinition));
+                Assert.True(SymbolEqualityComparer.Default.Equals(boundGeneric.Definition.RoslynSymbol, selected.ConstructedFrom));
+                Assert.Equal(generic.TypeArguments.Length, boundGeneric.TypeArguments.Length);
+                for (var index = 0; index < generic.TypeArguments.Length; index++)
+                    AssertDeclarationGraph(generic.TypeArguments[index], boundGeneric.TypeArguments[index],
+                        $"{path}.argument[{index}]");
+                Assert.True(SymbolEqualityComparer.IncludeNullability.Equals(generic, selected));
+                break;
+            case INamedTypeSymbol nominal:
+                var boundNominal = Assert.IsType<NominalBoundType>(actual);
+                Assert.Null(boundNominal.Declaration);
+                Assert.Equal(nominal.SpecialType, boundNominal.RoslynSymbol!.SpecialType);
+                Assert.Equal(nominal.ContainingAssembly.Identity, boundNominal.RoslynSymbol.ContainingAssembly.Identity);
+                Assert.True(SymbolEqualityComparer.IncludeNullability.Equals(nominal, boundNominal.RoslynSymbol));
+                break;
+            default:
+                Assert.Fail($"Unexpected oracle type {expected}");
+                break;
+        }
+    }
+
     public static IEnumerable<object[]> NativeMatrix()
     {
         for (var sourceShape = 0; sourceShape < 4; sourceShape++)

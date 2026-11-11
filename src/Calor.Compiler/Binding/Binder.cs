@@ -428,7 +428,7 @@ public sealed class Binder
                 _declaredReferenceAnnotation))
             return ResolveComputedMetadataType(context, element, namespaceScopeId,
                     namespaceIdentity, containingTypeName, declaredTypeParameters) is { } arrayElement
-                ? context.HostCompilationForBinder.CreateArrayTypeSymbol(arrayElement, rank)
+                ? context.HostCompilationForBinder.CreateArrayTypeSymbol(arrayElement, rank, arrayElement.NullableAnnotation)
                     .WithNullableAnnotation(arrayAnnotation == BoundTypes.NullableAnnotation.Annotated
                         ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
                         : arrayAnnotation == BoundTypes.NullableAnnotation.Oblivious
