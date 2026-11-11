@@ -11,7 +11,7 @@ namespace Calor.Compiler.Tests;
 /// binding surface, and it must cover the concrete ExpressionNode subclass set EXACTLY —
 /// in both directions. A new node class with no dispatch entry, or a stale entry for a
 /// removed class, fails here by construction (the code-side half of F-1's bidirectional
-/// completeness rule). The current language has 56 accepted expression classes;
+/// completeness rule). The current language has 57 accepted expression classes;
 /// KeywordArgNode is a parser helper rather than a value expression.
 /// </summary>
 public class BinderDispatchCompletenessTests
@@ -41,6 +41,18 @@ public class BinderDispatchCompletenessTests
               func Probe () → Func<{{carrier}}<int>>
                 return async () => 42
             """, expectedCount);
+    }
+
+    [Theory]
+    [InlineData("checked")]
+    [InlineData("unchecked")]
+    public void OverflowScope_CountsItsWrapperAndEveryOperandOnce(string keyword)
+    {
+        AssertExpressionCount($$"""
+            module OverflowAccounting
+              func Probe () → void
+                let int:value = {{keyword}}(1 + 2)
+            """, 4);
     }
 
     [Fact]
@@ -125,7 +137,8 @@ public class BinderDispatchCompletenessTests
         // value object that can no longer TYPE as an expression, so it leaves the
         // denominator by becoming unrepresentable, not by being silently skipped.
         // #1617 removes Some/None/Ok/Err expression classes from the current language.
+        // Native checked/unchecked expressions add one explicit lexical-scope class in 0.30.
         // The historical registration stays unchanged; exact surviving dispatch is checked above.
-        Assert.Equal(56, ConcreteExpressionTypes().Count);
+        Assert.Equal(57, ConcreteExpressionTypes().Count);
     }
 }
