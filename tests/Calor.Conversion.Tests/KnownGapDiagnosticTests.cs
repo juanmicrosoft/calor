@@ -1,3 +1,5 @@
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -77,9 +79,10 @@ public class KnownGapDiagnosticTests
         _output.WriteLine($"[{id}] Checking graceful fallback in output...");
         _output.WriteLine(result.CalorSource);
 
-        // If the conversion produced output, it should still have a module structure
-        // (not garbage or partial output). The presence of §M indicates structure.
-        Assert.Contains("\u00A7M{", result.CalorSource);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(result.CalorSource, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors));
+        Assert.Equal($"Gap_{id.Replace("-", "_")}", module.Name);
     }
 
     [Fact]

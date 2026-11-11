@@ -1,7 +1,9 @@
 using System.Runtime.Loader;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -84,8 +86,8 @@ public class WedgeW4SliceAStructuralTests
         foreach (var l in ppLosses) _output.WriteLine(l.ToString());
         _output.WriteLine(result.CalorSource!);
 
-        Assert.Contains("§R 2", result.CalorSource);
-        Assert.DoesNotContain("§R 1", result.CalorSource);
+        Assert.Contains("return 2", result.CalorSource);
+        Assert.DoesNotContain("return 1", result.CalorSource);
         Assert.NotEmpty(ppLosses);
         Assert.True(result.Context.Losses.Count > 0,
             "Conditional compilation must make the file non-native (LossCount > 0).");
@@ -364,7 +366,12 @@ public class WedgeW4SliceAStructuralTests
         Assert.IsType<LambdaExpressionNode>(binding.Initializer);
         Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(result.Ast!),
             node => node is LocalFunctionStatementNode);
-        Assert.Contains("§LAM{", result.CalorSource);
+        var diagnostics = new DiagnosticBag();
+        var parsed = new Parser(new Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors));
+        var parsedBinding = Assert.Single(RecursiveAstWalker.DescendantsAndSelf(parsed)
+            .OfType<BindStatementNode>(), node => node.Name == localName);
+        Assert.IsType<LambdaExpressionNode>(parsedBinding.Initializer);
         // Never hoisted as a module function.
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == localName);
     }
