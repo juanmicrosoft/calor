@@ -13,10 +13,7 @@ using Xunit.Abstractions;
 namespace Calor.Conversion.Tests;
 
 /// <summary>
-/// Tests that convert C# snippets from challenge reports and compare
-/// against approved .calr snapshot files.
-///
-/// To update snapshots, set CALOR_UPDATE_SNAPSHOTS=1 and run tests.
+/// Tests current conversion output separately from faithful historical snapshot inputs.
 /// </summary>
 public class SnapshotConversionTests
 {
@@ -279,13 +276,14 @@ public class SnapshotConversionTests
         }
     }
 
-    private static string RunSnapshotProbe(string source, string driver, string ownerPrefix)
+    private static string RunSnapshotProbe(string source, string driver, string ownerPrefix, string[]? symbols = null)
     {
         var probe = "public static class CurrentSnapshotProbe { public static string Run() { "
             + driver.Replace("$N$", ownerPrefix, StringComparison.Ordinal) + " } }";
         var compilation = CSharpCompilation.Create("SnapshotRuntime_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble),
-                CSharpSyntaxTree.ParseText(source), CSharpSyntaxTree.ParseText(probe)],
+                CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(preprocessorSymbols: symbols)),
+                CSharpSyntaxTree.ParseText(probe)],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
         using var stream = new MemoryStream();
@@ -621,22 +619,165 @@ public class SnapshotConversionTests
     [MemberData(nameof(SupportedSnippetData))]
     public void Convert_MatchesApprovedSnapshot(string id, string description, string csharpSource)
     {
-        var snapshotName = $"{id}.approved.calr";
-        var approved = TestHelpers.ReadSnapshot(snapshotName);
-
-        var result = TestHelpers.ConvertCSharp(csharpSource, $"Test_{id.Replace("-", "_")}");
+        var fixturePath = Path.Combine(Calor.Compiler.Tests.ActiveSyntaxInputs.RepositoryRoot,
+            "tests/TestData/Conversion/snapshot-current-output.json");
+        var expectations = JsonSerializer.Deserialize<Dictionary<string, CurrentSnapshotExpectation>>(
+            File.ReadAllText(fixturePath))!;
+        Assert.Equal(SupportedSnippetData().Select(row => (string)row[0]), expectations.Keys);
+        var expected = expectations[id];
+        Assert.Equal(expected.CSharpSource, csharpSource);
+        var moduleName = $"Test_{id.Replace("-", "_")}";
+        var result = TestHelpers.ConvertCSharp(csharpSource, moduleName);
 
         Assert.True(result.Success,
             $"Conversion failed for [{id}] {description}: " +
             string.Join("; ", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
 
-        VerifySnapshot(
-            snapshotName,
-            approved,
-            result.CalorSource!,
-            Environment.GetEnvironmentVariable("CALOR_UPDATE_SNAPSHOTS") == "1",
-            WriteSnapshot);
+        VerifySnapshot($"{id}.current", expected.CalorSource, result.CalorSource!, updateMode: false,
+            (_, _) => throw new InvalidOperationException("Current-output fixtures require independent review."));
+        Assert.Equal(expected.NativeConversionCount, result.NativeConversionCount);
+        Assert.Equal(expected.InteropPreservationCount, result.InteropPreservationCount);
+        Assert.Equal(expected.LossySubstitutionCount, result.LossySubstitutionCount);
+        Assert.Equal(expected.DropCount, result.DropCount);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Empty(diagnostics);
+        var generated = new CSharpEmitter().Emit(module);
+        var reemittedDiagnostics = new DiagnosticBag();
+        var reemitted = new CalorEmitter().Emit(module);
+        var reparsed = new Parser(new Lexer(reemitted, reemittedDiagnostics).TokenizeAllForParser(),
+            reemittedDiagnostics).Parse();
+        Assert.Empty(reemittedDiagnostics);
+        Assert.Equal(generated, new CSharpEmitter().Emit(reparsed));
+
+        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+        {
+            var before = SnapshotCompilation(csharpSource, symbols);
+            var after = SnapshotCompilation(generated, symbols);
+            Assert.Equal(SnapshotErrors(before), SnapshotErrors(after));
+            Assert.Equal(SnapshotApi(before, moduleName), SnapshotApi(after, moduleName));
+            Assert.Equal(SnapshotCallTargets(before, moduleName), SnapshotCallTargets(after, moduleName));
+        }
+
+        var production = Calor.Compiler.Program.Compile(result.CalorSource!, $"{id}.calr");
+        Assert.Equal(expected.NativeErrors, production.Diagnostics.Errors.Select(error => $"{error.Code}: {error.Message}"));
+        if (expected.NativeErrors.Length == 0)
+        {
+            Assert.Contains(expected.ProbeKind, new[] { "behavior", "completion", "metadata" });
+            Assert.NotNull(expected.RuntimeDriver);
+            Assert.Equal(
+                RunSnapshotProbe(csharpSource, expected.RuntimeDriver, "", expected.RuntimeSymbols),
+                RunSnapshotProbe(production.GeneratedCode, expected.RuntimeDriver, moduleName + ".", expected.RuntimeSymbols));
+        }
+        else
+        {
+            Assert.Equal("rejected", expected.ProbeKind);
+            Assert.Null(expected.RuntimeDriver);
+            Assert.True(production.HasErrors);
+            // Generated-code validation retains the rejected C# for diagnostics; never execute it.
+            if (expected.NativeErrors.All(error => error.StartsWith("Calor1002:", StringComparison.Ordinal)))
+                Assert.Equal(SnapshotDeclarations(generated, false, false, []),
+                    SnapshotDeclarations(production.GeneratedCode, false, false, []));
+            else
+                Assert.Empty(production.GeneratedCode);
+        }
+    }
+
+    private sealed record CurrentSnapshotExpectation(
+        string CSharpSource, string CalorSource, int NativeConversionCount, int InteropPreservationCount,
+        int LossySubstitutionCount, int DropCount, string[] NativeErrors, string ProbeKind,
+        string? RuntimeDriver, string[] RuntimeSymbols);
+
+    private static CSharpCompilation SnapshotCompilation(string source, string[] symbols) =>
+        CSharpCompilation.Create("SnapshotContract_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(preprocessorSymbols: symbols))],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+
+    private static string[] SnapshotErrors(CSharpCompilation compilation) =>
+        compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            .Select(diagnostic => $"{diagnostic.Id}: {diagnostic.GetMessage()}: "
+                + diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan)).ToArray();
+
+    private static string[] SnapshotApi(CSharpCompilation compilation, string moduleName)
+    {
+        var signatures = new List<string>();
+        Collect(compilation.Assembly.GlobalNamespace);
+        return signatures.Order(StringComparer.Ordinal).ToArray();
+
+        string Name(ISymbol? symbol) =>
+            (symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ?? "<null>")
+                .Replace(moduleName + ".", "", StringComparison.Ordinal);
+        string Parameters(IMethodSymbol method) => string.Join(",", method.Parameters.Select(parameter =>
+            $"{parameter.RefKind}:{Name(parameter.Type)}:{parameter.NullableAnnotation}:{parameter.Name}:{parameter.IsParams}:{parameter.IsOptional}:"
+                + (parameter.HasExplicitDefaultValue ? parameter.ExplicitDefaultValue?.ToString() ?? "null" : "-")));
+        string Constraints(ITypeParameterSymbol parameter) =>
+            $"{parameter.Name}:{parameter.Variance}:{parameter.HasReferenceTypeConstraint}:{parameter.ReferenceTypeConstraintNullableAnnotation}:"
+            + $"{parameter.HasNotNullConstraint}:{parameter.HasValueTypeConstraint}:{parameter.HasUnmanagedTypeConstraint}:{parameter.HasConstructorConstraint}:"
+            + string.Join(",", parameter.ConstraintTypes.Select(Name));
+        void Collect(INamespaceOrTypeSymbol owner)
+        {
+            foreach (var symbol in owner.GetMembers())
+            {
+                if (symbol is INamespaceSymbol ns)
+                    Collect(ns);
+                else if (symbol is INamedTypeSymbol type)
+                {
+                    signatures.Add($"type:{Name(type)}:{type.TypeKind}:{type.DeclaredAccessibility}:{type.IsStatic}:{type.IsAbstract}:"
+                        + $"{type.IsSealed}:{type.IsReadOnly}:{Name(type.BaseType)}:{string.Join(",", type.Interfaces.Select(Name))}:"
+                        + $"{string.Join("|", type.TypeParameters.Select(Constraints))}:{string.Join(",", type.GetAttributes().Select(attribute => Name(attribute.AttributeClass)))}");
+                    Collect(type);
+                }
+                else if (!symbol.IsImplicitlyDeclared)
+                {
+                    var head = $"{Name(symbol)}:{symbol.DeclaredAccessibility}:{symbol.IsStatic}";
+                    switch (symbol)
+                    {
+                        case IMethodSymbol method when method.MethodKind is MethodKind.Ordinary or MethodKind.Constructor
+                            or MethodKind.StaticConstructor or MethodKind.UserDefinedOperator or MethodKind.Conversion:
+                            signatures.Add($"method:{head}:{method.MethodKind}:{Name(method.ReturnType)}:{method.ReturnNullableAnnotation}:"
+                                + $"{method.RefKind}:{method.IsAbstract}:{method.IsVirtual}:{method.IsOverride}:{Parameters(method)}:"
+                                + string.Join("|", method.TypeParameters.Select(Constraints)));
+                            break;
+                        case IPropertySymbol property:
+                            signatures.Add($"property:{head}:{Name(property.Type)}:{property.NullableAnnotation}:{property.IsRequired}:"
+                                + $"{property.GetMethod?.DeclaredAccessibility}:{property.SetMethod?.DeclaredAccessibility}:{property.SetMethod?.IsInitOnly}");
+                            break;
+                        case IFieldSymbol field:
+                            signatures.Add($"field:{head}:{Name(field.Type)}:{field.NullableAnnotation}:{field.IsConst}:{field.ConstantValue}:{field.IsReadOnly}");
+                            break;
+                        case IEventSymbol @event:
+                            signatures.Add($"event:{head}:{Name(@event.Type)}");
+                            break;
+                    }
+                }
+            }
+        }
+    }
+
+    private static string[] SnapshotCallTargets(CSharpCompilation compilation, string moduleName)
+    {
+        var targets = new List<string>();
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        foreach (var node in tree.GetRoot().DescendantNodes().Where(node =>
+            node is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax))
+        {
+            var owner = node.Ancestors().FirstOrDefault(parent => parent is BaseMethodDeclarationSyntax
+                or PropertyDeclarationSyntax || parent is VariableDeclaratorSyntax variable
+                && variable.Parent?.Parent is FieldDeclarationSyntax);
+            var ownerSymbol = owner == null ? null : model.GetDeclaredSymbol(owner);
+            var binding = model.GetSymbolInfo(node);
+            var kind = node is BaseObjectCreationExpressionSyntax ? "constructor" : "invocation";
+            targets.Add($"{Name(ownerSymbol)}:{kind}:{Name(binding.Symbol)}:{binding.CandidateReason}:"
+                + string.Join(",", binding.CandidateSymbols.Select(Name)));
+        }
+        return targets.Order(StringComparer.Ordinal).ToArray();
+
+        string Name(ISymbol? symbol) =>
+            (symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ?? "<null>")
+                .Replace(moduleName + ".", "", StringComparison.Ordinal);
     }
 
     [Fact]
@@ -672,23 +813,6 @@ public class SnapshotConversionTests
         Assert.Empty(failures);
     }
 
-    private static void WriteSnapshot(string snapshotName, string content)
-    {
-        // Write to the source directory (not the bin output)
-        var projectDir = FindProjectDirectory();
-        if (projectDir == null) return;
-
-        var snapshotDir = Path.Combine(projectDir, "Snapshots");
-        Directory.CreateDirectory(snapshotDir);
-        var original = $"tests/Calor.Conversion.Tests/Snapshots/{snapshotName}";
-        var activeInputs = Calor.Compiler.Tests.ActiveSyntaxInputs.OriginalPaths;
-        var path = activeInputs.Contains(original)
-            ? Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(
-                Calor.Compiler.Tests.ActiveSyntaxInputs.RepositoryRoot, original)
-            : Path.Combine(snapshotDir, snapshotName);
-        File.WriteAllText(path, content);
-    }
-
     internal static void VerifySnapshot(
         string snapshotName,
         string? approved,
@@ -705,10 +829,27 @@ public class SnapshotConversionTests
         Assert.True(
             approved != null,
             $"Missing approved snapshot '{snapshotName}'. " +
-            "Set CALOR_UPDATE_SNAPSHOTS=1 explicitly to create it.");
-        Assert.Equal(
-            approved!.Replace("\r\n", "\n").Trim(),
-            actual.Replace("\r\n", "\n").Trim());
+            "Add an independently reviewed current-output fixture.");
+        Assert.Equal(Normalize(approved!), Normalize(actual));
+
+        static string Normalize(string source) => RawCSharpFrame.RewriteOutsideFrames(
+            RawCSharpFrame.NormalizeLineEndings(source), envelope => envelope.Trim());
+    }
+
+    [Fact]
+    public void SnapshotComparison_NormalizesOnlyTheEnvelope()
+    {
+        const string payload = "class C {}\r\n";
+        var marker = new RawCSharpFrame(payload, "snapshot-comparison", "internal fidelity fixture").ReasonMarker;
+        var header = $"module Snapshot\n  raw {marker} {Encoding.UTF8.GetByteCount(payload)}\n";
+        var approved = header + payload;
+        VerifySnapshot("raw", approved, header.Replace("\n", "\r\n", StringComparison.Ordinal) + payload,
+            updateMode: false, (_, _) => throw new InvalidOperationException("Must not write."));
+
+        const string differentPayload = "class C {}\n ";
+        Assert.Equal(Encoding.UTF8.GetByteCount(payload), Encoding.UTF8.GetByteCount(differentPayload));
+        Assert.NotNull(Record.Exception(() => VerifySnapshot("raw", approved, header + differentPayload,
+            updateMode: false, (_, _) => throw new InvalidOperationException("Must not write."))));
     }
 
     [Fact]
@@ -727,15 +868,4 @@ public class SnapshotConversionTests
         Assert.False(writeAttempted);
     }
 
-    private static string? FindProjectDirectory()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir != null)
-        {
-            if (File.Exists(Path.Combine(dir, "Calor.Conversion.Tests.csproj")))
-                return dir;
-            dir = Path.GetDirectoryName(dir);
-        }
-        return null;
-    }
 }
