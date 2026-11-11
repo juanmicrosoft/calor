@@ -20,6 +20,122 @@ public sealed class AgentDiagnosticTests : IDisposable
         new("Calor0001", "test", TextSpan.Empty, new SuggestedFix("test", edits, isSafeToApply: true));
 
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    [InlineData("\r")]
+    public async Task NativeWhitespaceFixes_AreSharedByLintCliAndMcp(string newline)
+    {
+        var source = "module White   " + newline
+            + "  func Value public () → string" + newline
+            + "    return \"tail  \" \t";
+        var expected = "module White" + newline
+            + "  func Value public () → string" + newline
+            + "    return \"tail  \"";
+        var original = Program.Compile(source);
+        Assert.False(original.HasErrors, string.Join("\n", original.Diagnostics.Errors));
+        var path = Path.Combine(_directory, "whitespace.calr");
+        var encoding = new UnicodeEncoding(false, true);
+        File.WriteAllText(path, source, encoding);
+        var originalBytes = File.ReadAllBytes(path);
+
+        var (lintExit, lintJson, _) = CliTestHarness.RunCli(_directory, "lint", path, "--format", "json");
+        Assert.Equal(1, lintExit);
+        var entries = JsonDocument.Parse(lintJson).RootElement.GetProperty("diagnostics");
+        Assert.Equal(2, entries.GetArrayLength());
+        var first = entries[0];
+        Assert.Equal(DiagnosticCode.LintTrailingWhitespace, first.GetProperty("code").GetString());
+        Assert.Equal(13, first.GetProperty("location").GetProperty("column").GetInt32());
+        Assert.Equal(3, first.GetProperty("location").GetProperty("length").GetInt32());
+        var patch = first.GetProperty("fix");
+        Assert.True(patch.GetProperty("isSafeToApply").GetBoolean());
+        var edit = Assert.Single(patch.GetProperty("edits").EnumerateArray());
+        Assert.Equal(path, edit.GetProperty("filePath").GetString());
+        Assert.Equal(1, edit.GetProperty("startLine").GetInt32());
+        Assert.Equal(13, edit.GetProperty("startColumn").GetInt32());
+        Assert.Equal(1, edit.GetProperty("endLine").GetInt32());
+        Assert.Equal(16, edit.GetProperty("endColumn").GetInt32());
+        Assert.Equal("", edit.GetProperty("newText").GetString());
+        Assert.Equal(originalBytes, File.ReadAllBytes(path));
+
+        var lint = await new CheckTool().ExecuteAsync(JsonSerializer.SerializeToElement(
+            new { action = "lint", source }));
+        Assert.False(lint.IsError);
+        var issues = JsonDocument.Parse(lint.Content[0].Text!).RootElement.GetProperty("issues");
+        Assert.Equal(2, issues.GetArrayLength());
+        Assert.Equal(DiagnosticCode.LintTrailingWhitespace, issues[0].GetProperty("code").GetString());
+        var mcpPatch = issues[0].GetProperty("fix");
+        Assert.True(mcpPatch.GetProperty("isSafeToApply").GetBoolean());
+        Assert.Equal(13, mcpPatch.GetProperty("edits")[0].GetProperty("startColumn").GetInt32());
+        Assert.Equal(16, mcpPatch.GetProperty("edits")[0].GetProperty("endColumn").GetInt32());
+
+        var fixedResult = await new FixTool().ExecuteAsync(JsonSerializer.SerializeToElement(new { source }));
+        Assert.False(fixedResult.IsError, fixedResult.Content[0].Text);
+        var fixedOutput = JsonDocument.Parse(fixedResult.Content[0].Text!).RootElement;
+        Assert.Equal(expected, fixedOutput.GetProperty("fixedSource").GetString());
+        Assert.Equal(2, fixedOutput.GetProperty("fixCount").GetInt32());
+        Assert.Equal(original.GeneratedCode, Program.Compile(expected).GeneratedCode);
+
+        var checkedResult = await new CheckTool().ExecuteAsync(JsonSerializer.SerializeToElement(
+            new { action = "diagnose", source, apply = true }));
+        Assert.False(checkedResult.IsError, checkedResult.Content[0].Text);
+        var checkedOutput = JsonDocument.Parse(checkedResult.Content[0].Text!).RootElement;
+        Assert.Equal(expected, checkedOutput.GetProperty("fixedSource").GetString());
+        Assert.Equal(2, checkedOutput.GetProperty("fixesApplied").GetInt32());
+        Assert.Empty(checkedOutput.GetProperty("diagnostics").EnumerateArray());
+
+        var (fixExit, fixJson, _) = CliTestHarness.RunCli(_directory, "fix", path, "--apply", "--format", "json");
+        Assert.Equal(0, fixExit);
+        Assert.Equal(2, JsonDocument.Parse(fixJson).RootElement.GetProperty("data")
+            .GetProperty("editsApplied").GetInt32());
+        Assert.Equal(encoding.GetPreamble().Concat(encoding.GetBytes(expected)).ToArray(), File.ReadAllBytes(path));
+        var (againExit, againJson, _) = CliTestHarness.RunCli(_directory, "fix", path, "--apply", "--format", "json");
+        Assert.Equal(0, againExit);
+        Assert.Equal(0, JsonDocument.Parse(againJson).RootElement.GetProperty("data")
+            .GetProperty("editsApplied").GetInt32());
+    }
+
+    [Fact]
+    public void NativeWhitespaceFixes_ProtectCommentsAndCountedPayloadBytes()
+    {
+        const string payload = "public static class Saved { public const string Text = \"tail  \"; }  \r\n";
+        var source = "module White   \r\n  // keep \t\r\n"
+            + $"  raw member {Encoding.UTF8.GetByteCount(payload)}\r\n{payload}\r\n";
+        var diagnostics = LosslessSourceDocument.DiagnoseTrailingWhitespace(source, "raw.calr");
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticCode.LintTrailingWhitespace, diagnostic.Code);
+        var result = DiagnosticFixes.Apply(source, source, "raw.calr", diagnostics.DiagnosticsWithFixes, out var count);
+        Assert.Equal(1, count);
+        Assert.Equal(source.Replace("module White   ", "module White", StringComparison.Ordinal), result);
+        Assert.Contains(payload, result);
+        var lexerDiagnostics = new DiagnosticBag();
+        _ = new Lexer(result, lexerDiagnostics).TokenizeAllForParser();
+        Assert.False(lexerDiagnostics.HasErrors, string.Join("\n", lexerDiagnostics.Errors));
+    }
+
+    [Fact]
+    public void NativeWhitespaceFixes_DoNotEditRetiredSourceOnFailedCompilation()
+    {
+        const string source = "module White   \n§/M\n";
+        var result = DiagnosticFixes.Repair(source, "retired.calr", new CompilationOptions(),
+            out var compilation, out var count);
+        Assert.True(compilation.HasErrors);
+        Assert.Equal(0, count);
+        Assert.Equal(source, result);
+    }
+
+    [Fact]
+    public void NativeWhitespaceFixes_DoNotOfferEditsWhenRawFramingIsInvalid()
+    {
+        const string source = "module White   \n  raw member 999\nclass C {}   ";
+        var lexicalDiagnostics = new DiagnosticBag();
+        _ = new Lexer(source, lexicalDiagnostics).TokenizeAllForParser();
+        Assert.True(lexicalDiagnostics.HasErrors);
+        var diagnostics = LosslessSourceDocument.DiagnoseTrailingWhitespace(source, "raw.calr");
+        Assert.Empty(diagnostics);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
+    }
+
+    [Theory]
     [InlineData(DiagnosticSeverity.Error, "")]
     [InlineData(DiagnosticSeverity.Warning, "warning: ")]
     [InlineData(DiagnosticSeverity.Info, "info: ")]

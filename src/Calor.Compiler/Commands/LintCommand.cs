@@ -292,32 +292,9 @@ public static class LintCommand
         _ = verbose;
         var snapshot = await SourceFileSnapshot.ReadAsync(filePath);
         var source = snapshot.Text;
-        var issues = new List<LintIssue>();
-        var trimmableTrailingWhitespace =
-            LosslessSourceDocument.GetTrimmableTrailingWhitespaceLines(source);
-
-        // Check source-level issues before parsing.
-        foreach (var lineNum in trimmableTrailingWhitespace.Order())
-        {
-            issues.Add(new LintIssue(
-                lineNum,
-                DiagnosticCode.LintTrailingWhitespace,
-                "Line has trailing whitespace"));
-        }
-
-        // Parse the file to generate fixed content
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath(filePath);
-
-        // Report style issues as warnings so they flow through the shared
-        // structured diagnostic output (--format json|sarif).
-        foreach (var issue in issues)
-        {
-            diagnostics.ReportWarning(
-                new TextSpan(0, 0, issue.Line, 1),
-                issue.Code,
-                issue.Message);
-        }
+        var diagnostics = LosslessSourceDocument.DiagnoseTrailingWhitespace(source, filePath);
+        var issues = diagnostics.Select(diagnostic =>
+            new LintIssue(diagnostic.Span.Line, diagnostic.Code, diagnostic.Message)).ToList();
 
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();

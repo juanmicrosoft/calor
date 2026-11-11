@@ -341,7 +341,9 @@ public sealed class CheckTool : McpToolBase
                 Issues = result.Issues.Select(i => new LintIssueOutput
                 {
                     Line = i.Line,
-                    Message = i.Message
+                    Message = i.Message,
+                    Code = i.Code,
+                    Fix = i.Fix
                 }).ToList(),
                 ParseErrors = result.ParseErrors,
                 FixedCode = fix ? result.FixedContent : null,
@@ -365,16 +367,9 @@ public sealed class CheckTool : McpToolBase
 
     private static LintResult LintSource(string source, bool attemptFix)
     {
-        var issues = new List<LintIssue>();
-        var trimmableTrailingWhitespace =
-            LosslessSourceDocument.GetTrimmableTrailingWhitespaceLines(source);
-        foreach (var lineNum in trimmableTrailingWhitespace.Order())
-        {
-            issues.Add(new LintIssue(lineNum, "Line has trailing whitespace"));
-        }
-
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath("mcp-input.calr");
+        var diagnostics = LosslessSourceDocument.DiagnoseTrailingWhitespace(source, "mcp-input.calr");
+        var issues = DiagnosticEnvelope.Build(diagnostics).Select(diagnostic =>
+            new LintIssue(diagnostic.Location.Line, diagnostic.Message, diagnostic.Code, diagnostic.Fix)).ToList();
 
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -822,7 +817,7 @@ public sealed class CheckTool : McpToolBase
         public string? FixSuppressedReason { get; init; }
     }
 
-    private sealed record LintIssue(int Line, string Message);
+    private sealed record LintIssue(int Line, string Message, string Code, EnvelopeFix? Fix);
 
     private sealed class LintOutput
     {
@@ -863,6 +858,13 @@ public sealed class CheckTool : McpToolBase
 
         [JsonPropertyName("message")]
         public required string Message { get; init; }
+
+        [JsonPropertyName("code")]
+        public required string Code { get; init; }
+
+        [JsonPropertyName("fix")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public EnvelopeFix? Fix { get; init; }
     }
 
     // --- TypeCheck ---

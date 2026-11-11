@@ -170,7 +170,7 @@ pipeline) so they can flow through the structured formats:
 
 | Code | Meaning |
 |:-----|:--------|
-| `Calor1300` | Lint: line has trailing whitespace |
+| `Calor1300` | Lint: line has trailing whitespace; includes a safe deletion patch. `calor fix --apply` and `calor_fix` apply it on cleanly compiling source. Comments and counted raw payloads are preserved |
 | `Calor1301` | Reserved legacy lint code; not emitted. Formatting never normalizes or abbreviates IDs |
 | `Calor1302` | Lint: input file not found |
 | `Calor1303` | Lint: input file is not a `.calr` file |

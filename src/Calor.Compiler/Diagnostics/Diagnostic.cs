@@ -1689,10 +1689,14 @@ internal static class DiagnosticFixes
         for (var pass = 0; pass < 3; pass++)
         {
             options.CancellationToken.ThrowIfCancellationRequested();
-            var next = Apply(source, source, filePath, result.Diagnostics.DiagnosticsWithFixes, out var applied);
+            var fixes = result.Diagnostics.DiagnosticsWithFixes.ToList();
+            if (!result.HasErrors)
+                fixes.AddRange(Formatting.LosslessSourceDocument.DiagnoseTrailingWhitespace(source, filePath)
+                    .DiagnosticsWithFixes);
+            var next = Apply(source, source, filePath, fixes, out var applied);
             if (next == source)
                 break;
-            descriptions?.AddRange(result.Diagnostics.DiagnosticsWithFixes
+            descriptions?.AddRange(fixes
                 .Where(d => d.Fix.IsSafeToApply)
                 .Select(d => $"{d.Code}: {d.Fix.Description}"));
             editsApplied += applied;
