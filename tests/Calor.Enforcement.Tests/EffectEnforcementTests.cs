@@ -401,7 +401,12 @@ public class EffectEnforcementTests
           §O{i32}
           §R §C{transform} §A value §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Mapper
+                func Apply public (int:value) → int
+                  return transform(value)
+            """));
 
         Assert.True(result.HasErrors,
             "Bare-name invocation of an unresolvable target must fail closed");
@@ -752,7 +757,19 @@ public class EffectEnforcementTests
         §A STR:""hello""
       §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class PureService
+                func Process public (string:data) → string
+                  return data
+              class EffectfulService
+                func Process public (string:data) → void
+                  ! cw
+                  System.Console.WriteLine(data)
+              func DoWork public (string:input) → void
+                ! cw
+                _a.Process("hello")
+            """));
 
         // The call to _a.Process is ambiguous (two classes define "Process").
         // With ambiguity detection, the engine does NOT false-resolve to PureService.Process
@@ -1155,7 +1172,12 @@ public class EffectEnforcementTests
     §E{}
     §C{m.DoWork} §/C
 ";
-        var result = TestHarness.CompileWithEffects(source);
+        var result = TestHarness.CompileWithEffects(NativeSource(source, """
+            module UnresolvedProbe UnresolvedProbe
+              func Go public (Mystery:m) → void
+                !
+                m.DoWork()
+            """));
 
         Assert.Contains(
             result.Diagnostics.ToList(),
@@ -1208,7 +1230,14 @@ public class EffectEnforcementTests
     §C{u.Run} §/C
     §C{u} §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module VetoReach VetoReach
+              func Go public ()
+                !
+                let u = Mystery.Make()
+                u.Run()
+                u()
+            """));
 
         Assert.DoesNotContain(
             result.Diagnostics.ToList(),
@@ -1250,21 +1279,34 @@ public class EffectEnforcementTests
     [Fact]
     public void E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse()
     {
-        var withoutReceiverUse = @"
+        var withoutReceiverUse = NativeSource(@"
 §M{VetoControl}
   §F{Go:pub}
     §E{}
     §B{u} §C{Mystery.Make} §/C
     §C{u} §/C
-";
-        var withReceiverUse = @"
+", """
+            module VetoControl VetoControl
+              func Go public ()
+                !
+                let u = Mystery.Make()
+                u()
+            """);
+        var withReceiverUse = NativeSource(@"
 §M{VetoReach}
   §F{Go:pub}
     §E{}
     §B{u} §C{Mystery.Make} §/C
     §C{u.Run} §/C
     §C{u} §/C
-";
+", """
+            module VetoReach VetoReach
+              func Go public ()
+                !
+                let u = Mystery.Make()
+                u.Run()
+                u()
+            """);
 
         foreach (var source in new[] { withoutReceiverUse, withReceiverUse })
         {
@@ -1305,7 +1347,12 @@ public class EffectEnforcementTests
     §E{}
     §R §C{make} §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module BareTargetProbe BareTargetProbe
+              func Go public (Func<int>:make) → int
+                !
+                return make()
+            """));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
         var rowUnknown = Assert.Single(
