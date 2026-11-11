@@ -4,6 +4,8 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
+using Calor.Compiler.Formatting;
+using Calor.Compiler.Binding.BoundTypes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -12,6 +14,203 @@ namespace Calor.Compiler.Tests;
 
 public sealed class Issue1401NullableContextConversionTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData(" overflow unchecked")]
+    [InlineData(" overflow checked")]
+    public void NativeObliviousModule_RoundTripsDeclarationMetadata(string overflow)
+    {
+        var source = $$"""
+            module Oblivious{{overflow}} nullable oblivious
+              module Fixture public
+                func Echo public (string:value) → string
+                  !
+                  return value
+                func Missing public () → string
+                  !
+                  return null
+                func Explicit public (string?:value) → string?
+                  !
+                  return value
+                func Nested public (System.Collections.Generic.List<string?[]>[]:value) → System.Collections.Generic.List<string?[]>[]
+                  !
+                  return value
+            """;
+        const string original = """
+            public static class Fixture {
+                public static string Echo(string value) => value;
+                public static string Missing() => null;
+                public static string? Explicit(string? value) => value;
+                public static System.Collections.Generic.List<string?[]>[] Nested(
+                    System.Collections.Generic.List<string?[]>[] value) => value;
+            }
+            """;
+        var compiled = Program.Compile(source, "oblivious.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        var emitted = new CalorEmitter().Emit(compiled.Ast!);
+        Assert.Contains("nullable oblivious", emitted);
+        var formatted = new CalorFormatter().FormatSource(emitted, "oblivious.calr");
+        Assert.True(formatted.Success, string.Join("\n", formatted.Errors));
+        Assert.Contains("nullable oblivious", formatted.Formatted);
+        var reparsed = Program.Compile(formatted.Formatted, "oblivious-reparsed.calr");
+        Assert.False(reparsed.HasErrors, string.Join("\n", reparsed.Diagnostics.Errors));
+        Assert.Equal(DeclaredMetadata(original), DeclaredMetadata(reparsed.GeneratedCode));
+        var warningsAsErrors = GeneratedCSharpCompiler.Validate(
+            [new(reparsed.GeneratedCode, "oblivious.g.cs")],
+            new GeneratedCSharpCompilationContext { TreatWarningsAsErrors = true });
+        Assert.True(warningsAsErrors.CompilationSuccess,
+            string.Join("\n", warningsAsErrors.CompilationErrors));
+        var annotationWarning = GeneratedCSharpCompiler.Validate(
+            [new(reparsed.GeneratedCode.Replace("#pragma warning disable CS8669", "", StringComparison.Ordinal),
+                "oblivious.g.cs")],
+            new GeneratedCSharpCompilationContext { TreatWarningsAsErrors = true });
+        Assert.False(annotationWarning.CompilationSuccess);
+        Assert.All(annotationWarning.CompilationErrors, diagnostic => Assert.Equal("CS8669", diagnostic.Id));
+        Assert.Equal(emitted, new CalorEmitter().Emit(reparsed.Ast!));
+    }
+
+    [Theory]
+    [InlineData("nullable enabled")]
+    [InlineData("nullable oblivious nullable oblivious")]
+    [InlineData("nullable")]
+    public void NativeObliviousModule_RejectsInvalidHeaderPolicies(string policy)
+    {
+        var result = Program.Compile($"module Invalid {policy}\n  func Main () → void\n    !\n");
+        Assert.True(result.HasErrors);
+    }
+
+    [Fact]
+    public void NativeObliviousModule_EscapesNamespaceNamedLikePolicy()
+    {
+        var result = Program.Compile("""
+            module File @nullable nullable oblivious
+              module Fixture public
+                func Echo public (string:value) → string
+                  !
+                  return value
+            """);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        var emitted = new CalorEmitter().Emit(result.Ast!);
+        Assert.Contains("module File @nullable nullable oblivious", emitted);
+        var reparsed = Program.Compile(emitted);
+        Assert.False(reparsed.HasErrors, string.Join("\n", reparsed.Diagnostics.Errors));
+        Assert.Equal(DeclaredMetadata("namespace nullable { public static class Fixture { public static string Echo(string value) => value; } }"),
+            DeclaredMetadata(reparsed.GeneratedCode));
+    }
+
+    [Fact]
+    public void NativeObliviousModule_DoesNotChangeDefaultOrReceivingChecks()
+    {
+        var normal = Program.Compile("""
+            module Checked
+              func Missing () → string
+                !
+                return null
+            """);
+        Assert.Contains(normal.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+        foreach (var guard in new[] { "", "if value != null\n      " })
+        {
+            var result = Program.Compile($$"""
+                module Oblivious nullable oblivious
+                  func Probe (string:value) → void
+                    !
+                    {{guard}}System.Int32.Parse(value)
+                """);
+            Assert.Equal(guard.Length == 0, result.HasErrors);
+            Assert.Equal(guard.Length == 0, result.Diagnostics.Errors.Any(
+                diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        }
+    }
+
+    [Theory]
+    [InlineData("string[]", "value[0]", "Oblivious")]
+    [InlineData("System.Collections.Generic.List<string>", "value[0]", "Oblivious")]
+    [InlineData("System.Collections.Generic.List<string?[]>[]", "value[0][0][0]", "Annotated")]
+    public void NativeObliviousModule_NestedReadsRetainUncertainty(string type, string expression, string annotation)
+    {
+        var source = $$"""
+            module Nested nullable oblivious
+              func Probe ({{type}}:value) → int
+                !
+                return System.Int32.Parse({{expression}})
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        var diagnostic = Assert.Single(result.Diagnostics.Errors.Where(
+            item => item.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Contains(annotation, diagnostic.Message);
+        if (type.Contains("List<string?[]>", StringComparison.Ordinal))
+        {
+            var diagnostics = new DiagnosticBag();
+            var ast = new Calor.Compiler.Parsing.Parser(
+                new Calor.Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
+            var outer = Assert.IsType<ArrayBoundType>(bound.Functions.Single().Symbol.Parameters.Single().MethodInputArrayType);
+            var generic = Assert.IsType<GenericInstantiationBoundType>(outer.ElementType);
+            var inner = Assert.IsType<ArrayBoundType>(Assert.Single(generic.TypeArguments));
+            Assert.Equal("Oblivious", outer.NullableAnnotation.ToString());
+            Assert.Equal("Oblivious", generic.NullableAnnotation.ToString());
+            Assert.Equal("Oblivious", inner.NullableAnnotation.ToString());
+            Assert.Equal("Annotated", Assert.IsType<NominalBoundType>(inner.ElementType).NullableAnnotation.ToString());
+        }
+    }
+
+    [Theory]
+    [InlineData("string", "null")]
+    [InlineData("string?", "null")]
+    [InlineData("string[]", "value")]
+    [InlineData("System.Collections.Generic.List<string?[]>[]", "value")]
+    public void NativeObliviousConversion_CertifiesActualReparsedMetadata(string type, string body)
+    {
+        var original = $$"""
+            public static class Fixture {
+                public static {{type}} Echo({{type}} value) => {{body}};
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(original, "Fixture.cs");
+        Assert.True(conversion.Success, FormatIssues(conversion));
+        Assert.Empty(conversion.Losses);
+        if (type != "string?")
+            Assert.Contains("nullable oblivious", conversion.CalorSource);
+        var result = Program.Compile(conversion.CalorSource!, "converted.calr");
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Equal(ConversionRoundTrip.Verified, conversion.Context.RoundTrip);
+        Assert.Equal(DeclaredMetadata(original), DeclaredMetadata(result.GeneratedCode));
+    }
+
+    [Fact]
+    public void NativeObliviousConversion_DoesNotFlattenMixedContexts()
+    {
+        const string source = """
+            #nullable disable
+            public static class Fixture {
+                public static string Unknown(string value) => value;
+            #nullable enable
+                public static string Known(string value) => value;
+            }
+            """;
+        var result = new CSharpToCalorConverter().Convert(source, "Mixed.cs");
+        Assert.True(result.Success, FormatIssues(result));
+        Assert.DoesNotContain("nullable oblivious", result.CalorSource);
+        Assert.True(result.InteropPreservationCount > 0);
+        var compiled = Program.Compile(result.CalorSource!, "mixed.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+    }
+
+    private static string[] DeclaredMetadata(string source)
+    {
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("Metadata", [tree],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        return CSharpToCalorConverter.DeclaredTypeMetadata(
+            compilation.GetSemanticModel(tree), tree.GetCompilationUnitRoot());
+    }
+
     [Theory]
     [InlineData(NullableContextOptions.Enable, "(string:value) -> string")]
     [InlineData(NullableContextOptions.Annotations, "(string:value) -> string")]

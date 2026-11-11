@@ -203,6 +203,7 @@ public sealed class Binder
     /// their return type is inferred, not the enclosing function's declaration.
     /// </summary>
     private string? _currentFunctionReturnType;
+    private BoundTypes.NullableAnnotation _declaredReferenceAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
 
     public Binder(DiagnosticBag diagnostics, string? sourceIdentity = null)
     {
@@ -742,7 +743,7 @@ public sealed class Binder
         {
             if (functionType.ParameterTypes[index] is not BoundTypes.NominalBoundType parameter
                 || !IsScalarStringTypeName(parameter.QualifiedName)
-                || parameter.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated)
+                || parameter.NullableAnnotation != BoundTypes.NullableAnnotation.NotAnnotated)
             {
                 continue;
             }
@@ -1004,6 +1005,8 @@ public sealed class Binder
     internal BoundModule Bind(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance)
     {
         _contractInheritance = contractInheritance;
+        _declaredReferenceAnnotation = module.HasObliviousNullability()
+            ? BoundTypes.NullableAnnotation.Oblivious : BoundTypes.NullableAnnotation.NotAnnotated;
         using var diagnosticContext = _diagnostics.EnterBindingContext();
         _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
         _metadataUsings = module.Usings;
@@ -3191,7 +3194,8 @@ public sealed class Binder
         string? declaringTypeName = null)
     {
         array = null;
-        if (!TrySplitArrayTypeSpelling(declaredType, out var elementName, out var rank, out var annotation))
+        if (!TrySplitArrayTypeSpelling(declaredType, out var elementName, out var rank, out var annotation,
+                _declaredReferenceAnnotation))
             return false;
 
         BoundTypes.BoundType element;
@@ -3202,6 +3206,9 @@ public sealed class Binder
             element = new BoundTypes.PrimitiveBoundType(
                 IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
                     ? TypeIdentity.Canonicalize(elementName) : elementName);
+        else if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+            && TypeIdentity.TrySplitGeneric(elementName.TrimEnd('?'), out _, out _))
+            element = BuildDeclaredBoundType(elementName);
         else if ((declaringFunction is not null
                 ? TryBuildCallableReference(elementName, declaringFunction)
                 : TryBuildReferenceType(elementName, declaringTypeName ?? _currentClassName,
@@ -3223,10 +3230,11 @@ public sealed class Binder
         string spelling,
         out string element,
         out int rank,
-        out BoundTypes.NullableAnnotation annotation)
+        out BoundTypes.NullableAnnotation annotation,
+        BoundTypes.NullableAnnotation defaultAnnotation = BoundTypes.NullableAnnotation.NotAnnotated)
     {
         var type = spelling.Trim();
-        annotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        annotation = defaultAnnotation;
         var wholeAnnotation = type.StartsWith('?') || type.EndsWith('?')
             || type.StartsWith("NULLABLE[inner=", StringComparison.OrdinalIgnoreCase)
                 && IsWholeBracketedType(type, type.IndexOf('['));
@@ -3368,7 +3376,7 @@ public sealed class Binder
         if (referent == "object")
             return allowObject && GetOrCreateMetadataBinder()?.Context.TryResolveType("System.Object") is { } objectType
                 ? new BoundTypes.NominalBoundType(referent,
-                    annotated ? BoundTypes.NullableAnnotation.Annotated : BoundTypes.NullableAnnotation.NotAnnotated,
+                    annotated ? BoundTypes.NullableAnnotation.Annotated : _declaredReferenceAnnotation,
                     roslynSymbol: objectType)
                 : null;
         var lookupReferent = string.Join(".", referent.Split('.').Select(part => part.TrimStart('@')));
@@ -3389,7 +3397,7 @@ public sealed class Binder
 
         var annotation = annotated
             ? BoundTypes.NullableAnnotation.Annotated
-            : BoundTypes.NullableAnnotation.NotAnnotated;
+            : _declaredReferenceAnnotation;
         // Predefined string spellings name the CLR special type, not a lexical type alias.
         if (referent is "STRING" or "string" or "str")
             return GetOrCreateMetadataBinder()?.Context.TryResolveType("System.String") is { } stringType
@@ -3477,10 +3485,16 @@ public sealed class Binder
             allowObject: true, namespaceScopeId);
     }
 
-    private static bool TryBuildDeclaredNullabilityShape(string bindTypeName, out BoundTypes.BoundType? target)
+    private bool TryBuildDeclaredNullabilityShape(string bindTypeName, out BoundTypes.BoundType? target)
     {
         target = null;
         var trimmed = bindTypeName.Trim();
+        if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+            && TypeIdentity.TrySplitGeneric(trimmed.TrimEnd('?'), out _, out _))
+        {
+            target = BuildDeclaredBoundType(trimmed);
+            return true;
+        }
 
         // v0.14 §S6 (task #7 Phase-C) — array-shape targets. Surface forms
         // accepted here mirror what ExpandType and IsLikelyType emit:
@@ -3493,7 +3507,7 @@ public sealed class Binder
         // through ExpandType. Prefix "?" on the ELEMENT indicates nullable
         // elements; the array container itself is orthogonal (S6 diagnoses
         // element mismatch only, per the D6 follow-on scope).
-        if (TryParseArrayStringTarget(trimmed, out var arrayTarget))
+        if (TryParseArrayStringTarget(trimmed, out var arrayTarget, _declaredReferenceAnnotation))
         {
             target = arrayTarget;
             return true;
@@ -3508,7 +3522,7 @@ public sealed class Binder
         // container's own annotation is orthogonal (per D6 same as arrays).
         // Anything outside this whitelist (Dictionary, Task, custom generic)
         // stays out-of-scope and falls through to the scalar path below.
-        if (TryParseGenericStringTarget(trimmed, out var genericTarget))
+        if (TryParseGenericStringTarget(trimmed, out var genericTarget, _declaredReferenceAnnotation))
         {
             target = genericTarget;
             return true;
@@ -3524,7 +3538,7 @@ public sealed class Binder
                 "STRING",
                 annotatedNullable
                     ? BoundTypes.NullableAnnotation.Annotated
-                    : BoundTypes.NullableAnnotation.NotAnnotated);
+                    : _declaredReferenceAnnotation);
             return true;
         }
 
@@ -3538,7 +3552,7 @@ public sealed class Binder
                 trimmed,
                 annotatedNullable
                     ? BoundTypes.NullableAnnotation.Annotated
-                    : BoundTypes.NullableAnnotation.NotAnnotated);
+                    : _declaredReferenceAnnotation);
             return true;
         }
         return false;
@@ -3578,7 +3592,8 @@ public sealed class Binder
     /// non-array or non-STRING-element shapes, keeping the S6 scope
     /// narrow (D6 follow-on).
     /// </summary>
-    private static bool TryParseArrayStringTarget(string trimmed, out BoundTypes.ArrayBoundType? target)
+    private static bool TryParseArrayStringTarget(string trimmed, out BoundTypes.ArrayBoundType? target,
+        BoundTypes.NullableAnnotation defaultAnnotation = BoundTypes.NullableAnnotation.NotAnnotated)
     {
         target = null;
         string? innerType = null;
@@ -3605,7 +3620,7 @@ public sealed class Binder
 
         if (innerType is null) return false;
 
-        var elementAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        var elementAnnotation = defaultAnnotation;
         var elementTrimmed = innerType.Trim();
 
         if (elementTrimmed.StartsWith("NULLABLE[inner=", StringComparison.Ordinal)
@@ -3631,7 +3646,7 @@ public sealed class Binder
         }
 
         var elementBound = new BoundTypes.NominalBoundType("STRING", elementAnnotation);
-        target = new BoundTypes.ArrayBoundType(elementBound);
+        target = new BoundTypes.ArrayBoundType(elementBound, nullableAnnotation: defaultAnnotation);
         return true;
     }
 
@@ -3668,10 +3683,11 @@ public sealed class Binder
     /// symmetrically against a source generic. Returns false for
     /// non-whitelisted definitions or non-STRING type arguments.
     /// </summary>
-    private static bool TryParseGenericStringTarget(string trimmed, out BoundTypes.GenericInstantiationBoundType? target)
+    private static bool TryParseGenericStringTarget(string trimmed, out BoundTypes.GenericInstantiationBoundType? target,
+        BoundTypes.NullableAnnotation defaultAnnotation = BoundTypes.NullableAnnotation.NotAnnotated)
     {
         target = null;
-        var outerAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        var outerAnnotation = defaultAnnotation;
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent))
         {
             outerAnnotation = BoundTypes.NullableAnnotation.Annotated;
@@ -3695,7 +3711,7 @@ public sealed class Binder
         if (ContainsTopLevelComma(argsSection)) return false;
 
         var innerRaw = argsSection.Trim();
-        var innerAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        var innerAnnotation = defaultAnnotation;
 
         if (innerRaw.StartsWith("NULLABLE[inner=", StringComparison.Ordinal)
             && innerRaw.EndsWith("]", StringComparison.Ordinal))
@@ -3787,7 +3803,7 @@ public sealed class Binder
         if (isScalarString)
         {
             // Parameter already declared nullable — accepting null is intended.
-            if (parameterType.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) return null;
+            if (parameterType.NullableAnnotation != BoundTypes.NullableAnnotation.NotAnnotated) return null;
 
             return new BoundTypes.NominalBoundType(
                 "STRING",
@@ -3930,7 +3946,7 @@ public sealed class Binder
     // literal-initialized locals (which are provably non-null) rather
     // than silently degrading to Oblivious and misfiring Calor0272.
     // Non-STRING inferred types keep the safe Oblivious default per §D6.
-    private static BoundTypes.NullableAnnotation InferAnnotationForStringBinding(
+    private BoundTypes.NullableAnnotation InferAnnotationForStringBinding(
         string? bindTypeName,
         string typeName,
         BoundExpression? initializer)
@@ -3947,7 +3963,7 @@ public sealed class Binder
             : BoundTypes.NullableAnnotation.Oblivious;
     }
 
-    private static BoundTypes.NullableAnnotation TryReadDeclaredStringAnnotation(string? bindTypeName)
+    private BoundTypes.NullableAnnotation TryReadDeclaredStringAnnotation(string? bindTypeName)
     {
         if (bindTypeName is null) return BoundTypes.NullableAnnotation.Oblivious;
         if (!TryBuildDeclaredNullabilityShape(bindTypeName, out var target)) return BoundTypes.NullableAnnotation.Oblivious;
@@ -4098,7 +4114,7 @@ public sealed class Binder
                 isMutable: false, isParameter: true, ParameterModifier.None, span)
             {
                 MethodInputArrayType = TryBuildMethodInputArrayType(type, out var array) ? array : null,
-                GenericNullabilityType = TryParseGenericStringTarget(type, out var generic) ? generic : null
+                GenericNullabilityType = TryParseGenericStringTarget(type, out var generic, _declaredReferenceAnnotation) ? generic : null
             });
         return scope;
     }
@@ -7104,8 +7120,8 @@ public sealed class Binder
                 && TryBuildMethodInputArrayType(resolution.Matches[0].ReturnType, out var nativeArray,
                     resolution.Matches[0].Function) ? nativeArray : null),
             GenericNullabilityType = genericNullabilityReturn ?? (resolution.Matches.Count == 1
-                && TryParseGenericStringTarget(resolution.Matches[0].ReturnType, out var genericReturn)
-                    ? genericReturn : null)
+                && TryBuildDeclaredNullabilityShape(resolution.Matches[0].ReturnType, out var genericReturn)
+                    ? genericReturn as BoundTypes.GenericInstantiationBoundType : null)
         };
         return boundCall;
     }
@@ -7183,7 +7199,7 @@ public sealed class Binder
             : nominal.QualifiedName;
         if (TryBuildMethodInputArrayType(spelling, out var array))
             return array;
-        return TryParseGenericStringTarget(spelling, out var generic) ? generic : null;
+        return TryParseGenericStringTarget(spelling, out var generic, nominal.NullableAnnotation) ? generic : null;
     }
 
     /// <summary>
@@ -10666,10 +10682,13 @@ public sealed class Binder
         return null;
     }
 
-    private static BoundTypes.BoundType BuildDeclaredBoundType(string typeName)
+    private BoundTypes.BoundType BuildDeclaredBoundType(string typeName)
     {
         var name = typeName.Trim();
-        var annotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+            && TryBuildMethodInputArrayType(name, out var array))
+            return array!;
+        var annotation = _declaredReferenceAnnotation;
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(name, out var referent))
         {
             name = referent;
@@ -10679,6 +10698,13 @@ public sealed class Binder
         {
             annotation = BoundTypes.NullableAnnotation.Oblivious;
         }
+
+        if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+            && TypeIdentity.TrySplitGeneric(name, out var definition, out var arguments))
+            return new BoundTypes.GenericInstantiationBoundType(
+                new BoundTypes.NominalBoundType(definition),
+                System.Collections.Immutable.ImmutableArray.CreateRange(arguments.Select(BuildDeclaredBoundType)),
+                annotation);
 
         return new BoundTypes.NominalBoundType(name, annotation);
     }

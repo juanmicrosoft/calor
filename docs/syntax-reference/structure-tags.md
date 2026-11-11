@@ -43,6 +43,32 @@ emit in `GlobalModule`. With namespace `Demo`, root functions emit in
 `block` requests a block namespace instead of a file-scoped namespace; it does
 not change the namespace's CLR identity.
 
+### Oblivious nullability
+
+The file header can end with `nullable oblivious`, independently of
+`overflow checked` or `overflow unchecked`. Without this field, the existing
+checked nullability rules remain unchanged.
+
+```calor
+module Legacy nullable oblivious
+  func Find public (string:key) → string
+    !
+    return null
+```
+
+In this module, an unannotated reference declaration makes no non-null promise:
+its C# metadata has `NullableAnnotation.None`. Explicit `string?` still has
+`Annotated` metadata. The policy also applies inside arrays and generic arguments;
+it does not change CLR types or turn an unknown value into a non-null value.
+Passing an oblivious value to a non-null receiving parameter still requires
+an explicit check. This is a file-wide annotation context, not a way to disable
+Calor's receiving, type, or effect checks.
+
+Generated C# disables only nullable **annotations**, while enabling nullable
+warnings. It suppresses `CS8669`, the generated-code warning for explicit `?`
+in an annotation-disabled context; receiving/type/effect errors are not suppressed.
+Mixed lexical annotation contexts are not represented by this header.
+
 ### Named static containers
 
 A nested `module` declares a named static container. Its functions are

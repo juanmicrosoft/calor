@@ -1111,6 +1111,9 @@ public sealed class Parser
         if (attrs["overflow"] is { } overflow && overflow is not ("checked" or "unchecked"))
             _diagnostics.ReportError(attrs.GetSpan("overflow") ?? startToken.Span, DiagnosticCode.InvalidModifier,
                 $"Module overflow policy must be 'checked' or 'unchecked', not '{overflow}'.");
+        if (attrs["nullable"] is { } nullable && nullable != "oblivious")
+            _diagnostics.ReportError(attrs.GetSpan("nullable") ?? startToken.Span, DiagnosticCode.InvalidModifier,
+                $"Module nullable policy must be 'oblivious', not '{nullable}'.");
 
         var id = GenerateParserAutoId("m");
         var moduleName = attrs["_pos0"] ?? "";
@@ -1385,7 +1388,7 @@ public sealed class Parser
         attributes.Add("_pos0", name.Value as string ?? name.Text, name.Span);
         var namespaceName = "";
         if (Current.Span.Line == start.Span.Line && Check(TokenKind.Identifier)
-            && Current.Text is not ("overflow" or "block"))
+            && Current.Text is not ("overflow" or "block" or "nullable"))
         {
             var namespaceStart = _position;
             var spelling = ReadInlineTypeToken(validateCanonicalSpelling: false);
@@ -1402,15 +1405,18 @@ public sealed class Parser
             Advance();
             attributes.Add("namespaceOrigin", "block");
         }
-        if (Current.Span.Line == start.Span.Line && Current.Text == "overflow")
+        while (Current.Span.Line == start.Span.Line && Current.Text is "overflow" or "nullable")
         {
-            Advance();
+            var field = Advance();
             var policy = Expect(TokenKind.Identifier);
-            attributes.Add("overflow", policy.Text, policy.Span);
+            if (attributes[field.Text] != null)
+                _diagnostics.ReportError(field.Span, DiagnosticCode.InvalidModifier,
+                    $"Duplicate module {field.Text} policy.");
+            attributes.Add(field.Text, policy.Text, policy.Span);
         }
         if (Current.Span.Line == start.Span.Line && !IsAtEnd && !Check(TokenKind.Dedent))
             _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                $"Invalid header field '{Current.Text}'; expected 'module name [namespace] [block] [overflow checked|unchecked]'.");
+                $"Invalid header field '{Current.Text}'; expected 'module name [namespace] [block] [overflow checked|unchecked] [nullable oblivious]'.");
         return attributes;
     }
 

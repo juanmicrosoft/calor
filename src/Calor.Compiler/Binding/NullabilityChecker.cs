@@ -130,8 +130,9 @@ internal static class NullabilityChecker
 
     private static bool CheckScalarStringTarget(BoundExpression source, NominalBoundType nominalTarget)
     {
-        // Target already declared nullable — accepting null is by design.
-        if (nominalTarget.NullableAnnotation == NullableAnnotation.Annotated) return false;
+        // Only a NotAnnotated destination promises non-null. Oblivious sources
+        // remain possibly-null when flowing into such a destination.
+        if (nominalTarget.NullableAnnotation != NullableAnnotation.NotAnnotated) return false;
 
         var isString = IsScalarString(nominalTarget);
         var isUserRef = !isString && nominalTarget.IsKnownReferenceType;
@@ -240,7 +241,7 @@ internal static class NullabilityChecker
         if (!IsScalarString(targetInner)) return false;
 
         // Target payload declared nullable — accepting null payloads is by design.
-        if (targetInner.NullableAnnotation == NullableAnnotation.Annotated) return false;
+        if (targetInner.NullableAnnotation != NullableAnnotation.NotAnnotated) return false;
 
         // Bridge only the known BCL aliases: unrelated namespaces sharing
         // a short name do not establish the same generic definition.

@@ -48,6 +48,17 @@ the CLI's validation context. Short-name ambiguity reports `CS0104`; use an alia
 or a fully qualified name. See [compilation-context imports](../semantics/dotnet-backend.md#compilation-context-imports)
 for API defaults, project opt-out and editor settings.
 
+Lossless conversion can use the native file-header field `nullable oblivious`
+when the resolved original declarations have disabled nullable annotations.
+It retains explicit nullable annotations, including nested array and generic
+annotations, instead of replacing unknown reference types with nullable types.
+The converter admits this replacement only after strict compilation of the
+actual emitted/reparsed Calor, C# compilation, and an exact comparison of declared
+owner/type/nullability metadata. Already faithful native output is retained.
+Mixed `#nullable` contexts, unresolved source context, or an uncertified native
+replacement retain the preservation boundary; raw C# is not native recovery.
+Conversion options and the default compilation context do not change.
+
 ### Generated output and refresh
 
 C#→Calor conversion saves an adjacent `<output>.conversion.json` receipt containing

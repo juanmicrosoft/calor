@@ -1650,7 +1650,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         AppendLine();
         if (!ContainsPreservedNullableDirective(node))
         {
-            AppendLine("#nullable enable");
+            if (node.HasObliviousNullability())
+            {
+                AppendLine("#nullable disable annotations");
+                AppendLine("#nullable enable warnings");
+                // Explicit '?' still carries Annotated metadata in an oblivious module.
+                // CS8669 only warns about that syntax in generated annotation-disabled code.
+                AppendLine("#pragma warning disable CS8669");
+            }
+            else
+                AppendLine("#nullable enable");
             AppendLine();
         }
 

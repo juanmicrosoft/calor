@@ -49,6 +49,12 @@ public sealed class ModuleNode : AstNode
         "unchecked" => false,
         var invalid => throw new InvalidOperationException($"Invalid module overflow policy '{invalid}'.")
     };
+    public bool HasObliviousNullability() => Attributes["nullable"] switch
+    {
+        null => false,
+        "oblivious" => true,
+        var invalid => throw new InvalidOperationException($"Invalid module nullable policy '{invalid}'.")
+    };
 
     // Extended Features: Structured Issues
     public IReadOnlyList<IssueNode> Issues { get; }

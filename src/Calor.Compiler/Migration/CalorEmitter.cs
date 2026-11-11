@@ -352,7 +352,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var namespaceHeader = namespaceName.Length == 0 ? "" : " " + EscapeNamespaceName(namespaceName);
         var origin = namespaceScope is { IsGlobal: false, IsFileScoped: false } ? " block" : "";
         var overflow = node.Attributes["overflow"] is { } mode ? $" overflow {mode}" : "";
-        AppendLine($"module {EscapeCalorIdentifier(moduleName)}{namespaceHeader}{origin}{overflow}");
+        var nullable = node.HasObliviousNullability() ? " nullable oblivious" : "";
+        AppendLine($"module {EscapeCalorIdentifier(moduleName)}{namespaceHeader}{origin}{overflow}{nullable}");
         Indent();
 
         if (node.DeclaredSemanticsVersion != null)
@@ -802,7 +803,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     private static string EscapeNamespaceName(string name) =>
-        string.Join(".", name.Split('.').Select(segment => segment is "overflow" or "block"
+        string.Join(".", name.Split('.').Select(segment => segment is "overflow" or "block" or "nullable"
             ? "@" + segment : EscapeCalorIdentifier(segment.TrimStart('@'))));
 
     public string Visit(InterfaceDefinitionNode node)

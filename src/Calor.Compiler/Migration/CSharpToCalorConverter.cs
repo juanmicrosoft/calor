@@ -412,6 +412,9 @@ public sealed class CSharpToCalorConverter
             var result = ConvertCore(csharpSource, sourceFile, cancellationToken,
                 capturePreservationContext, scopedImports ? null : namespaces[index].SpanStart,
                 originalSemanticModel, allowScopedNamespaceImports: scopedImports);
+            if (scopedImports)
+                result = TryConvertObliviousModule(csharpSource, sourceFile, result,
+                    cancellationToken, capturePreservationContext, allowScopedNamespaceImports: true);
             if (!result.Success || result.Losses.Count != 0)
                 return Single("A namespace did not convert entirely natively.");
             outputs.Add(new(scopedImports
@@ -526,7 +529,7 @@ public sealed class CSharpToCalorConverter
            && scope.Usings.All(directive => directive.UnsafeKeyword.IsKind(SyntaxKind.None)
                && directive.NamespaceOrType is NameSyntax);
 
-    private static string[] DeclaredTypeMetadata(SemanticModel model, CompilationUnitSyntax root)
+    internal static string[] DeclaredTypeMetadata(SemanticModel model, CompilationUnitSyntax root)
         => root.DescendantNodes()
             .Where(node => node is MemberDeclarationSyntax or VariableDeclaratorSyntax)
             .Select(node => model.GetDeclaredSymbol(node))
@@ -585,11 +588,107 @@ public sealed class CSharpToCalorConverter
         string csharpSource, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
     {
         var result = ConvertCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+        result = TryConvertObliviousModule(csharpSource, sourceFile, result,
+            cancellationToken, capturePreservationContext);
         if (_options.Fidelity != ConversionFidelity.Lossless
             || (result.Success && !result.Losses.Any(loss => loss.IsSemanticLoss)))
             return result;
 
         return PreserveOriginal(csharpSource, sourceFile, result, cancellationToken);
+    }
+
+    private ConversionResult TryConvertObliviousModule(
+        string source, string? sourceFile, ConversionResult attempted,
+        CancellationToken cancellationToken, bool capturePreservationContext,
+        bool allowScopedNamespaceImports = false)
+    {
+        if (_options.Fidelity != ConversionFidelity.Lossless
+            || !_options.ValidateRoundTripCSharp
+            || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches
+            || _options.References.Any(reference => !File.Exists(reference.Path)))
+            return attempted;
+
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        if (parseOptions.Kind != SourceCodeKind.Regular)
+            return attempted;
+        var tree = CSharpSyntaxTree.ParseText(source, parseOptions, sourceFile ?? "",
+            cancellationToken: cancellationToken);
+        var root = tree.GetCompilationUnitRoot(cancellationToken);
+        if (root.ContainsDiagnostics)
+            return attempted;
+        var original = CSharpCompilation.Create("ObliviousModuleAnalysis",
+            GeneratedCSharpCompiler.AddImplicitUsings(
+                new[] { tree }.Concat(_options.AdditionalSemanticSyntaxTrees
+                    .Where(sibling => !IsSameSyntaxTree(sibling, tree))),
+                _options.IncludeImplicitSystemUsing),
+            GetSemanticMetadataReferences(),
+            new CSharpCompilationOptions(
+                Enum.TryParse<OutputKind>(attempted.Metadata.OutputKind, out var outputKind)
+                    ? outputKind : _options.OutputKind, allowUnsafe: true)
+                .WithNullableContextOptions(_options.NullableContextOptions ?? NullableContextOptions.Disable));
+        var model = original.GetSemanticModel(tree);
+        if (original.GetDiagnostics(cancellationToken).Any(diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error))
+            return attempted;
+        var before = DeclaredTypeMetadata(model, root);
+        if (!before.Any(record => record.Contains("[None]", StringComparison.Ordinal)))
+            return attempted;
+
+        bool MetadataMatches(string generated)
+        {
+            var generatedTree = CSharpSyntaxTree.ParseText(generated, parseOptions,
+                cancellationToken: cancellationToken);
+            var compilation = original.ReplaceSyntaxTree(tree, generatedTree);
+            return !compilation.GetDiagnostics(cancellationToken).Any(diagnostic =>
+                    diagnostic.Severity == DiagnosticSeverity.Error)
+                && before.SequenceEqual(DeclaredTypeMetadata(compilation.GetSemanticModel(generatedTree),
+                    generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal);
+        }
+
+        if (attempted.Success && attempted.InteropPreservationCount == 0
+            && attempted.Losses.Count == 0
+            && attempted.CalorSource is { } current
+            && TryParseModule(current) is { } currentModule
+            && MetadataMatches(new CSharpEmitter().Emit(currentModule)))
+            return attempted;
+
+        ConversionResult PreserveUnrepresentedMetadata()
+        {
+            if (!attempted.Success || attempted.InteropPreservationCount != 0
+                || attempted.Losses.Count != 0)
+                return attempted;
+            attempted.Context.AddWarning(
+                "The native projection changed declared type/nullability metadata; "
+                + "a single oblivious module context could not certify a faithful replacement.",
+                "nullable-module-fidelity");
+            return PreserveOriginal(source, sourceFile, attempted, cancellationToken);
+        }
+
+        // One module policy cannot represent lexical changes of annotation context.
+        if (root.DescendantTrivia(descendIntoTrivia: true)
+                .Any(trivia => trivia.GetStructure() is NullableDirectiveTriviaSyntax)
+            || root.DescendantNodes().OfType<TypeSyntax>().Any(type =>
+                model.GetNullableContext(type.SpanStart).HasFlag(NullableContext.AnnotationsEnabled)))
+            return PreserveUnrepresentedMetadata();
+
+        var candidate = ConvertCore(source, sourceFile, cancellationToken, capturePreservationContext,
+            originalSemanticModel: model, allowScopedNamespaceImports: allowScopedNamespaceImports,
+            obliviousModule: true);
+        if (!candidate.Success || candidate.InteropPreservationCount != 0 || candidate.Losses.Count != 0
+            || candidate.CalorSource is not { } native)
+            return PreserveUnrepresentedMetadata();
+        // Reparse the actual deliverable and enforce the normal binder/effect
+        // checks. No deferred or unchecked output can authorize this recovery.
+        var compiled = Program.Compile(native, sourceFile, new CompilationOptions
+        {
+            IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+            ProjectDirectory = _options.ProjectDirectory,
+            CancellationToken = cancellationToken
+        });
+        if (compiled.HasErrors || !MetadataMatches(compiled.GeneratedCode))
+            return PreserveUnrepresentedMetadata();
+        candidate.Context.RoundTrip = ConversionRoundTrip.Verified;
+        return candidate;
     }
 
     internal ConversionResult PreserveOriginal(
@@ -753,7 +852,8 @@ public sealed class CSharpToCalorConverter
         bool capturePreservationContext,
         int? namespaceStart = null,
         SemanticModel? originalSemanticModel = null,
-        bool allowScopedNamespaceImports = false)
+        bool allowScopedNamespaceImports = false,
+        bool obliviousModule = false)
     {
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
@@ -983,7 +1083,10 @@ public sealed class CSharpToCalorConverter
                     context,
                     semanticModel,
                     cancellationToken,
-                    _options.NullableContextOptions.HasValue);
+                    _options.NullableContextOptions.HasValue)
+                {
+                    PreserveObliviousDeclarations = obliviousModule
+                };
                 calorAst = visitor.Convert(root, moduleName,
                     namespaceStart.HasValue
                         ? root.Members.OfType<NamespaceDeclarationSyntax>()

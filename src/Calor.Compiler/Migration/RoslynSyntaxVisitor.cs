@@ -19,6 +19,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly SemanticModel? _semanticModel;
     private readonly CancellationToken _cancellationToken;
     private readonly bool _hasEvaluatedNullableContext;
+    internal bool PreserveObliviousDeclarations { get; init; }
     private CSharpParseOptions _parseOptions = new(LanguageVersion.Preview);
     private readonly List<UsingDirectiveNode> _usings = new();
     private readonly List<InterfaceDefinitionNode> _interfaces = new();
@@ -126,6 +127,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         CompilationUnitSyntax root, string moduleName, NamespaceDeclarationSyntax? selectedNamespace)
     {
         var moduleAttributes = new AttributeCollection();
+        if (PreserveObliviousDeclarations)
+            moduleAttributes.Add("nullable", "oblivious");
         var checkOverflow = (_semanticModel?.Compilation.Options as CSharpCompilationOptions)?.CheckOverflow ?? false;
         moduleAttributes.Add("overflow", checkOverflow ? "checked" : "unchecked");
         _cancellationToken.ThrowIfCancellationRequested();
@@ -8867,6 +8870,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return mapped;
         }
 
+        // The serialized module header, not a transient '?' substitution,
+        // carries the source's annotation-disabled declaration context.
+        if (PreserveObliviousDeclarations)
+            return typeSyntax.IsVar
+                ? TypeMapper.CSharpToCalor(type.ToDisplayString(NullableTypeDisplayFormat))
+                : mapped;
+
         var returnFlowAnnotation = GetReturnFlowAnnotation(typeSyntax.Parent);
         var nullableAnnotation = returnFlowAnnotation ?? type.NullableAnnotation;
         if (typeSyntax.IsVar)
@@ -9116,6 +9126,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             and not IdentifierNameSyntax { Identifier.ValueText: "Task" })
             return MapDeclarationType(method.ReturnType);
         var mapped = TypeMapper.CSharpToCalor(unwrappedReturnType);
+        if (PreserveObliviousDeclarations)
+            return mapped;
         if (_semanticModel?.GetDeclaredSymbol(
                 method,
                 _cancellationToken) is not IMethodSymbol symbol
