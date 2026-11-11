@@ -270,7 +270,7 @@ public class SnapshotConversionTests
                 {
                     var driver = $"var values = $N$ArmProbe.Run({category}); return $N$ArmProbe.Trace + \":\" + System.String.Join(\",\", values);";
                     Assert.Equal(expected, RunSnapshotProbe(source, driver, ""));
-                    Assert.Equal(expected, RunSnapshotProbe(compiled.GeneratedCode, driver, moduleName + "."));
+                    Assert.Equal(expected, RunSnapshotProbe(compiled.GeneratedCode, driver, ""));
                 }
             }
         }
@@ -324,7 +324,7 @@ public class SnapshotConversionTests
                     new Calor.Compiler.CompilationOptions { EnableTypeChecking = typeChecking });
                 Assert.False(compiled.HasErrors,
                     string.Join("; ", compiled.Diagnostics.Errors) + "\n" + native);
-                Assert.Equal(expected, RunSnapshotProbe(compiled.GeneratedCode, driver, moduleName + "."));
+                Assert.Equal(expected, RunSnapshotProbe(compiled.GeneratedCode, driver, ""));
                 Assert.Contains("! alloc, mut", native);
                 var missingMutation = Calor.Compiler.Program.Compile(
                     native.Replace("! alloc, mut", "! alloc", StringComparison.Ordinal),
@@ -746,8 +746,8 @@ public class SnapshotConversionTests
             var before = SnapshotCompilation(csharpSource, symbols);
             var after = SnapshotCompilation(generated, symbols);
             Assert.Equal(SnapshotErrors(before), SnapshotErrors(after));
-            Assert.Equal(SnapshotApi(before, moduleName), SnapshotApi(after, moduleName));
-            Assert.Equal(SnapshotCallTargets(before, moduleName), SnapshotCallTargets(after, moduleName));
+            Assert.Equal(SnapshotApi(before), SnapshotApi(after));
+            Assert.Equal(SnapshotCallTargets(before), SnapshotCallTargets(after));
         }
 
         var production = Calor.Compiler.Program.Compile(result.CalorSource!, $"{id}.calr");
@@ -758,7 +758,7 @@ public class SnapshotConversionTests
             Assert.NotNull(expected.RuntimeDriver);
             Assert.Equal(
                 RunSnapshotProbe(csharpSource, expected.RuntimeDriver, "", expected.RuntimeSymbols),
-                RunSnapshotProbe(production.GeneratedCode, expected.RuntimeDriver, moduleName + ".", expected.RuntimeSymbols));
+                RunSnapshotProbe(production.GeneratedCode, expected.RuntimeDriver, "", expected.RuntimeSymbols));
         }
         else
         {
@@ -790,15 +790,14 @@ public class SnapshotConversionTests
             .Select(diagnostic => $"{diagnostic.Id}: {diagnostic.GetMessage()}: "
                 + diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan)).ToArray();
 
-    private static string[] SnapshotApi(CSharpCompilation compilation, string moduleName)
+    private static string[] SnapshotApi(CSharpCompilation compilation)
     {
         var signatures = new List<string>();
         Collect(compilation.Assembly.GlobalNamespace);
         return signatures.Order(StringComparer.Ordinal).ToArray();
 
         string Name(ISymbol? symbol) =>
-            (symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ?? "<null>")
-                .Replace(moduleName + ".", "", StringComparison.Ordinal);
+            symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ?? "<null>";
         string Parameters(IMethodSymbol method) => string.Join(",", method.Parameters.Select(parameter =>
             $"{parameter.RefKind}:{Name(parameter.Type)}:{parameter.NullableAnnotation}:{parameter.Name}:{parameter.IsParams}:{parameter.IsOptional}:"
                 + (parameter.HasExplicitDefaultValue ? parameter.ExplicitDefaultValue?.ToString() ?? "null" : "-")));
@@ -846,7 +845,7 @@ public class SnapshotConversionTests
         }
     }
 
-    private static string[] SnapshotCallTargets(CSharpCompilation compilation, string moduleName)
+    private static string[] SnapshotCallTargets(CSharpCompilation compilation)
     {
         var targets = new List<string>();
         var tree = compilation.SyntaxTrees.Single();
@@ -866,8 +865,7 @@ public class SnapshotConversionTests
         return targets.Order(StringComparer.Ordinal).ToArray();
 
         string Name(ISymbol? symbol) =>
-            (symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ?? "<null>")
-                .Replace(moduleName + ".", "", StringComparison.Ordinal);
+            symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) ?? "<null>";
     }
 
     [Fact]
