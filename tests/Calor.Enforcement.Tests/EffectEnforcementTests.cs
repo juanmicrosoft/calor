@@ -255,7 +255,12 @@ public class EffectEnforcementTests
           §O{void}
           §P ""Hello from method""
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class MyService
+                func PrintHello public () → void
+                  System.Console.WriteLine("Hello from method")
+            """));
 
         Assert.True(result.HasErrors,
             "§MT method with undeclared effect should fail enforcement");
@@ -275,7 +280,13 @@ public class EffectEnforcementTests
           §E{cw}
           §P ""Hello from method""
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class MyService
+                func PrintHello public () → void
+                  ! cw
+                  System.Console.WriteLine("Hello from method")
+            """));
 
         Assert.False(result.HasErrors,
             $"§MT with declared cw effect should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -317,7 +328,12 @@ public class EffectEnforcementTests
             §A STR:""log message""
           §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Logger
+                func Log public () → void
+                  Console.WriteLine("log message")
+            """));
 
         Assert.True(result.HasErrors,
             "§MT calling Console.WriteLine without cw effect should fail");
@@ -338,7 +354,12 @@ public class EffectEnforcementTests
           §O{i32}
           §R (+ a b)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Calculator
+                func Add public (int:a, int:b) → int
+                  return a + b
+            """));
 
         Assert.False(result.HasErrors,
             $"Pure §MT should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -530,7 +551,14 @@ public class EffectEnforcementTests
       §O{i32}
       §R §C{_calc.Add} §A INT:1 §A INT:2 §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Calculator
+                func Add public (int:a, int:b) → int
+                  return a + b
+              func UseCalculator public (Calculator:_calc) → int
+                return _calc.Add(1, 2)
+            """));
 
         Assert.False(result.HasErrors,
             $"Cross-class call to pure method should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -556,7 +584,15 @@ public class EffectEnforcementTests
         §A STR:""hello""
       §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Logger
+                func Log public (string:message) → void
+                  ! cw
+                  System.Console.WriteLine(message)
+              func DoWork public (Logger:_logger) → void
+                _logger.Log("hello")
+            """));
 
         // DoWork calls Logger.Log which has cw, but DoWork doesn't declare cw
         Assert.True(result.HasErrors,
@@ -585,7 +621,16 @@ public class EffectEnforcementTests
         §A STR:""hello""
       §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Logger
+                func Log public (string:message) → void
+                  ! cw
+                  System.Console.WriteLine(message)
+              func DoWork public (Logger:_logger) → void
+                ! cw
+                _logger.Log("hello")
+            """));
 
         Assert.False(result.HasErrors,
             $"Caller with declared effect should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -741,7 +786,17 @@ public class EffectEnforcementTests
       §O{i32}
       §R §C{_calc.Compute} §A INT:5 §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Calculator
+                func Compute public (int:x) → int
+                  return x + 1
+              class OtherService
+                func Format public (string:s) → string
+                  return s
+              func UseCalc public (Calculator:_calc) → int
+                return _calc.Compute(5)
+            """));
 
         // "Compute" is unique across classes, so cross-class resolution should work fine.
         Assert.False(result.HasErrors,
