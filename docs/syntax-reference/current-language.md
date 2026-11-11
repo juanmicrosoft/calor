@@ -1322,6 +1322,8 @@ Complete example: [Named static module with implicit static function](#example-c
 
 Enum extensions use an ordinary named static module, not a separate enum-extension container head. The receiver is the first parameter, with this before its type. Preserve the EnumNameExtensions CLR container and the extension method's static identity.
 
+Other source receiver types use the same `this` parameter syntax. Native member calls bind to the exact source declaration and constructed argument map selected by the emitted native C# image. These calls retain receiver syntax: rewriting them as provider-qualified static calls could select a different non-extension overload. The source callee's effects and receiver/argument evaluation effects are charged normally; a same-named metadata contract cannot supply the source method's row. This requires a complete, configuration-consistent image. Unresolved, ambiguous, or preserved source selections remain opaque. A nullable or oblivious extension receiver is a static argument, not an ordinary instance receiver: its declared nullability is checked without adding an instance null guard. The existing bounded enum-extension lookup is unchanged.
+
 Syntax: `module ModeExtensions; func IsActive (this Mode:value) → bool`
 
 C# equivalents (fragments):
@@ -1331,8 +1333,6 @@ public static class ModeExtensions { public static bool IsActive(this Mode value
 ```
 
 Complete example: [Enum extension functions in their named static container](#example-complete_enum_extensions).
-
-Other source receiver types use the same `this` parameter syntax. Native member calls bind to the exact source declaration and constructed argument map selected by the emitted native C# image. These calls retain receiver syntax: rewriting them as provider-qualified static calls could select a different non-extension overload. The source callee's effects and receiver/argument evaluation effects are charged normally; a same-named metadata contract cannot supply the source method's row. This requires a complete, configuration-consistent image. Unresolved, ambiguous, or preserved source selections remain opaque. A nullable or oblivious extension receiver is a static argument, not an ordinary instance receiver: its declared nullability is checked without adding an instance null guard. The existing bounded enum-extension lookup is unchanged.
 
 ## introduction version metadata
 
