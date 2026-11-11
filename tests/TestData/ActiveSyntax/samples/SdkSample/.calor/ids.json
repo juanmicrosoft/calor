@@ -5,7 +5,7 @@
   ],
   "Declarations": [
     {
-      "Id": "m_dx989s7znd5h",
+      "Id": "m_q8q2c911t863",
       "File": "program.calr",
       "Container": "",
       "Kind": 0,
@@ -13,18 +13,10 @@
       "Signature": ""
     },
     {
-      "Id": "m_xhbwhbve162m",
+      "Id": "f_f9de0phr1hew",
       "File": "program.calr",
       "Container": "SdkSample",
-      "Kind": 0,
-      "Name": "SdkSampleModule",
-      "Signature": "0"
-    },
-    {
-      "Id": "mt_8fsdp3t7kwk0",
-      "File": "program.calr",
-      "Container": "SdkSample.SdkSampleModule\u00600",
-      "Kind": 5,
+      "Kind": 1,
       "Name": "Main",
       "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
     }
