@@ -57,6 +57,44 @@ public class EjectStoryTests
     §R (?? missing -1)
 ";
 
+    // Keep the retired inputs above intact; these explicit mirrors exercise
+    // the same ejection obligations through the current native grammar.
+    // Explicit namespaces retain the original namespace-qualified CLR owners.
+    private const string ContractsCurrentNativeModule = """
+        module Pricing Pricing
+          func ClampToCap public (int:amount, int:cap) → int
+            requires cap >= 0
+            => result <= cap
+            return Math.Min(amount, cap)
+        """;
+
+    private const string EarlyReturnContractsCurrentNativeModule = """
+        module Pricing Pricing
+          func ClampToCap public (int:amount, int:cap) → int
+            requires cap >= 0
+            => result <= cap
+            if amount > cap
+              return cap
+            return amount
+        """;
+
+    private const string EffectsCurrentNativeModule = """
+        module Greeter Greeter
+          func Greet public (string:name) → void
+            ! cw
+            Console.WriteLine(name)
+        """;
+
+    private const string NullableCurrentNativeModule = """
+        module Ejected Ejected
+          func PickOrDefault public (int:x, bool:take) → int
+            if take
+              let int?:value = x
+              return value ?? 0
+            let int?:missing = null
+            return missing ?? -1
+        """;
+
     // ------------------------------------------------------------------
     // Helpers: emit with a chosen contract mode, compile, execute
     // ------------------------------------------------------------------
@@ -127,7 +165,16 @@ public class EjectStoryTests
     [InlineData(NullableModule)]
     public void EjectedModules_CompileCleanly(string calorSource)
     {
-        var csharp = Emit(calorSource, EmitContractMode.Debug);
+        // Row identities retain the frozen input; execution uses its explicit
+        // current-native representation, not a legacy-syntax translation.
+        var currentNativeSource = calorSource switch
+        {
+            ContractsModule => ContractsCurrentNativeModule,
+            EffectsModule => EffectsCurrentNativeModule,
+            NullableModule => NullableCurrentNativeModule,
+            _ => throw new ArgumentOutOfRangeException(nameof(calorSource))
+        };
+        var csharp = Emit(currentNativeSource, EmitContractMode.Debug);
         var validation = GeneratedCSharpCompiler.Validate(csharp);
         Assert.True(validation.SyntaxSuccess, string.Join("\n", validation.SyntaxErrors.Select(e => e.ToString())));
         Assert.True(validation.CompilationSuccess, string.Join("\n", validation.FormattedCompilationErrors));
@@ -140,7 +187,7 @@ public class EjectStoryTests
     [Fact]
     public void Contracts_BehaviorPreserved_OnValidInputs()
     {
-        var assembly = CompileToAssembly(Emit(ContractsModule, EmitContractMode.Debug));
+        var assembly = CompileToAssembly(Emit(ContractsCurrentNativeModule, EmitContractMode.Debug));
         Assert.Equal(5, Invoke(assembly, "Pricing", "ClampToCap", 5, 10));
         Assert.Equal(10, Invoke(assembly, "Pricing", "ClampToCap", 25, 10));
     }
@@ -148,7 +195,7 @@ public class EjectStoryTests
     [Fact]
     public void NullableFallback_BehaviorPreserved()
     {
-        var assembly = CompileToAssembly(Emit(NullableModule, EmitContractMode.Debug));
+        var assembly = CompileToAssembly(Emit(NullableCurrentNativeModule, EmitContractMode.Debug));
         Assert.Equal(42, Invoke(assembly, "Ejected", "PickOrDefault", 42, true));
         Assert.Equal(-1, Invoke(assembly, "Ejected", "PickOrDefault", 42, false));
     }
@@ -156,7 +203,7 @@ public class EjectStoryTests
     [Fact]
     public void Effects_BehaviorPreserved_AndNoRuntimeFootprint()
     {
-        var csharp = Emit(EffectsModule, EmitContractMode.Debug);
+        var csharp = Emit(EffectsCurrentNativeModule, EmitContractMode.Debug);
 
         // §E is compile-time discipline only: ejecting drops the enforcement,
         // not the behavior — no effect machinery appears in the output.
@@ -185,7 +232,7 @@ public class EjectStoryTests
     [Fact]
     public void Contracts_DegradeToRuntimeChecks_InDebugMode()
     {
-        var csharp = Emit(ContractsModule, EmitContractMode.Debug);
+        var csharp = Emit(ContractsCurrentNativeModule, EmitContractMode.Debug);
 
         // Both §Q and §S survive as runtime guards — `calor convert` runs no
         // verification, so nothing is elided on the eject path.
@@ -197,7 +244,7 @@ public class EjectStoryTests
     [Fact]
     public void Contracts_EarlyReturnBody_RetainsPostcondition()
     {
-        var csharp = Emit(EarlyReturnContractsModule, EmitContractMode.Debug);
+        var csharp = Emit(EarlyReturnContractsCurrentNativeModule, EmitContractMode.Debug);
         Assert.Contains("ContractKind.Requires", csharp);
         Assert.Contains("ContractKind.Ensures", csharp);
         Assert.Contains("goto __calorPostconditionExit", csharp);
@@ -206,7 +253,7 @@ public class EjectStoryTests
     [Fact]
     public void Contracts_ViolationThrows_AtRuntime()
     {
-        var assembly = CompileToAssembly(Emit(ContractsModule, EmitContractMode.Debug));
+        var assembly = CompileToAssembly(Emit(ContractsCurrentNativeModule, EmitContractMode.Debug));
 
         // cap < 0 violates §Q (>= cap 0) — the retained guard must throw.
         var ex = Assert.Throws<TargetInvocationException>(
@@ -219,7 +266,7 @@ public class EjectStoryTests
     [Fact]
     public void Contracts_ReleaseMode_KeepsLeanChecks()
     {
-        var csharp = Emit(ContractsModule, EmitContractMode.Release);
+        var csharp = Emit(ContractsCurrentNativeModule, EmitContractMode.Release);
         Assert.Contains("ContractViolationException", csharp);
 
         var assembly = CompileToAssembly(csharp);
@@ -231,7 +278,7 @@ public class EjectStoryTests
     [Fact]
     public void Contracts_OffMode_StripsAllChecks_TheDocumentedWaiver()
     {
-        var csharp = Emit(ContractsModule, EmitContractMode.Off);
+        var csharp = Emit(ContractsCurrentNativeModule, EmitContractMode.Off);
         Assert.DoesNotContain("ContractViolationException", csharp);
 
         // The waiver strips guards; behavior otherwise unchanged — the same
