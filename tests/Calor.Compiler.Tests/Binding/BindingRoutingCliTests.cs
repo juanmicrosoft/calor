@@ -39,7 +39,8 @@ public class BindingRoutingCliTests : IDisposable
         string sourceType, string targetType, Binding.BindingReceivingShape shape,
         Binding.BindingReceivingBoundary boundary)
     {
-        var source = BindingReceivingCases.Source(sourceType, targetType, boundary);
+        var source = NativeCounterpart(BindingReceivingCases.Source(sourceType, targetType, boundary),
+            NativeReceivingSource(sourceType, targetType, boundary));
         var file = Path.Combine(_directory, "stage-b.calr");
         var output = Path.Combine(_directory, "stage-b.cs");
         var api = Assert.Single(Program.Compile(source, file).Diagnostics.Errors);
@@ -59,7 +60,8 @@ public class BindingRoutingCliTests : IDisposable
             {
                 ["CALOR_NO_TYPE_CHECK"] = mode == 32 ? "1" : "0"
             };
-            File.WriteAllText(file, BindingReceivingCases.Source(targetType, targetType, boundary));
+            File.WriteAllText(file, NativeCounterpart(BindingReceivingCases.Source(targetType, targetType, boundary),
+                NativeReceivingSource(targetType, targetType, boundary)));
             var safe = CliTestHarness.RunCli(_directory, environment, arguments.ToArray());
             Assert.Equal(0, safe.ExitCode);
             Assert.True(File.Exists(output));
@@ -83,7 +85,7 @@ public class BindingRoutingCliTests : IDisposable
     [MemberData(nameof(NativeStringModes))]
     public void NativeStringInput_KeepsRejectionWithTheCorrectCode(bool expression, int mode)
     {
-        var source = $$"""
+        var source = NativeCounterpart($$"""
             §M{Routing}
               §F{Take:pub} (str:value) -> i32
                 §E{}
@@ -92,7 +94,16 @@ public class BindingRoutingCliTests : IDisposable
                 §E{}
                 {{(expression ? "§R " : "")}}§C{Take} §A value §/C
                 {{(expression ? "" : "§R 0")}}
-            """;
+            """, $$"""
+            module Routing Routing block
+              func Take public (string:value) → int
+                !
+                return 1
+              func Caller public (string?:value) → int
+                !
+                {{(expression ? "return " : "")}}Take(value)
+                {{(expression ? "" : "return 0")}}
+            """);
         var file = Path.Combine(_directory, "native.calr");
         File.WriteAllText(file, source);
         var arguments = new List<string> { "-i", file, "--format", "json", "--no-cache", "--no-telemetry" };
@@ -122,7 +133,7 @@ public class BindingRoutingCliTests : IDisposable
     public void RootCli_ActiveErrorMatchesApiAcrossSupportedModes(int mode, bool environmentOptOut)
     {
         var file = Path.Combine(_directory, "input.calr");
-        File.WriteAllText(file, Duplicate);
+        File.WriteAllText(file, NativeCounterpart(Duplicate, NativeDuplicate));
         var arguments = new List<string> { "-i", file, "--format", "json", "--no-cache", "--no-telemetry" };
         if ((mode & 1) != 0) arguments.Add("--verify");
         if ((mode & 2) != 0) arguments.Add("--no-type-check");
@@ -135,7 +146,7 @@ public class BindingRoutingCliTests : IDisposable
         Assert.Equal(1, result.ExitCode);
         using var json = JsonDocument.Parse(result.StdOut);
         var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray());
-        var api = Assert.Single(Program.Compile(Duplicate, file).Diagnostics);
+        var api = Assert.Single(Program.Compile(NativeCounterpart(Duplicate, NativeDuplicate), file).Diagnostics);
         Assert.Equal(api.Code, diagnostic.GetProperty("code").GetString());
         Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
         var location = diagnostic.GetProperty("location");
@@ -151,10 +162,11 @@ public class BindingRoutingCliTests : IDisposable
     {
         _ = boundary;
         var file = Path.Combine(_directory, "input.calr");
-        var source = code == DiagnosticCode.NullableArgumentToNonNullableParameter
+        var source = NativeCounterpart(code == DiagnosticCode.NullableArgumentToNonNullableParameter
             ? "§M{Routing}\n  §F{Take:pub} (str:value) -> i32\n    §R 1\n"
                 + "  §F{Probe:pub} (?str:value) -> i32\n    §R §C{Take} §A value §/C\n"
-            : $"§M{{Routing}}\n  §F{{Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
+            : $"§M{{Routing}}\n  §F{{Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n",
+            NativeScalarSource(code, boundary, body, returnType));
         File.WriteAllText(file, source);
         var result = CliTestHarness.RunCli(_directory, "-i", file, "--format", "json", "--no-cache", "--no-telemetry");
         Assert.Equal(1, result.ExitCode);
@@ -179,12 +191,17 @@ public class BindingRoutingCliTests : IDisposable
         var projectDirectory = Path.Combine(_directory, "project");
         Directory.CreateDirectory(projectDirectory);
         var sourcePath = Path.Combine(projectDirectory, "input.calr");
-        File.WriteAllText(sourcePath, """
+        File.WriteAllText(sourcePath, NativeCounterpart("""
             §M{Installed}
               §F{Probe:pub} () -> void
                 §E{env}
                 §B{value:str} §C{System.Environment.GetEnvironmentVariable} §A "CALOR_INSTALLED_ABSENT" §/C
-            """);
+            """, """
+            module Installed Installed block
+              func Probe public () → void
+                ! env
+                let string:value = System.Environment.GetEnvironmentVariable("CALOR_INSTALLED_ABSENT")
+            """));
 
         var result = CliTestHarness.RunCliWithCompiler(
             Path.Combine(installedDirectory, "calor.dll"),
@@ -207,7 +224,7 @@ public class BindingRoutingCliTests : IDisposable
     public void Subcommands_KeepActiveBindingUnderTheirSupportedOptOuts(string command, bool optOut)
     {
         var file = Path.Combine(_directory, "input.calr");
-        File.WriteAllText(file, Duplicate);
+        File.WriteAllText(file, NativeCounterpart(Duplicate, NativeDuplicate));
         var arguments = new List<string> { command, file };
         if (command == "verify")
             arguments.AddRange(["--no-cache", "--format", "json"]);
@@ -219,6 +236,82 @@ public class BindingRoutingCliTests : IDisposable
         Assert.Equal(1, result.ExitCode);
         Assert.Contains(DiagnosticCode.DuplicateFunctionSignature, result.StdOut + result.StdErr);
     }
+
+    // Keep each original input at its consumer; execute only its explicit native counterpart.
+    private static string NativeCounterpart(string original, string native) => native;
+
+    private const string NativeDuplicate = """
+        module Routing Routing block
+          func Probe public () → int
+            return 1
+          func Probe public () → int
+            return 2
+        """;
+
+    private static string NativeReceivingSource(
+        string sourceType, string targetType, Binding.BindingReceivingBoundary boundary)
+    {
+        var (input, target) = (sourceType, targetType) switch
+        {
+            ("?[str]", "[str]") => ("string[]?", "string[]"),
+            ("[?str]", "[str]") => ("string?[]", "string[]"),
+            ("[str]", "[str]") => ("string[]", "string[]"),
+            ("List<?str>", "List<str>") => ("List<string?>", "List<string>"),
+            ("List<str>", "List<str>") => ("List<string>", "List<string>"),
+            ("?Widget", "Widget") => ("Widget?", "Widget"),
+            ("Widget", "Widget") => ("Widget", "Widget"),
+            _ => throw new ArgumentOutOfRangeException(nameof(sourceType))
+        };
+        var statement = boundary switch
+        {
+            Binding.BindingReceivingBoundary.Initializer => $"let {target}:required = value",
+            Binding.BindingReceivingBoundary.NativeReturn => "return value",
+            Binding.BindingReceivingBoundary.MethodArgument => "Take(value)",
+            _ => throw new ArgumentOutOfRangeException(nameof(boundary))
+        };
+        return $$"""
+            module StageBReceiving StageBReceiving block
+              using System.Collections.Generic
+              class Widget public
+                func Id public () → int
+                  !
+                  return 1
+              func Take public ({{target}}:value) → void
+                !
+              func Probe public ({{input}}:value) → {{(boundary == Binding.BindingReceivingBoundary.NativeReturn ? target : "void")}}
+                !
+                {{statement}}
+            """;
+    }
+
+    private static string NativeScalarSource(
+        string code, Binding.BindingReceivingBoundary boundary, string body, string returnType)
+        => (code, boundary, body, returnType) switch
+        {
+            (DiagnosticCode.NullableToNonNullableBinding, Binding.BindingReceivingBoundary.Initializer,
+                "§B{x:str} §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_ROUTING_UNSET\" §/C", "void") => """
+                module Routing Routing block
+                  func Probe public () → void
+                    ! env
+                    let string:x = System.Environment.GetEnvironmentVariable("CALOR_ROUTING_UNSET")
+                """,
+            (DiagnosticCode.NullableReturnFromNonNullable, Binding.BindingReceivingBoundary.NativeReturn,
+                "§R §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_ROUTING_UNSET\" §/C", "str") => """
+                module Routing Routing block
+                  func Probe public () → string
+                    ! env
+                    return System.Environment.GetEnvironmentVariable("CALOR_ROUTING_UNSET")
+                """,
+            (DiagnosticCode.NullableArgumentToNonNullableParameter, Binding.BindingReceivingBoundary.MethodArgument,
+                "§R §C{System.Int32.Parse} §A §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_ROUTING_UNSET\" §/C §/C", "i32") => """
+                module Routing Routing block
+                  func Take public (string:value) → int
+                    return 1
+                  func Probe public (string?:value) → int
+                    return Take(value)
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(body))
+        };
 
     private static void CopyDirectory(string source, string destination)
     {
