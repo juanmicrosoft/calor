@@ -159,6 +159,99 @@ public class BindingDiagnosticPolicyTests
         Assert.Same(original, Assert.Single(destination));
     }
 
+    [Fact]
+    public void NativeReferenceSuggestions_SurviveRoutingWithoutBecomingSafeFixes()
+    {
+        const string source = "module Routing\n  func Probe (string:value) → string\n    return vlaue\n";
+        var binding = Bind(source);
+        var original = Assert.Single(binding.Errors);
+        var originalFix = Assert.Single(binding.DiagnosticsWithFixes);
+        Assert.False(originalFix.Fix.IsSafeToApply);
+        Assert.Equal("value", Assert.Single(originalFix.Fix.Edits).NewText);
+
+        var destination = new DiagnosticBag();
+        BindingDiagnosticPolicy.PropagateCompilationErrors(binding, destination);
+        BindingDiagnosticPolicy.PropagateCompilationErrors(binding, destination);
+        Assert.Empty(destination);
+        Assert.Empty(destination.DiagnosticsWithFixes);
+
+        var duplicate = Bind("module Routing\n  func Probe (int:x,int:x) → int\n    return x\n");
+        BindingDiagnosticPolicy.PropagateCompilationErrors(duplicate, destination);
+        BindingDiagnosticPolicy.PropagateCompilationErrors(duplicate, destination);
+        Assert.Equal(duplicate.Where(BindingDiagnosticPolicy.IsCompilationError), destination);
+        Assert.Same(Assert.Single(duplicate.DiagnosticsWithFixes).Fix,
+            Assert.Single(destination.DiagnosticsWithFixes).Fix);
+        foreach (var typeChecking in new[] { false, true })
+        {
+            var compiled = Program.Compile(source, "routing.calr", new CompilationOptions
+            {
+                EnableTypeChecking = typeChecking
+            });
+            Assert.True(compiled.HasErrors);
+            var diagnostic = Assert.Single(compiled.Diagnostics.Errors);
+            Assert.Equal(typeChecking ? DiagnosticCode.UndefinedReference : DiagnosticCode.CodeGenCompilationError,
+                diagnostic.Code);
+            if (typeChecking)
+            {
+                Assert.Empty(compiled.GeneratedCode);
+                Assert.Equal(original.Span, diagnostic.Span);
+            }
+            else
+            {
+                Assert.NotEmpty(compiled.GeneratedCode);
+                Assert.Empty(compiled.Diagnostics.DiagnosticsWithFixes);
+            }
+            var envelope = Assert.Single(DiagnosticEnvelope.Build(compiled.Diagnostics));
+            if (typeChecking)
+            {
+                Assert.NotNull(envelope.Fix);
+                Assert.False(envelope.Fix.IsSafeToApply);
+                Assert.Equal("value", Assert.Single(envelope.Fix.Edits).NewText);
+            }
+            else
+            {
+                Assert.Null(envelope.Fix);
+            }
+            var fixedSource = DiagnosticFixes.Repair(source, "routing.calr", new CompilationOptions
+            {
+                EnableTypeChecking = typeChecking
+            }, out var repaired, out var applied);
+            Assert.Equal(source, fixedSource);
+            Assert.Equal(0, applied);
+            Assert.Equal(compiled.Diagnostics.Select(d => (d.Code, d.Span, d.Message, d.Severity)),
+                repaired.Diagnostics.Select(d => (d.Code, d.Span, d.Message, d.Severity)));
+        }
+    }
+
+    [Fact]
+    public void RoutedFixes_KeepReportedWordingAndRespectFileSeverityAndPolicy()
+    {
+        var source = new DiagnosticBag();
+        source.SetFilePath("a.calr");
+        var span = new TextSpan(10, 5, 2, 4);
+        var fix = new SuggestedFix("Use value",
+            TextEdit.Replace("a.calr", 2, 4, 2, 9, "value"));
+        source.ReportErrorWithFix(span, DiagnosticCode.DuplicateDefinition, "binding wording", fix);
+        source.ReportErrorWithFix(span, DiagnosticCode.NullableToNonNullableBinding, "analysis only", fix);
+        var destination = new DiagnosticBag();
+        destination.SetFilePath("a.calr");
+        destination.ReportError(span, DiagnosticCode.DuplicateDefinition, "reported wording");
+        destination.ReportWarning(span, DiagnosticCode.DuplicateDefinition, "warning wording");
+        destination.ReportError(span, DiagnosticCode.NullableToNonNullableBinding, "analysis only");
+        destination.SetFilePath("b.calr");
+        destination.ReportError(span, DiagnosticCode.DuplicateDefinition, "other file");
+        var original = destination.ToArray();
+        BindingDiagnosticPolicy.PropagateFixesToExistingDiagnostics(source, destination);
+        BindingDiagnosticPolicy.PropagateFixesToExistingDiagnostics(source, destination);
+        Assert.Equal(original, destination.ToArray());
+        var attached = Assert.Single(destination.DiagnosticsWithFixes);
+        Assert.Equal("reported wording", attached.Message);
+        Assert.Same(fix, attached.Fix);
+        var envelopes = DiagnosticEnvelope.Build(destination);
+        Assert.NotNull(envelopes[0].Fix);
+        Assert.All(envelopes.Skip(1), diagnostic => Assert.Null(diagnostic.Fix));
+    }
+
     private static DiagnosticBag Bind(string source, DiagnosticBag? diagnostics = null)
     {
         Assert.StartsWith("module ", source);

@@ -275,6 +275,25 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         _diagnosticsWithFixes.AddRange(other._diagnosticsWithFixes);
     }
 
+    internal void ImportMatchingFixes(IEnumerable<DiagnosticWithFix> fixes)
+    {
+        var lookup = fixes.ToLookup(fix => (fix.Code, fix.Span, fix.Severity, fix.FilePath));
+        foreach (var diagnostic in _diagnostics)
+        {
+            var fix = lookup[(diagnostic.Code, diagnostic.Span, diagnostic.Severity, diagnostic.FilePath)].FirstOrDefault();
+            if (fix is null || _diagnosticsWithFixes.Any(existing => existing.Code == diagnostic.Code
+                && existing.Span == diagnostic.Span && existing.Severity == diagnostic.Severity
+                && existing.FilePath == diagnostic.FilePath && existing.Message == diagnostic.Message))
+                continue;
+
+            _diagnosticsWithFixes.Add(new DiagnosticWithFix(diagnostic.Code, diagnostic.Message,
+                diagnostic.Span, fix.Fix, diagnostic.Severity, diagnostic.FilePath)
+            {
+                BindingContext = diagnostic.BindingContext
+            });
+        }
+    }
+
     public void Clear()
     {
         _diagnostics.Clear();

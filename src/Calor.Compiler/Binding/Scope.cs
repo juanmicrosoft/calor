@@ -284,6 +284,17 @@ public static class BindingDiagnosticPolicy
                 continue;
             destination.Add(diagnostic);
         }
+        if (source is DiagnosticBag bag)
+            PropagateFixesToExistingDiagnostics(bag, destination);
+    }
+
+    internal static void PropagateFixesToExistingDiagnostics(DiagnosticBag source, DiagnosticBag destination)
+    {
+        var active = source.Where(IsCompilationError).ToArray();
+        destination.ImportMatchingFixes(source.DiagnosticsWithFixes.Where(fix => active.Any(diagnostic =>
+            diagnostic.Code == fix.Code && diagnostic.Span == fix.Span
+            && diagnostic.Severity == fix.Severity && diagnostic.FilePath == fix.FilePath
+            && diagnostic.Message == fix.Message)));
     }
 
     private static BindingDiagnosticRule Active(string code, string reason) =>

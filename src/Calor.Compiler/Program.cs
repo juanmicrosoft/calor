@@ -868,6 +868,9 @@ public class Program
 
             if (diagnostics.HasErrors)
             {
+                // Suggestions do not activate binder-only errors or make their edits safe.
+                diagnostics.ImportMatchingFixes(bindingDiagnostics.DiagnosticsWithFixes
+                    .Where(fix => !fix.Fix.IsSafeToApply));
                 TrackDiagnostics(telemetry, diagnostics);
                 return new CompilationResult(diagnostics, ast, "");
             }

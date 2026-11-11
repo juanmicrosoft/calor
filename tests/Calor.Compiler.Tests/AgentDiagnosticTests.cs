@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Calor.Compiler.Diagnostics;
@@ -12,6 +13,8 @@ public sealed class AgentDiagnosticTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"calor-agent-diag-{Guid.NewGuid():N}");
     private const string Broken = "§M{Calc}\n  §F{Add:i32:pub}\n    §R (+ 1 2)\n  §/F\n§/M";
+    private const string NativeLayout = "module Calc Calc   \n\tmodule CalcModule  \n"
+        + "\t\tfunc Add public () → int  \n\t\t\treturn 1 + 2  ";
 
     public AgentDiagnosticTests() => Directory.CreateDirectory(_directory);
     public void Dispose() => Directory.Delete(_directory, recursive: true);
@@ -274,20 +277,28 @@ public sealed class AgentDiagnosticTests : IDisposable
     [Fact]
     public async Task McpCheck_ReturnsFreshDiagnosticsAfterTargetedPatches()
     {
+        AssertRetiredSourceRejected(Broken);
+        var original = CompileNative(NativeLayout);
         var result = await new CheckTool().ExecuteAsync(JsonSerializer.SerializeToElement(
-            new { action = "diagnose", source = Broken, apply = true }));
+            new { action = "diagnose", source = NativeLayout, apply = true }));
         var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
         Assert.False(result.IsError);
         Assert.True(json.GetProperty("success").GetBoolean());
         Assert.Empty(json.GetProperty("diagnostics").EnumerateArray());
         Assert.True(json.GetProperty("fixesApplied").GetInt32() >= 3);
         Assert.False(Program.Compile(json.GetProperty("fixedSource").GetString()!).HasErrors);
+        Assert.Equal(original.GeneratedCode, CompileNative(json.GetProperty("fixedSource").GetString()!).GeneratedCode);
     }
 
     [Fact]
     public async Task McpCheck_DoesNotApplyFuzzySuggestions()
     {
-        const string source = "§M{Test}\n  §F{Contains:pub} () -> bool\n    §R (cotains \"hello\" \"h\")";
+        const string retired = "§M{Test}\n  §F{Contains:pub} () -> bool\n    §R (cotains \"hello\" \"h\")";
+        AssertRetiredSourceRejected(retired);
+        const string source = "module Test\n  func Contains public (string:value) → string\n    return vlaue";
+        AssertNativeFrontend(source);
+        var original = Program.Compile(source);
+        Assert.Contains(original.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
         var result = await new CheckTool().ExecuteAsync(JsonSerializer.SerializeToElement(
             new { action = "diagnose", source, apply = true }));
         var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
@@ -296,6 +307,9 @@ public sealed class AgentDiagnosticTests : IDisposable
         Assert.Equal(0, json.GetProperty("fixesApplied").GetInt32());
         var fix = json.GetProperty("diagnostics").EnumerateArray().First(d => d.TryGetProperty("fix", out _)).GetProperty("fix");
         Assert.False(fix.GetProperty("isSafeToApply").GetBoolean());
+        var edit = Assert.Single(fix.GetProperty("edits").EnumerateArray());
+        Assert.Equal("value", edit.GetProperty("newText").GetString());
+        Assert.Equal(0, json.GetProperty("fixesApplied").GetInt32());
     }
 
     [Theory]
@@ -304,14 +318,29 @@ public sealed class AgentDiagnosticTests : IDisposable
     [InlineData("§M{T}\n  §F{Value:pub} () -> i32\n    §E{}\n    §R 1 §/F\n§/M")]
     public async Task SafeFixes_PreserveGeneratedCodeAndInlineCodeBeforeClosers(string source)
     {
+        AssertRetiredSourceRejected(source);
+        if (source.Contains("§/F", StringComparison.Ordinal))
+            AssertInternalCloserRemovalPreservesInlineCode(source);
+        var native = source switch
+        {
+            "§M{T}\n    §F{Value:pub} () -> i32\n        §E{}\n        §R 1"
+                => "module T T\n  module TModule\n      func Value public () → int\n          !\n          return 1",
+            "§M{T}\n\t§F{Value:pub} () -> i32\n\t\t§E{}\n\t\t§R 1"
+                => "module T T\n\tmodule TModule\n\t\tfunc Value public () → int\n\t\t\t!\n\t\t\treturn 1",
+            "§M{T}\n  §F{Value:pub} () -> i32\n    §E{}\n    §R 1 §/F\n§/M"
+                => "module T T\n  module TModule\n    func Value public () → int\n      !\n      return 1   ",
+            _ => throw new ArgumentException("No native recipe is registered for this diagnostic fixture.", nameof(source))
+        };
+        var original = CompileNative(native);
         var tool = new CheckTool();
-        var result = await tool.ExecuteAsync(JsonSerializer.SerializeToElement(new { source, apply = true }));
+        var result = await tool.ExecuteAsync(JsonSerializer.SerializeToElement(new { source = native, apply = true }));
         var output = JsonDocument.Parse(result.Content[0].Text!).RootElement;
         Assert.False(result.IsError, result.Content[0].Text);
         var fixedSource = output.GetProperty("fixedSource").GetString()!;
-        Assert.NotEqual(source, fixedSource);
-        Assert.Contains("§R 1", fixedSource);
+        Assert.NotEqual(native, fixedSource);
+        Assert.Contains("return 1", fixedSource);
         Assert.False(Program.Compile(fixedSource).HasErrors);
+        Assert.Equal(original.GeneratedCode, CompileNative(fixedSource).GeneratedCode);
     }
 
     [Theory]
@@ -410,8 +439,10 @@ public sealed class AgentDiagnosticTests : IDisposable
     [Fact]
     public void CliApply_PreservesEncodingAndLeavesNoTemporaryFiles()
     {
+        AssertRetiredSourceRejected(Broken);
+        var original = CompileNative(NativeLayout);
         var path = Path.Combine(_directory, "broken.calr");
-        File.WriteAllText(path, Broken.Replace("\n", "\r\n"), new UnicodeEncoding(false, true));
+        File.WriteAllText(path, NativeLayout.Replace("\n", "\r\n"), new UnicodeEncoding(false, true));
         var (exit, stdout, stderr) = CliTestHarness.RunCli(_directory, "fix", path, "--apply", "--format", "json");
         Assert.Equal(0, exit);
         Assert.True(string.IsNullOrWhiteSpace(stderr), stderr);
@@ -422,8 +453,10 @@ public sealed class AgentDiagnosticTests : IDisposable
         Assert.Equal(new byte[] { 0xff, 0xfe }, bytes[..2]);
         var fixedSource = File.ReadAllText(path);
         Assert.DoesNotContain("§/F", fixedSource);
+        Assert.DoesNotContain("\t", fixedSource);
         Assert.DoesNotContain("\n", fixedSource.Replace("\r\n", ""));
         Assert.False(Program.Compile(fixedSource).HasErrors);
+        Assert.Equal(original.GeneratedCode, CompileNative(fixedSource).GeneratedCode);
         Assert.Single(Directory.GetFiles(_directory));
         var repeated = CliTestHarness.RunCli(_directory, "fix", path, "--apply", "--format", "json");
         Assert.Equal(0, repeated.ExitCode);
@@ -433,11 +466,16 @@ public sealed class AgentDiagnosticTests : IDisposable
     [Fact]
     public void CliPreview_IsReadOnlyAndKeepsErrorExitAndFixPayload()
     {
+        const string source = "module Calc\n\tfunc Add public () → int\n\t\treturn missing";
+        AssertNativeFrontend(source);
+        var original = Program.Compile(source);
+        Assert.Contains(original.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+        Assert.Contains(original.Diagnostics.DiagnosticsWithFixes, diagnostic => diagnostic.Fix.IsSafeToApply);
         var path = Path.Combine(_directory, "broken.calr");
-        File.WriteAllText(path, Broken);
+        File.WriteAllText(path, source);
         var (exit, stdout, _) = CliTestHarness.RunCli(_directory, "fix", path, "--apply", "--dry-run", "--format", "json");
         Assert.NotEqual(0, exit);
-        Assert.Equal(Broken, File.ReadAllText(path));
+        Assert.Equal(source, File.ReadAllText(path));
         var document = JsonDocument.Parse(stdout).RootElement;
         Assert.True(document.GetProperty("summary").GetProperty("errors").GetInt32() > 0);
         Assert.Contains(document.GetProperty("diagnostics").EnumerateArray(),
@@ -448,7 +486,12 @@ public sealed class AgentDiagnosticTests : IDisposable
     public void CliApply_UnfixableErrorsRemainErrors()
     {
         var path = Path.Combine(_directory, "broken.calr");
-        const string source = "§M{Test}\n  §F{Broken:pub} () -> i32\n    §R missing";
+        const string retired = "§M{Test}\n  §F{Broken:pub} () -> i32\n    §R missing";
+        AssertRetiredSourceRejected(retired);
+        const string source = "module Test\n  func Broken public () → int\n    return missing";
+        AssertNativeFrontend(source);
+        Assert.Contains(Program.Compile(source).Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
         File.WriteAllText(path, source);
         var (exit, stdout, _) = CliTestHarness.RunCli(_directory, "fix", "--apply", "--format", "json");
         Assert.NotEqual(0, exit);
@@ -487,7 +530,10 @@ public sealed class AgentDiagnosticTests : IDisposable
         var paths = new[] { "Alpha", "Beta" }.Select(name =>
         {
             var path = Path.Combine(_directory, $"{name}.calr");
-            File.WriteAllText(path, $"§M{{{name}}}\n  §F{{Value:pub}} () -> i32\n    §E{{}}\n    §R 1");
+            var source = $"module {name} {name}\n  module {name}Module\n"
+                + "    func Value public () → int\n      !\n      return 1";
+            CompileNative(source);
+            File.WriteAllText(path, source);
             return path;
         }).ToArray();
         for (var pass = 0; pass < 2; pass++)
@@ -510,5 +556,60 @@ public sealed class AgentDiagnosticTests : IDisposable
             _ => { }, async _ => await File.WriteAllTextAsync(path, "external change")));
         Assert.Equal("external change", await File.ReadAllTextAsync(path));
         Assert.Single(Directory.GetFiles(_directory));
+    }
+
+    private static void AssertNativeFrontend(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        _ = new Parser(tokens, diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+    }
+
+    private static CompilationResult CompileNative(string source)
+    {
+        AssertNativeFrontend(source);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        return compiled;
+    }
+
+    private static void AssertRetiredSourceRejected(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        var markers = tokens.Where(token => token.Text.StartsWith('§')).ToArray();
+        Assert.NotEmpty(markers);
+        foreach (var token in markers)
+        {
+            Assert.Equal(TokenKind.Error, token.Kind);
+            Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownSectionMarker
+                && diagnostic.Span.Equals(token.Span));
+            Assert.Equal(token.Text, source.Substring(token.Span.Start, token.Span.Length));
+        }
+    }
+
+    private static void AssertInternalCloserRemovalPreservesInlineCode(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var report = typeof(Parser).GetMethod("ReportLegacyCloser", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(report);
+        foreach (var (marker, kind) in new[] { ("§/F", TokenKind.EndFunc), ("§/M", TokenKind.EndModule) })
+        {
+            var offset = source.IndexOf(marker, StringComparison.Ordinal);
+            Assert.True(offset >= 0);
+            var span = new TextSpan(offset, marker.Length, source[..offset].Count(c => c == '\n') + 1,
+                offset - source.LastIndexOf('\n', offset));
+            var token = new Token(kind, marker, span);
+            var parser = new Parser([token, new Token(TokenKind.Eof, "", TextSpan.Empty)], diagnostics);
+            report.Invoke(parser, [token]);
+        }
+        Assert.Equal(2, diagnostics.Errors.Count());
+        Assert.All(diagnostics.Errors, diagnostic => Assert.Equal(DiagnosticCode.LegacyCloserForm, diagnostic.Code));
+        var fixedSource = DiagnosticFixes.Apply(source, source, "", diagnostics.DiagnosticsWithFixes, out var applied);
+        Assert.Equal(2, applied);
+        Assert.Contains("§R 1", fixedSource);
+        Assert.Equal(source.Replace("§/F", "", StringComparison.Ordinal).Replace("§/M", "", StringComparison.Ordinal), fixedSource);
     }
 }
