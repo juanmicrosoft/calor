@@ -2482,6 +2482,10 @@ public sealed class Binder
                 && DefinitelyTerminates(ifStatement.ThenBody))
             {
                 DeclareFailedConditionPatterns(ifStatement.Condition, boundIf.Condition);
+                if (ifStatement.Condition is BinaryOperationNode guard
+                    && IsSelectedBuiltInNullGuard(guard)
+                    && _sourceCallConversions?.TerminatingNullGuardConditions.Contains(guard) == true)
+                    DeclareFailedNullEqualityConditionPatterns(guard, boundIf.Condition);
             }
         }
         return result;
@@ -4857,6 +4861,51 @@ public sealed class Binder
         }
     }
 
+    private bool IsSelectedBuiltInNullGuard(BinaryOperationNode condition)
+    {
+        if (condition.Operator is not (BinaryOperator.Equal or BinaryOperator.Or)
+            || !ResolveSourceCallConversions || _asyncTypeModule is null)
+            return false;
+        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
+            _asyncTypeModule, _diagnostics, ProjectionContractMode);
+        return _sourceCallConversions.BuiltInNullGuardOperations.Contains(condition);
+    }
+
+    private void DeclareFailedNullEqualityConditionPatterns(
+        ExpressionNode condition,
+        BoundExpression boundCondition,
+        IReadOnlySet<string>? excludedNarrowings = null)
+    {
+        if (condition is not BinaryOperationNode comparison
+            || boundCondition is not BoundBinaryExpression binary
+            || !IsSelectedBuiltInNullGuard(comparison))
+            return;
+
+        if (comparison.Operator == BinaryOperator.Or)
+        {
+            var leftExclusions = excludedNarrowings is null
+                ? binary.InvalidatedLeftNarrowingNames
+                : excludedNarrowings.Concat(binary.InvalidatedLeftNarrowingNames)
+                    .ToHashSet(StringComparer.Ordinal);
+            DeclareFailedNullEqualityConditionPatterns(comparison.Left, binary.Left, leftExclusions);
+            DeclareFailedNullEqualityConditionPatterns(comparison.Right, binary.Right, excludedNarrowings);
+            return;
+        }
+
+        if (comparison.Operator != BinaryOperator.Equal)
+            return;
+        var (reference, bound) = comparison.Left is ReferenceNode { IsNullLiteral: true }
+            ? (comparison.Right, binary.Right)
+            : comparison.Right is ReferenceNode { IsNullLiteral: true }
+                ? (comparison.Left, binary.Left)
+                : (null, null);
+        if (reference is ReferenceNode local
+            && bound is BoundVariableExpression { HasUnknownInferredType: false } variable
+            && variable.Variable.StorageIdentity is { IsField: false, IsProperty: false }
+            && excludedNarrowings?.Contains(local.Name) != true)
+            DeclareNarrowedNonNullVariable(local, variable.Variable);
+    }
+
     private void DeclareNarrowedNonNullVariable(
         ReferenceNode reference,
         VariableSymbol variable,
@@ -6502,12 +6551,16 @@ public sealed class Binder
     {
         BoundExpression left;
         BoundExpression right;
-        if (binOp.Operator == BinaryOperator.And)
+        if (binOp.Operator == BinaryOperator.And
+            || binOp.Operator == BinaryOperator.Or && IsSelectedBuiltInNullGuard(binOp))
         {
             using var _ = PushScope(_scope.CreateChild());
             var existingNarrowings = _flowNarrowingSources.Keys.ToHashSet();
             left = BindExpression(binOp.Left);
-            DeclareSuccessfulConditionPatterns(binOp.Left, left);
+            if (binOp.Operator == BinaryOperator.And)
+                DeclareSuccessfulConditionPatterns(binOp.Left, left);
+            else
+                DeclareFailedNullEqualityConditionPatterns(binOp.Left, left);
             var introducedNarrowings = _flowNarrowingSources.Keys
                 .Where(variable => !existingNarrowings.Contains(variable))
                 .ToArray();
@@ -6518,11 +6571,11 @@ public sealed class Binder
                 .ToHashSet(StringComparer.Ordinal);
             invalidatedNames.UnionWith(GetExplicitlyMutatedVariableNames(right));
 
-            var conjunctionResultType = GetBinaryOperationResultType(
+            var shortCircuitResultType = GetBinaryOperationResultType(
                 binOp.Operator,
                 left.Type.DisplayString,
                 right.Type.DisplayString);
-            return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, conjunctionResultType)
+            return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, shortCircuitResultType)
             {
                 InvalidatedLeftNarrowingNames = invalidatedNames
             };

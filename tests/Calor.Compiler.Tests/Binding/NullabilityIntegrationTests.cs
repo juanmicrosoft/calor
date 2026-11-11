@@ -21,7 +21,7 @@ namespace Calor.Compiler.Tests;
 public class NullabilityIntegrationTests
 {
     private static (Calor.Compiler.Binding.BoundModule Module, DiagnosticBag Diagnostics)
-        BindSource(string source)
+        BindSource(string source, bool resolveSourceCallConversions = true)
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -29,7 +29,10 @@ public class NullabilityIntegrationTests
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
-        var bound = new Binder(diagnostics).Bind(module);
+        var bound = new Binder(diagnostics)
+        {
+            ResolveSourceCallConversions = resolveSourceCallConversions
+        }.Bind(module);
         return (bound, diagnostics);
     }
 
@@ -585,6 +588,228 @@ public class NullabilityIntegrationTests
             diagnostics,
             DiagnosticCode.NullableToNonNullableBinding,
             DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    [Theory]
+    [InlineData("value == null", "string")]
+    [InlineData("null == value", "string")]
+    [InlineData("(value == null) || (other == null)", "string")]
+    [InlineData("(value == null) || ((other == null) || (value == null))", "string")]
+    [InlineData("(other == null) || (value == null)", "Item")]
+    public void NullEqualityGuard_TerminatingBuiltinComparisonNarrowsReceivingValues(
+        string condition, string type)
+    {
+        var source = $$"""
+            module NullGuard
+              class Item public
+              func Take public ({{type}}:value) → void
+                !
+              func Probe public ({{type}}?:value, {{type}}?:other) → {{type}}
+                if {{condition}}
+                  return {{(type == "string" ? "\"fallback\"" : "new Item()")}}
+                let {{type}}:copy = value
+                Take(value)
+                {{(condition.Contains("other", StringComparison.Ordinal) ? "Take(other)" : "")}}
+                return value
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+    }
+
+    [Theory]
+    [InlineData("value == null", false, true)]
+    [InlineData("(value == null) || flag", false, true)]
+    [InlineData("(value == null) && flag", true, true)]
+    [InlineData("value == null", true, false)]
+    public void NullEqualityGuard_RequiresTerminatingSelectedProof(
+        string condition, bool terminates, bool resolveSourceCallConversions)
+    {
+        var source = $$"""
+            module UnprovenNullGuard
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value, bool:flag) → void
+                if {{condition}}
+                  {{(terminates ? "return" : "let bool:observed = true")}}
+                Take(value)
+            """;
+
+        var (_, diagnostics) = BindSource(source, resolveSourceCallConversions);
+
+        var diagnostic = Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(source.LastIndexOf("value", StringComparison.Ordinal), diagnostic.Span.Start);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NullEqualityGuard_ThrowingOrFullyReturningBranchNarrowsReceiving(bool nested)
+    {
+        var body = nested ? """
+            if flag
+              return
+            else
+              throw new System.Exception()
+            """ : "throw new System.Exception()";
+        var source = $$"""
+            module TerminatingNullGuard
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value, bool:flag) → void
+                if value == null
+                  {{body.Replace("\n", "\n      ", StringComparison.Ordinal)}}
+                Take(value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+    }
+
+    [Fact]
+    public void NullEqualityGuard_EscapingGotoBeforeReturnDoesNotProveNonnull()
+    {
+        var source = """
+            module EscapingNullGuard
+              func Take public (string:value) → void
+                !
+              func Probe public (string?:value) → void
+                if value == null
+                  goto after
+                  return
+                after:
+                Take(value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NullEqualityGuard_OverloadedOrUnresolvedComparisonDoesNotProveNonnull(bool unresolved)
+    {
+        var members = unresolved ? "extends Missing" : """
+            op == (Item?:left, Item?:right) → bool
+              return false
+            op != (Item?:left, Item?:right) → bool
+              return true
+            """;
+        var source = $$"""
+            module UncertainEquality
+              class Item public
+                {{members.Replace("\n", "\n    ", StringComparison.Ordinal)}}
+              func Take public (Item:value) → void
+                !
+              func Probe public (Item?:value) → void
+                if value == null
+                  return
+                Take(value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Theory]
+    [InlineData("set candidate replacement")]
+    [InlineData("Mutate(ref candidate)")]
+    [InlineData("MutateOut(out candidate)")]
+    [InlineData("change()")]
+    public void NullEqualityGuard_ExistingMutationInvalidationRemainsEffective(string mutation)
+    {
+        var source = $$"""
+            module NullGuardInvalidation
+              func Take public (string:value) → void
+                !
+              func Mutate public (ref string?:value) → bool
+                set value null
+                return false
+              func MutateOut public (out string?:value) → bool
+                set value null
+                return false
+              func Probe public (string?:value, string?:replacement) → void
+                var candidate = value
+                let Func<bool>:change = () => Mutate(ref candidate)
+                if candidate == null
+                  return
+                Take(candidate)
+                {{mutation}}
+                Take(candidate)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diagnostic = Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(source.LastIndexOf("candidate", StringComparison.Ordinal), diagnostic.Span.Start);
+    }
+
+    [Theory]
+    [InlineData("Mutate(ref candidate)", 1)]
+    [InlineData("MutateOut(out candidate)", 1)]
+    [InlineData("change()", 1)]
+    [InlineData("Mutate(ref other)", 0)]
+    [InlineData("((other == null) || Mutate(ref candidate))", 1)]
+    [InlineData("(Mutate(ref candidate) || (candidate == null))", 0)]
+    public void NullEqualityGuard_OrRightOperandCannotRestoreInvalidatedLeftFacts(
+        string right, int expectedDiagnostics)
+    {
+        var source = $$"""
+            module NullGuardConditionMutation
+              func Take public (string:value) → void
+                !
+              func Mutate public (ref string?:value) → bool
+                set value null
+                return false
+              func MutateOut public (out string?:value) → bool
+                set value null
+                return false
+              func Probe public (string?:value, string?:other) → void
+                var candidate = value
+                let Func<bool>:change = () => Mutate(ref candidate)
+                if (candidate == null) || {{right}}
+                  return
+                Take(candidate)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Equal(expectedDiagnostics, diagnostics.Count(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NullEqualityGuard_MemberStorageDoesNotGainUncertifiedFacts(bool setter)
+    {
+        var source = $$"""
+            module NullGuardMember
+              class Holder public
+                property string?:Value
+                  get public
+                  {{(setter ? "set public" : "")}}
+                func Take public (string:value) → void
+                  !
+                func Probe public () → void
+                  if Value == null
+                    return
+                  Take(Value)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
     }
 
     [Fact]

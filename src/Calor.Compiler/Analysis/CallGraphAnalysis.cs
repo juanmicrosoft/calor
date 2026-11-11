@@ -78,6 +78,8 @@ public sealed class CallGraphAnalysis
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
         internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
+        internal HashSet<BinaryOperationNode> BuiltInNullGuardOperations { get; } = new(ReferenceEqualityComparer.Instance);
+        internal HashSet<BinaryOperationNode> TerminatingNullGuardConditions { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<ExpressionNode, EffectResolverKey> StaticInitializerConstructors { get; } = new(ReferenceEqualityComparer.Instance);
         // Typing evidence only: neither bound-member identity nor getter-effect permission.
         internal Dictionary<FieldAccessNode, MetadataMemberTypeSelection> MetadataMemberTypes { get; } = new(ReferenceEqualityComparer.Instance);
@@ -139,6 +141,8 @@ public sealed class CallGraphAnalysis
         var conflictingTypes = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingParameters = new HashSet<ParameterNode>(ReferenceEqualityComparer.Instance);
         var conflictingLambdas = new HashSet<LambdaExpressionNode>(ReferenceEqualityComparer.Instance);
+        var conflictingNullGuards = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
+        var conflictingGuardTerminations = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
         var conflictingCalls = new HashSet<TextSpan>();
         var conflictingMembers = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
         var conflictingGetters = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
@@ -178,9 +182,13 @@ public sealed class CallGraphAnalysis
                 RegisterArgument(arguments[index], (node.Span, index));
         }
         var bindExpressions = operators.Length > 0 || visited.OfType<LambdaExpressionNode>().Any();
+        var bindNullGuards = visited.OfType<BinaryOperationNode>().Any(binary =>
+            binary.Operator == BinaryOperator.Equal
+            && (binary.Left is ReferenceNode { IsNullLiteral: true }
+                || binary.Right is ReferenceNode { IsNullLiteral: true }));
         var bindMemberTypes = visited.OfType<FieldAccessNode>().Any();
         var bindInitialization = EnumerateClasses(module).Any();
-        if (!bindExpressions && !bindMemberTypes && !bindInitialization
+        if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindInitialization
             && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
             return bindings;
 
@@ -391,12 +399,15 @@ public sealed class CallGraphAnalysis
                         constructor.MetadataName, [], EffectMemberKind.Constructor);
                 }
             }
-            if (!bindExpressions && !bindMemberTypes)
+            if (!bindExpressions && !bindNullGuards && !bindMemberTypes)
                 return;
 
-            var validMemberContext = bindMemberTypes && !compilation.GetDiagnostics().Any(diagnostic =>
+            var validProofContext = (bindMemberTypes || bindNullGuards) && !compilation.GetDiagnostics().Any(diagnostic =>
                 diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            var validMemberContext = bindMemberTypes && validProofContext;
             var selectedInTree = new HashSet<TextSpan>();
+            var selectedNullGuardsInTree = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
+            var terminatingGuardsInTree = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
             var selectedMembersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
             var selectedGettersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
             var selectedMethodGroupCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
@@ -422,6 +433,52 @@ public sealed class CallGraphAnalysis
                         AddMetadataMemberType(operation);
                         if (operation is IInvocationOperation metadataInvocation)
                             AddMetadataMethodGroupCall(metadataInvocation);
+                    }
+                    if (bindNullGuards && operation is IConditionalOperation
+                            { Syntax: IfStatementSyntax conditionalSyntax }
+                        && SyntaxOrigin(conditionalSyntax.Condition) is BinaryOperationNode
+                            { Operator: BinaryOperator.Equal or BinaryOperator.Or } guardCondition)
+                    {
+                        var flow = validProofContext
+                            ? model.AnalyzeControlFlow(conditionalSyntax.Statement) : null;
+                        if (flow is { Succeeded: true, EndPointIsReachable: false }
+                            && flow.ExitPoints.All(exit => exit is ReturnStatementSyntax or ThrowStatementSyntax)
+                            && !conflictingGuardTerminations.Contains(guardCondition))
+                        {
+                            terminatingGuardsInTree.Add(guardCondition);
+                            bindings.TerminatingNullGuardConditions.Add(guardCondition);
+                        }
+                        else
+                        {
+                            conflictingGuardTerminations.Add(guardCondition);
+                            bindings.TerminatingNullGuardConditions.Remove(guardCondition);
+                        }
+                    }
+                    if (bindNullGuards && operation is IBinaryOperation binaryGuard
+                        && Origin(operation) is BinaryOperationNode
+                            { Operator: BinaryOperator.Equal or BinaryOperator.Or } guard)
+                    {
+                        if (validProofContext && binaryGuard is
+                            {
+                                OperatorMethod: null,
+                                IsLifted: false,
+                                Type.SpecialType: SpecialType.System_Boolean
+                            }
+                            && (binaryGuard.OperatorKind, guard.Operator) is
+                                (BinaryOperatorKind.Equals, BinaryOperator.Equal)
+                                or (BinaryOperatorKind.ConditionalOr, BinaryOperator.Or)
+                            && !HasUserDefinedConversion(binaryGuard.LeftOperand)
+                            && !HasUserDefinedConversion(binaryGuard.RightOperand)
+                            && !conflictingNullGuards.Contains(guard))
+                        {
+                            selectedNullGuardsInTree.Add(guard);
+                            bindings.BuiltInNullGuardOperations.Add(guard);
+                        }
+                        else
+                        {
+                            conflictingNullGuards.Add(guard);
+                            bindings.BuiltInNullGuardOperations.Remove(guard);
+                        }
                     }
                     if (!bindExpressions)
                         continue;
@@ -476,6 +533,20 @@ public sealed class CallGraphAnalysis
                                      && SymbolEqualityComparer.Default.Equals(truth.Parameters[0].Type, operand)))
                             AddMethod(operation, truth);
                     }
+                }
+            }
+            foreach (var guard in ranges.Select(range => range.Node).OfType<BinaryOperationNode>()
+                         .Where(guard => guard.Operator is BinaryOperator.Equal or BinaryOperator.Or))
+            {
+                if (!selectedNullGuardsInTree.Contains(guard))
+                {
+                    conflictingNullGuards.Add(guard);
+                    bindings.BuiltInNullGuardOperations.Remove(guard);
+                }
+                if (!terminatingGuardsInTree.Contains(guard))
+                {
+                    conflictingGuardTerminations.Add(guard);
+                    bindings.TerminatingNullGuardConditions.Remove(guard);
                 }
             }
             foreach (var member in ranges.Select(range => range.Node).OfType<FieldAccessNode>()
@@ -536,6 +607,17 @@ public sealed class CallGraphAnalysis
                     && range.End >= syntax.Span.End).Node;
 
             AstNode? Origin(IOperation operation) => SyntaxOrigin(operation.Syntax);
+
+            static bool HasUserDefinedConversion(IOperation operand)
+            {
+                while (operand is IConversionOperation conversion)
+                {
+                    if (conversion.OperatorMethod is not null)
+                        return true;
+                    operand = conversion.Operand;
+                }
+                return false;
+            }
 
             void AddMetadataMethodGroupCall(IInvocationOperation invocation)
             {
