@@ -2,8 +2,11 @@ using Calor.Compiler.Migration;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using System.Text;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -328,13 +331,147 @@ public class SnapshotConversionTests
         var before = File.ReadAllText(originalPath);
         var after = File.ReadAllText(currentPath);
         Assert.NotEqual(before, after);
-        var originalProjection = TestHelpers.CompileCalorToCSharpWithDiagnostics(before);
-        var currentProjection = TestHelpers.CompileCalorToCSharpWithDiagnostics(after);
-        Assert.NotNull(originalProjection.GeneratedCode);
-        Assert.NotNull(currentProjection.GeneratedCode);
-        Assert.Empty(originalProjection.Diagnostics);
-        Assert.Empty(currentProjection.Diagnostics);
-        Assert.Equal(originalProjection.GeneratedCode, currentProjection.GeneratedCode);
+        // Captured from unmodified producer 2c4b6b45b; today's parser rejects the frozen syntax.
+        var fixturePath = Path.Combine(root, "tests/TestData/Conversion/snapshot-historical-projections.json");
+        var expectations = JsonSerializer.Deserialize<Dictionary<string, SnapshotProjectionExpectation>>(
+            File.ReadAllText(fixturePath))!;
+        Assert.Equal(CurrentSnapshotData().Select(row => (string)row[0]), expectations.Keys.Order(StringComparer.Ordinal));
+        var expected = expectations[original];
+        Assert.Equal(expected.OriginalSource, before);
+
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(after, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Empty(diagnostics);
+        foreach (var (mode, historical, escaped) in new[]
+        {
+            (EmitContractMode.Debug, expected.HistoricalDebugCSharp, expected.EscapedDebugCSharp),
+            (EmitContractMode.Off, expected.HistoricalOffCSharp, expected.EscapedOffCSharp)
+        })
+        {
+            var actual = new CSharpEmitter(mode).Emit(module);
+            if (original.EndsWith("/13-02.approved.calr", StringComparison.Ordinal))
+            {
+                Assert.Contains(CSharpSyntaxTree.ParseText(historical).GetDiagnostics(),
+                    diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+                Assert.NotNull(escaped);
+                Assert.Equal(escaped, actual);
+            }
+            else
+            {
+                Assert.Null(escaped);
+                var optionalConstructorParentheses = original.EndsWith("/13-08.approved.calr", StringComparison.Ordinal);
+                var liftedRawExpression = optionalConstructorParentheses
+                    || original.EndsWith("/12-01.approved.calr", StringComparison.Ordinal);
+                foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+                    Assert.Equal(
+                        SnapshotDeclarations(historical, optionalConstructorParentheses, liftedRawExpression, symbols),
+                        SnapshotDeclarations(actual, optionalConstructorParentheses, liftedRawExpression, symbols));
+            }
+        }
+
+        var production = Calor.Compiler.Program.Compile(after, currentPath);
+        Assert.Equal(expected.NativeErrors,
+            production.Diagnostics.Where(diagnostic => diagnostic.IsError)
+                .Select(diagnostic => $"{diagnostic.Code}: {diagnostic.Message}"));
+    }
+
+    private sealed record SnapshotProjectionExpectation(
+        string OriginalSource,
+        string HistoricalDebugCSharp,
+        string HistoricalOffCSharp,
+        string? EscapedDebugCSharp,
+        string? EscapedOffCSharp,
+        string[] NativeErrors);
+
+    private static string[] SnapshotDeclarations(
+        string source, bool optionalConstructorParentheses, bool liftedRawExpression, string[] symbols)
+    {
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(preprocessorSymbols: symbols));
+        var root = tree.GetCompilationUnitRoot();
+        var unusedImports = Array.Empty<Microsoft.CodeAnalysis.Text.TextSpan>();
+        if (liftedRawExpression)
+        {
+            var compilation = CSharpCompilation.Create("SnapshotRawLifting", [tree],
+                GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var diagnostics = compilation.GetDiagnostics();
+            Assert.DoesNotContain(diagnostics,
+                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            // Retired raw expressions requested extra backend imports; remove only Roslyn-proven unused ones.
+            unusedImports = diagnostics.Where(diagnostic => diagnostic.Id == "CS8019")
+                .Select(diagnostic => diagnostic.Location.SourceSpan).ToArray();
+        }
+        var declarations = new List<string>();
+        foreach (var directive in root.DescendantTrivia(descendIntoTrivia: true)
+            .Select(trivia => trivia.GetStructure()).OfType<DirectiveTriviaSyntax>()
+            .Where(directive => directive is IfDirectiveTriviaSyntax or ElifDirectiveTriviaSyntax
+                or ElseDirectiveTriviaSyntax or EndIfDirectiveTriviaSyntax))
+            declarations.Add(Project(directive));
+        AddMembers(root.Members, root.Usings, "");
+        return declarations.ToArray();
+
+        void AddMembers(SyntaxList<MemberDeclarationSyntax> members, SyntaxList<UsingDirectiveSyntax> usings, string owner)
+        {
+            declarations.AddRange(usings.Where(@using => !unusedImports.Any(span => span.IntersectsWith(@using.Span)))
+                .Select(@using => owner + ":" + Project(@using)));
+            foreach (var member in members)
+            {
+                if (member is BaseNamespaceDeclarationSyntax ns)
+                    AddMembers(ns.Members, ns.Usings, string.IsNullOrEmpty(owner) ? ns.Name.ToString() : owner + "." + ns.Name);
+                else
+                    declarations.Add(owner + ":" + Project(member));
+            }
+        }
+
+        string Project(SyntaxNode syntax)
+        {
+            var result = new StringBuilder();
+            Append(syntax);
+            return result.ToString();
+
+            void Append(SyntaxNodeOrToken element)
+            {
+                if (element.AsNode() is not { } node)
+                {
+                    var token = element.AsToken();
+                    result.Append('T').Append(token.RawKind).Append(token.IsMissing ? 'M' : 'P').Append(':')
+                        .Append(token.Text.Length).Append(':').Append(token.Text);
+                    return;
+                }
+                if (node is ParenthesizedExpressionSyntax parenthesized)
+                {
+                    Append(parenthesized.Expression);
+                    return;
+                }
+                if (optionalConstructorParentheses && node is ObjectCreationExpressionSyntax { ArgumentList: null } creation)
+                    node = creation.WithArgumentList(SyntaxFactory.ArgumentList());
+                result.Append('N').Append(node.RawKind).Append('[');
+                foreach (var child in node.ChildNodesAndTokens())
+                    Append(child);
+                result.Append(']');
+            }
+        }
+    }
+
+    [Fact]
+    public void SnapshotProjection_PreservesGroupingAndConstructorArguments()
+    {
+        string Project(string source, bool optionalConstructorParentheses = false) =>
+            Assert.Single(SnapshotDeclarations(source, optionalConstructorParentheses, false, []));
+
+        Assert.Equal(
+            Project("class C { int M(int x) => x + 1; }"),
+            Project("class C { int M(int x) => ((x + 1)); }"));
+        Assert.NotEqual(
+            Project("class C { int M(int a, int b, int c) => (a + b) * c; }"),
+            Project("class C { int M(int a, int b, int c) => a + (b * c); }"));
+
+        const string absent = "class C { C M() => new C {}; }";
+        const string empty = "class C { C M() => new C() {}; }";
+        Assert.NotEqual(Project(absent), Project(empty));
+        Assert.Equal(Project(absent, true), Project(empty, true));
+        Assert.NotEqual(
+            Project("class C { C(int x) {} C M() => new C(1); }", true),
+            Project("class C { C(int x) {} C M() => new C(2); }", true));
     }
 
     [Theory]
