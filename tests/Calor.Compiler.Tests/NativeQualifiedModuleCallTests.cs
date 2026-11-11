@@ -277,6 +277,133 @@ public sealed class NativeQualifiedModuleCallTests
         Assert.DoesNotContain("OrderServiceModule.SaveOrder", emitter.Emit(shadow));
     }
 
+    [Theory]
+    [InlineData("file", false)]
+    [InlineData("file", true)]
+    [InlineData("namespace", false)]
+    [InlineData("namespace", true)]
+    [InlineData("global", false)]
+    [InlineData("global", true)]
+    public void RealCli_NamespaceAliasNeverBorrowsUnrelatedFileLabel(string scope, bool reverse)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "calor-qualified-alias-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "callee.calr"),
+                "module M Actual.Store\n  func SaveOrder () → void\n    ! db:w\n");
+            File.WriteAllText(Path.Combine(root, "other.calr"),
+                "module Other Actual.Other\n"
+                + (scope == "global" ? "  global using M = Actual.Other\n" : "")
+                + "  func Noop () → void\n    !\n");
+            var source = scope == "namespace" ? """
+                module Caller Client block
+                  namespace using M = Actual.Other
+                  func Use () → void
+                    ! db:w
+                    M.SaveOrder()
+                """ + "\n" :
+                "module Caller\n"
+                + (scope == "file" ? "  using M = Actual.Other\n" : "")
+                + "  func Use () → void\n    ! db:w\n    M.SaveOrder()\n";
+            File.WriteAllText(Path.Combine(root, "caller.calr"), source);
+            var inputs = new[] { "callee.calr", "other.calr", "caller.calr" };
+            if (reverse)
+                Array.Reverse(inputs);
+            var result = CliTestHarness.RunCli(root,
+                "--input", inputs[0], "--input", inputs[1], "--input", inputs[2], "--format", "json");
+            Assert.True(result.ExitCode == 1, result.StdOut + result.StdErr);
+            using var json = JsonDocument.Parse(result.StdOut);
+            var diagnostics = json.RootElement.GetProperty("diagnostics").EnumerateArray().ToArray();
+            Assert.Contains(diagnostics, item => item.GetProperty("severity").GetString() == "error");
+            Assert.DoesNotContain(diagnostics, item =>
+                item.GetProperty("code").GetString()!.StartsWith("Calor00", StringComparison.Ordinal)
+                || item.GetProperty("code").GetString()!.StartsWith("Calor01", StringComparison.Ordinal));
+            var generated = Path.Combine(root, "caller.g.cs");
+            if (File.Exists(generated))
+                Assert.DoesNotContain("global::Actual.Store.StoreModule.SaveOrder", File.ReadAllText(generated));
+            Assert.Equal(source, File.ReadAllText(Path.Combine(root, "caller.calr")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void NamespaceAliasIsLexicalAndEmitterDoesNotRetargetIt()
+    {
+        var callee = Parse("module M Actual.Store\n  func SaveOrder () → void\n    ! db:w\n");
+        var source = """
+            module Caller Client.Aliased block
+              namespace using M = Actual.Other
+              func Rejected () → void
+                ! db:w
+                M.SaveOrder()
+            """ + "\n";
+        var caller = Parse(source);
+        var plain = Parse("""
+            module Plain Client.Plain block
+              func Accepted () → void
+                ! db:w
+                M.SaveOrder()
+            """);
+        var targets = CompilationDriver.BuildCrossModuleFunctionMap([callee, caller, plain]);
+        var diagnostics = new DiagnosticBag();
+        var binder = new Binder(diagnostics) { CrossModuleFunctionModules = targets };
+        binder.Bind(caller);
+        Assert.Empty(binder.CrossModuleCallTargets);
+        binder.Bind(plain);
+        Assert.Equal("M.SaveOrder", Assert.Single(binder.CrossModuleCallTargets).Value);
+        var emitter = new CSharpEmitter { CrossModuleFunctionModules = targets };
+        var generated = emitter.Emit(caller);
+        Assert.Contains("using M = Actual.Other;", generated);
+        Assert.DoesNotContain("global::Actual.Store.StoreModule.SaveOrder()", generated);
+        Assert.Contains("M.SaveOrder();", generated);
+        Assert.Contains("global::Actual.Store.StoreModule.SaveOrder()", emitter.Emit(plain));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ActualTypeAliasRetainsItsSelectedOwnerInsteadOfFileLabel(bool sourceType)
+    {
+        var callee = Parse("""
+            module M Actual.Store
+              func Abs (int:value) → int
+                ! db:w
+                return 0
+            """);
+        var caller = Parse(sourceType ? """
+            module Handler Local
+              using M = Local.Math
+              module Math
+                func Abs (int:value) → int
+                  !
+                  return 17
+              func Read () → int
+                !
+                return M.Abs(-3)
+            """ : """
+            module Handler
+              using M = System.Math
+              func Read () → int
+                !
+                return M.Abs(-3)
+            """);
+        var targets = CompilationDriver.BuildCrossModuleFunctionMap([callee, caller]);
+        var diagnostics = new DiagnosticBag();
+        var binder = new Binder(diagnostics) { CrossModuleFunctionModules = targets };
+        binder.Bind(caller);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Empty(binder.CrossModuleCallTargets);
+        var generated = new CSharpEmitter { CrossModuleFunctionModules = targets }.Emit(caller);
+        Assert.DoesNotContain("StoreModule.Abs", generated);
+        var assembly = Compile([new CSharpEmitter().Emit(callee), generated]);
+        var owner = sourceType ? "Local.LocalModule" : "GlobalModule";
+        Assert.Equal(sourceType ? 17 : 3, assembly.GetType(owner)!.GetMethod("Read")!.Invoke(null, null));
+    }
+
     private static ModuleNode Parse(string source)
     {
         var diagnostics = new DiagnosticBag();

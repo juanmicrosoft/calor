@@ -858,6 +858,10 @@ internal static class CompilationDriver
             IReadOnlyList<ModuleNode> modules,
             Func<FunctionNode, bool> includeFunction)
     {
+        var globalAliases = modules.SelectMany(module => module.Usings)
+            .Where(import => import.IsGlobal && import.Alias is not null)
+            .Select(import => import.Alias!)
+            .ToHashSet(StringComparer.Ordinal);
         var byName = new Dictionary<string, List<CrossModuleFunctionTarget>>(
             StringComparer.Ordinal);
         var byQualifiedName =
@@ -888,7 +892,8 @@ internal static class CompilationDriver
 
                 void AddQualifiedTarget(string qualifier)
                 {
-                    if (string.IsNullOrEmpty(qualifier))
+                    if (string.IsNullOrEmpty(qualifier)
+                        || globalAliases.Contains(qualifier.Split('.')[0].TrimStart('@')))
                         return;
 
                     var qualifiedName = $"{qualifier}.{functionName}";

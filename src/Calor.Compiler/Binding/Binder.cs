@@ -4909,6 +4909,17 @@ public sealed class Binder
             .Any(symbol => !allowDeclaredTypes || symbol is not TypeSymbol)
         || GetTypeParameterConstraints(head) is not null;
 
+    private bool HasVisibleUsingAlias(string head)
+    {
+        var scopes = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = _currentNamespaceScopeId; id is not null
+            && scopes.Add(id) && _metadataNamespaceScopes.TryGetValue(id, out var scope); id = scope.ParentScopeId)
+        {
+        }
+        return _metadataUsings.Any(import => import.Alias == head.TrimStart('@')
+            && (import.IsGlobal || import.NamespaceScopeId is null || scopes.Contains(import.NamespaceScopeId)));
+    }
+
     internal static string? DottedReferenceName(ExpressionNode expression) => expression switch
     {
         ReferenceNode reference => reference.Name,
@@ -6762,14 +6773,15 @@ public sealed class Binder
             BoundExpression? receiver = TryBindPredefinedTypeReceiver(member.Target);
             if (receiver is null && DottedReferenceName(member.Target) is { } receiverName
                 && !IsTypeReceiverHeadShadowed(receiverName.Split('.')[0], allowDeclaredTypes: true)
-                && ReferenceLookupNames(receiverName, _currentClassName ?? _currentNamespaceIdentity)
-                    .Select(name => ResolveTypeSymbol(name)).FirstOrDefault(type => type is not null) is { } typeSymbol)
+                && ResolveSourceType(receiverName, _currentClassName,
+                    _currentNamespaceIdentity, _currentNamespaceScopeId).Type is { } typeSymbol)
                 receiver = new BoundTypeReferenceExpression(member.Target.Span,
                     receiverName,
                     new BoundTypes.NominalBoundType(typeSymbol.QualifiedName, declaration: typeSymbol), typeSymbol);
             receiver ??= TryBindMetadataTypeReceiver(member.Target);
             if (receiver is null && sourceReceiver is not null && sourceTarget is not null
                 && !IsTypeReceiverHeadShadowed(sourceReceiver.Split('.')[0], allowDeclaredTypes: false)
+                && !HasVisibleUsingAlias(sourceReceiver.Split('.')[0])
                 && CrossModuleFunctionModules?.TryGetValue(sourceTarget, out var moduleTarget) == true)
             {
                 receiver = new BoundTypeReferenceExpression(member.Target.Span, sourceReceiver,
