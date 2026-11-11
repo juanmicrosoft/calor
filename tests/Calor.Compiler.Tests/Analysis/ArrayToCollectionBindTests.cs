@@ -771,6 +771,250 @@ public class ArrayToCollectionBindTests
         Assert.Equal(expected, HasArrayTrap(Validate(source)));
     }
 
+    [Theory]
+    [InlineData("Take(label: \"lines\", File.ReadAllLines(path))", false)]
+    [InlineData("Take(label: \"lines\", items: File.ReadAllLines(path))", true)]
+    [InlineData("Take(items: File.ReadAllLines(path), \"lines\")", true)]
+    [InlineData("Take(File.ReadAllLines(path), label: \"lines\")", true)]
+    public void NativeSelection_NamedArgumentsOnlyPermitInPositionPositionalContinuation(
+        string call, bool expected)
+    {
+        var source = $$"""
+            module NativeReview NativeReview
+              func Take (List<string>:items, string:label) → void
+                !
+              func Use (string:path) → void
+                ! fs:r
+                {{call}}
+            """;
+        foreach (var strict in new[] { true, false })
+        {
+            var diagnostics = Validate(source, strict);
+            Assert.Equal(expected ? 1 : 0, diagnostics.Count);
+            Assert.All(diagnostics, diagnostic =>
+            {
+                Assert.Equal(DiagnosticCode.BindArrayToConcreteCollection, diagnostic.Code);
+                Assert.Equal("File.ReadAllLines(path)",
+                    source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+            });
+        }
+        if (!expected)
+        {
+            var result = Program.Compile(source, "named-order.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.Equal(DiagnosticCode.NoMatchingOverload, Assert.Single(result.Diagnostics.Errors).Code);
+        }
+    }
+
+    [Theory]
+    [InlineData("1", false)]
+    [InlineData("GetNumber()", false)]
+    [InlineData("fixedNumber", false)]
+    [InlineData("number", true)]
+    [InlineData("(number)", true)]
+    [InlineData("items[0]", true)]
+    [InlineData("items[true]", false)]
+    [InlineData("list[0]", false)]
+    public void NativeSelection_RefOperandsRequireKnownWritableStorage(string operand, bool expected)
+    {
+        var source = $$"""
+            module NativeReview NativeReview
+              class Reader
+                func Read static (ref int:value) → string[]
+                  ! fs:r
+                  return File.ReadAllLines("data.txt")
+              func GetNumber () → int
+                !
+                return 1
+              func Use (int[]:items, List<int>:list) → void
+                ! fs:r
+                var int:number = 1
+                let int:fixedNumber = 1
+                let List<string>:lines = Reader.Read(ref {{operand}})
+            """;
+        foreach (var strict in new[] { true, false })
+        {
+            var diagnostics = Validate(source, strict);
+            Assert.Equal(expected ? 1 : 0, diagnostics.Count);
+            Assert.All(diagnostics, diagnostic =>
+                Assert.Equal(DiagnosticCode.BindArrayToConcreteCollection, diagnostic.Code));
+        }
+        if (operand is "1" or "GetNumber()")
+        {
+            var result = Program.Compile(source, "ref-operand.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            var diagnostic = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.InvalidByReferenceOperand, diagnostic.Code);
+            Assert.Equal(operand, source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        }
+    }
+
+    [Theory]
+    [InlineData("1", false)]
+    [InlineData("number", true)]
+    [InlineData("items[0]", true)]
+    public void NativeSelection_OutOperandsRequireKnownWritableStorage(string operand, bool expected)
+    {
+        var source = $$"""
+            module NativeReview NativeReview
+              class Reader
+                func Read static (out int:value) → string[]
+                  ! mut,fs:r
+                  set value 1
+                  return File.ReadAllLines("data.txt")
+              func Use (int[]:items) → void
+                ! mut,fs:r
+                var int:number = 0
+                let List<string>:lines = Reader.Read(out {{operand}})
+            """;
+        Assert.Equal(expected, HasArrayTrap(Validate(source)));
+        if (!expected)
+        {
+            var result = Program.Compile(source, "out-operand.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.Equal(DiagnosticCode.InvalidByReferenceOperand, Assert.Single(result.Diagnostics.Errors).Code);
+        }
+    }
+
+    [Theory]
+    [InlineData("number", true)]
+    [InlineData("this.number", true)]
+    [InlineData("fixedNumber", false)]
+    [InlineData("this.fixedNumber", false)]
+    public void NativeSelection_RefFieldsRetainReadonlyAndReceiverRules(string operand, bool expected)
+    {
+        var source = $$"""
+            module NativeReview NativeReview
+              class Reader
+                func Read static (ref int:value) → string[]
+                  ! fs:r
+                  return File.ReadAllLines("data.txt")
+              class Host
+                field int:number = 1
+                field int:fixedNumber readonly = 1
+                func Use () → void
+                  ! fs:r
+                  let List<string>:lines = Reader.Read(ref {{operand}})
+            """;
+        Assert.Equal(expected, HasArrayTrap(Validate(source)));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void NativeSelection_StaticBodiesRequireStaticFieldStorage(bool staticField, bool expected)
+    {
+        var source = $$"""
+            module NativeReview NativeReview
+              class Reader
+                func Read static (ref int:value) → string[]
+                  ! fs:r
+                  return File.ReadAllLines("data.txt")
+              class Host
+                field int:number {{(staticField ? "static" : "")}} = 1
+                func Use static () → void
+                  ! fs:r
+                  let List<string>:lines = Reader.Read(ref number)
+            """;
+        Assert.Equal(expected, HasArrayTrap(Validate(source)));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void NativeSelection_ArrayFieldStorageRequiresAnAvailableReceiver(bool staticField, bool expected)
+    {
+        var source = $$"""
+            module NativeReview NativeReview
+              class Reader
+                func Read static (ref int:value) → string[]
+                  ! fs:r
+                  return File.ReadAllLines("data.txt")
+              class Host
+                field int[]:items {{(staticField ? "static" : "")}}
+                func Use static () → void
+                  ! fs:r
+                  let List<string>:lines = Reader.Read(ref items[0])
+            """;
+        Assert.Equal(expected, HasArrayTrap(Validate(source)));
+    }
+
+    [Theory]
+    [InlineData("ref", "local")]
+    [InlineData("ref", "this.number")]
+    [InlineData("ref", "items[0]")]
+    [InlineData("out", "local")]
+    [InlineData("out", "this.number")]
+    [InlineData("out", "items[0]")]
+    public void NativeSelection_PublicCompilationPreservesWritableByReferenceOperands(
+        string modifier, string operand)
+    {
+        var source = $$"""
+            module NativeReview NativeReview
+              class Reader
+                func Read static ({{modifier}} int:value) → string[]
+                  ! mut,fs:r
+                  set value 1
+                  return File.ReadAllLines("data.txt")
+              class Host
+                field int:number = 0
+                func Use (int[]:items) → string[]
+                  ! mut,fs:r
+                  var int:local = 0
+                  return Reader.Read({{modifier}} {{operand}})
+            """;
+        var result = Program.Compile(source, "writable-operand.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("1", false)]
+    [InlineData("number", true)]
+    [InlineData("items[0]", true)]
+    public void NativeSelection_RefApplicabilityAlsoGuardsScalarRebinds(string operand, bool expected)
+    {
+        var source = $$"""
+            module NativeReview NativeReview
+              class Reader
+                func Read static (ref int:value) → string
+                  !
+                  return "text"
+              func Use (int[]:items) → void
+                !
+                var int:number = 1
+                var int:x = 0
+                var x = Reader.Read(ref {{operand}})
+            """;
+        var diagnostics = Validate(source);
+        Assert.Equal(expected ? 1 : 0, diagnostics.Count);
+        Assert.All(diagnostics, diagnostic =>
+            Assert.Equal(DiagnosticCode.BindRebindTypeMismatch, diagnostic.Code));
+    }
+
+    [Fact]
+    public void NativeSelection_FieldScalarShadowRemainsValid()
+    {
+        const string source = """
+            module NativeReview NativeReview
+              class Reader
+                func ReadAllText public (string:path) → int
+                  !
+                  return 7
+              class Host
+                field Reader:File
+                func Use public (string:path) → int
+                  !
+                  var int:x = 0
+                  var x = File.ReadAllText(path)
+                  return x
+            """;
+        Assert.Empty(Validate(source));
+        var result = Program.Compile(source, "field-shadow.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+    }
+
     [Fact]
     public void DocsAndCompilerGuards_ShareOneBclApiList()
     {

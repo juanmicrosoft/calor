@@ -82,6 +82,7 @@ public sealed class BindValidationPass
     // class C prefers C's member (implicit `this`); otherwise the free function.
     // This is what keeps a same-named method and free function from colliding.
     private string? _currentClassName;
+    private bool _currentBodyIsStatic;
 
     // Concrete generic collection classes an array is NOT implicitly convertible
     // to in C# (unlike the collection interfaces IList<T>/IEnumerable<T>/…, which
@@ -193,7 +194,7 @@ public sealed class BindValidationPass
 
             foreach (var ctor in cls.Constructors)
             {
-                CheckBody(ctor.Body, returnType: null, ctor.Parameters, fields, cls.Name);
+                CheckBody(ctor.Body, returnType: null, ctor.Parameters, fields, cls.Name, ctor.IsStatic);
             }
 
             foreach (var method in cls.Methods)
@@ -202,7 +203,7 @@ public sealed class BindValidationPass
                 CheckBody(method.Body, ReturnShape.GetAsyncReturnTypes(
                     method.Output?.TypeName ?? "void", method.IsAsync, module,
                     method.TypeParameters.Concat(cls.TypeParameters).Select(parameter => parameter.Name)).BodyType,
-                    method.Parameters, fields, cls.Name);
+                    method.Parameters, fields, cls.Name, method.IsStatic);
                 CheckLocalFunctions(method.Body, fields, cls.Name);
                 _localFunctionNames = [];
             }
@@ -210,14 +211,14 @@ public sealed class BindValidationPass
             foreach (var prop in cls.Properties)
             {
                 // A getter returns the property's type; setters/initers do not.
-                if (prop.Getter != null) CheckBody(prop.Getter.Body, prop.TypeName, parameters: null, fields, cls.Name);
-                if (prop.Setter != null) CheckBody(prop.Setter.Body, returnType: null, parameters: null, fields, cls.Name);
-                if (prop.Initer != null) CheckBody(prop.Initer.Body, returnType: null, parameters: null, fields, cls.Name);
+                if (prop.Getter != null) CheckBody(prop.Getter.Body, prop.TypeName, parameters: null, fields, cls.Name, prop.IsStatic);
+                if (prop.Setter != null) CheckBody(prop.Setter.Body, returnType: null, parameters: null, fields, cls.Name, prop.IsStatic);
+                if (prop.Initer != null) CheckBody(prop.Initer.Body, returnType: null, parameters: null, fields, cls.Name, prop.IsStatic);
             }
 
             foreach (var op in cls.OperatorOverloads)
             {
-                CheckBody(op.Body, op.Output?.TypeName, op.Parameters, fields, cls.Name);
+                CheckBody(op.Body, op.Output?.TypeName, op.Parameters, fields, cls.Name, isStatic: true);
             }
 
             foreach (var idx in cls.Indexers)
@@ -249,10 +250,12 @@ public sealed class BindValidationPass
         string? returnType,
         IReadOnlyList<ParameterNode>? parameters,
         IReadOnlyDictionary<string, string>? fields,
-        string? className)
+        string? className,
+        bool isStatic = false)
     {
         _currentReturnType = returnType;
         _currentClassName = className;
+        _currentBodyIsStatic = isStatic;
 
         // Fields are kept OUT of the scope stack: a local may legally shadow a field
         // in C# (the local wins), so field names must not trip the CS0136 check --
@@ -573,7 +576,8 @@ public sealed class BindValidationPass
             var function = local.Function;
             CheckBody(function.Body, ReturnShape.GetAsyncReturnTypes(
                 function.Output?.TypeName ?? "void", function.IsAsync, _asyncTypeModule,
-                function.TypeParameters.Select(parameter => parameter.Name)).BodyType, function.Parameters, fields, className);
+                function.TypeParameters.Select(parameter => parameter.Name)).BodyType, function.Parameters, fields, className,
+                _currentBodyIsStatic);
         }
     }
 
@@ -1329,7 +1333,8 @@ public sealed class BindValidationPass
                     candidate,
                     argumentTypes,
                     argumentNames,
-                    argumentModifiers))
+                    argumentModifiers,
+                    arguments))
                 .ToArray();
             if (matches.Length == 1
                 || matches.Length > 1
@@ -1381,7 +1386,7 @@ public sealed class BindValidationPass
             var matches = sameArity.Where(candidate =>
                 (!nativeReceiver || !candidate.IsGeneric && candidate.IsStatic != instanceReceiver)
                 && SignatureMatches(candidate, types, argumentNames, argumentModifiers,
-                    allowArrayMismatch, allowUnknownTypes)).ToArray();
+                    arguments, allowArrayMismatch, allowUnknownTypes)).ToArray();
             if (matches.Length != 1)
                 return false;
             signature = matches[0];
@@ -1427,11 +1432,12 @@ public sealed class BindValidationPass
         return type.TrimEnd('?', '*');
     }
 
-    private static bool SignatureMatches(
+    private bool SignatureMatches(
         UserCallableSignature signature,
         IReadOnlyList<string> argumentTypes,
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
+        IReadOnlyList<ExpressionNode> arguments,
         bool allowArrayMismatch = false,
         bool allowUnknownTypes = false)
     {
@@ -1440,6 +1446,7 @@ public sealed class BindValidationPass
 
         var usedParameters = new bool[signature.ParameterTypes.Count];
         var nextPositional = 0;
+        var outOfPositionNamed = false;
         for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
         {
             var argumentName = argumentNames != null && argumentIndex < argumentNames.Count
@@ -1457,9 +1464,12 @@ public sealed class BindValidationPass
                     .Select(item => item.index)
                     .DefaultIfEmpty(-1)
                     .First();
+                outOfPositionNamed |= parameterIndex != argumentIndex;
             }
             else
             {
+                if (outOfPositionNamed)
+                    return false;
                 while (nextPositional < usedParameters.Length
                        && usedParameters[nextPositional])
                 {
@@ -1468,6 +1478,7 @@ public sealed class BindValidationPass
                 parameterIndex = nextPositional++;
             }
 
+            var modifier = argumentModifiers?.ElementAtOrDefault(argumentIndex);
             if (parameterIndex < 0
                 || parameterIndex >= signature.ParameterTypes.Count
                 || usedParameters[parameterIndex]
@@ -1480,9 +1491,9 @@ public sealed class BindValidationPass
                     || allowUnknownTypes && argumentTypes[argumentIndex].Length == 0)
                 || !CallModifierMatches(
                     signature.ParameterModifiers[parameterIndex],
-                    argumentModifiers != null && argumentIndex < argumentModifiers.Count
-                        ? argumentModifiers[argumentIndex]
-                        : null))
+                    modifier)
+                || modifier is "ref" or "out" or "in"
+                    && !IsKnownByReferenceStorage(arguments[argumentIndex], writes: modifier is "ref" or "out"))
             {
                 return false;
             }
@@ -1490,6 +1501,59 @@ public sealed class BindValidationPass
             usedParameters[parameterIndex] = true;
         }
 
+        return true;
+    }
+
+    private bool IsKnownByReferenceStorage(ExpressionNode expression, bool writes)
+    {
+        switch (expression)
+        {
+            case ReferenceNode reference when IsDeclaredInAnyLiveScope(reference.Name):
+                return !writes || IsMutableInAnyLiveScope(reference.Name)
+                    && !_foreachIterationVars.Contains(reference.Name);
+            case ReferenceNode reference:
+                return IsKnownByReferenceField(reference.Name, writes, explicitThis: false);
+            case FieldAccessNode { Target: ThisExpressionNode } field:
+                return IsKnownByReferenceField(field.FieldName, writes, explicitThis: true);
+            case ArrayAccessNode array:
+                return TryInferArrayElementType(array, out _);
+            default:
+                return false;
+        }
+    }
+
+    private bool IsKnownByReferenceField(string name, bool writes, bool explicitThis)
+    {
+        var field = CurrentField(name);
+        return field != null
+            && (!explicitThis || !_currentBodyIsStatic && !field.IsStatic)
+            && (!_currentBodyIsStatic || field.IsStatic)
+            && !field.Modifiers.HasFlag(MethodModifiers.Const)
+            && (!writes || !field.Modifiers.HasFlag(MethodModifiers.Readonly));
+    }
+
+    private ClassFieldNode? CurrentField(string name)
+    {
+        var owners = _asyncTypeModule?.Classes.Where(cls => cls.Name == _currentClassName).Take(2).ToArray();
+        // Struct storage also depends on receiver mutability; leave it to the binder.
+        if (owners is not { Length: 1 } || owners[0].IsStruct)
+            return null;
+        var fields = owners[0].Fields.Where(field => field.Name == name).Take(2).ToArray();
+        return fields.Length == 1 ? fields[0] : null;
+    }
+
+    private bool TryInferArrayElementType(ArrayAccessNode array, out string type)
+    {
+        type = "";
+        if (array.Array is ReferenceNode receiver
+                && !IsDeclaredInAnyLiveScope(receiver.Name)
+                && !IsKnownByReferenceField(receiver.Name, writes: false, explicitThis: false)
+            || !TryInferExpressionType(array.Array, out var arrayType)
+            || ArrayElementType(arrayType) is not { } elementType
+            || !TryInferExpressionType(array.Index, out var indexType)
+            || CanonicalValidationType(indexType) != "INT")
+            return false;
+        type = elementType;
         return true;
     }
 
@@ -1570,6 +1634,12 @@ public sealed class BindValidationPass
                 return true;
             case ReferenceNode reference when TryLookupLocal(reference.Name, out typeName):
                 return !string.IsNullOrWhiteSpace(typeName);
+            case FieldAccessNode { Target: ThisExpressionNode } field
+                when !_currentBodyIsStatic && CurrentField(field.FieldName) is { IsStatic: false } declaration:
+                typeName = declaration.TypeName;
+                return true;
+            case ArrayAccessNode array when TryInferArrayElementType(array, out typeName):
+                return true;
             case ArrayCreationNode array:
                 typeName = $"[{array.ElementType}]";
                 return true;
