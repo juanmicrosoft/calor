@@ -153,8 +153,8 @@ retain each reason and distinguish writing from native conversion, compilation,
 and tests. Missing, malformed, unreadable inputs and failed writes remain errors.
 
 Object and collection initializers convert natively only at positions where their
-evaluation order is preserved. An unsupported position, such as the receiver in
-`new Box { Value = 2 }.Value`, preserves the complete containing member, not an
+evaluation order is preserved. Otherwise, as with the receiver in
+`new Box { Value = 2 }.Value`, conversion preserves the complete containing member, not an
 opaque expression inside a native method. The reported interop feature and raw
 payload identify that boundary. Initializers inside a preserved type or whole
 file are not native. A preserved callback body grants no native effect contract.
