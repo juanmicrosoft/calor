@@ -1,6 +1,6 @@
-§M{UninitExample}
-  §F{Process:pub} (i32:n) -> i32
-    §IF (> n 0)
-      §R n
-    §R (- 0 n)
-
+module UninitExample UninitExample
+  module UninitExampleModule
+    func Process public (int:n) → int
+      if n > 0
+        return n
+      return 0 - n

@@ -1,7 +1,7 @@
-§M{ArrayOps}
-  §F{Sum:pub} (i32:a, i32:b, i32:c) -> i32
-    §R (+ (+ a b) c)
+module ArrayOps ArrayOps
+  module ArrayOpsModule
+    func Sum public (int:a, int:b, int:c) → int
+      return (a + b) + c
 
-  §F{SumTwo:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
-
+    func SumTwo public (int:a, int:b) → int
+      return a + b

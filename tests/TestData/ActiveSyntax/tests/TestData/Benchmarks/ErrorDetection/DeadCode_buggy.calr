@@ -1,5 +1,5 @@
-§M{DeadCodeExample}
-  §F{GetStatus:pub} (i32:code) -> i32
-    §R code
-    §B{i32:unused} 42
-
+module DeadCodeExample DeadCodeExample
+  module DeadCodeExampleModule
+    func GetStatus public (int:code) → int
+      return code
+      let int:unused = 42

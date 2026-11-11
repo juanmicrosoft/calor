@@ -1,5 +1,4 @@
-// Current nullable/exception semantics, not a replay of the frozen benchmark.
-§M{RequiredNullable}
-  §F{GetValue:pub} (?i32:maybeVal) -> i32
-    §E{alloc,throw}
-    §R (?? maybeVal §TH §NEW{InvalidOperationException} §A "Missing value" §/NEW)
+module UnsafeOption UnsafeOption
+  module UnsafeOptionModule
+    func GetValue public (Option<int>:maybeVal) → int
+      return maybeVal.unwrap()
