@@ -11,7 +11,7 @@ using Calor.Compiler.Migration;
 
 namespace Calor.Compiler.Effects;
 
-internal sealed class CrossModuleTypeRegistry
+internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
 {
     private readonly Dictionary<string, List<TypeDefinitionNode>> _types = new(StringComparer.Ordinal);
     private readonly Dictionary<AstNode, ModuleNode> _modules = new();
@@ -20,11 +20,6 @@ internal sealed class CrossModuleTypeRegistry
     private readonly IReadOnlyDictionary<ModuleNode, string> _sourcePaths;
     private readonly Dictionary<ContractMode, IReadOnlyList<SourceProjection>> _projections = [];
     private readonly Dictionary<ModuleNode, (Binder Binder, DiagnosticBag Diagnostics)> _declarationBinders = [];
-
-    internal sealed record SourceProjection(ModuleNode Module, string Path, string Source,
-        string Marker, IReadOnlyList<AstNode> Callables);
-    internal sealed record SourceCallable(MethodNode Declaration, ClassDefinitionNode Owner,
-        FunctionSymbol Symbol, TypeSymbol OwnerSymbol);
 
     internal string Fingerprint { get; }
     internal bool HasTypes => _types.Count != 0;
@@ -87,7 +82,7 @@ internal sealed class CrossModuleTypeRegistry
             sources.Select(source => source.Module).ToArray(), sourceHashes,
             sources.ToDictionary(source => source.Module, source => Path.GetFullPath(source.Path)));
 
-    internal IReadOnlyList<SourceProjection> CompanionSources(string? sourcePath, ContractMode mode)
+    public IReadOnlyList<SourceProjection> CompanionSources(string? sourcePath, ContractMode mode)
     {
         if (sourcePath is null || !_sourcePaths.Values.Contains(Path.GetFullPath(sourcePath),
                 BuildStateCache.GetPathComparer()))
@@ -123,7 +118,7 @@ internal sealed class CrossModuleTypeRegistry
             !BuildStateCache.GetPathComparer().Equals(source.Path, Path.GetFullPath(sourcePath))).ToArray();
     }
 
-    internal SourceCallable? FindCallable(AstNode declaration)
+    public SourceCallable? FindCallable(AstNode declaration)
     {
         if (declaration is not MethodNode method)
             return null;

@@ -8,14 +8,27 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Calor.Compiler.Binding;
 
+internal sealed record SourceProjection(ModuleNode Module, string Path, string Source,
+    string Marker, IReadOnlyList<AstNode> Callables);
+
+internal sealed record SourceCallable(MethodNode Declaration, ClassDefinitionNode Owner,
+    FunctionSymbol Symbol, TypeSymbol OwnerSymbol);
+
+// Binding consumes project source evidence without depending on effect enforcement.
+internal interface ISourceBindingContext
+{
+    IReadOnlyList<SourceProjection> CompanionSources(string? sourcePath, ContractMode mode);
+    SourceCallable? FindCallable(AstNode declaration);
+}
+
 /// <summary>
 /// Performs semantic analysis and builds the bound tree.
 /// </summary>
 public sealed class Binder
 {
     internal IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctionModules { get; init; }
-    internal Effects.CrossModuleTypeRegistry? CrossModuleTypes { get; init; }
-    internal Dictionary<SymbolId, Effects.CrossModuleTypeRegistry.SourceCallable> ExternalSourceCalls { get; } = [];
+    internal ISourceBindingContext? CrossModuleTypes { get; init; }
+    internal Dictionary<SymbolId, SourceCallable> ExternalSourceCalls { get; } = [];
     internal IReadOnlyDictionary<AstNode, FunctionSymbol> FunctionSymbols => _functionSymbols;
     internal IReadOnlyDictionary<ClassDefinitionNode, TypeSymbol> ClassSymbols => _classSymbols;
     private readonly string? _sourcePath;

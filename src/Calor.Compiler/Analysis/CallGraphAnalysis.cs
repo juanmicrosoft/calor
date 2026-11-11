@@ -136,7 +136,7 @@ public sealed class CallGraphAnalysis
 
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
         ContractMode contractMode = ContractMode.Debug, bool singleModuleContext = true,
-        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null)
+        ISourceBindingContext? crossModuleTypes = null, string? sourcePath = null)
     {
         var bindings = new OperatorBindings();
         var types = bindings.ResultTypes;
@@ -703,7 +703,7 @@ public sealed class CallGraphAnalysis
                     var owner = model.GetSymbolInfo(access.Expression);
                     if (candidates.Cast<ISymbol>().Concat(info.Symbol is null ? [] : [info.Symbol])
                         .Concat(owner.CandidateSymbols).Concat(owner.Symbol is null ? [] : [owner.Symbol])
-                        .Any(symbol => symbol.Locations.Any(location =>
+                        .Any(symbol => symbol is not INamespaceSymbol && symbol.Locations.Any(location =>
                             location.IsInSource && location.SourceTree != tree)))
                         bindings.ForeignSourceCallSites.Add(sourceCall.Span);
                 }
