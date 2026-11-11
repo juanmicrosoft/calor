@@ -9,8 +9,9 @@ permalink: /cli/watch/
 # `calor watch` — Recompile on Change
 
 `calor watch` compiles the given sources, then watches them and recompiles on
-every change. Rebuilds are **incremental**: unchanged files are skipped via the
-build-state cache, so a one-file edit in a large tree recompiles one file.
+every change. Rebuilds are **incremental**: the build-state cache can skip
+unchanged files when their outputs remain valid. An edit may also recompile
+other files that depend on the changed declarations.
 Compile-only in v1 (no `--run`).
 
 ```bash
@@ -52,6 +53,12 @@ when **all** of these hold:
   participate in cross-module effect enforcement through these summaries);
 - no global invalidation applies (compiler upgrade, option change, or effect
   manifest change).
+
+For multi-file builds, changes to emitted cross-file targets or source paths
+invalidate the project cache. After other source-only edits, an unchanged output
+is reused only if a conservative syntax check rules out dependencies on both
+the old and current companion declarations. Conditional branches and unproven
+contexts force recompilation; this is not a complete dependency graph.
 
 Only diagnostic-clean files are cached: files with warnings/info always
 recompile so their diagnostics reappear on every rebuild. When sources are

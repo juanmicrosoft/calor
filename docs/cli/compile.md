@@ -89,6 +89,12 @@ content hash, options/compiler/effect-manifests unchanged, and a cached
 per-module effect summary available so cross-module effect enforcement still
 runs over skipped modules.
 
+For multi-file builds, changes to emitted cross-file targets or source paths
+invalidate the project cache. Other source-only edits can preserve unchanged
+outputs only after a conservative independence check against both the old and
+current companion declarations. Unproven cases, including conditional branches,
+recompile rather than reuse a potentially stale output.
+
 ```bash
 calor --input a.calr --input b.calr --cache    # first run: compiles both
 calor --input a.calr --input b.calr --cache    # second run: skips both
