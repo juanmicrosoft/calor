@@ -579,6 +579,7 @@ public static class TypeIdentity
             "f32" or "single" or "float[bits=32]" => "FLOAT[bits=32]",
             "f64" or "float" or "double" => "FLOAT",
             "dec" or "decimal" => "DECIMAL",
+            "char" when type is "char" or "CHAR" => "CHAR",
             "str" or "string" => "STRING",
             "bool" or "boolean" => "BOOL",
             "any" or "object" or "unknown" => "OBJECT",
@@ -594,7 +595,7 @@ public static class TypeIdentity
     /// </summary>
     private static readonly HashSet<string> ProvablyNonFunctionCanonicalNames = new(StringComparer.Ordinal)
     {
-        "INT", "UINT", "LONG", "ULONG", "DECIMAL", "STRING", "BOOL", "OBJECT", "VOID", "NEVER",
+        "INT", "UINT", "LONG", "ULONG", "DECIMAL", "CHAR", "STRING", "BOOL", "OBJECT", "VOID", "NEVER",
         "FLOAT", "FLOAT[bits=32]",
         "INT[bits=8][signed=true]", "INT[bits=8][signed=false]",
         "INT[bits=16][signed=true]", "INT[bits=16][signed=false]",

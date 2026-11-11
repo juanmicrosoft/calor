@@ -853,7 +853,7 @@ public class Program
             phaseSw.Restart();
             var typeChecker = new TypeChecking.TypeChecker(
                 diagnostics, binder.BoundAwaits, binder.BoundSourceEnumConstants,
-                binder.BoundSourceStaticFieldReads)
+                binder.BoundSourceStaticFieldReads, binder.BoundMetadataConstants)
             {
                 ProjectionContractMode = options.ContractMode
             };

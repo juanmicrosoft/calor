@@ -14,6 +14,7 @@ public sealed class TypeChecker
     private readonly IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? _boundAwaits;
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceEnumConstants;
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceStaticFieldReads;
+    private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundMetadataConstants;
     private ModuleNode? _module;
     private Analysis.CallGraphAnalysis.OperatorBindings? _sourceBindings;
     internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
@@ -71,13 +72,15 @@ public sealed class TypeChecker
     internal TypeChecker(DiagnosticBag diagnostics,
         IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? boundAwaits,
         IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceEnumConstants = null,
-        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceStaticFieldReads = null)
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceStaticFieldReads = null,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundMetadataConstants = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _env = new TypeEnvironment();
         _boundAwaits = boundAwaits;
         _boundSourceEnumConstants = boundSourceEnumConstants;
         _boundSourceStaticFieldReads = boundSourceStaticFieldReads;
+        _boundMetadataConstants = boundMetadataConstants;
     }
 
     /// <summary>
@@ -1860,6 +1863,8 @@ public sealed class TypeChecker
             return new ExternalType(constant.Type.DisplayString);
         if (_boundSourceStaticFieldReads?.TryGetValue(expr, out var selectedStaticField) == true)
             return ResolveTypeName(selectedStaticField.Type.DisplayString, expr.Span);
+        if (_boundMetadataConstants?.TryGetValue(expr, out var metadataConstant) == true)
+            return ResolveTypeName(metadataConstant.Type.DisplayString, expr.Span);
         return expr switch
         {
             IntLiteralNode => PrimitiveType.Int,

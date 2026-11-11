@@ -5858,8 +5858,15 @@ public sealed class EffectEnforcementPass
         }
 
         private EffectSet InferFromFieldAccess(FieldAccessNode field)
-            => InferFromMemberAccess(field.Target, field.FieldName, field.Span,
-                _context.CallGraph.SelectedMetadataGetter(field));
+            => _context.CallGraph.MetadataField(_context.CurrentFunctionId, field.Span) is { } metadataField
+                ? InferFromMetadataField(metadataField, InferFromExpression(field.Target), field.Span)
+                : InferFromMemberAccess(field.Target, field.FieldName, field.Span,
+                    _context.CallGraph.SelectedMetadataGetter(field));
+
+        private EffectSet InferFromMetadataField(CS.IFieldSymbol field, EffectSet receiverEffects, TextSpan span)
+            // Constants do not run a type initializer. Other metadata fields have no getter contract.
+            => field.IsConst ? receiverEffects
+                : receiverEffects.Union(UnknownResolvedOperation(field.ToDisplayString(), span));
 
         private EffectSet InferFromMemberAccess(ExpressionNode target, string memberName, TextSpan span,
             CallGraphAnalysis.MetadataGetterSelection? selectedGetter = null)
@@ -6181,6 +6188,8 @@ public sealed class EffectEnforcementPass
             var initialization = _context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, receiverSpan)
                 is { SourceStaticFieldOwner: { } receiverOwner }
                 ? InferStaticFieldInitialization(receiverOwner, reference.Span) : EffectSet.Empty;
+            if (_context.CallGraph.MetadataField(_context.CurrentFunctionId, reference.Span) is { } metadataField)
+                return InferFromMetadataField(metadataField, initialization, reference.Span);
             if (_context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, reference.Span) is { } metadata)
             {
                 var metadataMember = reference.Name[(reference.Name.LastIndexOf('.') + 1)..];

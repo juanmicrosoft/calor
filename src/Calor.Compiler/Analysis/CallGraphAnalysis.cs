@@ -1518,6 +1518,9 @@ public sealed class CallGraphAnalysis
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IFieldSymbol>
             MetadataEnumConstants
         { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IFieldSymbol>
+            MetadataFields
+        { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), VariableSymbol>
             SourceEnumConstants
         { get; } = new();
@@ -1580,6 +1583,9 @@ public sealed class CallGraphAnalysis
 
     internal Microsoft.CodeAnalysis.IFieldSymbol? MetadataEnumConstant(string callerId, TextSpan span) =>
         _boundValues.MetadataEnumConstants.GetValueOrDefault((callerId, span.Start, span.End));
+
+    internal Microsoft.CodeAnalysis.IFieldSymbol? MetadataField(string callerId, TextSpan span) =>
+        _boundValues.MetadataFields.GetValueOrDefault((callerId, span.Start, span.End));
 
     internal VariableSymbol? SourceEnumConstant(string callerId, TextSpan span) =>
         _boundValues.SourceEnumConstants.GetValueOrDefault((callerId, span.Start, span.End));
@@ -2480,6 +2486,9 @@ public sealed class CallGraphAnalysis
 
                 foreach (var node in DescendantsAndSelf(function))
                 {
+                    if (node is BoundFieldAccessExpression
+                        { ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol metadataField })
+                        boundValues.MetadataFields.TryAdd((callerId, node.Span.Start, node.Span.End), metadataField);
                     if (node is BoundFieldAccessExpression
                         {
                             Target: BoundTypeReferenceExpression { ResolvedType.IsEnum: true },

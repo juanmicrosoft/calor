@@ -4,6 +4,7 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -484,6 +485,168 @@ public sealed class NativeMetadataClosureTests
             var method = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Probe");
             Assert.Equal(3, method.Invoke(null, ["abc"]));
         }
+    }
+
+    [Theory]
+    [InlineData("float . NaN", SpecialType.System_Single)]
+    [InlineData("double . NaN", SpecialType.System_Double)]
+    [InlineData("decimal . One", SpecialType.System_Decimal)]
+    [InlineData("sbyte . MinValue", SpecialType.System_SByte)]
+    [InlineData("char . MaxValue", SpecialType.System_Char)]
+    public void NativePrimitiveConstants_RetainSelectedFieldTypeAndRuntimeBoxing(
+        string expression, SpecialType expectedType)
+    {
+        var source = $$"""
+            module PrimitiveConstant
+              func Probe public () → object
+                return {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+        var field = Assert.IsAssignableFrom<IFieldSymbol>(read.ResolvedMetadataMember);
+        Assert.True(field.IsStatic);
+        Assert.True(field.IsConst);
+        Assert.Equal(expectedType, field.ContainingType.SpecialType);
+        Assert.Equal(expectedType, field.Type.SpecialType);
+        var resultType = Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(read.Type);
+        Assert.True(SymbolEqualityComparer.IncludeNullability.Equals(field.Type, resultType.RoslynSymbol));
+        Assert.False(read.HasUnknownInferredType);
+
+        var original = $$"""
+            public static class PrimitiveConstant
+            {
+                public static object Probe() => {{expression}};
+            }
+            """;
+        var expected = CompileAssembly(original).GetType("PrimitiveConstant")!.GetMethod("Probe")!.Invoke(null, null)!;
+        var conversion = new CSharpToCalorConverter().Convert(original);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)), conversion.CalorSource! })
+        {
+            var compiled = Compile(candidate);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var actual = CompileAssembly(compiled.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
+                .Single(method => method.Name == "Probe").Invoke(null, null)!;
+            Assert.Equal(expected.GetType(), actual.GetType());
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    [Theory]
+    [InlineData("char.IsDigit('A')", SpecialType.System_Char, true)]
+    [InlineData("char.IsUpper('A')", SpecialType.System_Char, false)]
+    [InlineData("float.IsNaN(float . NaN)", SpecialType.System_Single, false)]
+    [InlineData("double.IsNaN(double . NaN)", SpecialType.System_Double, true)]
+    public void NativePrimitiveCalls_UseOnlyTheSelectedTypeContract(
+        string expression, SpecialType expectedType, bool hasContract)
+    {
+        var source = $$"""
+            module PrimitiveContract
+              func Probe public () → object
+                return {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(expectedType, selected.ContainingType.SpecialType);
+        Assert.Equal(expectedType, Assert.Single(selected.Parameters).Type.SpecialType);
+        Assert.True(SymbolEqualityComparer.IncludeNullability.Equals(selected.ReturnType,
+            Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(call.Type).RoslynSymbol));
+        var resolution = new EffectResolver().Resolve(EffectResolverKey.FromBoundReceiver(
+            call.Receiver!.Type, selected.Name, call.ResolvedParameterTypes));
+        Assert.Equal(hasContract, resolution.Status != EffectResolutionStatus.Unknown);
+        Assert.Equal(hasContract ? "embedded:Calor.Compiler.Manifests.bcl-system.calor-effects.json" : "unknown",
+            resolution.Source);
+        var compiled = Compile(source);
+        Assert.Equal(!hasContract, compiled.HasErrors);
+        if (!hasContract)
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Theory]
+    [InlineData("System.EventArgs.Empty", "System.EventArgs")]
+    [InlineData("string.Empty", "string")]
+    public void NativeReadonlyMetadataFields_DoNotBorrowPropertyGetterContracts(string expression, string type)
+    {
+        var source = $$"""
+            module ReadonlyField
+              func Probe public () → {{type}}
+                return {{expression}}
+            """;
+        var module = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+        var field = Assert.IsAssignableFrom<IFieldSymbol>(read.ResolvedMetadataMember);
+        Assert.True(field.IsStatic);
+        Assert.True(field.IsReadOnly);
+        Assert.False(field.IsConst);
+        var effects = new DiagnosticBag();
+        new EffectEnforcementPass(effects).Enforce(module);
+        Assert.Contains(effects, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains(field.ToDisplayString(), StringComparison.Ordinal));
+        Assert.DoesNotContain(effects, diagnostic => diagnostic.Message.Contains("get_Empty", StringComparison.Ordinal));
+        Assert.True(Compile(source).HasErrors);
+    }
+
+    [Fact]
+    public void NativeCharacterOverloads_PreserveSourceIdentityBoxingAndExceptions()
+    {
+        const string original = """
+            public static class CharacterOverloads
+            {
+                private static string Pick(char value) => "char";
+                private static string Pick(string value) => "string";
+                private static string Pick(object value) => "object";
+                public static object Probe() => Pick('\uD800');
+                public static object Box() => '\uD800';
+                public static object Throw() => double.Parse("not-a-number");
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(original);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        var compiled = Compile(conversion.CalorSource!);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var oracle = CompileAssembly(original).GetType("CharacterOverloads")!;
+        var actual = CompileAssembly(compiled.GeneratedCode).GetType("CharacterOverloads")!;
+        Assert.Equal(oracle.GetMethod("Probe")!.Invoke(null, null), actual.GetMethod("Probe")!.Invoke(null, null));
+        Assert.Equal('\uD800', Assert.IsType<char>(actual.GetMethod("Box")!.Invoke(null, null)));
+        Assert.IsType<FormatException>(Assert.Throws<TargetInvocationException>(
+            () => oracle.GetMethod("Throw")!.Invoke(null, null)).InnerException);
+        Assert.IsType<FormatException>(Assert.Throws<TargetInvocationException>(
+            () => actual.GetMethod("Throw")!.Invoke(null, null)).InnerException);
+    }
+
+    [Fact]
+    public void NativeCharacterOverloads_DoNotReinterpretANominalCharDeclaration()
+    {
+        const string source = """
+            module CharacterIdentity
+              class Char
+                field int:Value public
+              func Pick (@Char:value) → string
+                return "nominal"
+              func Pick (char:value) → string
+                return "char"
+              func Probe public () → string
+                return Pick('x')
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal("CHAR", TypeIdentity.Canonicalize(Assert.Single(call.ResolvedSymbol!.Parameters).TypeName));
+        var compiled = Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal("char", CompileAssembly(compiled.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
+            .Single(method => method.Name == "Probe").Invoke(null, null));
     }
 
     private static string ConvertPrimitiveReceiver(string source)

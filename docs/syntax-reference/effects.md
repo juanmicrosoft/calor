@@ -237,6 +237,12 @@ opaque members that may initialize the type remain Unknown. A source type
 named `Object` does not gain CLR constructor authority. This initializer proof
 does not expand operation analysis of generated method bodies.
 
+Selected metadata constants such as `decimal.One` and `double.NaN` do not run
+a type initializer. Their reads retain the declared CLR type; a `float`
+constant does not become a `double`. Other metadata fields, including
+`System.EventArgs.Empty`, are not property getters and cannot borrow a getter's
+effect contract. Unproved field initialization remains Unknown.
+
 ## Generic construction
 
 `where T : new` permits `new T()`; it does not prove that the selected runtime

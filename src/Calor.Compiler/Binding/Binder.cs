@@ -104,6 +104,10 @@ public sealed class Binder
         new(ReferenceEqualityComparer.Instance);
     internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundSourceStaticFieldReads =>
         _boundSourceStaticFieldReads;
+    private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundMetadataConstants =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundMetadataConstants =>
+        _boundMetadataConstants;
     private readonly Dictionary<ExpressionNode, BoundExpression> _boundContractExpressions = new();
     internal IReadOnlyDictionary<ExpressionNode, BoundExpression> BoundContractExpressions =>
         _boundContractExpressions;
@@ -334,6 +338,10 @@ public sealed class Binder
             }
             var t = arrayType is not null
                 ? GetMetadataArrayInputType(ctx, arrayType)
+                : args[i].Type is BoundTypes.NominalBoundType
+                    { RoslynSymbol: { IsValueType: true, IsGenericType: false,
+                        SpecialType: not Microsoft.CodeAnalysis.SpecialType.None } primitive }
+                    ? primitive
                 : (computedReceiver is null ? ResolveBclArgumentType(ctx, trimmed) : ResolveComputedMetadataType(ctx, display))
                     ?? (computedReceiver is null ? ctx.TryResolveType("System.Object") : null);
             if (t is null) return ResolveContextualCall();
@@ -1040,6 +1048,7 @@ public sealed class Binder
         _boundAwaits.Clear();
         _boundSourceEnumConstants.Clear();
         _boundSourceStaticFieldReads.Clear();
+        _boundMetadataConstants.Clear();
         _boundContractExpressions.Clear();
         _boundVerificationCalls.Clear();
         CrossModuleCallTargets.Clear();
@@ -4160,6 +4169,13 @@ public sealed class Binder
             } staticField && ReferenceEquals(selected, field)
                 && ReferenceEquals(receiver, receiverDeclaration))
             _boundSourceStaticFieldReads[expr] = staticField;
+        if (bound is BoundFieldAccessExpression
+            {
+                Target: BoundTypeReferenceExpression,
+                ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
+                    { IsStatic: true, IsConst: true, Type.SpecialType: not Microsoft.CodeAnalysis.SpecialType.None }
+            } metadataConstant)
+            _boundMetadataConstants[expr] = metadataConstant;
         return bound;
     }
 
@@ -4455,7 +4471,8 @@ public sealed class Binder
             }
             && (receiverType.IsReferenceType
                 || target is BoundTypeReferenceExpression
-                    && receiverType.TypeKind == Microsoft.CodeAnalysis.TypeKind.Enum))
+                    && (receiverType.TypeKind == Microsoft.CodeAnalysis.TypeKind.Enum
+                        || receiverType.SpecialType != Microsoft.CodeAnalysis.SpecialType.None)))
         {
             var metadataBinder = GetOrCreateMetadataBinder();
             string? reason = "The metadata context is unavailable.";
@@ -4469,7 +4486,7 @@ public sealed class Binder
             };
             if (memberType is Microsoft.CodeAnalysis.INamedTypeSymbol namedMemberType
                 && (namedMemberType is { IsReferenceType: true, IsGenericType: false }
-                    || IsBuiltInValueTypeName(namedMemberType.ToDisplayString())
+                    || TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(namedMemberType.ToDisplayString()))
                     || member is Microsoft.CodeAnalysis.IFieldSymbol { IsConst: true, Type.TypeKind: Microsoft.CodeAnalysis.TypeKind.Enum }
                         && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(namedMemberType, receiverType)))
             {
@@ -4478,7 +4495,7 @@ public sealed class Binder
                     fieldNameSpan: fieldAccess.FieldNameSpan,
                     resolvedType: namedMemberType.IsValueType
                         ? new BoundTypes.NominalBoundType(
-                            NormalizeTypeName(namedMemberType.ToDisplayString()),
+                            NormalizeTypeName(AttributeHelper.ExpandType(namedMemberType.ToDisplayString())),
                             Metadata.MetadataBinderResult.MapAnnotation(memberType.NullableAnnotation),
                             roslynSymbol: namedMemberType)
                         : Metadata.MetadataBinderResult.ToNominalBoundType(memberType))
@@ -4724,13 +4741,39 @@ public sealed class Binder
     }
 
     private BoundTypeReferenceExpression? TryBindPredefinedTypeReceiver(ExpressionNode expression)
-        => expression is ReferenceNode { IsVerbatim: false } reference
-            && SyntaxFactory.ParseTypeName(reference.Name) is PredefinedTypeSyntax
-            && GetOrCreateMetadataBinder() is { } metadata
-            && ResolveBclArgumentType(metadata.Context, reference.Name) is Microsoft.CodeAnalysis.INamedTypeSymbol symbol
-                ? new BoundTypeReferenceExpression(expression.Span, reference.Name,
-                    Metadata.MetadataBinderResult.ToNominalBoundType(symbol))
-                : null;
+    {
+        if (expression is not ReferenceNode { IsVerbatim: false } reference
+            || SyntaxFactory.ParseTypeName(reference.Name) is not PredefinedTypeSyntax predefined
+            || GetOrCreateMetadataBinder() is not { } metadata)
+            return null;
+        var specialType = predefined.Keyword.Kind() switch
+        {
+            SyntaxKind.BoolKeyword => Microsoft.CodeAnalysis.SpecialType.System_Boolean,
+            SyntaxKind.ByteKeyword => Microsoft.CodeAnalysis.SpecialType.System_Byte,
+            SyntaxKind.SByteKeyword => Microsoft.CodeAnalysis.SpecialType.System_SByte,
+            SyntaxKind.ShortKeyword => Microsoft.CodeAnalysis.SpecialType.System_Int16,
+            SyntaxKind.UShortKeyword => Microsoft.CodeAnalysis.SpecialType.System_UInt16,
+            SyntaxKind.IntKeyword => Microsoft.CodeAnalysis.SpecialType.System_Int32,
+            SyntaxKind.UIntKeyword => Microsoft.CodeAnalysis.SpecialType.System_UInt32,
+            SyntaxKind.LongKeyword => Microsoft.CodeAnalysis.SpecialType.System_Int64,
+            SyntaxKind.ULongKeyword => Microsoft.CodeAnalysis.SpecialType.System_UInt64,
+            SyntaxKind.CharKeyword => Microsoft.CodeAnalysis.SpecialType.System_Char,
+            SyntaxKind.FloatKeyword => Microsoft.CodeAnalysis.SpecialType.System_Single,
+            SyntaxKind.DoubleKeyword => Microsoft.CodeAnalysis.SpecialType.System_Double,
+            SyntaxKind.DecimalKeyword => Microsoft.CodeAnalysis.SpecialType.System_Decimal,
+            SyntaxKind.StringKeyword => Microsoft.CodeAnalysis.SpecialType.System_String,
+            SyntaxKind.ObjectKeyword => Microsoft.CodeAnalysis.SpecialType.System_Object,
+            SyntaxKind.VoidKeyword => Microsoft.CodeAnalysis.SpecialType.System_Void,
+            _ => Microsoft.CodeAnalysis.SpecialType.None
+        };
+        if (specialType == Microsoft.CodeAnalysis.SpecialType.None)
+            return null;
+        var symbol = metadata.Context.HostCompilationForBinder.GetSpecialType(specialType);
+        return symbol.TypeKind != Microsoft.CodeAnalysis.TypeKind.Error
+            ? new BoundTypeReferenceExpression(expression.Span, reference.Name,
+                Metadata.MetadataBinderResult.ToNominalBoundType(symbol))
+            : null;
+    }
 
     private bool IsTypeReceiverHeadShadowed(string head, bool allowDeclaredTypes) =>
         _scope.LookupAll(head).Concat(ResolveLexicalMembers(head))
