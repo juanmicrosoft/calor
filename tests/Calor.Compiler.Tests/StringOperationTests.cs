@@ -1,43 +1,333 @@
+using System.Reflection;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
 
 public class StringOperationTests
 {
-    private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
+    private static ModuleNode ParseNative(string source)
     {
-        diagnostics = new DiagnosticBag();
+        var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, source + "\n" + string.Join("\n", diagnostics));
         var parser = new Parser(tokens, diagnostics);
-        return parser.Parse();
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, source + "\n" + string.Join("\n", diagnostics));
+        return module;
     }
 
-    private static string WrapInFunction(string body)
+    // Frozen labels are not source translations. Native calls have ordinary call/member
+    // ASTs; only the explicitly internal parser/API controls below produce string IR.
+    private sealed record OperationCase(string Native, string Result, string Fixture, string? Keyword = null);
+    private sealed record ControlSource(string Label, string Parameters);
+
+    private static readonly IReadOnlyDictionary<string, OperationCase> Operations =
+        new Dictionary<string, OperationCase>
+        {
+            ["§R (len s)"] = new("s.Length", "int", "(len s)"),
+            ["§R (contains s \"hello\")"] = new("s.Contains(\"hello\")", "bool", "(contains s \"hello\")"),
+            ["§R (contains s \"x\")"] = new("s.Contains(\"x\")", "bool", "(contains s \"x\")"),
+            ["§R (starts s \"prefix\")"] = new("s.StartsWith(\"prefix\")", "bool", "(starts s \"prefix\")"),
+            ["§R (starts s \"x\")"] = new("s.StartsWith(\"x\")", "bool", "(starts s \"x\")"),
+            ["§R (ends s \"suffix\")"] = new("s.EndsWith(\"suffix\")", "bool", "(ends s \"suffix\")"),
+            ["§R (ends s \"x\")"] = new("s.EndsWith(\"x\")", "bool", "(ends s \"x\")"),
+            ["§R (indexof s \"x\")"] = new("s.IndexOf(\"x\")", "int", "(indexof s \"x\")"),
+            ["§R (substr s 0 5)"] = new("s.Substring(0, 5)", "string", "(substr s 0 5)"),
+            ["§R (substr s 5)"] = new("s.Substring(5)", "string", "(substr s 5)"),
+            ["§R (replace s \"old\" \"new\")"] = new("s.Replace(\"old\", \"new\")", "string", "(replace s \"old\" \"new\")"),
+            ["§R (replace s \"a\" \"b\")"] = new("s.Replace(\"a\", \"b\")", "string", "(replace s \"a\" \"b\")"),
+            ["§R (upper s)"] = new("s.ToUpper()", "string", "(upper s)"),
+            ["§R (lower s)"] = new("s.ToLower()", "string", "(lower s)"),
+            ["§R (trim s)"] = new("s.Trim()", "string", "(trim s)"),
+            ["§R (ltrim s)"] = new("s.TrimStart()", "string", "(ltrim s)"),
+            ["§R (rtrim s)"] = new("s.TrimEnd()", "string", "(rtrim s)"),
+            ["§R (lpad s 10)"] = new("s.PadLeft(10)", "string", "(lpad s 10)"),
+            ["§R (rpad s 10)"] = new("s.PadRight(10)", "string", "(rpad s 10)"),
+            ["§R (join \", \" items)"] = new("string.Join(\", \", items)", "string", "(join \", \" items)"),
+            ["§R (join \",\" items)"] = new("string.Join(\",\", items)", "string", "(join \",\" items)"),
+            ["§R (fmt \"Hello {0}\" name)"] = new("string.Format(\"Hello {0}\", name)", "string", "(fmt \"Hello {0}\" name)"),
+            ["§R (concat a b c)"] = new("string.Concat(a, b, c)", "string", "(concat a b c)"),
+            ["§R (isempty s)"] = new("string.IsNullOrEmpty(s)", "bool", "(isempty s)"),
+            ["§R (isblank s)"] = new("string.IsNullOrWhiteSpace(s)", "bool", "(isblank s)"),
+            ["§R (split s \",\")"] = new("s.Split(\",\")", "string[]", "(split s \",\")"),
+            ["§R (str x)"] = new("x.ToString()", "string", "(str x)"),
+            ["§R (str s)"] = new("s.ToString()", "string", "(str s)"),
+            ["§R (upper s \"extra\")"] = new("s.ToUpper(\"extra\")", "string", "(upper s \"extra\")"),
+            ["§R (contains s)"] = new("s.Contains()", "bool", "(contains s)"),
+            ["§R (substr s)"] = new("s.Substring()", "string", "(substr s)"),
+            ["§R (upper (trim s))"] = new("s.Trim().ToUpper()", "string", "(upper inner)"),
+            ["§R (contains (lower s) \"hello\")"] = new("s.ToLower().Contains(\"hello\")", "bool", "(contains inner \"hello\")"),
+            ["§R (len (upper (trim s)))"] = new("s.Trim().ToUpper().Length", "int", "(len inner)"),
+            ["§R (> (len s) 10)"] = new("s.Length > 10", "bool", "(> inner 10)"),
+            ["§R (fmt \"{0} + {1} = {2}\" a b c)"] = new("string.Format(\"{0} + {1} = {2}\", a, b, c)", "string", "(fmt \"{0} + {1} = {2}\" a b c)"),
+            ["§R (concat a b c d e)"] = new("string.Concat(a, b, c, d, e)", "string", "(concat a b c d e)"),
+            ["§R (contains s \"hello\" :ignore-case)"] = new("s.Contains(\"hello\", StringComparison.OrdinalIgnoreCase)", "bool", "(contains s \"hello\" :mode)", "ignore-case"),
+            ["§R (starts s \"prefix\" :ordinal)"] = new("s.StartsWith(\"prefix\", StringComparison.Ordinal)", "bool", "(starts s \"prefix\" :mode)", "ordinal"),
+            ["§R (ends s \"suffix\" :invariant)"] = new("s.EndsWith(\"suffix\", StringComparison.InvariantCulture)", "bool", "(ends s \"suffix\" :mode)", "invariant"),
+            ["§R (indexof s \"x\" :invariant-ignore-case)"] = new("s.IndexOf(\"x\", StringComparison.InvariantCultureIgnoreCase)", "int", "(indexof s \"x\" :mode)", "invariant-ignore-case"),
+            ["§R (equals s \"YES\" :ignore-case)"] = new("s.Equals(\"YES\", StringComparison.OrdinalIgnoreCase)", "bool", "(equals s \"YES\" :mode)", "ignore-case"),
+            ["§R (contains s \"x\" :ignore-case)"] = new("s.Contains(\"x\", StringComparison.OrdinalIgnoreCase)", "bool", "(contains s \"x\" :mode)", "ignore-case"),
+            ["§R (contains s \"x\" :ordinal)"] = new("s.Contains(\"x\", StringComparison.Ordinal)", "bool", "(contains s \"x\" :mode)", "ordinal"),
+            ["§R (starts s \"x\" :ignore-case)"] = new("s.StartsWith(\"x\", StringComparison.OrdinalIgnoreCase)", "bool", "(starts s \"x\" :mode)", "ignore-case"),
+            ["§R (ends s \"x\" :ignore-case)"] = new("s.EndsWith(\"x\", StringComparison.OrdinalIgnoreCase)", "bool", "(ends s \"x\" :mode)", "ignore-case"),
+            ["§R (indexof s \"x\" :ignore-case)"] = new("s.IndexOf(\"x\", StringComparison.OrdinalIgnoreCase)", "int", "(indexof s \"x\" :mode)", "ignore-case"),
+            ["§R (equals s \"x\" :ignore-case)"] = new("s.Equals(\"x\", StringComparison.OrdinalIgnoreCase)", "bool", "(equals s \"x\" :mode)", "ignore-case"),
+            ["§R (contains s \"x\" :invariant)"] = new("s.Contains(\"x\", StringComparison.InvariantCulture)", "bool", "(contains s \"x\" :mode)", "invariant"),
+            ["§R (contains s \"x\" :invariant-ignore-case)"] = new("s.Contains(\"x\", StringComparison.InvariantCultureIgnoreCase)", "bool", "(contains s \"x\" :mode)", "invariant-ignore-case"),
+            ["§R (starts s \"x\" :ordinal)"] = new("s.StartsWith(\"x\", StringComparison.Ordinal)", "bool", "(starts s \"x\" :mode)", "ordinal"),
+            ["§R (ends s \"x\" :invariant)"] = new("s.EndsWith(\"x\", StringComparison.InvariantCulture)", "bool", "(ends s \"x\" :mode)", "invariant"),
+            ["§R (equals s \"x\" :invariant-ignore-case)"] = new("s.Equals(\"x\", StringComparison.InvariantCultureIgnoreCase)", "bool", "(equals s \"x\" :mode)", "invariant-ignore-case"),
+            ["§R (upper s :ignore-case)"] = new("s.ToUpper(StringComparison.OrdinalIgnoreCase)", "string", "(upper s :mode)", "ignore-case"),
+            ["§R (contains s \"x\" :invalid-mode)"] = new("s.Contains(\"x\", StringComparison.InvalidMode)", "bool", "(contains s \"x\" :mode)", "invalid-mode"),
+            ["§R (equals s \"hello\")"] = new("s.Equals(\"hello\")", "bool", "(equals s \"hello\")"),
+        };
+
+    private static ControlSource WrapInFunction(string body) => new(body, "string:s");
+
+    private static ControlSource WrapInFunctionWithParams(string body, string paramStr) =>
+        new(body, paramStr switch
+        {
+            "§I{object:items}" => "object:items",
+            "§I{string:name}" => "string:name",
+            "§I{string:a} §I{string:b} §I{string:c}" => "string:a, string:b, string:c",
+            "§I{i32:x}" => "int:x",
+            "§I{i32:a} §I{i32:b} §I{i32:c}" => "int:a, int:b, int:c",
+            "§I{string:a} §I{string:b} §I{string:c} §I{string:d} §I{string:e}" =>
+                "string:a, string:b, string:c, string:d, string:e",
+            _ => throw new ArgumentOutOfRangeException(nameof(paramStr), paramStr, null),
+        });
+
+    private static string NativeSource(string body, string parameters = "string:s", string result = "string") =>
+        $"module Test\n  using System\n  func Main public ({parameters}) → {result}\n    !\n    "
+        + body.Replace("\n", "\n    ", StringComparison.Ordinal) + "\n";
+
+    private static ModuleNode ParseInternalControl(ControlSource control, out DiagnosticBag diagnostics)
     {
-        return $$"""
-            §M{Test}
-              §F{Main:pub}
-                  §I{string:s}
-                  §O{string}
-                  {{body}}
-            """;
+        var recipe = Operations[control.Label];
+        var nativeSource = NativeSource("return " + recipe.Native, control.Parameters, recipe.Result);
+        var native = AssertNativeRoundTrip(nativeSource);
+        var expectedShape = CSharpShape(SyntaxFactory.ParseExpression(recipe.Native));
+        Assert.Equal(expectedShape, NativeShape(Returned(native)));
+        var generatedReturn = Assert.Single(CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(native))
+            .GetRoot().DescendantNodes().OfType<ReturnStatementSyntax>());
+        Assert.Equal(expectedShape, CSharpShape(generatedReturn.Expression!));
+        AssertRetiredExpressionRejected(control, nativeSource);
+
+        var expression = InternalExpression(control.Label, out diagnostics);
+        // The original string-returning scaffold deliberately remains emission-only for
+        // bool/int/array operations. Native counterparts above use their actual result type.
+        return InternalModule(control.Parameters, [new ReturnStatementNode(TextSpan.Empty, expression)]);
     }
 
-    private static string WrapInFunctionWithParams(string body, string paramStr)
+    private static ModuleNode InternalModule(string parameters, IReadOnlyList<StatementNode> body)
     {
-        return $$"""
-            §M{Test}
-              §F{Main:pub}
-                  {{paramStr}}
-                  §O{string}
-                  {{body}}
-            """;
+        var scaffold = ParseNative(NativeSource("return \"\"", parameters));
+        var function = Assert.Single(scaffold.Functions);
+        var internalFunction = new FunctionNode(function.Span, function.LocalId, function.Name,
+            function.Visibility, function.Parameters, function.Output, function.Effects, body, function.Attributes)
+        {
+            NamespaceScopeId = function.NamespaceScopeId,
+        };
+        return scaffold.With(update =>
+        {
+            update.Functions = [internalFunction];
+            update.Items = scaffold.Items.Select(item => ReferenceEquals(item, function) ? internalFunction : item).ToArray();
+        });
+    }
+
+    private static ExpressionNode InternalExpression(string label, out DiagnosticBag diagnostics)
+    {
+        var recipe = Operations[label];
+        diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(recipe.Fixture, diagnostics).TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        if (recipe.Keyword != null)
+        {
+            var index = tokens.FindIndex(token => token.Text == "mode");
+            Assert.True(index >= 0);
+            var marker = tokens[index];
+            tokens[index] = new Token(TokenKind.Identifier, recipe.Keyword, marker.Span);
+        }
+
+        // This private prefix entry is intentionally NOT native source admission.
+        var parser = new Parser(tokens, diagnostics);
+        var entry = typeof(Parser).GetMethod("ParseLispExpression", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(entry);
+        var expression = Assert.IsAssignableFrom<ExpressionNode>(entry.Invoke(parser, null));
+        var position = Assert.IsType<int>(typeof(Parser)
+            .GetField("_position", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(parser));
+        Assert.All(tokens.Skip(position), token => Assert.True(token.Kind is TokenKind.Dedent or TokenKind.Eof));
+
+        ExpressionNode Inner(string innerLabel)
+        {
+            var inner = InternalExpression(innerLabel, out var innerDiagnostics);
+            Assert.False(innerDiagnostics.HasErrors, string.Join("\n", innerDiagnostics));
+            return inner;
+        }
+        // Explicit programmatic nesting retains IR objectives without pretending the
+        // native parenthesis dispatcher still recursively accepts Lisp expressions.
+        return label switch
+        {
+            "§R (upper (trim s))" => new StringOperationNode(expression.Span, StringOp.ToUpper, [Inner("§R (trim s)")]),
+            "§R (contains (lower s) \"hello\")" => new StringOperationNode(expression.Span, StringOp.Contains,
+                [Inner("§R (lower s)"), new StringLiteralNode(TextSpan.Empty, "hello")]),
+            "§R (len (upper (trim s)))" => new StringOperationNode(expression.Span, StringOp.Length, [Inner("§R (upper (trim s))")]),
+            "§R (> (len s) 10)" => new BinaryOperationNode(expression.Span, BinaryOperator.GreaterThan,
+                Inner("§R (len s)"), new IntLiteralNode(TextSpan.Empty, 10)),
+            _ => expression,
+        };
+    }
+
+    private static ExpressionNode Returned(ModuleNode module) =>
+        Assert.IsAssignableFrom<ExpressionNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Assert.Single(module.Functions).Body)).Expression);
+
+    private static ModuleNode AssertNativeRoundTrip(string source)
+    {
+        var first = ParseNative(source);
+        var emitted = new CalorEmitter().Emit(first);
+        Assert.DoesNotContain("§", emitted);
+        var second = ParseNative(emitted);
+        AssertCSharpEquivalent(new CSharpEmitter().Emit(first), new CSharpEmitter().Emit(second));
+        return first;
+    }
+
+    private sealed class RemoveParentheses : CSharpSyntaxRewriter
+    {
+        public override Microsoft.CodeAnalysis.SyntaxNode? VisitParenthesizedExpression(ParenthesizedExpressionSyntax node) =>
+            Visit(node.Expression);
+    }
+
+    private static void AssertCSharpEquivalent(string expected, string actual) =>
+        Assert.True(SyntaxFactory.AreEquivalent(
+            new RemoveParentheses().Visit(CSharpSyntaxTree.ParseText(expected).GetRoot()),
+            new RemoveParentheses().Visit(CSharpSyntaxTree.ParseText(actual).GetRoot())), expected + "\n!=\n" + actual);
+
+    private static string NativeShape(ExpressionNode expression) => expression switch
+    {
+        ReferenceNode reference => reference.Name,
+        StringLiteralNode literal => SymbolDisplay.FormatLiteral(literal.Value, true),
+        IntLiteralNode integer => integer.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        FieldAccessNode field => $"{NativeShape(field.Target)}.{field.FieldName}",
+        CallExpressionNode call => $"{call.Target}({string.Join(",", call.Arguments.Select(NativeShape))})",
+        ExpressionCallNode call => $"{NativeShape(call.TargetExpression)}({string.Join(",", call.Arguments.Select(NativeShape))})",
+        TypeOperationNode { Operation: TypeOp.Cast } cast => $"cast<{cast.TargetType}>({NativeShape(cast.Operand)})",
+        BinaryOperationNode binary => $"{binary.Operator}({NativeShape(binary.Left)},{NativeShape(binary.Right)})",
+        UnaryOperationNode unary => $"{unary.Operator}({NativeShape(unary.Operand)})",
+        _ => throw new InvalidOperationException("Not an ordinary native string expression: " + expression.GetType().Name),
+    };
+
+    private static string CSharpShape(ExpressionSyntax expression) => expression switch
+    {
+        ParenthesizedExpressionSyntax parenthesized => CSharpShape(parenthesized.Expression),
+        IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+        PredefinedTypeSyntax type => type.Keyword.ValueText,
+        LiteralExpressionSyntax literal => literal.Token.Text,
+        MemberAccessExpressionSyntax member => $"{CSharpShape(member.Expression)}.{member.Name}",
+        InvocationExpressionSyntax call => $"{CSharpShape(call.Expression)}({string.Join(",", call.ArgumentList.Arguments.Select(a => CSharpShape(a.Expression)))})",
+        CastExpressionSyntax cast => $"cast<{cast.Type}>({CSharpShape(cast.Expression)})",
+        CheckedExpressionSyntax checkedExpression => CSharpShape(checkedExpression.Expression),
+        BinaryExpressionSyntax binary => $"{binary.Kind() switch
+        {
+            SyntaxKind.GreaterThanExpression => nameof(BinaryOperator.GreaterThan),
+            SyntaxKind.AddExpression => nameof(BinaryOperator.Add),
+            SyntaxKind.LogicalAndExpression => nameof(BinaryOperator.And),
+            _ => throw new InvalidOperationException(binary.Kind().ToString()),
+        }}({CSharpShape(binary.Left)},{CSharpShape(binary.Right)})",
+        _ => throw new InvalidOperationException("Unexpected C# oracle: " + expression.Kind()),
+    };
+
+    private static void AssertRetiredExpressionRejected(ControlSource control, string validNative)
+    {
+        ParseNative(validNative);
+        var recipe = Operations[control.Label];
+        AssertRetiredMarkers(NativeSource(control.Label, control.Parameters, recipe.Result));
+        // Test the removed prefix independently of §R and a legacy module header.
+        var retired = control.Label["§R ".Length..];
+        var source = NativeSource("return " + retired, control.Parameters, recipe.Result);
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        Assert.DoesNotContain(tokens, token => token.Kind is TokenKind.RawCSharpExpression or TokenKind.CSharpInterop);
+        new Parser(tokens, diagnostics).Parse();
+        var start = source.IndexOf(retired, StringComparison.Ordinal);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Span.Start >= start && diagnostic.Span.Start < start + retired.Length
+            && diagnostic.Code == DiagnosticCode.UnexpectedToken);
+    }
+
+    private static void AssertRetiredMarkers(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        var markers = tokens.Where(token => token.Text.StartsWith('§')).ToArray();
+        Assert.NotEmpty(markers);
+        foreach (var marker in markers)
+        {
+            Assert.Equal(TokenKind.Error, marker.Kind);
+            Assert.Contains(diagnostics.Errors, error =>
+                error.Code == DiagnosticCode.UnknownSectionMarker && error.Span.Equals(marker.Span));
+            // Each sigil is also rejected at its own site in a verified native scaffold.
+            ParseNative(NativeSource("return \"\""));
+            var isolatedSource = NativeSource(marker.Text);
+            var isolatedDiagnostics = new DiagnosticBag();
+            var isolatedTokens = new Lexer(isolatedSource, isolatedDiagnostics).TokenizeAllForParser();
+            var offset = isolatedSource.IndexOf(marker.Text, StringComparison.Ordinal);
+            var isolated = Assert.Single(isolatedTokens, token => token.Span.Start == offset);
+            Assert.Equal(TokenKind.Error, isolated.Kind);
+            Assert.Contains(isolatedDiagnostics.Errors, error =>
+                error.Code == DiagnosticCode.UnknownSectionMarker && error.Span.Equals(isolated.Span));
+        }
+        Assert.DoesNotContain(tokens, token => token.Kind is TokenKind.RawCSharpExpression or TokenKind.CSharpInterop);
+    }
+
+    private static void AssertOwnedInternalError(ControlSource control, ModuleNode module, DiagnosticBag diagnostics, string code)
+    {
+        var error = Assert.Single(diagnostics.Errors);
+        Assert.Equal(code, error.Code);
+        var operation = GetReturnExpression(module);
+        if (code == DiagnosticCode.OperatorArgumentCount)
+            Assert.Equal(operation.Span, error.Span);
+        else
+        {
+            var start = Operations[control.Label].Fixture.IndexOf(":mode", StringComparison.Ordinal);
+            Assert.True(start >= 0);
+            Assert.Equal(new TextSpan(start, ":mode".Length, 1, start + 1), error.Span);
+        }
+    }
+
+    private static void AssertRuntime(string source, string method, object expected, params object?[] arguments)
+    {
+        var module = AssertNativeRoundTrip(source);
+        foreach (var input in new[] { source, new CalorEmitter().Emit(module) })
+        {
+            ParseNative(input);
+            var result = Program.Compile(input, "string-controls.calr", new CompilationOptions
+            {
+                EnableTypeChecking = true,
+                EnforceEffects = false,
+                StatusWriter = TextWriter.Null,
+            });
+            Assert.False(result.HasErrors, input + "\n" + string.Join("\n", result.Diagnostics));
+            var compilation = CSharpCompilation.Create("StringControls_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode)],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            var assembly = Assembly.Load(stream.ToArray());
+            var target = Assert.Single(assembly.GetTypes().SelectMany(type =>
+                type.GetMethods(BindingFlags.Public | BindingFlags.Static)), candidate => candidate.Name == method);
+            Assert.Equal(expected, target.Invoke(null, arguments));
+        }
     }
 
     private static StringOperationNode GetReturnExpression(ModuleNode module)
@@ -64,7 +354,7 @@ public class StringOperationTests
     public void Parse_Length_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (len s)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -76,7 +366,7 @@ public class StringOperationTests
     public void Parse_Contains_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (contains s \"hello\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -88,7 +378,7 @@ public class StringOperationTests
     public void Parse_StartsWith_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (starts s \"prefix\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -100,7 +390,7 @@ public class StringOperationTests
     public void Parse_EndsWith_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (ends s \"suffix\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -112,7 +402,7 @@ public class StringOperationTests
     public void Parse_IndexOf_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (indexof s \"x\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -124,7 +414,7 @@ public class StringOperationTests
     public void Parse_SubstringWithLength_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (substr s 0 5)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -136,7 +426,7 @@ public class StringOperationTests
     public void Parse_SubstringFrom_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (substr s 5)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -148,7 +438,7 @@ public class StringOperationTests
     public void Parse_Replace_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (replace s \"old\" \"new\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -160,7 +450,7 @@ public class StringOperationTests
     public void Parse_ToUpper_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (upper s)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -172,7 +462,7 @@ public class StringOperationTests
     public void Parse_ToLower_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (lower s)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -184,7 +474,7 @@ public class StringOperationTests
     public void Parse_Trim_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (trim s)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -196,7 +486,7 @@ public class StringOperationTests
     public void Parse_TrimStart_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (ltrim s)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -208,7 +498,7 @@ public class StringOperationTests
     public void Parse_TrimEnd_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (rtrim s)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -220,7 +510,7 @@ public class StringOperationTests
     public void Parse_PadLeft_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (lpad s 10)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -232,7 +522,7 @@ public class StringOperationTests
     public void Parse_PadRight_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (rpad s 10)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -245,7 +535,7 @@ public class StringOperationTests
     {
         // Test that join parses correctly - use string variables to avoid array syntax complexity
         var source = WrapInFunctionWithParams("§R (join \", \" items)", "§I{object:items}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -257,7 +547,7 @@ public class StringOperationTests
     public void Parse_Format_ReturnsStringOperationNode()
     {
         var source = WrapInFunctionWithParams("§R (fmt \"Hello {0}\" name)", "§I{string:name}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -269,7 +559,7 @@ public class StringOperationTests
     public void Parse_Concat_ReturnsStringOperationNode()
     {
         var source = WrapInFunctionWithParams("§R (concat a b c)", "§I{string:a} §I{string:b} §I{string:c}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -281,7 +571,7 @@ public class StringOperationTests
     public void Parse_IsNullOrEmpty_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (isempty s)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -293,7 +583,7 @@ public class StringOperationTests
     public void Parse_IsNullOrWhiteSpace_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (isblank s)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -305,7 +595,7 @@ public class StringOperationTests
     public void Parse_Split_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (split s \",\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -317,7 +607,7 @@ public class StringOperationTests
     public void Parse_ToString_ReturnsStringOperationNode()
     {
         var source = WrapInFunctionWithParams("§R (str x)", "§I{i32:x}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -352,7 +642,7 @@ public class StringOperationTests
     public void Emit_StringOperation_ProducesCorrectCSharp(string calor, string expectedCSharp)
     {
         var source = WrapInFunction($"§R {calor}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -367,7 +657,7 @@ public class StringOperationTests
     {
         // Test that join emits correctly - use object type to avoid array syntax complexity
         var source = WrapInFunctionWithParams("§R (join \",\" items)", "§I{object:items}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -381,7 +671,7 @@ public class StringOperationTests
     public void Emit_Format_ProducesCorrectCSharp()
     {
         var source = WrapInFunctionWithParams("§R (fmt \"Hello {0}\" name)", "§I{string:name}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -395,7 +685,7 @@ public class StringOperationTests
     public void Emit_Concat_ProducesCorrectCSharp()
     {
         var source = WrapInFunctionWithParams("§R (concat a b c)", "§I{string:a} §I{string:b} §I{string:c}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -413,9 +703,8 @@ public class StringOperationTests
     public void Parse_UpperWithoutArguments_IsOrdinaryIdentifierGrouping()
     {
         var source = WrapInFunction("§R (upper)");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
+        AssertRetiredMarkers(NativeSource(source.Label));
+        var module = AssertNativeRoundTrip(NativeSource("return (upper)"));
         var statement = Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
         Assert.Equal("upper", Assert.IsType<ReferenceNode>(statement.Expression).Name);
     }
@@ -424,30 +713,33 @@ public class StringOperationTests
     public void Parse_Upper_TooManyArgs_ReportsError()
     {
         var source = WrapInFunction("§R (upper s \"extra\")");
-        Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Message.Contains("accepts at most 1 argument"));
+        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.OperatorArgumentCount);
     }
 
     [Fact]
     public void Parse_Contains_OneArg_ReportsError()
     {
         var source = WrapInFunction("§R (contains s)");
-        Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
+        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.OperatorArgumentCount);
     }
 
     [Fact]
     public void Parse_Substr_OneArg_ReportsError()
     {
         var source = WrapInFunction("§R (substr s)");
-        Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
+        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.OperatorArgumentCount);
     }
 
     #endregion
@@ -458,7 +750,7 @@ public class StringOperationTests
     public void Parse_Nested_UpperTrim_ReturnsCorrectAst()
     {
         var source = WrapInFunction("§R (upper (trim s))");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -467,13 +759,26 @@ public class StringOperationTests
         var inner = strOp.Arguments[0] as StringOperationNode;
         Assert.NotNull(inner);
         Assert.Equal(StringOp.Trim, inner!.Operation);
+        AssertRuntime("""
+            module ReceiverControl
+              module Probe public
+                field int:calls private static = 0
+                func Next public () → string
+                  ! mut
+                  set calls calls + 1
+                  return " x "
+                func Run public () → int
+                  ! mut
+                  let length = Next().Trim().ToUpper().Length
+                  return calls * 100 + length
+            """, "Run", 101);
     }
 
     [Fact]
     public void Emit_Nested_UpperTrim_ProducesCorrectCSharp()
     {
         var source = WrapInFunction("§R (upper (trim s))");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -487,7 +792,7 @@ public class StringOperationTests
     public void Parse_Nested_ContainsLower_ReturnsCorrectAst()
     {
         var source = WrapInFunction("§R (contains (lower s) \"hello\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -502,7 +807,7 @@ public class StringOperationTests
     public void Emit_Nested_ContainsLower_ProducesCorrectCSharp()
     {
         var source = WrapInFunction("§R (contains (lower s) \"hello\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -516,7 +821,7 @@ public class StringOperationTests
     public void Emit_Nested_ThreeDeep_ProducesCorrectCSharp()
     {
         var source = WrapInFunction("§R (len (upper (trim s)))");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -542,9 +847,23 @@ public class StringOperationTests
                       §R ""
                   §R s
             """;
-        var module = Parse(source, out var diagnostics);
-
+        AssertRetiredMarkers(source);
+        var native = AssertNativeRoundTrip(NativeSource("if string.IsNullOrEmpty(s)\n  return \"\"\nreturn s"));
+        var nativeIf = Assert.IsType<IfStatementNode>(native.Functions[0].Body[0]);
+        Assert.Equal("string.IsNullOrEmpty(s)", NativeShape(nativeIf.Condition));
+        Assert.Equal("", Assert.IsType<StringLiteralNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(nativeIf.ThenBody)).Expression).Value);
+        Assert.Equal("s", Assert.IsType<ReferenceNode>(Assert.IsType<ReturnStatementNode>(
+            native.Functions[0].Body[1]).Expression).Name);
+        var condition = InternalExpression("§R (isempty s)", out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var module = InternalModule("string:s",
+        [
+            new IfStatementNode(TextSpan.Empty, "if", condition,
+                [new ReturnStatementNode(TextSpan.Empty, new StringLiteralNode(TextSpan.Empty, ""))],
+                [], null, new AttributeCollection()),
+            new ReturnStatementNode(TextSpan.Empty, new ReferenceNode(TextSpan.Empty, "s")),
+        ]);
         var func = module.Functions[0];
         var ifStmt = func.Body[0] as IfStatementNode;
         Assert.NotNull(ifStmt);
@@ -557,7 +876,7 @@ public class StringOperationTests
     public void Parse_StringOp_InBinaryExpression_Works()
     {
         var source = WrapInFunction("§R (> (len s) 10)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var func = module.Functions[0];
@@ -584,9 +903,20 @@ public class StringOperationTests
                   §B{x} (upper (trim s))
                   §R x
             """;
-        var module = Parse(source, out var diagnostics);
-
+        AssertRetiredMarkers(source);
+        var native = AssertNativeRoundTrip(NativeSource("let x = s.Trim().ToUpper()\nreturn x"));
+        var nativeBinding = Assert.IsType<BindStatementNode>(native.Functions[0].Body[0]);
+        Assert.Equal("x", nativeBinding.Name);
+        Assert.Equal("s.Trim().ToUpper()", NativeShape(nativeBinding.Initializer!));
+        Assert.Equal("x", Assert.IsType<ReferenceNode>(Assert.IsType<ReturnStatementNode>(
+            native.Functions[0].Body[1]).Expression).Name);
+        var initializer = InternalExpression("§R (upper (trim s))", out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var module = InternalModule("string:s",
+        [
+            new BindStatementNode(TextSpan.Empty, "x", null, false, initializer, new AttributeCollection()),
+            new ReturnStatementNode(TextSpan.Empty, new ReferenceNode(TextSpan.Empty, "x")),
+        ]);
         var expr = GetBindExpression(module);
         var strOp = expr as StringOperationNode;
         Assert.NotNull(strOp);
@@ -620,14 +950,18 @@ public class StringOperationTests
     public void RoundTrip_StringOp_ProducesValidCalor(string op)
     {
         var source = WrapInFunction($"§R {op}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var calorEmitter = new CalorEmitter();
         var roundTripped = calorEmitter.Emit(module);
 
-        Assert.Contains(op, roundTripped);
+        Assert.DoesNotContain("§", roundTripped);
+        var reparsed = AssertNativeRoundTrip(roundTripped);
+        Assert.Equal(CSharpShape(SyntaxFactory.ParseExpression(Operations[source.Label].Native)),
+            NativeShape(Returned(reparsed)));
+        AssertCSharpEquivalent(new CSharpEmitter().Emit(module), new CSharpEmitter().Emit(reparsed));
     }
 
     #endregion
@@ -646,15 +980,26 @@ public class StringOperationTests
                   §B{atIdx} (indexof email "@")
                   §R (substr email (+ atIdx 1))
             """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        AssertRetiredMarkers(source);
+        const string nativeSource = """
+            module Test
+              func GetDomain public (string:email) → string
+                !
+                let atIdx = email.IndexOf("@")
+                return email.Substring(atIdx + 1)
+            """;
+        var module = AssertNativeRoundTrip(nativeSource);
+        var body = Assert.Single(module.Functions).Body;
+        Assert.Equal("email.IndexOf(\"@\")", NativeShape(Assert.IsType<BindStatementNode>(body[0]).Initializer!));
+        Assert.Equal("email.Substring(Add(atIdx,1))", NativeShape(Assert.IsType<ReturnStatementNode>(body[1]).Expression!));
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
 
         Assert.Contains("email.IndexOf(\"@\")", code);
         Assert.Contains("email.Substring(checked(atIdx + 1))", code);
+        AssertRuntime(nativeSource, "GetDomain", "example.org", "ada@example.org");
+        AssertRuntime(nativeSource, "GetDomain", "whole", "whole");
     }
 
     [Fact]
@@ -669,15 +1014,25 @@ public class StringOperationTests
                   §B{cleaned} (lower (trim title))
                   §R (replace cleaned " " "-")
             """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        AssertRetiredMarkers(source);
+        const string nativeSource = """
+            module Test
+              func ToSlug public (string:title) → string
+                !
+                let cleaned = title.Trim().ToLower()
+                return cleaned.Replace(" ", "-")
+            """;
+        var module = AssertNativeRoundTrip(nativeSource);
+        var body = Assert.Single(module.Functions).Body;
+        Assert.Equal("title.Trim().ToLower()", NativeShape(Assert.IsType<BindStatementNode>(body[0]).Initializer!));
+        Assert.Equal("cleaned.Replace(\" \",\"-\")", NativeShape(Assert.IsType<ReturnStatementNode>(body[1]).Expression!));
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
 
         Assert.Contains("title.Trim().ToLower()", code);
         Assert.Contains(".Replace(\" \", \"-\")", code);
+        AssertRuntime(nativeSource, "ToSlug", "hello-world", "  Hello World  ");
     }
 
     [Fact]
@@ -692,15 +1047,24 @@ public class StringOperationTests
                   §O{bool}
                   §R (&& (! (isempty value)) (starts value prefix))
             """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        AssertRetiredMarkers(source);
+        const string nativeSource = """
+            module Test
+              func IsValid public (string:value, string:prefix) → bool
+                !
+                return !string.IsNullOrEmpty(value) && value.StartsWith(prefix)
+            """;
+        var module = AssertNativeRoundTrip(nativeSource);
+        Assert.Equal("And(Not(string.IsNullOrEmpty(value)),value.StartsWith(prefix))", NativeShape(Returned(module)));
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
 
         Assert.Contains("string.IsNullOrEmpty(value)", code);
         Assert.Contains("value.StartsWith(prefix)", code);
+        AssertRuntime(nativeSource, "IsValid", false, "", "");
+        AssertRuntime(nativeSource, "IsValid", true, "prefix-value", "prefix");
+        AssertRuntime(nativeSource, "IsValid", false, "other", "prefix");
     }
 
     #endregion
@@ -787,6 +1151,25 @@ public class StringOperationTests
         return null;
     }
 
+    private static ExpressionNode ConvertedReturn(ModuleNode module) =>
+        Assert.IsAssignableFrom<ExpressionNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(Assert.Single(Assert.Single(module.Classes).Methods).Body)).Expression);
+
+    private static ModuleNode AssertMigrationNative(ConversionResult result, string expectedExpression)
+    {
+        Assert.NotNull(result.Ast);
+        Assert.Empty(result.Losses);
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Equal(0, result.LossySubstitutionCount);
+        Assert.Equal(0, result.DropCount);
+        var source = new CalorEmitter().Emit(result.Ast);
+        Assert.DoesNotContain("§", source);
+        var native = AssertNativeRoundTrip(source);
+        Assert.Equal(CSharpShape(SyntaxFactory.ParseExpression(expectedExpression)), NativeShape(ConvertedReturn(native)));
+        AssertCSharpEquivalent(new CSharpEmitter().Emit(result.Ast), new CSharpEmitter().Emit(native));
+        return native;
+    }
+
     [Theory]
     [InlineData("s.ToUpper()", StringOp.ToUpper)]
     [InlineData("s.ToLower()", StringOp.ToLower)]
@@ -803,6 +1186,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(expectedOp, strOp!.Operation);
+        AssertMigrationNative(result, csharpExpr);
     }
 
     [Theory]
@@ -820,6 +1204,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(expectedOp, strOp!.Operation);
+        AssertMigrationNative(result, csharpExpr);
     }
 
     [Theory]
@@ -836,6 +1221,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(expectedOp, strOp!.Operation);
+        AssertMigrationNative(result, csharpExpr);
     }
 
     [Theory]
@@ -851,6 +1237,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(expectedOp, strOp!.Operation);
+        AssertMigrationNative(result, csharpExpr);
     }
 
     [Theory]
@@ -866,6 +1253,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(expectedOp, strOp!.Operation);
+        AssertMigrationNative(result, csharpExpr);
     }
 
     [Fact]
@@ -879,6 +1267,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(StringOp.Length, strOp!.Operation);
+        AssertMigrationNative(result, "s.Length");
     }
 
     [Fact]
@@ -892,6 +1281,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(StringOp.Concat, strOp!.Operation);
+        AssertMigrationNative(result, "string.Concat(a, b)");
     }
 
     [Fact]
@@ -905,6 +1295,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(StringOp.Join, strOp!.Operation);
+        AssertMigrationNative(result, "string.Join(\",\", items)");
     }
 
     [Fact]
@@ -918,6 +1309,7 @@ public class StringOperationTests
         var strOp = FindStringOperationInResult(result);
         Assert.NotNull(strOp);
         Assert.Equal(StringOp.Format, strOp!.Operation);
+        AssertMigrationNative(result, "string.Format(\"Hello {0}\", name)");
     }
 
     [Theory]
@@ -940,6 +1332,7 @@ public class StringOperationTests
         Assert.NotNull(strOp);
         Assert.Equal(expectedOp, strOp!.Operation);
         Assert.Equal(expectedMode, strOp.ComparisonMode);
+        AssertMigrationNative(result, csharpExpr);
     }
 
     [Fact]
@@ -953,9 +1346,16 @@ public class StringOperationTests
 
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("§C{string.Equals}", calor);
-        Assert.Contains("StringComparison.OrdinalIgnoreCase", calor);
+        Assert.Contains("string.Equals", calor);
+        Assert.Contains("StringComparison . OrdinalIgnoreCase", calor);
         Assert.DoesNotContain("(equals", calor);
+        var cast = Assert.IsType<TypeOperationNode>(ConvertedReturn(result.Ast!));
+        Assert.Equal(TypeOp.Cast, cast.Operation);
+        Assert.Equal("bool", cast.TargetType);
+        var originalCall = Assert.IsType<CallExpressionNode>(cast.Operand);
+        Assert.Equal("string.Equals", originalCall.Target);
+        Assert.Equal(3, originalCall.Arguments.Count);
+        AssertMigrationNative(result, "(bool)string.Equals(a, b, StringComparison.OrdinalIgnoreCase)");
     }
 
     [Theory]
@@ -975,7 +1375,19 @@ public class StringOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains(expectedKeyword, calor);
+        var nativeMode = expectedKeyword switch
+        {
+            ":ignore-case" => "StringComparison.OrdinalIgnoreCase",
+            ":ordinal" => "StringComparison.Ordinal",
+            ":invariant" => "StringComparison.InvariantCulture",
+            ":invariant-ignore-case" => "StringComparison.InvariantCultureIgnoreCase",
+            _ => throw new ArgumentOutOfRangeException(nameof(expectedKeyword), expectedKeyword, null),
+        };
+        Assert.Contains(nativeMode, calor);
+        Assert.DoesNotContain(expectedKeyword, calor);
+        AssertMigrationNative(result, csharpExpr);
+        AssertRuntime(NativeSource("return " + csharpExpr, result: "bool"), "Main",
+            expectedKeyword is ":ignore-case" or ":invariant-ignore-case", "X");
     }
 
     [Theory]
@@ -983,7 +1395,8 @@ public class StringOperationTests
     [InlineData("s.Contains(\"x\", StringComparison.CurrentCultureIgnoreCase)")]
     public void Migration_UnsupportedStringComparison_DoesNotConvertToNative(string csharpExpr)
     {
-        // CurrentCulture modes are not supported - should fall back to interop
+        // These modes have no StringOperationNode mode. The ordinary CLR call is
+        // preserved natively, not through raw C# interop or a substituted comparison.
         var csharp = $"public class Test {{ public bool M(string s) {{ return {csharpExpr}; }} }}";
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
@@ -998,11 +1411,17 @@ public class StringOperationTests
         Assert.DoesNotContain(":ignore-case", calor);
         Assert.DoesNotContain(":ordinal", calor);
         Assert.DoesNotContain(":invariant", calor);
+        Assert.IsType<CallExpressionNode>(ConvertedReturn(result.Ast!));
+        Assert.Null(FindStringOperationInResult(result));
+        AssertMigrationNative(result, csharpExpr);
     }
 
     #endregion
 
     #region Phase 10: Token Economics Tests
+
+    // Historical character-length comparisons only: neither model-token measurements
+    // nor evidence that today's native spelling has an advantage. Bodies stay unchanged.
 
     [Fact]
     public void TokenEconomics_Upper_BuiltinMoreCompact()
@@ -1115,7 +1534,7 @@ public class StringOperationTests
     public void Parse_FormatMultipleArgs_ReturnsCorrectNode()
     {
         var source = WrapInFunctionWithParams("§R (fmt \"{0} + {1} = {2}\" a b c)", "§I{i32:a} §I{i32:b} §I{i32:c}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -1127,7 +1546,7 @@ public class StringOperationTests
     public void Parse_ConcatMany_ReturnsCorrectNode()
     {
         var source = WrapInFunctionWithParams("§R (concat a b c d e)", "§I{string:a} §I{string:b} §I{string:c} §I{string:d} §I{string:e}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -1139,7 +1558,7 @@ public class StringOperationTests
     public void Emit_ConcatMany_ProducesCorrectCSharp()
     {
         var source = WrapInFunctionWithParams("§R (concat a b c d e)", "§I{string:a} §I{string:b} §I{string:c} §I{string:d} §I{string:e}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -1157,7 +1576,7 @@ public class StringOperationTests
     public void Parse_Contains_WithIgnoreCase_ReturnsStringOperationNodeWithMode()
     {
         var source = WrapInFunction("§R (contains s \"hello\" :ignore-case)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -1170,7 +1589,7 @@ public class StringOperationTests
     public void Parse_StartsWith_WithOrdinal_ReturnsStringOperationNodeWithMode()
     {
         var source = WrapInFunction("§R (starts s \"prefix\" :ordinal)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -1182,7 +1601,7 @@ public class StringOperationTests
     public void Parse_EndsWith_WithInvariant_ReturnsStringOperationNodeWithMode()
     {
         var source = WrapInFunction("§R (ends s \"suffix\" :invariant)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -1194,7 +1613,7 @@ public class StringOperationTests
     public void Parse_IndexOf_WithInvariantIgnoreCase_ReturnsStringOperationNodeWithMode()
     {
         var source = WrapInFunction("§R (indexof s \"x\" :invariant-ignore-case)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -1206,7 +1625,7 @@ public class StringOperationTests
     public void Parse_Equals_WithIgnoreCase_ReturnsStringOperationNodeWithMode()
     {
         var source = WrapInFunction("§R (equals s \"YES\" :ignore-case)");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -1226,7 +1645,7 @@ public class StringOperationTests
     public void Emit_StringOperationWithMode_ProducesCorrectCSharp(string calor, string expectedCSharp)
     {
         var source = WrapInFunction($"§R {calor}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
@@ -1244,36 +1663,49 @@ public class StringOperationTests
     public void RoundTrip_StringOpWithMode_ProducesValidCalor(string op)
     {
         var source = WrapInFunction($"§R {op}");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var calorEmitter = new CalorEmitter();
         var roundTripped = calorEmitter.Emit(module);
 
-        // Check the keyword is preserved
-        var keyword = op.Split(':')[1].TrimEnd(')');
-        Assert.Contains($":{keyword}", roundTripped);
+        var expectedMode = op switch
+        {
+            "(contains s \"x\" :ignore-case)" => "StringComparison.OrdinalIgnoreCase",
+            "(starts s \"x\" :ordinal)" => "StringComparison.Ordinal",
+            "(ends s \"x\" :invariant)" => "StringComparison.InvariantCulture",
+            "(equals s \"x\" :invariant-ignore-case)" => "StringComparison.InvariantCultureIgnoreCase",
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null),
+        };
+        Assert.Contains(expectedMode, roundTripped);
+        Assert.DoesNotContain("§", roundTripped);
+        var reparsed = AssertNativeRoundTrip(roundTripped);
+        Assert.Equal(CSharpShape(SyntaxFactory.ParseExpression(Operations[source.Label].Native)),
+            NativeShape(Returned(reparsed)));
+        AssertCSharpEquivalent(new CSharpEmitter().Emit(module), new CSharpEmitter().Emit(reparsed));
     }
 
     [Fact]
     public void Parse_Upper_WithComparisonMode_ReportsError()
     {
         var source = WrapInFunction("§R (upper s :ignore-case)");
-        Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Message.Contains("does not support comparison modes"));
+        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.InvalidComparisonMode);
     }
 
     [Fact]
     public void Parse_InvalidKeyword_ReportsError()
     {
         var source = WrapInFunction("§R (contains s \"x\" :invalid-mode)");
-        Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Message.Contains("Unknown comparison mode"));
+        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.InvalidComparisonMode);
     }
 
     [Theory]
@@ -1333,7 +1765,7 @@ public class StringOperationTests
     public void Parse_Equals_ReturnsStringOperationNode()
     {
         var source = WrapInFunction("§R (equals s \"hello\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var strOp = GetReturnExpression(module);
@@ -1345,7 +1777,7 @@ public class StringOperationTests
     public void Emit_Equals_ProducesCorrectCSharp()
     {
         var source = WrapInFunction("§R (equals s \"hello\")");
-        var module = Parse(source, out var diagnostics);
+        var module = ParseInternalControl(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
