@@ -26,6 +26,7 @@ public sealed class EffectEnforcementPass
     internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
     private CrossModuleTypeRegistry _varianceTypes = null!;
     private ModuleNode _varianceModule = null!;
+    private ModuleNode _module = null!;
 
     /// <summary>
     /// Default cap on the <see cref="ProcessScc"/> fixpoint: how many rounds over
@@ -259,6 +260,7 @@ public sealed class EffectEnforcementPass
 
     internal void Enforce(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance)
     {
+        _module = module;
         _chargedVariables.Clear();
         _returnedRows.Clear();
         _incompleteRowWalks.Clear();
@@ -697,6 +699,8 @@ public sealed class EffectEnforcementPass
             LambdaBodyRow = LambdaBodyRow,
             Invocations = _invocations,
             AstResolution = AstResolution,
+            EnclosingTypeParameters = _ownerClassByFunctionId.TryGetValue(function.Id, out var owner)
+                ? ReturnShape.GetCallableTypeParameters(owner, _module) : [],
         };
         var inferrer = new EffectInferrer(context);
         var effects = inferrer.InferFromFunction(function);
@@ -3451,6 +3455,7 @@ public sealed class EffectEnforcementPass
         public IReadOnlyDictionary<string, InterfaceDefinitionNode> InterfacesByName { get; }
         public IReadOnlyCollection<string> DelegateTypeNames { get; }
         public ClassDefinitionNode? OwnerClass { get; }
+        public IReadOnlyList<TypeParameterNode> EnclosingTypeParameters { get; init; } = [];
         public ConstructorDeclaration? CurrentConstructor { get; }
         public Func<string, EffectSet> ResolveInternalEffects { get; }
 
@@ -6952,47 +6957,16 @@ public sealed class EffectEnforcementPass
         {
             var effects = EffectSet.From("alloc").Union(InferFromMany(newExpr.Arguments));
             var constructorTarget = $"{newExpr.TypeName}..ctor";
-            var sourceType = _context.CallGraph.SourceCreationType(_context.CurrentFunctionId, newExpr.Span);
-            if (sourceType != null)
-                effects = effects.Union(InferSourceInitialization(sourceType, isStatic: true, newExpr.Span));
-            var resolvedInternalIds = _context.CallGraph.ResolvedConstructorCalls(
-                _context.CurrentFunctionId, newExpr.Span);
-            if (resolvedInternalIds.Count == 0 && sourceType == null)
-                resolvedInternalIds = _context.CallGraph.ResolveCallSites(
-                _context.CurrentFunctionId,
-                constructorTarget,
-                newExpr.Span);
-
             var selected = _context.CallGraph.SourceConstructor(newExpr);
-            if (sourceType != null && (selected == null
-                || !ReferenceEquals(_context.CallGraph.InitializationClass(selected.ContainingType), sourceType)
-                || resolvedInternalIds.Count > 0
-                    && (_context.CallGraph.InitializationFunction(selected) is not { } selectedId
-                        || !resolvedInternalIds.Contains(selectedId))))
+            if (selected == null && IsTypeParameterConstruction(newExpr))
             {
-                effects = effects.Union(UnknownResolvedOperation(
-                    $"{sourceType.FullyQualifiedSymbolIdentity ?? sourceType.Name}..ctor", newExpr.TypeNameSpan));
-            }
-            else if (resolvedInternalIds.Count > 0)
-            {
-                effects = effects.Union(InferFromInternalFunctions(resolvedInternalIds));
-            }
-            else if (sourceType != null)
-            {
-                if (newExpr.Arguments.Count != 0
-                    || CallGraphAnalysis.EnumerateConstructors(sourceType).Any(constructor => !constructor.IsStatic))
-                    effects = effects.Union(UnknownResolvedOperation(
-                        $"{sourceType.FullyQualifiedSymbolIdentity ?? sourceType.Name}..ctor", newExpr.TypeNameSpan));
-                else
-                    effects = effects.Union(InferImplicitSourceConstructor(sourceType, newExpr.Span));
+                // new()/struct permit construction, not a pure runtime constructor.
+                // Check lexical identity before any same-spelled source or manifest lookup.
+                effects = effects.Union(UnknownResolvedOperation(constructorTarget, newExpr.TypeNameSpan));
             }
             else
             {
-                var metadataType = _context.CallGraph.MetadataCreationType(_context.CurrentFunctionId, newExpr.Span);
-                effects = effects.Union(ResolveConstructorEffects(
-                    metadataType?.OriginalDefinition.ToDisplayString() ?? newExpr.TypeName,
-                    newExpr.Arguments,
-                    newExpr.TypeNameSpan));
+                effects = effects.Union(InferConcreteConstructor(newExpr, selected));
             }
 
             foreach (var initializer in newExpr.Initializers)
@@ -7027,6 +7001,61 @@ public sealed class EffectEnforcementPass
                 if (bound is { MutatesOnlyFreshCollectionReceiver: true } && !addEffects.IsUnknown)
                     addEffects = EffectSet.FromInternal(addEffects.Except(EffectSet.From("mut")));
                 effects = effects.Union(addEffects);
+            }
+
+            return effects;
+        }
+
+        private bool IsTypeParameterConstruction(NewExpressionNode creation) =>
+            creation.TypeArguments.Count == 0
+            && _lexicalTypeScopes.OfType<FunctionNode>().SelectMany(function => function.TypeParameters)
+                .Concat(_context.EnclosingTypeParameters)
+                .Any(parameter => parameter.Name.Equals(
+                    creation.TypeReference.Name.TrimStart('@'), StringComparison.Ordinal));
+
+        private EffectSet InferConcreteConstructor(NewExpressionNode newExpr, CS.IMethodSymbol? selected)
+        {
+            var effects = EffectSet.Empty;
+            var sourceType = _context.CallGraph.SourceCreationType(_context.CurrentFunctionId, newExpr.Span);
+            if (sourceType != null)
+                effects = effects.Union(InferSourceInitialization(sourceType, isStatic: true, newExpr.Span));
+            var resolvedInternalIds = _context.CallGraph.ResolvedConstructorCalls(
+                _context.CurrentFunctionId, newExpr.Span);
+            if (resolvedInternalIds.Count == 0 && sourceType == null)
+                resolvedInternalIds = _context.CallGraph.ResolveCallSites(
+                _context.CurrentFunctionId,
+                $"{newExpr.TypeName}..ctor",
+                newExpr.Span);
+
+            if (sourceType != null && (selected == null
+                || !ReferenceEquals(_context.CallGraph.InitializationClass(selected.ContainingType), sourceType)
+                || resolvedInternalIds.Count > 0
+                    && (_context.CallGraph.InitializationFunction(selected) is not { } selectedId
+                        || !resolvedInternalIds.Contains(selectedId))))
+            {
+                effects = effects.Union(UnknownResolvedOperation(
+                    $"{sourceType.FullyQualifiedSymbolIdentity ?? sourceType.Name}..ctor", newExpr.TypeNameSpan));
+            }
+            else if (resolvedInternalIds.Count > 0)
+            {
+                effects = effects.Union(InferFromInternalFunctions(resolvedInternalIds));
+            }
+            else if (sourceType != null)
+            {
+                if (newExpr.Arguments.Count != 0
+                    || CallGraphAnalysis.EnumerateConstructors(sourceType).Any(constructor => !constructor.IsStatic))
+                    effects = effects.Union(UnknownResolvedOperation(
+                        $"{sourceType.FullyQualifiedSymbolIdentity ?? sourceType.Name}..ctor", newExpr.TypeNameSpan));
+                else
+                    effects = effects.Union(InferImplicitSourceConstructor(sourceType, newExpr.Span));
+            }
+            else
+            {
+                var metadataType = _context.CallGraph.MetadataCreationType(_context.CurrentFunctionId, newExpr.Span);
+                effects = effects.Union(ResolveConstructorEffects(
+                    metadataType?.OriginalDefinition.ToDisplayString() ?? newExpr.TypeName,
+                    newExpr.Arguments,
+                    newExpr.TypeNameSpan));
             }
 
             return effects;
@@ -7093,9 +7122,6 @@ public sealed class EffectEnforcementPass
             ConstructorNode? currentConstructor = null)
         {
             var argumentTypes = arguments.Select(InferExpressionType).ToArray();
-            if (arguments.Count == 0 && HasNewConstraint(typeName))
-                return EffectSet.Empty;
-
             var shortType = StripGenericArguments(typeName);
             if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out var cls))
             {
@@ -7136,23 +7162,6 @@ public sealed class EffectEnforcementPass
                     $"{manifestType}..ctor({string.Join(",", argumentTypes)})",
                     span)
                 : resolution.Effects;
-        }
-
-        private bool HasNewConstraint(string typeName)
-        {
-            static bool Matches(TypeParameterNode parameter, string name)
-                => parameter.Name.Equals(name, StringComparison.Ordinal)
-                    && parameter.Constraints.Any(constraint =>
-                        constraint.Kind == TypeConstraintKind.New);
-
-            if (_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function)
-                && function.TypeParameters.Any(parameter => Matches(parameter, typeName)))
-            {
-                return true;
-            }
-
-            return _context.OwnerClass?.TypeParameters.Any(
-                parameter => Matches(parameter, typeName)) == true;
         }
 
         private static bool ConstructorParametersMatch(

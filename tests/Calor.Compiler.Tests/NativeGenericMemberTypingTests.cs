@@ -5,6 +5,8 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
+using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -426,6 +428,302 @@ public sealed class NativeGenericMemberTypingTests
                 "func Read (List<int>:items) → int\n    ! cw", StringComparison.Ordinal));
             Assert.False(accepted.HasErrors, string.Join(Environment.NewLine, accepted.Diagnostics));
         }
+    }
+
+    [Theory]
+    [InlineData("new")]
+    [InlineData("class, new")]
+    [InlineData("struct")]
+    public void GenericConstruction_MethodConstraintDoesNotProveConstructorEffects(string constraint)
+    {
+        var authored = $$"""
+            module GenericConstructor
+              module Factory
+                func Make<T> public () → T
+                  where T : {{constraint}}
+                  ! alloc
+                  return new T()
+            """;
+        foreach (var source in NativeInputs(authored))
+            AssertUnknownConstruction(source);
+    }
+
+    [Theory]
+    [InlineData("new", false)]
+    [InlineData("class, new", false)]
+    [InlineData("new", true)]
+    public void GenericConstruction_EnclosingClassParametersRemainUnknown(string constraint, bool nested)
+    {
+        var authored = nested
+            ? $$"""
+                module GenericConstructor
+                  class Factory<T> public
+                    where T : {{constraint}}
+                    class Nested public
+                      func Make public static () → T
+                        ! alloc
+                        return new T()
+                """
+            : $$"""
+                module GenericConstructor
+                  class Factory<T> public
+                    where T : {{constraint}}
+                    func Make public static () → T
+                      ! alloc
+                      return new T()
+                """;
+        foreach (var source in NativeInputs(authored))
+            AssertUnknownConstruction(source);
+    }
+
+    [Theory]
+    [InlineData("T", false)]
+    [InlineData("T", true)]
+    [InlineData("System.Text.StringBuilder", false)]
+    public void GenericConstruction_CannotBorrowSameSpelledConcreteConstructor(string name, bool sourceClass)
+    {
+        var authored = $$"""
+            module GenericConstructor
+              {{(sourceClass ? "class T public" : "")}}
+              func Make<{{name.Split('.').Last()}}> public () → {{name.Split('.').Last()}}
+                where {{name.Split('.').Last()}} : new
+                ! alloc
+                return new {{name.Split('.').Last()}}()
+            """;
+        foreach (var source in NativeInputs(authored))
+        {
+            var diagnostics = new DiagnosticBag();
+            var module = Parse(source);
+            var loader = new ManifestLoader();
+            loader.LoadFromJson($$"""
+                { "version": "1.0", "mappings": [{
+                  "type": "{{name}}", "constructors": { "()": [] }
+                }] }
+                """, "generic-constructor-test");
+            var resolver = new EffectResolver(loader);
+            new EffectEnforcementPass(diagnostics, resolver: resolver).Enforce(module);
+            Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            AssertUnknownConstruction(source);
+        }
+    }
+
+    [Theory]
+    [InlineData("public class ForeignConstructor { public static int Writes; public ForeignConstructor() { Writes++; } }", "mutation")]
+    [InlineData("public class ForeignConstructor { public ForeignConstructor() { System.Console.WriteLine(\"constructed\"); } }", "console")]
+    [InlineData("public class ForeignConstructor { public ForeignConstructor() { throw new System.InvalidOperationException(\"constructed\"); } }", "throw")]
+    [InlineData("public struct ForeignConstructor { public static int Writes; public ForeignConstructor() { Writes++; } }", "value")]
+    public void GenericConstruction_ForeignRuntimeBehaviorIsNotAllocationOnly(string foreignSource, string behavior)
+    {
+        var authored = $$"""
+            module GenericConstructor
+              module Factory
+                func Make<T> public () → T
+                  where T : {{(behavior == "value" ? "struct" : "new")}}
+                  ! alloc
+                  return new T()
+            """;
+        foreach (var source in NativeInputs(authored))
+        {
+            // Direct emission executes the counterexample, not an accepted strict program.
+            var generated = new CSharpEmitter().Emit(Parse(source));
+            var assembly = CompileAssembly(generated + Environment.NewLine + foreignSource + """
+
+                public class DefaultWitness { public static T Make<T>() => default(T); }
+                """);
+            var foreign = assembly.GetType("ForeignConstructor")!;
+            var make = assembly.GetType("Factory")!.GetMethod("Make")!.MakeGenericMethod(foreign);
+            if (behavior == "throw")
+            {
+                var exception = Assert.Throws<TargetInvocationException>(() => make.Invoke(null, null));
+                Assert.IsType<InvalidOperationException>(exception.GetBaseException());
+                Assert.Equal("constructed", exception.GetBaseException().Message);
+            }
+            else if (behavior == "console")
+            {
+                var previous = Console.Out;
+                using var output = new StringWriter();
+                try
+                {
+                    Console.SetOut(output);
+                    make.Invoke(null, null);
+                }
+                finally
+                {
+                    Console.SetOut(previous);
+                }
+                Assert.Equal("constructed" + Environment.NewLine, output.ToString());
+            }
+            else
+            {
+                if (behavior == "value")
+                {
+                    assembly.GetType("DefaultWitness")!.GetMethod("Make")!
+                        .MakeGenericMethod(foreign).Invoke(null, null);
+                    Assert.Equal(0, foreign.GetField("Writes")!.GetValue(null));
+                }
+                make.Invoke(null, null);
+                Assert.Equal(1, foreign.GetField("Writes")!.GetValue(null));
+            }
+            AssertUnknownConstruction(source);
+        }
+    }
+
+    [Fact]
+    public void GenericConstruction_PrimitiveDefaultRemainsPure()
+    {
+        const string authored = """
+            module GenericDefault
+              func Make<T> public () → int
+                where T : new
+                !
+                return default(int)
+            """;
+        foreach (var source in NativeInputs(authored))
+        {
+            var compiled = Program.Compile(source);
+            Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics));
+        }
+    }
+
+    [Fact]
+    public void GenericConstruction_ConcreteTypeInGenericFunctionRetainsItsConstructor()
+    {
+        const string authored = """
+            module ConcreteConstructor
+              class T public
+              func Make<U> public () → T
+                where U : new
+                ! alloc
+                return new T()
+            """;
+        foreach (var source in NativeInputs(authored))
+        {
+            var compiled = Program.Compile(source);
+            Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics));
+            CompileAssembly(compiled.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void GenericConstruction_UnknownPolicyDoesNotBecomeAConstructorContract()
+    {
+        const string authored = """
+            module GenericPolicy
+              func Make<T> public () → T
+                where T : new
+                ! alloc,cw,mut,throw
+                return new T()
+            """;
+        foreach (var source in NativeInputs(authored))
+        {
+            AssertUnknownConstruction(source);
+            var permissive = Program.Compile(source, null, new CompilationOptions
+            {
+                UnknownCallPolicy = UnknownCallPolicy.Permissive
+            });
+            Assert.False(permissive.HasErrors, string.Join(Environment.NewLine, permissive.Diagnostics));
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void GenericConstruction_MethodAndClassParameterShadowsDoNotGrantAuthority(bool methodConstraint)
+    {
+        var authored = $$"""
+            module GenericShadow
+              class Factory<T> public
+                where T : {{(methodConstraint ? "class" : "new")}}
+                func Make<T> public static () → T
+                  where T : {{(methodConstraint ? "new" : "struct")}}
+                  ! alloc
+                  return new T()
+            """;
+        foreach (var source in NativeInputs(authored))
+            AssertUnknownConstruction(source);
+    }
+
+    [Fact]
+    public void GenericConstruction_LambdaRetainsItsEnclosingTypeParameter()
+    {
+        const string authored = """
+            module LocalConstructor
+              func Make<T> public () → Func<T> ! alloc
+                where T : new
+                ! alloc
+                let Func<T>:callback ! alloc = () ! alloc => new T()
+                return callback
+            """;
+        foreach (var source in NativeInputs(authored))
+            AssertUnknownConstruction(source);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenericConstruction_ConcreteConstructorKeepsArgumentAndIntrinsicMutationEffects(bool allowConsole)
+    {
+        var authored = $$"""
+            module ConcreteArguments
+              class Widget public
+                field int:Value public
+                ctor (int:value)
+                  set this.Value value
+              func Argument () → int
+                ! cw
+                Console.WriteLine("argument")
+                return 1
+              func Make<T> public () → Widget
+                where T : new
+                ! alloc,mut{{(allowConsole ? ",cw" : "")}}
+                return new Widget(Argument())
+            """;
+        foreach (var source in NativeInputs(authored))
+        {
+            var compiled = Program.Compile(source);
+            Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            if (allowConsole)
+            {
+                Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics));
+                CompileAssembly(compiled.GeneratedCode);
+            }
+            else
+                Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("System.Text.StringBuilder", "new System.Text.StringBuilder()")]
+    [InlineData("int[]", "new int[] { 1, 2 }")]
+    public void GenericConstruction_KnownMetadataAndArrayConstructionRemainAvailable(string output, string expression)
+    {
+        var authored = $$"""
+            module ConcreteMetadata
+              func Make<StringBuilder> public () → {{output}}
+                where StringBuilder : new
+                ! alloc
+                return {{expression}}
+            """;
+        foreach (var source in NativeInputs(authored))
+        {
+            var compiled = Program.Compile(source);
+            Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics));
+            CompileAssembly(compiled.GeneratedCode);
+        }
+    }
+
+    private static void AssertUnknownConstruction(string source)
+    {
+        var compiled = Program.Compile(source);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains("..ctor", StringComparison.Ordinal));
+        var strict = Program.Compile(source, null, new CompilationOptions { StrictEffects = true });
+        Assert.Contains(strict.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains("..ctor", StringComparison.Ordinal));
     }
 
     private static IEnumerable<string> NativeInputs(string source)

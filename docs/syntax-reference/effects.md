@@ -237,6 +237,28 @@ opaque members that may initialize the type remain Unknown. A source type
 named `Object` does not gain CLR constructor authority. This initializer proof
 does not expand operation analysis of generated method bodies.
 
+## Generic construction
+
+`where T : new` permits `new T()`; it does not prove that the selected runtime
+constructor is pure. A foreign constructor can mutate state, write to the
+console, or throw. `class, new` and `struct` constraints do not establish an
+effect contract either: a value type can define a parameterless constructor.
+
+Open generic construction is therefore Unknown under strict effect checking,
+including parameters declared on enclosing classes and construction inside lambdas.
+Declaring `alloc`, or every known effect, cannot authorize Unknown.
+This closes an unsafe allocation-only exemption; it adds no constructor-effect
+row syntax or new permission. A same-spelled source type or manifest entry
+cannot supply the generic parameter's missing constructor contract.
+
+Known concrete constructors retain their existing source or metadata rules.
+Source constructors still permit only intrinsic initialization mutation and
+allocation. Allocation, argument evaluation, and initializers keep their own
+effects. Arrays and primitive `default(int)` do not invoke an open generic
+constructor. Native `default(T)` for a type parameter remains unsupported by the
+parser; this change does not extend that syntax. Permissive effects retain their
+existing explicit waiver, not a proof of constructor effects.
+
 ## Effect Codes
 
 Metadata property reads charge the getter's effect row whether the receiver is
