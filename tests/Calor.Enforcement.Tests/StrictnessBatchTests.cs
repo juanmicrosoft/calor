@@ -827,17 +827,111 @@ var x = 1;
                 ! cw
                 let r = items.ConvertAll(LoudMap)
             """;
-        var rejected = Calor.Compiler.Program.Compile(NativeSource(undeclared, undeclared));
-        Assert.True(rejected.HasErrors);
-        var error = Assert.Single(rejected.Diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.ForbiddenEffect, error.Code);
-        Assert.Equal("Function 'Go' uses effect 'cw' but does not declare it", error.Message);
-
-        var accepted = Calor.Compiler.Program.Compile(NativeSource(declared, declared));
+        const string pureDecoy = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                !
+                return x
+              func LoudMap (string:x) → string
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                !
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string impureDecoy = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func LoudMap (string:x) → string
+                !
+                return x
+              func Go (List<int>:items) → void
+                !
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string incompatibleCallback = """
+            module HigherOrder HigherOrder
+              func LoudMap (string:x) → string
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                ! cw
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string unknownReceiver = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (SomeExternal:items) → void
+                ! cw
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string shadowedCallback = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items, Func<int,int>:LoudMap !) → void
+                ! cw
+                let r = items.ConvertAll(LoudMap)
+            """;
+        var rejected = CompileNative(undeclared);
+        AssertCwRejected(rejected);
+        var accepted = CompileNative(declared);
         Assert.False(accepted.HasErrors, string.Join("; ", accepted.Diagnostics));
         Assert.Equal(SelectedClrCall(rejected), SelectedClrCall(accepted));
 
-        static (string Call, string Callback) SelectedClrCall(CompilationResult result)
+        var pure = CompileNative(pureDecoy);
+        Assert.False(pure.HasErrors, string.Join("; ", pure.Diagnostics));
+        Assert.Equal(SelectedClrCall(accepted), SelectedClrCall(pure));
+        var impure = CompileNative(impureDecoy);
+        AssertCwRejected(impure);
+        Assert.Equal(SelectedClrCall(rejected), SelectedClrCall(impure));
+
+        foreach (var source in new[] { incompatibleCallback, unknownReceiver, shadowedCallback })
+        {
+            var unknown = CompileNative(source);
+            Assert.True(unknown.HasErrors);
+            var unresolved = Assert.Single(unknown.Diagnostics,
+                diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.Contains(".ConvertAll", unresolved.Message);
+            var forbidden = Assert.Single(unknown.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.ForbiddenEffect, forbidden.Code);
+            Assert.Contains("Function 'Go' uses effect 'unknown' but does not declare it", forbidden.Message);
+            var (model, invocation) = ClrCall(unknown, valid: false);
+            Assert.Null(Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model, invocation).Symbol);
+            if (source == shadowedCallback)
+            {
+                var parameter = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IParameterSymbol>(
+                    Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model,
+                        invocation.ArgumentList.Arguments.Single().Expression).Symbol);
+                Assert.Equal("LoudMap", parameter.Name);
+                Assert.Equal("System.Func<int, int>", parameter.Type.ToDisplayString());
+            }
+        }
+
+        static CompilationResult CompileNative(string source) =>
+            Calor.Compiler.Program.Compile(NativeSource(source, source));
+
+        static void AssertCwRejected(CompilationResult result)
+        {
+            Assert.True(result.HasErrors);
+            var error = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.ForbiddenEffect, error.Code);
+            Assert.Equal("Function 'Go' uses effect 'cw' but does not declare it", error.Message);
+        }
+
+        static (Microsoft.CodeAnalysis.SemanticModel Model,
+            Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax Invocation) ClrCall(
+                CompilationResult result, bool valid)
         {
             var generated = new Calor.Compiler.CodeGen.CSharpEmitter().Emit(result.Ast!);
             var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
@@ -846,13 +940,19 @@ var x = 1;
                 "StrictnessMethodGroup", [tree], TestHarness.CompilationReferences,
                 new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
                    Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
-            Assert.DoesNotContain(compilation.GetDiagnostics(),
-                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            Assert.Equal(valid, !compilation.GetDiagnostics().Any(
+                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
             var invocation = Assert.Single(tree.GetRoot().DescendantNodes()
                 .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>(),
                 syntax => syntax.Expression is Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax
                    { Name.Identifier.ValueText: "ConvertAll" });
             var model = compilation.GetSemanticModel(tree);
+            return (model, invocation);
+        }
+
+        static (string Call, string Callback) SelectedClrCall(CompilationResult result)
+        {
+            var (model, invocation) = ClrCall(result, valid: true);
             var call = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(
                 Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model, invocation).Symbol);
             Assert.Equal(
