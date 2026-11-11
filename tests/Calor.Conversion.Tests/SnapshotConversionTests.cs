@@ -434,7 +434,8 @@ public class SnapshotConversionTests
 
         foreach (var snippet in ConversionCatalog.SupportedSnippets)
         {
-            var result = TestHelpers.ConvertCSharp(snippet.CSharpSource, $"Test_{snippet.Id.Replace("-", "_")}");
+            var moduleName = $"Test_{snippet.Id.Replace("-", "_")}";
+            var result = TestHelpers.ConvertCSharp(snippet.CSharpSource, moduleName);
 
             if (!result.Success || result.CalorSource == null)
             {
@@ -442,10 +443,18 @@ public class SnapshotConversionTests
                 continue;
             }
 
-            if (!result.CalorSource.Contains("§M{"))
+            if (!result.CalorSource.StartsWith($"module {moduleName} ", StringComparison.Ordinal))
             {
-                failures.Add($"[{snippet.Id}] {snippet.Description}: missing §M module tag");
+                failures.Add($"[{snippet.Id}] {snippet.Description}: missing native module declaration");
+                continue;
             }
+
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(result.CalorSource, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            if (diagnostics.HasErrors)
+                failures.Add($"[{snippet.Id}] {snippet.Description}: " + string.Join("; ", diagnostics.Errors));
+            else if (module.Name != moduleName)
+                failures.Add($"[{snippet.Id}] {snippet.Description}: module name changed to '{module.Name}'");
         }
 
         Assert.Empty(failures);
