@@ -6543,8 +6543,21 @@ public sealed class EffectEnforcementPass
                         && Binding.NullabilityChecker.GetMethodInputArrayType(receiver) is not null
                             ? Binding.Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType)
                             : receiver.Type;
+                    var parameterTypes = bound.ResolvedParameterTypes;
+                    var extension = method.ReducedFrom
+                        ?? (method is { IsExtensionMethod: true, IsStatic: true } ? method : null);
+                    if (extension is not null && !extension.Locations.Any(location => location.IsInSource))
+                    {
+                        // ReducedFrom is a definition: restore the selected construction
+                        // before looking up the static provider's full signature.
+                        if (method.ReducedFrom is not null && extension.IsGenericMethod)
+                            extension = extension.ConstructedFrom.Construct(method.TypeArguments.ToArray());
+                        effectReceiver = Binding.Metadata.MetadataBinderResult.ToNominalBoundType(extension.ContainingType);
+                        parameterTypes = extension.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray();
+                        evaluated = evaluated.Union(InferSelectedExtensionCallbacks(call, bound, method, extension));
+                    }
                     var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
-                        effectReceiver, method.Name, bound.ResolvedParameterTypes));
+                        effectReceiver, method.Name, parameterTypes));
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                         return evaluated.Union(resolution.Effects);
                 }
@@ -6627,6 +6640,62 @@ public sealed class EffectEnforcementPass
                         .Union(RecordAssumption(
                             "calls through an expression-valued target whose callee cannot be resolved"));
             }
+        }
+
+        private EffectSet InferSelectedExtensionCallbacks(
+            ExpressionCallNode call, BoundCallExpression bound, CS.IMethodSymbol method, CS.IMethodSymbol extension)
+        {
+            var effects = EffectSet.Empty;
+            if (method.ReducedFrom is not null
+                && extension.Parameters[0].Type.TypeKind == CS.TypeKind.Delegate
+                && call.TargetExpression is FieldAccessNode member && bound.Receiver is { } receiver)
+                effects = effects.Union(ChargeCallback(member.Target, receiver));
+            if (!method.Parameters.Any(parameter => parameter.Type.TypeKind == CS.TypeKind.Delegate))
+                return effects;
+            for (var index = 0; index < call.Arguments.Count; index++)
+            {
+                if (bound.ArgumentParameterIndices is not { } indices || index >= indices.Count
+                    || indices[index] < 0 || indices[index] >= method.Parameters.Length)
+                    return effects.Union(ChargeInvokedRow("an extension callback",
+                        (PolyRow.Unknown, "the selected callback argument mapping is unavailable"), call.Span));
+                if (method.Parameters[indices[index]].Type.TypeKind == CS.TypeKind.Delegate)
+                    effects = effects.Union(ChargeCallback(call.Arguments[index], bound.Arguments[index]));
+            }
+            return effects;
+
+            EffectSet ChargeCallback(ExpressionNode argument, BoundExpression value)
+            {
+                var function = AstScopeFunction();
+                var owner = function?.Name ?? _context.CurrentFunctionId;
+                var row = argument switch
+                {
+                    ReferenceNode reference => ResolveInvokedValueRow(
+                        reference.Name, value.Type.DisplayString, reference.Span),
+                    LambdaExpressionNode lambda => LambdaRow(lambda),
+                    TypeOperationNode { Operation: TypeOp.Cast, Operand: LambdaExpressionNode lambda } => LambdaRow(lambda),
+                    CallExpressionNode callback => ReturnedValueRow(callback.Target, callback.Span, null, owner),
+                    ExpressionCallNode { TargetExpression: FieldAccessNode } callback =>
+                        ReturnedValueRow("<expression-call>", callback.Span, null, owner),
+                    _ => null
+                };
+                if (row is { } callbackRow && function is not null)
+                {
+                    var declared = PolyRow.FromDeclaration(function.Effects);
+                    foreach (var (ordinal, variable) in callbackRow.Row.Variables)
+                        if (!declared.Variables.ContainsKey(ordinal))
+                            _context.Invocations?.ReportUndeclaredEffectVariable(
+                                _context.CurrentFunctionId, function.Effects?.Span ?? function.Span,
+                                $"Function '{owner}' uses effect variable '{variable}' but does not declare it"
+                                + $"\n  Effect row: charged by an extension callback (row: {callbackRow.Row.Display()})");
+                }
+                return ChargeInvokedRow($"a callback passed to '{extension.Name}'",
+                    row ?? (PolyRow.Unknown, "the selected callback value has no determinable effect row"), argument.Span);
+            }
+
+            (PolyRow Row, string Why) LambdaRow(LambdaExpressionNode lambda) =>
+                (lambda.Effects is not null ? PolyRow.From(lambda.Effects)
+                    : _context.LambdaBodyRow?.Invoke(lambda) ?? PolyRow.Unknown,
+                    "the selected callback lambda has no determinable body row");
         }
 
         private EffectSet InferFromCallExpression(CallExpressionNode call)

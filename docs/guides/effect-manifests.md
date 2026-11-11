@@ -118,6 +118,14 @@ When resolving effects for a method call, the resolver checks these sources in o
 5. **`namespaceDefaults`** - Namespace pattern match
 6. **Unknown** - Method effects are unknown
 
+For a metadata-selected extension call, lookup uses the actual static provider and
+its full constructed signature, including the receiver parameter. For example,
+`values.Count()` selects `System.Linq.Enumerable.Count<int>(IEnumerable<int>)`,
+not an instance method on `IEnumerable<int>`. A name match alone cannot authorize
+an unresolved overload such as `values.Where()`. Receiver and argument evaluation
+effects still count; delegate arguments also contribute their own effect rows.
+An unknown callback row remains unknown even when the provider has a contract.
+
 ## Manifest Search Locations
 
 Manifests are loaded from multiple locations (later sources override earlier):

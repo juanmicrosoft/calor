@@ -18,6 +18,297 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData("values.Count()")]
+    [InlineData("values.Skip(1).Count()")]
+    [InlineData("values.Concat(values).Count()")]
+    public void SelectedMetadataExtension_UsesItsActualProviderIncludingChains(string expression)
+    {
+        var source = $$"""
+            module SelectedExtensions
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<int>:values) → int
+                !
+                return {{expression}}
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().ToArray();
+        Assert.NotEmpty(calls);
+        Assert.All(calls, call =>
+        {
+            var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.NotNull(selected.ReducedFrom);
+            Assert.Equal("System.Linq.Enumerable", selected.ContainingType.ToDisplayString());
+            Assert.False(selected.Locations.Any(location => location.IsInSource));
+        });
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("int", false, "cw")]
+    [InlineData("int", true, "cw")]
+    [InlineData("string", false, "fs:r")]
+    [InlineData("string", true, "fs:r")]
+    public void SelectedMetadataExtension_UsesTheConstructedUnreducedSignature(
+        string elementType, bool staticCall, string effect)
+    {
+        var (ast, bound, diagnostics) = Bind($$"""
+            module SelectedSignature
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<{{elementType}}>:values) → int
+                !
+                return {{(staticCall ? "Enumerable.Count(values)" : "values.Count()")}}
+            """);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(staticCall, selected.IsStatic);
+        Assert.Equal(elementType, Assert.Single(selected.TypeArguments).ToDisplayString());
+        var loader = new ManifestLoader(loadUserLevelManifests: false);
+        loader.LoadFromJson("""
+            {
+              "version": "1.0",
+              "mappings": [{
+                "type": "System.Linq.Enumerable",
+                "methods": {
+                  "Count(System.Collections.Generic.IEnumerable<int>)": ["cw"],
+                  "Count(System.Collections.Generic.IEnumerable<string>)": ["fs:r"]
+                }
+              }]
+            }
+            """, "selected-extension-signatures");
+        new EffectEnforcementPass(diagnostics, resolver: new EffectResolver(loader)).Enforce(ast);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains($"'{effect}'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("values.Where()")]
+    [InlineData("values.Where(1)")]
+    [InlineData("values.Count(true)")]
+    [InlineData("values.Missing()")]
+    public void UnselectedMetadataExtension_CannotBorrowANameOnlyContract(string expression)
+    {
+        var source = $$"""
+            module InvalidExtension
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<int>:values) → object
+                !
+                return {{expression}}
+            """;
+        var (_, bound, _) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedMetadataMethod);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void SelectedMetadataExtension_AnotherProviderUsesOnlyItsOwnAuthority()
+    {
+        const string source = """
+            module OtherProvider
+              using System.Linq
+              func Use (IQueryable<int>:values) → int
+                !
+                return values.Count()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal("System.Linq.Queryable", call.ResolvedMetadataMethod?.ContainingType.ToDisplayString());
+        var loader = new ManifestLoader(loadUserLevelManifests: false);
+        loader.LoadFromJson("""
+            {
+              "version": "1.0",
+              "mappings": [{
+                "type": "System.Linq.Queryable",
+                "methods": { "Count(System.Linq.IQueryable<int>)": ["cw"] }
+              }]
+            }
+            """, "selected-queryable-signature");
+        var ast = Parse(source);
+        new EffectEnforcementPass(diagnostics, resolver: new EffectResolver(loader)).Enforce(ast);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SourceExtension_DoesNotBorrowTheSameNamedMetadataContract()
+    {
+        const string source = """
+            module SourceExtensions
+              enum Mode
+                First
+              module Enumerable
+                func Count (this Mode:value) → int
+                  ! cw
+                  System.Console.WriteLine("source extension")
+                  return 1
+              func Use (Mode:value) → int
+                !
+                return value.Count()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => call.IsSourceExtensionCall);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.NotNull(call.ResolvedSymbol);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(" ! cw", "", false, true)]
+    [InlineData(" ! cw", "cw", false, false)]
+    [InlineData("", "cw", false, true)]
+    [InlineData(" !", "", false, false)]
+    [InlineData(" ! cw", "", true, true)]
+    [InlineData(" ! cw", "cw", true, false)]
+    [InlineData("", "cw", true, true)]
+    [InlineData(" !", "", true, false)]
+    public void SelectedMetadataExtension_ChargesTheSelectedCallbackRowAndNamedArgumentMap(
+        string callbackRow, string callerEffects, bool staticCall, bool error)
+    {
+        var source = $$"""
+            module SelectedCallbackRows
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<int>:values, Func<int,int>:selector{{callbackRow}}) → IEnumerable<int>
+                ! {{callerEffects}}
+                return {{(staticCall ? "Enumerable.Select(selector: selector, source: values)" : "values.Select(selector: selector)")}}
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal("Select", call.ResolvedMetadataMethod?.Name);
+        Assert.Equal(staticCall ? new[] { 1, 0 } : new[] { 0 }, call.ArgumentParameterIndices);
+        var compiled = Program.Compile(source);
+        Assert.Equal(error, compiled.HasErrors);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        if (callbackRow.Length == 0)
+            Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        else if (error)
+            Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SelectedMetadataExtension_StillChargesATypedLambdaValue()
+    {
+        const string source = """
+            module TypedExtensionCallbacks
+              using System.Linq
+              using System.Collections.Generic
+              func Loud (int:value) → int
+                ! cw
+                System.Console.WriteLine(value)
+                return value
+              func Use (IEnumerable<int>:values) → IEnumerable<int>
+                !
+                let Func<int,int>:selector ! cw = (int:value) ! cw => Loud(value)
+                return values.Select(selector)
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => call.ResolvedMetadataMethod?.Name == "Select");
+        Assert.NotNull(call.ResolvedMetadataMethod!.ReducedFrom);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SelectedMetadataExtension_PreservesPolymorphicCallbackCharges(bool declaresVariable)
+    {
+        var source = $$"""
+            module PolymorphicExtension
+              using System.Linq
+              using System.Collections.Generic
+              func Use <! e> (IEnumerable<int>:values, Func<int,int>:selector ! e) → IEnumerable<int>
+                ! {{(declaresVariable ? "e" : "")}}
+                return values.Select(selector)
+            """;
+        var compiled = Program.Compile(source);
+        Assert.Equal(!declaresVariable, compiled.HasErrors);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        if (!declaresVariable)
+            Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("effect variable 'e'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SelectedMetadataExtension_StillEvaluatesReceiverAndOrdinaryArguments()
+    {
+        const string source = """
+            module ExtensionEvaluation
+              using System.Linq
+              using System.Collections.Generic
+              func Receiver (IEnumerable<int>:values) → IEnumerable<int>
+                ! cw
+                System.Console.WriteLine("receiver")
+                return values
+              func Argument () → int
+                ! cw
+                System.Console.WriteLine("argument")
+                return 1
+              func Use (IEnumerable<int>:values) → int
+                !
+                return Receiver(values).Skip(Argument()).Count()
+            """;
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Loud")]
+    [InlineData("(int:value) ! cw => Loud(value)")]
+    public void MetadataExtension_CallbackEffectsRemainChargedEvenWithoutMetadataSelection(string callback)
+    {
+        var source = $$"""
+            module ExtensionCallbacks
+              using System.Linq
+              using System.Collections.Generic
+              func Loud (int:value) → int
+                ! cw
+                System.Console.WriteLine(value)
+                return value
+              func Use (IEnumerable<int>:values) → IEnumerable<int>
+                !
+                return values.Select({{callback}})
+            """;
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        var permissive = Program.Compile(source, null, new CompilationOptions
+        {
+            UnknownCallPolicy = UnknownCallPolicy.Permissive,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.Contains(permissive.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [InlineData("text")]
     [InlineData("\"Q\"")]
     public void NativeStringIndex_BindsTheActualCharMethodAndPreservesRuntimeValue(string receiver)
