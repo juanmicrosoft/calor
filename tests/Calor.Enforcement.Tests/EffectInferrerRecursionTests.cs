@@ -1,4 +1,5 @@
 using System.Text;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
@@ -616,6 +617,39 @@ public class EffectInferrerRecursionTests
         Assert.Equal(afterFirst * 2, bound.CycleStops);
     }
 
+    [Fact]
+    public void CurrentNative_DeepNestingAtTwoHundredLinks_CompletesFailClosed()
+    {
+        var source = NestedChainCurrentNative(links: 200);
+        var pending = new Stack<(AstNode Node, int Depth)>();
+        pending.Push((Parse(source), 0));
+        var conditionals = 0;
+        var calls = 0;
+        var maxDepth = 0;
+        while (pending.TryPop(out var frame))
+        {
+            var depth = frame.Depth;
+            if (frame.Node is IfStatementNode)
+            {
+                conditionals++;
+                maxDepth = Math.Max(maxDepth, ++depth);
+            }
+            if (frame.Node is ExpressionCallNode) calls++;
+            foreach (var child in RecursiveAstWalker.GetAllChildren(frame.Node))
+                pending.Push((child, depth));
+        }
+        Assert.Equal(200, conditionals);
+        Assert.Equal(200, maxDepth);
+        Assert.Equal(201, calls);
+
+        var (bag, _) = Enforce(source);
+
+        Assert.Contains(bag, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(bag, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("uses effect 'unknown'", StringComparison.Ordinal));
+        Assert.DoesNotContain(bag, diagnostic => diagnostic.Code == DiagnosticCode.AnalysisICE);
+    }
+
     // ===== helpers =====
 
     /// <summary>
@@ -669,6 +703,24 @@ public class EffectInferrerRecursionTests
                 $"{indent}  §B{{{Link(i)}}} §C{{{(i == 1 ? "items" : Link(i - 1))}.Where}} §/C");
         }
         sb.AppendLine($"{new string(' ', 4 + (links * 2))}§C{{{Link(links)}.ToList}} §/C");
+        return sb.ToString();
+    }
+
+    // Keep the historical builder and its AST-resolution counters above intact.
+    // Invalid Where() calls stay unresolved; this pin checks native traversal safety.
+    private static string NestedChainCurrentNative(int links)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("module Nested Nested");
+        sb.AppendLine("  func Run private (List<int>:items, bool:flag) → void");
+        for (var i = 1; i <= links; i++)
+        {
+            var indent = new string(' ', 4 + ((i - 1) * 2));
+            sb.AppendLine($"{indent}if flag");
+            sb.AppendLine(
+                $"{indent}  let {Link(i)} = {(i == 1 ? "items" : Link(i - 1))}.Where()");
+        }
+        sb.AppendLine($"{new string(' ', 4 + (links * 2))}{Link(links)}.ToList()");
         return sb.ToString();
     }
 

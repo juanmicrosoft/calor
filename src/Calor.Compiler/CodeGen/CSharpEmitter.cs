@@ -4015,57 +4015,80 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(IfStatementNode node)
     {
-        var condition = node.Condition.Accept(this);
+        var frames = new Stack<(IfStatementNode Node, IReadOnlyList<StatementNode> Body,
+            int Statement, int Clause, bool Mapped, bool Nested)>();
+        var initialDepth = _statementDepth;
 
-        AppendLine($"if ({condition})");
-        AppendLine("{");
-        Indent();
-
-        PushDeclScope();
-        foreach (var stmt in node.ThenBody)
+        void BeginBody(string header)
         {
-            EmitStatement(stmt, _emissionContext);
-        }
-        PopDeclScope();
-
-        Dedent();
-        AppendLine("}");
-
-        // Emit ELSEIF clauses
-        foreach (var elseIf in node.ElseIfClauses)
-        {
-            var elseIfCondition = elseIf.Condition.Accept(this);
-            AppendLine($"else if ({elseIfCondition})");
+            AppendLine(header);
             AppendLine("{");
             Indent();
-
             PushDeclScope();
-            foreach (var stmt in elseIf.Body)
-            {
-                EmitStatement(stmt, _emissionContext);
-            }
-            PopDeclScope();
-
-            Dedent();
-            AppendLine("}");
         }
 
-        // Emit ELSE clause
-        if (node.ElseBody != null)
+        BeginBody($"if ({node.Condition.Accept(this)})");
+        frames.Push((node, node.ThenBody, 0, 0, false, false));
+        try
         {
-            AppendLine("else");
-            AppendLine("{");
-            Indent();
-
-            PushDeclScope();
-            foreach (var stmt in node.ElseBody)
+            while (frames.TryPop(out var frame))
             {
-                EmitStatement(stmt, _emissionContext);
-            }
-            PopDeclScope();
+                if (frame.Statement < frame.Body.Count)
+                {
+                    var statement = frame.Body[frame.Statement];
+                    frames.Push(frame with { Statement = frame.Statement + 1 });
+                    if (statement is IfStatementNode nested)
+                    {
+                        // Conditional visitors write directly; avoid recursive dispatch.
+                        _statementDepth++;
+                        var mapped = TryBeginLineMapping(nested);
+                        BeginBody($"if ({nested.Condition.Accept(this)})");
+                        frames.Push((nested, nested.ThenBody, 0, 0, mapped, true));
+                    }
+                    else
+                    {
+                        EmitStatement(statement, _emissionContext);
+                    }
+                    continue;
+                }
 
-            Dedent();
-            AppendLine("}");
+                PopDeclScope();
+                Dedent();
+                AppendLine("}");
+
+                if (frame.Clause < frame.Node.ElseIfClauses.Count)
+                {
+                    var clause = frame.Node.ElseIfClauses[frame.Clause];
+                    BeginBody($"else if ({clause.Condition.Accept(this)})");
+                    frames.Push(frame with
+                    {
+                        Body = clause.Body,
+                        Statement = 0,
+                        Clause = frame.Clause + 1
+                    });
+                }
+                else if (frame.Clause == frame.Node.ElseIfClauses.Count
+                    && frame.Node.ElseBody is { } elseBody)
+                {
+                    BeginBody("else");
+                    frames.Push(frame with
+                    {
+                        Body = elseBody,
+                        Statement = 0,
+                        Clause = frame.Clause + 1
+                    });
+                }
+                else if (frame.Nested)
+                {
+                    AppendLine();
+                    EndLineMapping(frame.Mapped);
+                    _statementDepth--;
+                }
+            }
+        }
+        finally
+        {
+            _statementDepth = initialDepth;
         }
 
         return "";
