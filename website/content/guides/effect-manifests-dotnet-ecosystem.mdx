@@ -52,21 +52,26 @@ Core .NET types the compiler has always known about, plus recent additions:
 
 ### Framework Interfaces (Tier B)
 
-Examples of framework policy entries:
+Examples of framework policy entries, not proof that a project call binds to
+that policy:
 
 | Type | Method | Effect | Why |
 |------|--------|--------|-----|
-| `ILogger.LogInformation` | All log methods | `cw` | Observable output |
+| `ILogger`, `LoggerExtensions` | `Log`, `LogInformation`, other listed log methods | `cw` | Observable output |
 | `DbContext.SaveChanges` | SaveChanges/Async | `db:w` | Database write |
 | `DbContext.Find` | Find/FindAsync | `db:r` | Database read |
-| `IConfiguration.GetSection` | GetSection, GetValue | `env:r` | Environment/config read |
+| `IConfiguration` | GetSection, GetChildren | `env:r` | Environment/config read |
 | `ControllerBase.Ok` | Ok, NotFound, BadRequest | pure | No side effects |
-| `HttpResponse.WriteAsync` | WriteAsync, Redirect | `net:w` | Network write |
-| `IHost.RunAsync` | Run, Start, Stop | `net:rw` | Starts network listener |
-| `IServiceProvider.GetService` | GetService | pure | DI resolution |
+| `HttpResponse` | Redirect, StartAsync, CompleteAsync | `net:w` | Network write |
+| `IHost` | StartAsync, StopAsync | `net:rw` | Host lifecycle policy |
+| `IServiceScopeFactory` | CreateScope | pure | DI scope policy |
 | `IOptions<T>.Value` | Value getter | pure | Configuration read |
-| `DbSet<T>.ToListAsync` | All query extensions | `db:r` | Database query |
-| `DatabaseFacade.Migrate` | Migrate, EnsureCreated | `db:w` | Schema modification |
+| `EntityFrameworkQueryableExtensions` | ToListAsync, other listed query methods | `db:r` | Database query |
+| `DatabaseFacade` | EnsureCreated, EnsureDeleted | `db:w` | Schema modification |
+
+Extension-call syntax does not change the declaring type. For example,
+`LogInformation` is a `LoggerExtensions` method, not an `ILogger` member.
+An entry under the wrong owner cannot supply missing CLR binding facts.
 
 ### Ecosystem Libraries (4 manifests)
 
@@ -99,6 +104,18 @@ name is not proof of its CLR identity. A call such as `client.GetAsync(...)`
 must retain its actual receiver and selected method; unresolved calls do not
 become native coverage merely because a similarly named manifest entry exists.
 
+The compiler needs the actual selected source declarations or referenced
+assembly metadata. A `using` directive changes name lookup; it does not add an
+assembly reference. In an SDK project, restore the real package/project
+references and build with `Calor.Sdk`, which passes resolved assembly paths to
+compilation and generated-C# validation. The standalone examples here use only
+the tool's available framework references.
+
+If a call remains unknown, adding a guessed effect row is not a resolution.
+Default enforcement retains the unknown charge; a known row such as `! cw`
+cannot cover it. Neither a successful manifest lookup nor generated C# alone
+proves that the complete project has valid effect authority.
+
 ### Resolution Priority
 
 Manifests are loaded in priority order (higher overrides lower):
@@ -113,6 +130,10 @@ Manifests are loaded in priority order (higher overrides lower):
 ## Adding Custom Manifests
 
 For types not covered by the built-in manifests, create a `.calor-effects.json` file in your project root:
+
+The following is a **schema example**: `MyApp` types are placeholders, not
+library declarations or a runnable program. Replace them with the actual
+declaring types and reviewed policies for your referenced implementation.
 
 ```json
 {
@@ -158,6 +179,13 @@ calor import Serilog --project .
 calor import path/to/My.Library.dll --references path/to/dependencies
 ```
 
+Here `--project` selects the directory for project-local policies and default
+output; it does not restore packages or add compilation references.
+`--references` supplies real dependencies for import's IL analysis. Review the
+generated policy, then install it in one of the locations above: an arbitrary
+`<package>.calor-effects.json` in the project root is not the project-local
+`.calor-effects.json`.
+
 Fully resolved concrete IL chains are emitted with `inferred` provenance.
 Existing curated coverage is reported but not duplicated. Unresolved members
 are listed as `Calor1351` and excluded—they are never represented by an empty
@@ -190,6 +218,9 @@ Broader effects encompass narrower ones: `fs:rw` covers both `fs:r` and `fs:w`.
 ## CLI Tools
 
 ### Resolve effects for a method
+
+These are **text-only policy lookups**, not compilations. They do not select a
+CLR overload, validate a receiver or prove that a project references the API:
 
 ```bash
 calor effects resolve Console.WriteLine    # → cw

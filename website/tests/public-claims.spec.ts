@@ -48,6 +48,15 @@ test('Calor 0.22 nullability guide is discoverable and its internal links and an
   }
   await page.goto(`${base}${guide}`);
   const article = page.locator('article');
+  // Preserve the original claims; only their documented native spellings changed.
+  const nativeClaims = new Map([
+    ["Calor 0.22's bounded receiving-boundary checks",
+      'the receiving-boundary checks were introduced in Calor 0.22'],
+    ['?[str]', 'string[]?'],
+    ['[?str]', 'string?[]'],
+    ['List<?str>', 'List<string?>'],
+    ['?Widget', 'Widget?'],
+  ]);
   for (const text of ['Calor0272', 'Calor0273', 'Calor0274', 'Oblivious',
     'constructor inputs', 'not whole-program null safety', 'D3', 'D12', 'D14',
     "Calor 0.22's bounded receiving-boundary checks", '?[str]', '[?str]', 'List<?str>', '?Widget',
@@ -57,7 +66,7 @@ test('Calor 0.22 nullability guide is discoverable and its internal links and an
     'An early return after a null test does not currently narrow a later method argument',
     'This is a manual migration, not an automatic converter rewrite',
     'remains open']) {
-    await expect(article).toContainText(text);
+    await expect(article).toContainText(nativeClaims.get(text) ?? text);
   }
   const sidebar = page.getByRole('navigation', { name: 'Documentation', exact: true });
   await expect(sidebar.getByRole('link', { name: 'Nullability and .NET Interop', exact: true }))

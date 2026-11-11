@@ -10,6 +10,9 @@ In a single-file project, Calor's effect system checks that every function's `!`
 
 This guide explains how Calor enforces that boundary — and what it means for your project layout, your MSBuild integration, and your build performance.
 
+Both source files must be inputs to the same compilation. A familiar module
+name or a `using` directive alone does not supply the callee's declaration.
+
 ---
 
 ## The Problem
@@ -56,7 +59,8 @@ to 'SaveOrder' (in module 'OrderService') but does not declare it.
 The `Calor0410` error is the cross-module check. The `Calor0417` warning is explained
 under "Undeclared public functions" below.
 
-Fix by adding the effect to the caller:
+Fix by adding the effect to the caller. This is a **function fragment** to use
+inside `Handler.calr`, not a complete file:
 
 ```calor
 func HandleRequest () → void
@@ -97,7 +101,7 @@ and `Calor0421` stay errors under every flag. See
 
 ## Bare-name vs. qualified calls
 
-The supported lookup forms are:
+The supported lookup forms are shown as **call fragments**, not complete files:
 
 ```calor
 SaveOrder()                     // bare name, when unambiguous across modules
@@ -167,6 +171,17 @@ Both patterns below compile and run. The module-qualified form resolves to the
 callee's actual generated C# container and preserves the same declared effect
 boundary as the using-directive form.
 
+In the complete callee above, `module OrderService OrderService` uses the first
+name as the file label and the second as the CLR namespace. Its root function
+emits in `OrderService.OrderServiceModule`; the label is not a static class.
+A nested `module` would declare a named static container.
+
+The multi-file driver uses the selected source declaration to qualify the
+generated call. The `using` directive below imports the namespace, not the
+callee's source or its effect contract. This is not a recipe for unresolved
+external calls: those still require actual referenced metadata and effect
+policy.
+
 ### 1. Using directive + bare name
 
 ```calor group=orders-using
@@ -179,6 +194,9 @@ module Handler
 ```
 
 ### 2. Module-qualified call
+
+This **function fragment** replaces the caller in `Handler.calr`; compile it
+with the complete `OrderService.calr` above:
 
 ```calor
 func HandleRequest () → void

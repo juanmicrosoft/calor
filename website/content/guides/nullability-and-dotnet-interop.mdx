@@ -167,6 +167,12 @@ module PatternSafe
 ```
 
 These are explicit consumption constructs, not whole-program flow analysis.
+Writing `requires input != null` states a precondition; it does not change a
+`string?` parameter into `string` for receiving-boundary checks. Likewise, a
+postcondition written with `=>` does not suppress these diagnostics. Use an
+explicit consumption construct where a non-null value is required. See
+[Contracts](/docs/syntax-reference/contracts/) for runtime modes and proof limits.
+
 Calor 0.22 also transfers some local guard facts, but loops, mutation,
 aliases, callbacks, and repeated member reads make arbitrary narrowing unsafe.
 Do not assume that a prior null test proves every later use safe. See
