@@ -636,7 +636,6 @@ var x = 1;
     [Fact]
     public void C1_PpBlock_StatementLeg_ChargesBranchEffects()
     {
-        // The native statement-PP call remains unknown, rather than proving cw.
         // Review C1 (statement leg): effects inside a §PP conditional block are
         // charged (union of branches) — a §PP body is never silently pure.
         var source = @"
@@ -648,7 +647,13 @@ var x = 1;
       §C{Console.WriteLine} ""hidden effect""
       §/PP{DEBUG}
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module PpHole PpHole
+              func Sneaky public () → void
+                !
+                pp DEBUG
+                  Console.WriteLine("hidden effect")
+            """));
 
         Assert.True(result.HasErrors, "§PP-wrapped effects must be charged");
         Assert.Contains(result.Diagnostics.Errors,

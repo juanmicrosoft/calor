@@ -1406,7 +1406,11 @@ public sealed class CallGraphAnalysis
     private static IEnumerable<BoundNode> DescendantsAndSelf(BoundNode node)
     {
         yield return node;
-        foreach (var child in node.ChildNodes)
+        // Other analyses keep these blocks opaque; call graphs need every branch's selected calls.
+        IEnumerable<BoundNode> children = node is BoundPreprocessorBlock conditional
+            ? conditional.Branches.SelectMany(branch => branch)
+            : node.ChildNodes;
+        foreach (var child in children)
         {
             foreach (var descendant in DescendantsAndSelf(child))
                 yield return descendant;

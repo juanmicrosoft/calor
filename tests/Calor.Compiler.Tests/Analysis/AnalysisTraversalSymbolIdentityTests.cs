@@ -19,6 +19,143 @@ public sealed class AnalysisTraversalSymbolIdentityTests
     private static TextSpan Span(int start) => new(start, start + 1, 1, start + 1);
 
     [Fact]
+    public void ConditionalCallGraph_VisitsBothBranchesAndNestedBlocks()
+    {
+        var integer = FunctionSymbol("Pick", "INT", "function:integer",
+            [Variable("value", "INT", "parameter:integer", isParameter: true)]);
+        var text = FunctionSymbol("Pick", "STRING", "function:text",
+            [Variable("value", "STRING", "parameter:text", isParameter: true)]);
+        var caller = Function(FunctionSymbol("Caller", "VOID", "function:caller"),
+        [
+            new BoundPreprocessorBlock(Span(1),
+            [
+                [new BoundReturnStatement(Span(2), new BoundCallExpression(
+                    Span(3), "Pick", [new BoundIntLiteral(Span(4), 1)], "INT", resolvedSymbol: integer))],
+                [new BoundPreprocessorBlock(Span(5),
+                [
+                    [new BoundReturnStatement(Span(6), new BoundCallExpression(
+                        Span(7), "Pick", [new BoundStringLiteral(Span(8), "value")], "STRING", resolvedSymbol: text))],
+                    [new BoundExpressionStatement(Span(9),
+                        new BoundCallExpression(Span(10), "External.Missing", [], "VOID"))]
+                ])]
+            ])
+        ]);
+        var graph = CallGraphAnalysis.BuildResolved(
+            Module([Function(integer, []), Function(text, []), caller]));
+
+        var edges = graph.ForwardGraph[caller.SymbolId];
+        Assert.Equal(2, edges.Count);
+        Assert.Contains(edges, edge => edge.Callee == integer.Id);
+        Assert.Contains(edges, edge => edge.Callee == text.Id);
+        Assert.Equal("External.Missing", Assert.Single(graph.UnresolvedCalls).Target);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ConditionalCallGraph_RetainsSelectedMetadataAndChargesItsRow(bool declared)
+    {
+        var source = $$"""
+            module ConditionalMetadata ConditionalMetadata
+              func Probe public () → void
+                {{(declared ? "! cw" : "!")}}
+                pp DEBUG
+                  Console.WriteLine("branch")
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var function = Assert.Single(module.Functions);
+        var branch = Assert.IsType<PreprocessorDirectiveNode>(Assert.Single(function.Body));
+        var call = Assert.IsType<ExpressionCallNode>(
+            Assert.IsType<ExpressionStatementNode>(Assert.Single(branch.Body)).Expression);
+        var bound = Assert.IsType<BoundCallExpression>(
+            CallGraphAnalysis.Build(module).ComputedMemberCall(function.Id, call.Span));
+        var selected = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(bound.ResolvedMetadataMethod);
+        Assert.Equal("System.Console", selected.ContainingType.ToDisplayString());
+        Assert.True(selected.IsStatic);
+        Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_String, Assert.Single(selected.Parameters).Type.SpecialType);
+
+        var result = Program.Compile(source, "conditional-metadata.calr");
+        Assert.Equal(!declared, result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        if (!declared)
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Probe'") && diagnostic.Message.Contains("'cw'"));
+    }
+
+    [Fact]
+    public void ConditionalCallGraph_RetainsSelectedOverloadAcrossNestedBranches()
+    {
+        const string source = """
+            module ConditionalOverloads
+              func Pick public (int:value) → int
+                !
+                return value
+              func Pick public (string:value) → string
+                !
+                return value
+              func Run public () → int
+                !
+                pp DEBUG
+                  pp FEATURE
+                    return Pick(7)
+                  pp else
+                    return Pick(8)
+                pp else
+                  return Pick(9)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var caller = bound.Functions.Single(function => function.Symbol.Name == "Run");
+        var integer = bound.Functions.Single(function =>
+            function.Symbol.Name == "Pick" && function.Symbol.ReturnType == "int");
+        var edges = CallGraphAnalysis.BuildResolved(bound).ForwardGraph[caller.SymbolId];
+        Assert.Equal(3, edges.Count);
+        Assert.All(edges, edge => Assert.Equal(integer.SymbolId, edge.Callee));
+        var graph = CallGraphAnalysis.Build(module);
+        var astCaller = module.Functions.Single(function => function.Name == "Run");
+        var astInteger = module.Functions.Single(function =>
+            function.Name == "Pick" && function.Output!.TypeName == "int");
+        var astEdges = graph.GetCallees(astCaller.Id).ToArray();
+        Assert.Equal(3, astEdges.Length);
+        Assert.All(astEdges, edge => Assert.Equal(astInteger.Id, edge.CalleeId));
+        var result = Program.Compile(source, "conditional-overloads.calr");
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+    }
+
+    [Fact]
+    public void ConditionalCallGraph_UnknownMetadataRemainsUnknown()
+    {
+        const string source = """
+            module ConditionalUnknown
+              func Probe public () → void
+                ! cw
+                pp DEBUG
+                  Console.DoesNotExist("branch")
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var function = Assert.Single(module.Functions);
+        var branch = Assert.IsType<PreprocessorDirectiveNode>(Assert.Single(function.Body));
+        var call = Assert.IsType<ExpressionCallNode>(
+            Assert.IsType<ExpressionStatementNode>(Assert.Single(branch.Body)).Expression);
+        var bound = Assert.IsType<BoundCallExpression>(
+            CallGraphAnalysis.Build(module).ComputedMemberCall(function.Id, call.Span));
+        Assert.Null(bound.ResolvedMetadataMethod);
+        var result = Program.Compile(source, "conditional-unknown.calr");
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("DoesNotExist"));
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'unknown'"));
+    }
+
+    [Fact]
     public void BoundAnalyses_FindNestedSeedsThroughStructuralWrappers()
     {
         var parameter = Variable("items", "INT[]", "local:items");
