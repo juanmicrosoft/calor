@@ -69,16 +69,21 @@ public sealed class PrimitiveBoundType : BoundType
     public override string DisplayString { get; }
 
     public PrimitiveBoundType(string name, int? bits = null, bool? signed = null)
+        : this(name, bits, signed, null)
+    {
+    }
+
+    internal PrimitiveBoundType(string name, int? bits, bool? signed, string? displayOverride)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Bits = bits;
         Signed = signed;
-        DisplayString = (bits, signed) switch
+        DisplayString = displayOverride ?? ((bits, signed) switch
         {
             (int b, bool s) => $"{name}[bits={b}][signed={s.ToString().ToLowerInvariant()}]",
             (int b, null) => $"{name}[bits={b}]",
             _ => name,
-        };
+        });
     }
 
     public override bool Equals(BoundType? other) =>

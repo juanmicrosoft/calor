@@ -15,6 +15,122 @@ namespace Calor.Compiler.Tests;
 public sealed class ArrayAllocationAnnotationTests
 {
     [Theory]
+    [InlineData("List<int>[]", "values[0]", "int")]
+    [InlineData("List<int>[,]", "values[0, 0]", "int")]
+    [InlineData("List<int>[][]", "values[0][0]", "int")]
+    [InlineData("List<string>[]", "values[0]", "string")]
+    public void MetadataGenericArrayElements_RetainTheSelectedConstructedIdentity(string type, string access, string argument)
+    {
+        var source = $$"""
+            module MetadataArrayElement
+              func Read ({{type}}:values, {{argument}}:value) → bool
+                !
+                return ({{access}}).Contains(value)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(new Parser(
+            new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse());
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var element = Assert.IsType<GenericInstantiationBoundType>(call.Receiver!.Type);
+        Assert.NotNull(element.RoslynSymbol);
+        Assert.True(Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+            element.RoslynSymbol, call.ResolvedMetadataMethod?.ContainingType));
+        Assert.Equal("System.Collections.Generic.List<T>", element.RoslynSymbol!.OriginalDefinition.ToDisplayString());
+        Assert.Equal(NullableAnnotation.NotAnnotated, element.NullableAnnotation);
+        Assert.Equal(argument == "int" ? Microsoft.CodeAnalysis.SpecialType.System_Int32
+                : Microsoft.CodeAnalysis.SpecialType.System_String,
+            Assert.Single(element.RoslynSymbol.TypeArguments).SpecialType);
+        var receiver = call.Receiver switch
+        {
+            BoundArrayAccess indexed => indexed.Array,
+            BoundMultiDimArrayAccess indexed => indexed.Array,
+            _ => throw new InvalidOperationException("Expected an actual array access")
+        };
+        Assert.Same(NullabilityChecker.GetMethodInputArrayType(receiver)!.ElementType, element);
+        var compiled = Program.Compile(source, "metadata-array-element.calr");
+        Assert.Empty(compiled.Diagnostics);
+    }
+
+    [Fact]
+    public void MetadataGenericArrayElements_UseTheSelectedCalleesDeclarationContext()
+    {
+        const string source = """
+            module MetadataArrayDeclarationContext
+              func Read<List> (System.Collections.Generic.List<int>[]:values) → bool
+                !
+                return Get(values)[0].Contains(0)
+              func Get private (System.Collections.Generic.List<int>[]:values) → List<int>[]
+                !
+                return values
+            """;
+        var result = Program.Compile(source, "metadata-array-declaration-context.calr");
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void MetadataGenericArrayElements_StillChargeTheSelectedMutation()
+    {
+        const string source = """
+            module MetadataArrayMutation
+              func Read (List<int>[]:values) → void
+                !
+                values[0].Add(1)
+            """;
+        var rejected = Program.Compile(source, "metadata-array-mutation.calr");
+        Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'mut'", StringComparison.Ordinal));
+        Assert.DoesNotContain(rejected.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Empty(Program.Compile(source.Replace("    !\n", "    ! mut\n", StringComparison.Ordinal),
+            "metadata-array-mutation.calr").Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("List<Missing>[]", "", "")]
+    [InlineData("List<T>[]", "<T>", "")]
+    [InlineData("List<int>[]", "<List>", "")]
+    [InlineData("List<int>[]", "", "  class List<T>\n")]
+    [InlineData("List<@Int32>[]", "", "  class @Int32\n")]
+    public void MetadataGenericArrayElements_DoNotBorrowUnestablishedOrSourceIdentities(
+        string type, string parameters, string declaration)
+    {
+        var source = $$"""
+            module UnestablishedMetadataArray
+            {{declaration}}  func Read{{parameters}} ({{type}}:values) → bool
+                !
+                return (values[0]).Contains(0)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(new Parser(
+            new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse());
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.True(Program.Compile(source, "unestablished-metadata-array.calr").HasErrors);
+    }
+
+    [Theory]
+    [InlineData("int[]", "values[0]")]
+    [InlineData("int[,]", "values[0, 0]")]
+    [InlineData("int[][]", "values[0][0]")]
+    public void PrimitiveArrayElements_KeepCanonicalIdentityAndDeclarationDisplay(string type, string access)
+    {
+        var source = $$"""
+            module PrimitiveArrayDisplay
+              func Read ({{type}}:values) → int
+                !
+                return {{access}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(new Parser(
+            new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse());
+        var result = Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions).Body[0]).Expression!;
+        var element = Assert.IsType<PrimitiveBoundType>(result.Type);
+        Assert.Equal("INT", element.Name);
+        Assert.Equal(new PrimitiveBoundType("INT"), element);
+        Assert.Equal("int", element.DisplayString);
+        Assert.False(result.HasUnknownInferredType);
+    }
+
+    [Theory]
     [InlineData("Cell[]", "copy[0]")]
     [InlineData("Cell[,]", "copy[0, 0]")]
     [InlineData("Cell[][]", "copy[0][0]")]

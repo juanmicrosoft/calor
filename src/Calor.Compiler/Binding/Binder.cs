@@ -406,40 +406,72 @@ public sealed class Binder
 
     private Microsoft.CodeAnalysis.ITypeSymbol? ResolveComputedMetadataType(
         Metadata.MetadataContext context, string typeName)
+        => ResolveComputedMetadataType(context, typeName, _currentNamespaceScopeId,
+            _currentNamespaceIdentity, _currentClassName, null);
+
+    private Microsoft.CodeAnalysis.ITypeSymbol? ResolveComputedMetadataType(
+        Metadata.MetadataContext context, string typeName, string? namespaceScopeId,
+        string? namespaceIdentity, string? containingTypeName, IReadOnlySet<string>? declaredTypeParameters)
     {
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(typeName, out var referent))
         {
-            var inner = ResolveComputedMetadataType(context, referent);
+            var inner = ResolveComputedMetadataType(context, referent, namespaceScopeId,
+                namespaceIdentity, containingTypeName, declaredTypeParameters);
             return inner?.IsValueType == true
                 ? context.TryResolveType("System.Nullable`1")?.Construct(inner)
                 : inner?.WithNullableAnnotation(Microsoft.CodeAnalysis.NullableAnnotation.Annotated);
         }
-        if (GetTypeParameterConstraints(typeName) is not null)
+        if (declaredTypeParameters?.Contains(typeName.TrimStart('@')) == true)
+            return null;
+        if (declaredTypeParameters is not null
+            && TrySplitArrayTypeSpelling(typeName, out var element, out var rank, out var arrayAnnotation,
+                _declaredReferenceAnnotation))
+            return ResolveComputedMetadataType(context, element, namespaceScopeId,
+                    namespaceIdentity, containingTypeName, declaredTypeParameters) is { } arrayElement
+                ? context.HostCompilationForBinder.CreateArrayTypeSymbol(arrayElement, rank)
+                    .WithNullableAnnotation(arrayAnnotation == BoundTypes.NullableAnnotation.Annotated
+                        ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
+                        : arrayAnnotation == BoundTypes.NullableAnnotation.Oblivious
+                            ? Microsoft.CodeAnalysis.NullableAnnotation.None : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated)
+                : null;
+        if (declaredTypeParameters is null && GetTypeParameterConstraints(typeName) is not null)
             return ResolveMetadataTypeParameter(context, typeName);
+        if (declaredTypeParameters is not null
+            && ResolveSourceType(TypeIdentity.ToLookupName(typeName), containingTypeName,
+                namespaceIdentity, namespaceScopeId).Handled)
+            return null;
         if (ResolveClass(typeName) is not null
             || _symbolsById.Values.OfType<TypeSymbol>().Any(type =>
                 type.Name == typeName || type.QualifiedName == TypeIdentity.ToLookupName(typeName)))
             return null;
         if (typeName is "OBJECT" or "object")
-            return context.TryResolveType("System.Object");
+            return PreserveDeclaredAnnotation(context.TryResolveType("System.Object"));
         if (TypeIdentity.TrySplitGeneric(typeName, out var name, out var arguments))
         {
-            if (ResolveTypeSymbol(name, arguments.Count) is not null)
+            if (declaredTypeParameters?.Contains(name.TrimStart('@')) == true
+                || ResolveTypeSymbol(name, arguments.Count) is not null)
                 return null;
             var metadataName = TypeIdentity.MapShortTypeNameToFullName(typeName);
             if (!metadataName.Contains('`'))
                 metadataName = (name is "Func" or "Action" ? $"System.{name}" : name) + $"`{arguments.Count}";
             var scoped = ResolveScopedMetadataType(context, name, arguments.Count,
-                _currentNamespaceScopeId, _currentNamespaceIdentity);
+                namespaceScopeId, namespaceIdentity);
             var definition = scoped.Handled ? scoped.Type : context.TryResolveType(metadataName);
-            var types = arguments.Select(argument => ResolveComputedMetadataType(context, argument)).ToArray();
+            var types = arguments.Select(argument => ResolveComputedMetadataType(context, argument,
+                namespaceScopeId, namespaceIdentity, containingTypeName, declaredTypeParameters)).ToArray();
             return definition is not null && definition.Arity == types.Length && types.All(type => type is not null)
-                ? definition.Construct(types.OfType<Microsoft.CodeAnalysis.ITypeSymbol>().ToArray())
+                ? PreserveDeclaredAnnotation(definition.Construct(types.OfType<Microsoft.CodeAnalysis.ITypeSymbol>().ToArray()))
                 : null;
         }
         var resolved = ResolveScopedMetadataType(context, typeName, 0,
-            _currentNamespaceScopeId, _currentNamespaceIdentity);
-        return resolved.Handled ? resolved.Type : ResolveBclArgumentType(context, typeName);
+            namespaceScopeId, namespaceIdentity);
+        return PreserveDeclaredAnnotation(resolved.Handled ? resolved.Type : ResolveBclArgumentType(context, typeName));
+
+        Microsoft.CodeAnalysis.ITypeSymbol? PreserveDeclaredAnnotation(Microsoft.CodeAnalysis.ITypeSymbol? type) =>
+            declaredTypeParameters is not null && type?.IsReferenceType == true
+                ? type.WithNullableAnnotation(_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+                    ? Microsoft.CodeAnalysis.NullableAnnotation.None : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated)
+                : type;
     }
 
     private (bool Handled, Microsoft.CodeAnalysis.INamedTypeSymbol? Type) ResolveScopedMetadataType(
@@ -707,6 +739,7 @@ public sealed class Binder
                 ? context.HostCompilationForBinder.CreateArrayTypeSymbol(element, array.Rank, element.NullableAnnotation)
                 : null,
             BoundTypes.NominalBoundType { RoslynSymbol: { } nominalSymbol } => nominalSymbol,
+            BoundTypes.GenericInstantiationBoundType { RoslynSymbol: { } genericSymbol } => genericSymbol,
             BoundTypes.NominalBoundType { Declaration: null, QualifiedName: "STRING" or "string" or "str" } =>
                 context.TryResolveType("System.String"),
             BoundTypes.PrimitiveBoundType primitive when IsBuiltInValueTypeName(primitive.Name) =>
@@ -3337,7 +3370,10 @@ public sealed class Binder
             || IsBuiltInValueTypeName(elementName))
             element = new BoundTypes.PrimitiveBoundType(
                 IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
-                    ? TypeIdentity.Canonicalize(elementName) : elementName);
+                    ? TypeIdentity.Canonicalize(elementName) : elementName,
+                bits: null, signed: null, displayOverride: elementName);
+        else if (TryBuildDeclaredMetadataArrayElement(elementName, declaringFunction, declaringTypeName) is { } metadataElement)
+            element = metadataElement;
         else if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
             && TypeIdentity.TrySplitGeneric(elementName.TrimEnd('?'), out _, out _))
             element = BuildDeclaredBoundType(elementName);
@@ -3354,6 +3390,39 @@ public sealed class Binder
 
         array = new BoundTypes.ArrayBoundType(element, rank, annotation);
         return true;
+    }
+
+    private BoundTypes.BoundType? TryBuildDeclaredMetadataArrayElement(
+        string elementName, FunctionSymbol? function, string? declaringTypeName)
+    {
+        if (!TypeIdentity.TrySplitGeneric(elementName.TrimEnd('?'), out _, out _)
+            || GetOrCreateMetadataBinder() is not { } metadata)
+            return null;
+        var containingType = function is not null ? function.ContainingTypeName : declaringTypeName ?? _currentClassName;
+        var scopeId = _currentNamespaceScopeId;
+        var namespaceIdentity = _currentNamespaceIdentity;
+        var parameters = function is null
+            ? (_currentMemberTypeParameters ?? []).Select(parameter => parameter.Name).ToHashSet(StringComparer.Ordinal)
+            : function.TypeParameters.ToHashSet(StringComparer.Ordinal);
+        if (function is not null)
+        {
+            _functionNamespaces.TryGetValue(function.Id, out namespaceIdentity);
+            scopeId = _functionSymbols.FirstOrDefault(pair => pair.Value == function).Key?.NamespaceScopeId;
+        }
+        if (containingType is not null && _classesByQualifiedName.TryGetValue(containingType, out var owner))
+        {
+            scopeId = owner.NamespaceScopeId;
+            namespaceIdentity = owner.NamespaceIdentity;
+            parameters.UnionWith(ReturnShape.GetCallableTypeParameters(owner, _asyncTypeModule).Select(parameter => parameter.Name));
+        }
+        return ResolveComputedMetadataType(metadata.Context, elementName, scopeId,
+                namespaceIdentity, containingType, parameters)
+            is Microsoft.CodeAnalysis.INamedTypeSymbol { IsReferenceType: true, IsUnboundGenericType: false } selected
+            ? Metadata.MetadataBinderResult.ToBoundType(selected.WithNullableAnnotation(
+                elementName.EndsWith('?') ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
+                : _declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+                    ? Microsoft.CodeAnalysis.NullableAnnotation.None : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated))
+            : null;
     }
 
     // Lexical decomposition only. Bound shapes are built from declarations, never
