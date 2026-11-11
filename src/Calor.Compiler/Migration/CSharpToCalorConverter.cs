@@ -1301,13 +1301,13 @@ public sealed class CSharpToCalorConverter
     }
 
     /// <summary>
-    /// #836 M2: counts raw-C# markers (§CSHARP{, §CS{, §RAW) in the emitted
+    /// #836 M2: counts raw-C# frames in the emitted
     /// Calor and records an <see cref="ConversionLossKind.EmitterFallback"/>
     /// loss for every marker beyond the ledgered interop preservations, so the
     /// "zero losses = fully native output" invariant holds even for fallbacks
     /// produced inside the CalorEmitter (which cannot reach the ledger yet).
     /// </summary>
-    private static void ReconcileEmitterFallbacks(string calorSource, ConversionContext context)
+    internal static void ReconcileEmitterFallbacks(string calorSource, ConversionContext context)
     {
         var markerLines = FindFallbackTokenLines(calorSource);
         var ledgered = context.Losses.Count(loss =>

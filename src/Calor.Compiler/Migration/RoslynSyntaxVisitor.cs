@@ -10972,9 +10972,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     new ArrayAccessNode(GetTextSpan(implicitElement),
                         new ThisExpressionNode(GetTextSpan(implicitElement)),
                         ConvertExpression(implicitElement.ArgumentList.Arguments[0].Expression)),
-                MakeRefExpressionSyntax makeRef => new RawCSharpExpressionNode(GetTextSpan(makeRef), makeRef.ToString()),
-                RefValueExpressionSyntax refValue => new RawCSharpExpressionNode(GetTextSpan(refValue), refValue.ToString()),
-                RefTypeExpressionSyntax refType => new RawCSharpExpressionNode(GetTextSpan(refType), refType.ToString()),
+                MakeRefExpressionSyntax makeRef => throw EscalateExpression(makeRef, "typed-reference", preserveMember: true),
+                RefValueExpressionSyntax refValue => throw EscalateExpression(refValue, "typed-reference", preserveMember: true),
+                RefTypeExpressionSyntax refType => throw EscalateExpression(refType, "typed-reference", preserveMember: true),
                 _ => CreateFallbackExpression(expression, "unknown-expression")
             };
         }
@@ -11122,7 +11122,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.DefaultLiteralExpression =>
                 DefaultValue(literal, GetTextSpan(literal)),
             SyntaxKind.ArgListExpression =>
-                new RawCSharpExpressionNode(GetTextSpan(literal), "__arglist"),
+                throw EscalateExpression(literal, "varargs", preserveMember: true),
             _ => CreateFallbackExpression(literal, "unknown-literal")
         };
     }

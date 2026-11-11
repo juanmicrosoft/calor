@@ -739,6 +739,11 @@ public class FeatureCheckCommandTests
     [InlineData("public void M() { { int x = 1; } }", "standalone-block")]
     [InlineData("public delegate T Factory<T>(T value);", "delegate-semantics")]
     [InlineData("[System.Obsolete] public delegate void Legacy();", "delegate-semantics")]
+    [InlineData("public void M() { int value = 7; var reference = __makeref(value); }", "typed-reference")]
+    [InlineData("public int M(System.TypedReference reference) => __refvalue(reference, int);", "typed-reference")]
+    [InlineData("public System.Type M(System.TypedReference reference) => __reftype(reference);", "typed-reference")]
+    [InlineData("public void M(__arglist) { }", "varargs")]
+    [InlineData("public void M() { var arguments = __arglist; }", "varargs")]
     public void SyntaxCapabilityClassifier_DetectsRequiredUnsupportedFeature(
         string source,
         string expectedFeature)

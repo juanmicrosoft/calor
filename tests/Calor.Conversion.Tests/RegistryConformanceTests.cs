@@ -940,9 +940,7 @@ public class RegistryConformanceTests
     [Fact]
     public void M2_EmitterSideRawFallback_IsCountedAsLoss()
     {
-        // #836 M2: raw C# reaching the output through emitter/visitor paths
-        // that bypass the ledger (§CS{…} from RawCSharpExpressionNode here)
-        // must still be counted, so "zero losses" always means fully native.
+        // #836 M2: an unledgered emitter fallback must not claim zero losses.
         var csharp = """
             public class Test
             {
@@ -960,9 +958,22 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
         Assert.Contains("__makeref", result.CalorSource);
 
-        // The §CS{…} fallback has no visitor-side ledger entry — the
-        // post-emission reconciliation must count it.
-        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.EmitterFallback);
+        var preservation = Assert.Single(result.Context.Losses);
+        Assert.Equal(ConversionLossKind.InteropPreserved, preservation.Kind);
+        Assert.Equal("typed-reference", preservation.Feature);
+        TestHelpers.AssertRawFraming(result.CalorSource);
+
+        // Re-emit the actual preserved AST with no visitor ledger to exercise
+        // emitter-side recovery independently of the visitor's correct accounting.
+        var emitted = new CalorEmitter().Emit(result.Ast!);
+        var unledgered = new ConversionContext();
+        CSharpToCalorConverter.ReconcileEmitterFallbacks(emitted, unledgered);
+        var recovered = Assert.Single(unledgered.Losses);
+        Assert.Equal(ConversionLossKind.EmitterFallback, recovered.Kind);
+        CSharpToCalorConverter.ReconcileEmitterFallbacks(emitted, unledgered);
+        Assert.Single(unledgered.Losses);
+        CSharpToCalorConverter.ReconcileEmitterFallbacks(emitted, result.Context);
+        Assert.Equal(preservation, Assert.Single(result.Context.Losses));
     }
 
     [Fact]
@@ -977,6 +988,90 @@ public class RegistryConformanceTests
 
         Assert.True(result.Success);
         Assert.Empty(result.Context.Losses);
+    }
+
+    [Theory]
+    [InlineData("public static object Probe() { int value = 7; var reference = __makeref(value); return System.TypedReference.ToObject(reference); }", "typed-reference")]
+    [InlineData("public static int Probe() { int value = 7; return __refvalue(__makeref(value), int); }", "typed-reference")]
+    [InlineData("public static System.Type Probe() { int value = 7; return __reftype(__makeref(value)); }", "typed-reference")]
+    [InlineData("public static int Probe(__arglist) { return new System.ArgIterator(__arglist).GetRemainingCount(); }", "varargs")]
+    [InlineData("public static void Probe(__arglist) { }", "varargs")]
+    public void UnsupportedRuntimeReferences_PreserveTheCompleteMember(string member, string feature)
+    {
+        var csharp = $"public class RuntimeReferences {{ {member} }}";
+        var original = CSharpSyntaxTree.ParseText(csharp).GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        foreach (var fidelity in new[] { ConversionFidelity.Lossy, ConversionFidelity.Lossless })
+        {
+            var result = new CSharpToCalorConverter(new ConversionOptions
+            {
+                Fidelity = fidelity,
+                ModuleName = "ConformanceTest",
+            }).Convert(csharp);
+            Assert.True(result.Success, string.Join("; ", result.Issues.Select(issue => issue.Message)));
+            var block = Assert.Single(Assert.Single(result.Ast!.Classes).InteropBlocks);
+            Assert.Equal(original.ToFullString(), block.CSharpCode);
+            Assert.Equal(feature, block.FeatureName);
+            var loss = Assert.Single(result.Losses);
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+            Assert.Equal(feature, loss.Feature);
+            Assert.Equal(1, result.Context.Stats.InteropBlocksEmitted);
+            TestHelpers.AssertRawFraming(result.CalorSource);
+            var emitted = TestHelpers.CompileCalorToCSharpWithDiagnostics(result.CalorSource!);
+            Assert.NotNull(emitted.GeneratedCode);
+            Assert.Empty(emitted.Diagnostics);
+            foreach (var source in new[] { csharp, emitted.GeneratedCode })
+            {
+                var validation = TestHelpers.RoslynCompile(source);
+                Assert.True(validation.CompilationSuccess,
+                    string.Join("; ", validation.FormattedCompilationErrors));
+            }
+        }
+    }
+
+    [Fact]
+    public void EscapedRuntimeIntrinsicName_RemainsANativeOrdinaryCall()
+    {
+        const string csharp = """
+            public static class RuntimeIdentifiers
+            {
+                private static int @__makeref(int value) => value;
+                public static int Probe() => @__makeref(7);
+            }
+            """;
+        var result = Convert(csharp);
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(issue => issue.Message)));
+        Assert.Empty(result.Losses);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        var emitted = TestHelpers.CompileCalorToCSharpWithDiagnostics(result.CalorSource!);
+        Assert.NotNull(emitted.GeneratedCode);
+        Assert.Empty(emitted.Diagnostics);
+        var validation = TestHelpers.RoslynCompile(emitted.GeneratedCode);
+        Assert.True(validation.CompilationSuccess,
+            string.Join("; ", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void TypedReferencePreservation_DoesNotConferPureCallableAuthority()
+    {
+        const string csharp = """
+            public static class RuntimeReferences
+            {
+                private static int Probe()
+                {
+                    int value = 7;
+                    return __refvalue(__makeref(value), int);
+                }
+                public static int Caller() => Probe();
+            }
+            """;
+        var result = Convert(csharp);
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(issue => issue.Message)));
+        Assert.Single(Assert.Single(result.Ast!.Classes).InteropBlocks);
+        var compiled = Calor.Compiler.Program.Compile(result.CalorSource!, "runtime-references.calr");
+        Assert.Contains(compiled.Diagnostics.Errors,
+            error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+                && error.Message.Contains("effect 'unknown'", StringComparison.Ordinal));
     }
 
     [Fact]

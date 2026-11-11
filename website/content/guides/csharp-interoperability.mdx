@@ -33,6 +33,12 @@ Two terms used throughout:
 Preserved C# is a migration boundary, not a failure. It is also work that is still to do.
 Every preserved piece is counted in the report.
 
+The converter preserves complete C# members containing `__makeref`, `__refvalue`,
+or `__reftype` as `typed-reference`, and `__arglist` signatures or expressions as
+`varargs`. Keeping the whole member retains its declarations and surrounding
+statements. These are preservation reasons, not native-conversion credit. A native
+caller still needs an authoritative effect contract.
+
 ---
 
 ## Before you start: run one file and read the report

@@ -1260,6 +1260,20 @@ public static class FeatureSupport
             Description = "ref expressions never convert natively: members with ref locals, ref returns (block or expression " +
                 "bodied), conditional refs or ref assignments are preserved as C#, with a ref-parameter warning"
         },
+        ["typed-reference"] = new FeatureInfo
+        {
+            Name = "typed-reference",
+            Support = SupportLevel.NotSupported,
+            Description = "__makeref, __refvalue and __reftype preserve the complete containing C# member",
+            Workaround = "Keep typed-reference operations in C#; preservation does not provide native effect enforcement"
+        },
+        ["varargs"] = new FeatureInfo
+        {
+            Name = "varargs",
+            Support = SupportLevel.NotSupported,
+            Description = "__arglist signatures and expressions preserve the complete containing C# member",
+            Workaround = "Keep CLR varargs in C#; preservation does not provide native effect enforcement"
+        },
         ["global-qualified-name"] = new FeatureInfo
         {
             Name = "global-qualified-name",
@@ -1559,7 +1573,7 @@ public static class FeatureSupport
     /// </summary>
     public static class SyntaxCapabilityClassifier
     {
-        /// <summary>The modern syntax features this classifier guarantees to detect.</summary>
+        /// <summary>The syntax features this classifier guarantees to detect.</summary>
         public static IReadOnlySet<string> RequiredUnsupportedFeatures { get; } =
             new HashSet<string>(StringComparer.Ordinal)
             {
@@ -1575,7 +1589,9 @@ public static class FeatureSupport
                 "interface-property-semantics",
                 "interface-indexer-semantics",
                 "interface-member",
-                "delegate-semantics"
+                "delegate-semantics",
+                "typed-reference",
+                "varargs"
             };
 
         /// <summary>
@@ -1591,6 +1607,15 @@ public static class FeatureSupport
             {
                 switch (current)
                 {
+                    case MakeRefExpressionSyntax or RefValueExpressionSyntax or RefTypeExpressionSyntax:
+                        Add(detections, current, "typed-reference");
+                        break;
+                    case LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.ArgListExpression):
+                        Add(detections, literal, "varargs");
+                        break;
+                    case ParameterSyntax parameter when parameter.Identifier.IsKind(SyntaxKind.ArgListKeyword):
+                        Add(detections, parameter, "varargs");
+                        break;
                     case InterfaceDeclarationSyntax interfaceDeclaration:
                         AddTypeModifierDetection(interfaceDeclaration, detections);
                         if (!IsRepresentableInterfaceDeclaration(interfaceDeclaration))

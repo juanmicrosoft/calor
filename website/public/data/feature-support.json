@@ -9,7 +9,7 @@
     "info": 0
   },
   "data": {
-    "totalFeatures": 180,
+    "totalFeatures": 182,
     "features": {
       "full": [
         {
@@ -807,6 +807,16 @@
           "name": "line-directive",
           "description": "#line directives are preserved verbatim in source order",
           "workaround": "Preserve the complete compilation unit to retain exact line mapping"
+        },
+        {
+          "name": "typed-reference",
+          "description": "__makeref, __refvalue and __reftype preserve the complete containing C# member",
+          "workaround": "Keep typed-reference operations in C#; preservation does not provide native effect enforcement"
+        },
+        {
+          "name": "varargs",
+          "description": "__arglist signatures and expressions preserve the complete containing C# member",
+          "workaround": "Keep CLR varargs in C#; preservation does not provide native effect enforcement"
         }
       ]
     }
