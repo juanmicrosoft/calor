@@ -65,7 +65,7 @@ public class EffectInferrerRecursionTests
     {
         // The issue's exact API: a default-constructed pass over the parsed,
         // UNBOUND module. Before the fix this line killed the process.
-        var module = Parse(TestHarness.LoadScenario(FixturePath));
+        var module = Parse(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
         var bag = new DiagnosticBag();
 
         new EffectEnforcementPass(bag).Enforce(module);
@@ -87,7 +87,7 @@ public class EffectInferrerRecursionTests
         // re-implementation is what catches a refactor that reintroduces an
         // unbounded pass on either path.
         var parse = CalorSourceHelper.Parse(
-            TestHarness.LoadScenario(FixturePath), "Issue1104.calr");
+            NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative), "Issue1104.calr");
         Assert.True(parse.IsSuccess);
 
         var result = new EditPreviewTool.EffectCheckResult();
@@ -102,7 +102,7 @@ public class EffectInferrerRecursionTests
     [Fact]
     public void SerilogFixture_CycleResolvesToSentinel_ByVisitedSetNotByCap()
     {
-        var (bag, bound) = Enforce(TestHarness.LoadScenario(FixturePath));
+        var (bag, bound) = Enforce(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
 
         // The hoisted `out var` binding is the name whose own resolution was
         // re-entered; it resolved by the VISITED SET, never by the backstop.
@@ -126,7 +126,7 @@ public class EffectInferrerRecursionTests
         // enclosing callable (Calor0410) — the sentinel must never be read as
         // "pure". If a future change makes a cycle resolve to a REAL type,
         // this goes red and the change gets looked at.
-        var (bag, _) = Enforce(TestHarness.LoadScenario(FixturePath));
+        var (bag, _) = Enforce(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
 
         Assert.Contains(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
             && d.Message.Contains("_batchScheduler.MarkFailure", StringComparison.Ordinal));
@@ -141,7 +141,7 @@ public class EffectInferrerRecursionTests
         // with something that no longer exercises the cycle: a binding with no
         // initializer on its own line, followed by a call that names it as an
         // argument, on a receiver that resolves (the field).
-        var source = TestHarness.LoadScenario(FixturePath);
+        var source = NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative);
         var module = Parse(source);
 
         var cls = Assert.Single(module.Classes);
@@ -163,11 +163,15 @@ public class EffectInferrerRecursionTests
         // `§B{~x} = scheduler.MarkFailure(x)` — the value's type depends on its
         // own type. The parameter gives the receiver a type, so the arguments
         // ARE typed and the cycle is entered.
-        var source = """
+        var source = NativeCounterpart("""
             §M{SelfCycle}
               §F{Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
                 §B{~x} §C{scheduler.MarkFailure} §A x §/C
-            """;
+            """, """
+            module SelfCycle SelfCycle
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                var x = scheduler.MarkFailure(x)
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -184,11 +188,16 @@ public class EffectInferrerRecursionTests
         // The issue's suspected shape: InferKnownCallResultType →
         // FindLocalDeclarationType → ResolveLocalValueTypeFromAst → back, via
         // the RECEIVER rather than an argument: `§B{a} = a.Where()`.
-        var source = """
+        var source = NativeCounterpart("""
             §M{SelfCycleReceiver}
               §F{Loop:priv} () -> void
                 §B{a} §C{a.Where} §/C
-            """;
+            """, """
+            module SelfCycleReceiver SelfCycleReceiver
+              using System.Linq
+              func Loop private () → void
+                let a = a.Where()
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -202,12 +211,18 @@ public class EffectInferrerRecursionTests
     public void TwoNodeCycle_ResolvesToSentinel_StoppingOnlyAtTheReEnteredName()
     {
         // a's type needs b's, b's needs a's.
-        var source = """
+        var source = NativeCounterpart("""
             §M{TwoCycle}
               §F{Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
                 §B{a} §C{scheduler.First} §A b §/C
                 §B{b} §C{scheduler.Second} §A a §/C
-            """;
+            """, """
+            module TwoCycle TwoCycle
+              using System.Linq
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                let a = scheduler.First(b)
+                let b = scheduler.Second(a)
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -224,7 +239,7 @@ public class EffectInferrerRecursionTests
     {
         // The search descends into nested statement bodies; a cycle spread
         // across them is still one cycle, and the nesting costs extra frames.
-        var source = """
+        var source = NativeCounterpart("""
             §M{ThreeCycle}
               §F{Loop:priv} (FailureAwareBatchScheduler:scheduler, bool:flag) -> void
                 §B{a} §C{scheduler.First} §A c §/C
@@ -232,7 +247,16 @@ public class EffectInferrerRecursionTests
                   §B{b} §C{scheduler.Second} §A a §/C
                   §WH flag
                     §B{c} §C{scheduler.Third} §A b §/C
-            """;
+            """, """
+            module ThreeCycle ThreeCycle
+              using System.Linq
+              func Loop private (FailureAwareBatchScheduler:scheduler, bool:flag) → void
+                let a = scheduler.First(c)
+                if flag
+                  let b = scheduler.Second(a)
+                  while flag
+                    let c = scheduler.Third(b)
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -252,7 +276,7 @@ public class EffectInferrerRecursionTests
         // name is resolved twice on DIFFERENT branches — legitimately, not
         // cyclically. Goes red under the drop-`Remove` mutation (the visited
         // set would remember the shared name from the first branch).
-        var source = """
+        var source = NativeCounterpart("""
             §M{Diamond}
               §F{Run:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
@@ -260,7 +284,16 @@ public class EffectInferrerRecursionTests
                 §B{_chainWhere003} §C{_chainWhere001.Where} §/C
                 §C{_chainWhere002.ToList} §/C
                 §C{_chainWhere003.ToList} §/C
-            """;
+            """, """
+            module Diamond Diamond
+              using System.Linq
+              func Run private (List<int>:items) → void
+                let _chainWhere001 = items.Where()
+                let _chainWhere002 = _chainWhere001.Where()
+                let _chainWhere003 = _chainWhere001.Where()
+                _chainWhere002.ToList()
+                _chainWhere003.ToList()
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -276,13 +309,20 @@ public class EffectInferrerRecursionTests
         // structural walk, and it hops into FindLocalDeclarationType for the
         // collection's name. Both take frames from the same counter now; on
         // ordinary code neither guard fires.
-        var source = """
+        var source = NativeCounterpart("""
             §M{Foreach}
               §F{Run:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §EACH{_eachItem001} _chainWhere001
                   §C{_eachItem001.ToString} §/C
-            """;
+            """, """
+            module Foreach Foreach
+              using System.Linq
+              func Run private (List<int>:items) → void
+                let _chainWhere001 = items.Where()
+                each _eachItem001 in _chainWhere001
+                  _eachItem001.ToString()
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -305,14 +345,22 @@ public class EffectInferrerRecursionTests
         // Review round 2, probe P3. Each function gets its own inferrer and so
         // its own visited set; a name cycling in one must not make the
         // identically-named local in another resolve to the sentinel.
-        var source = """
+        var source = NativeCounterpart("""
             §M{CrossFunction}
               §F{Cycles:priv} (FailureAwareBatchScheduler:scheduler) -> void
                 §B{~_chainWhere001} §C{scheduler.MarkFailure} §A _chainWhere001 §/C
               §F{DoesNot:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
-            """;
+            """, """
+            module CrossFunction CrossFunction
+              using System.Linq
+              func Cycles private (FailureAwareBatchScheduler:scheduler) → void
+                var _chainWhere001 = scheduler.MarkFailure(_chainWhere001)
+              func DoesNot private (List<int>:items) → void
+                let _chainWhere001 = items.Where()
+                _chainWhere001.ToList()
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -331,7 +379,7 @@ public class EffectInferrerRecursionTests
     {
         // Review round 2, probe P3b — the control for the above: two functions
         // that both resolve the same name normally, neither stopping.
-        var source = """
+        var source = NativeCounterpart("""
             §M{CrossFunctionControl}
               §F{First:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
@@ -339,7 +387,16 @@ public class EffectInferrerRecursionTests
               §F{Second:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
-            """;
+            """, """
+            module CrossFunctionControl CrossFunctionControl
+              using System.Linq
+              func First private (List<int>:items) → void
+                let _chainWhere001 = items.Where()
+                _chainWhere001.ToList()
+              func Second private (List<int>:items) → void
+                let _chainWhere001 = items.Where()
+                _chainWhere001.ToList()
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -356,7 +413,7 @@ public class EffectInferrerRecursionTests
         // pre-existing behaviour, not something #1104 introduced, and it is
         // pinned here so it is discovered by a red test rather than by a bug
         // report. The guard changes nothing about it — no stop of either kind.
-        var source = """
+        var source = NativeCounterpart("""
             §M{Siblings}
               §F{Run:priv} (List<i32>:items, bool:flag) -> void
                 §IF flag
@@ -364,7 +421,16 @@ public class EffectInferrerRecursionTests
                 §EL
                   §B{_chainWhere001} §NEW{StringBuilder} §/NEW
                 §C{_chainWhere001.ToList} §/C
-            """;
+            """, """
+            module Siblings Siblings
+              using System.Linq
+              func Run private (List<int>:items, bool:flag) → void
+                if flag
+                  let _chainWhere001 = items.Where()
+                else
+                  let _chainWhere001 = new StringBuilder()
+                _chainWhere001.ToList()
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -386,7 +452,7 @@ public class EffectInferrerRecursionTests
         // fired. Pins that the bound is not "give up at depth N" on ordinary
         // code.
         const int links = 40;
-        var (bag, bound) = Enforce(Chain(links));
+        var (bag, bound) = Enforce(NativeCounterpart(Chain(links), ChainNative(links)));
 
         Assert.Equal(0, bound.CycleStops);
         Assert.Equal(0, bound.DepthCapStops);
@@ -403,13 +469,20 @@ public class EffectInferrerRecursionTests
         // The visited set is a stack, not a memo: a name leaves it when its
         // resolution returns. Drop the `Remove` on the way out and the second
         // ask below reports a cycle that is not there.
-        var source = """
+        var source = NativeCounterpart("""
             §M{Twice}
               §F{Run:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
                 §C{_chainWhere001.ToList} §/C
-            """;
+            """, """
+            module Twice Twice
+              using System.Linq
+              func Run private (List<int>:items) → void
+                let _chainWhere001 = items.Where()
+                _chainWhere001.ToList()
+                _chainWhere001.ToList()
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -424,14 +497,22 @@ public class EffectInferrerRecursionTests
     {
         // The stop is scoped to the re-entered name; the neighbouring chain
         // still resolves and its terminal call is still known.
-        var source = """
+        var source = NativeCounterpart("""
             §M{Mixed}
               §F{Run:priv} (FailureAwareBatchScheduler:scheduler, List<i32>:items) -> void
                 §B{~x} §C{scheduler.MarkFailure} §A x §/C
                 §B{_chainWhere001} §C{items.Where} §/C
                 §B{_chainWhere002} §C{_chainWhere001.Where} §/C
                 §C{_chainWhere002.ToList} §/C
-            """;
+            """, """
+            module Mixed Mixed
+              using System.Linq
+              func Run private (FailureAwareBatchScheduler:scheduler, List<int>:items) → void
+                var x = scheduler.MarkFailure(x)
+                let _chainWhere001 = items.Where()
+                let _chainWhere002 = _chainWhere001.Where()
+                _chainWhere002.ToList()
+            """);
 
         var (bag, bound) = Enforce(source);
 
@@ -458,7 +539,7 @@ public class EffectInferrerRecursionTests
         // COMPLETES. The claim is the completion; the cap stops are how it is
         // achieved, and MaxObservedDepth never exceeding the cap is the bound
         // doing its job.
-        var (bag, bound) = Enforce(NestedChain(links: 50));
+        var (bag, bound) = Enforce(NativeCounterpart(NestedChain(links: 50), NestedChainNative(links: 50)));
 
         Assert.True(bound.DepthCapStops >= 1,
             "the deep-nesting shape must reach the cap — that is what makes it safe");
@@ -475,7 +556,7 @@ public class EffectInferrerRecursionTests
         // one the default was derived from (cap 448 survives a 1 MB thread,
         // 480 does not; the default is half of 448). It must complete with the
         // frame ceiling respected.
-        var (bag, bound) = Enforce(NestedChain(links: 200));
+        var (bag, bound) = Enforce(NativeCounterpart(NestedChain(links: 200), NestedChainNative(links: 200)));
 
         Assert.True(bound.DepthCapStops >= 1);
         Assert.Equal(EffectEnforcementPass.AstResolutionBound.DefaultDepthCap,
@@ -488,7 +569,7 @@ public class EffectInferrerRecursionTests
     {
         // The control for the two above: the same nested shape at corpus scale
         // resolves completely, so "nested" is not itself what trips the cap.
-        var (bag, bound) = Enforce(NestedChain(links: 5));
+        var (bag, bound) = Enforce(NativeCounterpart(NestedChain(links: 5), NestedChainNative(links: 5)));
 
         Assert.Equal(0, bound.DepthCapStops);
         Assert.Equal(0, bound.CycleStops);
@@ -501,7 +582,7 @@ public class EffectInferrerRecursionTests
         // A flat chain of N links costs exactly 2N frames. With the cap set to
         // 2N the deepest frame is admitted and the terminal call is known.
         const int links = 8;
-        var (bag, bound) = Enforce(Chain(links), cap: links * FramesPerFlatLink);
+        var (bag, bound) = Enforce(NativeCounterpart(Chain(links), ChainNative(links)), cap: links * FramesPerFlatLink);
 
         Assert.Equal(links * FramesPerFlatLink, bound.MaxObservedDepth);
         Assert.Equal(0, bound.DepthCapStops);
@@ -517,7 +598,7 @@ public class EffectInferrerRecursionTests
         // temporary is reported as unknown — the pass completes either way.
         const int links = 8;
         var (bag, bound) = Enforce(
-            Chain(links), cap: links * FramesPerFlatLink - 1);
+            NativeCounterpart(Chain(links), ChainNative(links)), cap: links * FramesPerFlatLink - 1);
 
         Assert.Equal(links * FramesPerFlatLink - 1, bound.MaxObservedDepth);
         Assert.True(bound.DepthCapStops >= 1, $"expected a cap stop, got {bound.DepthCapStops}");
@@ -534,14 +615,22 @@ public class EffectInferrerRecursionTests
     {
         // The smallest useful cap: one link (ask + structural level) resolves;
         // a second link needs a third frame and is refused.
-        var source = """
+        var source = NativeCounterpart("""
             §M{CapTwo}
               §F{Run:priv} (List<i32>:items) -> void
                 §B{_chainWhere001} §C{items.Where} §/C
                 §C{_chainWhere001.ToList} §/C
                 §B{_chainWhere002} §C{_chainWhere001.Where} §/C
                 §C{_chainWhere002.ToList} §/C
-            """;
+            """, """
+            module CapTwo CapTwo
+              using System.Linq
+              func Run private (List<int>:items) → void
+                let _chainWhere001 = items.Where()
+                _chainWhere001.ToList()
+                let _chainWhere002 = _chainWhere001.Where()
+                _chainWhere002.ToList()
+            """);
 
         var (bag, bound) = Enforce(source, cap: FramesPerFlatLink);
 
@@ -566,13 +655,13 @@ public class EffectInferrerRecursionTests
 
         // Exactly at the default: admitted.
         const int atCap = defaultCap / FramesPerFlatLink;
-        var (under, underBound) = Enforce(Chain(atCap));
+        var (under, underBound) = Enforce(NativeCounterpart(Chain(atCap), ChainNative(atCap)));
         Assert.Equal(0, underBound.DepthCapStops);
         Assert.Equal(defaultCap, underBound.MaxObservedDepth);
         Assert.DoesNotContain(under, d => d.Code == DiagnosticCode.UnknownExternalCall);
 
         // One link past it: refused at the root, and the pass still completes.
-        var (over, overBound) = Enforce(Chain(atCap + 1));
+        var (over, overBound) = Enforce(NativeCounterpart(Chain(atCap + 1), ChainNative(atCap + 1)));
         Assert.True(overBound.DepthCapStops >= 1);
         Assert.Equal(defaultCap, overBound.MaxObservedDepth);
         Assert.Contains(over, d => d.Code == DiagnosticCode.UnknownExternalCall
@@ -585,11 +674,15 @@ public class EffectInferrerRecursionTests
         // Review round 2, m4: the counters are per PASS INSTANCE, not per
         // Enforce call — nothing resets them, and a caller that enforces twice
         // with one pass sees the sum. Pinned so the doc and the name agree.
-        var (_, bound) = Enforce("""
+        var (_, bound) = Enforce(NativeCounterpart("""
             §M{Empty}
               §F{Run:priv} () -> void
                 §P "hello"
-            """);
+            """, """
+            module Empty Empty
+              func Run private () → void
+                Console.WriteLine("hello")
+            """));
 
         Assert.Equal(0, bound.CycleStops);
         Assert.Equal(0, bound.DepthCapStops);
@@ -603,11 +696,15 @@ public class EffectInferrerRecursionTests
         // The other half of m4: two Enforce calls on ONE pass accumulate.
         var bound = new EffectEnforcementPass.AstResolutionBound();
         var pass = new EffectEnforcementPass(new DiagnosticBag()) { AstResolution = bound };
-        var source = """
+        var source = NativeCounterpart("""
             §M{SelfCycle}
               §F{Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
                 §B{~x} §C{scheduler.MarkFailure} §A x §/C
-            """;
+            """, """
+            module SelfCycle SelfCycle
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                var x = scheduler.MarkFailure(x)
+            """);
 
         pass.Enforce(Parse(source));
         var afterFirst = bound.CycleStops;
@@ -652,6 +749,18 @@ public class EffectInferrerRecursionTests
 
     // ===== helpers =====
 
+    private const string SerilogFixtureNative = """
+        module Calor0425Leg Calor0425Leg
+          class BatchingSink internal sealed
+            field FailureAwareBatchScheduler:_batchScheduler private readonly
+
+            func LoopAsync private async ()
+              var shouldDropQueue = _batchScheduler.MarkFailure(shouldDropBatch, shouldDropQueue)
+        """;
+
+    // Retain each original input and oracle; only the explicitly paired input is parsed.
+    private static string NativeCounterpart(string original, string native) => native;
+
     /// <summary>
     /// The converter's chain shape from the issue: <c>_chainWhere001 =
     /// items.Where()</c>, <c>_chainWhere002 = _chainWhere001.Where()</c>, …,
@@ -684,6 +793,18 @@ public class EffectInferrerRecursionTests
         return sb.ToString();
     }
 
+    private static string ChainNative(int links)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("module Chain Chain");
+        sb.AppendLine("  using System.Linq");
+        sb.AppendLine("  func Run private (List<int>:items) → void");
+        for (var i = 1; i <= links; i++)
+            sb.AppendLine($"    let {Link(i)} = {(i == 1 ? "items" : Link(i - 1))}.Where()");
+        sb.AppendLine($"    {Link(links)}.ToList()");
+        return sb.ToString();
+    }
+
     /// <summary>
     /// The C1 shape: the same chain, but each link one <c>§IF</c> deeper than
     /// the last, so the structural walk costs a frame per level and the total
@@ -703,6 +824,23 @@ public class EffectInferrerRecursionTests
                 $"{indent}  §B{{{Link(i)}}} §C{{{(i == 1 ? "items" : Link(i - 1))}.Where}} §/C");
         }
         sb.AppendLine($"{new string(' ', 4 + (links * 2))}§C{{{Link(links)}.ToList}} §/C");
+        return sb.ToString();
+    }
+
+    private static string NestedChainNative(int links)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("module Nested Nested");
+        sb.AppendLine("  using System.Linq");
+        sb.AppendLine("  func Run private (List<int>:items, bool:flag) → void");
+        for (var i = 1; i <= links; i++)
+        {
+            var indent = new string(' ', 4 + ((i - 1) * 2));
+            sb.AppendLine($"{indent}if flag");
+            sb.AppendLine(
+                $"{indent}  let {Link(i)} = {(i == 1 ? "items" : Link(i - 1))}.Where()");
+        }
+        sb.AppendLine($"{new string(' ', 4 + (links * 2))}{Link(links)}.ToList()");
         return sb.ToString();
     }
 
