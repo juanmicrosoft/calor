@@ -1,10 +1,10 @@
-§M{AutoProps}
-  §F{GetX:pub} (i32:x) -> i32
-    §R x
+module AutoProps AutoProps
+  module AutoPropsModule
+    func GetX public (int:x) → int
+      return x
 
-  §F{GetY:pub} (i32:y) -> i32
-    §R y
+    func GetY public (int:y) → int
+      return y
 
-  §F{Sum:pub} (i32:x, i32:y) -> i32
-    §R (+ x y)
-
+    func Sum public (int:x, int:y) → int
+      return x + y

@@ -1,10 +1,10 @@
-§M{MethodOverriding}
-  §F{BaseSpeak:pub} () -> i32
-    §R 0
+module MethodOverriding MethodOverriding
+  module MethodOverridingModule
+    func BaseSpeak public () → int
+      return 0
 
-  §F{DogSpeak:pub} () -> i32
-    §R 1
+    func DogSpeak public () → int
+      return 1
 
-  §F{CatSpeak:pub} () -> i32
-    §R 2
-
+    func CatSpeak public () → int
+      return 2

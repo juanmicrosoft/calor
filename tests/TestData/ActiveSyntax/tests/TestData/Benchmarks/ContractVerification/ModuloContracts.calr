@@ -1,24 +1,24 @@
-§M{ModuloContracts}
-  §F{ModBounded:pub} (i32:a, i32:b) -> i32
-    §Q (> b 0)
-    §Q (>= a 0)
-    §S (>= result 0)
-    §S (< result b)
-    §R (% a b)
+module ModuloContracts ModuloContracts
+  module ModuloContractsModule
+    func ModBounded public (int:a, int:b) → int
+      requires b > 0
+      requires a >= 0
+      => result >= 0
+      => result < b
+      return a % b
 
-  §F{ModEvenOdd:pub} (i32:n) -> i32
-    §S (>= result 0)
-    §S (<= result 1)
-    §B{r} (% n 2)
-    §IF (< r 0)
-      §R (- 0 r)
-    §EL
-      §R r
+    func ModEvenOdd public (int:n) → int
+      => result >= 0
+      => result <= 1
+      let r = n % 2
+      if r < 0
+        return 0 - r
+      else
+        return r
 
-  §F{WrapAround:pub} (i32:index, i32:size) -> i32
-    §Q (> size 0)
-    §Q (>= index 0)
-    §S (>= result 0)
-    §S (< result size)
-    §R (% index size)
-
+    func WrapAround public (int:index, int:size) → int
+      requires size > 0
+      requires index >= 0
+      => result >= 0
+      => result < size
+      return index % size

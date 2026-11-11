@@ -1,12 +1,12 @@
-§M{InterpolationSearch}
-  §F{EstimatePosition:pub} (i32:low, i32:high, i32:target, i32:lowVal, i32:highVal) -> i32
-    §Q (<= low high)
-    §Q (< lowVal highVal)
-    §B{range} (- high low)
-    §B{valRange} (- highVal lowVal)
-    §B{offset} (- target lowVal)
-    §R (+ low (/ (* offset range) valRange))
+module InterpolationSearch InterpolationSearch
+  module InterpolationSearchModule
+    func EstimatePosition public (int:low, int:high, int:target, int:lowVal, int:highVal) → int
+      requires low <= high
+      requires lowVal < highVal
+      let range = high - low
+      let valRange = highVal - lowVal
+      let offset = target - lowVal
+      return low + ((offset * range) / valRange)
 
-  §F{InRange:pub} (i32:target, i32:lowVal, i32:highVal) -> bool
-    §R (&& (>= target lowVal) (<= target highVal))
-
+    func InRange public (int:target, int:lowVal, int:highVal) → bool
+      return target >= lowVal && target <= highVal

@@ -1,7 +1,7 @@
-§M{CancellableTask}
-  §F{IsCancelled:pub} (bool:token) -> bool
-    §R token
+module CancellableTask CancellableTask
+  module CancellableTaskModule
+    func IsCancelled public (bool:token) → bool
+      return token
 
-  §F{ShouldContinue:pub} (bool:cancelled, i32:iteration, i32:maxIterations) -> bool
-    §R (&& (! cancelled) (< iteration maxIterations))
-
+    func ShouldContinue public (bool:cancelled, int:iteration, int:maxIterations) → bool
+      return !cancelled && iteration < maxIterations

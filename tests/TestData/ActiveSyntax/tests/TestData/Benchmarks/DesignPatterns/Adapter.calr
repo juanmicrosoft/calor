@@ -1,12 +1,12 @@
-§M{Adapter}
-  §F{MilesToKm:pub} (f32:miles) -> f32
-    §Q (>= miles 0)
-    §R (* miles 1.60934)
+module Adapter Adapter
+  module AdapterModule
+    func MilesToKm public (float:miles) → float
+      requires miles >= 0
+      return miles * 1.60934
 
-  §F{KmToMiles:pub} (f32:km) -> f32
-    §Q (>= km 0)
-    §R (* km 0.621371)
+    func KmToMiles public (float:km) → float
+      requires km >= 0
+      return km * 0.621371
 
-  §F{FahrenheitToCelsius:pub} (f32:f) -> f32
-    §R (/ (* (- f 32) 5) 9)
-
+    func FahrenheitToCelsius public (float:f) → float
+      return ((f - 32) * 5) / 9

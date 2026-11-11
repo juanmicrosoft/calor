@@ -1,10 +1,10 @@
-§M{Sort}
-  §F{CompareAsc:pub} (i32:a, i32:b) -> bool
-    §R (< a b)
+module Sort Sort
+  module SortModule
+    func CompareAsc public (int:a, int:b) → bool
+      return a < b
 
-  §F{CompareDesc:pub} (i32:a, i32:b) -> bool
-    §R (> a b)
+    func CompareDesc public (int:a, int:b) → bool
+      return a > b
 
-  §F{IsSorted:pub} (i32:prev, i32:current) -> bool
-    §R (<= prev current)
-
+    func IsSorted public (int:prev, int:current) → bool
+      return prev <= current

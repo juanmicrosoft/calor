@@ -1,8 +1,8 @@
-§M{GenericClass}
-  §F{HasValue:pub} (bool:isPresent) -> bool
-    §R isPresent
+module GenericClass GenericClass
+  module GenericClassModule
+    func HasValue public (bool:isPresent) → bool
+      return isPresent
 
-  §F{Count:pub} (i32:count) -> i32
-    §S (>= result 0)
-    §R count
-
+    func Count public (int:count) → int
+      => result >= 0
+      return count

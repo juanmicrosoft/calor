@@ -1,7 +1,7 @@
-§M{BasicTryCatch}
-  §F{SafeDivide:pub} (i32:a, i32:b) -> i32
-    §IF (== b 0)
-      §R 0
-    §EL
-      §R (/ a b)
-
+module BasicTryCatch BasicTryCatch
+  module BasicTryCatchModule
+    func SafeDivide public (int:a, int:b) → int
+      if b == 0
+        return 0
+      else
+        return a / b

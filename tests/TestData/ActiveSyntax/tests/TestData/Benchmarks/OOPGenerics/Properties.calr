@@ -1,12 +1,12 @@
-§M{Properties}
-  §F{GetName:pub} (str:name) -> str
-    §R name
+module Properties Properties
+  module PropertiesModule
+    func GetName public (string:name) → string
+      return name
 
-  §F{ValidateAge:pub} (i32:age) -> i32
-    §Q (>= age 0)
-    §Q (<= age 150)
-    §R age
+    func ValidateAge public (int:age) → int
+      requires age >= 0
+      requires age <= 150
+      return age
 
-  §F{ValidateEmail:pub} (str:email, i32:length) -> bool
-    §R (> length 0)
-
+    func ValidateEmail public (string:email, int:length) → bool
+      return length > 0

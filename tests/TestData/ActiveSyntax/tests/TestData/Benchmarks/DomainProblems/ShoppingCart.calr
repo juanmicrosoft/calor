@@ -1,27 +1,27 @@
-§M{ShoppingCart}
-  §F{ItemTotal:pub} (f32:price, i32:quantity) -> f32
-    §Q (> price 0)
-    §Q (> quantity 0)
-    §S (>= result 0)
-    §R (* price quantity)
+module ShoppingCart ShoppingCart
+  module ShoppingCartModule
+    func ItemTotal public (float:price, int:quantity) → float
+      requires price > 0
+      requires quantity > 0
+      => result >= 0
+      return price * quantity
 
-  §F{CartSubtotal:pub} (f32:itemTotal1, f32:itemTotal2) -> f32
-    §Q (>= itemTotal1 0)
-    §Q (>= itemTotal2 0)
-    §S (>= result 0)
-    §R (+ itemTotal1 itemTotal2)
+    func CartSubtotal public (float:itemTotal1, float:itemTotal2) → float
+      requires itemTotal1 >= 0
+      requires itemTotal2 >= 0
+      => result >= 0
+      return itemTotal1 + itemTotal2
 
-  §F{TotalWithTax:pub} (f32:subtotal, f32:taxRate) -> f32
-    §Q (>= subtotal 0)
-    §Q (>= taxRate 0)
-    §Q (<= taxRate 1)
-    §S (>= result subtotal)
-    §R (+ subtotal (* subtotal taxRate))
+    func TotalWithTax public (float:subtotal, float:taxRate) → float
+      requires subtotal >= 0
+      requires taxRate >= 0
+      requires taxRate <= 1
+      => result >= subtotal
+      return subtotal + (subtotal * taxRate)
 
-  §F{NewQuantity:pub} (i32:oldQuantity, i32:change) -> i32
-    §B{result} (+ oldQuantity change)
-    §IF (< result 0)
-      §R 0
-    §EL
-      §R result
-
+    func NewQuantity public (int:oldQuantity, int:change) → int
+      let result = oldQuantity + change
+      if result < 0
+        return 0
+      else
+        return result

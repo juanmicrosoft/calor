@@ -1,12 +1,12 @@
-§M{SimpleClass}
-  §F{CreateAge:pub} (i32:birthYear, i32:currentYear) -> i32
-    §Q (> currentYear birthYear)
-    §S (> result 0)
-    §R (- currentYear birthYear)
+module SimpleClass SimpleClass
+  module SimpleClassModule
+    func CreateAge public (int:birthYear, int:currentYear) → int
+      requires currentYear > birthYear
+      => result > 0
+      return currentYear - birthYear
 
-  §F{IsAdult:pub} (i32:age) -> bool
-    §R (>= age 18)
+    func IsAdult public (int:age) → bool
+      return age >= 18
 
-  §F{FullName:pub} (str:first, str:last) -> str
-    §R first
-
+    func FullName public (string:first, string:last) → string
+      return first

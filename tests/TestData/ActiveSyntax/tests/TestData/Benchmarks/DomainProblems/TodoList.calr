@@ -1,15 +1,15 @@
-§M{TodoList}
-  §F{AddTask:pub} (i32:count) -> i32
-    §R (+ count 1)
+module TodoList TodoList
+  module TodoListModule
+    func AddTask public (int:count) → int
+      return count + 1
 
-  §F{CompleteTask:pub} (i32:completedCount) -> i32
-    §R (+ completedCount 1)
+    func CompleteTask public (int:completedCount) → int
+      return completedCount + 1
 
-  §F{PendingCount:pub} (i32:total, i32:completed) -> i32
-    §Q (>= total completed)
-    §S (>= result 0)
-    §R (- total completed)
+    func PendingCount public (int:total, int:completed) → int
+      requires total >= completed
+      => result >= 0
+      return total - completed
 
-  §F{AllDone:pub} (i32:total, i32:completed) -> bool
-    §R (== total completed)
-
+    func AllDone public (int:total, int:completed) → bool
+      return total == completed

@@ -1,11 +1,11 @@
-§M{PropertyMatch}
-  §F{ClassifyTemp:pub} (f32:temp, str:unit) -> i32
-    §IF (< temp 0)
-      §R 0
-    §EI (< temp 15)
-      §R 1
-    §EI (< temp 30)
-      §R 2
-    §EL
-      §R 3
-
+module PropertyMatch PropertyMatch
+  module PropertyMatchModule
+    func ClassifyTemp public (float:temp, string:unit) → int
+      if temp < 0
+        return 0
+      else if temp < 15
+        return 1
+      else if temp < 30
+        return 2
+      else
+        return 3

@@ -1,13 +1,13 @@
-§M{EnumMatch}
-  §F{HttpStatus:pub} (i32:code) -> i32
-    §IF (== code 200)
-      §R 0
-    §EI (== code 404)
-      §R 1
-    §EI (== code 500)
-      §R 2
-    §EI (== code 301)
-      §R 3
-    §EL
-      §R 4
-
+module EnumMatch EnumMatch
+  module EnumMatchModule
+    func HttpStatus public (int:code) → int
+      if code == 200
+        return 0
+      else if code == 404
+        return 1
+      else if code == 500
+        return 2
+      else if code == 301
+        return 3
+      else
+        return 4

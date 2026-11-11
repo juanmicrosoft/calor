@@ -1,15 +1,15 @@
-§M{CurrencyConverter}
-  §F{Convert:pub} (f32:amount, f32:rate) -> f32
-    §Q (>= amount 0)
-    §Q (> rate 0)
-    §S (>= result 0)
-    §R (* amount rate)
+module CurrencyConverter CurrencyConverter
+  module CurrencyConverterModule
+    func Convert public (float:amount, float:rate) → float
+      requires amount >= 0
+      requires rate > 0
+      => result >= 0
+      return amount * rate
 
-  §F{RoundToTwo:pub} (f32:value) -> f32
-    §B{shifted} (* value 100)
-    §R (/ (cast f64 (cast i32 (+ shifted 0.5))) 100)
+    func RoundToTwo public (float:value) → float
+      let shifted = value * 100
+      return (double)(int)(shifted + 0.5) / 100
 
-  §F{InverseRate:pub} (f32:rate) -> f32
-    §Q (> rate 0)
-    §R (/ 1 rate)
-
+    func InverseRate public (float:rate) → float
+      requires rate > 0
+      return 1 / rate

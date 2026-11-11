@@ -1,14 +1,14 @@
-§M{InterfaceImpl}
-  §F{AreaCircle:pub} (f32:radius) -> f32
-    §Q (> radius 0)
-    §R (* 3.14159265 (* radius radius))
+module InterfaceImpl InterfaceImpl
+  module InterfaceImplModule
+    func AreaCircle public (float:radius) → float
+      requires radius > 0
+      return 3.14159265 * (radius * radius)
 
-  §F{AreaSquare:pub} (f32:side) -> f32
-    §Q (> side 0)
-    §R (* side side)
+    func AreaSquare public (float:side) → float
+      requires side > 0
+      return side * side
 
-  §F{AreaTriangle:pub} (f32:base, f32:height) -> f32
-    §Q (> base 0)
-    §Q (> height 0)
-    §R (/ (* base height) 2)
-
+    func AreaTriangle public (float:@base, float:height) → float
+      requires @base > 0
+      requires height > 0
+      return (@base * height) / 2

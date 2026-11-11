@@ -1,14 +1,14 @@
-§M{DictOps}
-  §F{ContainsKey:pub} (bool:found) -> bool
-    §R found
+module DictOps DictOps
+  module DictOpsModule
+    func ContainsKey public (bool:found) → bool
+      return found
 
-  §F{EntryCount:pub} (i32:count) -> i32
-    §S (>= result 0)
-    §R count
+    func EntryCount public (int:count) → int
+      => result >= 0
+      return count
 
-  §F{GetOrDefault:pub} (i32:value, i32:defaultVal, bool:exists) -> i32
-    §IF exists
-      §R value
-    §EL
-      §R defaultVal
-
+    func GetOrDefault public (int:value, int:defaultVal, bool:exists) → int
+      if exists
+        return value
+      else
+        return defaultVal

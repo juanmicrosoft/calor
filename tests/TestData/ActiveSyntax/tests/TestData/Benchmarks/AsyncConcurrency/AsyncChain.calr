@@ -1,10 +1,10 @@
-§M{AsyncChain}
-  §AF{Step1:pub} (i32:input) -> i32
-    §R (+ input 1)
+module AsyncChain AsyncChain
+  module AsyncChainModule
+    func Step1 public async (int:input) → int
+      return input + 1
 
-  §AF{Step2:pub} (i32:input) -> i32
-    §R (* input 2)
+    func Step2 public async (int:input) → int
+      return input * 2
 
-  §F{SyncPipeline:pub} (i32:input) -> i32
-    §R (* (+ input 1) 2)
-
+    func SyncPipeline public (int:input) → int
+      return (input + 1) * 2

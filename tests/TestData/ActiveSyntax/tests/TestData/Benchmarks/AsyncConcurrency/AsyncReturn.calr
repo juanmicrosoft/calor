@@ -1,7 +1,7 @@
-§M{AsyncReturn}
-  §AF{ComputeAsync:pub} (i32:x) -> i32
-    §R (* x x)
+module AsyncReturn AsyncReturn
+  module AsyncReturnModule
+    func ComputeAsync public async (int:x) → int
+      return x * x
 
-  §F{ComputeSync:pub} (i32:x) -> i32
-    §R (* x x)
-
+    func ComputeSync public (int:x) → int
+      return x * x

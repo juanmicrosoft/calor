@@ -1,10 +1,10 @@
-§M{DepthFirstSearch}
-  §F{IsVisited:pub} (i32:node, i32:visitedBitmask) -> bool
-    §R (!= visitedBitmask 0)
+module DepthFirstSearch DepthFirstSearch
+  module DepthFirstSearchModule
+    func IsVisited public (int:node, int:visitedBitmask) → bool
+      return visitedBitmask != 0
 
-  §F{MarkVisited:pub} (i32:visitedCount) -> i32
-    §R (+ visitedCount 1)
+    func MarkVisited public (int:visitedCount) → int
+      return visitedCount + 1
 
-  §F{AllVisited:pub} (i32:visitedCount, i32:totalNodes) -> bool
-    §R (== visitedCount totalNodes)
-
+    func AllVisited public (int:visitedCount, int:totalNodes) → bool
+      return visitedCount == totalNodes

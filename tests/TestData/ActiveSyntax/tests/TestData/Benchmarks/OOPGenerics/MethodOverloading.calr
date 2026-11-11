@@ -1,10 +1,10 @@
-§M{MethodOverloading}
-  §F{AddInts:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+module MethodOverloading MethodOverloading
+  module MethodOverloadingModule
+    func AddInts public (int:a, int:b) → int
+      return a + b
 
-  §F{AddDoubles:pub} (f32:a, f32:b) -> f32
-    §R (+ a b)
+    func AddDoubles public (float:a, float:b) → float
+      return a + b
 
-  §F{AddThree:pub} (i32:a, i32:b, i32:c) -> i32
-    §R (+ (+ a b) c)
-
+    func AddThree public (int:a, int:b, int:c) → int
+      return (a + b) + c

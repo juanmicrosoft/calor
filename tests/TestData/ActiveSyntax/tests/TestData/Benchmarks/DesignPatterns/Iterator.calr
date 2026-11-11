@@ -1,14 +1,14 @@
-§M{Iterator}
-  §F{HasNext:pub} (i32:current, i32:end) -> bool
-    §R (< current end)
+module Iterator Iterator
+  module IteratorModule
+    func HasNext public (int:current, int:end) → bool
+      return current < end
 
-  §F{Next:pub} (i32:current, i32:step) -> i32
-    §Q (> step 0)
-    §R (+ current step)
+    func Next public (int:current, int:@step) → int
+      requires @step > 0
+      return current + @step
 
-  §F{Current:pub} (i32:value) -> i32
-    §R value
+    func Current public (int:value) → int
+      return value
 
-  §F{Reset:pub} (i32:start) -> i32
-    §R start
-
+    func Reset public (int:start) → int
+      return start

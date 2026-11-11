@@ -1,12 +1,12 @@
-§M{CollectionLib}
-  §F{ListLength:pub} (i32:count) -> i32
-    §S (>= result 0)
-    §R count
+module CollectionLib CollectionLib
+  module CollectionLibModule
+    func ListLength public (int:count) → int
+      => result >= 0
+      return count
 
-  §F{IsInBounds:pub} (i32:index, i32:count) -> bool
-    §R (&& (>= index 0) (< index count))
+    func IsInBounds public (int:index, int:count) → bool
+      return index >= 0 && index < count
 
-  §F{AfterAdd:pub} (i32:count) -> i32
-    §S (> result count)
-    §R (+ count 1)
-
+    func AfterAdd public (int:count) → int
+      => result > count
+      return count + 1

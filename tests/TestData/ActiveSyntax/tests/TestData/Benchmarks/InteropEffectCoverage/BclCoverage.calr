@@ -1,14 +1,14 @@
-§M{BclUsage}
-  §F{LogMessage:pub} (str:message) -> void
-    §E{cw}
-    §P message
+module BclUsage BclUsage
+  module BclUsageModule
+    func LogMessage public (string:message) → void
+      ! cw
+      System.Console.WriteLine(message)
 
-  §F{ConcatStrings:pub} (str:a, str:b) -> str
-    §R (concat a b)
+    func ConcatStrings public (string:a, string:b) → string
+      return string.Concat(a, b)
 
-  §F{GetLength:pub} (str:s) -> i32
-    §R (len s)
+    func GetLength public (string:s) → int
+      return s.Length
 
-  §F{ToUpperCase:pub} (str:s) -> str
-    §R (upper s)
-
+    func ToUpperCase public (string:s) → string
+      return s.ToUpper()

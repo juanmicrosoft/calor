@@ -1,12 +1,12 @@
-§M{RangeMatch}
-  §F{AgeGroup:pub} (i32:age) -> i32
-    §Q (>= age 0)
-    §IF (< age 13)
-      §R 0
-    §EI (< age 20)
-      §R 1
-    §EI (< age 65)
-      §R 2
-    §EL
-      §R 3
-
+module RangeMatch RangeMatch
+  module RangeMatchModule
+    func AgeGroup public (int:age) → int
+      requires age >= 0
+      if age < 13
+        return 0
+      else if age < 20
+        return 1
+      else if age < 65
+        return 2
+      else
+        return 3

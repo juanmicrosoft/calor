@@ -1,22 +1,22 @@
-§M{TowerOfHanoi}
-  §F{MovesForDisks:pub} (i32:disks) -> i32
-    §Q (> disks 0)
-    §S (> result 0)
-    §IF (== disks 1)
-      §R 1
-    §EI (== disks 2)
-      §R 3
-    §EI (== disks 3)
-      §R 7
-    §EI (== disks 4)
-      §R 15
-    §EL
-      §R (- (* (* 2 disks) disks) 1)
+module TowerOfHanoi TowerOfHanoi
+  module TowerOfHanoiModule
+    func MovesForDisks public (int:disks) → int
+      requires disks > 0
+      => result > 0
+      if disks == 1
+        return 1
+      else if disks == 2
+        return 3
+      else if disks == 3
+        return 7
+      else if disks == 4
+        return 15
+      else
+        return ((2 * disks) * disks) - 1
 
-  §F{IsBaseCase:pub} (i32:disks) -> bool
-    §R (== disks 1)
+    func IsBaseCase public (int:disks) → bool
+      return disks == 1
 
-  §F{SubProblemSize:pub} (i32:disks) -> i32
-    §Q (> disks 1)
-    §R (- disks 1)
-
+    func SubProblemSize public (int:disks) → int
+      requires disks > 1
+      return disks - 1

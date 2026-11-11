@@ -1,11 +1,11 @@
-§M{TypeMatch}
-  §F{Describe:pub} (i32:typeCode) -> i32
-    §IF (== typeCode 0)
-      §R 0
-    §EI (== typeCode 1)
-      §R 1
-    §EI (== typeCode 2)
-      §R 2
-    §EL
-      §R (- 0 1)
-
+module TypeMatch TypeMatch
+  module TypeMatchModule
+    func Describe public (int:typeCode) → int
+      if typeCode == 0
+        return 0
+      else if typeCode == 1
+        return 1
+      else if typeCode == 2
+        return 2
+      else
+        return 0 - 1

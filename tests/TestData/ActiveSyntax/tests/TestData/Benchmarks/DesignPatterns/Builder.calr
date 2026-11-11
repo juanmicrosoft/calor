@@ -1,10 +1,10 @@
-§M{Builder}
-  §F{IsComplete:pub} (bool:hasName, bool:hasAge) -> bool
-    §R (&& hasName hasAge)
+module Builder Builder
+  module BuilderModule
+    func IsComplete public (bool:hasName, bool:hasAge) → bool
+      return hasName && hasAge
 
-  §F{SetStep:pub} (i32:currentStep) -> i32
-    §R (+ currentStep 1)
+    func SetStep public (int:currentStep) → int
+      return currentStep + 1
 
-  §F{CanBuild:pub} (i32:requiredSteps, i32:completedSteps) -> bool
-    §R (>= completedSteps requiredSteps)
-
+    func CanBuild public (int:requiredSteps, int:completedSteps) → bool
+      return completedSteps >= requiredSteps

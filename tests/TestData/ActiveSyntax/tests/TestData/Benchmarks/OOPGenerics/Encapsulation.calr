@@ -1,7 +1,7 @@
-§M{Encapsulation}
-  §F{GetBalance:pub} (f32:balance) -> f32
-    §R balance
+module Encapsulation Encapsulation
+  module EncapsulationModule
+    func GetBalance public (float:balance) → float
+      return balance
 
-  §F{IsValidDeposit:pub} (f32:amount) -> bool
-    §R (> amount 0)
-
+    func IsValidDeposit public (float:amount) → bool
+      return amount > 0

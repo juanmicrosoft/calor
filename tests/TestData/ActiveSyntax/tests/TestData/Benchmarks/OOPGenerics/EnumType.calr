@@ -1,14 +1,14 @@
-§M{EnumType}
-  §F{DaysInSeason:pub} (i32:season) -> i32
-    §IF (== season 0)
-      §R 92
-    §EI (== season 1)
-      §R 92
-    §EI (== season 2)
-      §R 91
-    §EL
-      §R 90
+module EnumType EnumType
+  module EnumTypeModule
+    func DaysInSeason public (int:season) → int
+      if season == 0
+        return 92
+      else if season == 1
+        return 92
+      else if season == 2
+        return 91
+      else
+        return 90
 
-  §F{IsWarm:pub} (i32:season) -> bool
-    §R (|| (== season 1) (== season 0))
-
+    func IsWarm public (int:season) → bool
+      return season == 1 || season == 0

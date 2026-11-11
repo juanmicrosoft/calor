@@ -1,14 +1,14 @@
-§M{CsvParser}
-  §F{FieldCount:pub} (i32:commaCount) -> i32
-    §S (> result 0)
-    §R (+ commaCount 1)
+module CsvParser CsvParser
+  module CsvParserModule
+    func FieldCount public (int:commaCount) → int
+      => result > 0
+      return commaCount + 1
 
-  §F{IsQuoted:pub} (i32:firstChar) -> bool
-    §R (== firstChar 34)
+    func IsQuoted public (int:firstChar) → bool
+      return firstChar == 34
 
-  §F{IsDelimiter:pub} (i32:charCode) -> bool
-    §R (== charCode 44)
+    func IsDelimiter public (int:charCode) → bool
+      return charCode == 44
 
-  §F{IsNewline:pub} (i32:charCode) -> bool
-    §R (|| (== charCode 10) (== charCode 13))
-
+    func IsNewline public (int:charCode) → bool
+      return charCode == 10 || charCode == 13

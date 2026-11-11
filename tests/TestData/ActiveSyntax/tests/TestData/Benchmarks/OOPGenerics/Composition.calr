@@ -1,10 +1,10 @@
-§M{Composition}
-  §F{EngineHorsepower:pub} (i32:hp) -> i32
-    §Q (> hp 0)
-    §R hp
+module Composition Composition
+  module CompositionModule
+    func EngineHorsepower public (int:hp) → int
+      requires hp > 0
+      return hp
 
-  §F{CarSpeed:pub} (i32:hp, f32:weight) -> f32
-    §Q (> hp 0)
-    §Q (> weight 0)
-    §R (/ (cast f64 hp) weight)
-
+    func CarSpeed public (int:hp, float:weight) → float
+      requires hp > 0
+      requires weight > 0
+      return (double)hp / weight

@@ -1,20 +1,20 @@
-§M{AbsoluteContracts}
-  §F{AbsNonNeg:pub} (i32:x) -> i32
-    §Q (> x (- 0 2147483647))
-    §S (>= result 0)
-    §IF (>= x 0)
-      §R x
-    §EL
-      §R (- 0 x)
+module AbsoluteContracts AbsoluteContracts
+  module AbsoluteContractsModule
+    func AbsNonNeg public (int:x) → int
+      requires x > 0 - 2147483647
+      => result >= 0
+      if x >= 0
+        return x
+      else
+        return 0 - x
 
-  §F{AbsIdempotent:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §S (== result x)
-    §R x
+    func AbsIdempotent public (int:x) → int
+      requires x >= 0
+      => result == x
+      return x
 
-  §F{TriangleInequality:pub} (i32:absA, i32:absB, i32:absSum) -> bool
-    §Q (>= absA 0)
-    §Q (>= absB 0)
-    §Q (>= absSum 0)
-    §R (<= absSum (+ absA absB))
-
+    func TriangleInequality public (int:absA, int:absB, int:absSum) → bool
+      requires absA >= 0
+      requires absB >= 0
+      requires absSum >= 0
+      return absSum <= (absA + absB)

@@ -1,16 +1,16 @@
-§M{ExhaustiveMatch}
-  §F{CardSuit:pub} (i32:suit) -> i32
-    §IF (== suit 0)
-      §R 0
-    §EI (== suit 1)
-      §R 1
-    §EI (== suit 2)
-      §R 2
-    §EI (== suit 3)
-      §R 3
-    §EL
-      §R (- 0 1)
+module ExhaustiveMatch ExhaustiveMatch
+  module ExhaustiveMatchModule
+    func CardSuit public (int:suit) → int
+      if suit == 0
+        return 0
+      else if suit == 1
+        return 1
+      else if suit == 2
+        return 2
+      else if suit == 3
+        return 3
+      else
+        return 0 - 1
 
-  §F{IsRed:pub} (i32:suit) -> bool
-    §R (|| (== suit 1) (== suit 2))
-
+    func IsRed public (int:suit) → bool
+      return suit == 1 || suit == 2

@@ -1,8 +1,8 @@
-§M{ExceptionChain}
-  §F{WrapError:pub} (i32:code) -> i32
-    §R code
+module ExceptionChain ExceptionChain
+  module ExceptionChainModule
+    func WrapError public (int:code) → int
+      return code
 
-  §F{ErrorLevel:pub} (i32:depth) -> i32
-    §S (>= result 0)
-    §R depth
-
+    func ErrorLevel public (int:depth) → int
+      => result >= 0
+      return depth

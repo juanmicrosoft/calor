@@ -1,10 +1,10 @@
-§M{Singleton}
-  §F{IsInitialized:pub} (bool:hasInstance) -> bool
-    §R hasInstance
+module Singleton Singleton
+  module SingletonModule
+    func IsInitialized public (bool:hasInstance) → bool
+      return hasInstance
 
-  §F{GetValue:pub} (i32:value) -> i32
-    §R value
+    func GetValue public (int:value) → int
+      return value
 
-  §F{SetValue:pub} (i32:oldValue, i32:newValue) -> i32
-    §R newValue
-
+    func SetValue public (int:oldValue, int:newValue) → int
+      return newValue

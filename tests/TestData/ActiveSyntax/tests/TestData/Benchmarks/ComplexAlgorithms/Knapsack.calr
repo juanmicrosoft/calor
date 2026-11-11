@@ -1,17 +1,17 @@
-§M{Knapsack}
-  §F{BetterValue:pub} (i32:withItem, i32:withoutItem) -> i32
-    §IF (> withItem withoutItem)
-      §R withItem
-    §EL
-      §R withoutItem
+module Knapsack Knapsack
+  module KnapsackModule
+    func BetterValue public (int:withItem, int:withoutItem) → int
+      if withItem > withoutItem
+        return withItem
+      else
+        return withoutItem
 
-  §F{Fits:pub} (i32:weight, i32:capacity) -> bool
-    §Q (> weight 0)
-    §Q (>= capacity 0)
-    §R (<= weight capacity)
+    func Fits public (int:weight, int:capacity) → bool
+      requires weight > 0
+      requires capacity >= 0
+      return weight <= capacity
 
-  §F{RemainingCapacity:pub} (i32:capacity, i32:weight) -> i32
-    §Q (>= capacity weight)
-    §S (>= result 0)
-    §R (- capacity weight)
-
+    func RemainingCapacity public (int:capacity, int:weight) → int
+      requires capacity >= weight
+      => result >= 0
+      return capacity - weight

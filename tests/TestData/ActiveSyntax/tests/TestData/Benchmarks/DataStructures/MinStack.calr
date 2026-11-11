@@ -1,13 +1,13 @@
-§M{MinStack}
-  §F{NewMin:pub} (i32:value, i32:currentMin) -> i32
-    §IF (< value currentMin)
-      §R value
-    §EL
-      §R currentMin
+module MinStack MinStack
+  module MinStackModule
+    func NewMin public (int:value, int:currentMin) → int
+      if value < currentMin
+        return value
+      else
+        return currentMin
 
-  §F{IsNewMin:pub} (i32:value, i32:currentMin) -> bool
-    §R (<= value currentMin)
+    func IsNewMin public (int:value, int:currentMin) → bool
+      return value <= currentMin
 
-  §F{CanPop:pub} (i32:size) -> bool
-    §R (> size 0)
-
+    func CanPop public (int:size) → bool
+      return size > 0

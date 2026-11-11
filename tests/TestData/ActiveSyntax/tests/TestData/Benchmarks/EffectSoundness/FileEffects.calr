@@ -1,13 +1,13 @@
-§M{FileService}
-  §F{ReadFile:pub} (str:path) -> str
-    §E{fr}
-    §R path
+module FileService FileService
+  module FileServiceModule
+    func ReadFile public (string:path) → string
+      ! fr
+      return path
 
-  §F{WriteFile:pub} (str:path, str:content) -> void
-    §E{fw}
-    §P content
+    func WriteFile public (string:path, string:content) → void
+      ! fw
+      System.Console.WriteLine(content)
 
-  §F{ProcessFile:pub} (str:input, str:output) -> void
-    §E{fw}
-    §P input
-
+    func ProcessFile public (string:input, string:output) → void
+      ! fw
+      System.Console.WriteLine(input)

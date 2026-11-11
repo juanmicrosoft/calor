@@ -1,9 +1,9 @@
-§M{GroupBy}
-  §F{GroupKey:pub} (i32:value, i32:divisor) -> i32
-    §Q (!= divisor 0)
-    §R (/ value divisor)
+module GroupBy GroupBy
+  module GroupByModule
+    func GroupKey public (int:value, int:divisor) → int
+      requires divisor != 0
+      return value / divisor
 
-  §F{BucketIndex:pub} (i32:value, i32:bucketSize) -> i32
-    §Q (> bucketSize 0)
-    §R (/ value bucketSize)
-
+    func BucketIndex public (int:value, int:bucketSize) → int
+      requires bucketSize > 0
+      return value / bucketSize

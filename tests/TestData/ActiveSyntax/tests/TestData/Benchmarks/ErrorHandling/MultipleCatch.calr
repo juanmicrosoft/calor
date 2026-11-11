@@ -1,7 +1,7 @@
-§M{MultipleCatch}
-  §F{ParseInt:pub} (str:input, i32:defaultVal) -> i32
-    §R defaultVal
+module MultipleCatch MultipleCatch
+  module MultipleCatchModule
+    func ParseInt public (string:input, int:defaultVal) → int
+      return defaultVal
 
-  §F{IsNumeric:pub} (i32:charCode) -> bool
-    §R (&& (>= charCode 48) (<= charCode 57))
-
+    func IsNumeric public (int:charCode) → bool
+      return charCode >= 48 && charCode <= 57

@@ -1,19 +1,19 @@
-§M{Graph}
-  §F{IsConnected:pub} (i32:edgeCount) -> bool
-    §R (> edgeCount 0)
+module Graph Graph
+  module GraphModule
+    func IsConnected public (int:edgeCount) → bool
+      return edgeCount > 0
 
-  §F{Degree:pub} (i32:neighborCount) -> i32
-    §S (>= result 0)
-    §R neighborCount
+    func Degree public (int:neighborCount) → int
+      => result >= 0
+      return neighborCount
 
-  §F{HasEdge:pub} (i32:from, i32:to, i32:nodeCount) -> bool
-    §Q (>= from 0)
-    §Q (>= to 0)
-    §Q (< from nodeCount)
-    §Q (< to nodeCount)
-    §R (!= from to)
+    func HasEdge public (int:@from, int:@to, int:nodeCount) → bool
+      requires @from >= 0
+      requires @to >= 0
+      requires @from < nodeCount
+      requires @to < nodeCount
+      return @from != @to
 
-  §F{NodeCount:pub} (i32:count) -> i32
-    §S (>= result 0)
-    §R count
-
+    func NodeCount public (int:count) → int
+      => result >= 0
+      return count

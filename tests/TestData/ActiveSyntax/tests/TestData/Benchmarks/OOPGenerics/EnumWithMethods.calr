@@ -1,14 +1,14 @@
-§M{EnumWithMethods}
-  §F{Priority:pub} (i32:level) -> i32
-    §IF (== level 0)
-      §R 1
-    §EI (== level 1)
-      §R 2
-    §EI (== level 2)
-      §R 3
-    §EL
-      §R 4
+module EnumWithMethods EnumWithMethods
+  module EnumWithMethodsModule
+    func Priority public (int:level) → int
+      if level == 0
+        return 1
+      else if level == 1
+        return 2
+      else if level == 2
+        return 3
+      else
+        return 4
 
-  §F{IsUrgent:pub} (i32:level) -> bool
-    §R (>= level 2)
-
+    func IsUrgent public (int:level) → bool
+      return level >= 2

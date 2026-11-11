@@ -1,18 +1,18 @@
-§M{StateMachine}
-  §F{NextState:pub} (i32:current) -> i32
-    §IF (== current 0)
-      §R 1
-    §EI (== current 1)
-      §R 2
-    §EL
-      §R 0
+module StateMachine StateMachine
+  module StateMachineModule
+    func NextState public (int:current) → int
+      if current == 0
+        return 1
+      else if current == 1
+        return 2
+      else
+        return 0
 
-  §F{IsGreen:pub} (i32:state) -> bool
-    §R (== state 0)
+    func IsGreen public (int:state) → bool
+      return state == 0
 
-  §F{IsYellow:pub} (i32:state) -> bool
-    §R (== state 1)
+    func IsYellow public (int:state) → bool
+      return state == 1
 
-  §F{IsRed:pub} (i32:state) -> bool
-    §R (== state 2)
-
+    func IsRed public (int:state) → bool
+      return state == 2

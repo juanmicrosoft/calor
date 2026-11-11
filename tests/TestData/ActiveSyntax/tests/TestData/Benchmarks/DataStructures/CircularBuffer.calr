@@ -1,17 +1,17 @@
-§M{CircularBuffer}
-  §F{NextIndex:pub} (i32:current, i32:capacity) -> i32
-    §Q (> capacity 0)
-    §S (>= result 0)
-    §S (< result capacity)
-    §R (% (+ current 1) capacity)
+module CircularBuffer CircularBuffer
+  module CircularBufferModule
+    func NextIndex public (int:current, int:capacity) → int
+      requires capacity > 0
+      => result >= 0
+      => result < capacity
+      return (current + 1) % capacity
 
-  §F{IsFull:pub} (i32:count, i32:capacity) -> bool
-    §R (== count capacity)
+    func IsFull public (int:count, int:capacity) → bool
+      return count == capacity
 
-  §F{IsEmpty:pub} (i32:count) -> bool
-    §R (== count 0)
+    func IsEmpty public (int:count) → bool
+      return count == 0
 
-  §F{WriteIndex:pub} (i32:head, i32:count, i32:capacity) -> i32
-    §Q (> capacity 0)
-    §R (% (+ head count) capacity)
-
+    func WriteIndex public (int:head, int:count, int:capacity) → int
+      requires capacity > 0
+      return (head + count) % capacity

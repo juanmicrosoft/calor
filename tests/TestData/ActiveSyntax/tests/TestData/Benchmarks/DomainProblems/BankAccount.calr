@@ -1,15 +1,15 @@
-§M{BankAccount}
-  §F{Deposit:pub} (f32:balance, f32:amount) -> f32
-    §Q (> amount 0)
-    §S (> result balance)
-    §R (+ balance amount)
+module BankAccount BankAccount
+  module BankAccountModule
+    func Deposit public (float:balance, float:amount) → float
+      requires amount > 0
+      => result > balance
+      return balance + amount
 
-  §F{Withdraw:pub} (f32:balance, f32:amount) -> f32
-    §Q (> amount 0)
-    §Q (>= balance amount)
-    §S (< result balance)
-    §R (- balance amount)
+    func Withdraw public (float:balance, float:amount) → float
+      requires amount > 0
+      requires balance >= amount
+      => result < balance
+      return balance - amount
 
-  §F{CanWithdraw:pub} (f32:balance, f32:amount) -> bool
-    §R (&& (> amount 0) (>= balance amount))
-
+    func CanWithdraw public (float:balance, float:amount) → bool
+      return amount > 0 && balance >= amount

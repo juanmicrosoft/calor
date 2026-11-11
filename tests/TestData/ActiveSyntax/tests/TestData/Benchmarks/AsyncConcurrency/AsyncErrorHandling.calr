@@ -1,8 +1,8 @@
-§M{AsyncErrorHandling}
-  §AF{SafeFetch:pub} (str:url) -> str
-    §E{net}
-    §R url
+module AsyncErrorHandling AsyncErrorHandling
+  module AsyncErrorHandlingModule
+    func SafeFetch public async (string:url) → string
+      ! net
+      return url
 
-  §F{IsError:pub} (bool:succeeded) -> bool
-    §R (! succeeded)
-
+    func IsError public (bool:succeeded) → bool
+      return !succeeded

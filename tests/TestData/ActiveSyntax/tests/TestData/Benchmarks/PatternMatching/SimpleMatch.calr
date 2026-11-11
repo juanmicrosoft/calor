@@ -1,19 +1,19 @@
-§M{SimpleMatch}
-  §F{DayName:pub} (i32:day) -> i32
-    §IF (== day 1)
-      §R 1
-    §EI (== day 2)
-      §R 2
-    §EI (== day 3)
-      §R 3
-    §EI (== day 4)
-      §R 4
-    §EI (== day 5)
-      §R 5
-    §EI (== day 6)
-      §R 6
-    §EI (== day 7)
-      §R 7
-    §EL
-      §R 0
-
+module SimpleMatch SimpleMatch
+  module SimpleMatchModule
+    func DayName public (int:day) → int
+      if day == 1
+        return 1
+      else if day == 2
+        return 2
+      else if day == 3
+        return 3
+      else if day == 4
+        return 4
+      else if day == 5
+        return 5
+      else if day == 6
+        return 6
+      else if day == 7
+        return 7
+      else
+        return 0

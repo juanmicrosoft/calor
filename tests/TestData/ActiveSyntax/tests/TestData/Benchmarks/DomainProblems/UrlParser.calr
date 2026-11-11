@@ -1,16 +1,16 @@
-§M{UrlParser}
-  §F{HasProtocol:pub} (bool:startsWithHttp) -> bool
-    §R startsWithHttp
+module UrlParser UrlParser
+  module UrlParserModule
+    func HasProtocol public (bool:startsWithHttp) → bool
+      return startsWithHttp
 
-  §F{IsSecure:pub} (bool:isHttps) -> bool
-    §R isHttps
+    func IsSecure public (bool:isHttps) → bool
+      return isHttps
 
-  §F{DefaultPort:pub} (bool:isHttps) -> i32
-    §IF isHttps
-      §R 443
-    §EL
-      §R 80
+    func DefaultPort public (bool:isHttps) → int
+      if isHttps
+        return 443
+      else
+        return 80
 
-  §F{IsValidPort:pub} (i32:port) -> bool
-    §R (&& (> port 0) (<= port 65535))
-
+    func IsValidPort public (int:port) → bool
+      return port > 0 && port <= 65535

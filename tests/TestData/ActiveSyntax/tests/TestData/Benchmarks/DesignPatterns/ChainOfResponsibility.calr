@@ -1,15 +1,15 @@
-§M{ChainOfResponsibility}
-  §F{CanApprove:pub} (f32:amount, f32:limit) -> bool
-    §Q (> amount 0)
-    §Q (> limit 0)
-    §R (<= amount limit)
+module ChainOfResponsibility ChainOfResponsibility
+  module ChainOfResponsibilityModule
+    func CanApprove public (float:amount, float:limit) → bool
+      requires amount > 0
+      requires limit > 0
+      return amount <= limit
 
-  §F{ManagerLimit:pub} () -> f32
-    §R 1000
+    func ManagerLimit public () → float
+      return 1000
 
-  §F{DirectorLimit:pub} () -> f32
-    §R 10000
+    func DirectorLimit public () → float
+      return 10000
 
-  §F{VPLimit:pub} () -> f32
-    §R 100000
-
+    func VPLimit public () → float
+      return 100000

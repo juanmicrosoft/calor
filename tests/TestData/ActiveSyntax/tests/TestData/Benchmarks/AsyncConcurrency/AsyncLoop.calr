@@ -1,7 +1,7 @@
-§M{AsyncLoop}
-  §AF{ProcessItem:pub} (i32:item) -> i32
-    §R (* item 2)
+module AsyncLoop AsyncLoop
+  module AsyncLoopModule
+    func ProcessItem public async (int:item) → int
+      return item * 2
 
-  §F{HasMore:pub} (i32:index, i32:count) -> bool
-    §R (< index count)
-
+    func HasMore public (int:index, int:count) → bool
+      return index < count

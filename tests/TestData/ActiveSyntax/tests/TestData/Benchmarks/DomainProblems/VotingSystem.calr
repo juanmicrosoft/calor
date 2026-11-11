@@ -1,15 +1,15 @@
-§M{VotingSystem}
-  §F{AddVote:pub} (i32:currentVotes) -> i32
-    §R (+ currentVotes 1)
+module VotingSystem VotingSystem
+  module VotingSystemModule
+    func AddVote public (int:currentVotes) → int
+      return currentVotes + 1
 
-  §F{HasMajority:pub} (i32:votes, i32:totalVotes) -> bool
-    §Q (> totalVotes 0)
-    §R (> (* votes 2) totalVotes)
+    func HasMajority public (int:votes, int:totalVotes) → bool
+      requires totalVotes > 0
+      return (votes * 2) > totalVotes
 
-  §F{Percentage:pub} (i32:votes, i32:totalVotes) -> f32
-    §Q (> totalVotes 0)
-    §R (* (/ (cast f64 votes) (cast f64 totalVotes)) 100)
+    func Percentage public (int:votes, int:totalVotes) → float
+      requires totalVotes > 0
+      return ((double)votes / (double)totalVotes) * 100
 
-  §F{IsValid:pub} (i32:totalVotes, i32:eligibleVoters) -> bool
-    §R (<= totalVotes eligibleVoters)
-
+    func IsValid public (int:totalVotes, int:eligibleVoters) → bool
+      return totalVotes <= eligibleVoters

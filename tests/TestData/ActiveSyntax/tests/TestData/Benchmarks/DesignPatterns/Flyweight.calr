@@ -1,13 +1,13 @@
-§M{Flyweight}
-  §F{PoolSize:pub} (i32:uniqueCount) -> i32
-    §S (>= result 0)
-    §R uniqueCount
+module Flyweight Flyweight
+  module FlyweightModule
+    func PoolSize public (int:uniqueCount) → int
+      => result >= 0
+      return uniqueCount
 
-  §F{MemorySaved:pub} (i32:totalObjects, i32:uniqueObjects, i32:objectSize) -> i32
-    §Q (>= totalObjects uniqueObjects)
-    §S (>= result 0)
-    §R (* (- totalObjects uniqueObjects) objectSize)
+    func MemorySaved public (int:totalObjects, int:uniqueObjects, int:objectSize) → int
+      requires totalObjects >= uniqueObjects
+      => result >= 0
+      return (totalObjects - uniqueObjects) * objectSize
 
-  §F{IsPooled:pub} (i32:objectId, i32:poolSize) -> bool
-    §R (< objectId poolSize)
-
+    func IsPooled public (int:objectId, int:poolSize) → bool
+      return objectId < poolSize

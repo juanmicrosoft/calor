@@ -1,12 +1,12 @@
-§M{DbService}
-  §F{QueryCount:pub} (str:table) -> i32
-    §E{db}
-    §R 0
+module DbService DbService
+  module DbServiceModule
+    func QueryCount public (string:table) → int
+      ! db
+      return 0
 
-  §F{Insert:pub} (str:table, str:data) -> void
-    §E{db}
-    §P data
+    func Insert public (string:table, string:data) → void
+      ! db
+      System.Console.WriteLine(data)
 
-  §F{PureTransform:pub} (str:data) -> str
-    §R data
-
+    func PureTransform public (string:data) → string
+      return data

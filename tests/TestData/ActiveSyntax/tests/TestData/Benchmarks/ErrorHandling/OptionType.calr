@@ -1,14 +1,14 @@
-§M{OptionType}
-  §F{HasValue:pub} (bool:isSome) -> bool
-    §R isSome
+module OptionType OptionType
+  module OptionTypeModule
+    func HasValue public (bool:isSome) → bool
+      return isSome
 
-  §F{Unwrap:pub} (i32:value, bool:isSome) -> i32
-    §Q (== isSome true)
-    §R value
+    func Unwrap public (int:value, bool:isSome) → int
+      requires isSome == true
+      return value
 
-  §F{GetOrElse:pub} (i32:value, i32:fallback, bool:isSome) -> i32
-    §IF isSome
-      §R value
-    §EL
-      §R fallback
-
+    func GetOrElse public (int:value, int:fallback, bool:isSome) → int
+      if isSome
+        return value
+      else
+        return fallback

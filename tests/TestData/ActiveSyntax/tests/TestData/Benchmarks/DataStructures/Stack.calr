@@ -1,13 +1,13 @@
-§M{Stack}
-  §F{IsEmpty:pub} (i32:count) -> bool
-    §R (== count 0)
+module Stack Stack
+  module StackModule
+    func IsEmpty public (int:count) → bool
+      return count == 0
 
-  §F{Size:pub} (i32:count) -> i32
-    §R count
+    func Size public (int:count) → int
+      return count
 
-  §F{NewCount:pub} (i32:oldCount, bool:isPush) -> i32
-    §IF isPush
-      §R (+ oldCount 1)
-    §EL
-      §R (- oldCount 1)
-
+    func NewCount public (int:oldCount, bool:isPush) → int
+      if isPush
+        return oldCount + 1
+      else
+        return oldCount - 1

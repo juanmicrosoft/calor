@@ -1,14 +1,14 @@
-§M{DivisionContracts}
-  §F{SafeDiv:pub} (i32:a, i32:b) -> i32
-    §Q (!= b 0)
-    §R (/ a b)
+module DivisionContracts DivisionContracts
+  module DivisionContractsModule
+    func SafeDiv public (int:a, int:b) → int
+      requires b != 0
+      return a / b
 
-  §F{SafeMod:pub} (i32:a, i32:b) -> i32
-    §Q (!= b 0)
-    §S (>= result 0)
-    §R (% a b)
+    func SafeMod public (int:a, int:b) → int
+      requires b != 0
+      => result >= 0
+      return a % b
 
-  §F{DivRemainder:pub} (i32:a, i32:b) -> i32
-    §Q (!= b 0)
-    §R (- a (* (/ a b) b))
-
+    func DivRemainder public (int:a, int:b) → int
+      requires b != 0
+      return a - ((a / b) * b)

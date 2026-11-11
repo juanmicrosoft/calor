@@ -1,12 +1,12 @@
-§M{Composite}
-  §F{FileSize:pub} (i32:size) -> i32
-    §Q (>= size 0)
-    §R size
+module Composite Composite
+  module CompositeModule
+    func FileSize public (int:size) → int
+      requires size >= 0
+      return size
 
-  §F{TotalSize:pub} (i32:ownSize, i32:childrenSize) -> i32
-    §S (>= result ownSize)
-    §R (+ ownSize childrenSize)
+    func TotalSize public (int:ownSize, int:childrenSize) → int
+      => result >= ownSize
+      return ownSize + childrenSize
 
-  §F{IsLeaf:pub} (i32:childCount) -> bool
-    §R (== childCount 0)
-
+    func IsLeaf public (int:childCount) → bool
+      return childCount == 0

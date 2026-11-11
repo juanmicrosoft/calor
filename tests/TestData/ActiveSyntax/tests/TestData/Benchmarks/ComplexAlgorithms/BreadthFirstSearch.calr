@@ -1,10 +1,10 @@
-§M{BreadthFirstSearch}
-  §F{IsGoal:pub} (i32:current, i32:target) -> bool
-    §R (== current target)
+module BreadthFirstSearch BreadthFirstSearch
+  module BreadthFirstSearchModule
+    func IsGoal public (int:current, int:target) → bool
+      return current == target
 
-  §F{QueueEmpty:pub} (i32:queueSize) -> bool
-    §R (== queueSize 0)
+    func QueueEmpty public (int:queueSize) → bool
+      return queueSize == 0
 
-  §F{Distance:pub} (i32:parentDist) -> i32
-    §R (+ parentDist 1)
-
+    func Distance public (int:parentDist) → int
+      return parentDist + 1

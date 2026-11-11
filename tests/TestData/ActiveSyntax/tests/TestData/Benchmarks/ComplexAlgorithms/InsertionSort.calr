@@ -1,10 +1,10 @@
-§M{InsertionSort}
-  §F{ShouldShift:pub} (i32:current, i32:key) -> bool
-    §R (> current key)
+module InsertionSort InsertionSort
+  module InsertionSortModule
+    func ShouldShift public (int:current, int:key) → bool
+      return current > key
 
-  §F{InsertPosition:pub} (i32:j) -> i32
-    §R (+ j 1)
+    func InsertPosition public (int:j) → int
+      return j + 1
 
-  §F{NeedsSorting:pub} (i32:length) -> bool
-    §R (> length 1)
-
+    func NeedsSorting public (int:length) → bool
+      return length > 1

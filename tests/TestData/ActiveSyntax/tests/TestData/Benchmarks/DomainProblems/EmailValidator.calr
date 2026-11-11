@@ -1,13 +1,13 @@
-§M{EmailValidator}
-  §F{HasAtSign:pub} (bool:containsAt) -> bool
-    §R containsAt
+module EmailValidator EmailValidator
+  module EmailValidatorModule
+    func HasAtSign public (bool:containsAt) → bool
+      return containsAt
 
-  §F{HasDot:pub} (bool:containsDot) -> bool
-    §R containsDot
+    func HasDot public (bool:containsDot) → bool
+      return containsDot
 
-  §F{IsValidLength:pub} (i32:length) -> bool
-    §R (&& (>= length 5) (<= length 254))
+    func IsValidLength public (int:length) → bool
+      return length >= 5 && length <= 254
 
-  §F{IsValid:pub} (bool:hasAt, bool:hasDot, i32:length) -> bool
-    §R (&& (&& hasAt hasDot) (&& (>= length 5) (<= length 254)))
-
+    func IsValid public (bool:hasAt, bool:hasDot, int:length) → bool
+      return (hasAt && hasDot) && (length >= 5 && length <= 254)

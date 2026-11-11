@@ -1,15 +1,15 @@
-§M{Proxy}
-  §F{HasAccess:pub} (i32:userRole, i32:requiredRole) -> bool
-    §R (>= userRole requiredRole)
+module Proxy Proxy
+  module ProxyModule
+    func HasAccess public (int:userRole, int:requiredRole) → bool
+      return userRole >= requiredRole
 
-  §F{LogAccess:pub} (i32:userId, bool:granted) -> i32
-    §E{cw}
-    §IF granted
-      §P "Access granted"
-    §EL
-      §P "Access denied"
-    §R userId
+    func LogAccess public (int:userId, bool:granted) → int
+      ! cw
+      if granted
+        System.Console.WriteLine("Access granted")
+      else
+        System.Console.WriteLine("Access denied")
+      return userId
 
-  §F{CacheHit:pub} (bool:isCached) -> bool
-    §R isCached
-
+    func CacheHit public (bool:isCached) → bool
+      return isCached

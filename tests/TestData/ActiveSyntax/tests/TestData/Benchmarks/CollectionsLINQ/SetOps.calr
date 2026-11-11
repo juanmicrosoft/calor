@@ -1,12 +1,12 @@
-§M{SetOps}
-  §F{Contains:pub} (bool:found) -> bool
-    §R found
+module SetOps SetOps
+  module SetOpsModule
+    func Contains public (bool:found) → bool
+      return found
 
-  §F{SetSize:pub} (i32:size) -> i32
-    §S (>= result 0)
-    §R size
+    func SetSize public (int:size) → int
+      => result >= 0
+      return size
 
-  §F{UnionSize:pub} (i32:sizeA, i32:sizeB, i32:overlapCount) -> i32
-    §S (>= result 0)
-    §R (- (+ sizeA sizeB) overlapCount)
-
+    func UnionSize public (int:sizeA, int:sizeB, int:overlapCount) → int
+      => result >= 0
+      return (sizeA + sizeB) - overlapCount

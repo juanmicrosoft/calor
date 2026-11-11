@@ -1,15 +1,15 @@
-§M{QuickSort}
-  §F{ChoosePivot:pub} (i32:low, i32:high) -> i32
-    §Q (>= low 0)
-    §Q (<= low high)
-    §R high
+module QuickSort QuickSort
+  module QuickSortModule
+    func ChoosePivot public (int:low, int:high) → int
+      requires low >= 0
+      requires low <= high
+      return high
 
-  §F{ShouldSwap:pub} (i32:value, i32:pivot) -> bool
-    §R (<= value pivot)
+    func ShouldSwap public (int:value, int:pivot) → bool
+      return value <= pivot
 
-  §F{NextPartitionIndex:pub} (i32:current) -> i32
-    §R (+ current 1)
+    func NextPartitionIndex public (int:current) → int
+      return current + 1
 
-  §F{IsSortedPair:pub} (i32:a, i32:b) -> bool
-    §R (<= a b)
-
+    func IsSortedPair public (int:a, int:b) → bool
+      return a <= b

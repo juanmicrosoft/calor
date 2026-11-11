@@ -1,12 +1,12 @@
-§M{WildcardMatch}
-  §F{DefaultValue:pub} (i32:typeCode) -> i32
-    §IF (== typeCode 0)
-      §R 0
-    §EI (== typeCode 1)
-      §R 1
-    §EL
-      §R (- 0 1)
+module WildcardMatch WildcardMatch
+  module WildcardMatchModule
+    func DefaultValue public (int:typeCode) → int
+      if typeCode == 0
+        return 0
+      else if typeCode == 1
+        return 1
+      else
+        return 0 - 1
 
-  §F{IsKnown:pub} (i32:typeCode) -> bool
-    §R (&& (>= typeCode 0) (<= typeCode 1))
-
+    func IsKnown public (int:typeCode) → bool
+      return typeCode >= 0 && typeCode <= 1

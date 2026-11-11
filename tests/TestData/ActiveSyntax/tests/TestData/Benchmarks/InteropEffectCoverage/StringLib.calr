@@ -1,11 +1,11 @@
-§M{StringLib}
-  §F{StringLength:pub} (i32:length) -> i32
-    §S (>= result 0)
-    §R length
+module StringLib StringLib
+  module StringLibModule
+    func StringLength public (int:length) → int
+      => result >= 0
+      return length
 
-  §F{IsEmpty:pub} (i32:length) -> bool
-    §R (== length 0)
+    func IsEmpty public (int:length) → bool
+      return length == 0
 
-  §F{Concat:pub} (str:a, str:b) -> str
-    §R a
-
+    func Concat public (string:a, string:b) → string
+      return a

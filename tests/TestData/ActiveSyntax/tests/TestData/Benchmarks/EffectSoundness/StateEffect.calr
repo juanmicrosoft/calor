@@ -1,11 +1,12 @@
-§M{StateService}
-  §F{IncrementCounter:pub} (i32:counter) -> i32
-    §E{mut}
-    §R (+ counter 1)
+module StateService StateService
+  module StateServiceModule
+    func IncrementCounter public (int:counter) → int
+      ! mut
+      return counter + 1
 
-  §F{ResetCounter:pub} () -> i32
-    §E{mut}
-    §R 0
+    func ResetCounter public () → int
+      ! mut
+      return 0
 
-  §F{ReadCounter:pub} (i32:counter) -> i32
-    §R counter
+    func ReadCounter public (int:counter) → int
+      return counter

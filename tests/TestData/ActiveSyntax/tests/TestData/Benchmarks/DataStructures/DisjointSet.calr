@@ -1,13 +1,13 @@
-§M{DisjointSet}
-  §F{IsRoot:pub} (i32:node, i32:parent) -> bool
-    §R (== node parent)
+module DisjointSet DisjointSet
+  module DisjointSetModule
+    func IsRoot public (int:node, int:parent) → bool
+      return node == parent
 
-  §F{ShouldMerge:pub} (i32:rootA, i32:rootB) -> bool
-    §R (!= rootA rootB)
+    func ShouldMerge public (int:rootA, int:rootB) → bool
+      return rootA != rootB
 
-  §F{PickRoot:pub} (i32:rankA, i32:rankB, i32:rootA, i32:rootB) -> i32
-    §IF (>= rankA rankB)
-      §R rootA
-    §EL
-      §R rootB
-
+    func PickRoot public (int:rankA, int:rankB, int:rootA, int:rootB) → int
+      if rankA >= rankB
+        return rootA
+      else
+        return rootB

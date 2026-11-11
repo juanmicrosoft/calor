@@ -1,37 +1,37 @@
-§M{SwitchExpression}
-  §F{Season:pub} (i32:month) -> i32
-    §Q (>= month 1)
-    §Q (<= month 12)
-    §IF (== month 12)
-      §R 0
-    §EI (<= month 2)
-      §R 0
-    §EI (<= month 5)
-      §R 1
-    §EI (<= month 8)
-      §R 2
-    §EI (<= month 11)
-      §R 3
-    §EL
-      §R 0
+module SwitchExpression SwitchExpression
+  module SwitchExpressionModule
+    func Season public (int:month) → int
+      requires month >= 1
+      requires month <= 12
+      if month == 12
+        return 0
+      else if month <= 2
+        return 0
+      else if month <= 5
+        return 1
+      else if month <= 8
+        return 2
+      else if month <= 11
+        return 3
+      else
+        return 0
 
-  §F{DayType:pub} (i32:day) -> i32
-    §IF (== day 0)
-      §R 0
-    §EI (== day 6)
-      §R 0
-    §EL
-      §R 1
+    func DayType public (int:day) → int
+      if day == 0
+        return 0
+      else if day == 6
+        return 0
+      else
+        return 1
 
-  §F{HttpCategory:pub} (i32:status) -> i32
-    §IF (< status 200)
-      §R 1
-    §EI (< status 300)
-      §R 2
-    §EI (< status 400)
-      §R 3
-    §EI (< status 500)
-      §R 4
-    §EL
-      §R 5
-
+    func HttpCategory public (int:status) → int
+      if status < 200
+        return 1
+      else if status < 300
+        return 2
+      else if status < 400
+        return 3
+      else if status < 500
+        return 4
+      else
+        return 5

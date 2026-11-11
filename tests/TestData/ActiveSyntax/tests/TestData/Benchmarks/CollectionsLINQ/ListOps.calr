@@ -1,14 +1,14 @@
-§M{ListOps}
-  §F{Sum:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+module ListOps ListOps
+  module ListOpsModule
+    func Sum public (int:a, int:b) → int
+      return a + b
 
-  §F{Count:pub} (i32:n) -> i32
-    §S (>= result 0)
-    §R n
+    func Count public (int:n) → int
+      => result >= 0
+      return n
 
-  §F{FirstOrDefault:pub} (i32:value, i32:defaultVal, bool:hasElements) -> i32
-    §IF hasElements
-      §R value
-    §EL
-      §R defaultVal
-
+    func FirstOrDefault public (int:value, int:defaultVal, bool:hasElements) → int
+      if hasElements
+        return value
+      else
+        return defaultVal

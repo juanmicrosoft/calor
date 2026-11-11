@@ -1,41 +1,41 @@
-§M{OverflowSafe}
-  §F{IncrementSafe:pub} (i32:x) -> i32
-    §Q (< x 2147483647)
-    §S (> result x)
-    §R (+ x 1)
+module OverflowSafe OverflowSafe
+  module OverflowSafeModule
+    func IncrementSafe public (int:x) → int
+      requires x < 2147483647
+      => result > x
+      return x + 1
 
-  §F{DecrementSafe:pub} (i32:x) -> i32
-    §Q (> x -2147483648)
-    §S (< result x)
-    §R (- x 1)
+    func DecrementSafe public (int:x) → int
+      requires x > -2147483648
+      => result < x
+      return x - 1
 
-  §F{DoubleSafe:pub} (i32:x) -> i32
-    §Q (> x 0)
-    §Q (< x 1073741824)
-    §S (> result x)
-    §R (* x 2)
+    func DoubleSafe public (int:x) → int
+      requires x > 0
+      requires x < 1073741824
+      => result > x
+      return x * 2
 
-  §F{SquareSafe:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §Q (<= x 46340)
-    §S (>= result 0)
-    §R (* x x)
+    func SquareSafe public (int:x) → int
+      requires x >= 0
+      requires x <= 46340
+      => result >= 0
+      return x * x
 
-  §F{NegateSafe:pub} (i32:x) -> i32
-    §Q (< x 0)
-    §Q (> x -2147483648)
-    §S (> result 0)
-    §R (- 0 x)
+    func NegateSafe public (int:x) → int
+      requires x < 0
+      requires x > -2147483648
+      => result > 0
+      return 0 - x
 
-  §F{AddPositivesSafe:pub} (i32:x, i32:y) -> i32
-    §Q (> x 0)
-    §Q (< x 1073741824)
-    §Q (> y 0)
-    §Q (< y 1073741824)
-    §S (> result 0)
-    §R (+ x y)
+    func AddPositivesSafe public (int:x, int:y) → int
+      requires x > 0
+      requires x < 1073741824
+      requires y > 0
+      requires y < 1073741824
+      => result > 0
+      return x + y
 
-  §F{UnsignedNonNegative:pub} (u32:x) -> bool
-    §S (== result true)
-    §R (>= x 0)
-
+    func UnsignedNonNegative public (uint:x) → bool
+      => result == true
+      return x >= 0

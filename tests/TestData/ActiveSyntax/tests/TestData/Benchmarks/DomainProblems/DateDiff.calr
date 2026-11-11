@@ -1,17 +1,17 @@
-§M{DateDiff}
-  §F{DaysBetween:pub} (i32:dayA, i32:dayB) -> i32
-    §S (>= result 0)
-    §B{diff} (- dayB dayA)
-    §IF (< diff 0)
-      §R (- 0 diff)
-    §EL
-      §R diff
+module DateDiff DateDiff
+  module DateDiffModule
+    func DaysBetween public (int:dayA, int:dayB) → int
+      => result >= 0
+      let diff = dayB - dayA
+      if diff < 0
+        return 0 - diff
+      else
+        return diff
 
-  §F{WeeksBetween:pub} (i32:days) -> i32
-    §Q (>= days 0)
-    §R (/ days 7)
+    func WeeksBetween public (int:days) → int
+      requires days >= 0
+      return days / 7
 
-  §F{RemainingDays:pub} (i32:days) -> i32
-    §Q (>= days 0)
-    §R (% days 7)
-
+    func RemainingDays public (int:days) → int
+      requires days >= 0
+      return days % 7

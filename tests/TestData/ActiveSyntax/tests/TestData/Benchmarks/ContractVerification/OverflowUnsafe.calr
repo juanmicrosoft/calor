@@ -1,30 +1,30 @@
-§M{OverflowUnsafe}
-  §F{IncrementUnsafe:pub} (i32:x) -> i32
-    §S (> result x)
-    §R (+ x 1)
+module OverflowUnsafe OverflowUnsafe
+  module OverflowUnsafeModule
+    func IncrementUnsafe public (int:x) → int
+      => result > x
+      return x + 1
 
-  §F{DecrementUnsafe:pub} (i32:x) -> i32
-    §S (< result x)
-    §R (- x 1)
+    func DecrementUnsafe public (int:x) → int
+      => result < x
+      return x - 1
 
-  §F{DoubleUnsafe:pub} (i32:x) -> i32
-    §Q (> x 0)
-    §S (> result x)
-    §R (* x 2)
+    func DoubleUnsafe public (int:x) → int
+      requires x > 0
+      => result > x
+      return x * 2
 
-  §F{SquareUnsafe:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §S (>= result 0)
-    §R (* x x)
+    func SquareUnsafe public (int:x) → int
+      requires x >= 0
+      => result >= 0
+      return x * x
 
-  §F{NegateUnsafe:pub} (i32:x) -> i32
-    §Q (< x 0)
-    §S (> result 0)
-    §R (- 0 x)
+    func NegateUnsafe public (int:x) → int
+      requires x < 0
+      => result > 0
+      return 0 - x
 
-  §F{AddPositivesUnsafe:pub} (i32:x, i32:y) -> i32
-    §Q (> x 0)
-    §Q (> y 0)
-    §S (> result 0)
-    §R (+ x y)
-
+    func AddPositivesUnsafe public (int:x, int:y) → int
+      requires x > 0
+      requires y > 0
+      => result > 0
+      return x + y

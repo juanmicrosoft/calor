@@ -1,13 +1,13 @@
-§M{Zip}
-  §F{Add:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+module Zip Zip
+  module ZipModule
+    func Add public (int:a, int:b) → int
+      return a + b
 
-  §F{Multiply:pub} (i32:a, i32:b) -> i32
-    §R (* a b)
+    func Multiply public (int:a, int:b) → int
+      return a * b
 
-  §F{ZipLength:pub} (i32:lenA, i32:lenB) -> i32
-    §IF (< lenA lenB)
-      §R lenA
-    §EL
-      §R lenB
-
+    func ZipLength public (int:lenA, int:lenB) → int
+      if lenA < lenB
+        return lenA
+      else
+        return lenB

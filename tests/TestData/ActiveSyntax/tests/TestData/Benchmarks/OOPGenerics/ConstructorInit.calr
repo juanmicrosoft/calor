@@ -1,15 +1,15 @@
-§M{ConstructorInit}
-  §F{ValidateWidth:pub} (f32:width) -> f32
-    §Q (> width 0)
-    §R width
+module ConstructorInit ConstructorInit
+  module ConstructorInitModule
+    func ValidateWidth public (float:width) → float
+      requires width > 0
+      return width
 
-  §F{ValidateHeight:pub} (f32:height) -> f32
-    §Q (> height 0)
-    §R height
+    func ValidateHeight public (float:height) → float
+      requires height > 0
+      return height
 
-  §F{Area:pub} (f32:width, f32:height) -> f32
-    §Q (> width 0)
-    §Q (> height 0)
-    §S (> result 0)
-    §R (* width height)
-
+    func Area public (float:width, float:height) → float
+      requires width > 0
+      requires height > 0
+      => result > 0
+      return width * height

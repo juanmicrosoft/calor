@@ -1,7 +1,7 @@
-§M{SealedClass}
-  §F{GetValue:pub} (i32:value) -> i32
-    §R value
+module SealedClass SealedClass
+  module SealedClassModule
+    func GetValue public (int:value) → int
+      return value
 
-  §F{IsImmutable:pub} () -> bool
-    §R true
-
+    func IsImmutable public () → bool
+      return true

@@ -1,28 +1,28 @@
-§M{StringContracts}
-  §F{NonEmptyLength:pub} (str:s) -> i32
-    §Q (! (isempty s))
-    §S (> result 0)
-    §R (len s)
+module StringContracts StringContracts
+  module StringContractsModule
+    func NonEmptyLength public (string:s) → int
+      requires !string.IsNullOrEmpty(s)
+      => result > 0
+      return s.Length
 
-  §F{EmptyStringLength:pub} (str:s) -> bool
-    §S (== result (== (len s) 0))
-    §R (isempty s)
+    func EmptyStringLength public (string:s) → bool
+      => result == (s.Length == 0)
+      return string.IsNullOrEmpty(s)
 
-  §F{ConcatLonger:pub} (str:a, str:b) -> str
-    §Q (! (isempty a))
-    §S (> (len result) (len b))
-    §R (concat a b)
+    func ConcatLonger public (string:a, string:b) → string
+      requires !string.IsNullOrEmpty(a)
+      => result.Length > b.Length
+      return string.Concat(a, b)
 
-  §F{ContainsImpliesLength:pub} (str:haystack, str:needle) -> bool
-    §Q (! (isempty needle))
-    §S (|| (! result) (>= (len haystack) (len needle)))
-    §R (contains haystack needle)
+    func ContainsImpliesLength public (string:haystack, string:needle) → bool
+      requires !string.IsNullOrEmpty(needle)
+      => !result || haystack.Length >= needle.Length
+      return haystack.Contains(needle)
 
-  §F{PrefixLength:pub} (str:s, str:prefix) -> bool
-    §S (|| (! result) (>= (len s) (len prefix)))
-    §R (starts s prefix)
+    func PrefixLength public (string:s, string:prefix) → bool
+      => !result || s.Length >= prefix.Length
+      return s.StartsWith(prefix)
 
-  §F{SuffixLength:pub} (str:s, str:suffix) -> bool
-    §S (|| (! result) (>= (len s) (len suffix)))
-    §R (ends s suffix)
-
+    func SuffixLength public (string:s, string:suffix) → bool
+      => !result || s.Length >= suffix.Length
+      return s.EndsWith(suffix)

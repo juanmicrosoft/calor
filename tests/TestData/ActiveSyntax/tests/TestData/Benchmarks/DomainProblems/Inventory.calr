@@ -1,18 +1,18 @@
-§M{Inventory}
-  §F{Restock:pub} (i32:current, i32:quantity) -> i32
-    §Q (> quantity 0)
-    §S (> result current)
-    §R (+ current quantity)
+module Inventory Inventory
+  module InventoryModule
+    func Restock public (int:current, int:quantity) → int
+      requires quantity > 0
+      => result > current
+      return current + quantity
 
-  §F{Sell:pub} (i32:current, i32:quantity) -> i32
-    §Q (> quantity 0)
-    §Q (>= current quantity)
-    §S (>= result 0)
-    §R (- current quantity)
+    func Sell public (int:current, int:quantity) → int
+      requires quantity > 0
+      requires current >= quantity
+      => result >= 0
+      return current - quantity
 
-  §F{InStock:pub} (i32:quantity) -> bool
-    §R (> quantity 0)
+    func InStock public (int:quantity) → bool
+      return quantity > 0
 
-  §F{NeedsReorder:pub} (i32:quantity, i32:threshold) -> bool
-    §R (<= quantity threshold)
-
+    func NeedsReorder public (int:quantity, int:threshold) → bool
+      return quantity <= threshold

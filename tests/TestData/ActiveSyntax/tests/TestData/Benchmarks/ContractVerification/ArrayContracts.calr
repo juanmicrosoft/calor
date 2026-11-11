@@ -1,38 +1,38 @@
-§M{ArrayContracts}
-  §F{ValidIndex:pub} (i32:length, i32:index) -> bool
-    §Q (> length 0)
-    §S (== result (&& (>= index 0) (< index length)))
-    §R (&& (>= index 0) (< index length))
+module ArrayContracts ArrayContracts
+  module ArrayContractsModule
+    func ValidIndex public (int:length, int:index) → bool
+      requires length > 0
+      => result == (index >= 0 && index < length)
+      return index >= 0 && index < length
 
-  §F{LastValidIndex:pub} (i32:length) -> i32
-    §Q (> length 0)
-    §S (>= result 0)
-    §S (< result length)
-    §R (- length 1)
+    func LastValidIndex public (int:length) → int
+      requires length > 0
+      => result >= 0
+      => result < length
+      return length - 1
 
-  §F{LengthNonNegative:pub} (i32:length) -> bool
-    §Q (>= length 0)
-    §S (== result true)
-    §R (>= length 0)
+    func LengthNonNegative public (int:length) → bool
+      requires length >= 0
+      => result == true
+      return length >= 0
 
-  §F{SafeIndexRange:pub} (i32:length, i32:start, i32:count) -> bool
-    §Q (> length 0)
-    §Q (>= start 0)
-    §Q (> count 0)
-    §S (== result (<= (+ start count) length))
-    §R (<= (+ start count) length)
+    func SafeIndexRange public (int:length, int:start, int:count) → bool
+      requires length > 0
+      requires start >= 0
+      requires count > 0
+      => result == ((start + count) <= length)
+      return (start + count) <= length
 
-  §F{MidpointIndex:pub} (i32:low, i32:high) -> i32
-    §Q (>= low 0)
-    §Q (> high low)
-    §S (>= result low)
-    §S (< result high)
-    §R (+ low (/ (- high low) 2))
+    func MidpointIndex public (int:low, int:high) → int
+      requires low >= 0
+      requires high > low
+      => result >= low
+      => result < high
+      return low + ((high - low) / 2)
 
-  §F{BinarySearchBounds:pub} (i32:length, i32:low, i32:high) -> bool
-    §Q (> length 0)
-    §Q (>= low 0)
-    §Q (<= high length)
-    §S (== result (<= low high))
-    §R (<= low high)
-
+    func BinarySearchBounds public (int:length, int:low, int:high) → bool
+      requires length > 0
+      requires low >= 0
+      requires high <= length
+      => result == (low <= high)
+      return low <= high

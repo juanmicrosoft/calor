@@ -1,17 +1,17 @@
-§M{PropertyAccess}
-  §F{GetX:pub} (i32:x) -> i32
-    §R x
+module PropertyAccess PropertyAccess
+  module PropertyAccessModule
+    func GetX public (int:x) → int
+      return x
 
-  §F{GetY:pub} (i32:y) -> i32
-    §R y
+    func GetY public (int:y) → int
+      return y
 
-  §F{GetName:pub} (str:name) -> str
-    §R name
+    func GetName public (string:name) → string
+      return name
 
-  §F{GetAge:pub} (i32:age) -> i32
-    §Q (>= age 0)
-    §R age
+    func GetAge public (int:age) → int
+      requires age >= 0
+      return age
 
-  §F{GetEmail:pub} (str:email) -> str
-    §R email
-
+    func GetEmail public (string:email) → string
+      return email

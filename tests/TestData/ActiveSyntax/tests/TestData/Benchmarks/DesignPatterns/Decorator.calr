@@ -1,17 +1,17 @@
-§M{Decorator}
-  §F{BasePrice:pub} (f32:price) -> f32
-    §Q (> price 0)
-    §R price
+module Decorator Decorator
+  module DecoratorModule
+    func BasePrice public (float:price) → float
+      requires price > 0
+      return price
 
-  §F{WithTax:pub} (f32:price, f32:taxRate) -> f32
-    §Q (> price 0)
-    §Q (>= taxRate 0)
-    §S (>= result price)
-    §R (* price (+ 1 taxRate))
+    func WithTax public (float:price, float:taxRate) → float
+      requires price > 0
+      requires taxRate >= 0
+      => result >= price
+      return price * (1 + taxRate)
 
-  §F{WithDiscount:pub} (f32:price, f32:discount) -> f32
-    §Q (> price 0)
-    §Q (>= discount 0)
-    §Q (<= discount 1)
-    §R (* price (- 1 discount))
-
+    func WithDiscount public (float:price, float:discount) → float
+      requires price > 0
+      requires discount >= 0
+      requires discount <= 1
+      return price * (1 - discount)

@@ -1,18 +1,18 @@
-§M{BinaryTree}
-  §F{CompareValues:pub} (i32:a, i32:b) -> i32
-    §IF (< a b)
-      §R -1
-    §EI (> a b)
-      §R 1
-    §EL
-      §R 0
+module BinaryTree BinaryTree
+  module BinaryTreeModule
+    func CompareValues public (int:a, int:b) → int
+      if a < b
+        return -1
+      else if a > b
+        return 1
+      else
+        return 0
 
-  §F{ShouldGoLeft:pub} (i32:value, i32:nodeValue) -> bool
-    §R (< value nodeValue)
+    func ShouldGoLeft public (int:value, int:nodeValue) → bool
+      return value < nodeValue
 
-  §F{ShouldGoRight:pub} (i32:value, i32:nodeValue) -> bool
-    §R (> value nodeValue)
+    func ShouldGoRight public (int:value, int:nodeValue) → bool
+      return value > nodeValue
 
-  §F{IsMatch:pub} (i32:value, i32:nodeValue) -> bool
-    §R (== value nodeValue)
-
+    func IsMatch public (int:value, int:nodeValue) → bool
+      return value == nodeValue

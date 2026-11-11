@@ -1,8 +1,8 @@
-§M{SimpleAsync}
-  §AF{GetValue:pub} () -> i32
-    §E{net}
-    §R 42
+module SimpleAsync SimpleAsync
+  module SimpleAsyncModule
+    func GetValue public async () → int
+      ! net
+      return 42
 
-  §F{Fallback:pub} () -> i32
-    §R 0
-
+    func Fallback public () → int
+      return 0

@@ -1,11 +1,11 @@
-§M{TypeAlias}
-  §F{UserId:pub} (i32:id) -> i32
-    §Q (> id 0)
-    §R id
+module TypeAlias TypeAlias
+  module TypeAliasModule
+    func UserId public (int:id) → int
+      requires id > 0
+      return id
 
-  §F{IsValidId:pub} (i32:id) -> bool
-    §R (> id 0)
+    func IsValidId public (int:id) → bool
+      return id > 0
 
-  §F{NextId:pub} (i32:id) -> i32
-    §R (+ id 1)
-
+    func NextId public (int:id) → int
+      return id + 1

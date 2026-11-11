@@ -1,13 +1,13 @@
-§M{InlineSigs}
-  §F{Add:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+module InlineSigs InlineSigs
+  module InlineSigsModule
+    func Add public (int:a, int:b) → int
+      return a + b
 
-  §F{Multiply:pub} (i32:a, i32:b) -> i32
-    §R (* a b)
+    func Multiply public (int:a, int:b) → int
+      return a * b
 
-  §F{Negate:pub} (i32:x) -> i32
-    §R (- 0 x)
+    func Negate public (int:x) → int
+      return 0 - x
 
-  §F{IsZero:pub} (i32:x) -> bool
-    §R (== x 0)
-
+    func IsZero public (int:x) → bool
+      return x == 0

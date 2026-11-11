@@ -1,11 +1,11 @@
-§M{GuardClause}
-  §F{ValidatePositive:pub} (i32:value) -> bool
-    §R (> value 0)
+module GuardClause GuardClause
+  module GuardClauseModule
+    func ValidatePositive public (int:value) → bool
+      return value > 0
 
-  §F{ValidateRange:pub} (i32:value, i32:min, i32:max) -> bool
-    §Q (<= min max)
-    §R (&& (>= value min) (<= value max))
+    func ValidateRange public (int:value, int:min, int:max) → bool
+      requires min <= max
+      return value >= min && value <= max
 
-  §F{ValidateNotEmpty:pub} (i32:length) -> bool
-    §R (> length 0)
-
+    func ValidateNotEmpty public (int:length) → bool
+      return length > 0

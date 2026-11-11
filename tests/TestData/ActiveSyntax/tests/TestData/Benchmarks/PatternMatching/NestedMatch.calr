@@ -1,11 +1,11 @@
-§M{NestedMatch}
-  §F{ClassifyPair:pub} (bool:aPositive, bool:bPositive) -> i32
-    §IF (&& aPositive bPositive)
-      §R 1
-    §EI (&& (! aPositive) (! bPositive))
-      §R 3
-    §EI aPositive
-      §R 4
-    §EL
-      §R 2
-
+module NestedMatch NestedMatch
+  module NestedMatchModule
+    func ClassifyPair public (bool:aPositive, bool:bPositive) → int
+      if aPositive && bPositive
+        return 1
+      else if !aPositive && !bPositive
+        return 3
+      else if aPositive
+        return 4
+      else
+        return 2

@@ -1,12 +1,12 @@
-§M{NetService}
-  §F{FetchUrl:pub} (str:url) -> str
-    §E{net}
-    §R url
+module NetService NetService
+  module NetServiceModule
+    func FetchUrl public (string:url) → string
+      ! net
+      return url
 
-  §F{PostData:pub} (str:url, str:body) -> i32
-    §E{net}
-    §R 200
+    func PostData public (string:url, string:body) → int
+      ! net
+      return 200
 
-  §F{BuildUrl:pub} (str:base, str:path) -> str
-    §R base
-
+    func BuildUrl public (string:@base, string:path) → string
+      return @base

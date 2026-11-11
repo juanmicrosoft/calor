@@ -1,18 +1,18 @@
-§M{HashMap}
-  §F{BucketIndex:pub} (i32:hashCode, i32:bucketCount) -> i32
-    §Q (> bucketCount 0)
-    §S (>= result 0)
-    §S (< result bucketCount)
-    §B{absHash} hashCode
-    §IF (< absHash 0)
-      §ASSIGN absHash (- 0 absHash)
-    §R (% absHash bucketCount)
+module HashMap HashMap
+  module HashMapModule
+    func BucketIndex public (int:hashCode, int:bucketCount) → int
+      requires bucketCount > 0
+      => result >= 0
+      => result < bucketCount
+      let absHash = hashCode
+      if absHash < 0
+        set absHash 0 - absHash
+      return absHash % bucketCount
 
-  §F{LoadFactor:pub} (i32:itemCount, i32:bucketCount) -> f32
-    §Q (> bucketCount 0)
-    §R (/ (cast f64 itemCount) (cast f64 bucketCount))
+    func LoadFactor public (int:itemCount, int:bucketCount) → float
+      requires bucketCount > 0
+      return (double)itemCount / (double)bucketCount
 
-  §F{NeedsResize:pub} (i32:itemCount, i32:bucketCount) -> bool
-    §Q (> bucketCount 0)
-    §R (> (* itemCount 100) (* bucketCount 75))
-
+    func NeedsResize public (int:itemCount, int:bucketCount) → bool
+      requires bucketCount > 0
+      return (itemCount * 100) > (bucketCount * 75)
