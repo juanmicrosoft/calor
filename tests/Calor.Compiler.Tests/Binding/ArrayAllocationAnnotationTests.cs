@@ -1,4 +1,5 @@
 using Assembly = System.Reflection.Assembly;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.CodeGen;
@@ -13,6 +14,117 @@ namespace Calor.Compiler.Tests;
 
 public sealed class ArrayAllocationAnnotationTests
 {
+    [Theory]
+    [InlineData("Cell[]", "copy[0]")]
+    [InlineData("Cell[,]", "copy[0, 0]")]
+    [InlineData("Cell[][]", "copy[0][0]")]
+    [InlineData("Cell[][,]", "copy[0][0, 0]")]
+    [InlineData("Cell[,][]", "copy[0, 0][0]")]
+    public void SourceArrayAccess_RetainsTheDeclaredElementThroughAliases(string type, string access)
+    {
+        var source = $$"""
+            module SourceArrayIdentity
+              class Cell public
+                field int:V public
+              func Read public ({{type}}:values) → int
+                !
+                let copy = values
+                let cell = {{access}}
+                return (cell).V
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Binder(diagnostics).Bind(new Parser(
+            new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse());
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var function = Assert.Single(module.Functions);
+        var variable = Assert.IsType<BoundBindStatement>(function.Body[1]);
+        var element = Assert.IsType<NominalBoundType>(variable.Initializer!.Type);
+        var declaration = Assert.Single(module.SymbolsById.Values.OfType<TypeSymbol>(), symbol => symbol.Name == "Cell");
+        Assert.Same(declaration, element.Declaration);
+        Assert.Equal(NullableAnnotation.NotAnnotated, element.NullableAnnotation);
+        var field = Assert.IsType<BoundFieldAccessExpression>(
+            Assert.IsType<BoundReturnStatement>(function.Body[2]).Expression);
+        Assert.Same(declaration, Assert.IsType<NominalBoundType>(field.Target.Type).Declaration);
+        Assert.Equal("Cell", field.ResolvedField?.DeclaringTypeName);
+        Assert.Equal("V", field.ResolvedField?.Name);
+        foreach (var expression in BoundNodeHelpers.DescendantsAndSelf(module).OfType<BoundExpression>())
+        {
+            var receiver = expression switch
+            {
+                BoundArrayAccess indexed => indexed.Array,
+                BoundMultiDimArrayAccess indexed => indexed.Array,
+                _ => null
+            };
+            if (receiver is null)
+                continue;
+            var array = Assert.IsType<ArrayBoundType>(NullabilityChecker.GetMethodInputArrayType(receiver));
+            Assert.Same(array.ElementType, expression.Type);
+            Assert.False(expression.HasUnknownInferredType);
+            Assert.Same(expression.Type as ArrayBoundType, expression.MethodInputArrayType);
+        }
+        var compiled = Program.Compile(source, "source-array-identity.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("Cell?[]", "values[0]")]
+    [InlineData("Cell?[,]", "values[0, 0]")]
+    [InlineData("Cell?[][]", "values[0][0]")]
+    public void SourceArrayAccess_DoesNotPromoteNullableElements(string type, string access)
+    {
+        var source = $$"""
+            module NullableSourceArray
+              class Cell public
+              func Read public ({{type}}:values) → Cell
+                !
+                let cell = {{access}}
+                return cell
+            """;
+        var result = Program.Compile(source, "nullable-source-array.calr");
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Theory]
+    [InlineData("field int:V private")]
+    [InlineData("field int:V public static")]
+    [InlineData("field int:V public\n    field int:V public")]
+    public void SourceArrayFields_DoNotSelectInaccessibleStaticOrAmbiguousMembers(string declaration)
+    {
+        var source = $$"""
+            module SourceArrayFieldBoundary
+              class Cell public
+                {{declaration}}
+              func Read public (Cell[]:values) → int
+                !
+                return (values[0]).V
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Binder(diagnostics).Bind(new Parser(
+            new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse());
+        var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(module).OfType<BoundFieldAccessExpression>());
+        Assert.Null(read.ResolvedField);
+        Assert.True(read.HasUnknownInferredType);
+        Assert.True(Program.Compile(source, "source-array-field-boundary.calr").HasErrors);
+    }
+
+    [Fact]
+    public void ArrayDisplaySpellingAndComputedChildren_DoNotEstablishElementIdentity()
+    {
+        var named = new BoundStructuralExpression(default, "Unproven", "Cell[]");
+        var child = new BoundArrayCreation(default, "array", "array", "Cell", null, []);
+        var computed = new BoundStructuralExpression(default, "Computed", "Cell[]", [child]);
+        foreach (var receiver in new BoundExpression[] { named, computed })
+        {
+            var scalar = new BoundArrayAccess(default, receiver, new BoundIntLiteral(default, 0));
+            var rectangular = new BoundMultiDimArrayAccess(default, receiver, [new BoundIntLiteral(default, 0)]);
+            Assert.True(scalar.HasUnknownInferredType);
+            Assert.True(rectangular.HasUnknownInferredType);
+            Assert.Null(Assert.IsType<NominalBoundType>(scalar.Type).Declaration);
+            Assert.Null(Assert.IsType<NominalBoundType>(rectangular.Type).Declaration);
+        }
+    }
+
     [Fact]
     public void ProductionFizzBuzzRange_ConvertsCompilesAndRuns()
     {

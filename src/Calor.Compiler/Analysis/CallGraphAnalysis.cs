@@ -1530,7 +1530,7 @@ public sealed class CallGraphAnalysis
             AnonymousPropertyReads
         { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), BoundFieldAccessExpression>
-            SourceStaticFieldAccesses
+            SourceFieldAccesses
         { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.ArrayBoundType>
             ArrayTypes
@@ -1602,8 +1602,8 @@ public sealed class CallGraphAnalysis
     internal BoundFieldAccessExpression? AnonymousPropertyRead(string callerId, TextSpan span) =>
         _boundValues.AnonymousPropertyReads.GetValueOrDefault((callerId, span.Start, span.End));
 
-    internal BoundFieldAccessExpression? SourceStaticFieldAccess(string callerId, TextSpan span) =>
-        _boundValues.SourceStaticFieldAccesses.GetValueOrDefault((callerId, span.Start, span.End));
+    internal BoundFieldAccessExpression? SourceFieldAccess(string callerId, TextSpan span) =>
+        _boundValues.SourceFieldAccesses.GetValueOrDefault((callerId, span.Start, span.End));
 
     /// <summary>The declaration span of the variable the binder resolved a bare
     /// value reference (a call target or a <c>ReferenceNode</c>) to, or
@@ -2221,11 +2221,13 @@ public sealed class CallGraphAnalysis
             }
         }
 
-        foreach (var (site, field) in boundValues.SourceStaticFieldAccesses)
+        foreach (var (site, field) in boundValues.SourceFieldAccesses)
         {
-            foreach (var constructor in field.SourceStaticFieldOwner!.Constructors.Where(constructor => constructor.IsStatic))
+            if (field.SourceStaticFieldOwner is not { } fieldOwner)
+                continue;
+            foreach (var constructor in fieldOwner.Constructors.Where(constructor => constructor.IsStatic))
             {
-                var id = $"{field.SourceStaticFieldOwner.Name}.{constructor.Id}";
+                var id = $"{fieldOwner.Name}.{constructor.Id}";
                 if (!functions.TryGetValue(id, out var initializer))
                     continue;
                 callerToCallees[site.CallerId].Add((initializer.Name, field.Span));
@@ -2500,8 +2502,12 @@ public sealed class CallGraphAnalysis
                     if (node is BoundFieldAccessExpression { IsAnonymousPropertyRead: true } anonymousProperty)
                         boundValues.AnonymousPropertyReads.TryAdd(
                             (callerId, node.Span.Start, node.Span.End), anonymousProperty);
-                    if (node is BoundFieldAccessExpression { SourceStaticFieldOwner: not null } sourceField)
-                        boundValues.SourceStaticFieldAccesses.TryAdd(
+                    if (node is BoundFieldAccessExpression sourceField
+                        && (sourceField.SourceStaticFieldOwner is not null
+                            || sourceField is
+                                { ResolvedField: { IsField: true, IsStatic: false },
+                                    Target.Type: Binding.BoundTypes.NominalBoundType { Declaration: not null } }))
+                        boundValues.SourceFieldAccesses.TryAdd(
                             (callerId, node.Span.Start, node.Span.End), sourceField);
                     if (node is BoundFieldAccessExpression
                         {

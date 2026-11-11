@@ -5834,7 +5834,7 @@ public sealed class EffectEnforcementPass
         }
 
         private string InferFieldAccessType(FieldAccessNode field)
-            => _context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, field.Span)
+            => _context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, field.Span)
                 is { ResolvedField: { } sourceField }
                 ? EffectResolver.NormalizeParameterType(sourceField.TypeName)
                 : InferMemberType(field.Target, field.FieldName);
@@ -5873,10 +5873,13 @@ public sealed class EffectEnforcementPass
         {
             if (_context.CallGraph.IsResolvedEnumConstant(_context.CurrentFunctionId, span))
                 return EffectSet.Empty;
-            if (_context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, span)
+            if (_context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, span)
                 is { SourceStaticFieldOwner: { } owner })
                 return InferStaticFieldInitialization(owner, span);
             var effects = InferFromExpression(target);
+            if (_context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, span)
+                is { ResolvedField: { IsField: true, IsStatic: false } })
+                return effects;
             if (_context.CallGraph.IsTupleElementRead(_context.CurrentFunctionId, span))
                 return effects;
             if (_context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, span) is not null)
@@ -6173,7 +6176,7 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromReference(ReferenceNode reference, bool chargeMethodGroup = true)
         {
-            if (_context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, reference.Span)
+            if (_context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, reference.Span)
                 is { SourceStaticFieldOwner: { } sourceOwner })
                 return InferStaticFieldInitialization(sourceOwner, reference.Span);
             if (_context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, reference.Span) is not null)
@@ -6185,7 +6188,7 @@ public sealed class EffectEnforcementPass
             var separator = reference.Name.LastIndexOf('.');
             var receiverSpan = new TextSpan(reference.Span.Start, Math.Max(0, separator),
                 reference.Span.Line, reference.Span.Column);
-            var initialization = _context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, receiverSpan)
+            var initialization = _context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, receiverSpan)
                 is { SourceStaticFieldOwner: { } receiverOwner }
                 ? InferStaticFieldInitialization(receiverOwner, reference.Span) : EffectSet.Empty;
             if (_context.CallGraph.MetadataField(_context.CurrentFunctionId, reference.Span) is { } metadataField)
@@ -6474,7 +6477,7 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromAssignmentTarget(ExpressionNode target, bool readValue)
         {
-            if (_context.CallGraph.SourceStaticFieldAccess(_context.CurrentFunctionId, target.Span)
+            if (_context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, target.Span)
                 is { SourceStaticFieldOwner: { } sourceOwner })
                 return EffectSet.From("mut").Union(InferStaticFieldInitialization(sourceOwner, target.Span));
             if (target is FieldAccessNode field)

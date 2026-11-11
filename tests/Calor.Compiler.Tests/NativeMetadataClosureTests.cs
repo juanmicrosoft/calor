@@ -16,6 +16,218 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativeMetadataClosureTests
 {
+    [Fact]
+    public void SourceClassArray_DefaultConversionPreservesTheOriginalFixtureAndMetadata()
+    {
+        var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+            "tests/TestData/InteropScope/R0/fixtures/F5-ARRAY-01.cs.txt"));
+        var conversion = new CSharpToCalorConverter().Convert(source, "F5-ARRAY-01.cs");
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        RawFrameAssertions.AssertFramed(conversion.CalorSource!, present: false);
+        Assert.Contains("nullable oblivious", conversion.CalorSource!);
+        var original = CompileAssembly(source);
+        var originalTree = CSharpSyntaxTree.ParseText(source);
+        var metadataCompilation = CSharpCompilation.Create("ArrayMetadata", [originalTree],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var before = CSharpToCalorConverter.DeclaredTypeMetadata(
+            metadataCompilation.GetSemanticModel(originalTree), originalTree.GetCompilationUnitRoot());
+        foreach (var native in new[] { conversion.CalorSource!, new CalorEmitter().Emit(Parse(conversion.CalorSource!)) })
+        {
+            var compiled = Compile(native);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Empty(compiled.Diagnostics);
+            var bound = new Binder(new DiagnosticBag()).Bind(compiled.Ast!);
+            var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+                .Where(call => call.ResolvedMethodName == "GetLength").ToArray();
+            Assert.Equal(2, calls.Length);
+            Assert.All(calls, call =>
+            {
+                var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+                Assert.Equal(SpecialType.System_Array, method.ContainingType.SpecialType);
+                Assert.False(method.IsStatic);
+                Assert.False(method.IsGenericMethod);
+                Assert.Equal(SpecialType.System_Int32, method.ReturnType.SpecialType);
+                Assert.Equal(SpecialType.System_Int32, Assert.Single(method.Parameters).Type.SpecialType);
+                var shape = Assert.IsType<Calor.Compiler.Binding.BoundTypes.ArrayBoundType>(
+                    call.Receiver!.MethodInputArrayType);
+                Assert.Equal(2, shape.Rank);
+                Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious, shape.NullableAnnotation);
+                var element = Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(shape.ElementType);
+                Assert.Equal("Cell", element.Declaration?.QualifiedName);
+                Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious, element.NullableAnnotation);
+                var key = EffectResolverKey.FromBoundReceiver(
+                    Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType),
+                    method.Name, call.ResolvedParameterTypes);
+                var contract = new EffectResolver().Resolve(key);
+                Assert.Equal(EffectResolutionStatus.PureExplicit, contract.Status);
+                Assert.Equal("embedded:Calor.Compiler.Manifests.bcl-system.calor-effects.json", contract.Source);
+            });
+            var reads = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>()
+                .Where(read => read.FieldName == "V").ToArray();
+            Assert.Equal(2, reads.Length);
+            Assert.All(reads, read =>
+            {
+                Assert.True(read.ResolvedField is { IsField: true, IsStatic: false, DeclaringTypeName: "Cell" });
+                Assert.Same(bound.SymbolsById[read.ResolvedField!.Id], read.ResolvedField);
+                Assert.Same(Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(read.Target.Type).Declaration,
+                    bound.SymbolsById.Values.OfType<TypeSymbol>().Single(type => type.Name == "Cell"));
+                Assert.False(read.HasUnknownInferredType);
+            });
+            var generatedTree = CSharpSyntaxTree.ParseText(compiled.GeneratedCode);
+            var generatedCompilation = metadataCompilation.ReplaceSyntaxTree(originalTree, generatedTree);
+            Assert.Equal(before, CSharpToCalorConverter.DeclaredTypeMetadata(
+                generatedCompilation.GetSemanticModel(generatedTree), generatedTree.GetCompilationUnitRoot()));
+            var generated = CompileAssembly(compiled.GeneratedCode);
+            Assert.Equal("2x2|2|3", original.GetType("Probe")!.GetMethod("Run")!.Invoke(null, null));
+            Assert.Equal("2x2|2|3", generated.GetType("Probe")!.GetMethod("Run")!.Invoke(null, null));
+            foreach (var assembly in new[] { original, generated })
+            {
+                var result = assembly.GetType("Grid")!.GetMethod("Build")!;
+                Assert.Equal(2, result.ReturnType.GetArrayRank());
+                Assert.Same(assembly.GetType("Cell"), result.ReturnType.GetElementType());
+                Assert.Equal(typeof(int), assembly.GetType("Cell")!.GetField("V")!.FieldType);
+                var nullable = new NullabilityInfoContext().Create(result.ReturnParameter);
+                Assert.Equal(NullabilityState.Unknown, nullable.ReadState);
+                Assert.Equal(NullabilityState.Unknown, nullable.ElementType!.ReadState);
+            }
+        }
+    }
+
+    [Fact]
+    public void SourceClassArray_ReadsRetainReceiverIndexAndArgumentExceptionOrdering()
+    {
+        const string source = """
+            using System;
+            public class Cell { public int V; }
+            public static class Probe
+            {
+                private static string Log = "";
+                private static Cell[,] Values;
+                private static Cell[,] Receiver() { Log += "r"; return Values; }
+                private static int Index(int value, string mark) { Log += mark; return value; }
+                private static int Stop() { Log += "t"; throw new InvalidOperationException(); }
+                public static string Run()
+                {
+                    Values = new Cell[,] { { new Cell { V = 7 } } };
+                    Log = "";
+                    int value = Receiver()[Index(0, "a"), Index(0, "b")].V;
+                    string result = value + ":" + Log;
+                    Log = "";
+                    int length = Receiver().GetLength(Index(0, "d"));
+                    result += "|" + length + ":" + Log;
+                    Log = "";
+                    try { int bad = Receiver()[Index(9, "a"), Index(0, "b")].V; }
+                    catch (IndexOutOfRangeException) { result += "|" + Log; }
+                    Log = "";
+                    try { int bad = Receiver()[Stop(), Index(0, "b")].V; }
+                    catch (InvalidOperationException) { result += "|" + Log; }
+                    Log = "";
+                    try { int bad = Receiver().GetLength(Index(9, "d")); }
+                    catch (IndexOutOfRangeException) { result += "|" + Log; }
+                    Log = "";
+                    Values = null;
+                    try { int bad = Receiver()[Index(0, "a"), Index(0, "b")].V; }
+                    catch (NullReferenceException) { result += "|" + Log; }
+                    Log = "";
+                    try { int bad = Receiver().GetLength(Index(0, "d")); }
+                    catch (NullReferenceException) { result += "|" + Log; }
+                    return result;
+                }
+            }
+            """;
+        const string expected = "7:rab|1:rd|rab|rt|rd|rab|rd";
+        Assert.Equal(expected, CompileAssembly(source).GetType("Probe")!.GetMethod("Run")!.Invoke(null, null));
+        var converted = new CSharpToCalorConverter().Convert(source, "ArrayOrdering.cs");
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Empty(converted.Losses);
+        RawFrameAssertions.AssertFramed(converted.CalorSource!, present: false);
+        foreach (var native in new[] { converted.CalorSource!, new CalorEmitter().Emit(Parse(converted.CalorSource!)) })
+        {
+            var compiled = Compile(native);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(expected, CompileAssembly(compiled.GeneratedCode).GetType("Probe")!
+                .GetMethod("Run")!.Invoke(null, null));
+            var withoutMutation = Compile(native.Replace("! mut", "!", StringComparison.Ordinal)
+                .Replace("! alloc, mut", "! alloc", StringComparison.Ordinal));
+            Assert.Contains(withoutMutation.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        }
+    }
+
+    [Theory]
+    [InlineData("(Receiver(values)[0, 0]).V")]
+    [InlineData("(values[Mark(0), 0]).V")]
+    [InlineData("(values[0, Mark(0)]).V")]
+    [InlineData("Receiver(values).GetLength(0)")]
+    [InlineData("values.GetLength(Mark(0))")]
+    public void SourceClassArray_SelectedReadsRetainEveryEvaluatedChildEffect(string expression)
+    {
+        var source = $$"""
+            module SourceArrayEvaluation
+              class Cell public
+                field int:V public
+              func Receiver (Cell[,]:values) → Cell[,]
+                ! cw
+                System.Console.WriteLine("receiver")
+                return values
+              func Mark (int:value) → int
+                ! cw
+                System.Console.WriteLine("index")
+                return value
+              func Read (Cell[,]:values) → int
+                !
+                return {{expression}}
+            """;
+        var rejected = Compile(source);
+        Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+        var accepted = Compile(source.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal));
+        Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("Missing[]", "")]
+    [InlineData("Cell[]", "<Cell>")]
+    [InlineData("Cell[]?", "")]
+    public void SourceClassArray_UnestablishedGenericOrNullableReceiversRemainUnselected(string type, string parameters)
+    {
+        var source = $$"""
+            module SourceArrayBoundary
+              class Cell public
+                field int:V public
+              func Read{{parameters}} ({{type}}:values) → int
+                !
+                return values.GetLength(0)
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.True(Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("Array")]
+    [InlineData("Cell")]
+    public void SourceClassArray_SameSpelledNonArrayReceiversDoNotBorrowArrayContracts(string type)
+    {
+        var source = $$"""
+            module SourceArrayShadow
+              class {{type}} public
+                func GetLength public (int:dimension) → int
+                  ! cw
+                  System.Console.WriteLine("source")
+                  return dimension
+              func Read ({{type}}:values) → int
+                !
+                return (values).GetLength(0)
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        Assert.All(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => Assert.NotEqual(SpecialType.System_Array, call.ResolvedMetadataMethod?.ContainingType.SpecialType));
+        Assert.Contains(Compile(source).Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
     [Theory]
     [InlineData("sbyte", "byte")]
     [InlineData("byte", "long")]

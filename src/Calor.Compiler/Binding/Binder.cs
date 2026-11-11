@@ -586,10 +586,29 @@ public sealed class Binder
 
     private Microsoft.CodeAnalysis.ITypeSymbol? ResolveMetadataArrayReceiver(BoundExpression receiver)
     {
+        if (receiver.HasUnknownInferredType)
+            return null;
         if (NullabilityChecker.GetMethodInputArrayType(receiver) is { } array)
         {
             var context = GetOrCreateMetadataBinder()?.Context;
-            return context is null ? null : GetMetadataArrayInputType(context, array);
+            if (context is null)
+                return null;
+            if (GetMetadataArrayInputType(context, array) is { } metadataArray)
+                return metadataArray;
+            // Source elements have no metadata symbol. The established array still
+            // inherits System.Array; do not invent a substitute element type.
+            var element = array.ElementType;
+            while (element is BoundTypes.ArrayBoundType nested)
+                element = nested.ElementType;
+            return array.NullableAnnotation != BoundTypes.NullableAnnotation.Annotated
+                && element is BoundTypes.NominalBoundType { Declaration: { Id.IsNone: false } declaration }
+                && !declaration.QualifiedName.Contains('`')
+                && !TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(declaration.Name))
+                && _symbolsById.TryGetValue(declaration.Id, out var actual)
+                && ReferenceEquals(actual, declaration)
+                && IsSourceTypeAccessible(declaration)
+                    ? context.HostCompilationForBinder.GetSpecialType(Microsoft.CodeAnalysis.SpecialType.System_Array)
+                    : null;
         }
         if (receiver.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } symbol })
             return symbol;
@@ -622,8 +641,15 @@ public sealed class Binder
     private Microsoft.CodeAnalysis.IPropertySymbol? ResolveMetadataScalarArrayProperty(
         BoundExpression receiver, string memberName)
     {
+        var receiverType = ResolveMetadataArrayReceiver(receiver);
+        var arrayBase = receiverType is Microsoft.CodeAnalysis.IArrayTypeSymbol array
+            ? array.BaseType
+            : NullabilityChecker.GetMethodInputArrayType(receiver) is not null
+                && receiverType is Microsoft.CodeAnalysis.INamedTypeSymbol
+                    { SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Array } sourceArrayBase
+                    ? sourceArrayBase : null;
         return receiver is not BoundTypeReferenceExpression
-            && ResolveMetadataArrayReceiver(receiver) is Microsoft.CodeAnalysis.IArrayTypeSymbol { BaseType: { } arrayBase }
+            && arrayBase is not null
             && GetOrCreateMetadataBinder()?.ResolveMemberRead(arrayBase, memberName, false, out _)
                 is Microsoft.CodeAnalysis.IPropertySymbol
                 {
@@ -4405,6 +4431,16 @@ public sealed class Binder
             // one storage path; resolving it keeps the operand typed instead of OBJECT.
             _ when isPatternMember => ResolveAccessibleMembers(
                 ResolveClass(target.Type.DisplayString), fieldAccess.FieldName),
+            _ when !target.HasUnknownInferredType
+                && target is BoundArrayAccess or BoundMultiDimArrayAccess or IBoundStorageExpression
+                && target.Type is BoundTypes.NominalBoundType
+                    { Declaration: { } declaration, NullableAnnotation: not BoundTypes.NullableAnnotation.Annotated }
+                && IsSourceTypeAccessible(declaration)
+                && !declaration.QualifiedName.Contains('`')
+                && !TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(declaration.Name))
+                && _classesByQualifiedName.TryGetValue(declaration.QualifiedName, out var declaredOwner)
+                && declaredOwner.TypeParameters.Count == 0 =>
+                ResolveReadableInstanceMembers(declaredOwner, fieldAccess.FieldName),
             _ when ResolveClass(target.Type.DisplayString) is { IsStruct: false } instanceOwner =>
                 ResolveReadableInstanceProperties(instanceOwner, fieldAccess.FieldName),
             _ => ResolveStructFieldPath(target.Type.DisplayString, fieldAccess.FieldName),
@@ -5504,8 +5540,7 @@ public sealed class Binder
             elementType = Metadata.MetadataBinderResult.ToBoundType(property.Type);
             metadataArray = property.Type as Microsoft.CodeAnalysis.IArrayTypeSymbol;
         }
-        return new BoundArrayAccess(arrayAccess.Span, array, index,
-            elementType?.DisplayString, elementType)
+        return new BoundArrayAccess(arrayAccess.Span, array, index, resolvedType: elementType)
         {
             MetadataArrayResultType = metadataArray
         };
@@ -5513,9 +5548,12 @@ public sealed class Binder
 
     private BoundTypes.BoundType? GetArrayAccessElementType(BoundExpression array)
     {
+        if (array.HasUnknownInferredType)
+            return null;
+        if (NullabilityChecker.GetMethodInputArrayType(array) is { } establishedArray)
+            return establishedArray.Rank == 1 ? establishedArray.ElementType : null;
         var typeName = array.Type.DisplayString;
-        if (!array.HasUnknownInferredType
-            && GetOrCreateMetadataBinder() is { } metadata
+        if (GetOrCreateMetadataBinder() is { } metadata
             && ResolveComputedMetadataType(metadata.Context, typeName)
                 is Microsoft.CodeAnalysis.INamedTypeSymbol { SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } text)
         {
@@ -5529,8 +5567,7 @@ public sealed class Binder
                 return new BoundTypes.NominalBoundType("System.Char", roslynSymbol: character);
         }
         if (!TypeIdentity.TrySplitGeneric(typeName, out var name, out var arguments))
-            return GetIndexedElementType(typeName) is { } elementName
-                ? new BoundTypes.NominalBoundType(elementName) : null;
+            return null;
         if (array.Type is BoundTypes.NominalBoundType { Declaration: not null }
             || ResolveTypeSymbol(name, arguments.Count) is not null)
             return null;
@@ -8859,6 +8896,21 @@ public sealed class Binder
         return members.All(member => member is VariableSymbol { IsProperty: true, IsStatic: false } property
                 && HasAccessiblePropertyGetter(property, receiverClass))
             ? members : Array.Empty<Symbol>();
+    }
+
+    private IReadOnlyList<Symbol> ResolveReadableInstanceMembers(ClassDefinitionNode receiverClass, string memberName)
+    {
+        var members = ResolveAccessibleMembers(receiverClass, memberName);
+        if (members is [VariableSymbol { IsField: true, IsStatic: false } field]
+            && field.DeclaringTypeName is { } declaringType
+            && _classesByQualifiedName.TryGetValue(declaringType, out var owner)
+            && !owner.IsPartial && owner.PreprocessorBlocks.Count == 0 && owner.InteropBlocks.Count == 0
+            && EnumerateFields(owner).Count(declaration => declaration.Name == memberName) == 1
+            && (field.Visibility is not (Visibility.Protected or Visibility.PrivateProtected)
+                || _currentClass != null
+                    && IsSameOrDerivedClass(receiverClass, _qualifiedClassNames[_currentClass])))
+            return members;
+        return ResolveReadableInstanceProperties(receiverClass, memberName);
     }
 
     private bool HasAccessiblePropertyGetter(VariableSymbol member, ClassDefinitionNode receiverClass)

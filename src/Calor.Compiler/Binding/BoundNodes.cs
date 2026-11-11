@@ -1132,26 +1132,18 @@ public sealed class BoundArrayAccess : BoundExpression
         string? elementTypeName = null, BoundType? resolvedType = null) : base(span)
     {
         Array = array; Index = index;
-        HasUnknownInferredType = array.HasUnknownInferredType;
-        if (index is not BoundRangeExpression && array.MethodInputArrayType is
-            {
-                ElementType: NominalBoundType
-                {
-                    QualifiedName: "STRING" or "string" or "str" or "System.String"
-                }
-            } typedArray)
-        {
-            Type = typedArray.ElementType;
-            return;
-        }
+        resolvedType ??= index is not BoundRangeExpression && !array.HasUnknownInferredType
+            && NullabilityChecker.GetMethodInputArrayType(array) is { Rank: 1 } typedArray
+                ? typedArray.ElementType : null;
         var arrayTypeName = array.Type.DisplayString;
         elementTypeName ??= arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
             ? arrayTypeName[..^2]
             : null;
-        Type = resolvedType ?? new NominalBoundType(elementTypeName ?? "OBJECT");
+        Type = resolvedType is not null and not UnresolvedBoundType
+            ? resolvedType : new NominalBoundType(elementTypeName ?? "OBJECT");
         MethodInputArrayType = Type as ArrayBoundType;
         GenericNullabilityType = Type as GenericInstantiationBoundType;
-        HasUnknownInferredType = array.HasUnknownInferredType || resolvedType is null && elementTypeName is null;
+        HasUnknownInferredType = array.HasUnknownInferredType || resolvedType is null or UnresolvedBoundType;
     }
 }
 
@@ -1205,12 +1197,17 @@ public sealed class BoundMultiDimArrayAccess : BoundExpression
         IReadOnlyList<BoundExpression> indices) : base(span)
     {
         Array = array; Indices = indices;
-        // LastIndexOf: on jagged shapes like "i32[][,]" the element type is
-        // everything before the TRAILING bracket group ("i32[]"), not "i32" (B3 review m5).
+        var resolvedType = !array.HasUnknownInferredType
+            && NullabilityChecker.GetMethodInputArrayType(array) is { } typedArray
+            && typedArray.Rank == indices.Count ? typedArray.ElementType : null;
+        // Display-only recovery must not establish an element identity.
         var t = array.Type.DisplayString;
         var open = t.LastIndexOf('[');
-        Type = new NominalBoundType(open > 0 ? t[..open] : "OBJECT");
-        HasUnknownInferredType = array.HasUnknownInferredType || open <= 0;
+        Type = resolvedType is not null and not UnresolvedBoundType
+            ? resolvedType : new NominalBoundType(open > 0 ? t[..open] : "OBJECT");
+        MethodInputArrayType = Type as ArrayBoundType;
+        GenericNullabilityType = Type as GenericInstantiationBoundType;
+        HasUnknownInferredType = array.HasUnknownInferredType || resolvedType is null or UnresolvedBoundType;
     }
 }
 
