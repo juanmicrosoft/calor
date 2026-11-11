@@ -199,7 +199,7 @@ public class EffectRowLatticeTests
         """)]
     public void RowOnNonFunctionTypedPosition_IsCalor0405(string source)
     {
-        var compiled = TestHarness.Compile(source);
+        var compiled = TestHarness.Compile(NativeMisplacedRowSource(source));
 
         var misplaced = compiled.Diagnostics
             .Where(d => d.Code == DiagnosticCode.EffectRowMisplaced)
@@ -994,6 +994,46 @@ public class EffectRowLatticeTests
     // reaches it is a lambda whose ρ_body is Assumed, which is slice b's.
 
     // ------------------------------------------------------------ helpers ---
+
+    private static string NativeMisplacedRowSource(string original) => original switch
+    {
+        """
+        §M{Z9}
+          §F{Log:pub} (i32:x) -> void §E{cw}
+            §P x
+        """ => NativeSource(original, """
+            module Z9 Z9
+              func Log public (int:x) → void ! cw
+                System.Console.WriteLine(x)
+            """),
+        """
+        §M{Z9}
+          §F{Log:pub}
+            §I{i32:x} §E{cw}
+            §O{void}
+            §P x
+        """ => NativeSource(original, """
+            module Z9 Z9
+              func Log public (int:x ! cw) → void
+                System.Console.WriteLine(x)
+            """),
+        """
+        §M{Z9}
+          §F{Get:pub}
+            §O{i32} §E{cw}
+            §R INT:1
+        """ => NativeSource(original, """
+            module Z9 Z9
+              func Get public () → int ! cw
+                return 1
+            """),
+        """
+        §M{R2A}
+          §CL{Box:pub}
+            §FLD{:c:priv} §E{cw}
+        """ => original,
+        _ => throw new ArgumentOutOfRangeException(nameof(original))
+    };
 
     private static string NativeSource(string original, string native)
     {
