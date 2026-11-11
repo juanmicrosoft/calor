@@ -1,7 +1,2 @@
-§M{FixtureTest}
-  §NS{Alpha}
-    §M{Marker:pub}
-  §NS{Beta}
-    §M{Value:pub}
-      §F{Get:pub} () -> i32
-        §R INT:42
+module FixtureTest Alpha block
+  module Marker

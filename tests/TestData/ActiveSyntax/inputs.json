@@ -773,6 +773,7 @@
   "structuredPaths": [
     "bench/phase0-agent-native/fixtures/d-s1.5/conditional-expression-hoisting/fixture.json",
     "bench/phase0-agent-native/fixtures/d-s1.5/local-function/fixture.json",
+    "bench/phase0-agent-native/fixtures/d-s1.5/namespace-topology/fixture.json",
     "bench/phase0-agent-native/fixtures/d-s1.5/string-interpolation-hole/fixture.json",
     "tests/TestData/InteropScope/D1/refout-cases.json"
   ],

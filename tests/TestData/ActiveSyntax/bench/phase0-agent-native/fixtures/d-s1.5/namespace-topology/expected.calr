@@ -1,9 +1,2 @@
-§M{Fixture:overflow=unchecked}
-  §NS{Alpha}
-    §M{Marker:pub}
-
-
-  §NS{Beta}
-    §M{Value:pub}
-      §F{Get:pub} () -> int
-        §R 42
+module Fixture Alpha block overflow unchecked
+  module Marker

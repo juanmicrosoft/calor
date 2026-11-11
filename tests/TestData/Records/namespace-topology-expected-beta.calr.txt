@@ -1,0 +1,4 @@
+module Fixture Beta block overflow unchecked
+  module Value
+    func Get () → int
+      return 42

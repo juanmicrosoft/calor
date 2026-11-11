@@ -219,6 +219,64 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
     }
 
     [Fact]
+    public void NamespaceTopology_CurrentProjectPartsRetainBothClrOwners()
+    {
+        const string name = "namespace-topology";
+        CurrentExpectation_ChangesOnlyApprovedClassificationFields(name);
+        var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
+        var original = $"bench/phase0-agent-native/fixtures/d-s1.5/{name}/fixture.json";
+        using var doc = JsonDocument.Parse(File.ReadAllText(CurrentManifestPath(repoRoot, name, original)));
+        var observation = doc.RootElement.GetProperty("currentObservation");
+        Assert.Equal("current-compiler-active-syntax", observation.GetProperty("inputContract").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(observation.GetProperty("reason").GetString()));
+        var parts = observation.GetProperty("outputs").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "namespace-topology.namespace1.calr", "namespace-topology.namespace2.calr" },
+            parts.Select(part => part.GetProperty("fileName").GetString()));
+        Assert.Equal(new[] { "Alpha", "Beta" }, parts.Select(part => part.GetProperty("namespace").GetString()));
+        Assert.Equal(new[] { "Alpha.Marker", "Beta.Value" }, parts.Select(part => part.GetProperty("clrType").GetString()));
+        var entryPoint = doc.RootElement.GetProperty("runtimeEntryPoint").GetString()!;
+        var expected = doc.RootElement.GetProperty("runtimeExpectedInt").GetInt32();
+        var originalAssembly = AssertValueTestPasses(name,
+            new[] { File.ReadAllText(Path.Combine(RegistryPath(), name, "input.cs")) },
+            entryPoint, expected, expectedOwner: "Beta.Value");
+        foreach (var projection in new[] { "expectedPath", "testPath" })
+        {
+            var generated = new List<string>();
+            foreach (var part in parts)
+            {
+                var path = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot,
+                    part.GetProperty(projection).GetString()!);
+                var source = File.ReadAllText(path);
+                Calor.Compiler.Tests.RawFrameAssertions.AssertFramed(source, present: false);
+                var result = Program.Compile(source, Path.GetFileName(path),
+                    new Calor.Compiler.CompilationOptions
+                    {
+                        EnforceEffects = false,
+                        UnknownCallPolicy = Calor.Compiler.Effects.UnknownCallPolicy.Permissive
+                    });
+                Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+                AssertNative(result.Ast!);
+                var scope = Assert.Single(CSharpSyntaxTree.ParseText(result.GeneratedCode).GetRoot()
+                    .DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>());
+                Assert.Equal(part.GetProperty("namespace").GetString(), scope.Name.ToString());
+                generated.Add(result.GeneratedCode);
+            }
+            // Fixture projection proof is separate from the pending project-converter admission.
+            var assembly = AssertValueTestPasses(name, generated, entryPoint, expected, expectedOwner: "Beta.Value");
+            Assert.Equal(Shape(originalAssembly), Shape(assembly));
+        }
+
+        static string[] Shape(System.Reflection.Assembly assembly) => assembly.GetTypes()
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .Select(type => $"{type.FullName}|{type.Attributes}|"
+                + string.Join(";", type.GetMembers(System.Reflection.BindingFlags.DeclaredOnly
+                    | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic
+                    | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Instance)
+                    .Select(member => $"{member.MemberType}:{member}").Order(StringComparer.Ordinal)))
+            .ToArray();
+    }
+
+    [Fact]
     public void AllFixtures_AreCompleteConvertExactlyAndCompile()
     {
         // A single fact rather than a MemberData theory: the registry is legitimately
@@ -559,15 +617,24 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
         int expected,
         IReadOnlyList<string>? symbols = null,
         string? expectedOwner = null)
+        => AssertValueTestPasses(name, new[] { generatedCode }, entryPoint, expected, symbols, expectedOwner);
+
+    private static System.Reflection.Assembly AssertValueTestPasses(
+        string name,
+        IReadOnlyList<string> generatedCode,
+        string entryPoint,
+        int expected,
+        IReadOnlyList<string>? symbols = null,
+        string? expectedOwner = null)
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            generatedCode,
+        var trees = generatedCode.Select(code => CSharpSyntaxTree.ParseText(
+            code,
             new CSharpParseOptions(
                 LanguageVersion.Latest,
-                preprocessorSymbols: symbols ?? []));
+                preprocessorSymbols: symbols ?? []))).ToArray();
         var compilation = CSharpCompilation.Create(
             $"DS15_{name}_{Guid.NewGuid():N}",
-            [tree],
+            trees,
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
@@ -595,6 +662,7 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
         if (expectedOwner != null)
             Assert.Equal(expectedOwner, entry.DeclaringType!.FullName);
         Assert.Equal(expected, Assert.IsType<int>(entry.Invoke(null, null)));
+        return assembly;
     }
 
     private static HashSet<ConversionLossKind> ReadLossKinds(
