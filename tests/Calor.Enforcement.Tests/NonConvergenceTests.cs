@@ -136,6 +136,107 @@ public class NonConvergenceTests
             §C{Leaf} §/C
         """;
 
+    // Frozen inputs above retain the original theory identities. These native
+    // mirrors keep their declared rows, call edges and namespace-qualified owners.
+    private const string ThreeHopMutualRecursionCurrentNative = """
+        module M M
+          func A public (int:n) → int
+            ! cw,cr,fs:r
+            Console.WriteLine("a")
+            if n > 0
+              return B(n - 1)
+            return n
+          func B public (int:n) → int
+            ! cw,cr,fs:r
+            let string:s = Console.ReadLine()
+            if n > 0
+              return C(n - 1)
+            return n
+          func C public (int:n) → int
+            ! cw,cr,fs:r
+            let string:t = File.ReadAllText("x")
+            if n > 0
+              return A(n - 1)
+            return n
+        """;
+
+    private const string UnderDeclaredMutualRecursionCurrentNative = """
+        module M M
+          func A public (int:n) → int
+            ! cw,cr,fs:r
+            Console.WriteLine("a")
+            if n > 0
+              return B(n - 1)
+            return n
+          func B public (int:n) → int
+            ! cw,cr,fs:r
+            let string:s = Console.ReadLine()
+            if n > 0
+              return C(n - 1)
+            return n
+          func C public (int:n) → int
+            ! cw,cr
+            let string:t = File.ReadAllText("x")
+            if n > 0
+              return A(n - 1)
+            return n
+        """;
+
+    private const string ThreeHopRank1ChainCurrentNative = """
+        module M M
+          func Run<!e> public (Func<int>:g ! e) → int
+            ! e
+            return g()
+          func Outer public (Func<int>:h ! cw) → int
+            ! cw
+            return Run(h)
+          func Top public (Func<int>:q ! cw) → int
+            ! cw
+            return Outer(q)
+          func Top2 public (Func<int>:r ! cw) → int
+            !
+            return Top(r)
+        """;
+
+    private const string FourHopRank1ChainCurrentNative = """
+        module M M
+          func Run<!e> public (Func<int>:g ! e) → int
+            ! e
+            return g()
+          func Outer public (Func<int>:h ! cw) → int
+            ! cw
+            return Run(h)
+          func Top public (Func<int>:q ! cw) → int
+            ! cw
+            return Outer(q)
+          func Top2 public (Func<int>:r ! cw) → int
+            ! cw
+            return Top(r)
+          func Top3 public (Func<int>:s ! cw) → int
+            !
+            return Top2(s)
+        """;
+
+    private const string SelfRecursiveCurrentNative = """
+        module M M
+          func Fact public (int:n) → int
+            ! cw
+            Console.WriteLine("step")
+            if n <= 1
+              return 1
+            return n * Fact(n - 1)
+        """;
+
+    private const string NoRecursionNoRowsCurrentNative = """
+        module M M
+          func Leaf public () → void
+            ! cw
+            Console.WriteLine("leaf")
+          func Root public () → void
+            ! cw
+            Leaf()
+        """;
+
     /// <summary>
     /// A ring of <paramref name="n"/> functions, <c>F1 → F2 → … → Fn → F1</c>,
     /// each declaring <c>cw</c> and one of them printing. One SCC of n members
@@ -177,6 +278,37 @@ public class NonConvergenceTests
                 sb.Append($"      §B{{u{i}:i32}} §C{{A{i + 1}}} §A (- n 1) §/C\n");
             sb.Append(i > 1 ? $"      §R §C{{A{i - 1}}} §A (- n 1) §/C\n" : "      §R 0\n");
             sb.Append("    §R n\n");
+        }
+        return sb.ToString();
+    }
+
+    private static string RingCurrentNative(int n)
+    {
+        var sb = new StringBuilder("module M M\n");
+        for (var i = 1; i <= n; i++)
+        {
+            var next = i == n ? 1 : i + 1;
+            sb.Append($"  func F{i} public (int:n) → int\n    ! cw\n");
+            if (i == 1)
+                sb.Append("    Console.WriteLine(\"x\")\n");
+            sb.Append($"    if n > 0\n      return F{next}(n - 1)\n    return n\n");
+        }
+        return sb.ToString();
+    }
+
+    private static string DoubleChainCurrentNative(int n)
+    {
+        var sb = new StringBuilder("module M M\n");
+        for (var i = 1; i <= n; i++)
+        {
+            sb.Append($"  func A{i} public (int:n) → int\n    ! cw\n");
+            if (i == 1)
+                sb.Append("    Console.WriteLine(\"x\")\n");
+            sb.Append("    if n > 0\n");
+            if (i < n)
+                sb.Append($"      let int:u{i} = A{i + 1}(n - 1)\n");
+            sb.Append(i > 1 ? $"      return A{i - 1}(n - 1)\n" : "      return 0\n");
+            sb.Append("    return n\n");
         }
         return sb.ToString();
     }
@@ -235,7 +367,7 @@ public class NonConvergenceTests
     [Fact]
     public void ProcessScc_CapHit_Calor0406_IsReported()
     {
-        var diagnostics = Enforce(ThreeHopMutualRecursion, sccCap: 2);
+        var diagnostics = Enforce(ThreeHopMutualRecursionCurrentNative, sccCap: 2);
 
         var reported = Assert.Single(NonConvergence(diagnostics));
         Assert.Equal(DiagnosticSeverity.Error, reported.Severity);
@@ -253,7 +385,7 @@ public class NonConvergenceTests
     [Fact]
     public void ProcessScc_CapHit_IsReportedAtTheDeclarationOfAnSccMember()
     {
-        var (module, diagnostics) = Parse(ThreeHopMutualRecursion);
+        var (module, diagnostics) = Parse(ThreeHopMutualRecursionCurrentNative);
         new EffectEnforcementPass(diagnostics) { SccFixpointIterationCap = 2 }.Enforce(module);
 
         var reported = Assert.Single(NonConvergence(diagnostics));
@@ -268,7 +400,7 @@ public class NonConvergenceTests
     [Fact]
     public void ProcessScc_DefaultCap_Converges_NoCalor0406()
     {
-        var diagnostics = Enforce(ThreeHopMutualRecursion);
+        var diagnostics = Enforce(ThreeHopMutualRecursionCurrentNative);
 
         Assert.Empty(NonConvergence(diagnostics));
         Assert.Empty(diagnostics.Errors);
@@ -288,7 +420,7 @@ public class NonConvergenceTests
     [InlineData(5, false)]
     public void ProcessScc_CapBoundary(int cap, bool expectReport)
     {
-        var diagnostics = Enforce(ThreeHopMutualRecursion, sccCap: cap);
+        var diagnostics = Enforce(ThreeHopMutualRecursionCurrentNative, sccCap: cap);
 
         if (expectReport)
         {
@@ -311,7 +443,7 @@ public class NonConvergenceTests
     [InlineData(2, false)]
     public void ProcessScc_SelfRecursiveSingleton_HonoursTheCap(int cap, bool expectReport)
     {
-        var diagnostics = Enforce(SelfRecursive, sccCap: cap);
+        var diagnostics = Enforce(SelfRecursiveCurrentNative, sccCap: cap);
 
         var reported = NonConvergence(diagnostics);
         if (expectReport)
@@ -332,7 +464,7 @@ public class NonConvergenceTests
     [Fact]
     public void ProcessScc_NonRecursive_NeverReports_EvenAtCapOne()
     {
-        var diagnostics = Enforce(NoRecursionNoRows, sccCap: 1, chargeCap: 1);
+        var diagnostics = Enforce(NoRecursionNoRowsCurrentNative, sccCap: 1, chargeCap: 1);
 
         Assert.Empty(NonConvergence(diagnostics));
         Assert.Empty(diagnostics.Errors);
@@ -346,12 +478,12 @@ public class NonConvergenceTests
     [Fact]
     public void ProcessScc_MessageTruncatesAfterEightNames()
     {
-        var capped = Enforce(Ring(11), sccCap: 1);
+        var capped = Enforce(RingCurrentNative(11), sccCap: 1);
         var reported = Assert.Single(NonConvergence(capped));
         Assert.Contains(", and 3 more", reported.Message);
         Assert.Equal(8, Regex.Matches(reported.Message, @"'F\d+'").Count);
 
-        Assert.Empty(NonConvergence(Enforce(Ring(11))));
+        Assert.Empty(NonConvergence(Enforce(RingCurrentNative(11))));
     }
 
     // ------------------------------------------------------------------
@@ -370,7 +502,7 @@ public class NonConvergenceTests
     [InlineData(150)]
     public void DoubleChain_AtTheDefaultCap_Converges(int n)
     {
-        var diagnostics = Enforce(DoubleChain(n));
+        var diagnostics = Enforce(DoubleChainCurrentNative(n));
 
         Assert.Empty(NonConvergence(diagnostics));
         Assert.Empty(diagnostics.Errors);
@@ -384,7 +516,7 @@ public class NonConvergenceTests
     [Fact]
     public void DoubleChain101_AtAnInjectedFlatCapOf100_DoesNotConverge()
     {
-        var diagnostics = Enforce(DoubleChain(101), sccCap: 100);
+        var diagnostics = Enforce(DoubleChainCurrentNative(101), sccCap: 100);
 
         var reported = Assert.Single(NonConvergence(diagnostics));
         Assert.Contains("cap of 100 rounds", reported.Message);
@@ -425,7 +557,7 @@ public class NonConvergenceTests
     [Fact]
     public void PropagateInstantiatedCharges_CapHit_Calor0406_IsReported()
     {
-        var diagnostics = Enforce(ThreeHopRank1Chain, chargeCap: 2);
+        var diagnostics = Enforce(ThreeHopRank1ChainCurrentNative, chargeCap: 2);
 
         var reported = Assert.Single(NonConvergence(diagnostics));
         Assert.Equal(DiagnosticSeverity.Error, reported.Severity);
@@ -448,7 +580,7 @@ public class NonConvergenceTests
     [Fact]
     public void PropagateInstantiatedCharges_CapHit_TheUnchargedCallerIsSilent_SoCalor0406_IsTheOnlyError()
     {
-        var diagnostics = Enforce(FourHopRank1Chain, chargeCap: 2);
+        var diagnostics = Enforce(FourHopRank1ChainCurrentNative, chargeCap: 2);
 
         Assert.DoesNotContain(diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'Top3'"));
@@ -460,7 +592,7 @@ public class NonConvergenceTests
     [Fact]
     public void PropagateInstantiatedCharges_CapHit_IsReportedAtTheFirstUnprocessedFunction()
     {
-        var (module, diagnostics) = Parse(ThreeHopRank1Chain);
+        var (module, diagnostics) = Parse(ThreeHopRank1ChainCurrentNative);
         new EffectEnforcementPass(diagnostics) { InstantiatedChargeIterationCap = 2 }.Enforce(module);
 
         var reported = Assert.Single(NonConvergence(diagnostics));
@@ -475,7 +607,7 @@ public class NonConvergenceTests
     [Fact]
     public void PropagateInstantiatedCharges_DefaultCap_Converges_NoCalor0406()
     {
-        var diagnostics = Enforce(ThreeHopRank1Chain);
+        var diagnostics = Enforce(ThreeHopRank1ChainCurrentNative);
 
         Assert.Empty(NonConvergence(diagnostics));
         Assert.Contains(diagnostics,
@@ -500,7 +632,7 @@ public class NonConvergenceTests
     [InlineData(5, false, true)]
     public void PropagateInstantiatedCharges_CapBoundary(int cap, bool expectReport, bool expectTop3Charged)
     {
-        var diagnostics = Enforce(FourHopRank1Chain, chargeCap: cap);
+        var diagnostics = Enforce(FourHopRank1ChainCurrentNative, chargeCap: cap);
 
         var top3Charged = diagnostics.Any(
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'Top3'"));
@@ -525,11 +657,11 @@ public class NonConvergenceTests
     [Fact]
     public void Caps_AreIndependent_EachSiteReportsOnlyItself()
     {
-        var sccOnly = Enforce(ThreeHopMutualRecursion, sccCap: 2, chargeCap: 1);
+        var sccOnly = Enforce(ThreeHopMutualRecursionCurrentNative, sccCap: 2, chargeCap: 1);
         var reportedScc = Assert.Single(NonConvergence(sccOnly));
         Assert.Contains("SCC fixpoint", reportedScc.Message);
 
-        var chargeOnly = Enforce(ThreeHopRank1Chain, sccCap: 1, chargeCap: 2);
+        var chargeOnly = Enforce(ThreeHopRank1ChainCurrentNative, sccCap: 1, chargeCap: 2);
         var reportedCharge = Assert.Single(NonConvergence(chargeOnly));
         Assert.Contains("instantiated-charge propagation", reportedCharge.Message);
     }
@@ -552,8 +684,8 @@ public class NonConvergenceTests
     public void Calor0406_IsAnError_UnderEveryPolicy(string site, UnknownCallPolicy policy)
     {
         var diagnostics = site == "scc"
-            ? Enforce(ThreeHopMutualRecursion, sccCap: 2, policy: policy)
-            : Enforce(ThreeHopRank1Chain, chargeCap: 2, policy: policy);
+            ? Enforce(ThreeHopMutualRecursionCurrentNative, sccCap: 2, policy: policy)
+            : Enforce(ThreeHopRank1ChainCurrentNative, chargeCap: 2, policy: policy);
 
         var reported = Assert.Single(NonConvergence(diagnostics));
         Assert.Equal(DiagnosticSeverity.Error, reported.Severity);
@@ -584,7 +716,7 @@ public class NonConvergenceTests
             StringComparison.Ordinal);
         Assert.NotEqual(ThreeHopMutualRecursion, underDeclared);
 
-        var diagnostics = Enforce(underDeclared, sccCap: 100, policy: UnknownCallPolicy.Permissive);
+        var diagnostics = Enforce(UnderDeclaredMutualRecursionCurrentNative, sccCap: 100, policy: UnknownCallPolicy.Permissive);
         var forbidden = diagnostics.Where(d => d.Code == DiagnosticCode.ForbiddenEffect).ToList();
         Assert.NotEmpty(forbidden);
 
@@ -592,7 +724,7 @@ public class NonConvergenceTests
         Assert.All(forbidden, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
         Assert.All(forbidden, d => Assert.Contains("fs:r", d.Message, StringComparison.Ordinal));
 
-        var capped = Enforce(underDeclared, sccCap: 2, policy: UnknownCallPolicy.Permissive);
+        var capped = Enforce(UnderDeclaredMutualRecursionCurrentNative, sccCap: 2, policy: UnknownCallPolicy.Permissive);
         Assert.Equal(DiagnosticSeverity.Error, Assert.Single(NonConvergence(capped)).Severity);
     }
 
@@ -629,15 +761,30 @@ public class NonConvergenceTests
                   §R §C{RunTwice} §A this.stage §/C
             """;
 
+        const string currentNativeSource = """
+            module UnknownCharge UnknownCharge
+              func RunTwice<!e> public (Func<int>:stage ! e) → int
+                ! e
+                return stage() + stage()
+
+              class Holder public
+                field Func<int>:stage private ! cw
+                func Twice public () → int
+                  !
+                  return RunTwice(this.stage)
+            """;
+        Assert.NotEqual(source, currentNativeSource);
+        _ = Parse(currentNativeSource);
+
         var strict = TestHarness.CompileWithEffects(
-            source, policy: UnknownCallPolicy.Strict);
+            currentNativeSource, policy: UnknownCallPolicy.Strict);
         var strictForbidden = strict.Diagnostics
             .Where(d => d.Code == DiagnosticCode.ForbiddenEffect).ToList();
         Assert.NotEmpty(strictForbidden);
         Assert.All(strictForbidden, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
 
         var permissive = TestHarness.CompileWithEffects(
-            source, policy: UnknownCallPolicy.Permissive);
+            currentNativeSource, policy: UnknownCallPolicy.Permissive);
         var permissiveForbidden = permissive.Diagnostics
             .Where(d => d.Code == DiagnosticCode.ForbiddenEffect).ToList();
 
@@ -691,7 +838,16 @@ public class NonConvergenceTests
     [InlineData(SelfRecursive)]
     public void Driver_DefaultCaps_NoNonConvergenceCodes(string source)
     {
-        var result = TestHarness.Compile(source);
+        var currentNativeSource = source switch
+        {
+            ThreeHopMutualRecursion => ThreeHopMutualRecursionCurrentNative,
+            ThreeHopRank1Chain => ThreeHopRank1ChainCurrentNative,
+            FourHopRank1Chain => FourHopRank1ChainCurrentNative,
+            SelfRecursive => SelfRecursiveCurrentNative,
+            _ => throw new ArgumentOutOfRangeException(nameof(source))
+        };
+        _ = Parse(currentNativeSource);
+        var result = TestHarness.Compile(currentNativeSource);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectInferenceDidNotConverge);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.BreakingChangeWithoutMarker);
@@ -754,7 +910,7 @@ public class NonConvergenceTests
     [Fact]
     public void SccCapHit_ProducesCalor0406_NotCalor0600()
     {
-        var diagnostics = Enforce(ThreeHopMutualRecursion, sccCap: 2);
+        var diagnostics = Enforce(ThreeHopMutualRecursionCurrentNative, sccCap: 2);
 
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.BreakingChangeWithoutMarker);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.EffectInferenceDidNotConverge);
