@@ -370,7 +370,9 @@ public sealed class BoundCallStatement : BoundStatement
     public IReadOnlyList<int>? ArgumentParameterIndices { get; init; }
     /// <summary>Actual native selections, including each conditional alternative's own argument map.</summary>
     public IReadOnlyList<ResolvedOverloadMatch> SelectedOverloadMatches { get; init; } = [];
-    public override IEnumerable<BoundNode> ChildNodes => Arguments;
+    public override IEnumerable<BoundNode> ChildNodes =>
+        CallableStorageIdentity?.EventDeclaration is not null && Receiver is not null
+            ? [Receiver, .. Arguments] : Arguments;
 
     public BoundCallStatement(
         TextSpan span,

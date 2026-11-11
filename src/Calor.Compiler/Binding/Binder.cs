@@ -114,6 +114,7 @@ public sealed class Binder
     private readonly HashSet<FunctionSymbol> _staticMethodSymbols = new();
     private readonly Dictionary<SymbolId, string?> _functionNamespaces = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
+    private readonly Dictionary<EventDefinitionNode, VariableSymbol> _eventSymbols = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ClassDefinitionNode, ClassDefinitionNode> _containingClasses = new();
     private readonly Dictionary<ClassDefinitionNode, string> _qualifiedClassNames = new();
     private readonly Dictionary<ClassDefinitionNode, SymbolId> _classSymbolIds = new();
@@ -1041,6 +1042,7 @@ public sealed class Binder
         _staticMethodSymbols.Clear();
         _functionNamespaces.Clear();
         _classScopes.Clear();
+        _eventSymbols.Clear();
         _containingClasses.Clear();
         _qualifiedClassNames.Clear();
         _classSymbolIds.Clear();
@@ -1443,6 +1445,23 @@ public sealed class Binder
             }
         }
 
+        foreach (var (evt, alternative) in EnumerateEventRegistrations(cls))
+        {
+            var symbol = CreateVariable(
+                CreateDeclarationId(classIdentity, "event", evt.ToolingId, evt.Name),
+                evt.Name, evt.DelegateType, isMutable: true, isParameter: false,
+                ParameterModifier.None, evt.Span,
+                visibility: evt.Visibility, declaringTypeName: qualifiedClassName,
+                isField: !evt.HasAccessors, isStatic: evt.IsStatic,
+                conditionalAlternative: alternative,
+                functionType: TryBuildEventFunctionType(evt),
+                eventDeclaration: evt);
+            _eventSymbols.Add(evt, symbol);
+            if (!classScope.TryDeclare(symbol))
+                _diagnostics.ReportError(evt.Span, DiagnosticCode.DuplicateDefinition,
+                    $"Event '{evt.Name}' is already defined in '{qualifiedClassName}'");
+        }
+
         var methods = EnumerateMethodRegistrations(cls).ToArray();
         var ambiguousMethodKeys = methods.GroupBy(item =>
             CallableIdentityKey(item.Method.Name, item.Method.Parameters, item.Method.TypeParameters))
@@ -1664,6 +1683,16 @@ public sealed class Binder
     private static IEnumerable<EventDefinitionNode> EnumerateEvents(ClassDefinitionNode cls) =>
         cls.Events.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Events));
 
+    private static IEnumerable<(EventDefinitionNode Event, ConditionalAlternative? Alternative)>
+        EnumerateEventRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var evt in cls.Events)
+            yield return (evt, null);
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+            foreach (var evt in branch.Events)
+                yield return (evt, alternative);
+    }
+
     private static IEnumerable<OperatorOverloadNode> EnumerateOperators(ClassDefinitionNode cls) =>
         cls.OperatorOverloads.Concat(
             EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.OperatorOverloads));
@@ -1763,7 +1792,8 @@ public sealed class Binder
         bool isTypeInferred = false,
         BoundTypes.ArrayBoundType? methodInputArrayType = null,
         BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null,
-        bool hasUnknownInferredType = false)
+        bool hasUnknownInferredType = false,
+        EventDefinitionNode? eventDeclaration = null)
     {
         var symbol = new VariableSymbol(
             id,
@@ -1783,6 +1813,7 @@ public sealed class Binder
             nullableAnnotation,
             functionType)
         {
+            EventDeclaration = eventDeclaration,
             InferredReferenceType = inferredReferenceType,
             IsTypeInferred = isTypeInferred,
             HasUnknownInferredType = hasUnknownInferredType,
@@ -2559,8 +2590,8 @@ public sealed class Binder
             // 0.25 F3 (#847): bound as its own callable (BindLocalFunctions).
             LocalFunctionStatementNode => null,
             PreprocessorDirectiveNode preprocessor => BindPreprocessorDirective(preprocessor),
-            EventSubscribeNode => ScanUnboundWrites(stmt),
-            EventUnsubscribeNode => ScanUnboundWrites(stmt),
+            EventSubscribeNode subscribe => BindEventSubscription(subscribe, subscribe.Event, subscribe.Handler, adding: true),
+            EventUnsubscribeNode unsubscribe => BindEventSubscription(unsubscribe, unsubscribe.Event, unsubscribe.Handler, adding: false),
             // Unknown — explicit unsupported node, NOT null
             _ => BindUnsupportedStatement(stmt)
         };
@@ -2575,13 +2606,14 @@ public sealed class Binder
     private BoundCallStatement BindCallStatement(CallStatementNode call)
     {
         var args = BindCallArguments(call.Arguments, call.ArgumentModifiers);
-        var receiverSymbol = ResolveCallReceiver(
+        var isEventCall = TryGetEventStorage(call, out var eventStorage, out var eventType);
+        var receiverSymbol = isEventCall ? eventStorage : ResolveCallReceiver(
             call.Target,
             call.ReceiverSpan ?? call.CalleeSpan);
         var receiverTypeSymbol = receiverSymbol == null
             ? ResolveCallReceiverType(call.Target)
             : null;
-        var resolution = ResolveCall(
+        var resolution = isEventCall ? OverloadResolutionResult.NotFound() : ResolveCall(
             call.Span,
             call.Target,
             args,
@@ -2589,19 +2621,21 @@ public sealed class Binder
             call.ArgumentModifiers,
             call.TypeArguments,
             allowNullableStringCompatibility: true);
-        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
+        var bclResolution = !isEventCall && resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
             ? TryResolveBclCall(call.Target, args, call.ArgumentNames, call.ArgumentModifiers)
             : null;
         ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(call.Target, receiverSymbol, args, resolution, bclResolution);
         InvalidateMutatingCallArguments(args, call.ArgumentModifiers, resolution, bclResolution);
-        var callable = ResolveCallableStorage(call.Target, receiverSymbol);
+        var callable = isEventCall ? eventStorage.StorageIdentity : ResolveCallableStorage(call.Target, receiverSymbol);
         var callableEffects = InvalidateDeferredCallTarget(callable);
         var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
             call.Target,
             receiverSymbol,
             receiverTypeSymbol);
-        var receiver = BuildCallReceiver(
+        var receiver = isEventCall
+            ? new BoundVariableExpression(call.CalleeSpan, eventStorage, typeOverride: eventType)
+            : BuildCallReceiver(
             call.Target,
             call.ReceiverSpan ?? call.CalleeSpan,
             receiverSymbol,
@@ -2625,7 +2659,8 @@ public sealed class Binder
             receiverTypeSymbol,
             resolvedTypeName,
             resolvedMethodName,
-            (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
+            (isEventCall ? eventType.ParameterTypes.Select(type => type.DisplayString)
+                : bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
                 ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
@@ -4292,6 +4327,9 @@ public sealed class Binder
         if (target is BoundConditionalAccessExpression conditionalTarget)
             return ContinueConditionalAccess(fieldAccess.Span, conditionalTarget,
                 BindFieldAccess(fieldAccess, conditionalTarget.WhenNotNull, isPatternMember));
+        if (TryGetEventStorage(fieldAccess, out var eventStorage, out var eventType))
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
+                eventStorage.TypeName, eventStorage, fieldAccess.FieldNameSpan, resolvedType: eventType);
         if (target is BoundTypeReferenceExpression { ResolvedType: { IsEnum: true } enumType })
         {
             var members = _enumMembers[enumType.Id].Where(member => member.Name == fieldAccess.FieldName).ToArray();
@@ -4365,6 +4403,17 @@ public sealed class Binder
             _ => ResolveStructFieldPath(target.Type.DisplayString, fieldAccess.FieldName),
         };
         var fields = resolvedFields.OfType<VariableSymbol>().ToArray();
+        if (fields.Any(field => field.EventDeclaration is not null))
+        {
+            _diagnostics.ReportError(fieldAccess.FieldNameSpan, DiagnosticCode.UndefinedReference,
+                $"Event '{fieldAccess.FieldName}' is not readable as delegate storage in this context");
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan,
+                resolvedType: new BoundTypes.UnresolvedBoundType("Unavailable event backing storage", reported: true))
+            {
+                HasUnknownInferredType = true
+            };
+        }
         var fieldTypes = fields
             .Select(field => TypeIdentity.Canonicalize(field.TypeName))
             .Distinct(StringComparer.Ordinal)
@@ -6571,6 +6620,8 @@ public sealed class Binder
                     call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName);
             }
             receiver ??= BindExpression(member.Target);
+            if (TryGetEventStorage(member, out _, out _))
+                return BindFunctionValueCall(call, BindFieldAccess(member, receiver));
             if (receiver is BoundVariableExpression { Variable.Id.IsNone: true } unresolved)
                 receiver = new BoundVariableExpression(unresolved.Span, unresolved.Variable,
                     typeOverride: new BoundTypes.UnresolvedBoundType(
@@ -6588,7 +6639,11 @@ public sealed class Binder
                 "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
                 call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call);
         }
-        var target = BindExpression(call.TargetExpression);
+        return BindFunctionValueCall(call, BindExpression(call.TargetExpression));
+    }
+
+    private BoundExpression BindFunctionValueCall(ExpressionCallNode call, BoundExpression target)
+    {
         var arguments = BindCallArguments(call.Arguments, call.ArgumentModifiers);
         var resultType = target.Type is BoundTypes.FunctionBoundType function
             ? function.ReturnType
@@ -6644,6 +6699,9 @@ public sealed class Binder
     {
         if (refNode.IsNullLiteral)
             return new BoundNullLiteral(refNode.Span);
+
+        if (TryGetEventStorage(refNode, out var eventStorage, out var eventType))
+            return new BoundVariableExpression(refNode.Span, eventStorage, typeOverride: eventType);
 
         if (TryBindSourceStaticFieldReference(refNode) is { } sourceField)
             return sourceField;
@@ -6732,6 +6790,12 @@ public sealed class Binder
         if (symbols.All(symbol => symbol is VariableSymbol))
         {
             var variables = symbols.Cast<VariableSymbol>().ToArray();
+            if (variables.Any(variable => variable.StorageIdentity.EventDeclaration is not null))
+            {
+                _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
+                    $"Event '{refNode.Name}' is not readable as delegate storage in this context");
+                return new BoundVariableExpression(refNode.Span, CreateUnresolvedVariable(refNode));
+            }
             if (variables.Any(variable =>
                     variable.DeclaringTypeName != null
                     && !IsMemberAccessible(variable)))
@@ -6961,7 +7025,8 @@ public sealed class Binder
     private VariableSymbol? ResolveCallableStorage(string target, VariableSymbol? receiverSymbol) =>
         (target.EndsWith(".Invoke", StringComparison.Ordinal)
             ? receiverSymbol
-            : _scope.Lookup(target) as VariableSymbol)?.StorageIdentity;
+            : _scope.Lookup(target) is VariableSymbol { StorageIdentity.EventDeclaration: null } variable
+                ? variable : null)?.StorageIdentity;
 
     private CallableMutationSummary InvalidateDeferredCallTarget(BoundExpression target)
     {
@@ -7073,9 +7138,72 @@ public sealed class Binder
     private void SetCallableState(VariableSymbol variable, BoundExpression value)
     {
         var effects = GetCallableEffects(value);
+        if (variable.StorageIdentity.EventDeclaration is not null)
+            effects = UnionCallableEffects(GetCallableState(variable), effects);
         StoreCallableState(variable.StorageIdentity, effects);
         _deferredCallableWrites?.Add(new(
             variable.StorageIdentity, effects, GetCallableValueSources(value).ToArray()));
+    }
+
+    private BoundStatement? BindEventSubscription(
+        StatementNode statement, ExpressionNode eventExpression, ExpressionNode handler, bool adding)
+    {
+        if (!TryGetEventStorage(eventExpression, out var storage, out var type, subscription: true)
+            || storage.DeclaringTypeName is not { } owner || !IsWithinDeclaringType(owner))
+            return ScanUnboundWrites(statement);
+
+        BoundExpression target = eventExpression is FieldAccessNode field
+            ? new BoundFieldAccessExpression(field.Span, BindExpression(field.Target), field.FieldName,
+                storage.TypeName, storage, field.FieldNameSpan, resolvedType: type)
+            : new BoundVariableExpression(eventExpression.Span, storage, typeOverride: type);
+        var value = BindExpression(handler);
+        InvalidateMutableFlowNarrowing(storage, requireRebindable: false);
+        // Removal need not remove the last occurrence, and unknown subscribers
+        // can still be present. Retain the conservative union for both writes.
+        var effects = UnionCallableEffects(GetCallableState(storage), GetCallableEffects(value));
+        StoreCallableState(storage, effects);
+        _deferredCallableWrites?.Add(new(storage, effects, GetCallableValueSources(value).ToArray()));
+        return new BoundCompoundAssignment(statement.Span, target,
+            adding ? CompoundAssignmentOperator.Add : CompoundAssignmentOperator.Subtract, value);
+    }
+
+    private BoundTypes.FunctionBoundType? TryBuildEventFunctionType(EventDefinitionNode declaration)
+    {
+        if (declaration.HasAccessors || !ResolveSourceCallConversions || _asyncTypeModule is null)
+            return null;
+        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
+            _asyncTypeModule, _diagnostics, ProjectionContractMode);
+        return _sourceCallConversions.EventTypes.TryGetValue(declaration, out var type)
+            ? BuildEventFunctionType(type, declaration.DelegateType) : null;
+    }
+
+    private static BoundTypes.FunctionBoundType BuildEventFunctionType(
+        Microsoft.CodeAnalysis.INamedTypeSymbol type, string display)
+    {
+        var invoke = type.DelegateInvokeMethod!;
+        return new BoundTypes.FunctionBoundType(
+            System.Collections.Immutable.ImmutableArray.CreateRange(
+                invoke.Parameters.Select(parameter => Metadata.MetadataBinderResult.ToBoundType(parameter.Type))),
+            Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+            displayOverride: display, row: BoundTypes.EffectRow.Unknown);
+    }
+
+    private bool TryGetEventStorage(AstNode expression, out VariableSymbol storage,
+        out BoundTypes.FunctionBoundType type, bool subscription = false)
+    {
+        storage = null!;
+        type = null!;
+        if (_eventSymbols.Count == 0 || !ResolveSourceCallConversions || _asyncTypeModule is null)
+            return false;
+        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
+            _asyncTypeModule, _diagnostics, ProjectionContractMode);
+        if (!_sourceCallConversions.EventStorageUses.TryGetValue(expression, out var selected)
+            || selected.IsSubscription != subscription
+            || !_sourceCallConversions.EventTypes.ContainsKey(selected.Declaration)
+            || !_eventSymbols.TryGetValue(selected.Declaration, out storage!))
+            return false;
+        type = BuildEventFunctionType(selected.DelegateType, storage.TypeName);
+        return true;
     }
 
     private static IEnumerable<VariableSymbol> GetCallableValueSources(BoundExpression expression)
@@ -7084,6 +7212,9 @@ public sealed class Binder
             yield break;
         if (expression is BoundVariableExpression variable)
             yield return variable.Variable.StorageIdentity;
+        if (expression is BoundFieldAccessExpression { ResolvedFields: [var field] }
+            && field.EventDeclaration is not null)
+            yield return field.StorageIdentity;
         foreach (var child in expression.Children)
         {
             foreach (var source in GetCallableValueSources(child))
@@ -7097,6 +7228,9 @@ public sealed class Binder
             return lambda.CallableEffects;
         if (expression is BoundVariableExpression variable)
             return GetCallableState(variable.Variable);
+        if (expression is BoundFieldAccessExpression { ResolvedFields: [var field] }
+            && field.EventDeclaration is not null)
+            return GetCallableState(field);
         var effects = CallableMutationSummary.Empty;
         foreach (var child in expression.Children)
             effects = UnionCallableEffects(effects, GetCallableEffects(child));
@@ -7225,7 +7359,9 @@ public sealed class Binder
         var args = BindCallArguments(callExpr.Arguments, callExpr.ArgumentModifiers);
         var argumentNames = callExpr.ArgumentNames;
         var argumentModifiers = callExpr.ArgumentModifiers;
-        var receiverSymbol = computedReceiver is null ? ResolveCallReceiver(
+        var isEventCall = TryGetEventStorage(callExpr, out var eventStorage, out var eventType)
+            && computedReceiver is null;
+        var receiverSymbol = isEventCall ? eventStorage : computedReceiver is null ? ResolveCallReceiver(
             callExpr.Target,
             callExpr.ReceiverSpan ?? callExpr.CalleeSpan) : (computedReceiver as BoundVariableExpression)?.Variable;
         var receiverTypeSymbol = computedReceiver is BoundTypeReferenceExpression computedTypeReceiver
@@ -7233,7 +7369,7 @@ public sealed class Binder
             : computedReceiver is null && receiverSymbol == null
                 ? ResolveCallReceiverType(callExpr.Target)
                 : null;
-        var resolution = ResolveCall(
+        var resolution = isEventCall ? OverloadResolutionResult.NotFound() : ResolveCall(
             callExpr.Span,
             callExpr.Target,
             args,
@@ -7279,7 +7415,9 @@ public sealed class Binder
             resolvedTypeName = computedReceiver.Type.FullyQualifiedName;
             resolvedMethodName = computedMethodName;
         }
-        var receiver = computedReceiver ?? BuildCallReceiver(
+        var receiver = isEventCall
+            ? new BoundVariableExpression(callExpr.CalleeSpan, eventStorage, typeOverride: eventType)
+            : computedReceiver ?? BuildCallReceiver(
             callExpr.Target,
             callExpr.ReceiverSpan ?? callExpr.CalleeSpan,
             receiverSymbol,
@@ -7298,7 +7436,7 @@ public sealed class Binder
             && !callExpr.Target.StartsWith("System.", StringComparison.Ordinal)
             && !callExpr.Target.StartsWith("Microsoft.", StringComparison.Ordinal))
             metadataReceiver = TryBindMetadataTypeReceiver(new ReferenceNode(typeReceiver.Span, typeReceiver.Name));
-        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
+        var bclResolution = !isEventCall && resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
             ? metadataReceiver is not null
                 ? TryResolveBclCall($"{metadataReceiver.Type.FullyQualifiedName}.{resolvedMethodName}", args,
                     callExpr.ArgumentNames, callExpr.ArgumentModifiers, metadataReceiver, callExpr.TypeArguments, contextualCall)
@@ -7324,7 +7462,7 @@ public sealed class Binder
             && !resolution.HasOpaqueOverloads
             ? TryResolveInstanceArrayCall(callExpr, receiver)
             : null;
-        var annotatedReturn = bclResolution?.GetReturnBoundTypeEx();
+        var annotatedReturn = isEventCall ? eventType.ReturnType : bclResolution?.GetReturnBoundTypeEx();
         var methodInputArrayReturn = annotatedReturn as BoundTypes.ArrayBoundType;
         var genericNullabilityReturn = annotatedReturn as BoundTypes.GenericInstantiationBoundType;
         if (bclResolution?.LegacyReturnType is { } legacyReturn)
@@ -7381,7 +7519,7 @@ public sealed class Binder
         ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(callExpr.Target, receiverSymbol, args, resolution, bclResolution);
         InvalidateMutatingCallArguments(args, argumentModifiers, resolution, bclResolution);
-        var callable = computedMethodName == "Invoke"
+        var callable = isEventCall ? eventStorage.StorageIdentity : computedMethodName == "Invoke"
             ? receiverSymbol?.StorageIdentity
             : ResolveCallableStorage(callExpr.Target, receiverSymbol);
         var callableEffects = computedMethodName == "Invoke" && computedReceiver is not null
@@ -7395,7 +7533,8 @@ public sealed class Binder
             returnType,
             resolvedTypeName,
             resolvedMethodName,
-            resolvedParameterTypes: (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
+            resolvedParameterTypes: (isEventCall ? eventType.ParameterTypes.Select(type => type.DisplayString)
+                : bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
                 ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
@@ -7414,7 +7553,7 @@ public sealed class Binder
             annotatedReturnType: annotatedReturn,
             receiver: receiver)
         {
-            EvaluatedReceiver = computedReceiver,
+            EvaluatedReceiver = isEventCall ? receiver : computedReceiver,
             IsSourceExtensionCall = isSourceExtensionCall,
             ResolvedMetadataMethod = instanceArrayResolution?.Symbol
                 ?? (metadataReceiver is not null || metadataScalarReturn ? bclResolution?.Symbol : null),
@@ -7795,6 +7934,13 @@ public sealed class Binder
             .ToArray();
         if (variables.Length == 0)
             return null;
+
+        if (variables.Any(variable => variable.StorageIdentity.EventDeclaration is not null))
+        {
+            _diagnostics.ReportError(referenceSpan, DiagnosticCode.UndefinedReference,
+                $"Event '{receiverName}' is not readable as delegate storage in this context");
+            return null;
+        }
 
         if (_isStaticContext
             && variables.Any(variable =>
@@ -8812,7 +8958,10 @@ public sealed class Binder
         {
             // 0.25 F3 (#847): C# simple-name lookup: a local/parameter is invoked as a
             // value; a visible local function wins over members and module functions.
-            if (_scope.Lookup(target) is VariableSymbol { DeclaringTypeName: null })
+            if (_scope.Lookup(target) is VariableSymbol { DeclaringTypeName: null }
+                || _scope.Lookup(target) is VariableSymbol { StorageIdentity.EventDeclaration: not null }
+                || ResolveLexicalMembers(target).OfType<VariableSymbol>()
+                    .Any(variable => variable.EventDeclaration is not null))
                 yield break;
             if (_scope.GetOverloads(target).Any(_localFunctionSymbols.Contains))
             {
@@ -9703,6 +9852,12 @@ public sealed class Binder
                 target = new BoundVariableExpression(assign.Target.Span, restored);
             SetCallableState(restored, value);
         }
+        else if (target is BoundFieldAccessExpression { ResolvedFields: [var member] }
+            && member.EventDeclaration is not null)
+        {
+            InvalidateMutableFlowNarrowing(member, requireRebindable: false);
+            SetCallableState(member, value);
+        }
         return new BoundAssignmentStatement(assign.Span, target, value);
     }
 
@@ -9729,10 +9884,26 @@ public sealed class Binder
 
     private BoundCompoundAssignment BindCompoundAssignment(CompoundAssignmentStatementNode compound)
     {
+        if (compound.Operator is CompoundAssignmentOperator.Add or CompoundAssignmentOperator.Subtract
+            && TryGetEventStorage(compound.Target, out _, out _, subscription: true)
+            && BindEventSubscription(compound, compound.Target, compound.Value,
+                compound.Operator == CompoundAssignmentOperator.Add) is BoundCompoundAssignment subscription)
+            return subscription;
         var target = BindExpression(compound.Target);
         var value = BindExpression(compound.Value);
         ReportWriteToReadOnlyLocal(target, compound.Target.Span, "assign to {0}");
         InvalidateMemberFlowNarrowing(target);
+        var storage = target switch
+        {
+            BoundVariableExpression variable => variable.Variable.StorageIdentity,
+            BoundFieldAccessExpression { ResolvedFields: [var field] } => field,
+            _ => null
+        };
+        if (storage?.EventDeclaration is not null)
+        {
+            InvalidateMutableFlowNarrowing(storage, requireRebindable: false);
+            SetCallableState(storage, value);
+        }
         return new BoundCompoundAssignment(compound.Span, target, compound.Operator, value);
     }
 

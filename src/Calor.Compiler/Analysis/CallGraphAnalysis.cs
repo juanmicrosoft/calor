@@ -65,6 +65,9 @@ public sealed class CallGraphAnalysis
 
     internal sealed record InitializationOperation(IOperation Operation, bool Preserved);
 
+    internal sealed record EventStorageSelection(
+        EventDefinitionNode Declaration, INamedTypeSymbol DelegateType, bool IsSubscription);
+
     internal sealed record SourceInitialization(
         IReadOnlyList<InitializationOperation>? Instance,
         IReadOnlyList<InitializationOperation>? Static,
@@ -81,6 +84,8 @@ public sealed class CallGraphAnalysis
         internal HashSet<TextSpan> SourceExtensionCalls { get; } = [];
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
         internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<EventDefinitionNode, INamedTypeSymbol> EventTypes { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<AstNode, EventStorageSelection> EventStorageUses { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<ExpressionCallNode, Binding.Metadata.MetadataBinderResult> ContextualMetadataCalls { get; } = new(ReferenceEqualityComparer.Instance);
         internal HashSet<BinaryOperationNode> BuiltInNullGuardOperations { get; } = new(ReferenceEqualityComparer.Instance);
@@ -146,6 +151,8 @@ public sealed class CallGraphAnalysis
             .ToHashSet(ReferenceEqualityComparer.Instance);
         var conflictingTypes = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingParameters = new HashSet<ParameterNode>(ReferenceEqualityComparer.Instance);
+        var conflictingEvents = new HashSet<EventDefinitionNode>(ReferenceEqualityComparer.Instance);
+        var conflictingEventUses = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
         var conflictingLambdas = new HashSet<LambdaExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingNullGuards = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
         var conflictingGuardTerminations = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
@@ -198,6 +205,7 @@ public sealed class CallGraphAnalysis
                 || binary.Right is ReferenceNode { IsNullLiteral: true }));
         var bindMemberTypes = visited.OfType<FieldAccessNode>().Any();
         var bindInitialization = EnumerateClasses(module).Any();
+        var bindEvents = EnumerateClasses(module).Any(owner => EnumerateEvents(owner).Any(evt => !evt.HasAccessors));
         if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindInitialization
             && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
             return bindings;
@@ -306,6 +314,34 @@ public sealed class CallGraphAnalysis
             var model = compilation.GetSemanticModel(tree);
             var root = tree.GetRoot();
             var methods = new Dictionary<ISymbol, AstNode>(SymbolEqualityComparer.Default);
+            var events = new Dictionary<ISymbol, EventDefinitionNode>(SymbolEqualityComparer.Default);
+            foreach (var declaration in root.DescendantNodes().OfType<EventFieldDeclarationSyntax>())
+            {
+                foreach (var trivia in declaration.GetLeadingTrivia())
+                {
+                    if (!TryReadMarker(trivia, callablePrefix, out var index)
+                        || emittedCallables[index] is not EventDefinitionNode { HasAccessors: false } origin)
+                        continue;
+                    var symbol = declaration.Declaration.Variables is [var variable]
+                        ? model.GetDeclaredSymbol(variable) as IEventSymbol : null;
+                    if (symbol?.Type is not INamedTypeSymbol { DelegateInvokeMethod: { } invoke } type
+                        || HasErrorType(type) || HasErrorType(invoke.ReturnType)
+                        || invoke.Parameters.Any(parameter => HasErrorType(parameter.Type))
+                        || HasInvalidEventOwner(symbol.ContainingType)
+                        || model.GetDiagnostics(declaration.Span).Any(diagnostic =>
+                            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                        || symbol.ContainingType.GetMembers(symbol.Name).Length != 1
+                        || bindings.EventTypes.TryGetValue(origin, out var previous) && !SameEventType(previous, type))
+                    {
+                        conflictingEvents.Add(origin);
+                        bindings.EventTypes.Remove(origin);
+                        continue;
+                    }
+                    events[symbol.OriginalDefinition] = origin;
+                    if (!conflictingEvents.Contains(origin))
+                        bindings.EventTypes[origin] = type;
+                }
+            }
             foreach (var declaration in root.DescendantNodes().Where(node =>
                          node is BaseMethodDeclarationSyntax or LocalFunctionStatementSyntax))
             {
@@ -409,7 +445,7 @@ public sealed class CallGraphAnalysis
                         constructor.MetadataName, [], EffectMemberKind.Constructor);
                 }
             }
-            if (!bindExpressions && !bindNullGuards && !bindMemberTypes)
+            if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindEvents)
                 return;
 
             var validProofContext = (bindMemberTypes || bindNullGuards) && !compilation.GetDiagnostics().Any(diagnostic =>
@@ -423,6 +459,7 @@ public sealed class CallGraphAnalysis
             var selectedGettersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
             var selectedMethodGroupCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
             var selectedMetadataCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
+            var selectedEventUsesInTree = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
 
             foreach (var declaration in root.DescendantNodes().Where(node =>
                          node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax
@@ -440,6 +477,30 @@ public sealed class CallGraphAnalysis
                         continue;
                     foreach (var child in operation.ChildOperations)
                         pending.Push(child);
+                    if (operation is IEventReferenceOperation eventReference
+                        && Origin(operation) is { } eventUse
+                        && events.TryGetValue(eventReference.Event.OriginalDefinition, out var eventOrigin)
+                        && bindings.EventTypes.ContainsKey(eventOrigin)
+                        && eventReference.Event.Type is INamedTypeSymbol { DelegateInvokeMethod: not null } eventType
+                        && !model.GetDiagnostics(operation.Syntax.Span).Any(diagnostic =>
+                            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                    {
+                        var selection = new EventStorageSelection(eventOrigin, eventType,
+                            operation.Parent is IEventAssignmentOperation);
+                        if (bindings.EventStorageUses.TryGetValue(eventUse, out var previous)
+                            && (!ReferenceEquals(previous.Declaration, eventOrigin)
+                                || previous.IsSubscription != selection.IsSubscription
+                                || !SameEventType(previous.DelegateType, eventType)))
+                        {
+                            conflictingEventUses.Add(eventUse);
+                            bindings.EventStorageUses.Remove(eventUse);
+                        }
+                        else if (!conflictingEventUses.Contains(eventUse))
+                        {
+                            selectedEventUsesInTree.Add(eventUse);
+                            bindings.EventStorageUses[eventUse] = selection;
+                        }
+                    }
                     if (validProofContext && bindNullGuards)
                         AddStableMemberRead(operation);
                     if (validMemberContext)
@@ -566,6 +627,12 @@ public sealed class CallGraphAnalysis
                     conflictingGuardTerminations.Add(guard);
                     bindings.TerminatingNullGuardConditions.Remove(guard);
                 }
+            }
+            foreach (var use in ranges.Select(range => range.Node)
+                         .Where(use => !selectedEventUsesInTree.Contains(use)))
+            {
+                conflictingEventUses.Add(use);
+                bindings.EventStorageUses.Remove(use);
             }
             foreach (var member in ranges.Select(range => range.Node).OfType<FieldAccessNode>()
                          .Where(member => !selectedMembersInTree.Contains(member)))
@@ -1148,6 +1215,18 @@ public sealed class CallGraphAnalysis
                 || type is INamedTypeSymbol named && named.TypeArguments.Any(HasErrorType)
                 || type is IArrayTypeSymbol array && HasErrorType(array.ElementType);
 
+            bool HasInvalidEventOwner(INamedTypeSymbol owner)
+            {
+                for (INamedTypeSymbol? current = owner; current is not null; current = current.ContainingType)
+                    foreach (var reference in current.DeclaringSyntaxReferences)
+                        if (reference.GetSyntax() is TypeDeclarationSyntax declaration
+                            && model.GetDiagnostics(Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+                                declaration.SpanStart, declaration.OpenBraceToken.Span.End))
+                                .Any(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                            return true;
+                return false;
+            }
+
             void AddCall(IOperation operation, IMethodSymbol method,
                 System.Collections.Immutable.ImmutableArray<IArgumentOperation> arguments)
             {
@@ -1319,6 +1398,18 @@ public sealed class CallGraphAnalysis
                 }
             }
         }
+    }
+
+    private static bool SameEventType(INamedTypeSymbol left, INamedTypeSymbol right)
+    {
+        var format = SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions
+            | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+        return SameType(left, right) && left.ToDisplayString(format) == right.ToDisplayString(format)
+            && left.DelegateInvokeMethod is { } leftInvoke && right.DelegateInvokeMethod is { } rightInvoke
+            && leftInvoke.ReturnType.ToDisplayString(format) == rightInvoke.ReturnType.ToDisplayString(format)
+            && leftInvoke.Parameters.Zip(rightInvoke.Parameters).All(pair =>
+                pair.First.Type.ToDisplayString(format) == pair.Second.Type.ToDisplayString(format));
     }
 
     private static bool SameType(ITypeSymbol left, ITypeSymbol right) =>
@@ -2461,6 +2552,9 @@ public sealed class CallGraphAnalysis
                                 variable.Variable.DeclarationSpan;
                             boundValues.Variables[(callerId, node.Span.Start, node.Span.End)] =
                                 variable.Variable.StorageIdentity;
+                            break;
+                        case BoundFieldAccessExpression { ResolvedField: { EventDeclaration: not null } field }:
+                            boundValues.Variables[(callerId, node.Span.Start, node.Span.End)] = field.StorageIdentity;
                             break;
                         case BoundCallStatement statement:
                             target = statement.Target;

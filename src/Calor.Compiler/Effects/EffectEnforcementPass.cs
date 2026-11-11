@@ -2860,6 +2860,10 @@ public sealed class EffectEnforcementPass
         /// </summary>
         private RowSource? SourceRow(ExpressionNode? expression)
         {
+            if (expression is not null
+                && _pass._callGraphAnalysis.BoundVariable(_function.Id, expression.Span)
+                    is { EventDeclaration: not null, FunctionType: not null } storage)
+                return new RowSource(PolyRow.Unknown, $"event '{storage.Name}'");
             switch (expression)
             {
                 // 0.25 F3 (#847): either branch may flow; an unnameable branch is Unknown.

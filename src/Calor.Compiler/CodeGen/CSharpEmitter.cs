@@ -7680,6 +7680,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(EventDefinitionNode node)
     {
+        if (CallableOrigin is { } origin)
+            AppendLine(origin(node));
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",

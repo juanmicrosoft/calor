@@ -1665,6 +1665,447 @@ public sealed class CanonicalEnumDelegateEventTests
         }
     }
 
+    [Theory]
+    [InlineData("EventHandler", "EventArgs", false)]
+    [InlineData("EventHandler<Payload>", "Payload", false)]
+    [InlineData("EventHandler", "EventArgs", true)]
+    [InlineData("EventHandler<Payload>", "Payload", true)]
+    public void FieldLikeEventsBindSelectedDelegateStorageWithoutPromisingHandlerEffects(
+        string type, string argument, bool explicitInvoke)
+    {
+        var source = $$"""
+            module EventStorage block overflow unchecked nullable oblivious
+              using System
+              class Payload
+                extends EventArgs
+              class Source
+                event {{type}}:Changed
+                func Raise ({{argument}}:args) → void
+                  ! mut, cw, throw
+                  if Changed != null
+                    let copy = Changed
+                    {{(explicitInvoke ? "copy.Invoke" : "copy")}}(this, args)
+                    {{(explicitInvoke ? "Changed.Invoke" : "Changed")}}(this, args)
+            """;
+        var ast = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var storage = Assert.Single(bound.SymbolsById.Values.OfType<VariableSymbol>(),
+            variable => variable.EventDeclaration is not null);
+        Assert.Equal("Changed", storage.Name);
+        Assert.True(storage.IsMutable);
+        Assert.Equal("Source", storage.DeclaringTypeName);
+        var signature = Assert.IsType<FunctionBoundType>(storage.FunctionType);
+        Assert.True(signature.Row.IsUnknown);
+        Assert.Equal(2, signature.ParameterTypes.Length);
+        Assert.Equal(argument, signature.ParameterTypes[1].DisplayString.TrimEnd('?').Split('.').Last());
+        Assert.Equal("void", signature.ReturnType.DisplayString);
+        var raise = bound.Functions.Single(function => function.Symbol.Name == "Source.Raise");
+        var reads = BoundNodeHelpers.DescendantsAndSelf(raise).OfType<BoundVariableExpression>()
+            .Where(reference => reference.Variable.StorageIdentity == storage).ToArray();
+        Assert.True(reads.Length >= 3);
+        Assert.All(reads, read => Assert.True(Assert.IsType<FunctionBoundType>(read.Type).Row.IsUnknown));
+        var copy = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(raise).OfType<BoundBindStatement>());
+        Assert.True(copy.Variable.FunctionType!.Row.IsUnknown);
+        var calls = BoundNodeHelpers.DescendantsAndSelf(raise).OfType<BoundCallExpression>().ToArray();
+        Assert.Equal(2, calls.Length);
+        Assert.All(calls, call =>
+        {
+            Assert.Equal("void", call.Type.DisplayString);
+            Assert.Equal(2, call.Arguments.Count);
+            Assert.NotNull(call.ReceiverSymbol?.FunctionType);
+        });
+        foreach (var strict in new[] { false, true })
+        {
+            var compiled = Program.Compile(source, filePath: null, options: new CompilationOptions
+            {
+                StrictEffects = strict,
+                UnknownCallPolicy = Calor.Compiler.Effects.UnknownCallPolicy.Strict
+            });
+            Assert.True(compiled.HasErrors);
+            Assert.Empty(compiled.GeneratedCode);
+            Assert.Contains(compiled.Diagnostics.Errors,
+                diagnostic => diagnostic.Code is DiagnosticCode.EffectRowUnknown or DiagnosticCode.ForbiddenEffect);
+        }
+    }
+
+    [Theory]
+    [InlineData("Changed()")]
+    [InlineData("Changed.Invoke()")]
+    [InlineData("this.Changed()")]
+    [InlineData("this.Changed.Invoke()")]
+    [InlineData("let copy = Changed\ncopy()")]
+    [InlineData("let copy = this.Changed\ncopy.Invoke()")]
+    public void FieldLikeEventInvocationAloneRemainsUnknownUnderBothEnforcementModes(string body)
+    {
+        var source = $$"""
+            module EventInvocation
+              class Source
+                event System.Action:Changed
+                func Raise () → void
+                  ! cw, mut, throw
+            {{string.Join("\n", body.Split('\n').Select(line => "      " + line))}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var storage = Assert.Single(bound.SymbolsById.Values.OfType<VariableSymbol>(),
+            variable => variable.EventDeclaration is not null);
+        Assert.True(storage.FunctionType!.Row.IsUnknown);
+        foreach (var strict in new[] { false, true })
+        {
+            var compiled = Program.Compile(source, filePath: null,
+                options: new CompilationOptions { StrictEffects = strict });
+            Assert.True(compiled.HasErrors);
+            Assert.Empty(compiled.GeneratedCode);
+            Assert.Contains(compiled.Diagnostics.Errors,
+                error => error.Code == DiagnosticCode.ForbiddenEffect && error.Message.Contains("'unknown'"));
+        }
+    }
+
+    [Theory]
+    [InlineData("Changed")]
+    [InlineData("this.Changed")]
+    [InlineData("other.Changed")]
+    public void FieldLikeEventReadsAcrossPartialDeclarationsUseTheirActualStorage(string expression)
+    {
+        var source = $$"""
+            module PartialEvents
+              class Source partial
+                event System.Action:Changed
+              class Source partial
+                func Read (Source:other) → void
+                  let copy = {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var storage = Assert.Single(bound.SymbolsById.Values.OfType<VariableSymbol>(),
+            variable => variable.EventDeclaration is not null);
+        var copy = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundBindStatement>());
+        Assert.True(copy.Variable.FunctionType!.Row.IsUnknown);
+        Assert.Same(storage, copy.Initializer switch
+        {
+            BoundVariableExpression variable => variable.Variable.StorageIdentity,
+            BoundFieldAccessExpression field => field.ResolvedField,
+            _ => null
+        });
+    }
+
+    [Theory]
+    [InlineData("class Source\n    event System.Action:Changed\n      add\n        return\n      remove\n        return\n    func Read () → void\n      let copy = Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n  class Derived\n    extends Source\n    func Read () → void\n      let copy = Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n  func Read (Source:value) → void\n    let copy = value.Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n    func Read static () → void\n      let copy = Changed")]
+    [InlineData("class Source\n    event System.Action:Changed static\n    func Read (Source:value) → void\n      let copy = value.Changed")]
+    [InlineData("class Source\n    event System.Action:Changed static\n  func Read () → void\n    let copy = Source.Changed")]
+    [InlineData("class Source\n    event System.Action:Changed private\n  func Read (Source:value) → void\n    let copy = value.Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n    func Read () → void\n      let copy = Changed\n  class Source")]
+    [InlineData("func Read (System.ComponentModel.INotifyPropertyChanged:value) → void\n    let copy = value.PropertyChanged")]
+    public void EventReadsOutsideLegalFieldLikeStorageDoNotAcquireCallableTypes(string declaration)
+    {
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse("module IllegalEvents\n  " + declaration));
+        var copy = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundBindStatement>());
+        Assert.Null(copy.Variable.FunctionType);
+        Assert.IsNotType<FunctionBoundType>(copy.Initializer!.Type);
+        foreach (var suffix in new[] { "()", ".Invoke()" })
+        {
+            var invalidCall = "module IllegalEvents\n  "
+                + string.Join("\n", declaration.Split('\n').Select(line =>
+                    line.Contains("let copy = ", StringComparison.Ordinal)
+                        ? line.Replace("let copy = ", "", StringComparison.Ordinal) + suffix : line));
+            var callDiagnostics = new DiagnosticBag();
+            var calls = new Binder(callDiagnostics).Bind(Parse(invalidCall));
+            Assert.DoesNotContain(BoundNodeHelpers.DescendantsAndSelf(calls).OfType<BoundCallExpression>(),
+                call => call.ReceiverSymbol?.EventDeclaration is not null);
+            Assert.DoesNotContain(BoundNodeHelpers.DescendantsAndSelf(calls).OfType<BoundFieldAccessExpression>(),
+                field => field.ResolvedField?.EventDeclaration is not null);
+            Assert.True(Program.Compile(invalidCall).HasErrors);
+        }
+    }
+
+    [Fact]
+    public void EventNameShadowingUsesTheParameterRatherThanEventStorage()
+    {
+        const string source = """
+            module EventShadow
+              class Source
+                event System.Action:Changed
+                func Run (System.Action:Changed !) → void
+                  !
+                  Changed()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var target = call.ReceiverSymbol!;
+        Assert.True(target.IsParameter);
+        Assert.Null(target.EventDeclaration);
+        Assert.False(Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData(false, "Changed")]
+    [InlineData(false, "this.Changed")]
+    [InlineData(false, "other.Changed")]
+    [InlineData(true, "Changed")]
+    public void FieldLikeEventCopiesUseExistingUnknownRowCompatibilityPolicy(bool localShadow, string read)
+    {
+        var source = $$"""
+            module EventRow
+              class Source
+                event System.Action:Changed
+                func Run (System.Action:input !, Source:other) → void
+                  !
+                  let System.Action:{{(localShadow ? "Changed" : "copy")}} ! = {{(localShadow ? "input" : read)}}
+                  {{(localShadow ? "Changed" : "copy")}}()
+            """;
+        var result = Program.Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        if (!localShadow)
+        {
+            Assert.Contains(result.Diagnostics, error =>
+                error.Code == DiagnosticCode.EffectRowUnknown
+                && error.Severity == Calor.Compiler.Diagnostics.DiagnosticSeverity.Warning);
+            var strict = Program.Compile(source, filePath: null,
+                options: new CompilationOptions { StrictEffects = true });
+            Assert.True(strict.HasErrors);
+            Assert.Contains(strict.Diagnostics.Errors, error => error.Code == DiagnosticCode.EffectRowUnknown);
+        }
+        else
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(source));
+            var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+            Assert.Null(call.ReceiverSymbol!.EventDeclaration);
+            Assert.False(call.ReceiverSymbol.IsParameter);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FieldLikeEventDiagnosticRuntimeRetainsHandlerOrderingAndExceptions(bool isStatic)
+    {
+        var source = $$"""
+            module EventRuntime block overflow unchecked nullable oblivious
+              class Source
+                event System.Action<int>:Changed{{(isStatic ? " static" : "")}}
+                func Raise{{(isStatic ? " static" : "")}} (int:value) → void
+                  ! mut, cw, throw
+                  if Changed != null
+                    let copy = Changed
+                    copy(value)
+            """;
+        Assert.True(Program.Compile(source).HasErrors);
+        // Event positions have no row syntax. This checks diagnostic native emission,
+        // not strict native admission of an unknown handler invocation.
+        var compiled = Program.Compile(source, filePath: null, options: new CompilationOptions { EnforceEffects = false });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Execute(compiled.GeneratedCode, assembly =>
+        {
+            var type = assembly.GetType("Source")!;
+            var instance = isStatic ? null : Activator.CreateInstance(type);
+            var changed = type.GetEvent("Changed")!;
+            var raise = type.GetMethod("Raise")!;
+            var values = new List<int>();
+            Action<int> first = value => values.Add(value);
+            Action<int> second = value => values.Add(value * 10);
+            Action<int> failing = _ => throw new InvalidOperationException("handler");
+            raise.Invoke(instance, [1]);
+            Assert.Empty(values);
+            changed.AddEventHandler(instance, first);
+            raise.Invoke(instance, [2]);
+            changed.AddEventHandler(instance, second);
+            raise.Invoke(instance, [3]);
+            changed.RemoveEventHandler(instance, first);
+            raise.Invoke(instance, [4]);
+            changed.AddEventHandler(instance, failing);
+            changed.AddEventHandler(instance, first);
+            var error = Assert.Throws<TargetInvocationException>(() => raise.Invoke(instance, [5]));
+            Assert.Equal("handler", Assert.IsType<InvalidOperationException>(error.InnerException).Message);
+            Assert.Equal(new[] { 2, 3, 30, 40, 50 }, values);
+        });
+    }
+
+    [Theory]
+    [InlineData("set Changed later", "Changed", false)]
+    [InlineData("set Changed later", "Changed", true)]
+    [InlineData("set this.Changed later", "this.Changed", true)]
+    [InlineData("set other.Changed later", "other.Changed", true)]
+    [InlineData("subscribe", "Changed", true)]
+    [InlineData("subscribe", "this.Changed", true)]
+    [InlineData("unsubscribe", "Changed", true)]
+    [InlineData("compound", "Changed", true)]
+    public void FieldLikeEventWritesRetainCapturedMutationUntilInvocation(string write, string read, bool invoke)
+    {
+        var source = $$"""
+            module EventMutation
+              func Take (string:value) → void
+                !
+              class Source
+                event System.Action:Changed
+                func Probe (Source:other, string?:value) → void
+                  ! mut
+                  if value != null
+                    let System.Action:later ! mut = () =>
+                      set value null
+                    {{(write.StartsWith("set ", StringComparison.Ordinal) ? write : $"set {read} later")}}
+                    let copy = {{read}}
+                    {{(invoke ? "copy()" : "")}}
+                    Take(value)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = Parse(source);
+        if (!write.StartsWith("set ", StringComparison.Ordinal))
+        {
+            // Subscription has no native textual spelling. Exercise the existing
+            // AST operations without adding syntax or claiming public admission.
+            var conditional = Assert.IsType<IfStatementNode>(ast.Classes.Single().Methods.Single().Body.Single());
+            var body = Assert.IsType<List<StatementNode>>(conditional.ThenBody);
+            var assignment = Assert.IsType<AssignmentStatementNode>(body[1]);
+            body[1] = write == "compound"
+                ? new CompoundAssignmentStatementNode(assignment.Span, assignment.Target,
+                    CompoundAssignmentOperator.Add, assignment.Value)
+                : new EventSubscribeNode(assignment.Span, assignment.Target, assignment.Value);
+            if (write == "unsubscribe")
+                body.Insert(2, new EventUnsubscribeNode(assignment.Span, assignment.Target, assignment.Value));
+        }
+        var bound = new Binder(diagnostics).Bind(ast);
+        Assert.DoesNotContain(diagnostics.Errors,
+            diagnostic => diagnostic.Code != DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.Equal(invoke, diagnostics.Errors.Any(
+            diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        var copy = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundBindStatement>()
+            .Single(binding => binding.Variable.Name == "copy");
+        Assert.True(copy.Variable.FunctionType!.Row.IsUnknown);
+    }
+
+    [Fact]
+    public void FieldLikeEventReadsAndSignatureSelectionMustAgreeAcrossConfigurations()
+    {
+        const string source = """
+            module ConditionalEvents
+              class Source
+                pp FEATURE
+                  event System.Action<int>:Changed
+                pp else
+                  event System.Action<string>:Changed
+                func Read () → void
+                  let copy = Changed
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var copy = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundBindStatement>());
+        Assert.Null(copy.Variable.FunctionType);
+        Assert.IsNotType<FunctionBoundType>(copy.Initializer!.Type);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+    }
+
+    [Fact]
+    public void FieldLikeEventTypeNamesCannotBorrowAShadowedBclDelegateSignature()
+    {
+        const string source = """
+            module ShadowedEventType
+              using System
+              class EventHandler
+              class Source
+                event EventHandler:Changed
+                func Read () → void
+                  let copy = Changed
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        var storage = Assert.Single(bound.SymbolsById.Values.OfType<VariableSymbol>(),
+            variable => variable.EventDeclaration is not null);
+        Assert.Null(storage.FunctionType);
+        Assert.Null(Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound)
+            .OfType<BoundBindStatement>()).Variable.FunctionType);
+    }
+
+    [Fact]
+    public void FieldLikeEventDiagnosticRuntimeEvaluatesReceiverAndArgumentsOnceBeforeInvokingHandlers()
+    {
+        const string source = """
+            module EventEvaluation block overflow unchecked nullable oblivious
+              class Source
+                event System.Action<int>:Changed
+                func Receiver static (Source:value, bool:fail) → Source
+                  ! cw, throw, alloc
+                  System.Console.WriteLine("receiver")
+                  if fail
+                    throw new System.InvalidOperationException("receiver")
+                  return value
+                func Argument static (bool:fail) → int
+                  ! cw, throw, alloc
+                  System.Console.WriteLine("argument")
+                  if fail
+                    throw new System.InvalidOperationException("argument")
+                  return 7
+                func Run static (Source:value, bool:receiverFails, bool:argumentFails) → void
+                  ! cw, throw, mut, alloc
+                  Receiver(value, receiverFails).Changed(Argument(argumentFails))
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var run = bound.Functions.Single(function => function.Symbol.Name == "Source.Run");
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(run).OfType<BoundExpressionCall>());
+        var target = Assert.IsType<BoundFieldAccessExpression>(call.Target);
+        Assert.NotNull(target.ResolvedField!.EventDeclaration);
+        Assert.Equal(1, call.Children.Count(child => ReferenceEquals(child, call.Target)));
+        Assert.Equal(new[] { "Receiver", "Argument" },
+            BoundNodeHelpers.DescendantsAndSelf(run).OfType<BoundCallExpression>()
+                .Select(child => child.ResolvedSymbol!.Name.Split('.').Last()));
+        Assert.True(Program.Compile(source).HasErrors);
+        var compiled = Program.Compile(source, filePath: null,
+            options: new CompilationOptions { EnforceEffects = false });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Execute(compiled.GeneratedCode, assembly =>
+        {
+            var type = assembly.GetType("Source")!;
+            var instance = Activator.CreateInstance(type)!;
+            var runMethod = type.GetMethod("Run")!;
+            var changed = type.GetEvent("Changed")!;
+            void Invoke(bool receiverFails, bool argumentFails, string? failure, string[] expected)
+            {
+                var previous = Console.Out;
+                using var output = new StringWriter();
+                try
+                {
+                    Console.SetOut(output);
+                    if (failure is null)
+                        runMethod.Invoke(null, [instance, receiverFails, argumentFails]);
+                    else
+                    {
+                        var error = Assert.Throws<TargetInvocationException>(() =>
+                            runMethod.Invoke(null, [instance, receiverFails, argumentFails]));
+                        if (failure == "null")
+                            Assert.IsType<NullReferenceException>(error.InnerException);
+                        else
+                            Assert.Equal(failure, error.InnerException!.Message);
+                    }
+                }
+                finally { Console.SetOut(previous); }
+                Assert.Equal(expected, output.ToString().Split(Environment.NewLine,
+                    StringSplitOptions.RemoveEmptyEntries));
+            }
+            Invoke(false, false, "null", ["receiver", "argument"]);
+            Action<int> first = value => Console.WriteLine("first:" + value);
+            Action<int> failing = _ => throw new InvalidOperationException("handler");
+            changed.AddEventHandler(instance, first);
+            Invoke(false, false, null, ["receiver", "argument", "first:7"]);
+            Invoke(true, false, "receiver", ["receiver"]);
+            Invoke(false, true, "argument", ["receiver", "argument"]);
+            changed.AddEventHandler(instance, failing);
+            changed.AddEventHandler(instance, first);
+            Invoke(false, false, "handler", ["receiver", "argument", "first:7"]);
+        });
+    }
+
     private static ModuleNode Parse(string source)
     {
         var diagnostics = new DiagnosticBag();

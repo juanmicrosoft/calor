@@ -1334,6 +1334,7 @@ public sealed class VariableSymbol : Symbol
     public bool IsProperty { get; }
     public bool IsStatic { get; }
     internal bool IsEnumMember { get; init; }
+    internal EventDefinitionNode? EventDeclaration { get; init; }
     public ParameterModifier Modifier { get; }
     public ExpressionNode? DefaultValue { get; }
     public bool IsOptional => DefaultValue != null;
