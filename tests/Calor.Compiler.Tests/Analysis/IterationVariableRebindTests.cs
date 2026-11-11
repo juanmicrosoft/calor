@@ -17,6 +17,7 @@ public class IterationVariableRebindTests
 
     private static bool HasCode(string source, string code)
     {
+        source = NativeSource(source);
         var lex = new DiagnosticBag();
         var tokens = new Lexer(source, lex).TokenizeAllForParser();
         Assert.False(lex.HasErrors, "lexer: " + string.Join("; ", lex.Select(d => d.Message)));
@@ -28,6 +29,138 @@ public class IterationVariableRebindTests
         new BindValidationPass(bag, source, strictInference: true).Check(module);
         return bag.ToList().Any(d => d.Code == code);
     }
+
+    // Only these exact historical fixtures have native counterparts. The explicit
+    // namespace retains S.SModule; indexed each uses its explicit counter lowering.
+    private static string NativeSource(string original) => original switch
+    {
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x} arr\n      §B{~x:str} \"y\"\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                each x in arr
+                  var string:x = "y"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n" +
+        "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
+        "    §EACHKV{k:v} d\n      §B{~k:str} \"z\"\n    §R 0\n" => """
+            module S S
+              func Do public () → int
+                let Dictionary<string,int>:d = new Dictionary<string,int>()
+                each k, v in d
+                  var string:k = "z"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n" +
+        "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
+        "    §EACHKV{k:v} d\n      §B{~v:i32} 9\n    §R 0\n" => """
+            module S S
+              func Do public () → int
+                let Dictionary<string,int>:d = new Dictionary<string,int>()
+                each k, v in d
+                  var int:v = 9
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x} arr\n      §ASSIGN x \"y\"\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                each x in arr
+                  set x "y"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~s} 0\n" +
+        "    §L{i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n" => """
+            module S S
+              func Do public () → int
+                var s = 0
+                for i from 0 to 3 step 1
+                  var int:i = 9
+                  set s s + i
+                return s
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x:str:i} arr\n      §B{~i:i32} 5\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                var i = -1
+                each string:x in arr
+                  set i i + 1
+                  var int:i = 5
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x:str:i} arr\n      §ASSIGN i 0\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                var i = -1
+                each string:x in arr
+                  set i i + 1
+                  set i 0
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x} arr\n      §P x\n    §B{~x:str} \"y\"\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                each x in arr
+                  Console.WriteLine(x)
+                var string:x = "y"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r,cw}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x} arr\n      §P x\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r, cw
+                let string[]:arr = File.ReadAllLines(path)
+                each x in arr
+                  Console.WriteLine(x)
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (i32:x) -> i32\n" +
+        "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
+        "    §EACHKV{k:v} d\n      §B{x:i32} 9\n      §R x\n    §R x\n" => """
+            module S S
+              func Do public (int:x) → int
+                let Dictionary<string,int>:d = new Dictionary<string,int>()
+                each k, v in d
+                  let int:x = 9
+                  return x
+                return x
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
+        "    §EACHKV{k:v} d\n      §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
+        "      §R (len lines)\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let Dictionary<string,int>:d = new Dictionary<string,int>()
+                each k, v in d
+                  let List<string>:lines = File.ReadAllLines(path)
+                  return lines.Length
+                return 0
+            """,
+        _ => throw new ArgumentException("No native counterpart is registered for this iteration rebind fixture.", nameof(original))
+    };
 
     [Fact]
     public void RebindOfForeachVariable_IsRejected()

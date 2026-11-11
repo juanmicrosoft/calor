@@ -19,6 +19,7 @@ public class RebindTypeMismatchTests
 {
     private static bool HasMismatch(string source)
     {
+        source = NativeSource(source);
         var lex = new DiagnosticBag();
         var tokens = new Lexer(source, lex).TokenizeAllForParser();
         Assert.False(lex.HasErrors, "lexer: " + string.Join("; ", lex.Select(d => d.Message)));
@@ -33,6 +34,7 @@ public class RebindTypeMismatchTests
 
     private static IReadOnlyList<Diagnostic> Validate(string source)
     {
+        source = NativeSource(source);
         var lex = new DiagnosticBag();
         var tokens = new Lexer(source, lex).TokenizeAllForParser();
         var parseBag = new DiagnosticBag();
@@ -41,6 +43,108 @@ public class RebindTypeMismatchTests
         new BindValidationPass(bag, source, strictInference: true).Check(module);
         return bag.ToList();
     }
+
+    // Preserve the original inputs and binding oracle below. Only these exact
+    // fixtures have native counterparts; the explicit namespace retains S.SModule.
+    private static string NativeSource(string original) => original switch
+    {
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n" => """
+            module S S
+              func Do public () → int
+                var int:x = 0
+                var string:x = "hi"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i32} 0\n    §B{~x} 1\n    §R x\n" => """
+            module S S
+              func Do public () → int
+                let int:x = 0
+                var x = 1
+                return x
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x} \"hi\"\n    §R 0\n" => """
+            module S S
+              func Do public () → int
+                var int:x = 0
+                var x = "hi"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
+        "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n" => """
+            module S S
+              func Do public (string:p) → int
+                ! fs:r
+                var int:x = 0
+                var x = File.ReadAllText(p)
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:s) -> i32\n    §B{~x:i32} 0\n    §B{~x} s\n    §R 0\n" => """
+            module S S
+              func Do public (string:s) → int
+                var int:x = 0
+                var x = s
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i64\n    §B{~x:i64} 0\n    §B{~x} 5\n    §R x\n" => """
+            module S S
+              func Do public () → long
+                var long:x = 0
+                var x = 5
+                return x
+            """,
+        "§M{S}\n  §F{Do:pub} (i64:n) -> i32\n    §B{~x:i32} 0\n    §B{~x} n\n    §R 0\n" => """
+            module S S
+              func Do public (long:n) → int
+                var int:x = 0
+                var x = n
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
+        "    §B{~result} (* result n)\n    §R result\n" => """
+            module S S
+              func Do public (int:n) → int
+                var result = 1
+                var result = result * n
+                return result
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:i32} 5\n    §R x\n" => """
+            module S S
+              func Do public () → int
+                var int:x = 0
+                var int:x = 5
+                return x
+            """,
+        "§M{S}\n  §F{Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
+        "    §WH (<= 1 n)\n      §B{~result} (* result 2)\n    §R result\n" => """
+            module S S
+              func Fact public (int:n) → int
+                var result = 1
+                while 1 <= n
+                  var result = result * 2
+                return result
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x} 0\n    §B{~x:i32} 5\n    §R x\n" => """
+            module S S
+              func Do public () → int
+                var x = 0
+                var int:x = 5
+                return x
+            """,
+        "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
+        "    §IF (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
+        "    §IF (== b true)\n      §B{~x:str} \"y\"\n      §R 0\n    §R 0\n" => """
+            module S S
+              func Do public (bool:a, bool:b) → int
+                if a == true
+                  var int:x = 1
+                  return x
+                if b == true
+                  var string:x = "y"
+                  return 0
+                return 0
+            """,
+        _ => throw new ArgumentException("No native counterpart is registered for this type-mismatch rebind fixture.", nameof(original))
+    };
 
     [Fact]
     public void RebindWithDifferentType_IsRejected()
