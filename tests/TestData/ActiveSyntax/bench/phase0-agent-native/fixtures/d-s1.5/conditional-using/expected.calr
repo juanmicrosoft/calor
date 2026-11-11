@@ -1,16 +1,13 @@
-§M{Fixture:overflow=unchecked}
-  §PP{FEATURE}
-    §U{Number:System.Int32}
-    §M{ConditionalValue:pub}
-      §F{Get:pub} () -> Number
-        §R 41
+module Fixture Fixture overflow unchecked
+  pp FEATURE
+    using Number = System.Int32
+    module ConditionalValue
+      func Get () → Number
+        return 41
 
 
-  §PPE
-    §U{Number:System.Int32}
-    §M{ConditionalValue:pub}
-      §F{Get:pub} () -> Number
-        §R 42
-
-
-  §/PP{FEATURE}
+  pp else
+    using Number = System.Int32
+    module ConditionalValue
+      func Get () → Number
+        return 42

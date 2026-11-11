@@ -1,9 +1,9 @@
-§M{Fixture:overflow=unchecked}
-  §M{InterpolationToString:pub}
-    §F{Describe:pub} (int:count, string:name) -> string
-      §R "${name}:${count,4}|${count:D3}"
+module Fixture Fixture overflow unchecked
+  module InterpolationToString
+    func Describe (int:count, string:name) → string
+      return "${name}:${count,4}|${count:D3}"
 
-    §F{Verify:pub} () -> int
-      §B{string:s} §C{Describe} §A 7 §A "ab" §/C
-      §B{string:wrapped} "<${s}>"
-      §R (+ (? (== s "ab:   7|007") 1000 0) (len wrapped))
+    func Verify () → int
+      let string:s = Describe(7, "ab")
+      let string:wrapped = "<${s}>"
+      return (((s == "ab:   7|007") ? 1000 : 0) + wrapped.Length)

@@ -1,0 +1,21 @@
+{
+  "featureKey": "string-interpolation-hole",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "expectedLossKinds": [],
+  "allowedLossKinds": [],
+  "runtimeEntryPoint": "Verify",
+  "runtimeExpectedInt": 58,
+  "convertedRuntimeEntryPoint": "Verify",
+  "convertedExpectedUndefinedInt": 58,
+  "convertedExpectedDefinedInt": 58,
+  "definedSymbols": [],
+  "currentObservation": {
+    "inputContract": "current-compiler-active-syntax",
+    "reason": "The unchanged array-index interpolation holes now convert natively. The original C# and independently admitted native value fixture both execute to 58 without an interop loss.",
+    "nativeConversionCount": 6,
+    "fullyNative": true,
+    "interopFeatureCounts": {},
+    "requiredIssueFeatures": ["nullable-oblivious-nested-shape"]
+  }
+}

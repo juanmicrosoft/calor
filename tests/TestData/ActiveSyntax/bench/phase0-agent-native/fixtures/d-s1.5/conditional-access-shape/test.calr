@@ -1,33 +1,33 @@
-§M{Fixture:overflow=unchecked}
-  §M{ConditionalAccessFixture:pub}
-    §FLD{i32:ArgumentCalls:priv:stat}
+module Fixture Fixture overflow unchecked
+  module ConditionalAccessFixture
+    field int:ArgumentCalls private static
 
-    §F{Argument:priv} () -> i32
-      §E{mut}
-      §ASSIGN ArgumentCalls (+ ArgumentCalls 1)
-      §R 7
+    func Argument private () → int
+      ! mut
+      set ArgumentCalls (ArgumentCalls + 1)
+      return 7
 
-    §F{Run:pub} () -> i32
-      §S (== result 117)
-      §E{alloc,mut}
-      §ASSIGN ArgumentCalls 0
-      §B{~target:Holder} null
-      §B{?i32:skipped} §C (?. target "M") §A §C{Argument} §/C §/C
-      §IF (|| (!= skipped null) (!= ArgumentCalls 0))
-        §R (- 1)
-      §ASSIGN target §NEW{Holder} §/NEW
-      §B{?i32:selected} §C (?. target "M") §A §C{Argument} §/C §/C
-      §IF (|| (|| (!= selected 7) (!= ArgumentCalls 1)) (!= target.Calls 1))
-        §R (- 2)
-      §R (+ (+ (* ArgumentCalls 100) (* target.Calls 10)) (?? selected 0))
+    func Run () → int
+      ! alloc, mut
+      => result == 117
+      set ArgumentCalls 0
+      var Holder:target = null
+      let int?:skipped = target?.M(Argument())
+      if ((skipped != null) || (ArgumentCalls != 0))
+        return (-1)
+      set target new Holder()
+      let int?:selected = target?.M(Argument())
+      if (((selected != 7) || (ArgumentCalls != 1)) || (target.Calls != 1))
+        return (-2)
+      return (((ArgumentCalls * 100) + (target.Calls * 10)) + (selected ?? 0))
 
-    §CL{Holder:pub:seal}
-      §FLD{i32:Calls:pub}
+    class Holder sealed
+      field int:Calls
 
-      §PROP{M7:i32:pub}
-        §GET{pub}
-          §R 0
+      property int:M7
+        get public
+          return 0
 
-      §MT{M:pub} (i32:value) -> i32
-        §ASSIGN Calls (+ Calls 1)
-        §R value
+      func M (int:value) → int
+        set Calls (Calls + 1)
+        return value

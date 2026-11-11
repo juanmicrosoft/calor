@@ -1,11 +1,15 @@
-§M{Fixture:overflow=unchecked}
-  §U{System.Collections.Generic}
+module Fixture Fixture overflow unchecked
+  using System.Collections.Generic
 
-  §CL{Bag:pub}
-    §PROP{Items:List<int>:pub:get} = §LIST{int} 1 §/LIST
+  class Bag
+    property List<int>:Items = new System.Collections.Generic.List<int>() { 1 }
+      get public
 
 
-  §M{InitializerInterop:pub}
-    §F{Verify:pub} () -> int
-      §B{bag} (cast Bag §CS{(new Bag { Items = { 2, 3 } })})
-      §R (+ (* bag.Items.Count 10) §IDX bag.Items 2)
+  module InitializerInterop
+    raw member:initializer-interop:Method:Unsupported%20Method%3A%20public%20static%20int%20Verify%28%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20var%20bag%20%3D%20new%20Bag%20%7B%20Items%20%3D%20%7B%202%2C%203%20%7D... 143
+    public static int Verify()
+    {
+        var bag = new Bag { Items = { 2, 3 } };
+        return bag.Items.Count * 10 + bag.Items[2];
+    }

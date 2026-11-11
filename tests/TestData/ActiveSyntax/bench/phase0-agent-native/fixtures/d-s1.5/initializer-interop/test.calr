@@ -1,11 +1,14 @@
-§M{InitializerInteropTest}
-  §U{System.Collections.Generic}
+module InitializerInteropTest InitializerInteropTest
+  using System.Collections.Generic
 
-  §CL{Bag:pub}
-    §PROP{Items:List<i32>:pub:get} = §LIST{i32} 1 §/LIST
+  class Bag
+    property List<int>:Items = new List<int>() { 1 }
+      get public
 
-  §M{InitializerInteropTest:pub}
-    §F{Verify:pub} () -> i32
-      §S (== result 33)
-      §B{bag} (cast Bag §CS{(new Bag { Items = { 2, 3 } })})
-      §R (+ (* bag.Items.Count 10) §IDX bag.Items 2)
+  module InitializerInteropTest
+    func Verify () → int
+      => result == 33
+      let bag = new Bag()
+      bag.Items.Add(2)
+      bag.Items.Add(3)
+      return ((bag.Items.Count * 10) + bag.Items[2])

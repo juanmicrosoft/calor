@@ -1,5 +1,4 @@
-§M{Fixture:overflow=unchecked}
-  §NS{SingleScope}
-    §M{Value:pub}
-      §F{Get:pub} () -> int
-        §R 42
+module Fixture SingleScope block overflow unchecked
+  module Value
+    func Get () → int
+      return 42

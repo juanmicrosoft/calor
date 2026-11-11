@@ -1,4 +1,4 @@
-§M{ConditionalDeclarationFixture}
-  §M{FixtureOracle:pub}
-    §F{Get:pub} () -> i32
-      §R 127
+module ConditionalDeclarationFixture ConditionalDeclarationFixture
+  module FixtureOracle
+    func Get () → int
+      return 127

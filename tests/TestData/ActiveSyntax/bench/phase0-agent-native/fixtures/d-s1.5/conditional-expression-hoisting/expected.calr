@@ -1,28 +1,31 @@
-§M{Fixture:overflow=unchecked}
-  §M{ConditionalExpressionFixture:pub}
-    §F{Run:pub} () -> int
-      §B{~i:int} 0
-      §B{~gate:bool} false
-      §B{bool:ignored} (&& gate (> (cast int §CS{(i++)}) 0))
-      §IF (|| ignored (!= i 0))
-        §R (- 1)
-      §ASSIGN gate true
-      §B{~selectedAnd:bool} (&& gate (== (cast int §CS{(i++)}) 0))
-      §IF (|| (! selectedAnd) (!= i 1))
-        §R (- 2)
-      §B{~skippedOr:bool} (|| gate (> (cast int §CS{(++i)}) 0))
-      §IF (|| (! skippedOr) (!= i 1))
-        §R (- 3)
-      §ASSIGN gate false
-      §B{~selectedOr:bool} (|| gate (== (cast int §CS{(++i)}) 2))
-      §IF (|| (! selectedOr) (!= i 2))
-        §R (- 4)
-      §ASSIGN gate true
-      §B{int:selected} §IF gate → (cast int §CS{(i++)}) §EL → (cast int §CS{(++i)})
-      §IF (|| (!= selected 2) (!= i 3))
-        §R (- 5)
-      §ASSIGN gate false
-      §B{int:alternate} §IF gate → (cast int §CS{(++i)}) §EL → 9
-      §IF (|| (!= alternate 9) (!= i 3))
-        §R (- 6)
-      §R (+ (+ (* i 100) (* selected 10)) alternate)
+module Fixture Fixture overflow unchecked
+  module ConditionalExpressionFixture
+    raw member:conditional-expression-hoisting:Method:Unsupported%20Method%3A%20public%20static%20int%20Run%28%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20i%20%3D%200%3B%0A%20%20%20%20%20%20%20%20bool%20gate%20%3D%20false%3B%0A%20... 759
+    public static int Run()
+    {
+        int i = 0;
+        bool gate = false;
+        bool ignored = gate && i++ > 0;
+        if (ignored || i != 0) return -1;
+
+        gate = true;
+        bool selectedAnd = gate && i++ == 0;
+        if (!selectedAnd || i != 1) return -2;
+
+        bool skippedOr = gate || ++i > 0;
+        if (!skippedOr || i != 1) return -3;
+
+        gate = false;
+        bool selectedOr = gate || ++i == 2;
+        if (!selectedOr || i != 2) return -4;
+
+        gate = true;
+        int selected = gate ? i++ : ++i;
+        if (selected != 2 || i != 3) return -5;
+
+        gate = false;
+        int alternate = gate ? ++i : 9;
+        if (alternate != 9 || i != 3) return -6;
+
+        return i * 100 + selected * 10 + alternate;
+    }

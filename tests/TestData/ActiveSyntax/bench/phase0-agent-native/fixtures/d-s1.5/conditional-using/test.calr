@@ -1,14 +1,15 @@
-§M{FixtureTest}
-  §PP{FEATURE}
-    §U{Number:System.Int32}
-    §M{ConditionalValue:pub}
-      §F{Get:pub} () -> Number
-        §S (== result INT:41)
-        §R INT:41
-  §PPE
-    §U{Number:System.Int32}
-    §M{ConditionalValue:pub}
-      §F{Get:pub} () -> Number
-        §S (== result INT:42)
-        §R INT:42
-  §/PP{FEATURE}
+module FixtureTest FixtureTest
+  pp FEATURE
+    using Number = System.Int32
+  pp else
+    using Number = System.Int32
+
+  module ConditionalValue
+    pp FEATURE
+      func Get () → Number
+        => result == 41
+        return 41
+    pp else
+      func Get () → Number
+        => result == 42
+        return 42

@@ -1,11 +1,8 @@
-§M{Fixture:overflow=unchecked}
-  §M{InterpolationHole:pub}
-    §F{Verify:pub} () -> int
-      §E{alloc}
-      §ARR{items:int}
-        3
-        5
-        8
-      §B{int:i} 1
-      §B{string:s} "[${§CS{items[i]}}|${§CS{items[i + 1]}}]"
-      §R (? (== s "[5|8]") 58 (- 1))
+module Fixture Fixture overflow unchecked
+  module InterpolationHole
+    func Verify () → int
+      ! alloc
+      let int[]:items = new int[] { 3, 5, 8 }
+      let int:i = 1
+      let string:s = "[${items[i]}|${items[(i + 1)]}]"
+      return ((s == "[5|8]") ? 58 : (-1))

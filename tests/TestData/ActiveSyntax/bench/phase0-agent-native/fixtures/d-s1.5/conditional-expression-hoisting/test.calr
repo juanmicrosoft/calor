@@ -1,29 +1,54 @@
-§M{Fixture:overflow=unchecked}
-  §M{ConditionalExpressionFixture:pub}
-    §F{Run:pub} () -> i32
-      §S (== result 329)
-      §B{~i:i32} 0
-      §B{~gate:bool} false
-      §B{bool:ignored} (&& gate (> (cast i32 §CS{(i++)}) 0))
-      §IF (|| ignored (!= i 0))
-        §R (- 1)
-      §ASSIGN gate true
-      §B{~selectedAnd:bool} (&& gate (== (cast i32 §CS{(i++)}) 0))
-      §IF (|| (! selectedAnd) (!= i 1))
-        §R (- 2)
-      §B{~skippedOr:bool} (|| gate (> (cast i32 §CS{(++i)}) 0))
-      §IF (|| (! skippedOr) (!= i 1))
-        §R (- 3)
-      §ASSIGN gate false
-      §B{~selectedOr:bool} (|| gate (== (cast i32 §CS{(++i)}) 2))
-      §IF (|| (! selectedOr) (!= i 2))
-        §R (- 4)
-      §ASSIGN gate true
-      §B{i32:selected} §IF gate → (cast i32 §CS{(i++)}) §EL → (cast i32 §CS{(++i)})
-      §IF (|| (!= selected 2) (!= i 3))
-        §R (- 5)
-      §ASSIGN gate false
-      §B{i32:alternate} §IF gate → (cast i32 §CS{(++i)}) §EL → 9
-      §IF (|| (!= alternate 9) (!= i 3))
-        §R (- 6)
-      §R (+ (+ (* i 100) (* selected 10)) alternate)
+module Fixture Fixture overflow unchecked
+  module ConditionalExpressionFixture
+    func Run () → int
+      => result == 329
+      var int:i = 0
+      var bool:gate = false
+      var bool:ignored = false
+      if gate
+        let int:previous = i
+        set i (i + 1)
+        set ignored (previous > 0)
+      if (ignored || (i != 0))
+        return (-1)
+      set gate true
+      var bool:selectedAnd = false
+      if gate
+        let int:previous = i
+        set i (i + 1)
+        set selectedAnd (previous == 0)
+      if ((!selectedAnd) || (i != 1))
+        return (-2)
+      var bool:skippedOr = true
+      if (!gate)
+        set i (i + 1)
+        set skippedOr (i > 0)
+      if ((!skippedOr) || (i != 1))
+        return (-3)
+      set gate false
+      var bool:selectedOr = true
+      if (!gate)
+        set i (i + 1)
+        set selectedOr (i == 2)
+      if ((!selectedOr) || (i != 2))
+        return (-4)
+      set gate true
+      var int:selected = 0
+      if gate
+        set selected i
+        set i (i + 1)
+      else
+        set i (i + 1)
+        set selected i
+      if ((selected != 2) || (i != 3))
+        return (-5)
+      set gate false
+      var int:alternate = 0
+      if gate
+        set i (i + 1)
+        set alternate i
+      else
+        set alternate 9
+      if ((alternate != 9) || (i != 3))
+        return (-6)
+      return (((i * 100) + (selected * 10)) + alternate)

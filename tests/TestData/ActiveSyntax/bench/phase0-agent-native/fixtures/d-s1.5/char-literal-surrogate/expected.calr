@@ -1,6 +1,6 @@
-§M{Fixture:overflow=unchecked}
-  §M{SurrogateValues:pub}
-    §F{Verify:pub} () -> int
-      §B{char:high} '\ud800'
-      §B{char:low} '\udfff'
-      §R (+ (* (cast int high) 2) (cast int low))
+module Fixture Fixture overflow unchecked
+  module SurrogateValues
+    func Verify () → int
+      let char:high = '\ud800'
+      let char:low = '\udfff'
+      return ((((int)high) * 2) + ((int)low))

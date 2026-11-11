@@ -1,15 +1,15 @@
-§M{InterpolationFormattableTest}
-  §U{System}
+module InterpolationFormattableTest InterpolationFormattableTest
+  using System
 
-  §M{FormattableProbe:pub}
-    §F{Kind:pub} (FormattableString:f) -> i32
-      §R 1
+  module FormattableProbe
+    func Kind (FormattableString:f) → int
+      return 1
 
-    §F{Kind:pub} (any:o) -> i32
-      §R (- 1)
+    func Kind (object:o) → int
+      return (-1)
 
-    §F{Verify:pub} () -> i32
-      §S (== result 107)
-      §B{x:i32} 42
-      §B{s:str} "k=${x},${(+ x 1)}"
-      §R (+ (* §C{Kind} §A (cast global::System.FormattableString "k=${x},${(+ x 1)}") §/C 100) (len s))
+    func Verify () → int
+      => result == 107
+      let int:x = 42
+      let string:s = "k=${x},${(x + 1)}"
+      return ((Kind(((global::System.FormattableString)"k=${x},${(x + 1)}")) * 100) + s.Length)

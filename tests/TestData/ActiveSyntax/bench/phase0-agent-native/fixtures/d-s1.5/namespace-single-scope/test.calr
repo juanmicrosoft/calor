@@ -1,5 +1,4 @@
-§M{FixtureTest}
-  §NS{SingleScope}
-    §M{Value:pub}
-      §F{Get:pub} () -> i32
-        §R INT:42
+module FixtureTest SingleScope block
+  module Value
+    func Get () → int
+      return 42

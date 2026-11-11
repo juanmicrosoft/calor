@@ -1,53 +1,49 @@
-§M{Fixture:overflow=unchecked}
-  §PP{FEATURE}
-    §CL{ConditionalClass:pub}
-      §MT{Value:pub:stat} () -> int
-        §R 1
+module Fixture Fixture overflow unchecked
+  pp FEATURE
+    class ConditionalClass
+      func Value static () → int
+        return 1
 
 
-    record ConditionalRecord:pub (int:Value)
+    record ConditionalRecord (int:Value)
 
 
-    §DEL{ConditionalDelegate}
-      §I{int:value}
-      §O{int}
+    delegate ConditionalDelegate (int:value) → int
 
-    §CL{ConditionalPartial:pub:partial}
-      §MT{PartialValue:pub:stat} () -> int
-        §R 10
+    class ConditionalPartial partial
+      func PartialValue static () → int
+        return 10
 
 
-  §PPE
-    §CL{ConditionalClass:pub}
-      §MT{Value:pub:stat} () -> int
-        §R 2
+  pp else
+    class ConditionalClass
+      func Value static () → int
+        return 2
 
 
-    §CL{ConditionalRecord:pub:seal}
-      §PROP{Value:int:pub:get}
+    class ConditionalRecord sealed
+      property int:Value
+        get public
 
-      §CTOR{pub} (int:value)
-        §ASSIGN Value value
-
-
-    §DEL{ConditionalDelegate}
-      §I{int:value}
-      §O{int}
-
-    §CL{ConditionalPartial:pub:partial}
-      §MT{PartialValue:pub:stat} () -> int
-        §R 20
+      ctor (int:value)
+        set Value value
 
 
-  §/PP{FEATURE}
+    delegate ConditionalDelegate (int:value) → int
 
-  §CL{ConditionalPartial:pub:partial}
-    §MT{Shared:pub:stat} () -> int
-      §R 100
+    class ConditionalPartial partial
+      func PartialValue static () → int
+        return 20
 
 
-  §M{ConditionalHarness:pub}
-    §F{Get:pub} () -> int
-      §E{alloc}
-      §B{ConditionalDelegate:d} §LAM{value:int} (+ value 1) §/LAM
-      §R (+ (+ (+ (+ §C{ConditionalClass.Value} §/C §NEW{ConditionalRecord} §A 3 §/NEW.Value) §C{d} §A 4 §/C) §C{ConditionalPartial.PartialValue} §/C) §C{ConditionalPartial.Shared} §/C)
+
+  class ConditionalPartial partial
+    func Shared static () → int
+      return 100
+
+
+  module ConditionalHarness
+    func Get () → int
+      ! alloc
+      let ConditionalDelegate:d = (int:value) => (value + 1)
+      return ((((ConditionalClass.Value() + new ConditionalRecord(3) . Value) + d(4)) + ConditionalPartial.PartialValue()) + ConditionalPartial.Shared())

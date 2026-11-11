@@ -1,11 +1,16 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Calor.Compiler;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
+using DiagnosticBag = Calor.Compiler.Diagnostics.DiagnosticBag;
 
 namespace Calor.Conversion.Tests;
 
@@ -21,7 +26,7 @@ namespace Calor.Conversion.Tests;
 public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     private static readonly HashSet<string> CurrentExpectationFixtures =
-        ["local-function", "conditional-expression-hoisting", "conditional-declaration"];
+        ["local-function", "conditional-expression-hoisting", "conditional-declaration", "string-interpolation-hole"];
 
     private static string CurrentManifestPath(string repoRoot, string name, string original) =>
         name == "conditional-declaration"
@@ -79,6 +84,16 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
     {
         var inputPath = Path.Combine(RegistryPath(), "conditional-expression-hoisting", "input.cs");
         Assert.True(File.Exists(inputPath), "Required original conditional fixture missing.");
+        var source = File.ReadAllText(inputPath);
+        var method = CSharpSyntaxTree.ParseText(source).GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var updates = method.DescendantNodes().Where(node =>
+            node.IsKind(SyntaxKind.PostIncrementExpression)
+            || node.IsKind(SyntaxKind.PreIncrementExpression)).ToArray();
+        Assert.Equal(new[] { 7, 11, 14, 18, 22, 22, 26 },
+            updates.Select(node => node.GetLocation().GetLineSpan().StartLinePosition.Line + 1));
+        Assert.Equal(new[] { "i++", "i++", "++i", "++i", "i++", "++i", "++i" },
+            updates.Select(node => node.ToString()));
         var converted = new CSharpToCalorConverter(new ConversionOptions
         {
             Fidelity = ConversionFidelity.Lossy,
@@ -86,22 +101,121 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             GracefulFallback = true,
             AutoGenerateIds = true,
             PreprocessorMode = PreprocessorConversionMode.PreserveAllBranches
-        }).Convert(File.ReadAllText(inputPath), "conditional-expression-hoisting.cs");
+        }).Convert(source, "conditional-expression-hoisting.cs");
         Assert.True(converted.Success, string.Join("; ", converted.Issues.Select(issue => issue.Message)));
         var losses = converted.Losses.ToArray();
         output.WriteLine(JsonSerializer.Serialize(losses.Select(loss => new
         {
             loss.Feature, loss.Description, loss.Line
         })));
-        Assert.All(losses, loss =>
-        {
-            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
-            Assert.Equal("conditional-expression-hoisting", loss.Feature);
-        });
-        Assert.Equal(new int?[] { 7, 11, 14, 18, 22, 22, 26 }, losses.Select(loss => loss.Line));
-        Assert.Equal(new[] { "i++", "i++", "++i", "++i", "i++", "++i", "++i" },
-            losses.Select(loss => loss.Description.Split("as C#: ", StringSplitOptions.None)[1]));
+        // The retired seven-expression representation is now one complete member,
+        // not seven native sites or a partially hoisted native method.
+        var loss = Assert.Single(losses);
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.Equal("conditional-expression-hoisting", loss.Feature);
+        Assert.Equal(3, loss.Line);
+        Assert.Equal("Method preserved as §CSHARP interop: public static int Run()\n"
+            + "    {\n        int i = 0;\n        bool gate = false;\n ...", loss.Description);
+        Assert.Equal(4, converted.NativeConversionCount);
+        Assert.Empty(converted.Ast!.Functions);
+        var containingClass = Assert.Single(converted.Ast.Classes);
+        Assert.Empty(containingClass.Methods);
+        var block = Assert.Single(containingClass.InteropBlocks);
+        Assert.Equal(method.ToFullString(), block.CSharpCode);
+        Assert.Equal("conditional-expression-hoisting", block.FeatureName);
+        Assert.Equal("Unsupported Method: public static int Run()\n"
+            + "    {\n        int i = 0;\n        bool gate = false;\n ...", block.Reason);
+        Assert.Single(Calor.Compiler.Tests.RawFrameAssertions.GetFrames(converted.CalorSource));
         Assert.DoesNotContain("_arrayOperand", converted.CalorSource);
+        var compiled = Program.Compile(converted.CalorSource!, "conditional-expression-hoisting.calr",
+            new Calor.Compiler.CompilationOptions { EnforceEffects = false });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        AssertValueTestPasses("conditional-expression-hoisting", compiled.GeneratedCode, "Run", 329,
+            expectedOwner: "Fixture.ConditionalExpressionFixture");
+    }
+
+    [Fact]
+    public void InterpolationHole_CurrentObservationIsIndependentlyNative()
+    {
+        CurrentExpectation_ChangesOnlyApprovedClassificationFields("string-interpolation-hole");
+        ValidateFixture(Path.Combine(RegistryPath(), "string-interpolation-hole"), "string-interpolation-hole");
+        var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
+        var original = Path.Combine(RegistryPath(), "string-interpolation-hole", "test.calr");
+        var current = File.ReadAllText(Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, original));
+        Calor.Compiler.Tests.RawFrameAssertions.AssertFramed(current, present: false);
+        var result = Program.Compile(current, "string-interpolation-hole-test.calr",
+            new Calor.Compiler.CompilationOptions
+            {
+                EnforceEffects = false,
+                UnknownCallPolicy = Calor.Compiler.Effects.UnknownCallPolicy.Permissive
+            });
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        AssertNative(result.Ast!);
+        var arrays = CSharpSyntaxTree.ParseText(result.GeneratedCode).GetRoot()
+            .DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        Assert.Equal(2, arrays.Length);
+        Assert.All(arrays, access => Assert.Equal("items", access.Expression.ToString()));
+        Assert.Equal("i", arrays[0].ArgumentList.Arguments.Single().Expression.ToString());
+        var index = arrays[1].ArgumentList.Arguments.Single().Expression;
+        var addition = Assert.Single(index.DescendantNodesAndSelf().OfType<BinaryExpressionSyntax>());
+        Assert.True(addition.IsKind(SyntaxKind.AddExpression));
+        Assert.Equal("i", addition.Left.ToString());
+        Assert.Equal("1", addition.Right.ToString());
+        Assert.All(index.DescendantNodesAndSelf().OfType<CheckedExpressionSyntax>(),
+            expression => Assert.True(expression.IsKind(SyntaxKind.UncheckedExpression)));
+        AssertValueTestPasses("string-interpolation-hole", result.GeneratedCode, "Verify", 58,
+            expectedOwner: "InterpolationHoleTest.InterpolationHoleTestModule");
+    }
+
+    [Fact]
+    public void LocalFunctionValueFixture_RetainsForwardCallsRecursionAndContract()
+    {
+        var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
+        var original = Path.Combine(RegistryPath(), "local-function", "test.calr");
+        var current = File.ReadAllText(Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, original));
+        var frame = Assert.IsType<RawCSharpFrame>(
+            Assert.Single(Calor.Compiler.Tests.RawFrameAssertions.GetFrames(current)).Value);
+        Assert.Equal("method", frame.FeatureName);
+        // This is the original value fixture's emitted Run member from db19e25
+        // (line directives disabled), preserved with its contract, not native credit.
+        var method = Assert.IsType<MethodDeclarationSyntax>(SyntaxFactory.ParseMemberDeclaration(frame.Code));
+        var locals = method.DescendantNodes().OfType<LocalFunctionStatementSyntax>().ToArray();
+        Assert.Equal(new[] { "Add", "Square", "Fact" }, locals.Select(local => local.Identifier.ValueText));
+        foreach (var local in locals)
+        {
+            var firstCall = method.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .First(call => call.Expression.ToString() == local.Identifier.ValueText);
+            Assert.True(firstCall.SpanStart < local.SpanStart, "Local calls must still precede their declarations.");
+        }
+        Assert.Contains(locals[2].DescendantNodes().OfType<InvocationExpressionSyntax>(),
+            call => call.Expression.ToString() == "Fact");
+        var compiled = Program.Compile(current, "local-function-test.calr",
+            new Calor.Compiler.CompilationOptions
+            {
+                EnforceEffects = false,
+                UnknownCallPolicy = Calor.Compiler.Effects.UnknownCallPolicy.Permissive
+            });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        AssertValueTestPasses("local-function", compiled.GeneratedCode, "Run", 31620,
+            expectedOwner: "Fixture.LocalFunctionFixture");
+        var brokenContract = compiled.GeneratedCode.Replace(
+            "__calorPostconditionResult0 == 31620", "__calorPostconditionResult0 == 31621",
+            StringComparison.Ordinal);
+        Assert.NotEqual(compiled.GeneratedCode, brokenContract);
+        var failure = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
+            AssertValueTestPasses("local-function-contract", brokenContract, "Run", 31620));
+        Assert.IsType<Calor.Runtime.ContractViolationException>(failure.InnerException);
+    }
+
+    [Fact]
+    public void ExactComparison_DoesNotNormalizeCountedPayloadBytes()
+    {
+        const string payload = "public static int Run() => 329;\r\n";
+        var frame = new RawCSharpFrame(payload, "conditional-expression-hoisting", "comparison control");
+        var header = $"module Fixture\n  raw {frame.ReasonMarker} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n";
+        Assert.Equal(Normalize(header + payload), Normalize(header.Replace("\n", "\r\n", StringComparison.Ordinal) + payload));
+        Assert.NotEqual(Normalize(header + payload),
+            Normalize(header + payload.Replace("\r\n", "\n ", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -236,17 +350,26 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             Assert.Equal(observation.GetProperty("requiredIssueFeatures").EnumerateArray()
                 .Select(feature => feature.GetString()).Order(),
                 converted.Issues.Select(issue => issue.Feature).Distinct().Order());
-            if (name == "conditional-declaration")
+            if (name == "string-interpolation-hole")
             {
-                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!,
-                    doc.RootElement.GetProperty("convertedExpectedUndefinedInt").GetInt32(), []);
-                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!,
-                    doc.RootElement.GetProperty("convertedExpectedDefinedInt").GetInt32(), ["FEATURE"]);
+                var issue = Assert.Single(converted.Issues);
+                Assert.Equal("nullable-oblivious-nested-shape", issue.Feature);
+                Assert.Equal("Nested oblivious reference semantics for 'int[]' are not modeled; preserving syntax-only type mapping.",
+                    issue.Message);
             }
-            else
-            {
-                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, runtimeExpectedInt);
-            }
+        }
+        if (name == "conditional-declaration")
+        {
+            AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!,
+                doc.RootElement.GetProperty("convertedExpectedUndefinedInt").GetInt32(), []);
+            AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!,
+                doc.RootElement.GetProperty("convertedExpectedDefinedInt").GetInt32(), ["FEATURE"]);
+        }
+        else
+        {
+            AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, runtimeExpectedInt);
+            if (name == "conditional-using")
+                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, 41, ["FEATURE"]);
         }
         if (certifiedAbsent.ValueKind != JsonValueKind.Null)
         {
@@ -336,13 +459,15 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
                 compilation.GeneratedCode,
                 convertedEntry.GetString()!,
                 undefinedExpected.GetInt32(),
-                []);
+                [],
+                ExpectedOwner(name, valueFixture: false));
             AssertValueTestPasses(
                 name,
                 compilation.GeneratedCode,
                 convertedEntry.GetString()!,
                 definedExpected.GetInt32(),
-                symbols);
+                symbols,
+                ExpectedOwner(name, valueFixture: false));
         }
 
         // 4. Both Calor files compile with zero errors (indeterminate = failing).
@@ -359,21 +484,81 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             Assert.False(result.HasErrors,
                 $"{name}/{Path.GetFileName(calr)} does not compile: " +
                 string.Join("; ", result.Diagnostics.Where(d => d.IsError).Select(d => d.Message)));
+            if (calr == expectedPath && converted.Losses.Count == 0)
+                AssertNative(result.Ast!);
             if (calr == testPath)
+            {
+                if (name != "local-function")
+                    AssertNative(result.Ast!);
                 AssertValueTestPasses(
                     name,
                     result.GeneratedCode,
                     runtimeEntryPoint!,
-                    runtimeExpectedInt);
+                    runtimeExpectedInt,
+                    expectedOwner: ExpectedOwner(name, valueFixture: true));
+                if (name == "conditional-declaration")
+                    AssertValueTestPasses(name, result.GeneratedCode, runtimeEntryPoint!, runtimeExpectedInt,
+                        ["FEATURE"], ExpectedOwner(name, valueFixture: true));
+            }
+            else if (doc.RootElement.TryGetProperty("convertedExpectedUndefinedInt", out var expectedValue))
+            {
+                AssertValueTestPasses(name, result.GeneratedCode, runtimeEntryPoint!, expectedValue.GetInt32(),
+                    expectedOwner: ExpectedOwner(name, valueFixture: false));
+                var symbols = doc.RootElement.TryGetProperty("definedSymbols", out var symbolArray)
+                    ? symbolArray.EnumerateArray().Select(symbol => symbol.GetString()!).ToArray() : [];
+                AssertValueTestPasses(name, result.GeneratedCode, runtimeEntryPoint!,
+                    doc.RootElement.GetProperty("convertedExpectedDefinedInt").GetInt32(), symbols,
+                    ExpectedOwner(name, valueFixture: false));
+            }
+            else
+            {
+                AssertValueTestPasses(name, result.GeneratedCode, runtimeEntryPoint!, runtimeExpectedInt,
+                    expectedOwner: ExpectedOwner(name, valueFixture: false));
+            }
+            if (name == "conditional-using")
+                AssertValueTestPasses(name, result.GeneratedCode, runtimeEntryPoint!, 41, ["FEATURE"],
+                    ExpectedOwner(name, valueFixture: calr == testPath));
         }
     }
+
+    private static void AssertNative(AstNode node)
+    {
+        Assert.False(node is CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode
+            or FallbackExpressionNode or FallbackCommentNode, $"Non-native value fixture node: {node.GetType().Name}");
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            AssertNative(child);
+    }
+
+    private static string ExpectedOwner(string name, bool valueFixture) => name switch
+    {
+        "namespace-single-scope" => "SingleScope.Value",
+        "namespace-topology" => "Beta.Value",
+        "char-literal-surrogate" => valueFixture
+            ? "SurrogateValueTest.SurrogateValueTestModule" : "Fixture.SurrogateValues",
+        "conditional-access-shape" => "Fixture.ConditionalAccessFixture",
+        "conditional-declaration" => valueFixture
+            ? "ConditionalDeclarationFixture.FixtureOracle" : "Fixture.ConditionalHarness",
+        "conditional-expression-hoisting" => "Fixture.ConditionalExpressionFixture",
+        "conditional-using" => valueFixture ? "FixtureTest.ConditionalValue" : "Fixture.ConditionalValue",
+        "initializer-interop" => valueFixture
+            ? "InitializerInteropTest.InitializerInteropTest" : "Fixture.InitializerInterop",
+        "local-function" => "Fixture.LocalFunctionFixture",
+        "string-interpolation-formattable" => valueFixture
+            ? "InterpolationFormattableTest.FormattableProbe" : "Fixture.InterpolationFormattable",
+        "string-interpolation-hole" => valueFixture
+            ? "InterpolationHoleTest.InterpolationHoleTestModule" : "Fixture.InterpolationHole",
+        "string-interpolation-to-string" => valueFixture
+            ? "InterpolationToStringTest.InterpolationToStringTestModule" : "Fixture.InterpolationToString",
+        _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unregistered fixture owner.")
+    };
 
     private static void AssertValueTestPasses(
         string name,
         string generatedCode,
         string entryPoint,
         int expected,
-        IReadOnlyList<string>? symbols = null)
+        IReadOnlyList<string>? symbols = null,
+        string? expectedOwner = null)
     {
         var tree = CSharpSyntaxTree.ParseText(
             generatedCode,
@@ -407,6 +592,8 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             _ = method.Invoke(null, null);
         var entry = Assert.Single(methods.Where(method =>
             method.Name == entryPoint && method.ReturnType == typeof(int)));
+        if (expectedOwner != null)
+            Assert.Equal(expectedOwner, entry.DeclaringType!.FullName);
         Assert.Equal(expected, Assert.IsType<int>(entry.Invoke(null, null)));
     }
 
@@ -432,8 +619,16 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             .ToHashSet();
     }
 
-    private static string Normalize(string s) =>
-        s.Replace("\r\n", "\n").TrimEnd('\n');
+    private static string Normalize(string s)
+    {
+        var normalized = RawCSharpFrame.NormalizeLineEndings(s);
+        var diagnostics = new DiagnosticBag();
+        var payloadEnd = new Lexer(normalized, diagnostics).TokenizeAll()
+            .Where(token => token.Value is RawCSharpFrame)
+            .Select(token => token.Span.End).DefaultIfEmpty().Max();
+        Assert.Empty(diagnostics.Errors);
+        return normalized[..payloadEnd] + normalized[payloadEnd..].TrimEnd('\n');
+    }
 
     /// <summary>README rule: every char outside [a-z0-9-] becomes '-', runs collapsed.</summary>
     private static string SanitizeKey(string key)
