@@ -57,6 +57,9 @@ public sealed class CallGraphAnalysis
     internal sealed record MetadataGetterSelection(
         IPropertySymbol Property, INamedTypeSymbol ReceiverType);
 
+    internal sealed record MetadataMethodGroupCallSelection(
+        IMethodSymbol Method, INamedTypeSymbol ReceiverType, IReadOnlyList<FunctionNode> Callbacks);
+
     internal sealed class OperatorBindings
     {
         internal Dictionary<AstNode, HashSet<string>> SourceCalls { get; } = new(ReferenceEqualityComparer.Instance);
@@ -71,6 +74,7 @@ public sealed class CallGraphAnalysis
         // Typing evidence only: neither bound-member identity nor getter-effect permission.
         internal Dictionary<FieldAccessNode, MetadataMemberTypeSelection> MetadataMemberTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<FieldAccessNode, MetadataGetterSelection> MetadataGetters { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<ExpressionCallNode, MetadataMethodGroupCallSelection> MetadataMethodGroupCalls { get; } = new(ReferenceEqualityComparer.Instance);
     }
 
     private OperatorBindings _operatorBindings = new();
@@ -83,6 +87,8 @@ public sealed class CallGraphAnalysis
         _operatorBindings.StaticInitializerConstructors.GetValueOrDefault(initializer);
     internal MetadataGetterSelection? SelectedMetadataGetter(FieldAccessNode field) =>
         _operatorBindings.MetadataGetters.GetValueOrDefault(field);
+    internal MetadataMethodGroupCallSelection? SelectedMetadataMethodGroupCall(ExpressionCallNode call) =>
+        _operatorBindings.MetadataMethodGroupCalls.GetValueOrDefault(call);
 
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
         ContractMode contractMode = ContractMode.Debug)
@@ -107,6 +113,7 @@ public sealed class CallGraphAnalysis
         var conflictingCalls = new HashSet<TextSpan>();
         var conflictingMembers = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
         var conflictingGetters = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
+        var conflictingMethodGroupCalls = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
         var argumentOwners = new Dictionary<AstNode, (TextSpan Call, int Index)>(ReferenceEqualityComparer.Instance);
         var ambiguousArguments = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
         var sourceArgumentCounts = new Dictionary<TextSpan, int>();
@@ -310,6 +317,7 @@ public sealed class CallGraphAnalysis
             var selectedInTree = new HashSet<TextSpan>();
             var selectedMembersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
             var selectedGettersInTree = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
+            var selectedMethodGroupCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
 
             foreach (var declaration in root.DescendantNodes().Where(node =>
                          node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax
@@ -328,7 +336,11 @@ public sealed class CallGraphAnalysis
                     foreach (var child in operation.ChildOperations)
                         pending.Push(child);
                     if (validMemberContext)
+                    {
                         AddMetadataMemberType(operation);
+                        if (operation is IInvocationOperation metadataInvocation)
+                            AddMetadataMethodGroupCall(metadataInvocation);
+                    }
                     if (!bindExpressions)
                         continue;
                     if (operation is IInvocationOperation invocation)
@@ -396,6 +408,12 @@ public sealed class CallGraphAnalysis
                 conflictingGetters.Add(member);
                 bindings.MetadataGetters.Remove(member);
             }
+            foreach (var call in ranges.Select(range => range.Node).OfType<ExpressionCallNode>()
+                         .Where(call => !selectedMethodGroupCallsInTree.Contains(call)))
+            {
+                conflictingMethodGroupCalls.Add(call);
+                bindings.MetadataMethodGroupCalls.Remove(call);
+            }
             if (!bindExpressions)
                 return;
 
@@ -436,6 +454,56 @@ public sealed class CallGraphAnalysis
                     && range.End >= syntax.Span.End).Node;
 
             AstNode? Origin(IOperation operation) => SyntaxOrigin(operation.Syntax);
+
+            void AddMetadataMethodGroupCall(IInvocationOperation invocation)
+            {
+                if (invocation.IsImplicit
+                    || invocation.TargetMethod is not { IsStatic: false, MethodKind: MethodKind.Ordinary } method
+                    || method.IsExtensionMethod
+                    || method.Locations.Any(location => location.IsInSource)
+                    || invocation.Instance is not IParameterReferenceOperation
+                        { Type: INamedTypeSymbol receiver }
+                    || receiver.Locations.Any(location => location.IsInSource)
+                    || HasErrorType(receiver) || HasErrorType(method.ReturnType)
+                    || Origin(invocation) is not ExpressionCallNode
+                        { TargetExpression: FieldAccessNode { Target: ReferenceNode } } origin
+                    || origin.Arguments.Count == 0
+                    || invocation.Arguments.Length != origin.Arguments.Count
+                    || conflictingMethodGroupCalls.Contains(origin))
+                    return;
+
+                var callbacks = new Dictionary<ExpressionNode, FunctionNode>(ReferenceEqualityComparer.Instance);
+                foreach (var argument in invocation.Arguments)
+                {
+                    if (argument.ArgumentKind != ArgumentKind.Explicit
+                        || argument.Value is not IDelegateCreationOperation
+                        {
+                            IsImplicit: true,
+                            Target: IMethodReferenceOperation { Instance: null, Method.IsStatic: true } reference
+                        }
+                        || Origin(reference) is not ReferenceNode argumentOrigin
+                        || !origin.Arguments.Contains(argumentOrigin)
+                        || !methods.TryGetValue(reference.Method.OriginalDefinition, out var declaration)
+                        || declaration is not FunctionNode callback
+                        || !module.Functions.Contains(callback)
+                        || !callbacks.TryAdd(argumentOrigin, callback))
+                        return;
+                }
+
+                var selection = new MetadataMethodGroupCallSelection(method, receiver,
+                    origin.Arguments.Select(argument => callbacks[argument]).ToArray());
+                selectedMethodGroupCallsInTree.Add(origin);
+                if (bindings.MetadataMethodGroupCalls.TryGetValue(origin, out var previous)
+                    && (!SymbolEqualityComparer.Default.Equals(previous.Method, method)
+                        || !SameType(previous.ReceiverType, receiver)
+                        || !previous.Callbacks.SequenceEqual(selection.Callbacks)))
+                {
+                    conflictingMethodGroupCalls.Add(origin);
+                    bindings.MetadataMethodGroupCalls.Remove(origin);
+                }
+                else
+                    bindings.MetadataMethodGroupCalls[origin] = selection;
+            }
 
             void AddMetadataMemberType(IOperation operation)
             {

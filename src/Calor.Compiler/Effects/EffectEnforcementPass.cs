@@ -6316,6 +6316,21 @@ public sealed class EffectEnforcementPass
         {
             if (call.TargetExpression is FieldAccessNode member)
             {
+                if (_context.CallGraph.SelectedMetadataMethodGroupCall(call) is { } selected)
+                {
+                    // The binding image selected both the metadata overload and each
+                    // source callback; no method spelling or guessed delegate type participates.
+                    var effects = InferFromExpression(member.Target);
+                    foreach (var callback in selected.Callbacks)
+                        effects = effects.Union(MethodGroupEffects(callback.Effects, callback.EffectParameters.Count));
+                    var resolved = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                        Binding.Metadata.MetadataBinderResult.ToBoundType(selected.ReceiverType),
+                        selected.Method.Name,
+                        selected.Method.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray()));
+                    return effects.Union(resolved.Status == EffectResolutionStatus.Unknown
+                        ? UnknownResolvedOperation($"{selected.ReceiverType}.{selected.Method.Name}", call.Span)
+                        : resolved.Effects);
+                }
                 var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
                 var ids = _context.CallGraph.ResolveCallSites(
                     _context.CurrentFunctionId, "<expression-call>", call.Span);
