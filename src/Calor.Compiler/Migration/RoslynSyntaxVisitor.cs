@@ -10862,6 +10862,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertExpression(ExpressionSyntax expression)
     {
+        if (_conditionalRegionDepth > 0 && expression is AnonymousFunctionExpressionSyntax)
+        {
+            // Deferred bodies own their statement context; the receiver/argument
+            // containing the delegate must not constrain work done on invocation.
+            var enclosingDepth = _conditionalRegionDepth;
+            _conditionalRegionDepth = 0;
+            try
+            {
+                return ConvertExpressionCore(expression);
+            }
+            finally
+            {
+                _conditionalRegionDepth = enclosingDepth;
+            }
+        }
         return _conditionalRegionDepth > 0
             ? ConvertConditionalRegion(expression, () => ConvertExpressionCore(expression))
             : ConvertExpressionCore(expression);
@@ -13301,7 +13316,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private static bool IsInlineConditionalExpression(ExpressionNode node) => node is
         NewExpressionNode { Initializers.Count: 0 } or
         ArrayCreationNode { Initializer.Count: > 0 } or
-        LambdaExpressionNode { IsExpressionLambda: true };
+        LambdaExpressionNode;
 
     private static bool IsEmptyBlockLevelCollection(ExpressionNode? node)
     {
@@ -15190,7 +15205,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         AnonymousFunctionExpressionSyntax function when function.DescendantNodes().OfType<DefaultExpressionSyntax>().Any() => false,
         AnonymousMethodExpressionSyntax => true,
         LambdaExpressionSyntax { ExpressionBody: null } => true,
-        LambdaExpressionSyntax { ExpressionBody: { } body } => IsMarkerFreeValue(body) || IsCallOnlyValue(body),
+        LambdaExpressionSyntax { ExpressionBody: { } body } => IsMarkerFreeValue(body) || IsCallOnlyValue(body)
+            || StripParentheses(body) is BaseObjectCreationExpressionSyntax,
         // `new T[n]` / `new T[] { a, b }`: §ARR stays inline when its sizes and elements do.
         ArrayCreationExpressionSyntax array =>
             array.Type.RankSpecifiers.SelectMany(rank => rank.Sizes)
@@ -16129,12 +16145,53 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     exprBody = ConvertExpression(lambda.ExpressionBody);
 
+                    if (exprBody is NewExpressionNode { Initializers.Count: > 0 } creation
+                        && creation.Initializers.Any(initializer =>
+                            initializer.Value is LambdaExpressionNode { StatementBody: not null }))
+                    {
+                        var syntax = StripParentheses(lambda.ExpressionBody) as BaseObjectCreationExpressionSyntax;
+                        if (_pendingStatements.Count != 0
+                            || syntax?.Initializer == null
+                            || _semanticModel == null || syntax.SyntaxTree != _semanticModel.SyntaxTree
+                            || _semanticModel.GetTypeInfo(syntax).Type is not { IsReferenceType: true }
+                            || !syntax.Initializer.Expressions.All(initializer =>
+                                initializer is AssignmentExpressionSyntax { Left: IdentifierNameSyntax } assignment
+                                && IsInertInitializerMember(_semanticModel.GetSymbolInfo(assignment.Left).Symbol)
+                                && _semanticModel.GetSymbolInfo(assignment.Left).Symbol is not
+                                    (IPropertySymbol { SetMethod.IsInitOnly: true } or
+                                     IPropertySymbol { IsRequired: true } or IFieldSymbol { IsRequired: true })))
+                        {
+                            throw EscalateExpression(lambda.ExpressionBody, "initializer-interop", preserveMember: true);
+                        }
+                        // Construct first, then evaluate each value and assign in source
+                        // order. A block closure must stay inside its enclosing callback.
+                        var name = _context.GenerateId("_new", creation.TypeName);
+                        var target = new ReferenceNode(creation.Span, name);
+                        _pendingStatements.Add(new BindStatementNode(creation.Span, name, null, false,
+                            new NewExpressionNode(creation.Span, creation.TypeName, creation.TypeArguments,
+                                creation.Arguments, [], creation.TypeNameSpan, creation.TypeReference,
+                                creation.ArgumentNames), new AttributeCollection()));
+                        foreach (var initializer in creation.Initializers)
+                            _pendingStatements.Add(new AssignmentStatementNode(creation.Span,
+                                new FieldAccessNode(creation.Span, target, initializer.PropertyName),
+                                initializer.Value));
+                        exprBody = target;
+                    }
+
                     // If the expression body produced pending statements (e.g., chain hoisting),
                     // convert the expression body to a statement body with those binds prepended.
                     if (_pendingStatements.Count > 0)
                     {
                         stmtBody = new List<StatementNode>(_pendingStatements);
-                        stmtBody.Add(new ReturnStatementNode(exprBody.Span, exprBody));
+                        if (LambdaReturnsValue(lambda) == false)
+                        {
+                            if (exprBody is not ReferenceNode)
+                                stmtBody.Add(new ExpressionStatementNode(exprBody.Span, exprBody));
+                        }
+                        else
+                        {
+                            stmtBody.Add(new ReturnStatementNode(exprBody.Span, exprBody));
+                        }
                         exprBody = null;
                     }
                 }

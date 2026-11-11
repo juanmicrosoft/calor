@@ -39,6 +39,12 @@ or `__reftype` as `typed-reference`, and `__arglist` signatures or expressions a
 statements. These are preservation reasons, not native-conversion credit. A native
 caller still needs an authoritative effect contract.
 
+Nested callbacks retain their own execution scope. When an object initializer
+contains a block lambda, conversion can construct the object and assign its members
+in order inside the enclosing callback. This lowering does not move `init` or
+`required` writes outside an initializer, or change value-type copy semantics;
+the converter preserves the complete member in those cases.
+
 ---
 
 ## Before you start: run one file and read the report

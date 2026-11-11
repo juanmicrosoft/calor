@@ -276,6 +276,96 @@ public class SnapshotConversionTests
         }
     }
 
+    [Theory]
+    [InlineData(false, "0:12:1234:12341234:2")]
+    [InlineData(true, "0:12:1212")]
+    public void NativeProducer_DeferredInitializerKeepsConstructionAndClosureOrder(bool returnsVoid, string expected)
+    {
+        var source = $$"""
+            using System;
+            public class Node
+            {
+                public int Value;
+                public Action Run;
+                public Node() { Probe.Next(1); }
+            }
+            public static class Probe
+            {
+                public static int Trace;
+                public static int Next(int value) { Trace = Trace * 10 + value; return value; }
+                public static {{(returnsVoid ? "Action" : "Func<Node>")}} Create(int captured)
+                {
+                    return () => new Node
+                    {
+                        Value = Next(2),
+                        Run = () => { Next(captured); Next(4); }
+                    };
+                }
+            }
+            """;
+        const string moduleName = "DeferredInitializer";
+        var conversion = TestHelpers.ConvertCSharp(source, moduleName);
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        Assert.Empty(conversion.Losses);
+        Assert.NotNull(conversion.CalorSource);
+        TestHelpers.AssertRawFraming(conversion.CalorSource, present: false);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(conversion.CalorSource, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Empty(diagnostics);
+        var driver = returnsVoid
+            ? "var f = $N$Probe.Create(3); var before = $N$Probe.Trace; f(); var after = $N$Probe.Trace; f(); return before + \":\" + after + \":\" + $N$Probe.Trace;"
+            : "var f = $N$Probe.Create(3); var before = $N$Probe.Trace; var first = f(); var after = $N$Probe.Trace; first.Run(); var invoked = $N$Probe.Trace; var second = f(); second.Run(); return before + \":\" + after + \":\" + invoked + \":\" + $N$Probe.Trace + \":\" + second.Value;";
+        Assert.Equal(expected, RunSnapshotProbe(source, driver, ""));
+        foreach (var native in new[] { conversion.CalorSource, new CalorEmitter().Emit(module) })
+        {
+            foreach (var typeChecking in new[] { false, true })
+            {
+                var compiled = Calor.Compiler.Program.Compile(native, "deferred-initializer.calr",
+                    new Calor.Compiler.CompilationOptions { EnableTypeChecking = typeChecking });
+                Assert.False(compiled.HasErrors,
+                    string.Join("; ", compiled.Diagnostics.Errors) + "\n" + native);
+                Assert.Equal(expected, RunSnapshotProbe(compiled.GeneratedCode, driver, moduleName + "."));
+                Assert.Contains("! alloc, mut", native);
+                var missingMutation = Calor.Compiler.Program.Compile(
+                    native.Replace("! alloc, mut", "! alloc", StringComparison.Ordinal),
+                    "deferred-initializer-missing-mutation.calr",
+                    new Calor.Compiler.CompilationOptions { EnableTypeChecking = typeChecking });
+                Assert.Contains(missingMutation.Diagnostics.Errors,
+                    diagnostic => diagnostic.Code == "Calor0410"
+                        && diagnostic.Message.Contains("'mut'", StringComparison.Ordinal));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("class", "public Action Run { get; init; }")]
+    [InlineData("class", "public required Action Run;")]
+    [InlineData("struct", "public Action Run;")]
+    public void NativeProducer_DeferredInitializerDoesNotMoveRestrictedWrites(string kind, string member)
+    {
+        var source = $$"""
+            using System;
+            public {{kind}} Node { {{member}} }
+            public static class Probe
+            {
+                public static Func<Node> Create(int captured) => () => new Node
+                {
+                    Run = () => { captured = captured + 1; captured = captured + 2; }
+                };
+            }
+            """;
+        var conversion = TestHelpers.ConvertCSharp(source, "RestrictedDeferredInitializer");
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        var originalMethod = CSharpSyntaxTree.ParseText(source).GetRoot()
+            .DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        var block = Assert.Single(conversion.Ast!.Classes.Single(cls => cls.Name == "Probe").InteropBlocks);
+        Assert.Equal(originalMethod.ToFullString(), block.CSharpCode);
+        Assert.Equal("initializer-interop", block.FeatureName);
+        var roundTrip = TestHelpers.FullRoundTrip(source, "RestrictedDeferredInitializer");
+        Assert.True(roundTrip.CalorParseSuccess, string.Join("; ", roundTrip.CalorDiagnostics));
+        Assert.True(roundTrip.RoslynSuccess, string.Join("; ", roundTrip.RoslynErrors));
+    }
+
     private static string RunSnapshotProbe(string source, string driver, string ownerPrefix, string[]? symbols = null)
     {
         var probe = "public static class CurrentSnapshotProbe { public static string Run() { "

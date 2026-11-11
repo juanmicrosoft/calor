@@ -3354,6 +3354,7 @@ public sealed class EffectEnforcementPass
     private sealed class EffectInferrer
     {
         private readonly InferenceContext _context;
+        private readonly Stack<AstNode> _lexicalTypeScopes = new();
 
         public EffectInferrer(InferenceContext context)
         {
@@ -3372,11 +3373,19 @@ public sealed class EffectEnforcementPass
 
         public EffectSet InferFromFunction(FunctionNode function)
         {
-            var effects = InferFromStatements(function.Body);
-            foreach (var condition in function.Preconditions.Select(precondition => precondition.Condition)
-                         .Concat(function.Postconditions.Select(postcondition => postcondition.Condition)))
-                effects = effects.Union(InferFromExpression(condition));
-            return effects;
+            _lexicalTypeScopes.Push(function);
+            try
+            {
+                var effects = InferFromStatements(function.Body);
+                foreach (var condition in function.Preconditions.Select(precondition => precondition.Condition)
+                             .Concat(function.Postconditions.Select(postcondition => postcondition.Condition)))
+                    effects = effects.Union(InferFromExpression(condition));
+                return effects;
+            }
+            finally
+            {
+                _lexicalTypeScopes.Pop();
+            }
         }
 
         /// <summary>0.25 F3 (#847): the local function whose parameters AST searches read.</summary>
@@ -4887,21 +4896,32 @@ public sealed class EffectEnforcementPass
             if (AstScopeFunction() is not { } function)
                 return null;
 
-            // FALLBACK: declared parameter type string.
-            foreach (var parameter in function.Parameters)
+            IEnumerable<AstNode> scopes = _lexicalTypeScopes.Count == 0 ? [function] : _lexicalTypeScopes;
+            foreach (var scope in scopes)
             {
-                if (parameter.Name.Equals(name, StringComparison.Ordinal))
+                if (scope is FunctionNode callable
+                    && callable.Parameters.FirstOrDefault(parameter => parameter.Name.Equals(name, StringComparison.Ordinal))
+                        is { } parameter)
                     return parameter.TypeName;
+                if (scope is LambdaExpressionNode lambda
+                    && lambda.Parameters.FirstOrDefault(parameter => parameter.Name.Equals(name, StringComparison.Ordinal))
+                        is { } lambdaParameter)
+                    return lambdaParameter.TypeName ?? UnknownLocalTypeSentinel;
+
+                var statements = scope switch
+                {
+                    FunctionNode declaration => declaration.Body,
+                    LambdaExpressionNode declaration => declaration.StatementBody,
+                    _ => null
+                };
+                if (statements == null)
+                    continue;
+                var declaredType = FindLocalDeclarationType(name, statements)
+                    ?? FindForeachVariableType(name, statements);
+                if (declaredType != null)
+                    return declaredType;
             }
 
-            // FALLBACK: §B declaration / §FE variable type string, found lexically.
-            var declaredType = FindLocalDeclarationType(name, function.Body);
-            if (declaredType != null)
-                return declaredType;
-
-            var foreachType = FindForeachVariableType(name, function.Body);
-            if (foreachType != null)
-                return foreachType;
 
             // FALLBACK: enclosing-class field type string.
             var field = _context.OwnerClass?.Fields.FirstOrDefault(
@@ -6789,6 +6809,7 @@ public sealed class EffectEnforcementPass
             var before = _context.Assumptions.Count;
 
             _lambdaDepth++;
+            _lexicalTypeScopes.Push(lambda);
             EffectSet body;
             try
             {
@@ -6800,6 +6821,7 @@ public sealed class EffectEnforcementPass
             }
             finally
             {
+                _lexicalTypeScopes.Pop();
                 _lambdaDepth--;
             }
 
