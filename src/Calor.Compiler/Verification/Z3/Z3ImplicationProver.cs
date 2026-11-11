@@ -151,6 +151,10 @@ public sealed class Z3ImplicationProver : IDisposable
             translator.DeclareVariable("result", "i32");
         }
 
+        // Keep the typed BCL model for both translation and exception-path definedness.
+        antecedent = translator.NormalizeBclExpression(antecedent);
+        consequent = translator.NormalizeBclExpression(consequent);
+
         // Translate antecedent → Z3 BoolExpr A
         var antecedentExpr = translator.TranslateBoolExpr(antecedent);
         if (antecedentExpr == null)
@@ -433,6 +437,9 @@ public sealed class Z3ImplicationProver : IDisposable
             // Default to i32 if no output type specified
             translator.DeclareVariable("result", "i32");
         }
+
+        implementerPostcondition = translator.NormalizeBclExpression(implementerPostcondition);
+        interfacePostcondition = translator.NormalizeBclExpression(interfacePostcondition);
 
         // Translate implementer postcondition → Z3 BoolExpr (the antecedent)
         var implementerExpr = translator.TranslateBoolExpr(implementerPostcondition);

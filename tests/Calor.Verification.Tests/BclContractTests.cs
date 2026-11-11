@@ -239,6 +239,176 @@ public class BclContractTests
     }
 
     [SkippableTheory]
+    [InlineData("string.IsNullOrEmpty(s)", "")]
+    [InlineData("string.Concat(s, \"d\") == \"abcd\"", "abc")]
+    [InlineData("s.Contains(\"b\")", "abc")]
+    [InlineData("s.StartsWith(\"a\", System.StringComparison.Ordinal)", "abc")]
+    [InlineData("s.EndsWith(\"c\", System.StringComparison.Ordinal)", "abc")]
+    [InlineData("s.IndexOf(\"b\", System.StringComparison.Ordinal) == 1", "abc")]
+    [InlineData("s.Equals(\"abc\")", "abc")]
+    [InlineData("s.Substring(1, 2) == \"bc\"", "abc")]
+    [InlineData("s.Substring(1) == \"bc\"", "abc")]
+    public void DirectNativeStringCalls_TranslateSelectedModels(string predicate, string input)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var condition = ParseNativePredicate(predicate);
+        Assert.Contains(Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(condition).Prepend(condition),
+            node => node is ExpressionCallNode);
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+        Assert.True(translator.DeclareVariable("s", "string"));
+        Assert.NotNull(translator.Translate(condition));
+        var translated = translator.TranslateBoolExpr(condition);
+        Assert.NotNull(translated);
+        using var solver = ctx.MkSolver();
+        solver.Assert(ctx.MkEq(translator.Variables["s"].Expr, ctx.MkString(input)), ctx.MkNot(translated));
+        Assert.Equal(Microsoft.Z3.Status.UNSATISFIABLE, solver.Check());
+    }
+
+    [SkippableTheory]
+    [InlineData("string.IsNullOrEmpty(s) && s != \"\"", "x > 0")]
+    [InlineData("s.Substring(-1, 1) == \"\"", "false")]
+    [InlineData("s.Substring(0, -1) == \"\"", "false")]
+    [InlineData("s.Substring(-1) == \"\"", "false")]
+    public void DirectNativeImplication_KeepsStringAssumptionsAndRanges(string assumed, string required)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var antecedent = ParseNativePredicate(assumed);
+        var consequent = ParseNativePredicate(required);
+        using var ctx = Z3ContextFactory.Create();
+        using var prover = new Z3ImplicationProver(ctx);
+        (string Name, string Type)[] parameters = [("s", "string"), ("x", "int"),
+            ("unusedFloat", "float"), ("unusedArray", "int[]")];
+        foreach (var result in new[]
+        {
+            prover.ProveImplication(parameters, antecedent, consequent),
+            prover.CheckPreconditionWeakening(parameters, antecedent, consequent),
+            prover.CheckPostconditionStrengthening(parameters, "string", consequent, antecedent)
+        })
+        {
+            Assert.Equal(ImplicationStatus.Unknown, result.Status);
+            Assert.Equal(ProofStatus.Assumed, result.Outcome!.Status);
+            Assert.Equal(new[] { Z3Verifier.StringModelAssumption }, result.Outcome.Assumptions);
+            Assert.Null(result.Outcome.Counterexample);
+        }
+    }
+
+    [SkippableFact]
+    public void DirectNativePostconditions_KeepResultAndPreconditionScopes()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        using var ctx = Z3ContextFactory.Create();
+        using var prover = new Z3ImplicationProver(ctx);
+        var throwingResult = prover.CheckPostconditionStrengthening([], "string",
+            ParseNativePredicate("false"), ParseNativePredicate("result.Substring(-1, 1) == \"\""));
+        var nullOnlyPrecondition = prover.CheckPostconditionStrengthening(
+            [("s", "string"), ("x", "int"), ("unused", "int[]")], "int",
+            ParseNativePredicate("x > 0"), ParseNativePredicate("true"),
+            ParseNativePredicate("string.IsNullOrEmpty(s) && s != \"\""));
+        foreach (var result in new[] { throwingResult, nullOnlyPrecondition })
+        {
+            Assert.Equal(ImplicationStatus.Unknown, result.Status);
+            Assert.Equal(ProofStatus.Assumed, result.Outcome!.Status);
+            Assert.Equal(new[] { Z3Verifier.StringModelAssumption }, result.Outcome.Assumptions);
+            Assert.Null(result.Outcome.Counterexample);
+        }
+    }
+
+    [SkippableFact]
+    public void DirectNativeConditionalSubstring_KeepsDefinednessRefusal()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        using var ctx = Z3ContextFactory.Create();
+        using var prover = new Z3ImplicationProver(ctx);
+        var antecedent = ParseNativePredicate("x > 0");
+        var consequent = ParseNativePredicate("x > 0 || s.Substring(-1, 1) == \"\"");
+        foreach (var result in new[]
+        {
+            prover.ProveImplication([("s", "string"), ("x", "int")], antecedent, consequent),
+            prover.CheckPostconditionStrengthening([("s", "string"), ("x", "int")], "int",
+                consequent, antecedent)
+        })
+        {
+            Assert.Equal(ImplicationStatus.Unknown, result.Status);
+            Assert.Equal(ProofStatus.Assumed, result.Outcome!.Status);
+            Assert.Equal(new[] { Z3Verifier.ContractExpressionDivisionAssumption, Z3Verifier.StringModelAssumption },
+                result.Outcome.Assumptions);
+            Assert.Contains("conditionally-evaluated", result.Outcome.Reason);
+            Assert.Null(result.Outcome.Counterexample);
+        }
+    }
+
+    [SkippableFact]
+    public void DirectNativeSubstring_KeepsCheckedOverflowInArguments()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var antecedent = ParseNativePredicate("s.Substring((2147483647 + 1) * 0, 1) == \"a\"");
+        var consequent = ParseNativePredicate("false");
+        using var ctx = Z3ContextFactory.Create();
+        using var prover = new Z3ImplicationProver(ctx);
+        var checkedResult = prover.ProveImplication([("s", "string")], antecedent, consequent);
+        Assert.Equal(ImplicationStatus.Unknown, checkedResult.Status);
+        Assert.Equal(ProofStatus.Assumed, checkedResult.Outcome!.Status);
+        Assert.Equal(new[] { Z3Verifier.StringModelAssumption }, checkedResult.Outcome.Assumptions);
+        prover.CheckIntegerOverflow = false;
+        var uncheckedResult = prover.ProveImplication([("s", "string")], antecedent, consequent);
+        Assert.Equal(ImplicationStatus.Unsupported, uncheckedResult.Status);
+        Assert.Null(uncheckedResult.Outcome!.Counterexample);
+    }
+
+    [SkippableTheory]
+    [InlineData("String.IsNullOrEmpty(s)")]
+    [InlineData("System.String.IsNullOrEmpty(s)")]
+    [InlineData("@string.IsNullOrEmpty(s)")]
+    [InlineData("s.Contains(value: \"a\")")]
+    [InlineData("s.Contains(ref s)")]
+    [InlineData("string.Concat<char>(s) == \"\"")]
+    [InlineData("string.Concat(s, 1) == \"\"")]
+    [InlineData("s.Substring(1, 2, 3) == \"\"")]
+    [InlineData("s.StartsWith(\"a\")")]
+    [InlineData("s.StartsWith(\"a\", StringComparison.Ordinal)")]
+    [InlineData("s.Contains('a')")]
+    [InlineData("s.Replace(\"a\", \"b\") == s")]
+    [InlineData("s.Substring(1).Contains(\"a\")")]
+    [InlineData("Echo(s).Contains(\"a\")")]
+    public void DirectNativeCalls_KeepOwnershipAndOverloadRefusals(string predicate)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var condition = ParseNativePredicate(predicate);
+        (string Name, string Type)[] parameters = [("s", "string"), ("String", "Widget"),
+            ("System", "Widget"), ("StringComparison", "Widget")];
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+        foreach (var (name, type) in parameters)
+            Assert.True(translator.DeclareVariable(name, type));
+        Assert.Null(translator.TranslateBoolExpr(condition));
+        using var prover = new Z3ImplicationProver(ctx);
+        foreach (var result in new[]
+        {
+            prover.ProveImplication(parameters, condition, condition),
+            prover.CheckPostconditionStrengthening(parameters, "bool", condition, condition)
+        })
+        {
+            Assert.Equal(ImplicationStatus.Unsupported, result.Status);
+            Assert.Equal(ProofStatus.Unsupported, result.Outcome!.Status);
+            Assert.Null(result.Outcome.Counterexample);
+        }
+    }
+
+    private static ExpressionNode ParseNativePredicate(string predicate)
+    {
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer($$"""
+            module DirectNativeBcl
+              func Probe (string:s, int:x) → int
+                requires {{predicate}}
+                return 0
+            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return Assert.Single(Assert.Single(module.Functions).Preconditions).Condition;
+    }
+
+    [SkippableTheory]
     [InlineData("string.IsNullOrEmpty(s)", "bool", "", "true")]
     [InlineData("string.Concat(s, \"d\")", "string", "abc", "\"abcd\"")]
     [InlineData("string.Concat(s.Substring(1), \"d\")", "string", "abc", "\"bcd\"")]

@@ -760,7 +760,7 @@ public sealed class ContractTranslator
     /// </summary>
     public Expr? Translate(ExpressionNode node)
     {
-        if (node is CallExpressionNode or FieldAccessNode
+        if (node is CallExpressionNode or ExpressionCallNode or FieldAccessNode
             || node is ReferenceNode reference && reference.Name.Contains('.'))
         {
             var modeled = NormalizeBclExpression(node);
