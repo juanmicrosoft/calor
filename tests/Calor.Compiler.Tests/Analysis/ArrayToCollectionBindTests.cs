@@ -436,6 +436,341 @@ public class ArrayToCollectionBindTests
         Assert.False(HasArrayTrap(diags));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NativeCalls_ArrayChecksKeepTheirDiagnosticOwners(bool strictInference)
+    {
+        const string source = """
+            module NativeBindings NativeBindings
+              func Take (List<string>:items) → int
+                !
+                return 0
+              func Use (string:path, Dictionary<int,int>:d) → List<string>
+                ! fs:r
+                each k, v in d
+                  let List<string>:lines = File.ReadAllLines(path)
+                var List<string>:items = new List<string>()
+                set items File.ReadAllLines(path)
+                Take(File.ReadAllLines(path))
+                return File.ReadAllLines(path)
+            """;
+
+        var diagnostics = Validate(source, strictInference);
+        Assert.Equal(4, diagnostics.Count);
+        Assert.All(diagnostics, diagnostic =>
+            Assert.Equal(DiagnosticCode.BindArrayToConcreteCollection, diagnostic.Code));
+        Assert.Equal(
+            new[]
+            {
+                "let List<string>:lines = File.ReadAllLines(path)",
+                "set items File.ReadAllLines(path)",
+                "File.ReadAllLines(path)",
+                "return File.ReadAllLines(path)",
+            },
+            diagnostics.Select(diagnostic => source.Substring(diagnostic.Span.Start, diagnostic.Span.Length)));
+        var compiled = Program.Compile(source, "native-bindings.calr",
+            new CompilationOptions { StrictBindInference = strictInference, StatusWriter = TextWriter.Null });
+        Assert.Equal(diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Span)),
+            compiled.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.BindArrayToConcreteCollection)
+                .Select(diagnostic => (diagnostic.Code, diagnostic.Span)));
+    }
+
+    [Theory]
+    [InlineData("File.ReadAllText(path)")]
+    [InlineData("System.IO.File.ReadAllText(path)")]
+    [InlineData("Reader.Read(path)")]
+    public void NativeCalls_ScalarReturnReachesRebindCategoryCheck(string expression)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              class Reader
+                func Read static (string:path) → string
+                  !
+                  return path
+              func Use (string:path) → int
+                ! fs:r
+                var int:x = 0
+                var x = {{expression}}
+                return x
+            """;
+        var diagnostic = Assert.Single(Validate(source));
+        Assert.Equal(DiagnosticCode.BindRebindTypeMismatch, diagnostic.Code);
+        Assert.Equal("var x = " + expression, source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        var compiled = Program.Compile(source, "native-rebind.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compiled.Diagnostics, actual =>
+            actual.Code == diagnostic.Code && actual.Span == diagnostic.Span);
+    }
+
+    [Theory]
+    [InlineData("Read(1)", true)]
+    [InlineData("Read(\"list\")", false)]
+    [InlineData("Read(selector: 1)", true)]
+    [InlineData("Read(selector: \"list\")", false)]
+    [InlineData("Read(true)", false)]
+    [InlineData("Read(missing: 1)", false)]
+    [InlineData("Read(ref number)", false)]
+    [InlineData("Read<int>(1)", false)]
+    public void NativeCalls_SourceOverloadsDoNotBorrowAnInapplicableReturn(string call, bool expected)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              class Reader
+                func Read static (int:selector) → string[]
+                  ! fs:r
+                  return File.ReadAllLines("data.txt")
+                func Read static (string:selector) → List<string>
+                  !
+                  return new List<string>()
+              func Use () → void
+                ! fs:r
+                var int:number = 1
+                let List<string>:items = Reader.{{call}}
+            """;
+        Assert.Equal(expected, HasArrayTrap(Validate(source)));
+    }
+
+    [Theory]
+    [InlineData("Reader.Read(ref number)", true)]
+    [InlineData("Reader.Read(number)", false)]
+    [InlineData("Reader.Read(out number)", false)]
+    [InlineData("Reader.Read(value: ref number)", true)]
+    public void NativeCalls_RefSelectionRetainsTheArgumentModifier(string call, bool expected)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              class Reader
+                func Read static (ref int:value) → string[]
+                  ! fs:r
+                  return File.ReadAllLines("data.txt")
+                func Read static (int:value) → List<string>
+                  !
+                  return new List<string>()
+              func Use () → void
+                ! fs:r
+                var int:number = 1
+                let List<string>:items = {{call}}
+            """;
+        Assert.Equal(expected, HasArrayTrap(Validate(source)));
+    }
+
+    [Fact]
+    public void NativeCalls_NamedArgumentsKeepTheCollectionParameterPosition()
+    {
+        const string source = """
+            module NativeBindings NativeBindings
+              class Reader
+                func Take static (List<string>:items, string:label) → void
+                  !
+              func Use (string:path) → void
+                ! fs:r
+                Reader.Take(label: "lines", items: File.ReadAllLines(path))
+            """;
+        var diagnostic = Assert.Single(Validate(source));
+        Assert.Equal(DiagnosticCode.BindArrayToConcreteCollection, diagnostic.Code);
+        Assert.Equal("File.ReadAllLines(path)", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        Assert.Contains("Parameter 2 of 'Reader.Take'", diagnostic.Message);
+    }
+
+    [Fact]
+    public void NativeCalls_EvaluatedReceiverIsStillScannedWithoutGuessingItsReturn()
+    {
+        const string source = """
+            module NativeBindings NativeBindings
+              func Take (List<string>:items) → object
+                !
+                return new object()
+              func Use (string:path) → void
+                ! fs:r
+                let List<string>:items = Take(File.ReadAllLines(path)).Unknown()
+            """;
+        var diagnostic = Assert.Single(Validate(source));
+        Assert.Equal(DiagnosticCode.BindArrayToConcreteCollection, diagnostic.Code);
+        Assert.Equal("File.ReadAllLines(path)", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+    }
+
+    [Theory]
+    [InlineData("File.ReadAllLines()")]
+    [InlineData("File.ReadAllLines(1)")]
+    [InlineData("File.ReadAllLines(missing: path)")]
+    [InlineData("File.ReadAllLines(ref path)")]
+    [InlineData("File.ReadAllLines<int>(path)")]
+    [InlineData("missing.ReadAllLines(path)")]
+    public void NativeCalls_InvalidOrUnknownMetadataCallsStayUnknown(string expression)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              func Use (string:path) → void
+                ! fs:r
+                let List<string>:items = {{expression}}
+            """;
+        Assert.Empty(Validate(source));
+    }
+
+    [Theory]
+    [InlineData("File.ReadAllLines(path)", "File")]
+    [InlineData("System.IO.File.ReadAllLines(path)", "System")]
+    public void NativeCalls_LexicalReceiverDoesNotBorrowABclReturn(string expression, string receiver)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              func Use (object:{{receiver}}, string:path) → void
+                !
+                let List<string>:items = {{expression}}
+            """;
+        Assert.Empty(Validate(source));
+    }
+
+    [Theory]
+    [InlineData("using File = Other.Reader", "File.ReadAllLines(path)")]
+    [InlineData("class File", "File.ReadAllLines(path)")]
+    [InlineData("interface File\n    func Other () → void\n      !", "File.ReadAllLines(path)")]
+    [InlineData("class System", "System.IO.File.ReadAllLines(path)")]
+    public void NativeCalls_SourceOrAliasReceiverDoesNotBorrowABclReturn(string declaration, string expression)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              {{declaration}}
+              func Use (string:path) → void
+                !
+                let List<string>:items = {{expression}}
+            """;
+        Assert.Empty(Validate(source));
+    }
+
+    [Fact]
+    public void NativeCalls_AmbiguousSourceShadowDoesNotFallBackToBcl()
+    {
+        const string source = """
+            module NativeBindings NativeBindings
+              class File
+                func ReadAllLines static (string:path) → string[]
+                  !
+                  return missing
+                func ReadAllLines static (string:path) → List<string>
+                  !
+                  return new List<string>()
+              func Use (string:path) → void
+                !
+                let List<string>:items = File.ReadAllLines(path)
+            """;
+        Assert.Empty(Validate(source));
+    }
+
+    [Fact]
+    public void NativeCalls_ValueInvocationDoesNotBorrowASourceMethodReturn()
+    {
+        const string source = """
+            module NativeBindings NativeBindings
+              class Reader
+                func Read static (string:path) → string[]
+                  !
+                  return missing
+              func Use (string:path) → void
+                !
+                let Func<string,List<string>>:Read = static (string:value) =>
+                  return new List<string>()
+                let List<string>:items = Read.Invoke(path)
+            """;
+        Assert.Empty(Validate(source));
+    }
+
+    [Fact]
+    public void NativeCalls_ValidArrayAndScalarUsesCompileNormally()
+    {
+        const string source = """
+            module NativeBindings NativeBindings
+              func Use (string:path) → string[]
+                ! fs:r
+                var string:text = ""
+                var text = File.ReadAllText(path)
+                let IEnumerable<string>:lines = File.ReadAllLines(path)
+                return File.ReadAllLines(path)
+            """;
+        Assert.Empty(Validate(source));
+        var result = Program.Compile(source, "native-valid.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData(true, "Array.empty()", true)]
+    [InlineData(false, "Array.empty()", false)]
+    [InlineData(true, "Array.empty<int>()", false)]
+    public void NativeCalls_GenericFactoryStrictnessRetainsExplicitTypeArguments(
+        bool strictInference, string expression, bool expected)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              func Use () → void
+                let items = {{expression}}
+            """;
+        var diagnostics = Validate(source, strictInference);
+        Assert.Equal(expected, diagnostics.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.BindCannotInferGenericReturn));
+    }
+
+    [Fact]
+    public void NativeCalls_SourceFactoryAndTypedInstanceUseTheirOwnSignatures()
+    {
+        const string source = """
+            module NativeBindings NativeBindings
+              class Array
+                func empty static () → int
+                  !
+                  return 0
+              class Reader
+                func Read (string:path) → string[]
+                  ! fs:r
+                  return File.ReadAllLines(path)
+              func Use (Reader:reader, string:path) → void
+                ! fs:r
+                let value = Array.empty()
+                let List<string>:items = reader.Read(path)
+            """;
+        var diagnostic = Assert.Single(Validate(source));
+        Assert.Equal(DiagnosticCode.BindArrayToConcreteCollection, diagnostic.Code);
+        Assert.StartsWith("Binding 'items'", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("File.ReadAllText(1)", "")]
+    [InlineData("File.ReadAllText(missing: path)", "")]
+    [InlineData("File.ReadAllText(ref path)", "")]
+    [InlineData("File.ReadAllText<int>(path)", "")]
+    [InlineData("File.ReadAllText(path)", "object:File, ")]
+    public void NativeCalls_InvalidOrValueShadowedScalarCallsDoNotInventACategory(
+        string expression, string parameters)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              func Use ({{parameters}}string:path) → void
+                ! fs:r
+                var int:x = 0
+                var x = {{expression}}
+            """;
+        Assert.Empty(Validate(source));
+    }
+
+    [Theory]
+    [InlineData("Take(items: File.ReadAllLines(path))", true)]
+    [InlineData("Take(missing: File.ReadAllLines(path))", false)]
+    [InlineData("Take(ref File.ReadAllLines(path))", false)]
+    [InlineData("Take<int>(File.ReadAllLines(path))", false)]
+    public void NativeCalls_NestedArrayDoesNotRescueAnInvalidOuterSelection(string call, bool expected)
+    {
+        var source = $$"""
+            module NativeBindings NativeBindings
+              func Take (List<string>:items) → void
+                !
+              func Use (string:path) → void
+                ! fs:r
+                {{call}}
+            """;
+        Assert.Equal(expected, HasArrayTrap(Validate(source)));
+    }
+
     [Fact]
     public void DocsAndCompilerGuards_ShareOneBclApiList()
     {

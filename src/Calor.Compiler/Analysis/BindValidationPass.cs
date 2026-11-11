@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.Metadata;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 
@@ -33,7 +34,9 @@ namespace Calor.Compiler.Analysis;
 /// <c>Binder</c>. The <c>Binder</c> still contains a defensive copy of
 /// the <c>Calor0250</c> check (used by <c>VerificationAnalysisPass</c>
 /// and unit tests) so that direct binder invocations still surface
-/// the diagnostic.</para>
+/// the diagnostic. Native named calls reuse source signatures and the curated
+/// BCL tables; a BCL return is used only after metadata selects a valid static
+/// overload. These are diagnostic type facts, not effect or purity facts.</para>
 /// </summary>
 public sealed class BindValidationPass
 {
@@ -49,11 +52,6 @@ public sealed class BindValidationPass
     private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
     private readonly HashSet<string> _ambiguousUserReturnTypes = new(StringComparer.Ordinal);
 
-    // Parameter types of each user function/method, keyed by "name/arity" (and
-    // "Type.Method/arity"), so an array passed to a concrete-collection parameter
-    // at a call site can be flagged (#725). Rebuilt on every Check(module).
-    private readonly Dictionary<string, List<string>> _userParamTypes = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _ambiguousUserParamTypes = new(StringComparer.Ordinal);
     // Full callable signatures used to disambiguate same-arity overloads with
     // canonical Calor type identity before the arity-only fallback is considered.
     private readonly Dictionary<string, List<UserCallableSignature>> _userSignatures =
@@ -139,11 +137,45 @@ public sealed class BindValidationPass
     }
 
     private ModuleNode? _asyncTypeModule;
+    private MetadataContext? _metadataContext;
+    private readonly HashSet<string> _sourceTypeHeads = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _aliasHeads = new(StringComparer.Ordinal);
 
     public void Check(ModuleNode module)
     {
+        try
+        {
+            CheckModule(module);
+        }
+        finally
+        {
+            _metadataContext?.Dispose();
+            _metadataContext = null;
+        }
+    }
+
+    private void CheckModule(ModuleNode module)
+    {
         _asyncTypeModule = module;
         BuildUserSignatures(module);
+        _sourceTypeHeads.Clear();
+        _aliasHeads.Clear();
+        foreach (var node in DescendantsAndSelf(module))
+        {
+            var name = node switch
+            {
+                ClassDefinitionNode declaration => declaration.Name,
+                InterfaceDefinitionNode declaration => declaration.Name,
+                EnumDefinitionNode declaration => declaration.Name,
+                DelegateDefinitionNode declaration => declaration.Name,
+                TypeParameterNode parameter => parameter.Name,
+                _ => null,
+            };
+            if (name != null)
+                _sourceTypeHeads.Add(name.Split('.')[0]);
+            if (node is UsingDirectiveNode { Alias: { } alias })
+                _aliasHeads.Add(alias);
+        }
 
         foreach (var func in module.Functions)
         {
@@ -443,6 +475,9 @@ public sealed class BindValidationPass
                 }
                 type = "";
                 return false;
+
+            case ExpressionCallNode call:
+                return TryResolveNativeReturnType(call, out type);
 
             default:
                 var literal = LiteralTypeOrNull(value);
@@ -906,7 +941,115 @@ public sealed class BindValidationPass
         {
             if (node is CallExpressionNode call)
                 CheckCallArguments(call);
+            else if (node is ExpressionCallNode native
+                && TryGetNamedCall(native, out var named)
+                && TryResolveNativeSignature(named, allowArrayMismatch: true, out var signature))
+            {
+                CheckCallArguments(named.Target, named.Arguments,
+                    GetParameterTypesInArgumentOrder(signature, named.ArgumentNames, named.Arguments.Count));
+            }
         }
+    }
+
+    // Only structural name chains can reuse the named-call machinery. Evaluated
+    // receivers stay unknown here, but the original tree is still scanned above.
+    private static bool TryGetNamedCall(ExpressionCallNode call, out CallExpressionNode named)
+    {
+        if (Binder.DottedReferenceName(call.TargetExpression) is not { } target)
+        {
+            named = null!;
+            return false;
+        }
+        named = new CallExpressionNode(call.Span, target, call.Arguments,
+            call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments);
+        return true;
+    }
+
+    private bool TryResolveNativeReturnType(ExpressionCallNode native, out string type)
+    {
+        type = "";
+        if (!TryGetNamedCall(native, out var call))
+            return false;
+        if (TryResolveNativeSignature(call, allowArrayMismatch: false, out var signature))
+        {
+            type = signature.ReturnType ?? "";
+            return type.Length > 0;
+        }
+        if (!CanUseCuratedTarget(call.Target) || call.TypeArguments is { Count: > 0 })
+            return false;
+
+        var dot = call.Target.LastIndexOf('.');
+        if (dot <= 0)
+            return false;
+        var receiverName = call.Target[..dot];
+        var metadataName = TypeIdentity.MapShortTypeNameToFullName(receiverName);
+        var methodName = call.Target[(dot + 1)..];
+        var key = $"{metadataName[(metadataName.LastIndexOf('.') + 1)..]}.{methodName}";
+        if (!ArrayReturningBcl.Methods.ContainsKey(key) && !ScalarReturningBcl.Methods.ContainsKey(key))
+            return false;
+        if (metadataName != TypeIdentity.MapShortTypeNameToFullName(key[..key.IndexOf('.')]))
+            return false;
+
+        _metadataContext ??= MetadataContext.Create();
+        if (_metadataContext.TryResolveType(metadataName) is not { } receiver)
+            return false;
+        var arguments = new MetadataArgument[call.Arguments.Count];
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            if (!TryInferExpressionType(call.Arguments[index], out var argumentType)
+                || _metadataContext.TryResolveType(TypeIdentity.MapShortTypeNameToFullName(argumentType))
+                    is not { } argumentSymbol)
+                return false;
+            var modifier = call.ArgumentModifiers?.ElementAtOrDefault(index) switch
+            {
+                "ref" => Microsoft.CodeAnalysis.RefKind.Ref,
+                "out" => Microsoft.CodeAnalysis.RefKind.Out,
+                "in" => Microsoft.CodeAnalysis.RefKind.In,
+                _ => Microsoft.CodeAnalysis.RefKind.None,
+            };
+            arguments[index] = new MetadataArgument(argumentSymbol, modifier,
+                call.ArgumentNames?.ElementAtOrDefault(index));
+        }
+        var selected = new MetadataBinder(_metadataContext).ResolveExpressionCall(
+            receiver, methodName, arguments, [], isStatic: true).Symbol;
+        if (selected is not { IsStatic: true })
+            return false;
+        var selectedKey = $"{selected.ContainingType.Name}.{selected.Name}";
+        if (ArrayReturningBcl.Methods.TryGetValue(selectedKey, out var element)
+            && selected.ReturnType is Microsoft.CodeAnalysis.IArrayTypeSymbol)
+        {
+            type = $"[{element}]";
+            return true;
+        }
+        if (ScalarReturningBcl.Methods.TryGetValue(selectedKey, out var scalar)
+            && selected.ReturnType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String)
+        {
+            type = scalar;
+            return true;
+        }
+        return false;
+    }
+
+    private bool CanUseCuratedTarget(string target)
+    {
+        var head = target.Split('.')[0];
+        return !TryLookupLocal(head, out _) && !_localFunctionNames.Contains(head)
+            && !_sourceTypeHeads.Contains(head) && !_aliasHeads.Contains(head)
+            && !_userSignatures.ContainsKey(head)
+            && (_currentClassName == null || !_userSignatures.ContainsKey($"{_currentClassName}.{head}"));
+    }
+
+    private bool TryResolveNativeSignature(
+        CallExpressionNode call, bool allowArrayMismatch, out UserCallableSignature signature)
+    {
+        signature = null!;
+        var head = call.Target.Split('.')[0];
+        if (call.TypeArguments is { Count: > 0 } || _aliasHeads.Contains(head)
+            || _localFunctionNames.Contains(head) || IsValueCallTarget(call.Target))
+            return false;
+        return TryResolveFallbackSignature(call.Target, call.Arguments, call.ArgumentNames,
+            call.ArgumentModifiers, allowArrayMismatch, out signature, out _,
+            nativeReceiver: true, allowUnknownTypes: false);
     }
 
     private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
@@ -925,12 +1068,16 @@ public sealed class BindValidationPass
     /// (current class before module level), exact by canonical argument type when
     /// possible, and falls back to arity only when a unique signature remains.
     /// </summary>
-    private void CheckCallArguments(CallExpressionNode call) =>
+    private void CheckCallArguments(CallExpressionNode call)
+    {
+        if (call.TypeArguments is { Count: > 0 })
+            return;
         CheckCallArguments(
             call.Target,
             call.Arguments,
             call.ArgumentNames,
             call.ArgumentModifiers);
+    }
 
     private void CheckCallArguments(
         string target,
@@ -955,12 +1102,14 @@ public sealed class BindValidationPass
             return;
         }
 
-        if (!TryResolveParamTypes(target, args.Count, out var paramTypes))
+        if (!TryResolveFallbackSignature(target, args, argumentNames, argumentModifiers,
+                allowArrayMismatch: true, out var signature, out _))
         {
             return;
         }
 
-        CheckCallArguments(target, args, paramTypes);
+        CheckCallArguments(target, args,
+            GetParameterTypesInArgumentOrder(signature, argumentNames, args.Count));
     }
 
     private void CheckCallArguments(
@@ -985,7 +1134,8 @@ public sealed class BindValidationPass
     private bool TryResolveReturnType(CallExpressionNode call, out string returnType)
     {
         returnType = string.Empty;
-        if (_localFunctionNames.Contains(call.Target) || IsValueCallTarget(call.Target))
+        if (call.TypeArguments is { Count: > 0 }
+            || _localFunctionNames.Contains(call.Target) || IsValueCallTarget(call.Target))
             return false;
         if (TryResolveExactSignature(
                 call.Target,
@@ -998,6 +1148,14 @@ public sealed class BindValidationPass
             returnType = exactSignature.ReturnType;
             return true;
         }
+        if (TryResolveFallbackSignature(call.Target, call.Arguments, call.ArgumentNames,
+                call.ArgumentModifiers, allowArrayMismatch: false, out var fallback, out var hasCandidates))
+        {
+            returnType = fallback.ReturnType ?? "";
+            return returnType.Length > 0;
+        }
+        if (hasCandidates)
+            return false;
 
         var target = call.Target;
         var arity = call.Arguments.Count;
@@ -1022,37 +1180,6 @@ public sealed class BindValidationPass
         return _userReturnTypes.TryGetValue(key, out returnType!);
     }
 
-    private bool TryResolveParamTypes(string target, int arity, out List<string> paramTypes)
-    {
-        paramTypes = [];
-        if (_localFunctionNames.Contains(target) || IsValueCallTarget(target))
-            return false;
-        if (_currentClassName != null)
-        {
-            var qualified = $"{_currentClassName}.{target}/{arity}";
-            if (_ambiguousUserParamTypes.Contains(qualified))
-            {
-                paramTypes = [];
-                return false;
-            }
-            if (_userParamTypes.TryGetValue(qualified, out paramTypes!))
-                return true;
-        }
-
-        return TryResolveParamTypesCore($"{target}/{arity}", out paramTypes);
-    }
-
-    private bool TryResolveParamTypesCore(string key, out List<string> paramTypes)
-    {
-        if (_ambiguousUserParamTypes.Contains(key))
-        {
-            paramTypes = [];
-            return false;
-        }
-
-        return _userParamTypes.TryGetValue(key, out paramTypes!);
-    }
-
     /// <summary>
     /// Returns the Calor element type if <paramref name="init"/> is known to be an
     /// array -- a call to a known array-returning BCL method, or a call to a user
@@ -1060,6 +1187,9 @@ public sealed class BindValidationPass
     /// </summary>
     private string? InitializerArrayElement(ExpressionNode init)
     {
+        if (init is ExpressionCallNode native)
+            return TryResolveNativeReturnType(native, out var nativeType)
+                ? ArrayElementType(nativeType) : null;
         if (init is not CallExpressionNode call)
         {
             return null;
@@ -1071,9 +1201,7 @@ public sealed class BindValidationPass
         // is context-sensitive (current class before module level).
         if (TryResolveReturnType(call, out var returnType))
         {
-            return IsArrayTypeName(returnType)
-                ? returnType.Trim().TrimStart('[').TrimEnd(']').Trim()
-                : null;
+            return ArrayElementType(returnType);
         }
 
         if (ArrayReturningBcl.Methods.TryGetValue(call.Target, out var bclElement))
@@ -1089,28 +1217,25 @@ public sealed class BindValidationPass
     // under the bare name; methods ONLY under "Class.Member" -- never the bare name --
     // so a method cannot clobber a same-named free function's signature (PR #728
     // review finding 1). Unqualified calls are matched context-sensitively at the
-    // call site (see TryResolveReturnType / TryResolveParamTypes). Constructors,
+    // call site (see TryResolveReturnType / TryResolveFallbackSignature). Constructors,
     // operators, and indexers are intentionally not registered (§NEW / operator /
     // indexer call forms are unchecked -- a documented conservative false negative).
     private void BuildUserSignatures(ModuleNode module)
     {
         _userReturnTypes.Clear();
         _ambiguousUserReturnTypes.Clear();
-        _userParamTypes.Clear();
-        _ambiguousUserParamTypes.Clear();
         _userSignatures.Clear();
 
         foreach (var func in module.Functions)
         {
             var returnType = ReturnShape.GetAsyncReturnTypes(func.Output?.TypeName ?? "void", func.IsAsync, module,
                 func.TypeParameters.Select(parameter => parameter.Name)).CallableType;
-            RegisterSignature(func.Name, func.Parameters, returnType);
+            RegisterSignature(func.Name, func.Parameters, returnType,
+                isGeneric: func.TypeParameters.Count > 0);
             if (!ReturnShape.IsVoidType(returnType))
             {
                 RegisterReturnType(func.Name, func.Parameters, returnType);
             }
-
-            RegisterParams(func.Name, func.Parameters);
         }
 
         foreach (var cls in module.Classes)
@@ -1120,13 +1245,12 @@ public sealed class BindValidationPass
                 var key = $"{cls.Name}.{method.Name}";
                 var returnType = ReturnShape.GetAsyncReturnTypes(method.Output?.TypeName ?? "void", method.IsAsync, module,
                     method.TypeParameters.Concat(cls.TypeParameters).Select(parameter => parameter.Name)).CallableType;
-                RegisterSignature(key, method.Parameters, returnType);
+                RegisterSignature(key, method.Parameters, returnType, method.IsStatic,
+                    method.TypeParameters.Count > 0 || cls.TypeParameters.Count > 0);
                 if (!ReturnShape.IsVoidType(returnType))
                 {
                     RegisterReturnType(key, method.Parameters, returnType);
                 }
-
-                RegisterParams(key, method.Parameters);
             }
         }
     }
@@ -1135,12 +1259,16 @@ public sealed class BindValidationPass
         IReadOnlyList<string> ParameterNames,
         IReadOnlyList<string> ParameterTypes,
         IReadOnlyList<ParameterModifier> ParameterModifiers,
-        string? ReturnType);
+        string? ReturnType,
+        bool IsStatic,
+        bool IsGeneric);
 
     private void RegisterSignature(
         string name,
         IReadOnlyList<ParameterNode> parameters,
-        string? returnType)
+        string? returnType,
+        bool isStatic = true,
+        bool isGeneric = false)
     {
         if (!_userSignatures.TryGetValue(name, out var signatures))
         {
@@ -1152,7 +1280,7 @@ public sealed class BindValidationPass
             parameters.Select(parameter => parameter.Name).ToArray(),
             parameters.Select(parameter => parameter.TypeName ?? "").ToArray(),
             parameters.Select(parameter => parameter.Modifier).ToArray(),
-            returnType));
+            returnType, isStatic, isGeneric));
     }
 
     // 0.25 F3 (#847): a bare call to one of these names is the local function,
@@ -1223,6 +1351,45 @@ public sealed class BindValidationPass
         return false;
     }
 
+    private bool TryResolveFallbackSignature(
+        string target,
+        IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        bool allowArrayMismatch,
+        out UserCallableSignature signature,
+        out bool hasCandidates,
+        bool nativeReceiver = false,
+        bool allowUnknownTypes = true)
+    {
+        signature = null!;
+        hasCandidates = false;
+        if (_localFunctionNames.Contains(target) || IsValueCallTarget(target))
+            return false;
+        var types = arguments.Select(argument =>
+            TryInferExpressionType(argument, out var type) ? type : "").ToArray();
+        if (!allowUnknownTypes && types.Any(type => type.Length == 0))
+            return false;
+        var head = target.Split('.')[0];
+        var instanceReceiver = head == "this" || TryLookupLocal(head, out _);
+        foreach (var name in GetSignatureLookupNames(target))
+        {
+            if (!_userSignatures.TryGetValue(name, out var candidates))
+                continue;
+            var sameArity = candidates.Where(candidate => candidate.ParameterTypes.Count == arguments.Count).ToArray();
+            hasCandidates = sameArity.Length > 0;
+            var matches = sameArity.Where(candidate =>
+                (!nativeReceiver || !candidate.IsGeneric && candidate.IsStatic != instanceReceiver)
+                && SignatureMatches(candidate, types, argumentNames, argumentModifiers,
+                    allowArrayMismatch, allowUnknownTypes)).ToArray();
+            if (matches.Length != 1)
+                return false;
+            signature = matches[0];
+            return true;
+        }
+        return false;
+    }
+
     private IEnumerable<string> GetSignatureLookupNames(string target)
     {
         if (_currentClassName != null)
@@ -1242,6 +1409,7 @@ public sealed class BindValidationPass
             && TryLookupLocal(target[..firstDot], out var receiverType))
         {
             yield return $"{GetNominalTypeName(receiverType)}.{target[(firstDot + 1)..]}";
+            yield break;
         }
 
         yield return target;
@@ -1263,7 +1431,9 @@ public sealed class BindValidationPass
         UserCallableSignature signature,
         IReadOnlyList<string> argumentTypes,
         IReadOnlyList<string?>? argumentNames,
-        IReadOnlyList<string?>? argumentModifiers)
+        IReadOnlyList<string?>? argumentModifiers,
+        bool allowArrayMismatch = false,
+        bool allowUnknownTypes = false)
     {
         if (signature.ParameterTypes.Count != argumentTypes.Count)
             return false;
@@ -1301,10 +1471,13 @@ public sealed class BindValidationPass
             if (parameterIndex < 0
                 || parameterIndex >= signature.ParameterTypes.Count
                 || usedParameters[parameterIndex]
-                || !string.Equals(
-                    CanonicalValidationType(signature.ParameterTypes[parameterIndex]),
-                    CanonicalValidationType(argumentTypes[argumentIndex]),
-                    StringComparison.Ordinal)
+                || !(string.Equals(
+                        CanonicalValidationType(signature.ParameterTypes[parameterIndex]),
+                        CanonicalValidationType(argumentTypes[argumentIndex]),
+                        StringComparison.Ordinal)
+                    || allowArrayMismatch && ArrayElementType(argumentTypes[argumentIndex]) != null
+                        && TryGetConcreteCollectionName(signature.ParameterTypes[parameterIndex], out _)
+                    || allowUnknownTypes && argumentTypes[argumentIndex].Length == 0)
                 || !CallModifierMatches(
                     signature.ParameterModifiers[parameterIndex],
                     argumentModifiers != null && argumentIndex < argumentModifiers.Count
@@ -1408,6 +1581,8 @@ public sealed class BindValidationPass
                 return true;
             case CallExpressionNode call when TryResolveReturnType(call, out typeName):
                 return true;
+            case ExpressionCallNode call when TryResolveNativeReturnType(call, out typeName):
+                return true;
             default:
                 typeName = string.Empty;
                 return false;
@@ -1431,23 +1606,6 @@ public sealed class BindValidationPass
 
     private static string? CanonicalNullableType(string? typeName) =>
         typeName == null ? null : CanonicalValidationType(typeName);
-
-    private void RegisterParams(string name, IReadOnlyList<ParameterNode> parameters)
-    {
-        // ParameterNode.TypeName is non-null (parser invariant); the ?? guard keeps
-        // a future nullable-annotation change from feeding null into the check.
-        var key = $"{name}/{parameters.Count}";
-        if (_ambiguousUserParamTypes.Contains(key))
-            return;
-        if (_userParamTypes.ContainsKey(key))
-        {
-            _userParamTypes.Remove(key);
-            _ambiguousUserParamTypes.Add(key);
-            return;
-        }
-
-        _userParamTypes[key] = parameters.Select(p => p.TypeName ?? "").ToList();
-    }
 
     private void RegisterReturnType(
         string name,
@@ -1481,8 +1639,13 @@ public sealed class BindValidationPass
         }
     }
 
-    private static bool IsArrayTypeName(string? typeName)
-        => typeName != null && typeName.TrimStart().StartsWith("[", StringComparison.Ordinal);
+    private static string? ArrayElementType(string typeName)
+    {
+        var type = typeName.Trim();
+        if (type.StartsWith('[') && type.EndsWith(']'))
+            return type[1..^1].Trim();
+        return type.EndsWith("[]", StringComparison.Ordinal) ? type[..^2].Trim() : null;
+    }
 
     private static bool TryGetConcreteCollectionName(string declared, out string collectionName)
     {
@@ -1523,6 +1686,16 @@ public sealed class BindValidationPass
                 "Add an explicit type annotation, e.g. '§B{" + bind.Name + ":Vec<i32>} §C{Vec<i32>.empty} §/C'.";
             ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferGenericReturn, msg,
                 $"Annotate binding with ':{template}'", $":{template}");
+            return;
+        }
+        if (init is ExpressionCallNode native && TryGetNamedCall(native, out var named)
+            && named.TypeArguments is not { Count: > 0 } && CanUseCuratedTarget(named.Target)
+            && TryGetGenericFactoryTemplate(named.Target, out var nativeTemplate))
+        {
+            var msg = $"Binding '{bind.Name}' is initialised from '{named.Target}' whose return type " +
+                "is generic and has no resolved type argument. Add an explicit type annotation.";
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferGenericReturn, msg,
+                $"Annotate binding with ':{nativeTemplate}'", $":{nativeTemplate}");
             return;
         }
 
