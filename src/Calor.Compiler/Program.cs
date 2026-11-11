@@ -841,6 +841,7 @@ public class Program
         bindingDiagnostics.SetFilePath(filePath);
         var binder = new Binder(bindingDiagnostics, filePath)
         {
+            CrossModuleTypes = options.CrossModuleTypes,
             ProjectionContractMode = options.ContractMode
         };
         binder.Bind(ast);
@@ -985,6 +986,7 @@ public class Program
                 crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys)
             {
                 CrossModuleTypes = options.CrossModuleTypes,
+                SourcePath = filePath,
                 CrossModuleFunctionModules = options.CrossModuleFunctionModules,
                 ProjectionContractMode = options.ContractMode
             };

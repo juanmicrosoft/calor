@@ -260,6 +260,7 @@ public static class ProjectIndexBuilder
             index.Residual.AmbiguousCallees.Add(ambiguous);
 
         RecordEffectRows(index, options, symbols);
+        symbols.SourceTypes.EnsureSourceSnapshots();
 
         index.Canonicalize();
         return index;
@@ -326,6 +327,8 @@ public static class ProjectIndexBuilder
                 var effectDiagnostics = new DiagnosticBag();
                 var pass = CreateEffectPass(
                     effectDiagnostics, resolver, projectDirectory, crossModuleNames, options);
+                pass.CrossModuleTypes = symbols.SourceTypes;
+                pass.SourcePath = document.FilePath;
                 pass.Enforce(document.Ast);
                 if (effectDiagnostics.Any(d => d.Code == DiagnosticCode.EffectInferenceDidNotConverge))
                 {

@@ -49,7 +49,8 @@ public sealed class CallGraphAnalysis
         IReadOnlyList<ResolvedArgumentMapping> Arguments,
         bool UsesUserDefinedConversion,
         bool UsesAnonymousFunctionConversion,
-        bool IncludesExtensionReceiver);
+        bool IncludesExtensionReceiver,
+        IMethodSymbol? Method = null);
 
     internal sealed record MetadataMemberTypeSelection(
         ISymbol Member, INamedTypeSymbol ReceiverType, ITypeSymbol ResultType);
@@ -82,6 +83,7 @@ public sealed class CallGraphAnalysis
         internal List<string> Failures { get; } = [];
         internal Dictionary<TextSpan, SourceCallSelection> SelectedCalls { get; } = [];
         internal HashSet<TextSpan> SourceExtensionCalls { get; } = [];
+        internal HashSet<TextSpan> ForeignSourceCallSites { get; } = [];
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
         internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<EventDefinitionNode, INamedTypeSymbol> EventTypes { get; } = new(ReferenceEqualityComparer.Instance);
@@ -133,7 +135,8 @@ public sealed class CallGraphAnalysis
         _operatorBindings.SourceConstructionErrors;
 
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
-        ContractMode contractMode = ContractMode.Debug, bool singleModuleContext = true)
+        ContractMode contractMode = ContractMode.Debug, bool singleModuleContext = true,
+        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null)
     {
         var bindings = new OperatorBindings();
         var types = bindings.ResultTypes;
@@ -269,6 +272,7 @@ public sealed class CallGraphAnalysis
             }
         };
         var source = emitter.Emit(module);
+        var companions = crossModuleTypes?.CompanionSources(sourcePath, contractMode) ?? [];
         foreach (var diagnostic in emissionDiagnostics)
             diagnostics?.Add(diagnostic);
         if (emissionDiagnostics.HasErrors)
@@ -279,7 +283,8 @@ public sealed class CallGraphAnalysis
         }
         var options = new CSharpParseOptions(LanguageVersion.Preview);
         var initial = CSharpSyntaxTree.ParseText(source, options);
-        var symbols = initial.GetRoot().DescendantTrivia(descendIntoTrivia: true)
+        var symbols = companions.Select(companion => CSharpSyntaxTree.ParseText(companion.Source, options))
+            .Prepend(initial).SelectMany(tree => tree.GetRoot().DescendantTrivia(descendIntoTrivia: true))
             .Select(trivia => trivia.GetStructure()).OfType<DirectiveTriviaSyntax>()
             .Select(directive => directive switch
             {
@@ -308,12 +313,31 @@ public sealed class CallGraphAnalysis
 
         void BindTree(SyntaxTree tree)
         {
-            var compilation = CSharpCompilation.Create("CalorOperatorBindings", [tree],
+            var companionTrees = companions.Select(companion => (
+                Projection: companion,
+                Tree: CSharpSyntaxTree.ParseText(companion.Source, (CSharpParseOptions)tree.Options,
+                    companion.Path))).ToArray();
+            var compilation = CSharpCompilation.Create("CalorOperatorBindings",
+                companionTrees.Select(companion => (SyntaxTree)companion.Tree).Prepend(tree),
                 GeneratedCSharpCompiler.References,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
             var model = compilation.GetSemanticModel(tree);
             var root = tree.GetRoot();
             var methods = new Dictionary<ISymbol, AstNode>(SymbolEqualityComparer.Default);
+            foreach (var companion in companionTrees)
+            {
+                var companionModel = compilation.GetSemanticModel(companion.Tree);
+                foreach (var declaration in companion.Tree.GetRoot().DescendantNodes()
+                             .OfType<BaseMethodDeclarationSyntax>())
+                {
+                    foreach (var trivia in declaration.GetLeadingTrivia())
+                    {
+                        if (TryReadMarker(trivia, companion.Projection.Marker, out var index)
+                            && companionModel.GetDeclaredSymbol(declaration) is IMethodSymbol method)
+                            methods[method] = companion.Projection.Callables[index];
+                    }
+                }
+            }
             var events = new Dictionary<ISymbol, EventDefinitionNode>(SymbolEqualityComparer.Default);
             foreach (var declaration in root.DescendantNodes().OfType<EventFieldDeclarationSyntax>())
             {
@@ -559,7 +583,7 @@ public sealed class CallGraphAnalysis
                         }
                     }
                     if (operation is IInvocationOperation invocation
-                        && (bindExpressions || invocation.TargetMethod.IsExtensionMethod))
+                        && (bindExpressions || companions.Count > 0 || invocation.TargetMethod.IsExtensionMethod))
                         AddCall(invocation, invocation.TargetMethod, invocation.Arguments);
                     if (!bindExpressions)
                         continue;
@@ -673,6 +697,16 @@ public sealed class CallGraphAnalysis
             {
                 var info = model.GetSymbolInfo(syntax);
                 var candidates = info.CandidateSymbols.OfType<IMethodSymbol>();
+                if (syntax is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax access }
+                    && SyntaxOrigin(syntax) is ExpressionCallNode sourceCall)
+                {
+                    var owner = model.GetSymbolInfo(access.Expression);
+                    if (candidates.Cast<ISymbol>().Concat(info.Symbol is null ? [] : [info.Symbol])
+                        .Concat(owner.CandidateSymbols).Concat(owner.Symbol is null ? [] : [owner.Symbol])
+                        .Any(symbol => symbol.Locations.Any(location =>
+                            location.IsInSource && location.SourceTree != tree)))
+                        bindings.ForeignSourceCallSites.Add(sourceCall.Span);
+                }
                 if (syntax is InvocationExpressionSyntax
                     && SyntaxOrigin(syntax) is ExpressionCallNode { TargetExpression: FieldAccessNode } extensionCall
                     && candidates.Prepend(info.Symbol as IMethodSymbol).Any(method => method is
@@ -695,8 +729,11 @@ public sealed class CallGraphAnalysis
             }
 
             foreach (var site in ranges.Select(range => range.Node)
-                         .Where(argumentOwners.ContainsKey)
-                         .Select(node => argumentOwners[node].Call).Distinct()
+                         .SelectMany(node => node is ExpressionCallNode or CallExpressionNode
+                                 or CallStatementNode or NewExpressionNode
+                             ? new[] { node.Span }
+                             : argumentOwners.TryGetValue(node, out var owner) ? [owner.Call] : [])
+                         .Distinct()
                          .Where(site => !selectedInTree.Contains(site)))
             {
                 conflictingCalls.Add(site);
@@ -1220,7 +1257,8 @@ public sealed class CallGraphAnalysis
                 for (INamedTypeSymbol? current = owner; current is not null; current = current.ContainingType)
                     foreach (var reference in current.DeclaringSyntaxReferences)
                         if (reference.GetSyntax() is TypeDeclarationSyntax declaration
-                            && model.GetDiagnostics(Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+                            && compilation.GetSemanticModel(reference.SyntaxTree)
+                                .GetDiagnostics(Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
                                 declaration.SpanStart, declaration.OpenBraceToken.Span.End))
                                 .Any(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                             return true;
@@ -1241,7 +1279,13 @@ public sealed class CallGraphAnalysis
                 if (model.GetDiagnostics(operation.Syntax.Span).Any(diagnostic =>
                         diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     return;
-                TextSpan? site = null;
+                if (HasErrorType(method.ContainingType) || HasErrorType(method.ReturnType)
+                    || method.Parameters.Any(parameter => HasErrorType(parameter.Type))
+                    || HasInvalidEventOwner(method.ContainingType))
+                    return;
+                TextSpan? site = Origin(operation) is ExpressionCallNode or CallExpressionNode
+                    or CallStatementNode or NewExpressionNode
+                    ? Origin(operation)!.Span : null;
                 var mappings = new List<ResolvedArgumentMapping>();
                 var usesUserConversion = false;
                 var usesAnonymousFunctionConversion = false;
@@ -1316,12 +1360,16 @@ public sealed class CallGraphAnalysis
                     mappings.OrderBy(mapping => mapping.ArgumentIndex)
                         .Select(mapping => includesReceiver
                             ? mapping with { ArgumentIndex = mapping.ArgumentIndex + 1 } : mapping).ToArray(),
-                    usesUserConversion, usesAnonymousFunctionConversion, includesReceiver);
+                    usesUserConversion, usesAnonymousFunctionConversion, includesReceiver, method);
                 selectedInTree.Add(callSite);
                 if (bindings.SelectedCalls.TryGetValue(callSite, out var existing)
                     && (!ReferenceEquals(existing.Declaration, selection.Declaration)
                         || existing.ReturnType != selection.ReturnType
                         || existing.IncludesExtensionReceiver != selection.IncludesExtensionReceiver
+                        || existing.Method is { } previousMethod
+                            && (!SameType(previousMethod.ContainingType, method.ContainingType)
+                                || !previousMethod.TypeArguments.Zip(method.TypeArguments).All(pair =>
+                                    SameType(pair.First, pair.Second)))
                         || !existing.Arguments.SequenceEqual(selection.Arguments)))
                 {
                     if (usesUserConversion || existing.UsesUserDefinedConversion
@@ -1497,6 +1545,7 @@ public sealed class CallGraphAnalysis
     /// </summary>
     public sealed class BoundValueIndex
     {
+        internal Dictionary<string, FunctionNode> ExternalSourceFunctions { get; } = [];
         internal Dictionary<(string CallerId, int Start, int End), SourceArgumentSelection>
             SourceArguments
         { get; } = new();
@@ -2056,7 +2105,8 @@ public sealed class CallGraphAnalysis
     internal static CallGraphAnalysis Build(ModuleNode ast,
         IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
         Verification.ModuleInheritanceResult? contractInheritance = null,
-        ContractMode projectionContractMode = ContractMode.Debug)
+        ContractMode projectionContractMode = ContractMode.Debug,
+        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null)
     {
         if (contractInheritance is null)
         {
@@ -2186,7 +2236,15 @@ public sealed class CallGraphAnalysis
 
         var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
              declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
-            ResolveBoundCallSites(ast, functions, crossModuleFunctions, contractInheritance, projectionContractMode);
+            ResolveBoundCallSites(ast, functions, crossModuleFunctions, contractInheritance, projectionContractMode,
+                crossModuleTypes, sourcePath);
+
+        foreach (var (id, declaration) in boundValues.ExternalSourceFunctions)
+        {
+            functions[id] = declaration;
+            calleeToCallers[id] = [];
+            callerToCallees[id] = [];
+        }
 
         // Build call edges
         var unresolvedCalls = new List<AstUnresolvedCallSite>();
@@ -2239,7 +2297,8 @@ public sealed class CallGraphAnalysis
         }
 
         var operatorBindings = ResolveOperatorCalls(ast, contractMode: projectionContractMode,
-            singleModuleContext: crossModuleFunctions == null);
+            singleModuleContext: crossModuleFunctions == null,
+            crossModuleTypes: crossModuleTypes, sourcePath: sourcePath);
         var operatorCalls = operatorBindings.SourceCalls;
         foreach (var function in functions.Values)
         {
@@ -2292,6 +2351,9 @@ public sealed class CallGraphAnalysis
         return analysis;
     }
 
+    internal IReadOnlyDictionary<string, FunctionNode> ExternalSourceFunctions =>
+        _boundValues.ExternalSourceFunctions;
+
     private static (
         Dictionary<AstCallKey, IReadOnlyList<string>> Resolved,
         HashSet<AstCallKey> BoundCallSites,
@@ -2308,7 +2370,9 @@ public sealed class CallGraphAnalysis
             IReadOnlyDictionary<string, FunctionNode> functions,
             IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
             Verification.ModuleInheritanceResult contractInheritance,
-            ContractMode projectionContractMode)
+            ContractMode projectionContractMode,
+            CrossModuleTypeRegistry? crossModuleTypes,
+            string? sourcePath)
     {
         var resolved = new Dictionary<AstCallKey, IReadOnlyList<string>>();
         var boundCallSites = new HashSet<AstCallKey>();
@@ -2382,11 +2446,13 @@ public sealed class CallGraphAnalysis
         try
         {
             var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
-            var boundModule = new Binder(diagnostics)
+            var binder = new Binder(diagnostics, sourcePath)
             {
                 CrossModuleFunctionModules = crossModuleFunctions,
+                CrossModuleTypes = crossModuleTypes,
                 ProjectionContractMode = projectionContractMode
-            }.Bind(ast, contractInheritance);
+            };
+            var boundModule = binder.Bind(ast, contractInheritance);
             boundValues.Complete = true;
             var incompatibleCallSpans = diagnostics
                 .Where(diagnostic =>
@@ -2400,6 +2466,18 @@ public sealed class CallGraphAnalysis
                     LegacyId: ResolveLegacyFunctionId(function, functions)))
                 .Where(item => item.LegacyId != null)
                 .ToDictionary(item => item.SymbolId, item => item.LegacyId!);
+            foreach (var (id, selected) in binder.ExternalSourceCalls)
+            {
+                var method = selected.Declaration;
+                legacyIds[id] = id.Value;
+                boundValues.ExternalSourceFunctions[id.Value] = new FunctionNode(
+                    method.Span, id.Value, selected.Symbol.Name, method.Visibility,
+                    method.TypeParameters, method.Parameters, method.Output, method.Effects,
+                    [], [], [], method.Attributes)
+                {
+                    EffectParameters = method.EffectParameters
+                };
+            }
             var typeDeclarations = boundModule.SymbolsById.Values.OfType<TypeSymbol>()
                 .ToLookup(symbol => (symbol.DefinitionSpan, symbol.DeclarationSpan));
             var callableDeclarations = boundModule.SymbolsById.Values.OfType<FunctionSymbol>()
@@ -2454,7 +2532,8 @@ public sealed class CallGraphAnalysis
                     callerIds[local.SymbolId] = enclosingId;
             }
 
-            foreach (var symbol in boundModule.SymbolsById.Values)
+            foreach (var symbol in boundModule.SymbolsById.Values.Concat(
+                         binder.ExternalSourceCalls.Values.Select(selected => selected.Symbol)))
             {
                 if (symbol is FunctionSymbol callable && legacyIds.TryGetValue(callable.Id, out var callableId))
                 {

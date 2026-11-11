@@ -842,6 +842,7 @@ public class BoundCallExpression : BoundExpression
     internal bool HasUnresolvedArguments { get; init; }
     public override BoundType Type { get; }
     public BoundExpression? EvaluatedReceiver { get; init; }
+    internal Microsoft.CodeAnalysis.IMethodSymbol? SelectedSourceMethod { get; init; }
     // A reduced source extension is represented as its selected static call:
     // Arguments[0] is the receiver, already included in the child enumeration.
     internal bool IsSourceExtensionCall { get; init; }

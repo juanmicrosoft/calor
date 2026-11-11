@@ -1,6 +1,8 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
+using Calor.Compiler.Incremental;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Refactoring;
@@ -90,6 +92,7 @@ public sealed class ProjectSymbolIndex
     private readonly SortedSet<string> _ambiguousCallees = new(StringComparer.Ordinal);
 
     public IReadOnlyList<IndexedDocument> Documents { get; }
+    internal CrossModuleTypeRegistry SourceTypes { get; }
 
     /// <summary>Calls resolved to a declaration, attributed to their containing function.</summary>
     public IReadOnlyList<ProjectCallEdge> CallEdges => _callEdges;
@@ -98,9 +101,10 @@ public sealed class ProjectSymbolIndex
     public ProjectResolutionResidual Residual =>
         new(_unresolvedCalls, [.. _ambiguousCallees]);
 
-    private ProjectSymbolIndex(IReadOnlyList<IndexedDocument> documents)
+    private ProjectSymbolIndex(IReadOnlyList<IndexedDocument> documents, CrossModuleTypeRegistry sourceTypes)
     {
         Documents = documents;
+        SourceTypes = sourceTypes;
         _byFile = documents.ToDictionary(
             document => document.FilePath,
             _ => new List<SymbolOccurrence>(),
@@ -125,10 +129,13 @@ public sealed class ProjectSymbolIndex
         var documents = new List<IndexedDocument>();
         var failed = new List<string>();
         var parsed = new List<(string Path, string Source, ModuleNode Ast)>();
+        var sourceHashes = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
 
         foreach (var path in filePaths.OrderBy(path => path, StringComparer.Ordinal))
         {
-            var source = File.ReadAllText(path);
+            var bytes = File.ReadAllBytes(path);
+            sourceHashes[Path.GetFullPath(path)] = BuildStateCache.ComputeContentHash(bytes);
+            var source = CompilationDriver.DecodeSource(bytes);
             var parseDiagnostics = new DiagnosticBag();
             var parser = new Parser(new Lexer(source, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics);
             ModuleNode? ast;
@@ -158,11 +165,17 @@ public sealed class ProjectSymbolIndex
             if (synchronizeIdentities && initializeIdentityRoot == null)
                 Ids.DeclarationIdentityStore.SyncIfRegistered(Path.GetFullPath(path));
             Ids.DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(path), source, ast);
+        }
+        var sourceTypes = CrossModuleTypeRegistry.Build(
+            parsed.Select(document => (document.Ast, document.Path)).ToArray(),
+            sourceHashes);
+        foreach (var (path, source, ast) in parsed)
+        {
             var bindDiagnostics = new DiagnosticBag();
             BoundModule bound;
             try
             {
-                bound = new Binder(bindDiagnostics, path).Bind(ast);
+                bound = new Binder(bindDiagnostics, path) { CrossModuleTypes = sourceTypes }.Bind(ast);
             }
             catch (Exception)
             {
@@ -174,7 +187,8 @@ public sealed class ProjectSymbolIndex
         }
 
         skipped = failed;
-        var index = new ProjectSymbolIndex(documents);
+        sourceTypes.EnsureSourceSnapshots();
+        var index = new ProjectSymbolIndex(documents, sourceTypes);
         index.Populate();
         return index;
     }

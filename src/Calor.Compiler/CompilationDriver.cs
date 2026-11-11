@@ -540,6 +540,7 @@ internal static class CompilationDriver
                 file, result, options, relativeKey, statBeforeRead, sourceBytes, summary));
         }
 
+        crossModuleTypes?.EnsureSourceSnapshots();
         var generatedValidationFailed = false;
         // Generated-output validation runs over the outputs of THIS run's clean
         // files plus every cached output, as one Roslyn compilation. A file that
@@ -801,6 +802,7 @@ internal static class CompilationDriver
         out CrossModuleTypeRegistry types)
     {
         var modules = new List<ModuleNode>();
+        var parsedSources = new List<(ModuleNode Module, string Path)>();
         var sourceHashes = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
         foreach (var file in sources)
         {
@@ -817,14 +819,16 @@ internal static class CompilationDriver
                 {
                     continue;
                 }
+                Ids.DeclarationIdentityStore.AttachIfRegistered(file.FullName, text, module);
                 modules.Add(module);
+                parsedSources.Add((module, file.FullName));
             }
             catch (IOException)
             {
             }
         }
 
-        types = CrossModuleTypeRegistry.Build(modules, sourceHashes);
+        types = CrossModuleTypeRegistry.Build(parsedSources, sourceHashes);
         return BuildCrossModuleFunctionMap(modules);
     }
 
@@ -942,7 +946,7 @@ internal static class CompilationDriver
     /// (UTF-8 default, BOM detection) so the compiled text matches what a plain
     /// read would have produced while the cache hashes the raw bytes.
     /// </summary>
-    private static string DecodeSource(byte[] bytes)
+    internal static string DecodeSource(byte[] bytes)
     {
         using var reader = new StreamReader(new MemoryStream(bytes), detectEncodingFromByteOrderMarks: true);
         return reader.ReadToEnd();

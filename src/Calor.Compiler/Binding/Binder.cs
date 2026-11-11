@@ -14,6 +14,11 @@ namespace Calor.Compiler.Binding;
 public sealed class Binder
 {
     internal IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctionModules { get; init; }
+    internal Effects.CrossModuleTypeRegistry? CrossModuleTypes { get; init; }
+    internal Dictionary<SymbolId, Effects.CrossModuleTypeRegistry.SourceCallable> ExternalSourceCalls { get; } = [];
+    internal IReadOnlyDictionary<AstNode, FunctionSymbol> FunctionSymbols => _functionSymbols;
+    internal IReadOnlyDictionary<ClassDefinitionNode, TypeSymbol> ClassSymbols => _classSymbols;
+    private readonly string? _sourcePath;
     internal Dictionary<TextSpan, string> CrossModuleCallTargets { get; } = new();
     internal Dictionary<TextSpan, FunctionSymbol> SourceExtensionCallTargets { get; } = new();
     internal delegate BoundExpression ExpressionBinder(Binder binder, ExpressionNode expression);
@@ -220,6 +225,7 @@ public sealed class Binder
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _sourceIdentity = SymbolSourceIdentity.Canonicalize(sourceIdentity);
+        _sourcePath = sourceIdentity;
         _scope = new Scope();
     }
 
@@ -392,8 +398,7 @@ public sealed class Binder
                     || argument is BoundVariableExpression
                         { Variable: { IsTypeInferred: true, FunctionType: not null } }))
                 return null;
-            _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
-                _asyncTypeModule, _diagnostics, ProjectionContractMode);
+            SourceCallBindings();
             return _sourceCallConversions.ContextualMetadataCalls.TryGetValue(contextualCall, out var selected)
                 ? selected : null;
         }
@@ -1057,7 +1062,8 @@ public sealed class Binder
 
     public BoundModule Bind(ModuleNode module) => Bind(module, null);
 
-    internal BoundModule Bind(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance)
+    internal BoundModule Bind(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance,
+        bool declarationsOnly = false)
     {
         _contractInheritance = contractInheritance;
         _declaredReferenceAnnotation = module.HasObliviousNullability()
@@ -1079,6 +1085,7 @@ public sealed class Binder
         _boundVerificationCalls.Clear();
         CrossModuleCallTargets.Clear();
         SourceExtensionCallTargets.Clear();
+        ExternalSourceCalls.Clear();
         _staticMethodSymbols.Clear();
         _functionNamespaces.Clear();
         _classScopes.Clear();
@@ -1128,6 +1135,10 @@ public sealed class Binder
         RegisterAdditionalTypes(module);
         foreach (var cls in module.Classes)
             RegisterClassTree(cls, _moduleSymbolId, null);
+
+        if (declarationsOnly)
+            return new BoundModule(module.Span, module.Name, [],
+                _symbolOrder.ToDictionary(id => id, id => _symbolsById[id]));
 
         foreach (var variable in _symbolsById.Values.OfType<VariableSymbol>().Where(variable =>
                      (variable.IsField || variable.IsProperty) && variable.MethodInputArrayType is not null))
@@ -5057,8 +5068,7 @@ public sealed class Binder
         if (condition.Operator is not (BinaryOperator.Equal or BinaryOperator.Or)
             || !ResolveSourceCallConversions || _asyncTypeModule is null)
             return false;
-        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
-            _asyncTypeModule, _diagnostics, ProjectionContractMode);
+        SourceCallBindings();
         return _sourceCallConversions.BuiltInNullGuardOperations.Contains(condition);
     }
 
@@ -6078,8 +6088,7 @@ public sealed class Binder
     {
         if (targetType is null && ResolveSourceCallConversions && _asyncTypeModule is not null)
         {
-            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
-                _asyncTypeModule, _diagnostics, ProjectionContractMode);
+            SourceCallBindings();
             if (_sourceCallConversions.LambdaTargets.TryGetValue(lambda, out var target)
                 && target.DelegateInvokeMethod is { } invoke)
                 targetType = new BoundTypes.FunctionBoundType(
@@ -6664,6 +6673,8 @@ public sealed class Binder
                     receiver, conditional.MemberName));
         if (call.TargetExpression is FieldAccessNode member)
         {
+            if (TryBindExternalSourceCall(call, member) is { } sourceCall)
+                return sourceCall;
             var sourceReceiver = DottedReferenceName(member.Target);
             var sourceTarget = sourceReceiver is null ? null : $"{sourceReceiver}.{member.FieldName}";
             BoundExpression? receiver = TryBindPredefinedTypeReceiver(member.Target);
@@ -6686,6 +6697,7 @@ public sealed class Binder
                     sourceTarget, call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
                     call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName);
             }
+
             receiver ??= BindExpression(member.Target);
             if (TryGetEventStorage(member, out _, out _))
                 return BindFunctionValueCall(call, BindFieldAccess(member, receiver));
@@ -6707,6 +6719,48 @@ public sealed class Binder
                 call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call);
         }
         return BindFunctionValueCall(call, BindExpression(call.TargetExpression));
+    }
+
+    [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(_sourceCallConversions))]
+    private CallGraphAnalysis.OperatorBindings SourceCallBindings() =>
+        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
+            _asyncTypeModule!, _diagnostics, ProjectionContractMode,
+            crossModuleTypes: CrossModuleTypes, sourcePath: _sourcePath);
+
+    private BoundCallExpression? TryBindExternalSourceCall(ExpressionCallNode call, FieldAccessNode member)
+    {
+        if (CrossModuleTypes is null || !ResolveSourceCallConversions || _asyncTypeModule is null)
+            return null;
+        var bindings = SourceCallBindings();
+        bindings.SelectedCalls.TryGetValue(call.Span, out var selected);
+        if (selected is not null && _functionSymbols.ContainsKey(selected.Declaration))
+            return null;
+        if (selected is null
+            || selected.Method is not { IsStatic: true, MethodKind: Microsoft.CodeAnalysis.MethodKind.Ordinary } method
+            || method.ContainingType.StaticConstructors.Length != 0
+            || selected.IncludesExtensionReceiver
+            || CrossModuleTypes.FindCallable(selected.Declaration) is not { } callable)
+        {
+            if (!bindings.ForeignSourceCallSites.Contains(call.Span))
+                return null;
+            var arguments = BindCallArguments(call.Arguments, call.ArgumentModifiers);
+            return new BoundCallExpression(call.Span, "<expression-call>", arguments, "OBJECT",
+                calleeSpan: member.FieldNameSpan, receiverSpan: member.Target.Span)
+            {
+                HasOpaqueOverloads = true,
+                HasUnknownInferredType = true
+            };
+        }
+        var receiver = new BoundTypeReferenceExpression(member.Target.Span,
+            DottedReferenceName(member.Target) ?? method.ContainingType.ToDisplayString(),
+            Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType), callable.OwnerSymbol);
+        var bound = BindCallExpression(new CallExpressionNode(call.Span, "<expression-call>",
+            call.Arguments, call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments,
+            member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call,
+            (selected, callable.Symbol));
+        if (bound.ResolvedSymbol == callable.Symbol)
+            ExternalSourceCalls[callable.Symbol.Id] = callable;
+        return bound;
     }
 
     private BoundExpression BindFunctionValueCall(ExpressionCallNode call, BoundExpression target)
@@ -7238,8 +7292,7 @@ public sealed class Binder
     {
         if (declaration.HasAccessors || !ResolveSourceCallConversions || _asyncTypeModule is null)
             return null;
-        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
-            _asyncTypeModule, _diagnostics, ProjectionContractMode);
+        SourceCallBindings();
         return _sourceCallConversions.EventTypes.TryGetValue(declaration, out var type)
             ? BuildEventFunctionType(type, declaration.DelegateType) : null;
     }
@@ -7262,8 +7315,7 @@ public sealed class Binder
         type = null!;
         if (_eventSymbols.Count == 0 || !ResolveSourceCallConversions || _asyncTypeModule is null)
             return false;
-        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
-            _asyncTypeModule, _diagnostics, ProjectionContractMode);
+        SourceCallBindings();
         if (!_sourceCallConversions.EventStorageUses.TryGetValue(expression, out var selected)
             || selected.IsSubscription != subscription
             || !_sourceCallConversions.EventTypes.ContainsKey(selected.Declaration)
@@ -7421,7 +7473,8 @@ public sealed class Binder
 
     private BoundCallExpression BindCallExpression(CallExpressionNode callExpr,
         BoundExpression? computedReceiver = null, string? computedMethodName = null,
-        ExpressionCallNode? contextualCall = null)
+        ExpressionCallNode? contextualCall = null,
+        (CallGraphAnalysis.SourceCallSelection Selection, FunctionSymbol Symbol)? sourceSelection = null)
     {
         var args = BindCallArguments(callExpr.Arguments, callExpr.ArgumentModifiers);
         var argumentNames = callExpr.ArgumentNames;
@@ -7436,7 +7489,11 @@ public sealed class Binder
             : computedReceiver is null && receiverSymbol == null
                 ? ResolveCallReceiverType(callExpr.Target)
                 : null;
-        var resolution = isEventCall ? OverloadResolutionResult.NotFound() : ResolveCall(
+        var resolution = sourceSelection is { } source
+            ? args.Any(argument => argument.HasUnknownInferredType)
+                ? OverloadResolutionResult.UnresolvedArguments()
+                : OverloadResolutionResult.Resolved(source.Symbol, source.Selection.ReturnType, source.Selection.Arguments)
+            : isEventCall ? OverloadResolutionResult.NotFound() : ResolveCall(
             callExpr.Span,
             callExpr.Target,
             args,
@@ -7529,7 +7586,11 @@ public sealed class Binder
             && !resolution.HasOpaqueOverloads
             ? TryResolveInstanceArrayCall(callExpr, receiver)
             : null;
-        var annotatedReturn = isEventCall ? eventType.ReturnType : bclResolution?.GetReturnBoundTypeEx();
+        var selectedSourceMethod = sourceSelection is { } selectedCall && resolution.Function == selectedCall.Symbol
+            ? selectedCall.Selection.Method : null;
+        var annotatedReturn = selectedSourceMethod is { } selectedSource
+            ? Metadata.MetadataBinderResult.ToBoundType(selectedSource.ReturnType)
+            : isEventCall ? eventType.ReturnType : bclResolution?.GetReturnBoundTypeEx();
         var methodInputArrayReturn = annotatedReturn as BoundTypes.ArrayBoundType;
         var genericNullabilityReturn = annotatedReturn as BoundTypes.GenericInstantiationBoundType;
         if (bclResolution?.LegacyReturnType is { } legacyReturn)
@@ -7583,7 +7644,23 @@ public sealed class Binder
             methodInputArrayReturn ??= callableShape as BoundTypes.ArrayBoundType;
             genericNullabilityReturn ??= callableShape as BoundTypes.GenericInstantiationBoundType;
         }
-        ValidateCallArguments(args, resolution, bclResolution);
+        if (sourceSelection?.Selection.Method is { } sourceArgumentMethod
+            && resolution.Function == sourceSelection.Value.Symbol)
+        {
+            var reported = new HashSet<(TextSpan Span, string ParameterName, string TargetShape)>();
+            foreach (var mapping in sourceSelection.Value.Selection.Arguments)
+            {
+                var parameter = sourceArgumentMethod.Parameters[mapping.ParameterIndex];
+                var parameterType = mapping.IsExpandedParams && parameter.Type is Microsoft.CodeAnalysis.IArrayTypeSymbol array
+                    ? array.ElementType : parameter.Type;
+                if (parameter.RefKind != Microsoft.CodeAnalysis.RefKind.Out
+                    && TryBuildBclArgumentTarget(parameterType) is { } target)
+                    ValidateCallArgument(args[mapping.ArgumentIndex], parameter.Name, target,
+                        mapping.IsExpandedParams, reported);
+            }
+        }
+        else
+            ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(callExpr.Target, receiverSymbol, args, resolution, bclResolution);
         InvalidateMutatingCallArguments(args, argumentModifiers, resolution, bclResolution);
         var callable = isEventCall ? eventStorage.StorageIdentity : computedMethodName == "Invoke"
@@ -7600,7 +7677,9 @@ public sealed class Binder
             returnType,
             resolvedTypeName,
             resolvedMethodName,
-            resolvedParameterTypes: (isEventCall ? eventType.ParameterTypes.Select(type => type.DisplayString)
+            resolvedParameterTypes: (selectedSourceMethod is { } sourceMethod
+                ? sourceMethod.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
+                : isEventCall ? eventType.ParameterTypes.Select(type => type.DisplayString)
                 : bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
                 ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
@@ -7621,6 +7700,7 @@ public sealed class Binder
             receiver: receiver)
         {
             EvaluatedReceiver = isEventCall ? receiver : computedReceiver,
+            SelectedSourceMethod = selectedSourceMethod,
             IsSourceExtensionCall = isSourceExtensionCall,
             ResolvedMetadataMethod = instanceArrayResolution?.Symbol
                 ?? (metadataReceiver is not null || metadataScalarReturn ? bclResolution?.Symbol : null),
@@ -7650,8 +7730,7 @@ public sealed class Binder
     {
         if (!ResolveSourceCallConversions || _asyncTypeModule is null)
             return OverloadResolutionResult.NotFound();
-        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
-            _asyncTypeModule, _diagnostics, ProjectionContractMode);
+        SourceCallBindings();
         if (_sourceCallConversions.SelectedCalls.TryGetValue(call.Span, out var selected)
             && selected.IncludesExtensionReceiver
             && selected.Arguments.Count == arguments.Count
@@ -8293,8 +8372,7 @@ public sealed class Binder
 
         if (ResolveSourceCallConversions && _asyncTypeModule is not null && callSpan is { } site)
         {
-            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
-                _asyncTypeModule, _diagnostics, ProjectionContractMode);
+            SourceCallBindings();
             if (_sourceCallConversions.AmbiguousCalls.Contains(site))
                 return OverloadResolutionResult.Ambiguous(accessibleCandidates);
             if (_sourceCallConversions.SelectedCalls.TryGetValue(site, out var selected)
@@ -11177,8 +11255,7 @@ public sealed class Binder
     {
         if (ResolveSourceCallConversions && _asyncTypeModule is not null)
         {
-            _sourceCallConversions ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
-                _asyncTypeModule, _diagnostics, ProjectionContractMode);
+            SourceCallBindings();
             if (_sourceCallConversions.ParameterTypes.TryGetValue(parameter, out var type))
                 return type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
                     ? new BoundTypes.FunctionBoundType(

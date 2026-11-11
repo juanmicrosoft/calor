@@ -1,5 +1,12 @@
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.Dataflow;
+using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Indexing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -10,6 +17,497 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Path.GetTempPath(), "calor-variance-" + Guid.NewGuid().ToString("N"));
 
     public CrossModuleVarianceTests() => Directory.CreateDirectory(_directory);
+
+    private const string NativeLibrary = """
+        module Library Contracts block
+          module Arithmetic public
+            func Pick public (int:value) → int
+              !
+              return (value + 1)
+            func Pick public (string:value) → int
+              ! cw
+              System.Console.WriteLine(value)
+              return 2
+        """;
+
+    [Theory]
+    [InlineData("Contracts.Arithmetic", "")]
+    [InlineData("Arithmetic", "  using Contracts\n")]
+    [InlineData("Chosen", "  using Chosen = Contracts.Arithmetic\n")]
+    public void NativeCrossFileCallRetainsExactSourceSymbolAndIndexEdge(string owner, string imports)
+    {
+        Write("library", NativeLibrary);
+        Write("caller", $$"""
+            module Caller Consumer block
+            {{imports}}  module Entry public
+                func Probe public () → int
+                  !
+                  return {{owner}}.Pick(41)
+            """);
+        var files = Directory.GetFiles(_directory, "*.calr").Order(StringComparer.Ordinal)
+            .Select(path => new FileInfo(path)).ToArray();
+        CompilationDriver.BuildCrossModuleFunctionMap(files, out var types);
+        var source = File.ReadAllText(Path.Combine(_directory, "caller.calr"));
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var binder = new Binder(diagnostics, Path.Combine(_directory, "caller.calr")) { CrossModuleTypes = types };
+        var bound = binder.Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var symbol = Assert.IsType<FunctionSymbol>(call.ResolvedSymbol);
+        Assert.Equal("Contracts.Arithmetic.Pick", symbol.Name);
+        Assert.Equal("INT", TypeIdentity.Canonicalize(Assert.Single(symbol.Parameters).TypeName));
+        Assert.Equal("INT", TypeIdentity.Canonicalize(call.Type.DisplayString));
+        Assert.Null(call.ResolvedMetadataMethod);
+        var selected = Assert.Single(binder.ExternalSourceCalls).Value;
+        Assert.Same(symbol, selected.Symbol);
+        Assert.Empty(selected.Declaration.Effects!.Effects);
+        Assert.Equal("Contracts.Arithmetic", selected.OwnerSymbol.QualifiedName);
+        Assert.Equal(0, Assert.Single(Assert.Single(call.SelectedOverloadMatches).Arguments).ParameterIndex);
+
+        var compiled = Compile(cache: true);
+        Assert.False(compiled.Diagnostics.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(2, compiled.Result.Compiled.Count);
+        var index = ProjectIndexBuilder.Build(new(_directory, "native",
+            ProjectIndexBuilder.DiscoverSources(_directory)));
+        var edge = Assert.Single(index.CallEdges);
+        var declaration = Assert.Single(index.Declarations, declaration => declaration.SymbolId == edge.CalleeSymbolId);
+        Assert.Equal("library.calr", declaration.File);
+        Assert.Equal("Contracts.Arithmetic.Pick", declaration.Name);
+        Assert.Empty(index.Residual.UnresolvedCalls.Where(call => call.File == "caller.calr"));
+        Assert.Empty(index.Residual.EffectRowsUnavailable);
+        Assert.All(index.EffectRows.Where(row => row.File == "caller.calr"),
+            row => Assert.Equal("fits", row.Verdict));
+
+        var trees = Directory.GetFiles(_directory, "*.g.cs")
+            .Select(path => CSharpSyntaxTree.ParseText(File.ReadAllText(path))).ToArray();
+        var compilation = CSharpCompilation.Create("CrossFile_" + Guid.NewGuid().ToString("N"),
+            trees, GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var image = new MemoryStream();
+        var emitted = compilation.Emit(image);
+        Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(42, assembly.GetType("Consumer.Entry")!.GetMethod("Probe")!.Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData("\"effectful\"", "cw")]
+    [InlineData("System.Console.ReadLine() ?? \"fallback\"", "cr")]
+    public void NativeCrossFileCallDoesNotEraseCalleeOrArgumentEffects(string argument, string effect)
+    {
+        Write("library", NativeLibrary);
+        Write("caller", $$"""
+            module Caller Consumer block
+              module Entry public
+                func Probe public () → int
+                  !
+                  return Contracts.Arithmetic.Pick({{argument}})
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'" + effect + "'", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Theory]
+    [InlineData("Contracts.Arithmetic.Pick(true)", "", "")]
+    [InlineData("Contracts.Arithmetic.Pick<int>(41)", "", "")]
+    [InlineData("Contracts.Arithmetic.Pick(ref value)", "int:value", "")]
+    [InlineData("Contracts.Arithmetic.Pick(41)", "", "private")]
+    [InlineData("Contracts.Arithmetic.Pick(41)", "", "instance")]
+    [InlineData("Contracts.Arithmetic.Pick(41)", "", "duplicate-owner")]
+    [InlineData("Contracts.Arithmetic.Pick(41)", "object:Contracts", "")]
+    [InlineData("Contracts.Arithmetic.Pick(41)", "", "type-parameter-shadow")]
+    [InlineData("Contracts.Arithmetic.Pick(41)", "", "static-initialization")]
+    [InlineData("Library.Arithmetic.Pick(41)", "", "")]
+    [InlineData("Arithmetic.Pick(41)", "", "ambiguous-import")]
+    [InlineData("System.String.Equals(\"x\", \"x\")", "", "source-metadata-shadow")]
+    [InlineData("Contracts.Arithmetic.Pick(null)", "", "ambiguous-method")]
+    public void NativeCrossFileInvalidCallsNeverAcquireSourceOrMetadataContracts(
+        string expression, string parameters, string variant)
+    {
+        var library = variant switch
+        {
+            "private" => NativeLibrary.Replace("func Pick public (int:", "func Pick private (int:"),
+            "instance" => NativeLibrary.Replace("module Arithmetic public", "class Arithmetic public"),
+            "static-initialization" => NativeLibrary.Replace("module Arithmetic public",
+                "module Arithmetic public\n    field string?:Seed public static = System.Console.ReadLine()"),
+            "ambiguous-method" => """
+                module Library Contracts block
+                  module Arithmetic public
+                    func Pick public (System.IDisposable:value) → int
+                      !
+                      return 1
+                    func Pick public (System.ICloneable:value) → int
+                      !
+                      return 2
+                """,
+            "source-metadata-shadow" => """
+                module Mask System block
+                  module String public
+                    func Equals public (int:value) → int
+                      !
+                      return value
+                """,
+            _ => NativeLibrary
+        };
+        Write("library", library);
+        if (variant == "duplicate-owner")
+            Write("duplicate", library);
+        if (variant == "ambiguous-import")
+            Write("other", library.Replace("Contracts", "Other"));
+        var imports = variant == "ambiguous-import" ? "  using Contracts\n  using Other\n" : "";
+        Write("caller", $$"""
+            module Caller Consumer block
+            {{imports}}  module Entry public
+                func Probe{{(variant == "type-parameter-shadow" ? "<Contracts>" : "")}} public ({{parameters}}) → object
+                  !
+                  return {{expression}}
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        Assert.True(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var symbols = Refactoring.ProjectSymbolIndex.Build(
+            Directory.GetFiles(_directory, "*.calr"), out var skipped);
+        Assert.Empty(skipped);
+        var caller = Assert.Single(symbols.Documents, document => document.FilePath.EndsWith("caller.calr", StringComparison.Ordinal));
+        Assert.All(BoundNodeHelpers.DescendantsAndSelf(caller.BoundModule).OfType<BoundCallExpression>(),
+            call =>
+            {
+                Assert.Null(call.ResolvedSymbol);
+                Assert.Null(call.ResolvedMetadataMethod);
+            });
+        Assert.DoesNotContain(symbols.CallEdges, edge => edge.FilePath == caller.FilePath);
+        Assert.Contains(symbols.Residual.UnresolvedCalls, call => call.FilePath == caller.FilePath);
+    }
+
+    [Theory]
+    [InlineData("cw", "cw", null)]
+    [InlineData("cw", null, DiagnosticCode.EffectRowUnknown)]
+    [InlineData("", "cw", DiagnosticCode.EffectRowMismatch)]
+    public void NativeCrossFileCallbackContractsStayAttachedToTheirDeclaration(
+        string destination, string? argumentRow, string? expectedCode)
+    {
+        Write("library", $$"""
+            module Library Contracts block
+              module Callbacks public
+                func Apply public (Func<int>:callback ! {{destination}}) → int
+                  ! {{destination}}
+                  return callback()
+            """);
+        Write("caller", $$"""
+            module Caller Consumer block
+              module Entry public
+                func Probe public (Func<int>:callback {{(argumentRow is null ? "" : "! " + argumentRow)}}) → int
+                  ! cw
+                  return Contracts.Callbacks.Apply(callback)
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        if (expectedCode is null)
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        else
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Code == expectedCode);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Theory]
+    [InlineData("Echo<int>(41)", "int", "INT", false)]
+    [InlineData("Maybe(null)", "string?", "STRING", true)]
+    public void NativeCrossFileConstructedSignaturesPreserveGenericsAndNullability(
+        string expression, string result, string canonical, bool nullable)
+    {
+        Write("library", """
+            module Library Contracts block
+              module Arithmetic public
+                func Echo<T> public (T:value) → T
+                  !
+                  return value
+                func Maybe public (string?:value) → string?
+                  !
+                  return value
+            """);
+        Write("caller", $$"""
+            module Caller Consumer block
+              module Entry public
+                func Probe public () → {{result}}
+                  !
+                  return Contracts.Arithmetic.{{expression}}
+            """);
+        var files = Directory.GetFiles(_directory, "*.calr").Select(path => new FileInfo(path)).ToArray();
+        CompilationDriver.BuildCrossModuleFunctionMap(files, out var types);
+        var path = Path.Combine(_directory, "caller.calr");
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer(File.ReadAllText(path), diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binder(diagnostics, path) { CrossModuleTypes = types }.Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.NotNull(call.ResolvedSymbol);
+        Assert.Equal(nullable, call.Type is Binding.BoundTypes.NominalBoundType
+            { NullableAnnotation: Binding.BoundTypes.NullableAnnotation.Annotated });
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.SelectedSourceMethod);
+        Assert.Equal("Contracts.Arithmetic", selected.ContainingType.ToDisplayString());
+        Assert.Contains(canonical, TypeIdentity.Canonicalize(call.Type.DisplayString), StringComparison.Ordinal);
+        Assert.Contains(canonical,
+            TypeIdentity.Canonicalize(Assert.Single(Assert.Single(call.SelectedOverloadMatches).Arguments).ParameterType),
+            StringComparison.Ordinal);
+        var compiled = Compile(cache: true);
+        Assert.False(compiled.Diagnostics.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    [Fact]
+    public void NativeCrossFileWarmBuildInvalidatesChangedSourceSignaturesAndRows()
+    {
+        Write("library", NativeLibrary);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Probe public () → int
+                  !
+                  return Contracts.Arithmetic.Pick(41)
+            """);
+        var cold = Compile(cache: true);
+        Assert.False(cold.Diagnostics.HasErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Equal(2, cold.Result.Compiled.Count);
+        var warm = Compile(cache: true);
+        Assert.False(warm.Diagnostics.HasErrors, string.Join("\n", warm.Diagnostics));
+        Assert.Equal(2, warm.Result.Skipped.Count);
+        Write("library", NativeLibrary.Replace(
+            "func Pick public (int:value) → int\n      !",
+            "func Pick public (int:value) → int\n      ! cw"));
+        var changed = Compile(cache: true);
+        Assert.Contains(changed.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.Empty(changed.Result.Skipped);
+        Write("library", NativeLibrary.Replace("func Pick public (int:value)", "func Pick public (bool:value)")
+            .Replace("return (value + 1)", "return 42"));
+        var signature = Compile(cache: true);
+        Assert.True(signature.Diagnostics.HasErrors);
+        Assert.Empty(signature.Result.Skipped);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeCrossFileZeroArgumentSelectionSurvivesPartialAndUnrelatedPreprocessorMembers(bool partial)
+    {
+        Write("library", $$"""
+            module Library Contracts block
+              module Arithmetic public {{(partial ? "partial" : "")}}
+                func Zero public () → int
+                  !
+                  return 42
+                pp FEATURE
+                  func Other public () → int
+                    !
+                    return 1
+            """);
+        if (partial)
+            Write("part", """
+                module More Contracts block
+                  module Arithmetic public partial
+                    func Echo public (int:value) → int
+                      !
+                      return value
+                """);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Probe public () → int
+                  !
+                  return Contracts.Arithmetic.Zero()
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var index = ProjectIndexBuilder.Build(new(_directory, "native",
+            ProjectIndexBuilder.DiscoverSources(_directory)));
+        Assert.Single(index.CallEdges);
+        Assert.Empty(index.Residual.UnresolvedCalls);
+        Assert.Empty(index.Residual.EffectRowsUnavailable);
+    }
+
+    [Fact]
+    public void NativeCrossFileConfigurationDependentDeclarationsRemainUnresolved()
+    {
+        Write("library", """
+            module Library Contracts block
+              module Arithmetic public
+                pp FEATURE
+                  func Zero public () → int
+                    !
+                    return 1
+                pp else
+                  func Zero public () → int
+                    !
+                    return 2
+            """);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Probe public () → int
+                  !
+                  return Contracts.Arithmetic.Zero()
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        var index = Refactoring.ProjectSymbolIndex.Build(
+            Directory.GetFiles(_directory, "*.calr"), out var skipped);
+        Assert.Empty(skipped);
+        Assert.Empty(index.CallEdges);
+        Assert.Contains(index.Residual.UnresolvedCalls, call => call.FilePath.EndsWith("caller.calr", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NativeCrossFileNullableArgumentsUseTheSelectedConstructedParameter()
+    {
+        Write("library", NativeLibrary);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Probe public (string?:value) → int
+                  ! cw
+                  return Contracts.Arithmetic.Pick(value)
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void NativeCrossFileSourceSnapshotChangesAreExplicitFailures()
+    {
+        Write("library", NativeLibrary);
+        var files = Directory.GetFiles(_directory, "*.calr").Select(path => new FileInfo(path)).ToArray();
+        CompilationDriver.BuildCrossModuleFunctionMap(files, out var types);
+        Write("library", NativeLibrary.Replace("value + 1", "value + 2"));
+        var error = Assert.Throws<IOException>(() => types.EnsureSourceSnapshots());
+        Assert.Contains("changed after cross-module declaration collection", error.Message);
+    }
+
+    [Fact]
+    public void NativeCrossFileCallerTypeParametersKeepTheirLexicalIdentity()
+    {
+        Write("library", """
+            module Library Contracts block
+              module Arithmetic public
+                func Echo<T> public (T:value) → T
+                  !
+                  return value
+            """);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Probe<T> public (T:value) → T
+                  !
+                  return Contracts.Arithmetic.Echo<T>(value)
+            """);
+        var files = Directory.GetFiles(_directory, "*.calr").Select(path => new FileInfo(path)).ToArray();
+        CompilationDriver.BuildCrossModuleFunctionMap(files, out var types);
+        var path = Path.Combine(_directory, "caller.calr");
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer(File.ReadAllText(path), diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binder(diagnostics, path) { CrossModuleTypes = types }.Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.SelectedSourceMethod);
+        var argument = Assert.IsAssignableFrom<ITypeParameterSymbol>(Assert.Single(selected.TypeArguments));
+        Assert.Equal("Probe", argument.ContainingSymbol.Name);
+        Assert.Equal("Consumer.Entry", argument.ContainingType.ToDisplayString());
+        var (_, compiledDiagnostics) = Compile(cache: true);
+        Assert.False(compiledDiagnostics.HasErrors, string.Join("\n", compiledDiagnostics));
+    }
+
+    [Fact]
+    public void NativeCrossFileNominalOverloadsDoNotBorrowAnotherParametersRow()
+    {
+        Write("library", """
+            module Library Contracts block
+              class Item public
+              module Arithmetic public
+                func Pick public (Contracts.Item:value) → int
+                  !
+                  return 1
+                func Pick public (System.Text.StringBuilder:value) → int
+                  ! cw
+                  return 2
+            """);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Probe public (Contracts.Item:value) → int
+                  !
+                  return Contracts.Arithmetic.Pick(value)
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var index = Refactoring.ProjectSymbolIndex.Build(
+            Directory.GetFiles(_directory, "*.calr"), out var skipped);
+        Assert.Empty(skipped);
+        var caller = Assert.Single(index.Documents, document => document.FilePath.EndsWith("caller.calr", StringComparison.Ordinal));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(caller.BoundModule).OfType<BoundCallExpression>());
+        Assert.Equal("Contracts.Item", Assert.Single(call.ResolvedSymbol!.Parameters).TypeName);
+        Assert.Equal("Contracts.Item", Assert.Single(call.SelectedSourceMethod!.Parameters).Type.ToDisplayString());
+    }
+
+    [Theory]
+    [InlineData("", true)]
+    [InlineData("cw", false)]
+    public void NativeCrossFileOverrideVarianceRetainsTheOriginalBaseDeclaration(string row, bool violation)
+    {
+        Write("base", $$"""
+            module BaseFile Contracts block
+              class Base public
+                func Render public virtual () → void
+                  ! {{row}}
+                  return
+            """);
+        Write("derived", """
+            module DerivedFile Consumer block
+              class Derived public
+                extends Contracts.Base
+                func Render public override () → void
+                  ! cw
+                  return
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        Assert.Equal(violation, diagnostics.HasErrors);
+        Assert.Equal(violation, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.OverrideEffectVariance));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.EffectRowUnknown);
+    }
+
+    [Fact]
+    public void NativeCrossFileLocalCallsKeepTheirBodiesAndAreNotForeignDeclarations()
+    {
+        Write("library", NativeLibrary);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Probe public () → int
+                  !
+                  return Entry.Local(41)
+                func Local public (int:value) → int
+                  !
+                  return Contracts.Arithmetic.Pick(value)
+            """);
+        var symbols = Refactoring.ProjectSymbolIndex.Build(
+            Directory.GetFiles(_directory, "*.calr"), out var skipped);
+        Assert.Empty(skipped);
+        var caller = Assert.Single(symbols.Documents, document => document.FilePath.EndsWith("caller.calr", StringComparison.Ordinal));
+        var diagnostics = new DiagnosticBag();
+        var binder = new Binder(diagnostics, caller.FilePath) { CrossModuleTypes = symbols.SourceTypes };
+        binder.Bind(caller.Ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Equal("Contracts.Arithmetic.Pick", Assert.Single(binder.ExternalSourceCalls).Value.Symbol.Name);
+        var index = ProjectIndexBuilder.Build(new(_directory, "native",
+            ProjectIndexBuilder.DiscoverSources(_directory)));
+        Assert.Equal(2, index.CallEdges.Count);
+        Assert.DoesNotContain(index.Residual.UnresolvedCalls, call => call.File == "caller.calr");
+        Assert.Empty(index.Residual.EffectRowsUnavailable);
+        Assert.Equal(4, index.EffectRows.Count);
+        Assert.All(index.EffectRows, row => Assert.Equal("fits", row.Verdict));
+        var (_, compiledDiagnostics) = Compile(cache: true);
+        Assert.False(compiledDiagnostics.HasErrors, string.Join("\n", compiledDiagnostics));
+    }
 
     [Theory]
     [InlineData("", true)]

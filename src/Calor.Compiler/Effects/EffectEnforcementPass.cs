@@ -22,7 +22,8 @@ public sealed class EffectEnforcementPass
     private readonly UnknownCallPolicy _policy;
     private readonly bool _strictEffects;
     private readonly HashSet<string> _crossModuleFunctionNames;
-    internal CrossModuleTypeRegistry? CrossModuleTypes { get; init; }
+    internal CrossModuleTypeRegistry? CrossModuleTypes { get; set; }
+    internal string? SourcePath { get; set; }
     internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
     private CrossModuleTypeRegistry _varianceTypes = null!;
     private ModuleNode _varianceModule = null!;
@@ -272,7 +273,8 @@ public sealed class EffectEnforcementPass
 
         // Phase 1: Build function map and call graph (includes functions and methods)
         _callGraphAnalysis = CallGraphAnalysis.Build(
-            module, CrossModuleFunctionModules, contractInheritance, ProjectionContractMode);
+            module, CrossModuleFunctionModules, contractInheritance, ProjectionContractMode,
+            CrossModuleTypes, SourcePath);
         if (_callGraphAnalysis.SourceConstructionErrors.Count > 0)
         {
             foreach (var error in _callGraphAnalysis.SourceConstructionErrors)
@@ -297,6 +299,8 @@ public sealed class EffectEnforcementPass
             CallGraphAnalysis.EnumerateDelegates(module).Select(d => d.Name), StringComparer.Ordinal);
         _ownerClassByFunctionId = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
         _declarationOnlyRows.Clear();
+        foreach (var (id, declaration) in _callGraphAnalysis.ExternalSourceFunctions)
+            _declarationOnlyRows[id] = declaration.Effects;
         foreach (var declaration in CallGraphAnalysis.EnumerateInterfaces(module))
             foreach (var method in declaration.Methods)
                 _declarationOnlyRows[$"{declaration.Name}.{method.Id}"] = method.Effects;
@@ -414,6 +418,8 @@ public sealed class EffectEnforcementPass
         // other effect is rejected and must be moved behind a declared method.
         foreach (var function in _callGraphAnalysis.Functions.Values)
         {
+            if (_callGraphAnalysis.ExternalSourceFunctions.ContainsKey(function.Id))
+                continue;
             if (_constructorsByFunctionId.TryGetValue(function.Id, out var constructor))
                 CheckImplicitEffectBody(function, constructor.Constructor,
                     DiagnosticCode.ConstructorEffectContractUnavailable,
@@ -447,6 +453,8 @@ public sealed class EffectEnforcementPass
         _declarationFacts.Clear();
         foreach (var function in _callGraphAnalysis.Functions.Values)
         {
+            if (_callGraphAnalysis.ExternalSourceFunctions.ContainsKey(function.Id))
+                continue;
             string kind;
             string mismatchCode;
             EffectSet declaredSet;

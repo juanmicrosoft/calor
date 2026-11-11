@@ -33,7 +33,21 @@ calor -i MyModule.calr -o MyModule.g.cs
 
 # With verbose output
 calor -v -i MyModule.calr -o MyModule.g.cs
+
+# Compile a project together; write one .g.cs beside each input
+calor -i Library.calr -i App.calr --strict-effects --no-cache
 ```
+
+Repeat `-i` for every source file in a batch. Omit `-o` for a multi-file
+invocation: one explicit output path would be shared by all inputs.
+Calls to another file's named static module use its declared CLR namespace
+and owner, for example `Contracts.Arithmetic.Pick(41)`. Binding selects the
+actual source overload in the caller's namespace and import context, and
+effect checking charges that declaration's row along with argument effects.
+The project index uses the same source selections for call edges.
+Ambiguous, inaccessible, or invalid calls remain unresolved; they do not
+borrow another source or metadata contract. Foreign instance methods and
+owners with static initialization are not closed by this source-call path.
 
 ---
 

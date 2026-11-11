@@ -4,6 +4,8 @@ using System.Text.Json;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Incremental;
 using Calor.Compiler.Migration;
 
@@ -15,15 +17,25 @@ internal sealed class CrossModuleTypeRegistry
     private readonly Dictionary<AstNode, ModuleNode> _modules = new();
     private readonly List<UsingDirectiveNode> _globalUsings;
     private readonly IReadOnlyDictionary<string, string>? _sourceHashes;
+    private readonly IReadOnlyDictionary<ModuleNode, string> _sourcePaths;
+    private readonly Dictionary<ContractMode, IReadOnlyList<SourceProjection>> _projections = [];
+    private readonly Dictionary<ModuleNode, (Binder Binder, DiagnosticBag Diagnostics)> _declarationBinders = [];
+
+    internal sealed record SourceProjection(ModuleNode Module, string Path, string Source,
+        string Marker, IReadOnlyList<AstNode> Callables);
+    internal sealed record SourceCallable(MethodNode Declaration, ClassDefinitionNode Owner,
+        FunctionSymbol Symbol, TypeSymbol OwnerSymbol);
 
     internal string Fingerprint { get; }
     internal bool HasTypes => _types.Count != 0;
 
     private CrossModuleTypeRegistry(
         IReadOnlyList<ModuleNode> modules,
-        IReadOnlyDictionary<string, string>? sourceHashes)
+        IReadOnlyDictionary<string, string>? sourceHashes,
+        IReadOnlyDictionary<ModuleNode, string>? sourcePaths = null)
     {
         _sourceHashes = sourceHashes;
+        _sourcePaths = sourcePaths ?? new Dictionary<ModuleNode, string>();
         _globalUsings = modules.SelectMany(module => module.Usings)
             .Where(directive => directive.IsGlobal).ToList();
         foreach (var module in new PartialClassMerger().Merge(modules))
@@ -60,12 +72,81 @@ internal sealed class CrossModuleTypeRegistry
             }))
             .OrderBy(declaration => declaration, StringComparer.Ordinal);
         Fingerprint = Convert.ToHexString(SHA256.HashData(
-            Encoding.UTF8.GetBytes(string.Join("\n", declarations))));
+            Encoding.UTF8.GetBytes(string.Join("\n", declarations)
+                + "\n" + string.Join("\n", sourceHashes?.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => pair.Key + "=" + pair.Value) ?? []))));
     }
 
     internal static CrossModuleTypeRegistry Build(
         IReadOnlyList<ModuleNode> modules,
         IReadOnlyDictionary<string, string>? sourceHashes = null) => new(modules, sourceHashes);
+
+    internal static CrossModuleTypeRegistry Build(
+        IReadOnlyList<(ModuleNode Module, string Path)> sources,
+        IReadOnlyDictionary<string, string> sourceHashes) => new(
+            sources.Select(source => source.Module).ToArray(), sourceHashes,
+            sources.ToDictionary(source => source.Module, source => Path.GetFullPath(source.Path)));
+
+    internal IReadOnlyList<SourceProjection> CompanionSources(string? sourcePath, ContractMode mode)
+    {
+        if (sourcePath is null || !_sourcePaths.Values.Contains(Path.GetFullPath(sourcePath),
+                BuildStateCache.GetPathComparer()))
+            return [];
+        if (!_projections.TryGetValue(mode, out var projections))
+        {
+            var emitted = new List<SourceProjection>();
+            foreach (var (module, path) in _sourcePaths)
+            {
+                var callables = new List<AstNode>();
+                var marker = "calor-source-callable-" + Guid.NewGuid().ToString("N") + ":";
+                var diagnostics = new DiagnosticBag();
+                var emitter = new CSharpEmitter(mode, null, null, diagnostics: diagnostics)
+                {
+                    AnnotateSource = (_, text) => text,
+                    CallableOrigin = declaration =>
+                    {
+                        var index = callables.Count;
+                        callables.Add(declaration);
+                        return $"/*{marker}{index}*/";
+                    }
+                };
+                var text = emitter.Emit(module);
+                if (diagnostics.HasErrors)
+                    throw new InvalidOperationException(
+                        $"Cannot project source '{path}': "
+                        + string.Join("; ", diagnostics.Errors.Select(error => error.Message)));
+                emitted.Add(new(module, path, text, marker, callables));
+            }
+            _projections[mode] = projections = emitted;
+        }
+        return projections.Where(source =>
+            !BuildStateCache.GetPathComparer().Equals(source.Path, Path.GetFullPath(sourcePath))).ToArray();
+    }
+
+    internal SourceCallable? FindCallable(AstNode declaration)
+    {
+        if (declaration is not MethodNode method)
+            return null;
+        var owner = _sourcePaths.Keys.SelectMany(CallGraphAnalysis.EnumerateClasses)
+            .FirstOrDefault(candidate => CallGraphAnalysis.EnumerateMethods(candidate)
+                .Any(member => ReferenceEquals(member, method)));
+        if (owner is null)
+            return null;
+        var module = _sourcePaths.Keys.First(candidate =>
+            CallGraphAnalysis.EnumerateClasses(candidate).Contains(owner));
+        if (!_declarationBinders.TryGetValue(module, out var binding))
+        {
+            var diagnostics = new DiagnosticBag();
+            var binder = new Binder(diagnostics, _sourcePaths[module])
+            {
+                ResolveSourceCallConversions = false
+            };
+            binder.Bind(module, null, declarationsOnly: true);
+            _declarationBinders[module] = binding = (binder, diagnostics);
+        }
+        return binding.Diagnostics.HasErrors ? null
+            : new(method, owner, binding.Binder.FunctionSymbols[method], binding.Binder.ClassSymbols[owner]);
+    }
 
     internal bool MatchesSourceHash(string path, string hash) =>
         _sourceHashes == null
@@ -76,6 +157,14 @@ internal sealed class CrossModuleTypeRegistry
         if (!MatchesSourceHash(path, BuildStateCache.ComputeContentHash(bytes)))
             throw new IOException(
                 $"Source '{path}' changed after cross-module declaration collection. Retry compilation.");
+    }
+
+    internal void EnsureSourceSnapshots()
+    {
+        if (_sourceHashes is null)
+            return;
+        foreach (var path in _sourceHashes.Keys)
+            EnsureSourceSnapshot(path, File.ReadAllBytes(path));
     }
 
     private static object MethodContract(
