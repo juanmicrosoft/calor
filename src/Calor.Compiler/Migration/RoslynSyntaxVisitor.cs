@@ -12621,7 +12621,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         // #774: a compound assignment in expression context must not ignore its
         // operator (the old behavior turned `x += 1` into `x = 1`). Hoist the
-        // correctly-mapped compound assignment; the expression's value is the
+        // equivalent native store; the expression's value is the
         // updated target, re-read (IsSingleEvaluationAssignmentSite allows only
         // variables and fields here, whose read has no effect). Unmapped
         // operators escalate to interop.
@@ -12642,10 +12642,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (_pendingStatements.Count != pendingBefore)
             throw EscalateExpression(assignment, "embedded-assignment");
         // #1634: a small integral target keeps C#'s implicit narrowing cast.
-        _pendingStatements.Add(NarrowingCastType(assignment, assignment.Left) is { } castType
-            ? new AssignmentStatementNode(span, target, new TypeOperationNode(span, TypeOp.Cast,
-                new BinaryOperationNode(span, ToBinaryOperator(compOp), target, rhs), castType))
-            : new CompoundAssignmentStatementNode(span, target, compOp, rhs));
+        ExpressionNode updatedValue = new BinaryOperationNode(span, ToBinaryOperator(compOp), target, rhs);
+        if (NarrowingCastType(assignment, assignment.Left) is { } castType)
+            updatedValue = new TypeOperationNode(span, TypeOp.Cast, updatedValue, castType);
+        _pendingStatements.Add(new AssignmentStatementNode(span, target, updatedValue));
 
         return ConvertExpression(assignment.Left);
     }

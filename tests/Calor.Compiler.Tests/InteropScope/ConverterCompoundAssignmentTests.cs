@@ -261,6 +261,38 @@ public class ConverterCompoundAssignmentTests
         Assert.Equal(SupportLevel.NotSupported, FeatureSupport.GetFeatureInfo("compound-assignment-narrowing")!.Support);
     }
 
+    [Theory]
+    [InlineData("", "int total = 7; int value = (total += 5); return total + \":\" + value;", "12:12")]
+    [InlineData("", "byte total = 250; byte value = (total += 10); return total + \":\" + value;", "4:4")]
+    [InlineData("", "int total = int.MaxValue; int value = (total += 1); return total + \":\" + value;", "-2147483648:-2147483648")]
+    [InlineData("", "int total = 7; int value = (total *= 3); return total + \":\" + value;", "21:21")]
+    [InlineData("static int total = 7; static int calls; static int Take() { calls++; total = 100; return 2; }",
+        "int value = (total += Take()); return total + \":\" + value + \":\" + calls;", "9:9:1")]
+    public void EmbeddedCompoundStores_PreserveValuesWithoutRetiredSyntax(string members, string body, string expected)
+    {
+        var source = $"public static class Probe {{ {members} public static string Run() {{ {body} }} }}";
+        Assert.Equal(expected, RefOutImplementationTests.Run(source));
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        Assert.Empty(conversion.Losses);
+        Assert.NotNull(conversion.CalorSource);
+        Assert.DoesNotContain("§", conversion.CalorSource);
+        var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+        var module = new Compiler.Parsing.Parser(
+            new Compiler.Parsing.Lexer(conversion.CalorSource, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Empty(diagnostics);
+        foreach (var native in new[] { conversion.CalorSource, new CalorEmitter().Emit(module) })
+        {
+            foreach (var typeChecking in new[] { false, true })
+            {
+                var compiled = Program.Compile(native, "compound-value.calr",
+                    new CompilationOptions { EnableTypeChecking = typeChecking });
+                Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+                Assert.Equal(expected, RefOutImplementationTests.Run(compiled.GeneratedCode));
+            }
+        }
+    }
+
     private static string Convert(string source)
         => new CSharpToCalorConverter(new ConversionOptions()).Convert(source).CalorSource!.Replace("\r\n", "\n");
 }
