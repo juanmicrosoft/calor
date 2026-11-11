@@ -107,5 +107,45 @@
       "recordedCompile": "permissive-effects:Calor0410",
       "compile": "default"
     }
+  },
+  "additionalRows": {
+    "F5-ARRAY-01": {
+      "surfaces": [
+        "LibraryDefault", "CliDefault", "CliPassthrough", "McpDefault",
+        "McpPassthroughOnError", "McpPassthroughOnErrorModuleName"
+      ],
+      "obliviousNullability": true,
+      "declarationMetadataMatchesOriginal": true,
+      "getLengthReceiverAnnotations": ["Oblivious", "Oblivious"]
+    },
+    "ordering": {
+      "surfaces": [
+        "LibraryDefault", "CliDefault", "CliPassthrough", "McpDefault",
+        "McpPassthroughOnError", "McpPassthroughOnErrorModuleName"
+      ],
+      "obliviousNullability": true,
+      "declarationMetadataMatchesOriginal": true,
+      "getLengthReceiverAnnotations": ["Oblivious", "NotAnnotated"]
+    },
+    "shapes": {
+      "surfaces": [
+        "LibraryDefault", "CliDefault", "CliPassthrough", "McpDefault",
+        "McpPassthroughOnError", "McpPassthroughOnErrorModuleName"
+      ],
+      "obliviousNullability": true,
+      "declarationMetadataMatchesOriginal": true,
+      "getLengthReceiverAnnotations": ["NotAnnotated", "NotAnnotated", "NotAnnotated", "NotAnnotated"]
+    }
+  },
+  "additionalControls": {
+    "X-INT-02": {
+      "row": "F5-ARRAY-01",
+      "surfaces": ["library", "cli-convert", "mcp-convert", "mcp-convert-passthroughOnError"],
+      "recordedCompile": "permissive-effects:Calor0410",
+      "compile": "default",
+      "obliviousNullability": true,
+      "declarationMetadataMatchesOriginal": true,
+      "getLengthReceiverAnnotations": ["Oblivious", "Oblivious"]
+    }
   }
 }

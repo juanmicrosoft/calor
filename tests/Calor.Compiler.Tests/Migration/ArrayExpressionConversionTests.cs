@@ -29,7 +29,7 @@ namespace Calor.Compiler.Tests;
 /// evaluated subexpression changes the result. Nothing may be preserved as C# (no rescue,
 /// no raw preservation) on a native row. Rows retain the original unknown-effect observations.
 /// Separate current observations require enforced compilation and exact metadata binding for
-/// the repaired rows and explicitly registered migration surfaces. Other rows retain their
+/// the repaired rows and explicitly registered surfaces. Other rows retain their
 /// recorded Calor0410 expectation for 'unknown'.
 /// </summary>
 public class ArrayExpressionConversionTests
@@ -1448,9 +1448,7 @@ public class ArrayExpressionConversionTests
         var strict = Program.Compile(calor, row + ".calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         var currentUnknownEffects = unknownEffects;
-        var hasCurrentResults = row is "F5-ARRAY-05" or "round2" or "round3"
-            || (row is "F5-ARRAY-01" or "ordering" or "shapes"
-                && surface is Surface.ProjectMigrate or Surface.ProjectMigratePassthrough);
+        var hasCurrentResults = row is "F5-ARRAY-05" or "round2" or "round3" or "F5-ARRAY-01" or "ordering" or "shapes";
         if (hasCurrentResults)
         {
             using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(
@@ -1463,9 +1461,25 @@ public class ArrayExpressionConversionTests
             var observation = root.GetProperty("rows").GetProperty(row);
             if (observation.TryGetProperty("surfaces", out var surfaces))
             {
-                Assert.Equal(new[] { nameof(Surface.ProjectMigrate), nameof(Surface.ProjectMigratePassthrough) },
-                    surfaces.EnumerateArray().Select(value => value.GetString()));
-                Assert.Contains(surface.ToString(), surfaces.EnumerateArray().Select(value => value.GetString()));
+                if (surface is Surface.ProjectMigrate or Surface.ProjectMigratePassthrough)
+                {
+                    Assert.Equal(new[] { nameof(Surface.ProjectMigrate), nameof(Surface.ProjectMigratePassthrough) },
+                        surfaces.EnumerateArray().Select(value => value.GetString()));
+                    Assert.Contains(surface.ToString(), surfaces.EnumerateArray().Select(value => value.GetString()));
+                }
+                else
+                {
+                    var additional = root.GetProperty("additionalRows").GetProperty(row);
+                    var registered = additional.GetProperty("surfaces");
+                    Assert.Equal(new[]
+                    {
+                        nameof(Surface.LibraryDefault), nameof(Surface.CliDefault), nameof(Surface.CliPassthrough),
+                        nameof(Surface.McpDefault), nameof(Surface.McpPassthroughOnError),
+                        nameof(Surface.McpPassthroughOnErrorModuleName)
+                    }, registered.EnumerateArray().Select(value => value.GetString()));
+                    Assert.Contains(surface.ToString(), registered.EnumerateArray().Select(value => value.GetString()));
+                    AssertCurrentArrayDeclarations(source, strict, additional);
+                }
             }
             Assert.Equal(unknownEffects, observation.GetProperty("recordedUnknownEffects").GetBoolean());
             Assert.Equal(expected, observation.GetProperty("trace").GetString());
@@ -1486,6 +1500,54 @@ public class ArrayExpressionConversionTests
         {
             Assert.Equal(compilation.GeneratedCode, strict.GeneratedCode);
             Assert.Equal(expected, Run(strict.GeneratedCode));
+        }
+    }
+
+    internal static void AssertCurrentArrayDeclarations(string source, CompilationResult compilation, JsonElement observation)
+    {
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        Assert.True(observation.GetProperty("obliviousNullability").GetBoolean());
+        var ast = Assert.IsType<ModuleNode>(compilation.Ast);
+        Assert.True(ast.HasObliviousNullability());
+        Assert.True(observation.GetProperty("declarationMetadataMatchesOriginal").GetBoolean());
+        var originalTree = CSharpSyntaxTree.ParseText(source);
+        var generatedTree = CSharpSyntaxTree.ParseText(compilation.GeneratedCode);
+        var original = CSharpCompilation.Create("ArrayCurrentDeclarations", [originalTree],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var generated = original.ReplaceSyntaxTree(originalTree, generatedTree);
+        Assert.Empty(original.GetDiagnostics().Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        Assert.Empty(generated.GetDiagnostics().Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        Assert.Equal(CSharpToCalorConverter.DeclaredTypeMetadata(original.GetSemanticModel(originalTree),
+                originalTree.GetCompilationUnitRoot()),
+            CSharpToCalorConverter.DeclaredTypeMetadata(generated.GetSemanticModel(generatedTree),
+                generatedTree.GetCompilationUnitRoot()));
+
+        var diagnostics = new DiagnosticBag();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        var nodes = BoundDescendants(bound).ToArray();
+        var calls = nodes.OfType<BoundCallExpression>()
+            .Where(call => call.ResolvedMethodName == "GetLength").ToArray();
+        var annotations = observation.GetProperty("getLengthReceiverAnnotations");
+        Assert.Equal(calls.Length, annotations.GetArrayLength());
+        for (var index = 0; index < calls.Length; index++)
+        {
+            var array = Assert.IsType<ArrayBoundType>(calls[index].Receiver!.MethodInputArrayType);
+            Assert.Equal(annotations[index].GetString(), array.NullableAnnotation.ToString());
+            if (array.ElementType is NominalBoundType { Declaration: not null } element)
+                Assert.Equal(Binding.BoundTypes.NullableAnnotation.Oblivious, element.NullableAnnotation);
+        }
+        var resolver = new EffectResolver(new Effects.Manifests.ManifestLoader(loadUserLevelManifests: false));
+        foreach (var property in nodes.OfType<BoundFieldAccessExpression>()
+            .Select(field => field.ResolvedMetadataMember).OfType<IPropertySymbol>()
+            .Where(property => property.ContainingType.SpecialType == SpecialType.System_Array))
+        {
+            var key = EffectResolverKey.FromBoundReceiver(
+                Binding.Metadata.MetadataBinderResult.ToNominalBoundType(property.ContainingType),
+                property.Name, null, EffectMemberKind.Getter);
+            var contract = resolver.Resolve(key);
+            Assert.Equal(EffectResolutionStatus.PureExplicit, contract.Status);
+            Assert.Equal("embedded:Calor.Compiler.Manifests.bcl-system.calor-effects.json", contract.Source);
         }
     }
 

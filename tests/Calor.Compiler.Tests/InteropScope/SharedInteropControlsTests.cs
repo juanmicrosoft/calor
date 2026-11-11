@@ -25,7 +25,7 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// reviewed in the pull request that changes them. Current initializer frame counts and strict
 /// compilation are pinned separately in <c>initializer-current-expectations.json</c>; original
 /// sources, traces, outcomes and all other observation fields remain the original controls.
-/// Explicit X-INT-02 migration observations use <c>R0/array-current-results.json</c>.
+/// Explicit X-INT-02 surface observations use <c>R0/array-current-results.json</c>.
 /// </summary>
 public sealed class SharedInteropControlsTests : IDisposable
 {
@@ -96,12 +96,14 @@ public sealed class SharedInteropControlsTests : IDisposable
             expected!["compile"] = current["compile"]!.DeepClone();
             expected["paths"]!["interop"] = current["interop"]!.DeepClone();
         }
-        if (id == "X-INT-02" && surface is "cli-migrate" or "mcp-migrate" or "mcp-batch")
+        if (id == "X-INT-02")
         {
             using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
                 "tests/TestData/InteropScope/R0/array-current-results.json")));
-            var registered = current.RootElement.GetProperty("controls").GetProperty(id);
-            Assert.Equal(new[] { "cli-migrate", "mcp-migrate", "mcp-batch" },
+            var migration = surface is "cli-migrate" or "mcp-migrate" or "mcp-batch";
+            var registered = current.RootElement.GetProperty(migration ? "controls" : "additionalControls").GetProperty(id);
+            Assert.Equal(migration ? new[] { "cli-migrate", "mcp-migrate", "mcp-batch" }
+                    : ["library", "cli-convert", "mcp-convert", "mcp-convert-passthroughOnError"],
                 registered.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
             Assert.Contains(surface, registered.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
             Assert.Equal(registered.GetProperty("recordedCompile").GetString(), expected!["compile"]!.GetValue<string>());
@@ -118,6 +120,8 @@ public sealed class SharedInteropControlsTests : IDisposable
             Assert.Equal(observation.GetProperty("trace").GetString(), original);
             var strict = Compile(id, calor!, enforceEffects: true);
             ArrayExpressionConversionTests.AssertCurrentArraySelections(strict, observation);
+            if (!migration)
+                ArrayExpressionConversionTests.AssertCurrentArrayDeclarations(source, strict, registered);
             var permissive = Compile(id, calor!, enforceEffects: false);
             Assert.False(permissive.HasErrors, string.Join(Environment.NewLine, permissive.Diagnostics.Errors));
             Assert.Equal(permissive.GeneratedCode, strict.GeneratedCode);
