@@ -39,6 +39,262 @@ public class SnapshotConversionTests
             .Order(StringComparer.Ordinal).Select(path => new object[] { path });
 
     [Theory]
+    [InlineData("09-03")]
+    [InlineData("10-01")]
+    [InlineData("11-05")]
+    [InlineData("12-01")]
+    public void NativeProducer_RoundTripsWithoutInterop(string id)
+    {
+        var snippet = ConversionCatalog.SupportedSnippets.Single(snippet => snippet.Id == id);
+        var result = TestHelpers.ConvertCSharp(snippet.CSharpSource, $"Test_{id.Replace("-", "_")}");
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(issue => issue.Message)));
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Equal(0, result.LossySubstitutionCount);
+        Assert.Equal(0, result.DropCount);
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§", result.CalorSource);
+
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(result.CalorSource, diagnostics).TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var module = new Parser(tokens, diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var roundTrip = new CalorEmitter().Emit(module);
+        var secondDiagnostics = new DiagnosticBag();
+        var secondTokens = new Lexer(roundTrip, secondDiagnostics).TokenizeAllForParser();
+        Assert.False(secondDiagnostics.HasErrors, string.Join("\n", secondDiagnostics));
+        var second = new Parser(secondTokens, secondDiagnostics).Parse();
+        Assert.False(secondDiagnostics.HasErrors, string.Join("\n", secondDiagnostics));
+        var generated = new CSharpEmitter().Emit(module);
+        Assert.Equal(generated, new CSharpEmitter().Emit(second));
+        var validation = TestHelpers.RoslynCompile(generated);
+        if (id == "09-03")
+        {
+            // The original broad slice arm already makes [1, 2, ..] unreachable.
+            var originalError = Assert.Single(TestHelpers.RoslynCompile(snippet.CSharpSource).CompilationErrors);
+            var generatedError = Assert.Single(validation.CompilationErrors);
+            Assert.Equal("CS8510", originalError.Id);
+            Assert.Equal(originalError.Id, generatedError.Id);
+            Assert.Equal("[1, 2, ..]", ErrorPattern(originalError));
+            Assert.Equal(ErrorPattern(originalError), ErrorPattern(generatedError));
+        }
+        else
+        {
+            Assert.True(validation.CompilationSuccess, string.Join("\n", validation.FormattedCompilationErrors));
+        }
+
+        static string ErrorPattern(Microsoft.CodeAnalysis.Diagnostic diagnostic) =>
+            diagnostic.Location.SourceTree!.GetRoot().FindNode(diagnostic.Location.SourceSpan)
+                .WithoutTrivia().NormalizeWhitespace().ToFullString();
+    }
+
+    [Fact]
+    public void NativeProducer_RuntimePreservesEvaluationAndSliceBindings()
+    {
+        const string source = """
+            using System;
+            using System.Collections.Generic;
+            namespace NativeProducerRuntime;
+            public static class NativeOutputs
+            {
+                private static int trace;
+                private static int Mark(int value) { trace = trace * 10 + value; return value; }
+                private static int[] Items() { Mark(5); return new int[] { 6, 7, 8 }; }
+                private static int Index() { Mark(6); return 1; }
+                private static int @sizeof(int value) => value + 1;
+                public static string Run()
+                {
+                    trace = 0;
+                    var values = new Dictionary<int, int>
+                    {
+                        { Mark(1), Mark(2) },
+                        { Mark(3), Mark(4) }
+                    };
+                    var text = $"{Items()[Index()]}";
+                    return $"{values[1]}:{values[3]}:{text}:{trace}:{sizeof(int)}:{@sizeof(7)}";
+                }
+                public static int Duplicate()
+                {
+                    trace = 0;
+                    try
+                    {
+                        var values = new Dictionary<int, int>
+                        {
+                            { Mark(1), Mark(2) },
+                            { Mark(1), Mark(3) },
+                            { Mark(4), Mark(5) }
+                        };
+                    }
+                    catch (ArgumentException) { return trace; }
+                    return -1;
+                }
+                public static int Middle(int[] values) => values switch
+                {
+                    [] => -1,
+                    [var single] => single,
+                    [var first, .. var middle, var last] => first + middle.Length * 10 + last,
+                    _ => 0
+                };
+                public static int Prefix(int[] values) => values switch
+                {
+                    [.. var prefix, var last] => prefix.Length * 10 + last,
+                    _ => -1
+                };
+                public static int Suffix(int[] values) => values switch
+                {
+                    [var first, .. var suffix] => first * 10 + suffix.Length,
+                    _ => -1
+                };
+                public static int Nested(int[][] values) => values switch
+                {
+                    [[var first], ..] => first,
+                    _ => -1
+                };
+                public static int Discard(int[] values)
+                {
+                    int _ = 7;
+                    return values switch { [..] => _, _ => 0 };
+                }
+            }
+            """;
+        AssertRuntime(source);
+        var conversion = TestHelpers.ConvertCSharp(source, "NativeProducerRuntime");
+        _output.WriteLine(conversion.CalorSource);
+        foreach (var issue in conversion.Issues)
+            _output.WriteLine(issue.Message);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues.Select(issue => issue.Message)));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Equal(0, conversion.LossySubstitutionCount);
+        Assert.Equal(0, conversion.DropCount);
+        Assert.NotNull(conversion.CalorSource);
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(conversion.CalorSource, diagnostics).TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var module = new Parser(tokens, diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        foreach (var native in new[] { conversion.CalorSource, new CalorEmitter().Emit(module) })
+        {
+            foreach (var typeChecking in new[] { false, true })
+            {
+                var compiled = Calor.Compiler.Program.Compile(native, "native-producer.calr",
+                    options: new Calor.Compiler.CompilationOptions { EnableTypeChecking = typeChecking });
+                Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + native);
+                Assert.NotNull(compiled.GeneratedCode);
+                AssertRuntime(compiled.GeneratedCode);
+            }
+        }
+
+        static void AssertRuntime(string csharp)
+        {
+            var compilation = CSharpCompilation.Create("NativeProducer_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble),
+                    CSharpSyntaxTree.ParseText(csharp)],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            var context = new System.Runtime.Loader.AssemblyLoadContext(compilation.AssemblyName, isCollectible: true);
+            try
+            {
+                stream.Position = 0;
+                var type = context.LoadFromStream(stream).GetType("NativeProducerRuntime.NativeOutputs");
+                Assert.NotNull(type);
+                Assert.Equal("2:4:7:123456:4:8", type.GetMethod("Run")!.Invoke(null, null));
+                Assert.Equal(1213, type.GetMethod("Duplicate")!.Invoke(null, null));
+                foreach (var (values, middle, prefix, suffix) in new[]
+                {
+                    (Array.Empty<int>(), -1, -1, -1),
+                    (new[] { 9 }, 9, 9, 90),
+                    (new[] { 2, 3 }, 5, 13, 21),
+                    (new[] { 2, 4, 5, 3 }, 25, 33, 23)
+                })
+                {
+                    Assert.Equal(middle, type.GetMethod("Middle")!.Invoke(null, [values]));
+                    Assert.Equal(prefix, type.GetMethod("Prefix")!.Invoke(null, [values]));
+                    Assert.Equal(suffix, type.GetMethod("Suffix")!.Invoke(null, [values]));
+                }
+                Assert.Equal(7, type.GetMethod("Nested")!.Invoke(null,
+                    [new[] { new[] { 7 }, new[] { 2, 3 } }]));
+                Assert.Equal(-1, type.GetMethod("Nested")!.Invoke(null,
+                    [new[] { new[] { 7, 8 } }]));
+                Assert.Equal(7, type.GetMethod("Discard")!.Invoke(null, [Array.Empty<int>()]));
+            }
+            finally
+            {
+                context.Unload();
+            }
+        }
+    }
+
+    [Fact]
+    public void NativeProducer_RejectsDuplicateListSlicesAtTheirSourceSpan()
+    {
+        const string source = """
+            module DuplicateSlices
+              func Test (int[]:values) → int
+                return match values
+                  case [.., ..] → 1
+                  case _ → 0
+            """;
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        new Parser(tokens, diagnostics).Parse();
+        var error = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
+        Assert.Equal(source.LastIndexOf("..", StringComparison.Ordinal), error.Span.Start);
+        Assert.Equal(2, error.Span.Length);
+    }
+
+    [Theory]
+    [InlineData("[.. var slice]", true)]
+    [InlineData("[..]", false)]
+    public void NativeProducer_ArraySliceAllocationRequiresItsEffectRow(string pattern, bool allocates)
+    {
+        var source = $$"""
+            module SliceEffects
+              func Read (int[]:values) → int
+                !
+                return match values
+                  case {{pattern}} → 1
+                  case _ → 0
+            """;
+        var compiled = Calor.Compiler.Program.Compile(source);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        if (allocates)
+        {
+            Assert.True(compiled.HasErrors);
+            var error = Assert.Single(compiled.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.ForbiddenEffect, error.Code);
+            Assert.Contains("'alloc'", error.Message);
+        }
+        else
+        {
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        }
+    }
+
+    [Fact]
+    public void NativeProducer_NonArrayListPatternDoesNotAcquireArrayAuthority()
+    {
+        const string source = """
+            module NonArrayPattern
+              func Read (string:value) → int
+                !
+                return match value
+                  case [..] → 1
+                  case _ → 0
+            """;
+        var compiled = Calor.Compiler.Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains("list-pattern members", StringComparison.Ordinal));
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [InlineData("07-04", 7)]
     [InlineData("13-03", 7)]
     public void CallbackContracts_RetainNativeMethodsAndConversionCounts(string id, int nativeCount)

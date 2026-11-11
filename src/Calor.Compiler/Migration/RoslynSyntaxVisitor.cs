@@ -14116,7 +14116,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             && objCreation.Initializer?.Expressions.All(expr =>
                 expr is InitializerExpressionSyntax entry
                 && entry.Expressions.Count == 2
-                && entry.Expressions.All(value => value is LiteralExpressionSyntax)) == true;
+                && entry.Expressions.All(value => value is LiteralExpressionSyntax || IsCallOnlyValue(value))) == true;
         var collectionName = objCreation.Type switch
         {
             GenericNameSyntax generic => generic.Identifier.ValueText,
@@ -16420,6 +16420,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         MemberAccessExpressionSyntax member => IsDottedName(member)
             || member is { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression, Expression: TypeOfExpressionSyntax },
         TypeOfExpressionSyntax => true,
+        SizeOfExpressionSyntax => true,
+        ElementAccessExpressionSyntax element => IsNativeHole(element.Expression)
+            && element.ArgumentList.Arguments.All(argument =>
+                argument.NameColon == null
+                && argument.RefKindKeyword.IsKind(SyntaxKind.None)
+                && IsNativeHole(argument.Expression)),
         // nameof(x) converts to a NameOfExpressionNode, a compile-time string.
         InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } } nameOf =>
             nameOf.ArgumentList.Arguments.Count == 1,

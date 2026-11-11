@@ -2628,58 +2628,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(DictionaryCreationNode node)
     {
-        var keyType = TypeMapper.ToSurfaceType(node.KeyType);
-        var valueType = TypeMapper.ToSurfaceType(node.ValueType);
-        if (_inlineCollections > 0)
-        {
-            var entries = new List<string>();
-            foreach (var entry in node.Entries)
-            {
-                var pair = RenderInlineCollectionItems([entry.Key, entry.Value]);
-                entries.Add($"§KV {pair[0]} {pair[1]}");
-            }
-            return RenderInlineCollection($"§DICT{{{keyType}:{valueType}}}", $"§/DICT", entries);
-        }
-
-        // Pre-evaluate entries to flush hoisted bindings before the §DICT block
-        var evaluatedEntries = new List<(string key, string value)>();
-        var allHoisted = new List<string>();
-        foreach (var entry in node.Entries)
-        {
-            // See sibling DictionaryNode visitor: AcceptInInlineSibling protects nested zero-arg calls.
-            var key = AcceptCollectionElement(entry.Key);
-            var value = AcceptCollectionElement(entry.Value);
-            // Review M3: the KEY needs the same guard as the value - a dictionary
-            // whose key is an object initializer is multi-line too.
-            if (key.Contains('\n'))
-                key = HoistToTempVar(key);
-            if (value.Contains('\n'))
-                value = HoistToTempVar(value);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedEntries.Add((key, value));
-        }
-
-        // Emit hoisted bindings before the dict
-        foreach (var hoisted in allHoisted)
-        {
-            AppendLine(hoisted);
-        }
-
-        AppendLine($"§DICT{{{node.Name}:{keyType}:{valueType}}}");
-        Indent();
-
-        foreach (var (key, value) in evaluatedEntries)
-        {
-            AppendLine($"§KV {key} {value}");
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/DICT");
-        return "";
+        return Visit(new NewExpressionNode(node.Span, "System.Collections.Generic.Dictionary",
+            [node.KeyType, node.ValueType], [], [],
+            collectionInitializers: node.Entries.Select(entry =>
+                new CallExpressionNode(entry.Span, "Add", [entry.Key, entry.Value])).ToArray()));
     }
 
     public string Visit(KeyValuePairNode node)
@@ -3786,20 +3738,23 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ListPatternNode node)
     {
         var parts = new List<string>();
+        var slice = node.SlicePattern == null ? null
+            : node.SlicePattern.Name == "_" ? ".."
+            : $".. {Visit(node.SlicePattern)}";
         for (int i = 0; i < node.Patterns.Count; i++)
         {
-            if (node.SlicePattern != null && i == node.SliceIndex)
+            if (slice != null && i == node.SliceIndex)
             {
-                parts.Add($"§REST{{{node.SlicePattern.Name}}}");
+                parts.Add(slice);
             }
             parts.Add(EmitPattern(node.Patterns[i]));
         }
         // Slice at end (or no non-slice patterns before it)
-        if (node.SlicePattern != null && node.SliceIndex >= node.Patterns.Count)
+        if (slice != null && node.SliceIndex >= node.Patterns.Count)
         {
-            parts.Add($"§REST{{{node.SlicePattern.Name}}}");
+            parts.Add(slice);
         }
-        return $"§PLIST {string.Join(" ", parts)}";
+        return $"[{string.Join(", ", parts)}]";
     }
 
     // Type system nodes
@@ -5107,7 +5062,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(SizeOfNode node)
     {
         var typeName = TypeMapper.ToSurfaceType(node.TypeName);
-        return $"§SIZEOF{{{typeName}}}";
+        return $"sizeof({typeName})";
     }
 
     public string Visit(MultiDimArrayCreationNode node)

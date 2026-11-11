@@ -8,6 +8,9 @@ Calor expressions use infix operators with C# precedence, ordinary postfix calls
 and indexing. Write `a + b`, `items[index]` and `value.Method(argument)`.
 Parentheses group an expression; they do not introduce a prefix operation.
 
+Runtime string holes also accept calls and indexing, as in
+`"${Format(x)}:${labels[0]}"`. Their receivers and indices evaluate in place.
+
 ## Precedence and grouping
 
 The table runs from strongest to weakest binding.
@@ -179,6 +182,11 @@ See [control flow](/docs/syntax-reference/control-flow/) and
 
 Collections use ordinary .NET members, not dedicated query tags.
 
+Dictionary construction supports collection initializers:
+`new Dictionary<string, int>() { { "alice", 30 }, { "bob", 40 } }`.
+Each key and value evaluates in source order, followed by that pair's `Add`.
+A duplicate key throws before later entries run.
+
 | Expression | Meaning |
 |:-----------|:--------|
 | `items.Contains(value)` | Membership in a list or set |
@@ -209,6 +217,12 @@ module CollectionExpressions
 Use an ordinary property read for `Count` or `Length`, not a zero-argument call.
 See [types](/docs/syntax-reference/types/) for collection construction and
 [calls](/docs/syntax-reference/calls/) for metadata overload resolution.
+
+## Type intrinsics
+
+Use `typeof(T)`, `nameof(name)` and `sizeof(T)` with ordinary parentheses.
+For example, `sizeof(int)` returns `4`. Other types follow C#'s rules for
+`sizeof` and unsafe contexts.
 
 ## Next
 

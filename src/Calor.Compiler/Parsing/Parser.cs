@@ -5919,14 +5919,18 @@ public sealed class Parser
             return new LambdaExpressionNode(token.Span.Union(lambda.Span), lambda.Id,
                 lambda.Parameters, lambda.Effects, name == "async",
                 lambda.ExpressionBody, lambda.StatementBody, lambda.Attributes, name == "static");
-        if (!verbatim && name is "typeof" or "nameof")
+        if (!verbatim && name is "typeof" or "nameof" or "sizeof")
         {
             Expect(TokenKind.OpenParen);
             var value = ParseLispTypeName(out var typeSpan);
             var close = Expect(TokenKind.CloseParen);
-            return name == "typeof"
-                ? new TypeOfExpressionNode(token.Span.Union(close.Span), value, typeSpan)
-                : new NameOfExpressionNode(token.Span.Union(close.Span), value);
+            var span = token.Span.Union(close.Span);
+            return name switch
+            {
+                "typeof" => new TypeOfExpressionNode(span, value, typeSpan),
+                "sizeof" => new SizeOfNode(span, value),
+                _ => new NameOfExpressionNode(span, value)
+            };
         }
 
         if (name.EndsWith('.') && (Check(TokenKind.At)
@@ -6100,8 +6104,52 @@ public sealed class Parser
         return cases;
     }
 
+    private ListPatternNode ParseNativeListPattern()
+    {
+        var open = Expect(TokenKind.OpenBracket);
+        var patterns = new List<PatternNode>();
+        VarPatternNode? slice = null;
+        var sliceIndex = -1;
+        while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+        {
+            if (Check(TokenKind.RangeOp))
+            {
+                var range = Advance();
+                if (slice != null)
+                    _diagnostics.ReportError(range.Span, DiagnosticCode.UnexpectedToken,
+                        "A list pattern may contain only one slice.");
+                var rest = new VarPatternNode(range.Span, "_");
+                if (Check(TokenKind.Var))
+                {
+                    Advance();
+                    var name = Expect(TokenKind.Identifier);
+                    rest = new VarPatternNode(range.Span.Union(name.Span),
+                        TokenIdentifier(name), name.Span);
+                }
+                else if (!Check(TokenKind.Comma) && !Check(TokenKind.CloseBracket))
+                {
+                    _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                        "A list slice must be '..' or '.. var name'.");
+                }
+                slice = rest;
+                sliceIndex = patterns.Count;
+            }
+            else
+            {
+                patterns.Add(ParsePattern());
+            }
+            if (!Check(TokenKind.CloseBracket))
+                Expect(TokenKind.Comma);
+        }
+        var close = Expect(TokenKind.CloseBracket);
+        return new ListPatternNode(open.Span.Union(close.Span), patterns, slice, sliceIndex);
+    }
+
     private PatternNode ParsePattern()
     {
+        if (Check(TokenKind.OpenBracket))
+            return ParseNativeListPattern();
+
         // Handle (not ...), (or ... ...), (and ... ...) pattern combinators
         if (Check(TokenKind.OpenParen))
         {

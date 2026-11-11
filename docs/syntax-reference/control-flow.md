@@ -294,6 +294,17 @@ module HttpStatus
 when a missing value needs a fallback. For failures, use exceptions and
 `try`/`catch`; see [Types](/calor/syntax-reference/types/#failure-uses-exceptions).
 
+### List patterns
+
+List patterns use brackets: `[]` matches an empty list and `[var first]`
+matches one element. A single `..` can skip elements at the start, middle or
+end. Use `.. var rest` to bind that slice, as in
+`[var first, .. var rest, var last]`.
+
+Binding an array slice requires the `alloc` effect; bare `..` does not allocate.
+Other list-like receiver types currently retain unresolved effects rather than
+acquiring an array's purity contract.
+
 ### Statement match
 
 A statement match uses indented case bodies, not expression arrows. A body can

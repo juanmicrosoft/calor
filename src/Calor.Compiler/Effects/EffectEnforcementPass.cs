@@ -6052,6 +6052,8 @@ public sealed class EffectEnforcementPass
             var effects = InferFromExpression(matchStmt.Target);
             foreach (var matchCase in matchStmt.Cases)
             {
+                effects = effects.Union(InferFromPattern(matchCase.Pattern,
+                    _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, matchStmt.Target.Span)));
                 effects = effects.Union(InferFromStatements(matchCase.Body));
             }
             return effects;
@@ -6431,9 +6433,46 @@ public sealed class EffectEnforcementPass
             var effects = InferFromExpression(match.Target);
             foreach (var matchCase in match.Cases)
             {
+                effects = effects.Union(InferFromPattern(matchCase.Pattern,
+                    _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, match.Target.Span)));
                 effects = effects.Union(InferFromStatements(matchCase.Body));
             }
             return effects;
+        }
+
+        private EffectSet InferFromPattern(PatternNode pattern, Binding.BoundTypes.ArrayBoundType? arrayType)
+        {
+            switch (pattern)
+            {
+                case ListPatternNode list:
+                    if (arrayType is not { Rank: 1 })
+                        return UnknownResolvedOperation("list-pattern members", list.Span);
+                    var effects = list.SlicePattern is { Name: not "_" }
+                        ? EffectSet.From("alloc") : EffectSet.Empty;
+                    foreach (var child in list.Patterns)
+                        effects = effects.Union(InferFromPattern(child,
+                            arrayType.ElementType as Binding.BoundTypes.ArrayBoundType));
+                    return effects;
+                case NegatedPatternNode negated:
+                    return InferFromPattern(negated.Inner, arrayType);
+                case OrPatternNode either:
+                    return InferFromPattern(either.Left, arrayType).Union(InferFromPattern(either.Right, arrayType));
+                case AndPatternNode both:
+                    return InferFromPattern(both.Left, arrayType).Union(InferFromPattern(both.Right, arrayType));
+                case PropertyPatternNode property:
+                    var propertyEffects = EffectSet.Empty;
+                    foreach (var member in property.Matches)
+                        propertyEffects = propertyEffects.Union(InferFromPattern(member.Pattern,
+                            _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, member.Span)));
+                    return propertyEffects;
+                case PositionalPatternNode positional:
+                    var positionalEffects = EffectSet.Empty;
+                    foreach (var child in positional.Patterns)
+                        positionalEffects = positionalEffects.Union(InferFromPattern(child, null));
+                    return positionalEffects;
+                default:
+                    return EffectSet.Empty;
+            }
         }
 
         private EffectSet InferFromNewExpression(NewExpressionNode newExpr)

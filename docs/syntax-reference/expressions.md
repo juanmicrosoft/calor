@@ -11,6 +11,9 @@ Calor expressions use infix operators with C# precedence, ordinary postfix calls
 and indexing. Write `a + b`, `items[index]` and `value.Method(argument)`.
 Parentheses group an expression; they do not introduce a prefix operation.
 
+Runtime string holes also accept calls and indexing, as in
+`"${Format(x)}:${labels[0]}"`. Their receivers and indices evaluate in place.
+
 Keywords and operators are case-sensitive. Use the symbolic operators below,
 not word aliases such as `add` or `eq`. Pattern combinators `and`, `or` and
 `not` belong to patterns, not ordinary Boolean expressions.
@@ -206,6 +209,11 @@ change the program if that helper had effects; syntax migration must not do so.
 
 Collections use ordinary .NET members, not dedicated query tags.
 
+Dictionary construction supports collection initializers:
+`new Dictionary<string, int>() { { "alice", 30 }, { "bob", 40 } }`.
+Each key and value evaluates in source order, followed by that pair's `Add`.
+A duplicate key throws before later entries run.
+
 | Expression | Meaning |
 |:-----------|:--------|
 | `items.Contains(value)` | Membership in a list or set |
@@ -250,6 +258,12 @@ when selected, and its effects still contribute to the enclosing callable.
 Nullable annotations remain attached to resolved values. Unknown, source,
 foreign, opaque or type-parameter receivers do not acquire a string purity
 contract by using the same member name.
+
+## Type intrinsics
+
+Use `typeof(T)`, `nameof(name)` and `sizeof(T)` with ordinary parentheses.
+For example, `sizeof(int)` returns `4`. Other types follow C#'s rules for
+`sizeof` and unsafe contexts.
 
 ## Next
 

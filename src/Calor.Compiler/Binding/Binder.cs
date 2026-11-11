@@ -5887,7 +5887,7 @@ public sealed class Binder
                         ["IsConstant"] = variable.Name.Contains('.', StringComparison.Ordinal),
                     });
             case VarPatternNode variable:
-                if (allowBindings)
+                if (allowBindings && variable.Name != "_")
                     DeclarePatternVariable(variable.IdentifierSpan, variable.Name,
                         matchedValue?.Type is BoundTypes.UnresolvedBoundType
                             ? "OBJECT" : matchedValue?.Type.DisplayString ?? "OBJECT",
@@ -5942,9 +5942,23 @@ public sealed class Binder
                     patterns: property.Matches.Select((match, index) =>
                         BindPattern(match.Pattern, allowBindings, memberValues[index])).ToArray());
             case ListPatternNode list:
-                var listPatterns = list.Patterns.Select(child => BindPattern(child, allowBindings)).ToList();
+                var matchedArray = matchedValue?.MethodInputArrayType
+                    ?? matchedValue?.Type as BoundTypes.ArrayBoundType;
+                var elementValue = matchedArray is { Rank: 1 }
+                    ? PatternValue(list.Span, matchedArray.ElementType)
+                    : null;
+                var listPatterns = list.Patterns.Select(child => BindPattern(child, allowBindings, elementValue)).ToList();
                 if (list.SlicePattern != null)
-                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count), BindPattern(list.SlicePattern, allowBindings));
+                {
+                    var sliceValue = matchedArray is { Rank: 1 }
+                        ? PatternValue(list.SlicePattern.Span,
+                            new BoundTypes.ArrayBoundType(matchedArray.ElementType,
+                                nullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated)
+                            { RoslynSymbol = matchedArray.RoslynSymbol })
+                        : null;
+                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count),
+                        BindPattern(list.SlicePattern, allowBindings, sliceValue));
+                }
                 return Pattern(
                     list,
                     metadata: new Dictionary<string, object?>
@@ -5970,6 +5984,11 @@ public sealed class Binder
                         ["AnalysisIncomplete"] = true,
                     });
         }
+
+        static BoundExpression PatternValue(Parsing.TextSpan span, BoundTypes.BoundType type) =>
+            new BoundStructuralExpression(span, nameof(ListPatternNode), type.DisplayString,
+                children: null, metadata: null, deferredChildren: null,
+                typeAnnotation: BoundTypes.NullableAnnotation.Oblivious, resultType: type);
     }
 
     private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName,
@@ -5997,6 +6016,9 @@ public sealed class Binder
                 : nullableAnnotation,
             isTypeInferred: isTypeInferred,
             inferredReferenceType: inferredReferenceType,
+            functionType: isTypeInferred ? inferredValue?.Type as BoundTypes.FunctionBoundType : null,
+            methodInputArrayType: isTypeInferred ? inferredValue?.Type as BoundTypes.ArrayBoundType : null,
+            genericNullabilityType: isTypeInferred ? inferredValue?.Type as BoundTypes.GenericInstantiationBoundType : null,
             hasUnknownInferredType: isTypeInferred && (inferredValue is null
                 || inferredValue.HasUnknownInferredType
                 || inferredValue.Type is BoundTypes.UnresolvedBoundType

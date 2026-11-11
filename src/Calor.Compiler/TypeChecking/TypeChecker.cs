@@ -1778,7 +1778,7 @@ public sealed class TypeChecker
             // `§VAR{d}` — the `var d` pattern. Binds like VariablePatternNode; it reached the
             // default arm below and hard-errored, so every switch arm using it was rejected.
             case VarPatternNode varPatNode:
-                if (bindVariables)
+                if (bindVariables && varPatNode.Name != "_")
                 {
                     _env.DefineVariable(varPatNode.Name, expectedType);
                 }
@@ -1839,6 +1839,9 @@ public sealed class TypeChecker
                 {
                     CheckPattern(sub, elementType, bindVariables);
                 }
+                if (listPat.SlicePattern != null)
+                    CheckPattern(listPat.SlicePattern, expectedType is ArrayType ? expectedType : ErrorType.Instance,
+                        bindVariables);
                 break;
 
             default:
