@@ -275,14 +275,8 @@ internal static class NullabilityChecker
     /// String is the only in-scope element type for S3+S6 targets.
     /// </summary>
     private static bool IsScalarString(NominalBoundType type) =>
-        type.QualifiedName switch
-        {
-            "STRING" => true,
-            "string" => true,
-            "str" => true,
-            "System.String" => true,
-            _ => false,
-        };
+        type.RoslynSymbol?.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String
+        || type.QualifiedName is "STRING" or "string" or "str" or "System.String";
 
     /// <summary>
     /// Reads the <c>NullableAnnotation</c> from any <c>BoundType</c>
