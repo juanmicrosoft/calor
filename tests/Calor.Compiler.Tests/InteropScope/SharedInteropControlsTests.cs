@@ -25,6 +25,7 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// reviewed in the pull request that changes them. Current initializer frame counts and strict
 /// compilation are pinned separately in <c>initializer-current-expectations.json</c>; original
 /// sources, traces, outcomes and all other observation fields remain the original controls.
+/// Explicit X-INT-02 migration observations use <c>R0/array-current-results.json</c>.
 /// </summary>
 public sealed class SharedInteropControlsTests : IDisposable
 {
@@ -94,6 +95,35 @@ public sealed class SharedInteropControlsTests : IDisposable
                 Dir, "initializer-current-expectations.json")))![id]!;
             expected!["compile"] = current["compile"]!.DeepClone();
             expected["paths"]!["interop"] = current["interop"]!.DeepClone();
+        }
+        if (id == "X-INT-02" && surface is "cli-migrate" or "mcp-migrate" or "mcp-batch")
+        {
+            using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+                "tests/TestData/InteropScope/R0/array-current-results.json")));
+            var registered = current.RootElement.GetProperty("controls").GetProperty(id);
+            Assert.Equal(new[] { "cli-migrate", "mcp-migrate", "mcp-batch" },
+                registered.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
+            Assert.Contains(surface, registered.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
+            Assert.Equal(registered.GetProperty("recordedCompile").GetString(), expected!["compile"]!.GetValue<string>());
+            Assert.Equal("default", registered.GetProperty("compile").GetString());
+            Assert.Equal("native", outcome);
+            Assert.False(surfaceError);
+            RawFrameAssertions.AssertFramed(calor!, present: false);
+            Assert.DoesNotContain("§CS{", calor!);
+            foreach (var path in new[] { "interop", "rescue", "passthrough", "lossy", "dropped" })
+                Assert.Equal(0, cell["paths"]![path]!.GetValue<int>());
+            var observation = current.RootElement.GetProperty("rows").GetProperty(registered.GetProperty("row").GetString()!);
+            Assert.True(observation.GetProperty("recordedUnknownEffects").GetBoolean());
+            Assert.True(observation.GetProperty("strictCompileSuccess").GetBoolean());
+            Assert.Equal(observation.GetProperty("trace").GetString(), original);
+            var strict = Compile(id, calor!, enforceEffects: true);
+            ArrayExpressionConversionTests.AssertCurrentArraySelections(strict, observation);
+            var permissive = Compile(id, calor!, enforceEffects: false);
+            Assert.False(permissive.HasErrors, string.Join(Environment.NewLine, permissive.Diagnostics.Errors));
+            Assert.Equal(permissive.GeneratedCode, strict.GeneratedCode);
+            Assert.Equal(original, Run(strict.GeneratedCode));
+            Assert.Equal(original, Run(permissive.GeneratedCode));
+            expected["compile"] = JsonValue.Create(registered.GetProperty("compile").GetString());
         }
         Assert.True(JsonNode.DeepEquals(expected, cell),
             $"{id} on {surface} reclassified: expected {expected?.ToJsonString()}, observed {cell.ToJsonString()}");

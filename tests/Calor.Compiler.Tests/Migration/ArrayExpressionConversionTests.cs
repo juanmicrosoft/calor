@@ -9,6 +9,7 @@ using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
@@ -28,7 +29,8 @@ namespace Calor.Compiler.Tests;
 /// evaluated subexpression changes the result. Nothing may be preserved as C# (no rescue,
 /// no raw preservation) on a native row. Rows retain the original unknown-effect observations.
 /// Separate current observations require enforced compilation and exact metadata binding for
-/// the repaired F5-ARRAY-05/round2/round3 rows. Unresolved rows still report Calor0410 for 'unknown'.
+/// the repaired rows and explicitly registered migration surfaces. Other rows retain their
+/// recorded Calor0410 expectation for 'unknown'.
 /// </summary>
 public class ArrayExpressionConversionTests
 {
@@ -1446,7 +1448,9 @@ public class ArrayExpressionConversionTests
         var strict = Program.Compile(calor, row + ".calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         var currentUnknownEffects = unknownEffects;
-        var hasCurrentResults = row is "F5-ARRAY-05" or "round2" or "round3";
+        var hasCurrentResults = row is "F5-ARRAY-05" or "round2" or "round3"
+            || (row is "F5-ARRAY-01" or "ordering" or "shapes"
+                && surface is Surface.ProjectMigrate or Surface.ProjectMigratePassthrough);
         if (hasCurrentResults)
         {
             using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(
@@ -1454,39 +1458,20 @@ public class ArrayExpressionConversionTests
             var root = current.RootElement;
             Assert.Equal(Enum.GetNames<Surface>(),
                 root.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
-            Assert.Equal(new[] { "F5-ARRAY-05", "round2", "round3" },
+            Assert.Equal(new[] { "F5-ARRAY-05", "round2", "round3", "F5-ARRAY-01", "ordering", "shapes" },
                 root.GetProperty("rows").EnumerateObject().Select(value => value.Name));
             var observation = root.GetProperty("rows").GetProperty(row);
+            if (observation.TryGetProperty("surfaces", out var surfaces))
+            {
+                Assert.Equal(new[] { nameof(Surface.ProjectMigrate), nameof(Surface.ProjectMigratePassthrough) },
+                    surfaces.EnumerateArray().Select(value => value.GetString()));
+                Assert.Contains(surface.ToString(), surfaces.EnumerateArray().Select(value => value.GetString()));
+            }
             Assert.Equal(unknownEffects, observation.GetProperty("recordedUnknownEffects").GetBoolean());
             Assert.Equal(expected, observation.GetProperty("trace").GetString());
             Assert.True(observation.GetProperty("strictCompileSuccess").GetBoolean());
             currentUnknownEffects = false;
-            var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(strict.Ast!);
-            var calls = BoundDescendants(bound).OfType<BoundCallExpression>()
-                .Where(call => call.ResolvedMethodName == "GetLength").ToArray();
-            Assert.Equal(observation.GetProperty("getLengthCalls").GetInt32(), calls.Length);
-            Assert.All(calls, call =>
-            {
-                var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
-                Assert.Equal(SpecialType.System_Array, method.ContainingType.SpecialType);
-                Assert.Equal("GetLength", method.Name);
-                Assert.False(method.IsStatic);
-                Assert.False(method.IsGenericMethod);
-                Assert.Equal(SpecialType.System_Int32, Assert.Single(method.Parameters).Type.SpecialType);
-                Assert.Equal(SpecialType.System_Int32, method.ReturnType.SpecialType);
-            });
-            var properties = BoundDescendants(bound).OfType<BoundFieldAccessExpression>()
-                .Select(field => field.ResolvedMetadataMember).OfType<IPropertySymbol>()
-                .Where(property => property.ContainingType.SpecialType == SpecialType.System_Array).ToArray();
-            Assert.Equal(observation.GetProperty("arrayProperties").EnumerateArray().Select(value => value.GetString()),
-                properties.Select(property => property.Name));
-            Assert.All(properties, property =>
-            {
-                Assert.False(property.IsStatic);
-                Assert.Empty(property.Parameters);
-                Assert.NotNull(property.GetMethod);
-                Assert.Equal(SpecialType.System_Int32, property.Type.SpecialType);
-            });
+            AssertCurrentArraySelections(strict, observation);
         }
         Assert.True(strict.HasErrors == currentUnknownEffects,
             string.Join(Environment.NewLine, strict.Diagnostics.Errors) + "\n" + calor);
@@ -1502,6 +1487,101 @@ public class ArrayExpressionConversionTests
             Assert.Equal(compilation.GeneratedCode, strict.GeneratedCode);
             Assert.Equal(expected, Run(strict.GeneratedCode));
         }
+    }
+
+    internal static void AssertCurrentArraySelections(CompilationResult compilation, JsonElement observation)
+    {
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(compilation.Ast!);
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        var nodes = BoundDescendants(bound).ToArray();
+        var calls = nodes.OfType<BoundCallExpression>()
+            .Where(call => call.ResolvedMethodName == "GetLength").ToArray();
+        Assert.Equal(observation.GetProperty("getLengthCalls").GetInt32(), calls.Length);
+        var resolver = new EffectResolver(new Effects.Manifests.ManifestLoader(loadUserLevelManifests: false));
+        Assert.All(calls, call =>
+        {
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.Equal(SpecialType.System_Array, method.ContainingType.SpecialType);
+            Assert.Equal("GetLength", method.Name);
+            Assert.False(method.IsStatic);
+            Assert.False(method.IsGenericMethod);
+            Assert.Equal(SpecialType.System_Int32, Assert.Single(method.Parameters).Type.SpecialType);
+            Assert.Equal(SpecialType.System_Int32, method.ReturnType.SpecialType);
+            var key = EffectResolverKey.FromBoundReceiver(
+                Binding.Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType),
+                method.Name, call.ResolvedParameterTypes);
+            var contract = resolver.Resolve(key);
+            Assert.Equal(EffectResolutionStatus.PureExplicit, contract.Status);
+            Assert.Equal("embedded:Calor.Compiler.Manifests.bcl-system.calor-effects.json", contract.Source);
+        });
+        if (observation.TryGetProperty("getLengthReceivers", out var receivers))
+        {
+            Assert.Equal(calls.Length, receivers.GetArrayLength());
+            for (var index = 0; index < calls.Length; index++)
+            {
+                var shape = Assert.IsType<ArrayBoundType>(calls[index].Receiver!.MethodInputArrayType);
+                var expected = receivers[index];
+                Assert.Equal(expected.GetProperty("rank").GetInt32(), shape.Rank);
+                Assert.Equal(expected.GetProperty("element").GetString(), shape.ElementType.DisplayString);
+                if (expected.TryGetProperty("sourceElement", out var owner))
+                {
+                    var element = Assert.IsType<NominalBoundType>(shape.ElementType);
+                    Assert.Same(bound.SymbolsById.Values.OfType<TypeSymbol>()
+                        .Single(type => type.QualifiedName == owner.GetString()), element.Declaration);
+                }
+            }
+        }
+        var properties = nodes.OfType<BoundFieldAccessExpression>()
+            .Select(field => field.ResolvedMetadataMember).OfType<IPropertySymbol>()
+            .Where(property => property.ContainingType.SpecialType == SpecialType.System_Array).ToArray();
+        Assert.Equal(observation.GetProperty("arrayProperties").EnumerateArray().Select(value => value.GetString()),
+            properties.Select(property => property.Name));
+        Assert.All(properties, property =>
+        {
+            Assert.False(property.IsStatic);
+            Assert.Empty(property.Parameters);
+            Assert.NotNull(property.GetMethod);
+            Assert.Equal(SpecialType.System_Int32, property.Type.SpecialType);
+        });
+        if (observation.TryGetProperty("sourceFields", out var fields))
+            foreach (var expected in fields.EnumerateArray())
+            {
+                var reads = nodes.OfType<BoundFieldAccessExpression>()
+                    .Where(field => field.FieldName == expected.GetProperty("name").GetString()).ToArray();
+                Assert.Equal(expected.GetProperty("count").GetInt32(), reads.Length);
+                Assert.All(reads, read =>
+                {
+                    var field = Assert.IsType<VariableSymbol>(read.ResolvedField);
+                    Assert.True(field.IsField);
+                    Assert.False(field.IsStatic);
+                    Assert.Equal(expected.GetProperty("owner").GetString(), field.DeclaringTypeName);
+                    Assert.Equal(expected.GetProperty("type").GetString(), field.TypeName);
+                    Assert.Same(bound.SymbolsById[field.Id], field);
+                    Assert.Same(bound.SymbolsById.Values.OfType<TypeSymbol>()
+                        .Single(type => type.QualifiedName == field.DeclaringTypeName),
+                        Assert.IsType<NominalBoundType>(read.Target.Type).Declaration);
+                    Assert.False(read.HasUnknownInferredType);
+                });
+            }
+        if (observation.TryGetProperty("sourceCalls", out var sourceCalls))
+            foreach (var expected in sourceCalls.EnumerateArray())
+            {
+                var selected = nodes.OfType<BoundCallExpression>()
+                    .Where(call => call.ResolvedSymbol?.Name == expected.GetProperty("name").GetString()).ToArray();
+                Assert.Equal(expected.GetProperty("count").GetInt32(), selected.Length);
+                Assert.All(selected, call =>
+                {
+                    var method = call.ResolvedSymbol!;
+                    Assert.Same(bound.SymbolsById[method.Id], method);
+                    Assert.Equal(expected.GetProperty("owner").GetString(), method.ContainingTypeName);
+                    Assert.Equal(expected.GetProperty("returnType").GetString(), method.ReturnType);
+                    Assert.Equal(expected.GetProperty("parameters").EnumerateArray().Select(value => value.GetString()),
+                        method.Parameters.Select(parameter => parameter.TypeName));
+                    Assert.Null(call.ResolvedMetadataMethod);
+                });
+            }
     }
 
     [Fact]
