@@ -1,107 +1,108 @@
-§M{L3M27}
+module L3M27 L3M27 block
+  module L3M27Module public
 
-  §F{l3m27_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 39)
+    func l3m27_fn01 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 39)
 
-  §F{l3m27_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 89)
+    func l3m27_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 89)
 
-  §F{l3m27_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 4)
-    §Q (>= y 0)
-    §S (>= result 25096)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (< total 25096)
-      §R 25096
-    §EL
-      §R total
+    func l3m27_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 25096)
+      let int:total = ((x * 2) + y)
+      if (total < 25096)
+        return 25096
+      else
+        return total
 
-  §F{l3m27_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 25103)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (> total 25103)
-      §R 25103
-    §R total
+    func l3m27_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25103)
+      let int:total = ((x * 5) + y)
+      if (total > 25103)
+        return 25103
+      return total
 
-  §F{l3m27_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 2)
-    §Q (>= y 0)
-    §S (>= result 25110)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (< total 25110)
-      §R 25110
-    §EL
-      §R total
+    func l3m27_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 2)
+      requires (y >= 0)
+      => (result >= 25110)
+      let int:total = ((x * 5) + y)
+      if (total < 25110)
+        return 25110
+      else
+        return total
 
-  §F{l3m27_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 3)
-    §S (>= x 4)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF (> acc 25117)
-      §R (+ acc 25117)
-    §EL
-      §R (+ (* acc 2) 25117)
+    func l3m27_fn06 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 3) + y)
+      if (acc > 25117)
+        return (acc + 25117)
+      else
+        return ((acc * 2) + 25117)
 
-  §F{l3m27_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 47)
+    func l3m27_fn07 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 47)
 
-  §F{l3m27_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 14)
+    func l3m27_fn08 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 14)
 
-  §F{l3m27_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 25124)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (> total 25124)
-      §R 25124
-    §R total
+    func l3m27_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25124)
+      let int:total = ((x * 2) + y)
+      if (total > 25124)
+        return 25124
+      return total
 
-  §F{l3m27_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 25131)
-    §IF (>= x 25131)
-      §R x
-    §EL
-      §R 25131
+    func l3m27_fn10 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 25131)
+      if (x >= 25131)
+        return x
+      else
+        return 25131
 
-  §F{l3m27_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 8)
-    §Q (>= y 0)
-    §S (>= result 25138)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (< total 25138)
-      §R 25138
-    §EL
-      §R total
+    func l3m27_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 25138)
+      let int:total = ((x * 5) + y)
+      if (total < 25138)
+        return 25138
+      else
+        return total
 
-  §F{l3m27_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 4)
-    §S (>= x 5)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 25145)
-      §R (+ acc 25145)
-    §EL
-      §R (+ (* acc 2) 25145)
+    func l3m27_fn12 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 25145)
+        return (acc + 25145)
+      else
+        return ((acc * 2) + 25145)
 
-  §F{l3m27_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 46)
+    func l3m27_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 46)

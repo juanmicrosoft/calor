@@ -1,101 +1,102 @@
-§M{L3M32}
+module L3M32 L3M32 block
+  module L3M32Module public
 
-  §F{l3m32_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 25362)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 25362)
-      §R 25362
-    §R total
+    func l3m32_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25362)
+      let int:total = ((x * 3) + y)
+      if (total > 25362)
+        return 25362
+      return total
 
-  §F{l3m32_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 25369)
-      §R (+ acc 25369)
-    §EL
-      §R (+ (* acc 2) 25369)
+    func l3m32_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 0)
+      => (x >= 1)
+      let int:acc = ((x * 2) + y)
+      if (acc > 25369)
+        return (acc + 25369)
+      else
+        return ((acc * 2) + 25369)
 
-  §F{l3m32_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 8)
-    §Q (>= y 0)
-    §S (>= result 25376)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (< total 25376)
-      §R 25376
-    §EL
-      §R total
+    func l3m32_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 25376)
+      let int:total = ((x * 5) + y)
+      if (total < 25376)
+        return 25376
+      else
+        return total
 
-  §F{l3m32_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 25383)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 25383)
-      §R 25383
-    §R total
+    func l3m32_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25383)
+      let int:total = ((x * 3) + y)
+      if (total > 25383)
+        return 25383
+      return total
 
-  §F{l3m32_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 38)
+    func l3m32_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 38)
 
-  §F{l3m32_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 4)
-    §Q (>= y 0)
-    §S (>= result 25390)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (< total 25390)
-      §R 25390
-    §EL
-      §R total
+    func l3m32_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 25390)
+      let int:total = ((x * 3) + y)
+      if (total < 25390)
+        return 25390
+      else
+        return total
 
-  §F{l3m32_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 73)
+    func l3m32_fn07 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 73)
 
-  §F{l3m32_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 73)
+    func l3m32_fn08 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 73)
 
-  §F{l3m32_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 1)
-    §Q (>= y 0)
-    §S (>= result 25397)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (< total 25397)
-      §R 25397
-    §EL
-      §R total
+    func l3m32_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 1)
+      requires (y >= 0)
+      => (result >= 25397)
+      let int:total = ((x * 3) + y)
+      if (total < 25397)
+        return 25397
+      else
+        return total
 
-  §F{l3m32_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 27)
+    func l3m32_fn10 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 27)
 
-  §F{l3m32_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 85)
+    func l3m32_fn11 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 85)
 
-  §F{l3m32_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 22)
+    func l3m32_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 22)
 
-  §F{l3m32_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 25404)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (> total 25404)
-      §R 25404
-    §R total
+    func l3m32_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25404)
+      let int:total = ((x * 5) + y)
+      if (total > 25404)
+        return 25404
+      return total

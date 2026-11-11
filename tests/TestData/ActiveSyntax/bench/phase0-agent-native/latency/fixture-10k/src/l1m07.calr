@@ -1,112 +1,113 @@
-§M{L1M07}
+module L1M07 L1M07 block
+  module L1M07Module public
 
-  §F{l1m07_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 1)
-    §S (>= x 2)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF (> acc 20308)
-      §R (+ acc 20308)
-    §EL
-      §R (+ (* acc 2) 20308)
+    func l1m07_fn01 public (int:x, int:y) → int
+      !
+      requires (x > 1)
+      => (x >= 2)
+      let int:acc = ((x * 3) + y)
+      if (acc > 20308)
+        return (acc + 20308)
+      else
+        return ((acc * 2) + 20308)
 
-  §F{l1m07_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m05_fn06} §A x §A INT:43 §/C
-    §R (+ v1 y)
+    func l1m07_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M05.L2M05Module.l2m05_fn06(x, 43)
+      return (v1 + y)
 
-  §F{l1m07_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 3)
-    §Q (>= y 0)
-    §S (>= result 20315)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (< total 20315)
-      §R 20315
-    §EL
-      §R total
+    func l1m07_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 3)
+      requires (y >= 0)
+      => (result >= 20315)
+      let int:total = ((x * 3) + y)
+      if (total < 20315)
+        return 20315
+      else
+        return total
 
-  §F{l1m07_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 3)
-    §S (>= x 4)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 20322)
-      §R (+ acc 20322)
-    §EL
-      §R (+ (* acc 2) 20322)
+    func l1m07_fn04 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 2) + y)
+      if (acc > 20322)
+        return (acc + 20322)
+      else
+        return ((acc * 2) + 20322)
 
-  §F{l1m07_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 2)
-    §S (>= x 3)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 20329)
-      §R (+ acc 20329)
-    §EL
-      §R (+ (* acc 2) 20329)
+    func l1m07_fn05 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 2) + y)
+      if (acc > 20329)
+        return (acc + 20329)
+      else
+        return ((acc * 2) + 20329)
 
-  §F{l1m07_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m15_fn11} §A x §A INT:32 §/C
-    §B{v2:i32} §C{l2m17_fn12} §A x §A INT:4 §/C
-    §R (+ (+ v1 v2) y)
+    func l1m07_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M15.L2M15Module.l2m15_fn11(x, 32)
+      let int:v2 = L2M17.L2M17Module.l2m17_fn12(x, 4)
+      return ((v1 + v2) + y)
 
-  §F{l1m07_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 20336)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (> total 20336)
-      §R 20336
-    §R total
+    func l1m07_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20336)
+      let int:total = ((x * 5) + y)
+      if (total > 20336)
+        return 20336
+      return total
 
-  §F{l1m07_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 3)
-    §S (>= x 4)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF (> acc 20343)
-      §R (+ acc 20343)
-    §EL
-      §R (+ (* acc 2) 20343)
+    func l1m07_fn08 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 5) + y)
+      if (acc > 20343)
+        return (acc + 20343)
+      else
+        return ((acc * 2) + 20343)
 
-  §F{l1m07_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m31_fn09} §A x §A INT:54 §/C
-    §R (+ v1 y)
+    func l1m07_fn09 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M31.L2M31Module.l2m31_fn09(x, 54)
+      return (v1 + y)
 
-  §F{l1m07_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 4)
-    §Q (>= y 0)
-    §S (>= result 20350)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (< total 20350)
-      §R 20350
-    §EL
-      §R total
+    func l1m07_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 20350)
+      let int:total = ((x * 3) + y)
+      if (total < 20350)
+        return 20350
+      else
+        return total
 
-  §F{l1m07_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m05_fn02} §A x §A INT:72 §/C
-    §R (+ v1 y)
+    func l1m07_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M05.L2M05Module.l2m05_fn02(x, 72)
+      return (v1 + y)
 
-  §F{l1m07_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 20357)
-    §IF (>= x 20357)
-      §R x
-    §EL
-      §R 20357
+    func l1m07_fn12 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 20357)
+      if (x >= 20357)
+        return x
+      else
+        return 20357
 
-  §F{l1m07_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 20364)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (> total 20364)
-      §R 20364
-    §R total
+    func l1m07_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20364)
+      let int:total = ((x * 2) + y)
+      if (total > 20364)
+        return 20364
+      return total

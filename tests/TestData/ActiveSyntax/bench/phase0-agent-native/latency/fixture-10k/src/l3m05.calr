@@ -1,119 +1,120 @@
-§M{L3M05}
+module L3M05 L3M05 block
+  module L3M05Module public
 
-  §F{l3m05_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 88)
+    func l3m05_fn01 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 88)
 
-  §F{l3m05_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 23850)
-      §R (+ acc 23850)
-    §EL
-      §R (+ (* acc 2) 23850)
+    func l3m05_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 0)
+      => (x >= 1)
+      let int:acc = ((x * 2) + y)
+      if (acc > 23850)
+        return (acc + 23850)
+      else
+        return ((acc * 2) + 23850)
 
-  §F{l3m05_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 4)
-    §Q (>= y 0)
-    §S (>= result 23857)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (< total 23857)
-      §R 23857
-    §EL
-      §R total
+    func l3m05_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 23857)
+      let int:total = ((x * 2) + y)
+      if (total < 23857)
+        return 23857
+      else
+        return total
 
-  §F{l3m05_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 51)
+    func l3m05_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 51)
 
-  §F{l3m05_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 6)
-    §Q (>= y 0)
-    §S (>= result 23864)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (< total 23864)
-      §R 23864
-    §EL
-      §R total
+    func l3m05_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 23864)
+      let int:total = ((x * 5) + y)
+      if (total < 23864)
+        return 23864
+      else
+        return total
 
-  §F{l3m05_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 23871)
-    §IF (>= x 23871)
-      §R x
-    §EL
-      §R 23871
+    func l3m05_fn06 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23871)
+      if (x >= 23871)
+        return x
+      else
+        return 23871
 
-  §F{l3m05_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 23878)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (> total 23878)
-      §R 23878
-    §R total
+    func l3m05_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23878)
+      let int:total = ((x * 5) + y)
+      if (total > 23878)
+        return 23878
+      return total
 
-  §F{l3m05_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF (> acc 23885)
-      §R (+ acc 23885)
-    §EL
-      §R (+ (* acc 2) 23885)
+    func l3m05_fn08 public (int:x, int:y) → int
+      !
+      requires (x > 0)
+      => (x >= 1)
+      let int:acc = ((x * 3) + y)
+      if (acc > 23885)
+        return (acc + 23885)
+      else
+        return ((acc * 2) + 23885)
 
-  §F{l3m05_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 23892)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 23892)
-      §R 23892
-    §R total
+    func l3m05_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23892)
+      let int:total = ((x * 3) + y)
+      if (total > 23892)
+        return 23892
+      return total
 
-  §F{l3m05_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 23899)
-    §IF (>= x 23899)
-      §R x
-    §EL
-      §R 23899
+    func l3m05_fn10 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23899)
+      if (x >= 23899)
+        return x
+      else
+        return 23899
 
-  §F{l3m05_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 23906)
-    §IF (>= x 23906)
-      §R x
-    §EL
-      §R 23906
+    func l3m05_fn11 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23906)
+      if (x >= 23906)
+        return x
+      else
+        return 23906
 
-  §F{l3m05_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 23913)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 23913)
-      §R 23913
-    §R total
+    func l3m05_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23913)
+      let int:total = ((x * 3) + y)
+      if (total > 23913)
+        return 23913
+      return total
 
-  §F{l3m05_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 23920)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 23920)
-      §R 23920
-    §R total
+    func l3m05_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23920)
+      let int:total = ((x * 3) + y)
+      if (total > 23920)
+        return 23920
+      return total

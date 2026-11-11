@@ -1,93 +1,94 @@
-§M{L3M12}
+module L3M12 L3M12 block
+  module L3M12Module public
 
-  §F{l3m12_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 3)
-    §S (>= x 4)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 24256)
-      §R (+ acc 24256)
-    §EL
-      §R (+ (* acc 2) 24256)
+    func l3m12_fn01 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 2) + y)
+      if (acc > 24256)
+        return (acc + 24256)
+      else
+        return ((acc * 2) + 24256)
 
-  §F{l3m12_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 4)
+    func l3m12_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 4)
 
-  §F{l3m12_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 24263)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (> total 24263)
-      §R 24263
-    §R total
+    func l3m12_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24263)
+      let int:total = ((x * 5) + y)
+      if (total > 24263)
+        return 24263
+      return total
 
-  §F{l3m12_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 72)
+    func l3m12_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 72)
 
-  §F{l3m12_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 5)
-    §Q (>= y 0)
-    §S (>= result 24270)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (< total 24270)
-      §R 24270
-    §EL
-      §R total
+    func l3m12_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 24270)
+      let int:total = ((x * 2) + y)
+      if (total < 24270)
+        return 24270
+      else
+        return total
 
-  §F{l3m12_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 76)
+    func l3m12_fn06 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 76)
 
-  §F{l3m12_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 24277)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 24277)
-      §R 24277
-    §R total
+    func l3m12_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24277)
+      let int:total = ((x * 3) + y)
+      if (total > 24277)
+        return 24277
+      return total
 
-  §F{l3m12_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 24284)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 24284)
-      §R 24284
-    §R total
+    func l3m12_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24284)
+      let int:total = ((x * 3) + y)
+      if (total > 24284)
+        return 24284
+      return total
 
-  §F{l3m12_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 71)
+    func l3m12_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 71)
 
-  §F{l3m12_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 39)
+    func l3m12_fn10 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 39)
 
-  §F{l3m12_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 85)
+    func l3m12_fn11 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 85)
 
-  §F{l3m12_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 24291)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 24291)
-      §R 24291
-    §R total
+    func l3m12_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24291)
+      let int:total = ((x * 3) + y)
+      if (total > 24291)
+        return 24291
+      return total
 
-  §F{l3m12_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 53)
+    func l3m12_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 53)

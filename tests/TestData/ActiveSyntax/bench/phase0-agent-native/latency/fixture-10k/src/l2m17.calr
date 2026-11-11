@@ -1,102 +1,103 @@
-§M{L2M17}
+module L2M17 L2M17 block
+  module L2M17Module public
 
-  §F{l2m17_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 22597)
-    §IF (>= x 22597)
-      §R x
-    §EL
-      §R 22597
+    func l2m17_fn01 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22597)
+      if (x >= 22597)
+        return x
+      else
+        return 22597
 
-  §F{l2m17_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l3m10_fn10} §A x §A INT:34 §/C
-    §R (+ v1 y)
+    func l2m17_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M10.L3M10Module.l3m10_fn10(x, 34)
+      return (v1 + y)
 
-  §F{l2m17_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l3m30_fn09} §A x §A INT:88 §/C
-    §R (+ v1 y)
+    func l2m17_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M30.L3M30Module.l3m30_fn09(x, 88)
+      return (v1 + y)
 
-  §F{l2m17_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 22604)
-    §IF (>= x 22604)
-      §R x
-    §EL
-      §R 22604
+    func l2m17_fn04 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22604)
+      if (x >= 22604)
+        return x
+      else
+        return 22604
 
-  §F{l2m17_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l3m25_fn09} §A x §A INT:64 §/C
-    §B{v2:i32} §C{l3m27_fn02} §A x §A INT:22 §/C
-    §R (+ (+ v1 v2) y)
+    func l2m17_fn05 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M25.L3M25Module.l3m25_fn09(x, 64)
+      let int:v2 = L3M27.L3M27Module.l3m27_fn02(x, 22)
+      return ((v1 + v2) + y)
 
-  §F{l2m17_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l3m20_fn01} §A x §A INT:48 §/C
-    §R (+ v1 y)
+    func l2m17_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M20.L3M20Module.l3m20_fn01(x, 48)
+      return (v1 + y)
 
-  §F{l2m17_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 22611)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (> total 22611)
-      §R 22611
-    §R total
+    func l2m17_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22611)
+      let int:total = ((x * 2) + y)
+      if (total > 22611)
+        return 22611
+      return total
 
-  §F{l2m17_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 22618)
-    §IF (>= x 22618)
-      §R x
-    §EL
-      §R 22618
+    func l2m17_fn08 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22618)
+      if (x >= 22618)
+        return x
+      else
+        return 22618
 
-  §F{l2m17_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 7)
-    §S (>= x 8)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 22625)
-      §R (+ acc 22625)
-    §EL
-      §R (+ (* acc 2) 22625)
+    func l2m17_fn09 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 2) + y)
+      if (acc > 22625)
+        return (acc + 22625)
+      else
+        return ((acc * 2) + 22625)
 
-  §F{l2m17_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 22632)
-    §IF (>= x 22632)
-      §R x
-    §EL
-      §R 22632
+    func l2m17_fn10 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22632)
+      if (x >= 22632)
+        return x
+      else
+        return 22632
 
-  §F{l2m17_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 5)
-    §S (>= x 6)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF (> acc 22639)
-      §R (+ acc 22639)
-    §EL
-      §R (+ (* acc 2) 22639)
+    func l2m17_fn11 public (int:x, int:y) → int
+      !
+      requires (x > 5)
+      => (x >= 6)
+      let int:acc = ((x * 5) + y)
+      if (acc > 22639)
+        return (acc + 22639)
+      else
+        return ((acc * 2) + 22639)
 
-  §F{l2m17_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l3m14_fn01} §A x §A INT:53 §/C
-    §B{v2:i32} §C{l3m17_fn04} §A x §A INT:84 §/C
-    §R (+ (+ v1 v2) y)
+    func l2m17_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M14.L3M14Module.l3m14_fn01(x, 53)
+      let int:v2 = L3M17.L3M17Module.l3m17_fn04(x, 84)
+      return ((v1 + v2) + y)
 
-  §F{l2m17_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l3m26_fn05} §A x §A INT:2 §/C
-    §R (+ v1 y)
+    func l2m17_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M26.L3M26Module.l3m26_fn05(x, 2)
+      return (v1 + y)

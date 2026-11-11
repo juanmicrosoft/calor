@@ -1,91 +1,92 @@
-§M{L3M28}
+module L3M28 L3M28 block
+  module L3M28Module public
 
-  §F{l3m28_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 25152)
-    §IF (>= x 25152)
-      §R x
-    §EL
-      §R 25152
+    func l3m28_fn01 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 25152)
+      if (x >= 25152)
+        return x
+      else
+        return 25152
 
-  §F{l3m28_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 13)
+    func l3m28_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 13)
 
-  §F{l3m28_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 69)
+    func l3m28_fn03 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 69)
 
-  §F{l3m28_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 22)
+    func l3m28_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 22)
 
-  §F{l3m28_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 25159)
-    §IF (>= x 25159)
-      §R x
-    §EL
-      §R 25159
+    func l3m28_fn05 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 25159)
+      if (x >= 25159)
+        return x
+      else
+        return 25159
 
-  §F{l3m28_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 25166)
-    §IF (>= x 25166)
-      §R x
-    §EL
-      §R 25166
+    func l3m28_fn06 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 25166)
+      if (x >= 25166)
+        return x
+      else
+        return 25166
 
-  §F{l3m28_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 72)
+    func l3m28_fn07 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 72)
 
-  §F{l3m28_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 1)
-    §Q (>= y 0)
-    §S (>= result 25173)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (< total 25173)
-      §R 25173
-    §EL
-      §R total
+    func l3m28_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 1)
+      requires (y >= 0)
+      => (result >= 25173)
+      let int:total = ((x * 3) + y)
+      if (total < 25173)
+        return 25173
+      else
+        return total
 
-  §F{l3m28_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 74)
+    func l3m28_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 74)
 
-  §F{l3m28_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 25180)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 25180)
-      §R 25180
-    §R total
+    func l3m28_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25180)
+      let int:total = ((x * 3) + y)
+      if (total > 25180)
+        return 25180
+      return total
 
-  §F{l3m28_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 66)
+    func l3m28_fn11 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 66)
 
-  §F{l3m28_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 62)
+    func l3m28_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 62)
 
-  §F{l3m28_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 28)
+    func l3m28_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 28)

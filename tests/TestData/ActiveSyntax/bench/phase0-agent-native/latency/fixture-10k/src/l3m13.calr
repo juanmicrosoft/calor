@@ -1,96 +1,97 @@
-§M{L3M13}
+module L3M13 L3M13 block
+  module L3M13Module public
 
-  §F{l3m13_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 24298)
-    §IF (>= x 24298)
-      §R x
-    §EL
-      §R 24298
+    func l3m13_fn01 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24298)
+      if (x >= 24298)
+        return x
+      else
+        return 24298
 
-  §F{l3m13_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 10)
+    func l3m13_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 10)
 
-  §F{l3m13_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 24305)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (> total 24305)
-      §R 24305
-    §R total
+    func l3m13_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24305)
+      let int:total = ((x * 5) + y)
+      if (total > 24305)
+        return 24305
+      return total
 
-  §F{l3m13_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 6)
-    §Q (>= y 0)
-    §S (>= result 24312)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (< total 24312)
-      §R 24312
-    §EL
-      §R total
+    func l3m13_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 24312)
+      let int:total = ((x * 5) + y)
+      if (total < 24312)
+        return 24312
+      else
+        return total
 
-  §F{l3m13_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 72)
+    func l3m13_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 72)
 
-  §F{l3m13_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 7)
-    §S (>= x 8)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF (> acc 24319)
-      §R (+ acc 24319)
-    §EL
-      §R (+ (* acc 2) 24319)
+    func l3m13_fn06 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 5) + y)
+      if (acc > 24319)
+        return (acc + 24319)
+      else
+        return ((acc * 2) + 24319)
 
-  §F{l3m13_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 45)
+    func l3m13_fn07 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 45)
 
-  §F{l3m13_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 24326)
-    §IF (>= x 24326)
-      §R x
-    §EL
-      §R 24326
+    func l3m13_fn08 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24326)
+      if (x >= 24326)
+        return x
+      else
+        return 24326
 
-  §F{l3m13_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 77)
+    func l3m13_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 77)
 
-  §F{l3m13_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 34)
+    func l3m13_fn10 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 34)
 
-  §F{l3m13_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 30)
+    func l3m13_fn11 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 30)
 
-  §F{l3m13_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 15)
+    func l3m13_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 15)
 
-  §F{l3m13_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 1)
-    §S (>= x 2)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 24333)
-      §R (+ acc 24333)
-    §EL
-      §R (+ (* acc 2) 24333)
+    func l3m13_fn13 public (int:x, int:y) → int
+      !
+      requires (x > 1)
+      => (x >= 2)
+      let int:acc = ((x * 2) + y)
+      if (acc > 24333)
+        return (acc + 24333)
+      else
+        return ((acc * 2) + 24333)

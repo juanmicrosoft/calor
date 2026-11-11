@@ -1,101 +1,102 @@
-§M{L3M19}
+module L3M19 L3M19 block
+  module L3M19Module public
 
-  §F{l3m19_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 4)
-    §S (>= x 5)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF (> acc 24634)
-      §R (+ acc 24634)
-    §EL
-      §R (+ (* acc 2) 24634)
+    func l3m19_fn01 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 5) + y)
+      if (acc > 24634)
+        return (acc + 24634)
+      else
+        return ((acc * 2) + 24634)
 
-  §F{l3m19_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 87)
+    func l3m19_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 87)
 
-  §F{l3m19_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 24641)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 24641)
-      §R 24641
-    §R total
+    func l3m19_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24641)
+      let int:total = ((x * 3) + y)
+      if (total > 24641)
+        return 24641
+      return total
 
-  §F{l3m19_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 83)
+    func l3m19_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 83)
 
-  §F{l3m19_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 1)
+    func l3m19_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 1)
 
-  §F{l3m19_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 3)
-    §Q (>= y 0)
-    §S (>= result 24648)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (< total 24648)
-      §R 24648
-    §EL
-      §R total
+    func l3m19_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 3)
+      requires (y >= 0)
+      => (result >= 24648)
+      let int:total = ((x * 2) + y)
+      if (total < 24648)
+        return 24648
+      else
+        return total
 
-  §F{l3m19_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 24655)
-    §IF (>= x 24655)
-      §R x
-    §EL
-      §R 24655
+    func l3m19_fn07 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24655)
+      if (x >= 24655)
+        return x
+      else
+        return 24655
 
-  §F{l3m19_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 56)
+    func l3m19_fn08 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 56)
 
-  §F{l3m19_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 26)
+    func l3m19_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 26)
 
-  §F{l3m19_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 8)
-    §Q (>= y 0)
-    §S (>= result 24662)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (< total 24662)
-      §R 24662
-    §EL
-      §R total
+    func l3m19_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 24662)
+      let int:total = ((x * 5) + y)
+      if (total < 24662)
+        return 24662
+      else
+        return total
 
-  §F{l3m19_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 24669)
-    §B{total:i32} (+ (* x 5) y)
-    §IF (> total 24669)
-      §R 24669
-    §R total
+    func l3m19_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24669)
+      let int:total = ((x * 5) + y)
+      if (total > 24669)
+        return 24669
+      return total
 
-  §F{l3m19_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 24676)
-      §R (+ acc 24676)
-    §EL
-      §R (+ (* acc 2) 24676)
+    func l3m19_fn12 public (int:x, int:y) → int
+      !
+      requires (x > 0)
+      => (x >= 1)
+      let int:acc = ((x * 2) + y)
+      if (acc > 24676)
+        return (acc + 24676)
+      else
+        return ((acc * 2) + 24676)
 
-  §F{l3m19_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 20)
+    func l3m19_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 20)

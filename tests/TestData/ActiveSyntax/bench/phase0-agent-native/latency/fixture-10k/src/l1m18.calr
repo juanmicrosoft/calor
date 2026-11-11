@@ -1,107 +1,108 @@
-§M{L1M18}
+module L1M18 L1M18 block
+  module L1M18Module public
 
-  §F{l1m18_fn01:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 20917)
-    §IF (>= x 20917)
-      §R x
-    §EL
-      §R 20917
+    func l1m18_fn01 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 20917)
+      if (x >= 20917)
+        return x
+      else
+        return 20917
 
-  §F{l1m18_fn02:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 20924)
-    §IF (>= x 20924)
-      §R x
-    §EL
-      §R 20924
+    func l1m18_fn02 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 20924)
+      if (x >= 20924)
+        return x
+      else
+        return 20924
 
-  §F{l1m18_fn03:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 20931)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 20931)
-      §R 20931
-    §R total
+    func l1m18_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20931)
+      let int:total = ((x * 3) + y)
+      if (total > 20931)
+        return 20931
+      return total
 
-  §F{l1m18_fn04:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 20938)
-    §B{total:i32} (+ (* x 3) y)
-    §IF (> total 20938)
-      §R 20938
-    §R total
+    func l1m18_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20938)
+      let int:total = ((x * 3) + y)
+      if (total > 20938)
+        return 20938
+      return total
 
-  §F{l1m18_fn05:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (<= result 20945)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (> total 20945)
-      §R 20945
-    §R total
+    func l1m18_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20945)
+      let int:total = ((x * 2) + y)
+      if (total > 20945)
+        return 20945
+      return total
 
-  §F{l1m18_fn06:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= x 6)
-    §Q (>= y 0)
-    §S (>= result 20952)
-    §B{total:i32} (+ (* x 2) y)
-    §IF (< total 20952)
-      §R 20952
-    §EL
-      §R total
+    func l1m18_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 20952)
+      let int:total = ((x * 2) + y)
+      if (total < 20952)
+        return 20952
+      else
+        return total
 
-  §F{l1m18_fn07:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m03_fn07} §A x §A INT:48 §/C
-    §R (+ v1 y)
+    func l1m18_fn07 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M03.L2M03Module.l2m03_fn07(x, 48)
+      return (v1 + y)
 
-  §F{l1m18_fn08:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m18_fn13} §A x §A INT:8 §/C
-    §R (+ v1 y)
+    func l1m18_fn08 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M18.L2M18Module.l2m18_fn13(x, 8)
+      return (v1 + y)
 
-  §F{l1m18_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (> x 3)
-    §S (>= x 4)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF (> acc 20959)
-      §R (+ acc 20959)
-    §EL
-      §R (+ (* acc 2) 20959)
+    func l1m18_fn09 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 2) + y)
+      if (acc > 20959)
+        return (acc + 20959)
+      else
+        return ((acc * 2) + 20959)
 
-  §F{l1m18_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m02_fn12} §A x §A INT:76 §/C
-    §B{v2:i32} §C{l2m19_fn11} §A x §A INT:83 §/C
-    §R (+ (+ v1 v2) y)
+    func l1m18_fn10 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M02.L2M02Module.l2m02_fn12(x, 76)
+      let int:v2 = L2M19.L2M19Module.l2m19_fn11(x, 83)
+      return ((v1 + v2) + y)
 
-  §F{l1m18_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m22_fn01} §A x §A INT:44 §/C
-    §B{v2:i32} §C{l2m13_fn05} §A x §A INT:2 §/C
-    §R (+ (+ v1 v2) y)
+    func l1m18_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M22.L2M22Module.l2m22_fn01(x, 44)
+      let int:v2 = L2M13.L2M13Module.l2m13_fn05(x, 2)
+      return ((v1 + v2) + y)
 
-  §F{l1m18_fn12:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m26_fn04} §A x §A INT:84 §/C
-    §B{v2:i32} §C{l2m09_fn12} §A x §A INT:19 §/C
-    §R (+ (+ v1 v2) y)
+    func l1m18_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M26.L2M26Module.l2m26_fn04(x, 84)
+      let int:v2 = L2M09.L2M09Module.l2m09_fn12(x, 19)
+      return ((v1 + v2) + y)
 
-  §F{l1m18_fn13:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §Q (>= y 0)
-    §S (>= result x)
-    §S (>= result 20966)
-    §IF (>= x 20966)
-      §R x
-    §EL
-      §R 20966
+    func l1m18_fn13 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 20966)
+      if (x >= 20966)
+        return x
+      else
+        return 20966
