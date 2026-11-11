@@ -60,9 +60,11 @@ public class BinderControlValueFamilyTests
     {
         var (expr, diags) = BindReturn(new NullConditionalNode(S,
             new ReferenceNode(S, "obj"), "Length"));
-        var ncond = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("Length", ncond.Metadata["MemberName"]);
-        Assert.Empty(BoundChildren.DeferredOf(ncond)); // target itself always evaluates
+        var ncond = Assert.IsType<BoundConditionalAccessExpression>(expr);
+        Assert.Equal("Length", Assert.IsType<BoundFieldAccessExpression>(ncond.WhenNotNull).FieldName);
+        Assert.IsType<BoundVariableExpression>(ncond.Receiver);
+        Assert.Equal([ncond.WhenNotNull], BoundChildren.DeferredOf(ncond));
+        Assert.True(ncond.HasUnknownInferredType);
         AssertComplete(diags);
     }
 

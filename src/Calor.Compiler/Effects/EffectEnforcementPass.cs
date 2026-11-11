@@ -6484,6 +6484,10 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromExpressionCall(ExpressionCallNode call)
         {
+            if (call.TargetExpression is NullConditionalNode conditional)
+                return InferFromExpressionCall(new ExpressionCallNode(call.Span,
+                    new FieldAccessNode(conditional.Span, conditional.Target, conditional.MemberName),
+                    call.Arguments, call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments));
             if (call.TargetExpression is FieldAccessNode member)
             {
                 if (_context.CallGraph.SelectedMetadataMethodGroupCall(call) is { } selected)

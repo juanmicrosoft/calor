@@ -2109,6 +2109,26 @@ public class BoundStructuralExpression : BoundExpression
     }
 }
 
+/// <summary>A lifted result with a separately typed, conditionally evaluated continuation.</summary>
+public sealed class BoundConditionalAccessExpression : BoundStructuralExpression
+{
+    public BoundExpression Receiver { get; }
+    public BoundExpression WhenNotNull { get; }
+
+    internal BoundConditionalAccessExpression(
+        TextSpan span, BoundExpression receiver, BoundExpression whenNotNull, BoundType resultType)
+        : base(span, nameof(NullConditionalNode), resultType.DisplayString,
+            [receiver, whenNotNull], metadata: null, deferredChildren: [whenNotNull],
+            NullableAnnotation.Oblivious, resultType)
+    {
+        Receiver = receiver;
+        WhenNotNull = whenNotNull;
+        HasUnknownInferredType = receiver.HasUnknownInferredType || whenNotNull.HasUnknownInferredType;
+        MethodInputArrayType = resultType as ArrayBoundType;
+        GenericNullabilityType = resultType as GenericInstantiationBoundType;
+    }
+}
+
 /// <summary>
 /// Structurally retained expression whose full semantic interpretation is not
 /// available to analysis yet.

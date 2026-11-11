@@ -283,6 +283,17 @@ Nullable annotations remain attached to resolved values. Unknown, source,
 foreign, opaque or type-parameter receivers do not acquire a string purity
 contract by using the same member name.
 
+For `value?.Length.ToString()`, the continuation selects `int.ToString()` on
+the underlying `Length` value. The complete result is still nullable: a null
+`value` skips the getter, the call and its arguments. The receiver evaluates
+once. Assigning that nullable result to a non-nullable destination still
+requires a fallback or a separate proof.
+
+Parenthesized conditional receivers such as `(value?.Length).ToString()` remain
+unsupported native postfix forms. They must not be interpreted as the chain
+above: C# invokes `Nullable<int>.ToString()` outside the conditional region,
+which returns an empty string when the lifted value is null.
+
 ## Type intrinsics
 
 Use `typeof(T)`, `nameof(name)` and `sizeof(T)` with ordinary parentheses.

@@ -1,6 +1,7 @@
-using System.Reflection;
 using System.Runtime.Loader;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
@@ -8,11 +9,345 @@ using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using DiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
+using NullableAnnotation = Calor.Compiler.Binding.BoundTypes.NullableAnnotation;
 
 namespace Calor.Compiler.Tests;
 
 public class NullCoalescingTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Original095_ProjectConversion_IsStrictNativeWithExactMetadata(bool implicitSystem)
+    {
+        var root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "Directory.Build.props")))
+            root = Path.GetDirectoryName(root)!;
+        var path = Path.Combine(root, "tests", "TestData", "CSharpImport", "Level5_Advanced", "095_NullCoalescing.cs");
+        var bytes = File.ReadAllBytes(path);
+        var source = File.ReadAllText(path);
+        var converter = implicitSystem
+            ? new CSharpToCalorConverter(new ConversionOptions
+            {
+                IncludeImplicitSystemUsing = true,
+                NullableContextOptions = NullableContextOptions.Disable,
+                ParseOptions = new CSharpParseOptions(LanguageVersion.Preview)
+            })
+            : new CSharpToCalorConverter();
+        var project = converter.ConvertProject(source, path);
+        Assert.True(project.Success);
+        var conversion = Assert.Single(project.Outputs).Conversion;
+        Assert.Empty(conversion.Losses);
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        foreach (var text in new[] { conversion.CalorSource!, new CalorEmitter().Emit(Parse(conversion.CalorSource!, out _)) })
+        {
+            var compiled = Program.Compile(text, "095.calr");
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+            var tree = CSharpSyntaxTree.ParseText(compiled.GeneratedCode);
+            var image = CSharpCompilation.Create("ConditionalSelection", [tree],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.DoesNotContain(image.GetDiagnostics(), item => item.Severity == DiagnosticSeverity.Error);
+            var invocation = Assert.Single(tree.GetRoot().DescendantNodes()
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>());
+            var selected = Assert.IsAssignableFrom<IMethodSymbol>(image.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol);
+            Assert.Equal(SpecialType.System_Int32, selected.ContainingType.SpecialType);
+            Assert.Equal("ToString", selected.Name);
+        }
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void ConditionalContinuation_BindsUnderlyingMemberAndLiftsOnlyTheResult()
+    {
+        const string source = """
+            module Conditional
+              func Probe (string?:value) → string?
+                !
+                return value?.Length.ToString()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source, out _));
+        var conditional = Assert.IsType<BoundConditionalAccessExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions.Single().Body)).Expression);
+        Assert.Equal(NullableAnnotation.Annotated, Assert.IsType<NominalBoundType>(conditional.Type).NullableAnnotation);
+        var call = Assert.IsType<BoundCallExpression>(conditional.WhenNotNull);
+        Assert.Equal(SpecialType.System_Int32, call.ResolvedMetadataMethod!.ContainingType.SpecialType);
+        var length = Assert.IsType<BoundFieldAccessExpression>(call.Receiver);
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(length.ResolvedMetadataMember);
+        Assert.Equal(SpecialType.System_String, property.ContainingType.SpecialType);
+        Assert.Equal(SpecialType.System_Int32, property.Type.SpecialType);
+        Assert.Empty(length.Target.Children);
+        Assert.Equal(NullableAnnotation.NotAnnotated,
+            Assert.IsType<NominalBoundType>(length.Target.Type).NullableAnnotation);
+        Assert.Equal([call], conditional.DeferredChildren);
+        Assert.IsType<BoundVariableExpression>(conditional.Receiver);
+        Assert.False(Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("string", "value?.Length.ToString()")]
+    [InlineData("int", "System.Int32.Parse(value?.ToString())")]
+    [InlineData("string[]", "value?.Split(new char[0])")]
+    public void ConditionalResult_DoesNotSuppressReceivingChecks(string resultType, string expression)
+    {
+        var result = Program.Compile($$"""
+            module Conditional
+              func Probe (string?:value) → {{resultType}}
+                return {{expression}}
+            """);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, item => item.Code is
+            DiagnosticCode.NullableReturnFromNonNullable or DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    [Theory]
+    [InlineData("string[]", "new string[0]", "string[]")]
+    [InlineData("List<string?>", "new List<string?>()", "List<string>")]
+    public void ConditionalSourceResults_RetainArrayContainerAndGenericPayloadChecks(
+        string type, string value, string receiving)
+    {
+        var result = Program.Compile($$"""
+            module Conditional
+              using System.Collections.Generic
+              class Box public
+                func Read public () → {{type}}
+                  ! alloc
+                  return {{value}}
+              func Probe (Box?:value) → {{receiving}}
+                ! alloc
+                return value?.Read()
+            """);
+        Assert.Contains(result.Diagnostics.Errors, item => item.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Theory]
+    [InlineData("string?:value", "value?.Length")]
+    [InlineData("int[]?:value", "value?.Length")]
+    public void ConditionalValueResults_AreLiftedToActualNullableValueTypes(string parameter, string expression)
+    {
+        var source = $"module Conditional\n  func Probe ({parameter}) → int?\n    return {expression}\n";
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source, out _));
+        var result = Assert.IsType<BoundConditionalAccessExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions.Single().Body)).Expression);
+        var lifted = Assert.IsType<GenericInstantiationBoundType>(result.Type);
+        Assert.Equal(SpecialType.System_Nullable_T, lifted.RoslynSymbol!.OriginalDefinition.SpecialType);
+        Assert.Equal(SpecialType.System_Int32, lifted.RoslynSymbol.TypeArguments.Single().SpecialType);
+    }
+
+    [Fact]
+    public void ConditionalNullableValueReceiver_SelectsTheUnderlyingMethod()
+    {
+        const string source = """
+            module Conditional
+              func Probe (int?:value) → string?
+                !
+                return value?.ToString()
+            """;
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var bound = new Binder(new DiagnosticBag()).Bind(compiled.Ast!);
+        var conditional = Assert.IsType<BoundConditionalAccessExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions.Single().Body)).Expression);
+        Assert.Equal(SpecialType.System_Int32,
+            Assert.IsType<BoundCallExpression>(conditional.WhenNotNull).ResolvedMetadataMethod!.ContainingType.SpecialType);
+        const string original = """
+            public static class Probe
+            {
+                public static string? Read(int? value) => value?.ToString();
+            }
+            """;
+        AssertNativeRuntimeAndReemission(original,
+            "public static class Witness { public static string Run() => (Probe.Read(null) ?? \"null\") + \"|\" + Probe.Read(42); }", "null|42",
+            enforceEffects: true);
+    }
+
+    [Theory]
+    [InlineData("int")]
+    [InlineData("System.DateTime")]
+    public void ConditionalNonNullableValueReceivers_AreRejected(string type)
+    {
+        var result = Program.Compile($$"""
+            module Conditional
+              func Probe ({{type}}:value) → string?
+                !
+                return value?.ToString()
+            """);
+        Assert.Contains(result.Diagnostics.Errors, item => item.Message.Contains("CS0023", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false, "fallback|1|0")]
+    [InlineData(true, "BC|1|1")]
+    public void ConditionalContinuation_NestedAccessSkipsArgumentsAndEvaluatesReceiverOnce(bool present, string expected)
+    {
+        const string source = """
+            public static class Probe
+            {
+                private static int Reads;
+                private static int Arguments;
+                private static string? Target(bool present) { Reads++; return present ? "abc" : null; }
+                private static int Argument() { Arguments++; return 1; }
+                public static string Run(bool present)
+                {
+                    Reads = Arguments = 0;
+                    var value = Target(present)?.Substring(Argument())?.ToUpperInvariant() ?? "fallback";
+                    return value + "|" + Reads + "|" + Arguments;
+                }
+            }
+            """;
+        AssertNativeRuntimeAndReemission(source,
+            $"public static class Witness {{ public static string Run() => Probe.Run({present.ToString().ToLowerInvariant()}); }}",
+            expected, enforceEffects: true);
+    }
+
+    [Theory]
+    [InlineData("value?.Length.ToString()", "null|0|3")]
+    [InlineData("(value?.Length).ToString()", "|0|3")]
+    public void ConditionalParentheses_DistinguishNativeContinuationFromLiftedNullableReceiver(
+        string expression, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                private static string Read(string? value) => {{expression}};
+                public static string Run() => (Read(null) ?? "null") + "|" + Read("") + "|" + Read("abc");
+            }
+            """;
+        var actual = ExecuteNativeWitness(source, "public static class Witness { public static string Run() => Probe.Run(); }");
+        Assert.Equal(expected, actual);
+        if (expression.StartsWith('('))
+        {
+            var rejected = Program.Compile("""
+                module Conditional
+                  func Probe (string?:value) → string
+                    return (value?.Length).ToString()
+                """);
+            Assert.True(rejected.HasErrors);
+            Assert.Contains(rejected.Diagnostics.Errors, item => item.Message.Contains("not yet supported", StringComparison.Ordinal));
+            var conversion = new CSharpToCalorConverter().ConvertProject(source, "GroupedConditional.cs");
+            Assert.True(conversion.Success);
+            var output = Assert.Single(conversion.Outputs).Conversion;
+            Assert.Empty(output.Losses);
+            Assert.Equal(0, output.InteropPreservationCount);
+            var compiled = Program.Compile(output.CalorSource!);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(actual, ExecuteNativeWitness(compiled.GeneratedCode,
+                "public static class Witness { public static string Run() => Probe.Run(); }"));
+            Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+            var tree = CSharpSyntaxTree.ParseText(compiled.GeneratedCode);
+            var image = CSharpCompilation.Create("GroupedSelection", [tree],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var invocation = Assert.Single(tree.GetRoot().DescendantNodes()
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
+                .Where(call => call.Expression.ToString().EndsWith(".ToString", StringComparison.Ordinal)));
+            var selected = Assert.IsAssignableFrom<IMethodSymbol>(image.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol);
+            Assert.Equal(SpecialType.System_Nullable_T, selected.ContainingType.OriginalDefinition.SpecialType);
+        }
+        else
+            AssertNativeRuntimeAndReemission(source,
+                "public static class Witness { public static string Run() => Probe.Run(); }", actual);
+    }
+
+    [Theory]
+    [InlineData("System.Globalization.TextInfo", "CultureName.ToString()")]
+    [InlineData("Missing", "Length.ToString()")]
+    public void ConditionalUnknownReceiversAndGetters_RemainFailClosed(string type, string tail)
+    {
+        var result = Program.Compile($$"""
+            module Conditional
+              func Probe ({{type}}?:value) → string?
+                !
+                return value?.{{tail}}
+            """);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, item => item.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Fact]
+    public void ConditionalSourceShadow_DoesNotBorrowFrameworkGetterPurity()
+    {
+        const string source = """
+            module Conditional Conditional
+              class String public
+                property int:Length public
+                  get
+                    System.Console.WriteLine(1)
+                    return 3
+              func Probe (Conditional.String?:value) → string?
+                !
+                return value?.Length.ToString()
+            """;
+        var result = Program.Compile(source);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, item => item.Code == DiagnosticCode.ForbiddenEffect
+            && item.Message.Contains("cw", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("null", "null|0")]
+    [InlineData("\"aax\"", "bbx|1")]
+    public void ConditionalMethodInConstructor_PreservesSelectionAndArgumentLaziness(
+        string value, string expected)
+    {
+        const string source = """
+            module Conditional Conditional
+              class Box public
+                field string?:Location public
+                ctor public (string?:value)
+                  set this.Location value?.Replace(Probe.Argument(), "b")
+              module Probe public
+                field int:Calls public static
+                func Argument public () → string
+                  ! mut
+                  set Calls (Calls + 1)
+                  return "a"
+            """;
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(compiled.Ast!);
+        var selected = bound.Functions.SelectMany(function => Descendants(function))
+            .OfType<BoundCallExpression>().Single(call => call.ResolvedMetadataMethod?.Name == "Replace");
+        Assert.Equal(SpecialType.System_String, selected.ResolvedMetadataMethod!.ContainingType.SpecialType);
+        Assert.Equal([SpecialType.System_String, SpecialType.System_String],
+            selected.ResolvedMetadataMethod.Parameters.Select(parameter => parameter.Type.SpecialType));
+        var witness = $$"""
+            public static class Witness {
+                public static string Run() {
+                    var box = new Conditional.Box({{value}});
+                    return (box.Location ?? "null") + "|" + Conditional.Probe.Calls;
+                }
+            }
+            """;
+        Assert.Equal(expected, ExecuteNativeWitness(compiled.GeneratedCode, witness));
+        var reemitted = new CalorEmitter().Emit(compiled.Ast!);
+        var reparsed = Program.Compile(reemitted);
+        Assert.False(reparsed.HasErrors, string.Join("\n", reparsed.Diagnostics));
+        Assert.Equal(expected, ExecuteNativeWitness(reparsed.GeneratedCode, witness));
+    }
+
+    private static IEnumerable<BoundNode> Descendants(BoundNode node)
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes)
+            foreach (var descendant in Descendants(child))
+                yield return descendant;
+    }
+
+    private static string[] DeclaredMetadata(string source)
+    {
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("Metadata", [tree],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(compilation.GetDiagnostics(), item => item.Severity == DiagnosticSeverity.Error);
+        return CSharpToCalorConverter.DeclaredTypeMetadata(compilation.GetSemanticModel(tree), tree.GetCompilationUnitRoot());
+    }
+
     [Theory]
     [InlineData("null", "null")]
     [InlineData("\"\"", "0")]
@@ -251,7 +586,8 @@ public class NullCoalescingTests
     }
 
     private static void AssertNativeRuntimeAndReemission(
-        string source, string witness, string expected, string sourceFile = "NullCoalescingNative.cs")
+        string source, string witness, string expected, string sourceFile = "NullCoalescingNative.cs",
+        bool enforceEffects = false)
     {
         Assert.Equal(expected, ExecuteNativeWitness(source, witness));
         var conversion = new CSharpToCalorConverter().Convert(source, sourceFile);
@@ -270,7 +606,7 @@ public class NullCoalescingTests
         foreach (var text in new[] { conversion.CalorSource, reemitted })
         {
             var compiled = Program.Compile(text, "null-coalescing-native.calr",
-                new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+                new CompilationOptions { EnforceEffects = enforceEffects, StatusWriter = TextWriter.Null });
             Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
             Assert.Equal(expected, ExecuteNativeWitness(compiled.GeneratedCode, witness));
         }

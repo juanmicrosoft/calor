@@ -957,17 +957,17 @@ public sealed class NativePostfixTests
             """;
         var (ast, bound, diagnostics) = Bind(source);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
-        var call = Assert.IsType<BoundExpressionCall>(Assert.IsType<BoundReturnStatement>(
+        var conditional = Assert.IsType<BoundConditionalAccessExpression>(Assert.IsType<BoundReturnStatement>(
             Assert.Single(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body)).Expression);
-        var conditional = Assert.IsType<BoundStructuralExpression>(call.Target);
-        Assert.Equal(nameof(NullConditionalNode), conditional.NodeTypeName);
-        Assert.Equal("Substring", conditional.Metadata["MemberName"]);
-        Assert.Equal("x", Assert.IsType<BoundVariableExpression>(Assert.Single(conditional.Children)).Variable.Name);
+        var call = Assert.IsType<BoundCallExpression>(conditional.WhenNotNull);
+        Assert.Equal("Substring", call.ResolvedMetadataMethod!.Name);
+        Assert.Equal("x", Assert.IsType<BoundVariableExpression>(conditional.Receiver).Variable.Name);
+        Assert.Equal([call], conditional.DeferredChildren);
         Assert.IsType<BoundCallExpression>(Assert.Single(call.Arguments));
-        Assert.True(call.HasUnknownInferredType);
+        Assert.False(call.HasUnknownInferredType);
         var result = Program.Compile(new CalorEmitter().Emit(ast));
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
     }
 
     [Theory]
@@ -986,7 +986,7 @@ public sealed class NativePostfixTests
             """;
         var result = Program.Compile(source);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
     }
 
     [Theory]

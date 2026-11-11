@@ -4269,6 +4269,9 @@ public sealed class Binder
             ?? TryBindSourceStaticFieldReceiver(fieldAccess)
             ?? TryBindMetadataTypeReceiver(fieldAccess.Target)
             ?? BindExpression(fieldAccess.Target);
+        if (target is BoundConditionalAccessExpression conditionalTarget)
+            return ContinueConditionalAccess(fieldAccess.Span, conditionalTarget,
+                BindFieldAccess(fieldAccess, conditionalTarget.WhenNotNull, isPatternMember));
         if (target is BoundTypeReferenceExpression { ResolvedType: { IsEnum: true } enumType })
         {
             var members = _enumMembers[enumType.Id].Where(member => member.Name == fieldAccess.FieldName).ToArray();
@@ -5746,16 +5749,94 @@ public sealed class Binder
     private BoundExpression BindNullConditional(NullConditionalNode conditional)
     {
         var target = BindExpression(conditional.Target);
-        return Structural(
-            conditional,
-            "OBJECT",
-            [target],
-            new Dictionary<string, object?>
-            {
-                ["MemberName"] = conditional.MemberName,
-                ["TargetType"] = target.Type.DisplayString,
-            });
+        return BindConditionalAccess(conditional.Span, target, receiver =>
+            BindFieldAccess(new FieldAccessNode(conditional.Span,
+                conditional.Target, conditional.MemberName), receiver));
     }
+
+    private BoundExpression BindConditionalAccess(
+        TextSpan span, BoundExpression target, Func<BoundExpression, BoundExpression> bindContinuation)
+    {
+        if (target is BoundConditionalAccessExpression outer)
+            return ContinueConditionalAccess(span, outer,
+                BindConditionalAccess(span, outer.WhenNotNull, bindContinuation));
+
+        var type = GetConditionalReceiverType(ConditionalValueType(target));
+        if (type is BoundTypes.GenericInstantiationBoundType
+            { RoslynSymbol.OriginalDefinition.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Nullable_T,
+                TypeArguments: [var underlying] })
+            type = underlying;
+        else
+            type = ConditionalReferenceType(type, BoundTypes.NullableAnnotation.NotAnnotated);
+        // A placeholder is not another evaluation of the receiver. Only the outer node owns it.
+        var receiver = new BoundStructuralExpression(span, "ConditionalReceiver", type.DisplayString,
+            children: null, metadata: null, deferredChildren: null,
+            BoundTypes.NullableAnnotation.Oblivious, type)
+        {
+            HasUnknownInferredType = target.HasUnknownInferredType,
+            MethodInputArrayType = type as BoundTypes.ArrayBoundType,
+            GenericNullabilityType = type as BoundTypes.GenericInstantiationBoundType
+        };
+        var continuation = bindContinuation(receiver);
+        return new BoundConditionalAccessExpression(span, target, continuation,
+            LiftConditionalResult(ConditionalValueType(continuation)));
+    }
+
+    private BoundConditionalAccessExpression ContinueConditionalAccess(
+        TextSpan span, BoundConditionalAccessExpression conditional, BoundExpression continuation) =>
+        new(span, conditional.Receiver, continuation, LiftConditionalResult(ConditionalValueType(continuation)));
+
+    private static BoundTypes.BoundType ConditionalValueType(BoundExpression expression) =>
+        (BoundTypes.BoundType?)NullabilityChecker.GetMethodInputArrayType(expression)
+        ?? expression.GenericNullabilityType ?? expression.Type;
+
+    private BoundTypes.BoundType LiftConditionalResult(BoundTypes.BoundType type)
+    {
+        type = GetConditionalReceiverType(type);
+        var symbol = type switch
+        {
+            BoundTypes.NominalBoundType nominal => nominal.RoslynSymbol,
+            BoundTypes.GenericInstantiationBoundType generic => generic.RoslynSymbol,
+            _ => null
+        };
+        if (symbol is { IsValueType: true }
+            && symbol.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Void
+            && symbol.OriginalDefinition.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Nullable_T
+            && GetOrCreateMetadataBinder()?.Context.TryResolveType("System.Nullable`1") is { } nullable)
+            return Metadata.MetadataBinderResult.ToBoundType(nullable.Construct(symbol));
+        return ConditionalReferenceType(type, BoundTypes.NullableAnnotation.Annotated);
+    }
+
+    private BoundTypes.BoundType GetConditionalReceiverType(BoundTypes.BoundType type)
+    {
+        if (type is BoundTypes.NominalBoundType { RoslynSymbol: null, Declaration: null } nominal
+            && GetOrCreateMetadataBinder() is { } metadata
+            && ResolveComputedMetadataType(metadata.Context, nominal.QualifiedName)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol symbol)
+            return symbol.IsValueType || symbol.IsGenericType
+                ? Metadata.MetadataBinderResult.ToBoundType(symbol)
+                : new BoundTypes.NominalBoundType(nominal.QualifiedName, nominal.NullableAnnotation,
+                    roslynSymbol: symbol);
+        return type;
+    }
+
+    private static BoundTypes.BoundType ConditionalReferenceType(
+        BoundTypes.BoundType type, BoundTypes.NullableAnnotation annotation) => type switch
+    {
+        BoundTypes.NominalBoundType nominal when nominal.IsKnownReferenceType
+            || nominal.RoslynSymbol?.IsReferenceType == true =>
+            new BoundTypes.NominalBoundType(nominal.QualifiedName, annotation,
+                nominal.Declaration, nominal.RoslynSymbol),
+        BoundTypes.ArrayBoundType array =>
+            new BoundTypes.ArrayBoundType(array.ElementType, array.Rank, annotation)
+            {
+                RoslynSymbol = array.RoslynSymbol
+            },
+        BoundTypes.GenericInstantiationBoundType generic when generic.RoslynSymbol?.IsValueType != true =>
+            new BoundTypes.GenericInstantiationBoundType(generic.Definition, generic.TypeArguments, annotation,
+                generic.RoslynSymbol),
+        _ => type
+    };
 
     private BoundExpression BindRangeExpression(RangeExpressionNode range)
     {
@@ -6428,6 +6509,12 @@ public sealed class Binder
 
     private BoundExpression BindExpressionCall(ExpressionCallNode call)
     {
+        if (call.TargetExpression is NullConditionalNode conditional)
+            return BindConditionalAccess(call.Span, BindExpression(conditional.Target), receiver =>
+                BindCallExpression(new CallExpressionNode(call.Span,
+                    "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
+                    call.TypeArguments, conditional.Span, conditional.Target.Span),
+                    receiver, conditional.MemberName));
         if (call.TargetExpression is FieldAccessNode member)
         {
             var sourceReceiver = DottedReferenceName(member.Target);
@@ -6460,6 +6547,12 @@ public sealed class Binder
             else if (receiver is BoundVariableExpression { HasUnknownInferredType: true } inferred
                 && sourceTarget is not null)
                 receiver = BuildCallReceiver(sourceTarget, member.Target.Span, inferred.Variable, null, null);
+            if (receiver is BoundConditionalAccessExpression conditionalReceiver)
+                return ContinueConditionalAccess(call.Span, conditionalReceiver,
+                    BindCallExpression(new CallExpressionNode(call.Span,
+                        "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
+                        call.TypeArguments, member.FieldNameSpan, member.Target.Span),
+                        conditionalReceiver.WhenNotNull, member.FieldName));
             return BindCallExpression(new CallExpressionNode(call.Span,
                 "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
                 call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call);
