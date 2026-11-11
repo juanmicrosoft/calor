@@ -231,6 +231,7 @@ public interface IAstVisitor
     void Visit(FallbackExpressionNode node);
     void Visit(FallbackCommentNode node);
     void Visit(TypeOfExpressionNode node);
+    void Visit(OverflowContextExpressionNode node);
     void Visit(NameOfExpressionNode node);
     void Visit(ExpressionCallNode node);
     void Visit(YieldReturnStatementNode node);
@@ -412,6 +413,7 @@ public interface IAstVisitor<T>
     T Visit(FallbackExpressionNode node);
     T Visit(FallbackCommentNode node);
     T Visit(TypeOfExpressionNode node);
+    T Visit(OverflowContextExpressionNode node);
     T Visit(NameOfExpressionNode node);
     T Visit(ExpressionCallNode node);
     T Visit(YieldReturnStatementNode node);
@@ -600,6 +602,7 @@ public static class AstSchemaMetadata
         Create<FallbackExpressionNode>("ExpressionNodes.cs"),
         Create<FallbackCommentNode>("StatementNodes.cs"),
         Create<TypeOfExpressionNode>("ModernOperatorNodes.cs"),
+        Create<OverflowContextExpressionNode>("ModernOperatorNodes.cs"),
         Create<NameOfExpressionNode>("ModernOperatorNodes.cs"),
         Create<ExpressionCallNode>("ModernOperatorNodes.cs"),
         Create<YieldReturnStatementNode>("ControlFlowNodes.cs"),
@@ -822,6 +825,7 @@ internal static class AstVisitorDispatch
             case FallbackExpressionNode typed: visitor.Visit(typed); return;
             case FallbackCommentNode typed: visitor.Visit(typed); return;
             case TypeOfExpressionNode typed: visitor.Visit(typed); return;
+            case OverflowContextExpressionNode typed: visitor.Visit(typed); return;
             case NameOfExpressionNode typed: visitor.Visit(typed); return;
             case ExpressionCallNode typed: visitor.Visit(typed); return;
             case YieldReturnStatementNode typed: visitor.Visit(typed); return;
@@ -1011,6 +1015,7 @@ internal static class AstVisitorDispatch
             FallbackExpressionNode typed => visitor.Visit(typed),
             FallbackCommentNode typed => visitor.Visit(typed),
             TypeOfExpressionNode typed => visitor.Visit(typed),
+            OverflowContextExpressionNode typed => visitor.Visit(typed),
             NameOfExpressionNode typed => visitor.Visit(typed),
             ExpressionCallNode typed => visitor.Visit(typed),
             YieldReturnStatementNode typed => visitor.Visit(typed),

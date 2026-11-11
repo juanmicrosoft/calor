@@ -4278,6 +4278,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         return $"{left} {op} {right}";
     }
 
+    public string Visit(OverflowContextExpressionNode node)
+    {
+        var previous = _overflowContext;
+        _overflowContext = node.IsChecked ? "checked" : "unchecked";
+        try
+        {
+            return $"{_overflowContext}({node.Operand.Accept(this)})";
+        }
+        finally
+        {
+            _overflowContext = previous;
+        }
+    }
+
     public string Visit(UnaryOperationNode node)
     {
         var expression = EmitUnaryOperation(node);

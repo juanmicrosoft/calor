@@ -992,12 +992,12 @@ public sealed class TypeChecker
             _inferredLambdaReturnTypes?.Add(returnType);
             if (_currentReturnType != null
                 && !_suppressContextualDiagnostics
-                && !(_validateReturnAssignments || ret.Expression is CallExpressionNode)
+                && !(_validateReturnAssignments || ret.Expression is CallExpressionNode or OverflowContextExpressionNode)
                 && IsDistinctNamedRefinement(_currentReturnType, returnType))
             {
                 ReportDistinctNamedRefinement(ret.Expression.Span, _currentReturnType, returnType, "a return");
             }
-            if ((_validateReturnAssignments || ret.Expression is CallExpressionNode)
+            if ((_validateReturnAssignments || ret.Expression is CallExpressionNode or OverflowContextExpressionNode)
                 && _currentReturnType != null
                 && !ContainsInferencePlaceholder(_currentReturnType)
                 && !ContainsInferencePlaceholder(returnType)
@@ -1878,6 +1878,7 @@ public sealed class TypeChecker
             },
             ReferenceNode refNode => InferReferenceType(refNode),
             UnaryOperationNode unary => InferUnaryOperationType(unary),
+            OverflowContextExpressionNode overflow => InferExpressionType(overflow.Operand, expectedType),
             BinaryOperationNode binOp => InferBinaryOperationType(binOp),
             RecordCreationNode rec => InferRecordCreationType(rec),
             FieldAccessNode field => InferFieldAccessType(field),

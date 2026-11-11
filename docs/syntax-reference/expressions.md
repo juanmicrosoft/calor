@@ -94,6 +94,30 @@ module ArithmeticBehavior
 `Divide(-2147483648, -1)` throws `OverflowException`.
 These are body exceptions, not failed runtime contract checks.
 
+### Explicit overflow scopes
+
+`checked(expression)` and `unchecked(expression)` override the surrounding
+integer overflow policy, including narrowing casts. Scopes nest; the innermost
+scope controls each operation. They do not change operand order or how many
+times an operand runs, and do not change arithmetic inside a called function.
+Division by zero still throws in either scope.
+
+```calor
+module OverflowExpressions
+  func Wrap (int:value) → int
+    !
+    return unchecked(value + 1)
+
+  func Narrow (long:value) → int
+    !
+    return checked((int)value)
+```
+
+`Wrap(2147483647)` returns `-2147483648`. `Narrow(2147483648L)` throws
+`OverflowException`. Use `@checked` and `@unchecked` for ordinary identifiers
+with these names. Explicit overflow scopes currently remain unmodeled by the
+contract verifier; they do not justify eliding a runtime guard.
+
 ## Comparison and logical operators
 
 Comparisons use two operands: `a == b`, `a != b`, `a < b`, `a <= b`,

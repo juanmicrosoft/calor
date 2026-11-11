@@ -11999,12 +11999,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ? "checked"
             : "unchecked";
         _context.RecordFeatureUsage($"{keyword}-expression");
-        _context.RecordLoss(
-            ConversionLossKind.InteropPreserved,
-            $"{keyword}-expression",
-            $"{keyword} overflow expression preserved verbatim",
-            expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        return new RawCSharpExpressionNode(GetTextSpan(expression), expression.ToString());
+        // Operand temporaries must not escape this lexical overflow scope.
+        return new OverflowContextExpressionNode(
+            GetTextSpan(expression),
+            ConvertInPlace(expression.Expression, always: true),
+            expression.IsKind(SyntaxKind.CheckedExpression));
     }
 
     private string? InferTypeFromExpression(ExpressionSyntax expr)

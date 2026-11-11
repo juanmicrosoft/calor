@@ -5919,6 +5919,14 @@ public sealed class Parser
             return new LambdaExpressionNode(token.Span.Union(lambda.Span), lambda.Id,
                 lambda.Parameters, lambda.Effects, name == "async",
                 lambda.ExpressionBody, lambda.StatementBody, lambda.Attributes, name == "static");
+        if (!verbatim && name is "checked" or "unchecked")
+        {
+            Expect(TokenKind.OpenParen);
+            var operand = ParseExpression();
+            var close = Expect(TokenKind.CloseParen);
+            return new OverflowContextExpressionNode(
+                token.Span.Union(close.Span), operand, name == "checked");
+        }
         if (!verbatim && name is "typeof" or "nameof" or "sizeof")
         {
             Expect(TokenKind.OpenParen);

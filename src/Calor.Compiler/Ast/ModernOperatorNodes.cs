@@ -204,6 +204,22 @@ public sealed class TypeOfExpressionNode : ExpressionNode
 }
 
 /// <summary>
+/// A lexical checked/unchecked scope over an expression, including its conversions.
+/// </summary>
+public sealed class OverflowContextExpressionNode : ExpressionNode
+{
+    public ExpressionNode Operand { get; }
+    public bool IsChecked { get; }
+
+    public OverflowContextExpressionNode(TextSpan span, ExpressionNode operand, bool isChecked)
+        : base(span)
+    {
+        Operand = operand ?? throw new ArgumentNullException(nameof(operand));
+        IsChecked = isChecked;
+    }
+}
+
+/// <summary>
 /// Represents a nameof expression.
 /// (nameof value) generates: nameof(value)
 /// </summary>

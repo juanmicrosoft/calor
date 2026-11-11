@@ -610,6 +610,10 @@
       "source": "ModernOperatorNodes.cs"
     },
     {
+      "name": "OverflowContextExpressionNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
       "name": "NameOfExpressionNode",
       "source": "ModernOperatorNodes.cs"
     },

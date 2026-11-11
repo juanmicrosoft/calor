@@ -5574,6 +5574,7 @@ public sealed class EffectEnforcementPass
                 ThisExpressionNode => EffectResolver.NormalizeParameterType(
                     _context.OwnerClass?.Name ?? "?"),
                 WithExpressionNode with => InferExpressionType(with.Target),
+                OverflowContextExpressionNode overflow => InferExpressionType(overflow.Operand),
                 TypeOperationNode { Operation: TypeOp.Cast or TypeOp.As } operation =>
                     EffectResolver.NormalizeParameterType(operation.TargetType),
                 BaseExpressionNode => EffectResolver.NormalizeParameterType(
@@ -6165,6 +6166,7 @@ public sealed class EffectEnforcementPass
                 MatchExpressionNode match => InferFromMatchExpression(match),
                 BinaryOperationNode binOp => InferFromExpression(binOp.Left).Union(InferFromExpression(binOp.Right)),
                 UnaryOperationNode unOp => InferFromExpression(unOp.Operand),
+                OverflowContextExpressionNode overflow => InferFromExpression(overflow.Operand),
                 ConditionalExpressionNode cond => InferFromExpression(cond.Condition)
                     .Union(InferFromExpression(cond.WhenTrue))
                     .Union(InferFromExpression(cond.WhenFalse)),

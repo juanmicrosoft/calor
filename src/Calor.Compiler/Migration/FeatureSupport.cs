@@ -557,6 +557,18 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "checked/unchecked wrapper stripped, body statements fully preserved"
         },
+        ["checked-expression"] = new FeatureInfo
+        {
+            Name = "checked-expression",
+            Support = SupportLevel.Full,
+            Description = "checked expressions retain their lexical overflow scope, including nested overrides and casts"
+        },
+        ["unchecked-expression"] = new FeatureInfo
+        {
+            Name = "unchecked-expression",
+            Support = SupportLevel.Full,
+            Description = "unchecked expressions retain their lexical overflow scope, including nested overrides and casts"
+        },
         ["with-expression"] = new FeatureInfo
         {
             Name = "with-expression",

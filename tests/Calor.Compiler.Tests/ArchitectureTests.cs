@@ -534,7 +534,7 @@ public class ArchitectureTests
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(56, concreteExpressions.Length);
+        Assert.Equal(57, concreteExpressions.Length);
         Assert.Equal(concreteExpressions, registeredExpressions);
     }
 

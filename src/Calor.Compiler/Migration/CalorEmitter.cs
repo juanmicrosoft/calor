@@ -4734,6 +4734,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"typeof({TypeMapper.ToSurfaceType(node.TypeName)})";
     }
 
+    public string Visit(OverflowContextExpressionNode node)
+    {
+        var keyword = node.IsChecked ? "checked" : "unchecked";
+        return $"{keyword}({AcceptInConditionalRegion(node.Operand)})";
+    }
+
     public string Visit(NameOfExpressionNode node)
     {
         var name = node.Name;

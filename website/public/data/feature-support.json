@@ -9,7 +9,7 @@
     "info": 0
   },
   "data": {
-    "totalFeatures": 178,
+    "totalFeatures": 180,
     "features": {
       "full": [
         {
@@ -118,7 +118,7 @@
         },
         {
           "name": "anonymous-type",
-          "description": "Anonymous types are represented by anonymous-object nodes"
+          "description": "Anonymous objects use native new { Name = expression } syntax and anonymous-object nodes, retaining initializer order and allocation effects"
         },
         {
           "name": "foreach-index",
@@ -239,6 +239,14 @@
         {
           "name": "checked-block",
           "description": "checked/unchecked wrapper stripped, body statements fully preserved"
+        },
+        {
+          "name": "checked-expression",
+          "description": "checked expressions retain their lexical overflow scope, including nested overrides and casts"
+        },
+        {
+          "name": "unchecked-expression",
+          "description": "unchecked expressions retain their lexical overflow scope, including nested overrides and casts"
         },
         {
           "name": "with-expression",
@@ -552,7 +560,7 @@
         },
         {
           "name": "array-element-block",
-          "description": "An array element that Calor writes as a block (a collection initializer, or a multi-line element such as an anonymous object in a rectangular array row) preserves its statement as counted C# interop",
+          "description": "Statement-only array elements require counted C# preservation when inline emission or safe typed hoisting is unavailable. Anonymous objects and ordinary collection initializers use inline native syntax",
           "workaround": "Bind the element to a local first, then use the local in the array"
         },
         {

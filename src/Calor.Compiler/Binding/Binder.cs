@@ -59,6 +59,7 @@ public sealed class Binder
             [typeof(NewExpressionNode)] = static (binder, expression) => binder.BindNewExpression((NewExpressionNode)expression),
             [typeof(NullCoalesceNode)] = static (binder, expression) => binder.BindNullCoalesce((NullCoalesceNode)expression),
             [typeof(NullConditionalNode)] = static (binder, expression) => binder.BindNullConditional((NullConditionalNode)expression),
+            [typeof(OverflowContextExpressionNode)] = static (binder, expression) => binder.BindOverflowContext((OverflowContextExpressionNode)expression),
             [typeof(PointerDereferenceNode)] = static (binder, expression) => binder.BindPointerDereference((PointerDereferenceNode)expression),
             [typeof(RangeExpressionNode)] = static (binder, expression) => binder.BindRangeExpression((RangeExpressionNode)expression),
             [typeof(RawCSharpExpressionNode)] = static (binder, expression) => binder.BindRawCSharpInterop((RawCSharpExpressionNode)expression),
@@ -4611,6 +4612,21 @@ public sealed class Binder
             $"{prefix}.{field.FieldName}",
         _ => null
     };
+
+    private BoundExpression BindOverflowContext(OverflowContextExpressionNode expression)
+    {
+        var operand = BindExpression(expression.Operand);
+        return new BoundStructuralExpression(
+            expression.Span, nameof(OverflowContextExpressionNode), operand.Type.DisplayString,
+            [operand], new Dictionary<string, object?> { ["IsChecked"] = expression.IsChecked },
+            deferredChildren: null, typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
+            resultType: operand.Type)
+        {
+            HasUnknownInferredType = operand.HasUnknownInferredType,
+            MethodInputArrayType = operand.MethodInputArrayType,
+            GenericNullabilityType = operand.GenericNullabilityType
+        };
+    }
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
     {
