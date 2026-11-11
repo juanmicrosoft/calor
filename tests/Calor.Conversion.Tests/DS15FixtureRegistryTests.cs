@@ -222,10 +222,14 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
     public void NamespaceTopology_CurrentProjectPartsRetainBothClrOwners()
     {
         const string name = "namespace-topology";
-        CurrentExpectation_ChangesOnlyApprovedClassificationFields(name);
         var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
         var original = $"bench/phase0-agent-native/fixtures/d-s1.5/{name}/fixture.json";
         using var doc = JsonDocument.Parse(File.ReadAllText(CurrentManifestPath(repoRoot, name, original)));
+        var historicalManifest = JsonNode.Parse(File.ReadAllText(Path.Combine(repoRoot, original)));
+        var currentManifest = JsonNode.Parse(doc.RootElement.GetRawText())!.AsObject();
+        Assert.True(currentManifest.Remove("currentObservation"));
+        Assert.True(JsonNode.DeepEquals(historicalManifest, currentManifest),
+            "Topology projection must retain every original field, including zero-Interop certification.");
         var observation = doc.RootElement.GetProperty("currentObservation");
         Assert.Equal("current-compiler-active-syntax", observation.GetProperty("inputContract").GetString());
         Assert.False(string.IsNullOrWhiteSpace(observation.GetProperty("reason").GetString()));
