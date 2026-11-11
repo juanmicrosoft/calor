@@ -4,6 +4,8 @@ using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis.Operations;
+using CS = Microsoft.CodeAnalysis;
 
 namespace Calor.Compiler.Effects;
 
@@ -267,6 +269,12 @@ public sealed class EffectEnforcementPass
         // Phase 1: Build function map and call graph (includes functions and methods)
         _callGraphAnalysis = CallGraphAnalysis.Build(
             module, CrossModuleFunctionModules, contractInheritance, ProjectionContractMode);
+        if (_callGraphAnalysis.SourceConstructionErrors.Count > 0)
+        {
+            foreach (var error in _callGraphAnalysis.SourceConstructionErrors)
+                _diagnostics.Add(error);
+            return;
+        }
         foreach (var failure in _callGraphAnalysis.OperatorBindingFailures)
             _diagnostics.Report(module.Span, DiagnosticCode.ForbiddenEffect, failure, DiagnosticSeverity.Error);
 
@@ -692,6 +700,9 @@ public sealed class EffectEnforcementPass
         var effects = inferrer.InferFromFunction(function);
         if (declarationOnly)
             effects = effects.Union(GetDeclaredEffects(row));
+        if (context.CurrentConstructor is { Constructor.IsStatic: false } initializing
+            && !_callGraphAnalysis.IsRecordCopyConstructor(initializing.Constructor))
+            effects = effects.Union(inferrer.InferInstanceInitialization(initializing.Owner, function.Span));
         if (context.CurrentConstructor is { Constructor.IsStatic: false }
             && context.CurrentConstructor.Constructor.Initializer != null)
         {
@@ -5715,6 +5726,8 @@ public sealed class EffectEnforcementPass
             if (_context.CurrentConstructor is { Constructor.IsStatic: true } current
                 && ReferenceEquals(current.Owner, owner))
                 return EffectSet.Empty;
+            if (_context.CallGraph.Initialization(owner) != null)
+                return InferSourceInitialization(owner, isStatic: true, span);
             // A read may initialize the entire declaring type, not just this field.
             // Only self-contained primitives or an explicitly bound constructor
             // with contract authority can prove that no hidden invocation is omitted.
@@ -5738,6 +5751,151 @@ public sealed class EffectEnforcementPass
             }
             return effects.Union(InferFromInternalFunctions(owner.Constructors.Where(constructor => constructor.IsStatic)
                     .Select(constructor => $"{owner.Name}.{constructor.Id}").ToArray()));
+        }
+
+        private readonly HashSet<(ClassDefinitionNode Owner, bool Static)> _activeInitializations = [];
+
+        public EffectSet InferInstanceInitialization(ClassDefinitionNode owner, TextSpan span) =>
+            InferSourceInitialization(owner, isStatic: false, span);
+
+        private EffectSet InferSourceInitialization(ClassDefinitionNode owner, bool isStatic, TextSpan span)
+        {
+            var selection = _context.CallGraph.Initialization(owner);
+            var operations = isStatic ? selection?.Static : selection?.Instance;
+            if (operations == null)
+                return UnknownResolvedOperation($"{owner.Name}..{(isStatic ? "cctor" : "ctor")}", span);
+            if (!_activeInitializations.Add((owner, isStatic)))
+                return isStatic ? EffectSet.Empty : UnknownResolvedOperation($"{owner.Name}..ctor", span);
+            try
+            {
+                var effects = operations.Aggregate(EffectSet.Empty, (effects, initializer) =>
+                    effects.Union(InferInitializationOperation(initializer.Operation, initializer.Preserved, span)));
+                if (isStatic)
+                    effects = effects.Union(InferFromInternalFunctions(owner.Constructors
+                        .Where(constructor => constructor.IsStatic).Select(constructor => $"{owner.Name}.{constructor.Id}")));
+                return effects;
+            }
+            finally
+            {
+                _activeInitializations.Remove((owner, isStatic));
+            }
+        }
+
+        private EffectSet InferInitializationOperation(CS.IOperation operation, bool preserved, TextSpan span)
+        {
+            if (operation.Type?.TypeKind is CS.TypeKind.Error or CS.TypeKind.Dynamic)
+                return UnknownResolvedOperation("invalid source initializer", span);
+            var effects = EffectSet.Empty;
+            switch (operation)
+            {
+                case ILiteralOperation:
+                case IDefaultValueOperation:
+                case IInstanceReferenceOperation:
+                    return effects;
+                case IInvocationOperation call:
+                    effects = InferInitializationMethod(call.TargetMethod, preserved, span);
+                    break;
+                case IObjectCreationOperation { Constructor: { } constructor }:
+                    effects = EffectSet.From("alloc").Union(InferInitializationMethod(
+                        constructor, preserved || constructor.ContainingType.SpecialType
+                            == CS.SpecialType.System_Object, span));
+                    break;
+                case IConversionOperation { OperatorMethod: { } conversion }:
+                    effects = InferInitializationMethod(conversion, preserved, span);
+                    break;
+                case IBinaryOperation { OperatorMethod: { } binary }:
+                    effects = InferInitializationMethod(binary, preserved, span);
+                    break;
+                case IUnaryOperation { OperatorMethod: { } unary }:
+                    effects = InferInitializationMethod(unary, preserved, span);
+                    break;
+                case IFieldReferenceOperation field:
+                    if (_context.CallGraph.InitializationClass(field.Field.ContainingType) is not { } fieldOwner)
+                        return UnknownResolvedOperation(field.Field.ToDisplayString(), span);
+                    if (field.Field.IsStatic && !field.Field.IsConst)
+                        effects = InferStaticFieldInitialization(fieldOwner, span);
+                    break;
+                case IPropertyReferenceOperation { Property.GetMethod: { } getter }:
+                    effects = InferInitializationMethod(getter, preserved, span);
+                    break;
+                case ISimpleAssignmentOperation
+                    { Target: IPropertyReferenceOperation { Property.SetMethod: { } setter } target } assignment:
+                    effects = InferInitializationMethod(setter, preserved, span)
+                        .Union(InferInitializationOperation(assignment.Value, preserved, span));
+                    if (target.Instance != null)
+                        effects = effects.Union(InferInitializationOperation(target.Instance, preserved, span));
+                    foreach (var argument in target.Arguments)
+                        effects = effects.Union(InferInitializationOperation(argument, preserved, span));
+                    return effects;
+                case IArrayCreationOperation:
+                    effects = EffectSet.From("alloc");
+                    break;
+                case IArgumentOperation:
+                case IConversionOperation { OperatorMethod: null }:
+                case IBinaryOperation { OperatorMethod: null }:
+                case IUnaryOperation { OperatorMethod: null }:
+                case IConditionalOperation:
+                case IArrayInitializerOperation:
+                case IObjectOrCollectionInitializerOperation:
+                    break;
+                default:
+                    return UnknownResolvedOperation($"source initializer operation '{operation.Kind}'", span);
+            }
+            foreach (var child in operation.ChildOperations)
+                effects = effects.Union(InferInitializationOperation(child, preserved, span));
+            return effects;
+        }
+
+        private EffectSet InferInitializationMethod(CS.IMethodSymbol method, bool metadataAllowed, TextSpan span)
+        {
+            if (method.MethodKind == CS.MethodKind.Constructor
+                && _context.CallGraph.InitializationClass(method.ContainingType) is { } owner)
+            {
+                var initialization = InferStaticFieldInitialization(owner, span);
+                if (_context.CallGraph.InitializationFunction(method) is { } constructorId)
+                    return initialization.Union(InferFromInternalFunctions([constructorId]));
+                if (!method.IsImplicitlyDeclared || method.Parameters.Length != 0)
+                    return UnknownResolvedOperation(method.ToDisplayString(), span);
+                return initialization.Union(InferImplicitSourceConstructor(owner, span));
+            }
+            if (_context.CallGraph.InitializationFunction(method) is { } id)
+            {
+                var effects = InferFromInternalFunctions([id]);
+                return method.IsStatic
+                    && _context.CallGraph.InitializationClass(method.ContainingType) is { } methodOwner
+                        ? effects.Union(InferStaticFieldInitialization(methodOwner, span))
+                        : effects;
+            }
+            if (!metadataAllowed || method.Locations.Any(location => location.IsInSource))
+                return UnknownResolvedOperation(method.ToDisplayString(), span);
+            var kind = method.MethodKind switch
+            {
+                CS.MethodKind.Constructor => EffectMemberKind.Constructor,
+                CS.MethodKind.PropertyGet => EffectMemberKind.Getter,
+                CS.MethodKind.PropertySet => EffectMemberKind.Setter,
+                _ => EffectMemberKind.Method
+            };
+            var name = method.AssociatedSymbol is CS.IPropertySymbol property
+                ? property.MetadataName : method.MetadataName;
+            var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                Binding.Metadata.MetadataBinderResult.ToBoundType(method.ContainingType), name,
+                kind == EffectMemberKind.Getter ? null
+                    : method.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray(), kind));
+            return resolution.Status == EffectResolutionStatus.Unknown
+                ? UnknownResolvedOperation(method.ToDisplayString(), span)
+                : resolution.Effects;
+        }
+
+        private EffectSet InferImplicitSourceConstructor(ClassDefinitionNode owner, TextSpan span)
+        {
+            var effects = InferSourceInitialization(owner, isStatic: false, span);
+            var initialization = _context.CallGraph.Initialization(owner);
+            if (initialization is { IsValueType: true })
+                return effects;
+            var selected = initialization?.BaseConstructor;
+            return selected == null
+                ? effects.Union(UnknownResolvedOperation($"{owner.Name}.base..ctor", span))
+                : effects.Union(InferInitializationMethod(selected, metadataAllowed: true, span));
         }
 
         private static bool IsIntrinsicInitializerType(string type)
@@ -6527,25 +6685,28 @@ public sealed class EffectEnforcementPass
                 constructorTarget,
                 newExpr.Span);
 
-            if (resolvedInternalIds.Count > 0)
+            var selected = _context.CallGraph.SourceConstructor(newExpr);
+            if (sourceType != null && (selected == null
+                || !ReferenceEquals(_context.CallGraph.InitializationClass(selected.ContainingType), sourceType)
+                || resolvedInternalIds.Count > 0
+                    && (_context.CallGraph.InitializationFunction(selected) is not { } selectedId
+                        || !resolvedInternalIds.Contains(selectedId))))
+            {
+                effects = effects.Union(UnknownResolvedOperation(
+                    $"{sourceType.FullyQualifiedSymbolIdentity ?? sourceType.Name}..ctor", newExpr.TypeNameSpan));
+            }
+            else if (resolvedInternalIds.Count > 0)
             {
                 effects = effects.Union(InferFromInternalFunctions(resolvedInternalIds));
             }
             else if (sourceType != null)
             {
-                // Only the binder-selected declaration can establish an implicit source constructor.
-                var initializers = sourceType.Fields.Where(field => !field.IsStatic && field.DefaultValue != null)
-                    .Select(field => (field.TypeName, Value: field.DefaultValue!))
-                    .Concat(sourceType.Properties.Where(property => !property.IsStatic && property.DefaultValue != null)
-                        .Select(property => (property.TypeName, Value: property.DefaultValue!)));
-                if (newExpr.Arguments.Count != 0 || sourceType.IsPartial
-                    || sourceType.BaseClass != null || sourceType.InteropBlocks.Count != 0
-                    || sourceType.PreprocessorBlocks.Count != 0
-                    || CallGraphAnalysis.EnumerateConstructors(sourceType).Any(constructor => !constructor.IsStatic)
-                    || initializers.Any(initializer =>
-                        !IsIntrinsicInitializerType(initializer.TypeName) || !IsIntrinsicInitializer(initializer.Value)))
+                if (newExpr.Arguments.Count != 0
+                    || CallGraphAnalysis.EnumerateConstructors(sourceType).Any(constructor => !constructor.IsStatic))
                     effects = effects.Union(UnknownResolvedOperation(
                         $"{sourceType.FullyQualifiedSymbolIdentity ?? sourceType.Name}..ctor", newExpr.TypeNameSpan));
+                else
+                    effects = effects.Union(InferImplicitSourceConstructor(sourceType, newExpr.Span));
             }
             else
             {
@@ -6637,31 +6798,15 @@ public sealed class EffectEnforcementPass
             var resolved = _context.CallGraph.ResolvedConstructorCalls(_context.CurrentFunctionId, initializer.Span);
             if (resolved.Count > 0)
                 return effects.Union(InferFromInternalFunctions(resolved));
-            var targetType = initializer.IsBaseCall
-                ? declaration.Owner.BaseClass
-                : declaration.OwnerName;
-
-            if (string.IsNullOrWhiteSpace(targetType))
-            {
-                return initializer.IsBaseCall
-                    ? effects
-                    : effects.Union(UnknownResolvedOperation(
-                        $"{declaration.OwnerName}..ctor",
-                        initializer.Span));
-            }
-
-            return effects.Union(ResolveConstructorEffects(
-                targetType,
-                initializer.Arguments,
-                initializer.Span,
-                declaration.Constructor));
+            if (_context.CallGraph.ConstructorInitializer(declaration.Constructor) is { } selected)
+                return effects.Union(InferInitializationMethod(selected, metadataAllowed: true, initializer.Span));
+            return effects.Union(UnknownResolvedOperation($"{declaration.OwnerName}..ctor", initializer.Span));
         }
 
         public EffectSet InferFromImplicitBaseConstructor(ConstructorDeclaration declaration)
-            => ResolveConstructorEffects(
-                declaration.Owner.BaseClass!,
-                [],
-                declaration.Constructor.Span);
+            => _context.CallGraph.ConstructorInitializer(declaration.Constructor) is { } selected
+                ? InferInitializationMethod(selected, metadataAllowed: true, declaration.Constructor.Span)
+                : UnknownResolvedOperation($"{declaration.Owner.Name}.base..ctor", declaration.Constructor.Span);
 
         private EffectSet ResolveConstructorEffects(
             string typeName,

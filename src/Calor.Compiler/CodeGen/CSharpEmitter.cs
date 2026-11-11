@@ -766,6 +766,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     internal Func<AstNode, string, string>? AnnotateSource { get; init; }
     internal Func<AstNode, string>? CallableOrigin { get; init; }
+    internal Func<ClassDefinitionNode, string>? TypeOrigin { get; init; }
 
     string IAstResultObserver<string>.Observe(AstNode node, string result) =>
         node is ExpressionNode or StatementNode && result.Length > 0 && AnnotateSource is { } annotate
@@ -5938,6 +5939,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(ClassDefinitionNode node)
     {
+        if (TypeOrigin is { } origin)
+            AppendLine(origin(node));
         EmitCSharpAttributes(node.CSharpAttributes);
         EnsureDefaultConstraintsLegal(
             node.TypeParameters,

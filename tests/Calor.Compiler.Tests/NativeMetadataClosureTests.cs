@@ -1554,6 +1554,199 @@ public sealed class NativeMetadataClosureTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void NativeConstruction_SelectedBaseInitializationCannotLoseCalls(
+        bool declaredConstructor, bool staticInitializer)
+    {
+        var authored = $$"""
+            module BaseInitialization
+              class Parent
+                field int:Value public {{(staticInitializer ? "static" : "")}} = Initialize()
+                func Initialize private static () → int
+                  ! cw
+                  System.Console.WriteLine("base initialization")
+                  return 7
+                {{(declaredConstructor ? "ctor ()" : "")}}
+              class Child
+                extends Parent
+              func Make () → Child
+                ! alloc
+                return new Child()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions
+            {
+                EnableTypeChecking = typed,
+                DeferGeneratedOutputValidation = true
+            });
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Make'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("Missing")]
+    [InlineData("Parent")]
+    public void NativeConstruction_UnavailableBaseInitializationStaysClosed(string baseType)
+    {
+        var authored = $$"""
+            module UnavailableBase
+              class Parent
+                ctor private ()
+              class Child
+                extends {{baseType}}
+              func Make () → Child
+                ! alloc
+                return new Child()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions
+            {
+                EnableTypeChecking = typed,
+                DeferGeneratedOutputValidation = true
+            });
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void NativeConstruction_FieldReceivingConversionIsCharged()
+    {
+        const string authored = """
+            module InitializerConversion
+              class Item
+                op implicit (int:value) → Item
+                  System.Console.WriteLine(value)
+                  return new Item()
+              class Holder
+                field Item:Value public = 1
+                ctor ()
+              func Make () → Holder
+                ! alloc
+                return new Holder()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions
+            {
+                EnableTypeChecking = typed,
+                DeferGeneratedOutputValidation = true
+            });
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Make'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void NativeConstruction_SelectedInitializerMethodChargesOtherTypeInitialization()
+    {
+        const string authored = """
+            module StaticInitializationDependency
+              class Seed
+                field int:Value public static = Initialize()
+                func Initialize private static () → int
+                  ! cw
+                  System.Console.WriteLine("static initialization")
+                  return 7
+                func Read public static () → int
+                  return 42
+              class Holder
+                field int:Value public = Seed.Read()
+              func Make () → Holder
+                ! alloc
+                return new Holder()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions
+            {
+                EnableTypeChecking = typed,
+                DeferGeneratedOutputValidation = true
+            });
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Make'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            var allowed = Program.Compile(source.Replace("! alloc", "! alloc, cw", StringComparison.Ordinal),
+                null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.False(allowed.HasErrors, string.Join("\n", allowed.Diagnostics));
+            var assembly = CompileAssembly(allowed.GeneratedCode);
+            var make = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Make");
+            var holder = make.Invoke(null, null)!;
+            Assert.Equal(42, holder.GetType().GetField("Value")!.GetValue(holder));
+        }
+    }
+
+    [Fact]
+    public void NativeConstruction_StructZeroInitializationDoesNotInventABaseCall()
+    {
+        const string authored = """
+            module ValueInitialization
+              class Point struct
+                field int:Value public
+              func Make () → Point
+                ! alloc
+                return new Point()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            var assembly = CompileAssembly(result.GeneratedCode);
+            var make = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Make");
+            var point = make.Invoke(null, null)!;
+            Assert.True(point.GetType().IsValueType);
+            Assert.Equal(0, point.GetType().GetField("Value")!.GetValue(point));
+        }
+    }
+
+    [Fact]
+    public void NativeConstruction_ProjectContextDoesNotClosePartialDeclarations()
+    {
+        const string authored = """
+            module PartialInitialization
+              class Service partial
+                ctor ()
+                func Read () → int
+                  return 42
+              func Make () → Service
+                ! alloc
+                return new Service()
+            """;
+        foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
+        foreach (var typed in new[] { false, true })
+        {
+            var standalone = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.False(standalone.HasErrors, string.Join("\n", standalone.Diagnostics));
+            var assembly = CompileAssembly(standalone.GeneratedCode);
+            var make = assembly.GetTypes().SelectMany(type => type.GetMethods()).Single(method => method.Name == "Make");
+            var service = make.Invoke(null, null)!;
+            Assert.Equal(42, service.GetType().GetMethod("Read")!.Invoke(service, null));
+            var project = Program.Compile(source, null, new CompilationOptions
+            {
+                EnableTypeChecking = typed,
+                DeferGeneratedOutputValidation = true,
+                CrossModuleFunctionModules = new Dictionary<string, CrossModuleFunctionTarget>()
+            });
+            Assert.Contains(project.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
     [InlineData("", "Next()")]
     [InlineData("(Next())", "1")]
     public void NativeCollectionInitializer_DoesNotDropConstructorOrElementCallEffects(string arguments, string entry)

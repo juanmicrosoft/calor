@@ -60,6 +60,14 @@ public sealed class CallGraphAnalysis
     internal sealed record MetadataMethodGroupCallSelection(
         IMethodSymbol Method, INamedTypeSymbol ReceiverType, IReadOnlyList<FunctionNode> Callbacks);
 
+    internal sealed record InitializationOperation(IOperation Operation, bool Preserved);
+
+    internal sealed record SourceInitialization(
+        IReadOnlyList<InitializationOperation>? Instance,
+        IReadOnlyList<InitializationOperation>? Static,
+        IMethodSymbol? BaseConstructor,
+        bool IsValueType = false);
+
     internal sealed class OperatorBindings
     {
         internal Dictionary<AstNode, HashSet<string>> SourceCalls { get; } = new(ReferenceEqualityComparer.Instance);
@@ -75,6 +83,13 @@ public sealed class CallGraphAnalysis
         internal Dictionary<FieldAccessNode, MetadataMemberTypeSelection> MetadataMemberTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<FieldAccessNode, MetadataGetterSelection> MetadataGetters { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<ExpressionCallNode, MetadataMethodGroupCallSelection> MetadataMethodGroupCalls { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<ClassDefinitionNode, SourceInitialization> Initializations { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<ISymbol, ClassDefinitionNode> InitializationClasses { get; } = new(SymbolEqualityComparer.Default);
+        internal Dictionary<ISymbol, string> InitializationFunctions { get; } = new(SymbolEqualityComparer.Default);
+        internal Dictionary<ConstructorNode, IMethodSymbol> ConstructorInitializers { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<NewExpressionNode, IMethodSymbol> SourceConstructors { get; } = new(ReferenceEqualityComparer.Instance);
+        internal HashSet<ConstructorNode> RecordCopyConstructors { get; } = new(ReferenceEqualityComparer.Instance);
+        internal List<Diagnostics.Diagnostic> SourceConstructionErrors { get; } = [];
     }
 
     private OperatorBindings _operatorBindings = new();
@@ -89,9 +104,23 @@ public sealed class CallGraphAnalysis
         _operatorBindings.MetadataGetters.GetValueOrDefault(field);
     internal MetadataMethodGroupCallSelection? SelectedMetadataMethodGroupCall(ExpressionCallNode call) =>
         _operatorBindings.MetadataMethodGroupCalls.GetValueOrDefault(call);
+    internal SourceInitialization? Initialization(ClassDefinitionNode owner) =>
+        _operatorBindings.Initializations.GetValueOrDefault(owner);
+    internal ClassDefinitionNode? InitializationClass(INamedTypeSymbol type) =>
+        _operatorBindings.InitializationClasses.GetValueOrDefault(type.OriginalDefinition);
+    internal string? InitializationFunction(IMethodSymbol method) =>
+        _operatorBindings.InitializationFunctions.GetValueOrDefault(method.OriginalDefinition);
+    internal IMethodSymbol? ConstructorInitializer(ConstructorNode constructor) =>
+        _operatorBindings.ConstructorInitializers.GetValueOrDefault(constructor);
+    internal IMethodSymbol? SourceConstructor(NewExpressionNode creation) =>
+        _operatorBindings.SourceConstructors.GetValueOrDefault(creation);
+    internal bool IsRecordCopyConstructor(ConstructorNode constructor) =>
+        _operatorBindings.RecordCopyConstructors.Contains(constructor);
+    internal IReadOnlyList<Diagnostics.Diagnostic> SourceConstructionErrors =>
+        _operatorBindings.SourceConstructionErrors;
 
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
-        ContractMode contractMode = ContractMode.Debug)
+        ContractMode contractMode = ContractMode.Debug, bool singleModuleContext = true)
     {
         var bindings = new OperatorBindings();
         var types = bindings.ResultTypes;
@@ -114,6 +143,8 @@ public sealed class CallGraphAnalysis
         var conflictingMembers = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
         var conflictingGetters = new HashSet<FieldAccessNode>(ReferenceEqualityComparer.Instance);
         var conflictingMethodGroupCalls = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
+        var conflictingConstructorInitializers = new HashSet<ConstructorNode>(ReferenceEqualityComparer.Instance);
+        var conflictingSourceConstructors = new HashSet<NewExpressionNode>(ReferenceEqualityComparer.Instance);
         var argumentOwners = new Dictionary<AstNode, (TextSpan Call, int Index)>(ReferenceEqualityComparer.Instance);
         var ambiguousArguments = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
         var sourceArgumentCounts = new Dictionary<TextSpan, int>();
@@ -148,7 +179,9 @@ public sealed class CallGraphAnalysis
         }
         var bindExpressions = operators.Length > 0 || visited.OfType<LambdaExpressionNode>().Any();
         var bindMemberTypes = visited.OfType<FieldAccessNode>().Any();
-        if (!bindExpressions && !bindMemberTypes && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
+        var bindInitialization = EnumerateClasses(module).Any();
+        if (!bindExpressions && !bindMemberTypes && !bindInitialization
+            && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
             return bindings;
 
         void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
@@ -169,9 +202,23 @@ public sealed class CallGraphAnalysis
         var expressionPrefix = $"calor-expression-{markerIdentity}:";
         var expressionEndPrefix = $"calor-expression-end-{markerIdentity}:";
         var callablePrefix = $"calor-callable-{markerIdentity}:";
+        var typePrefix = $"calor-type-{markerIdentity}:";
         var expressions = new List<AstNode>();
         var operatorIds = operators.ToDictionary(pair => pair.Node, pair => pair.Id);
         var emittedCallables = new List<AstNode>();
+        var emittedTypes = new List<ClassDefinitionNode>();
+        var initializationIds = new Dictionary<AstNode, string>(ReferenceEqualityComparer.Instance);
+        foreach (var function in module.Functions)
+            initializationIds[function] = function.Id;
+        foreach (var owner in EnumerateClasses(module))
+        {
+            foreach (var method in EnumerateMethods(owner))
+                initializationIds[method] = $"{owner.Name}.{method.Id}";
+            foreach (var constructor in EnumerateConstructors(owner))
+                initializationIds[constructor] = $"{owner.Name}.{constructor.Id}";
+            foreach (var op in EnumerateOperators(owner))
+                initializationIds[op] = $"{owner.Name}.{op.Id}";
+        }
         string CallableOrigin(AstNode declaration)
         {
             var index = emittedCallables.Count;
@@ -187,7 +234,13 @@ public sealed class CallGraphAnalysis
                 expressions.Add(expression);
                 return $"/*{expressionPrefix}{index}*/{text}/*{expressionEndPrefix}{index}*/";
             },
-            CallableOrigin = CallableOrigin
+            CallableOrigin = CallableOrigin,
+            TypeOrigin = declaration =>
+            {
+                var index = emittedTypes.Count;
+                emittedTypes.Add(declaration);
+                return $"/*{typePrefix}{index}*/";
+            }
         };
         var source = emitter.Emit(module);
         foreach (var diagnostic in emissionDiagnostics)
@@ -245,6 +298,32 @@ public sealed class CallGraphAnalysis
                     {
                         var origin = emittedCallables[index];
                         methods[method] = origin;
+                        if (initializationIds.TryGetValue(origin, out var functionId))
+                            bindings.InitializationFunctions[method.OriginalDefinition] = functionId;
+                        if (origin is ConstructorNode copy && method.ContainingType.IsRecord
+                            && method.Parameters is [var original]
+                            && SymbolEqualityComparer.Default.Equals(original.Type, method.ContainingType))
+                            bindings.RecordCopyConstructors.Add(copy);
+                        if (origin is ConstructorNode constructorOrigin
+                            && declaration is ConstructorDeclarationSyntax constructorSyntax)
+                        {
+                            if (model.GetOperation(constructorSyntax) is not IConstructorBodyOperation
+                                { Initializer: IExpressionStatementOperation { Operation: IInvocationOperation initializer } }
+                                || model.GetDiagnostics(initializer.Syntax.Span).Any(diagnostic =>
+                                    diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                            {
+                                conflictingConstructorInitializers.Add(constructorOrigin);
+                                bindings.ConstructorInitializers.Remove(constructorOrigin);
+                            }
+                            else if (bindings.ConstructorInitializers.TryGetValue(constructorOrigin, out var previous)
+                                && !SameInitializationMethod(previous, initializer.TargetMethod))
+                            {
+                                conflictingConstructorInitializers.Add(constructorOrigin);
+                                bindings.ConstructorInitializers.Remove(constructorOrigin);
+                            }
+                            else if (!conflictingConstructorInitializers.Contains(constructorOrigin))
+                                bindings.ConstructorInitializers[constructorOrigin] = initializer.TargetMethod;
+                        }
                         IReadOnlyList<ParameterNode> parameters = origin switch
                         {
                             FunctionNode function => function.Parameters,
@@ -282,6 +361,9 @@ public sealed class CallGraphAnalysis
                     ranges.Add((starts[endIndex], trivia.SpanStart, expressions[endIndex]));
             }
             ranges.Sort((left, right) => (left.End - left.Start).CompareTo(right.End - right.Start));
+
+            if (bindInitialization)
+                BindInitializations();
             // This narrow initializer proof is independent of the header-only
             // signature projection gate. No other generated operations gain authority.
             if (initializerCreations.Count > 0 && symbols.Length == 0
@@ -503,6 +585,239 @@ public sealed class CallGraphAnalysis
                 }
                 else
                     bindings.MetadataMethodGroupCalls[origin] = selection;
+            }
+
+            void BindInitializations()
+            {
+                var declarations = new Dictionary<INamedTypeSymbol,
+                    List<(ClassDefinitionNode Origin, TypeDeclarationSyntax Syntax)>>(SymbolEqualityComparer.Default);
+                foreach (var syntax in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (model.GetDeclaredSymbol(syntax) is not INamedTypeSymbol type)
+                        continue;
+                    foreach (var trivia in syntax.GetLeadingTrivia())
+                    {
+                        if (!TryReadMarker(trivia, typePrefix, out var index))
+                            continue;
+                        if (!declarations.TryGetValue(type.OriginalDefinition, out var parts))
+                            declarations[type.OriginalDefinition] = parts = [];
+                        parts.Add((emittedTypes[index], syntax));
+                    }
+                }
+
+                foreach (var (type, parts) in declarations)
+                    if (parts is [var part] && type.DeclaringSyntaxReferences.Length == 1)
+                    {
+                        bindings.InitializationClasses[type] = part.Origin;
+                        if (part.Syntax is not RecordDeclarationSyntax record)
+                            continue;
+                        var primary = record.ParameterList?.Parameters.FirstOrDefault() is { } parameter
+                            && model.GetDeclaredSymbol(parameter) is IParameterSymbol selectedParameter
+                                ? selectedParameter.ContainingSymbol as IMethodSymbol
+                                : null;
+                        if (record.ParameterList?.Parameters.Count is null or 0)
+                        {
+                            var candidates = type.InstanceConstructors.Where(constructor =>
+                                    constructor.Parameters.Length == 0
+                                    && (constructor.IsImplicitlyDeclared
+                                        || constructor.DeclaringSyntaxReferences.Any(reference =>
+                                            reference.SyntaxTree == tree && reference.Span == record.Span)))
+                                .Take(2).ToArray();
+                            primary = candidates is [var selected] ? selected : null;
+                        }
+                        if (part.Origin.RecordPrimaryConstructor is { } primaryOrigin && primary != null)
+                        {
+                            methods[primary.OriginalDefinition] = primaryOrigin;
+                            bindings.InitializationFunctions[primary.OriginalDefinition] =
+                                $"{part.Origin.Name}.{primaryOrigin.Id}";
+                            if (record.BaseList?.Types.OfType<PrimaryConstructorBaseTypeSyntax>()
+                                    .Select(baseType => model.GetOperation(baseType))
+                                    .OfType<IInvocationOperation>().Take(2).ToArray() is [var baseCall]
+                                && !model.GetDiagnostics(baseCall.Syntax.Span).Any(diagnostic =>
+                                    diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                                bindings.ConstructorInitializers[primaryOrigin] = baseCall.TargetMethod;
+                        }
+                        var copies = type.InstanceConstructors.Where(constructor =>
+                            constructor.IsImplicitlyDeclared && constructor.Parameters is [var original]
+                            && SymbolEqualityComparer.Default.Equals(original.Type, type)).Take(2).ToArray();
+                        var copy = copies is [var selectedCopy] ? selectedCopy : null;
+                        if (part.Origin.RecordCopyConstructor is { } copyOrigin && copy != null)
+                        {
+                            methods[copy.OriginalDefinition] = copyOrigin;
+                            bindings.InitializationFunctions[copy.OriginalDefinition] =
+                                $"{part.Origin.Name}.{copyOrigin.Id}";
+                            bindings.RecordCopyConstructors.Add(copyOrigin);
+                            var baseCopies = type.BaseType?.InstanceConstructors.Where(constructor =>
+                                constructor.Parameters is [var original]
+                                && SymbolEqualityComparer.Default.Equals(original.Type, type.BaseType)
+                                && compilation.IsSymbolAccessibleWithin(constructor, type)).Take(2).ToArray();
+                            if (baseCopies is [var baseCopy])
+                                bindings.ConstructorInitializers[copyOrigin] = baseCopy;
+                        }
+                    }
+                foreach (var (type, parts) in declarations)
+                {
+                    if (parts is not [var part] || !bindings.InitializationClasses.ContainsKey(type)
+                        || part.Origin.IsPartial && !singleModuleContext
+                        || model.GetDiagnostics(Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+                            part.Syntax.SpanStart, part.Syntax.OpenBraceToken.SpanStart)).Any(diagnostic =>
+                            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                    {
+                        foreach (var invalid in parts)
+                            bindings.Initializations[invalid.Origin] = new SourceInitialization(null, null, null);
+                        continue;
+                    }
+                    var instance = new List<InitializationOperation>();
+                    var statics = new List<InitializationOperation>();
+                    var validInstance = true;
+                    var validStatic = true;
+                    foreach (var member in part.Syntax.Members)
+                    {
+                        switch (member)
+                        {
+                            case FieldDeclarationSyntax field:
+                                foreach (var variable in field.Declaration.Variables)
+                                    AddInitializer(variable.Initializer,
+                                        field.Modifiers.Any(SyntaxKind.StaticKeyword));
+                                break;
+                            case PropertyDeclarationSyntax property:
+                                AddInitializer(property.Initializer,
+                                    property.Modifiers.Any(SyntaxKind.StaticKeyword));
+                                break;
+                            case ConstructorDeclarationSyntax constructor:
+                                if (model.GetDeclaredSymbol(constructor) is not IMethodSymbol selected
+                                    || !methods.ContainsKey(selected.OriginalDefinition))
+                                {
+                                    if (constructor.Modifiers.Any(SyntaxKind.StaticKeyword))
+                                        validStatic = false;
+                                    else
+                                        validInstance = false;
+                                }
+                                break;
+                            case MethodDeclarationSyntax { AttributeLists.Count: 0 }:
+                            case OperatorDeclarationSyntax:
+                            case ConversionOperatorDeclarationSyntax:
+                            case IndexerDeclarationSyntax:
+                            case EventDeclarationSyntax:
+                            case EventFieldDeclarationSyntax eventField when
+                                eventField.Declaration.Variables.All(variable => variable.Initializer == null):
+                            case BaseTypeDeclarationSyntax:
+                            case DelegateDeclarationSyntax:
+                                break;
+                            default:
+                                validInstance = validStatic = false;
+                                break;
+                        }
+                    }
+                    // This is the language's implicit base() call, not a bare-name lookup.
+                    // Optional/params-only and ambiguous base overload sets remain unavailable.
+                    var baseConstructors = type.BaseType?.InstanceConstructors
+                        .Where(constructor => constructor.Parameters.Length == 0
+                            && compilation.IsSymbolAccessibleWithin(constructor, type)).Take(2).ToArray();
+                    var baseConstructor = baseConstructors is [var selectedBase] ? selectedBase : null;
+                    if (bindings.Initializations.TryGetValue(part.Origin, out var previous))
+                    {
+                        validInstance &= previous.Instance != null;
+                        validStatic &= previous.Static != null;
+                        if (previous.Instance != null) instance.AddRange(previous.Instance);
+                        if (previous.Static != null) statics.AddRange(previous.Static);
+                        if (previous.BaseConstructor == null || baseConstructor == null
+                            || !SameInitializationMethod(previous.BaseConstructor, baseConstructor))
+                            baseConstructor = null;
+                    }
+                    bindings.Initializations[part.Origin] = new SourceInitialization(
+                        validInstance ? instance : null, validStatic ? statics : null, baseConstructor,
+                        type.IsValueType);
+                    if (part.Origin is { BaseClass: not null, RecordPrimaryConstructor: { Initializer: null } primary }
+                        && baseConstructor != null)
+                        bindings.ConstructorInitializers[primary] = baseConstructor;
+
+                    void AddInitializer(EqualsValueClauseSyntax? initializer, bool isStatic)
+                    {
+                        if (initializer == null)
+                            return;
+                        var operation = model.GetOperation(initializer) switch
+                        {
+                            IFieldInitializerOperation field => field.Value,
+                            IPropertyInitializerOperation property => property.Value,
+                            _ => null
+                        };
+                        if (operation == null
+                            || model.GetDiagnostics(initializer.Span).Any(diagnostic =>
+                                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                        {
+                            if (isStatic) validStatic = false;
+                            else validInstance = false;
+                            return;
+                        }
+                        (isStatic ? statics : instance).Add(new InitializationOperation(
+                            operation, Origin(operation) is not ExpressionNode));
+                    }
+                }
+
+                // An invalid getter argument does not select a constructor. Preserve the
+                // actual C# failure instead of inventing an unknown constructor effect.
+                foreach (var syntax in root.DescendantNodes().OfType<ObjectCreationExpressionSyntax>())
+                {
+                    if (SyntaxOrigin(syntax) is not NewExpressionNode creation)
+                        continue;
+                    if (model.GetTypeInfo(syntax.Type).Type is not INamedTypeSymbol type
+                        || !declarations.ContainsKey(type.OriginalDefinition))
+                    {
+                        conflictingSourceConstructors.Add(creation);
+                        bindings.SourceConstructors.Remove(creation);
+                        continue;
+                    }
+                    if (model.GetOperation(syntax) is IObjectCreationOperation { Constructor: { } constructor }
+                        && !model.GetDiagnostics(syntax.Span).Any(diagnostic =>
+                            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                    {
+                        if (bindings.SourceConstructors.TryGetValue(creation, out var previous)
+                            && !SameInitializationMethod(previous, constructor))
+                        {
+                            conflictingSourceConstructors.Add(creation);
+                            bindings.SourceConstructors.Remove(creation);
+                        }
+                        else if (!conflictingSourceConstructors.Contains(creation))
+                            bindings.SourceConstructors[creation] = constructor;
+                    }
+                    else
+                    {
+                        conflictingSourceConstructors.Add(creation);
+                        bindings.SourceConstructors.Remove(creation);
+                    }
+                    var invalidReads = syntax.ArgumentList?.Arguments
+                        .SelectMany(argument => argument.Expression.DescendantNodesAndSelf()
+                            .OfType<MemberAccessExpressionSyntax>())
+                        .Where(member =>
+                        {
+                            var info = model.GetSymbolInfo(member);
+                            return (info.Symbol == null ? info.CandidateSymbols : [info.Symbol])
+                                .OfType<IPropertySymbol>().Any(property =>
+                                    declarations.ContainsKey(property.ContainingType.OriginalDefinition));
+                        }) ?? [];
+                    foreach (var error in invalidReads.SelectMany(member => model.GetDiagnostics(member.Span))
+                                 .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                    {
+                        var message = $"Generated C# failed compilation ({error.Id}): {error.GetMessage()}";
+                        if (!bindings.SourceConstructionErrors.Any(previous =>
+                                previous.Span == creation.Span && previous.Message == message))
+                            bindings.SourceConstructionErrors.Add(new Diagnostics.Diagnostic(
+                                DiagnosticCode.CodeGenCompilationError, message, creation.Span,
+                                Diagnostics.DiagnosticSeverity.Error));
+                    }
+                }
+            }
+
+            bool SameInitializationMethod(IMethodSymbol left, IMethodSymbol right)
+            {
+                var leftId = bindings.InitializationFunctions.GetValueOrDefault(left.OriginalDefinition);
+                var rightId = bindings.InitializationFunctions.GetValueOrDefault(right.OriginalDefinition);
+                return leftId != null || rightId != null ? leftId != null && leftId == rightId
+                    : SameType(left.ContainingType, right.ContainingType) && left.MetadataName == right.MetadataName
+                        && left.Parameters.Length == right.Parameters.Length
+                        && left.Parameters.Zip(right.Parameters).All(pair =>
+                            pair.First.RefKind == pair.Second.RefKind && SameType(pair.First.Type, pair.Second.Type));
             }
 
             void AddMetadataMemberType(IOperation operation)
@@ -1568,7 +1883,8 @@ public sealed class CallGraphAnalysis
             }
         }
 
-        var operatorBindings = ResolveOperatorCalls(ast, contractMode: projectionContractMode);
+        var operatorBindings = ResolveOperatorCalls(ast, contractMode: projectionContractMode,
+            singleModuleContext: crossModuleFunctions == null);
         var operatorCalls = operatorBindings.SourceCalls;
         foreach (var function in functions.Values)
         {
@@ -1748,6 +2064,13 @@ public sealed class CallGraphAnalysis
                         .Take(2).ToArray();
                     if (declarations is [var declaration])
                         legacyIds.TryAdd(declaration.Id, $"{cls.Name}.{method.Id}");
+                }
+                foreach (var constructor in EnumerateConstructors(cls))
+                {
+                    var declarations = callableDeclarations[(owner.QualifiedName, constructor.Span, cls.IdentifierSpan)]
+                        .Take(2).ToArray();
+                    if (declarations is [var declaration])
+                        legacyIds.TryAdd(declaration.Id, $"{cls.Name}.{constructor.Id}");
                 }
             }
             foreach (var declaration in EnumerateInterfaces(ast))
