@@ -7245,14 +7245,15 @@ public sealed class Binder
             computedMethodName: computedMethodName);
         var isSourceExtensionCall = false;
         if (resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
-            && computedReceiver is not null and not BoundTypeReferenceExpression
-            && computedReceiver.Type is BoundTypes.NominalBoundType { Declaration.IsEnum: true })
+            && computedReceiver is not null and not BoundTypeReferenceExpression)
         {
             IReadOnlyList<BoundExpression> extensionArguments = [computedReceiver, .. args];
             IReadOnlyList<string?>? extensionNames = argumentNames is null ? null : [null, .. argumentNames];
             IReadOnlyList<string?>? extensionModifiers = argumentModifiers is null ? null : [null, .. argumentModifiers];
-            var extensionResolution = ResolveSourceEnumExtension(
-                callExpr, computedMethodName!, extensionArguments, extensionNames, extensionModifiers);
+            var extensionResolution = computedReceiver.Type is BoundTypes.NominalBoundType { Declaration.IsEnum: true }
+                ? ResolveSourceEnumExtension(
+                    callExpr, computedMethodName!, extensionArguments, extensionNames, extensionModifiers)
+                : ResolveSelectedSourceExtension(callExpr, extensionArguments);
             if (extensionResolution.Kind != OverloadResolutionKind.NotFound || extensionResolution.HasOpaqueOverloads)
             {
                 resolution = extensionResolution;
@@ -7260,7 +7261,10 @@ public sealed class Binder
                 argumentNames = extensionNames;
                 argumentModifiers = extensionModifiers;
                 isSourceExtensionCall = true;
-                if (resolution.Function is { } selected)
+                // Image-selected calls must retain receiver syntax: a static
+                // spelling can select a competing non-extension overload.
+                if (resolution.Function is { } selected
+                    && computedReceiver.Type is BoundTypes.NominalBoundType { Declaration.IsEnum: true })
                     SourceExtensionCallTargets[callExpr.Span] = selected;
             }
         }
@@ -7432,6 +7436,29 @@ public sealed class Binder
                     ? genericReturn as BoundTypes.GenericInstantiationBoundType : null)
         };
         return boundCall;
+    }
+
+    private OverloadResolutionResult ResolveSelectedSourceExtension(
+        CallExpressionNode call, IReadOnlyList<BoundExpression> arguments)
+    {
+        if (!ResolveSourceCallConversions || _asyncTypeModule is null)
+            return OverloadResolutionResult.NotFound();
+        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
+            _asyncTypeModule, _diagnostics, ProjectionContractMode);
+        if (_sourceCallConversions.SelectedCalls.TryGetValue(call.Span, out var selected)
+            && selected.IncludesExtensionReceiver
+            && selected.Arguments.Count == arguments.Count
+            && selected.Arguments.Select(mapping => mapping.ArgumentIndex).SequenceEqual(
+                Enumerable.Range(0, arguments.Count))
+            && selected.Declaration is MethodNode { IsStatic: true, Parameters.Count: > 0 } method
+            && method.Parameters[0].Modifier.HasFlag(ParameterModifier.This)
+            && _functionSymbols.TryGetValue(method, out var function)
+            && _staticMethodSymbols.Contains(function) && IsFunctionAccessible(function))
+            return OverloadResolutionResult.Resolved(function, selected.ReturnType, selected.Arguments);
+        // A selected or competing source extension cannot fall back to a
+        // same-named metadata contract when its native identity is unavailable.
+        return _sourceCallConversions.SourceExtensionCalls.Contains(call.Span)
+            ? OverloadResolutionResult.Opaque() : OverloadResolutionResult.NotFound();
     }
 
     private OverloadResolutionResult ResolveSourceEnumExtension(

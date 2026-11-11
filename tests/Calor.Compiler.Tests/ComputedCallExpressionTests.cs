@@ -314,6 +314,287 @@ public sealed class ComputedCallExpressionTests
             && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourceExtension_NativeImageOwnsConstructedOverloadAndNamedArgumentIdentity(bool explicitType)
+    {
+        var source = $$"""
+            module NativeSourceSelections
+              module Extensions
+                func Pick<T> (this string?:value, T:item, int:amount = 7) → int
+                  !
+                  return amount
+                func Pick<T> (this object?:value, T:item, int:amount = 7) → int
+                  ! cw
+                  return 0
+              func Use (string?:value) → int
+                !
+                return value.Pick{{(explicitType ? "<int>" : "")}}(amount: 9, item: 4)
+            """;
+        var (ast, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var caller = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(caller).OfType<BoundCallExpression>());
+        Assert.True(call.IsSourceExtensionCall);
+        Assert.Null(call.ResolvedMetadataMethod);
+        var match = Assert.Single(call.SelectedOverloadMatches);
+        Assert.Same(call.ResolvedSymbol, match.Function);
+        Assert.Same(bound.SymbolsById[match.Function.Id], match.Function);
+        Assert.Equal("Extensions.Pick", match.Function.Name);
+        Assert.Equal(1, match.Function.GenericArity);
+        Assert.Contains("STRING", match.Function.Parameters[0].TypeName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(new[] { 0, 1, 2 }, match.Arguments.Select(argument => argument.ArgumentIndex));
+        Assert.Equal(new[] { 0, 2, 1 }, match.Arguments.Select(argument => argument.ParameterIndex));
+        Assert.Equal("int", match.Arguments[2].ParameterType);
+        Assert.Equal(new string?[] { null, "amount", "item" }, call.ArgumentNames);
+        Assert.Same(call.EvaluatedReceiver, call.Arguments[0]);
+        Assert.Equal(1, call.Children.Count(child => ReferenceEquals(child, call.EvaluatedReceiver)));
+        Assert.Empty(bound.Functions.Single(function => function.Symbol == match.Function).DeclaredEffects);
+        Assert.Contains(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[caller.SymbolId],
+            edge => edge.Callee == match.Function.Id && edge.Span == call.Span);
+        var selected = CallGraphAnalysis.ResolveOperatorCalls(ast).SelectedCalls[call.Span];
+        Assert.Same(ast.Classes.Single().Methods[0], selected.Declaration);
+        Assert.Equal(match.Arguments, selected.Arguments);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains($"value.Pick{(explicitType ? "<int>" : "")}(amount: 9, item: 4)", compiled.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData("! cw\n      System.Console.WriteLine(value)\n      return 1", "cw")]
+    [InlineData("!\n      System.GC.KeepAlive(value)\n      return 1", "unknown")]
+    public void SourceExtension_ChargesTheSelectedNativeBodyWithoutMetadataAuthority(string body, string effect)
+    {
+        var source = $$"""
+            module NativeSourceEffects
+              module Extensions
+                func Count (this string?:value) → int
+                  {{body}}
+              func Use (string?:value) → int
+                !
+                return value.Count()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => call.IsSourceExtensionCall);
+        Assert.Equal("Extensions.Count", call.ResolvedSymbol?.Name);
+        Assert.Null(call.ResolvedMetadataMethod);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains($"Function 'Use' uses effect '{effect}'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourceExtension_SourceAndMetadataShadowingKeepTheActuallySelectedOwner(bool instance)
+    {
+        var source = $$"""
+            module NativeExtensionShadowing
+              using System.Linq
+              module Extensions
+                func {{(instance ? "Contains" : "Count")}} (this string:value{{(instance ? ", string:item" : "")}}) → {{(instance ? "bool" : "int")}}
+                  ! cw
+                  System.Console.WriteLine(value)
+                  return {{(instance ? "true" : "1")}}
+              func Use (string:value) → {{(instance ? "bool" : "int")}}
+                !
+                return value.{{(instance ? "Contains(\"x\")" : "Count()")}}
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(
+            function => function.Symbol.Name == "Use")).OfType<BoundCallExpression>());
+        Assert.Equal(!instance, call.IsSourceExtensionCall);
+        Assert.Equal(instance, call.ResolvedMetadataMethod is not null);
+        Assert.Equal(instance, call.ResolvedSymbol is null);
+        var compiled = Program.Compile(source);
+        Assert.Equal(!instance, compiled.HasErrors);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        if (!instance)
+            Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("", "value.Count(true)")]
+    [InlineData("  module Other\n    func Count (this string:value) → int\n      !\n      return 2\n", "value.Count()")]
+    [InlineData("raw", "value.Count()")]
+    [InlineData("raw-only", "value.Count()")]
+    public void SourceExtension_UnresolvedOrAmbiguousNativeCallsCannotBorrowLinqPurity(string extra, string expression)
+    {
+        var native = extra == "raw-only" ? "" : """
+              module Extensions
+                func Count (this string:value) → int
+                  !
+                  return 1
+
+            """;
+        if (extra is "raw" or "raw-only")
+        {
+            const string raw = "public static int Count(this string value) => 2;";
+            extra = $"  module Other\n    raw member {raw.Length}\n{raw}\n";
+        }
+        var source = $$"""
+            module NativeExtensionBoundaries
+              using System.Linq
+            {{native}}{{extra}}  func Use (string:value) → int
+                !
+                return {{expression}}
+            """;
+        var (ast, bound, _) = Bind(source);
+        var caller = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(caller).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.True(call.HasOpaqueOverloads);
+        Assert.Empty(CallGraphAnalysis.BuildResolved(bound).ForwardGraph[caller.SymbolId]);
+        Assert.Empty(CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions.Single().Id, "<expression-call>", call.Span));
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        var effects = new DiagnosticBag();
+        new EffectEnforcementPass(effects, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
+        Assert.Contains(effects.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourceExtension_RequiresACompleteNativeImageInEveryConfiguration(bool valid)
+    {
+        var source = $$"""
+            module NativeExtensionConfigurations
+              module Extensions partial
+                func Read (this string:value) → int
+                  !
+                  return 1
+              func Use (string:value) → int
+                !
+                pp FEATURE
+                  let marker = {{(valid ? "1" : "MissingSibling()")}}
+                pp else
+                  let marker = 0
+                return value.Read()
+            """;
+        var (_, bound, _) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => call.ResolvedMethodName == "Read");
+        Assert.Equal(valid, call.ResolvedSymbol is not null);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.Equal(!valid, Program.Compile(source).HasErrors);
+    }
+
+    [Fact]
+    public void SourceExtension_AnApplicableNativeInstanceMemberStillShadowsTheExtension()
+    {
+        const string source = """
+            module NativeInstanceShadowing
+              class Holder
+                func Read () → int
+                  ! cw
+                  System.Console.WriteLine("instance")
+                  return 1
+              module Extensions
+                func Read (this Holder:value) → int
+                  !
+                  return 2
+              func Use (Holder:value) → int
+                !
+                return value.Read()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Use")).OfType<BoundCallExpression>());
+        Assert.False(call.IsSourceExtensionCall);
+        Assert.Equal("Holder.Read", call.ResolvedSymbol?.Name);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.Contains(Program.Compile(source).Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("string", true)]
+    [InlineData("string?", false)]
+    public void SourceExtension_StillChecksTheActualDeclaredReceiverParameter(string receiverType, bool mismatch)
+    {
+        var source = $$"""
+            module SourceReceiverNullability
+              module Extensions
+                func Read (this {{receiverType}}:value) → int
+                  !
+                  return 1
+              func Use (string?:value) → int
+                !
+                return value.Read()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.True(call.IsSourceExtensionCall);
+        Assert.Equal("Extensions.Read", call.ResolvedSymbol?.Name);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.Equal(mismatch, diagnostics.Any(diagnostic => diagnostic.Code == "Calor0274"));
+        Assert.Equal(mismatch, Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("Missing().Read(1)")]
+    [InlineData("value.Read(Missing())")]
+    [InlineData("(1).Read(1)")]
+    public void SourceExtension_UnresolvedInputsCannotAcquireTheNativeCalleeRow(string expression)
+    {
+        var source = $$"""
+            module UnresolvedSourceInputs
+              module Extensions
+                func Read (this string:value, int:amount) → int
+                  !
+                  return amount
+              func Use (string:value) → int
+                !
+                return {{expression}}
+            """;
+        var (_, bound, _) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => call.ResolvedMethodName == "Read");
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Null(call.ResolvedMetadataMethod);
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void SourceExtension_ConflictingNativeDeclarationsAcrossConfigurationsRemainOpaque()
+    {
+        const string source = """
+            module SourceSelectionConfigurations
+              module Extensions
+                pp FEATURE
+                  func Read (this string:value) → int
+                    ! cw
+                    return 1
+                pp else
+                  func Read (this string:value) → int
+                    !
+                    return 2
+              func Use (string:value) → int
+                !
+                return value.Read()
+            """;
+        var (_, bound, _) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.True(call.HasOpaqueOverloads);
+        Assert.Contains(Program.Compile(source).Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
     [Fact]
     public void SourceExtension_DoesNotBorrowTheSameNamedMetadataContract()
     {

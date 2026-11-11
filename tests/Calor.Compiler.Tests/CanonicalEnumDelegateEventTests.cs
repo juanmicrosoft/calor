@@ -13,12 +13,153 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using Binder = Calor.Compiler.Binding.Binder;
+using BoundNullability = Calor.Compiler.Binding.BoundTypes.NullableAnnotation;
 
 namespace Calor.Compiler.Tests;
 
 [Collection("ProductionPipelineConsole")]
 public sealed class CanonicalEnumDelegateEventTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeSourceExtensionAllowsItsDeclaredNullableOrObliviousReceiverWithoutAnInstanceGuard(bool oblivious)
+    {
+        var type = oblivious ? "string" : "string?";
+        var source = $$"""
+            module SourceNullReceivers{{(oblivious ? " block overflow unchecked nullable oblivious" : "")}}
+              module StringExtensions
+                func IsNullOrEmpty (this {{type}}:s) → bool
+                  return ((s == null) || (s.Length == 0))
+              func Use ({{type}}:s) → int
+                !
+                let empty = s.IsNullOrEmpty()
+                if empty
+                  return 0
+                return 1
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.True(call.IsSourceExtensionCall);
+        Assert.Equal("StringExtensions.IsNullOrEmpty", call.ResolvedSymbol?.Name);
+        Assert.Equal(oblivious ? BoundNullability.Oblivious : BoundNullability.Annotated,
+            Assert.IsType<NominalBoundType>(call.Arguments[0].Type).NullableAnnotation);
+        Assert.Null(call.ResolvedMetadataMethod);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("s.IsNullOrEmpty()", compiled.GeneratedCode);
+        Assert.DoesNotContain("ThrowIfNull", compiled.GeneratedCode);
+        Execute(compiled.GeneratedCode, assembly =>
+        {
+            var use = assembly.GetType("GlobalModule")!.GetMethod("Use")!;
+            Assert.Equal(0, use.Invoke(null, [null]));
+            Assert.Equal(0, use.Invoke(null, [""]));
+            Assert.Equal(1, use.Invoke(null, ["word"]));
+        });
+    }
+
+    [Fact]
+    public void NativeSourceExtensionKeepsReducedSyntaxWhenStaticSpellingWouldSelectAnotherOverload()
+    {
+        const string source = """
+            module SourceStaticOverloads
+              module Extensions
+                func Pick (this object:value) → int
+                  !
+                  return 1
+                func Pick (string:value) → int
+                  ! cw
+                  System.Console.WriteLine("wrong static overload")
+                  return 2
+              func Main (string:value) → int
+                !
+                return value.Pick()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions.Single(function =>
+            function.Symbol.Name == "Main")).OfType<BoundCallExpression>());
+        Assert.True(call.IsSourceExtensionCall);
+        Assert.Equal("object", call.ResolvedSymbol!.Parameters[0].TypeName);
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("return value.Pick();", compiled.GeneratedCode);
+        Assert.DoesNotContain("return global::Extensions.Pick(", compiled.GeneratedCode);
+        Execute(compiled.GeneratedCode, assembly => Assert.Equal(1,
+            assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, ["value"])));
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void NativeSourceExtensionChargesAndEvaluatesReceiverAndNamedArgumentsOnceInOrder(
+        bool selectedEffect, bool receiverEffect, bool argumentEffect)
+    {
+        var source = $$"""
+            module SourceReceiverOrder
+              module Extensions
+                func Pick (this string:value, int:first, int:second) → int
+                  !{{(selectedEffect ? " cw" : "")}}
+                  {{(selectedEffect ? "System.Console.WriteLine(\"selected\")" : "")}}
+                  return first + second
+              func Receiver () → string
+                !{{(receiverEffect ? " cw" : "")}}
+                {{(receiverEffect ? "System.Console.WriteLine(\"receiver\")" : "")}}
+                return "value"
+              func First () → int
+                !{{(argumentEffect ? " cw" : "")}}
+                {{(argumentEffect ? "System.Console.WriteLine(\"first\")" : "")}}
+                return 3
+              func Second () → int
+                !{{(argumentEffect ? " cw" : "")}}
+                {{(argumentEffect ? "System.Console.WriteLine(\"second\")" : "")}}
+                return 4
+              func Main () → int
+                ! cw
+                return Receiver().Pick(second: Second(), first: First())
+            """;
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(Parse(source));
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var main = bound.Functions.Single(function => function.Symbol.Name == "Main");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(main).OfType<BoundCallExpression>().ToArray();
+        Assert.Equal(4, calls.Length);
+        var selected = Assert.Single(calls, call => call.IsSourceExtensionCall);
+        Assert.Equal(new[] { 0, 2, 1 },
+            Assert.Single(selected.SelectedOverloadMatches).Arguments.Select(argument => argument.ParameterIndex));
+        Assert.Same(selected.EvaluatedReceiver, selected.Arguments[0]);
+        Assert.Equal(1, selected.Children.Count(child => ReferenceEquals(child, selected.EvaluatedReceiver)));
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var previous = Console.Out;
+        using var output = new StringWriter();
+        try
+        {
+            Console.SetOut(output);
+            Execute(compiled.GeneratedCode, assembly => Assert.Equal(7,
+                assembly.GetType("GlobalModule")!.GetMethod("Main")!.Invoke(null, null)));
+        }
+        finally
+        {
+            Console.SetOut(previous);
+        }
+        var expected = new List<string>();
+        if (receiverEffect) expected.Add("receiver");
+        if (argumentEffect) expected.AddRange(["second", "first"]);
+        if (selectedEffect) expected.Add("selected");
+        Assert.Equal(expected, output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        var pureCaller = source.Replace("func Main () → int\n    ! cw", "func Main () → int\n    !",
+            StringComparison.Ordinal);
+        Assert.Contains(Program.Compile(pureCaller).Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("Function 'Main' uses effect 'cw'", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("", "Color.Red")]
     [InlineData("", "color")]

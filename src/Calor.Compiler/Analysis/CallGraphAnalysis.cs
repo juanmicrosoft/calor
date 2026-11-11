@@ -78,6 +78,7 @@ public sealed class CallGraphAnalysis
         internal Dictionary<ExpressionNode, string> ResultTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal List<string> Failures { get; } = [];
         internal Dictionary<TextSpan, SourceCallSelection> SelectedCalls { get; } = [];
+        internal HashSet<TextSpan> SourceExtensionCalls { get; } = [];
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
         internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
@@ -189,6 +190,8 @@ public sealed class CallGraphAnalysis
                 RegisterArgument(arguments[index], (node.Span, index));
         }
         var bindExpressions = operators.Length > 0 || visited.OfType<LambdaExpressionNode>().Any();
+        var bindSourceExtensions = visited.OfType<ExpressionCallNode>().Any(call =>
+            call.TargetExpression is FieldAccessNode);
         var bindNullGuards = visited.OfType<BinaryOperationNode>().Any(binary =>
             binary.Operator == BinaryOperator.Equal
             && (binary.Left is ReferenceNode { IsNullLiteral: true }
@@ -494,11 +497,12 @@ public sealed class CallGraphAnalysis
                             bindings.BuiltInNullGuardOperations.Remove(guard);
                         }
                     }
+                    if (operation is IInvocationOperation invocation
+                        && (bindExpressions || invocation.TargetMethod.IsExtensionMethod))
+                        AddCall(invocation, invocation.TargetMethod, invocation.Arguments);
                     if (!bindExpressions)
                         continue;
-                    if (operation is IInvocationOperation invocation)
-                        AddCall(invocation, invocation.TargetMethod, invocation.Arguments);
-                    else if (operation is IObjectCreationOperation { Constructor: { } constructor } creation)
+                    if (operation is IObjectCreationOperation { Constructor: { } constructor } creation)
                         AddCall(creation, constructor, creation.Arguments);
                     if (operation is IDelegateCreationOperation
                         {
@@ -594,13 +598,19 @@ public sealed class CallGraphAnalysis
                 conflictingMetadataCalls.Add(call);
                 bindings.ContextualMetadataCalls.Remove(call);
             }
-            if (!bindExpressions)
+            if (!bindExpressions && !bindSourceExtensions)
                 return;
 
             foreach (var syntax in root.DescendantNodes().Where(node =>
                          node is InvocationExpressionSyntax or ObjectCreationExpressionSyntax))
             {
-                var candidates = model.GetSymbolInfo(syntax).CandidateSymbols.OfType<IMethodSymbol>();
+                var info = model.GetSymbolInfo(syntax);
+                var candidates = info.CandidateSymbols.OfType<IMethodSymbol>();
+                if (syntax is InvocationExpressionSyntax
+                    && SyntaxOrigin(syntax) is ExpressionCallNode { TargetExpression: FieldAccessNode } extensionCall
+                    && candidates.Prepend(info.Symbol as IMethodSymbol).Any(method => method is
+                        { IsExtensionMethod: true } && method.Locations.Any(location => location.IsInSource)))
+                    bindings.SourceExtensionCalls.Add(extensionCall.Span);
                 if (!candidates.Any(candidate => methods.ContainsKey(candidate.OriginalDefinition))
                     || !model.GetDiagnostics(syntax.Span).Any(diagnostic => diagnostic.Id == "CS0121"))
                     continue;
@@ -1219,6 +1229,8 @@ public sealed class CallGraphAnalysis
                     return;
                 }
                 if (conflictingCalls.Contains(callSite))
+                    return;
+                if (includesReceiver && !validProofContext)
                     return;
                 var selection = new SourceCallSelection(declaration,
                     Binding.Metadata.MetadataBinderResult.ToBoundType(method.ReturnType).DisplayString,
