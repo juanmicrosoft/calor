@@ -1,8 +1,18 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler;
+using Binder = Calor.Compiler.Binding.Binder;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
+using Calor.Compiler.Verification.Z3.Cache;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using System.Reflection;
 using Xunit;
+using Z3ContractVerificationResult = Calor.Compiler.Verification.Z3.ContractVerificationResult;
 
 namespace Calor.Verification.Tests;
 
@@ -226,5 +236,281 @@ public class BclContractTests
         Assert.NotNull(dotted);
         Assert.NotNull(field);
         Assert.Equal(dotted.ToString(), field.ToString());
+    }
+
+    [SkippableTheory]
+    [InlineData("string.IsNullOrEmpty(s)", "bool", "", "true")]
+    [InlineData("string.Concat(s, \"d\")", "string", "abc", "\"abcd\"")]
+    [InlineData("string.Concat(s.Substring(1), \"d\")", "string", "abc", "\"bcd\"")]
+    [InlineData("s.Substring(1).Contains(\"b\")", "bool", "abc", "true")]
+    [InlineData("s.StartsWith(\"a\", System.StringComparison.Ordinal)", "bool", "abc", "true")]
+    public void NativeSelectedStringCalls_PreserveOutcomesRuntimeGuardsAndReparse(
+        string expression, string output, string input, string expected)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        foreach (var refute in new[] { false, true })
+        {
+            var source = $$"""
+                module NativeBclProof
+                  func Probe public (string:s) → {{output}}
+                    ! alloc
+                    requires s == "{{input}}"
+                    => result {{(refute ? "!=" : "==")}} {{expected}}
+                    return {{expression}}
+                """;
+            foreach (var reparse in new[] { false, true })
+            {
+                var (compiled, verification) = CompileNative(source);
+                var binder = new Binder(new DiagnosticBag());
+                binder.Bind(compiled.Ast!);
+                Assert.NotEmpty(binder.BoundVerificationCalls);
+                Assert.All(binder.BoundVerificationCalls.Values, call =>
+                {
+                    Assert.NotNull(call.ResolvedMetadataMethod);
+                    Assert.Equal(SpecialType.System_String, call.ResolvedMetadataMethod.ContainingType.SpecialType);
+                    Assert.False(call.ResolvedMetadataMethod.IsGenericMethod);
+                    Assert.DoesNotContain(call.ResolvedMetadataMethod.Parameters, parameter => parameter.IsParams);
+                });
+                Assert.Equal(refute ? ProofStatus.Refuted : ProofStatus.Assumed, verification.EffectiveOutcome.Status);
+                if (!refute)
+                    Assert.Equal(expression.Contains("Substring", StringComparison.Ordinal)
+                        ? new[] { Z3Verifier.ExceptionalPathDivisionAssumption, Z3Verifier.StringModelAssumption }
+                        : new[] { Z3Verifier.StringModelAssumption }, verification.EffectiveOutcome.Assumptions);
+                Assert.Contains("ContractKind.Ensures", compiled.GeneratedCode);
+                Assert.DoesNotContain("// PROVEN: Postcondition", compiled.GeneratedCode);
+                var unverified = Program.Compile(source, "native-bcl-proof.calr", new Calor.Compiler.CompilationOptions
+                {
+                    StrictEffects = true,
+                    ContractMode = ContractMode.Debug,
+                    StatusWriter = TextWriter.Null
+                });
+                Assert.False(unverified.HasErrors, string.Join("\n", unverified.Diagnostics));
+                foreach (var code in new[] { compiled.GeneratedCode, unverified.GeneratedCode })
+                {
+                    var exception = InvokeNative(code, input);
+                    if (refute)
+                        Assert.IsType<Calor.Runtime.ContractViolationException>(exception);
+                    else
+                        Assert.Null(exception);
+                }
+                if (!reparse)
+                    source = new CalorEmitter().Emit(compiled.Ast!);
+            }
+        }
+    }
+
+    [SkippableTheory]
+    [InlineData("string.Concat(part, \"d\")", "let part = s.Substring(1)", "\"bcd\"", true)]
+    [InlineData("part.Substring(1)", "let part = s", "\"bc\"", false)]
+    public void NativeSelectedCalls_KeepImmutableSubstitutionAndDefinedness(
+        string expression, string binding, string expected, bool modeled)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var source = $$"""
+            module NativeBclProof
+              func Probe public (string:s) → string
+                ! alloc
+                requires s == "abc"
+                => result == {{expected}}
+                {{binding}}
+                return {{expression}}
+            """;
+        var (compiled, verification) = CompileNative(source);
+        Assert.Equal(modeled ? ProofStatus.Assumed : ProofStatus.Unsupported, verification.EffectiveOutcome.Status);
+        if (!modeled)
+            Assert.Contains("index range could not be modeled", verification.CounterexampleDescription);
+        Assert.Null(InvokeNative(compiled.GeneratedCode, "abc"));
+
+        var (_, undefined) = CompileNative(source.Replace("Substring(1)", "Substring(5)", StringComparison.Ordinal));
+        Assert.Equal(ContractVerificationStatus.Unsupported, undefined.Status);
+    }
+
+    [SkippableFact]
+    public void NativeContractCalls_UseSelectedOverloadsWithoutPromotingNullableAssumptions()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var (compiled, verification) = CompileNative("""
+            module NativeBclProof
+              func Probe public (string:s, int[]:items) → string
+                ! alloc
+                requires s == "abc"
+                => string.Concat(s, "d") == result && items.Length == items.Length
+                return string.Concat(s, "d")
+            """);
+        Assert.Equal(ProofStatus.Assumed, verification.EffectiveOutcome.Status);
+        Assert.Equal(new[] { Z3Verifier.NullableReferenceModelAssumption, Z3Verifier.StringModelAssumption },
+            verification.EffectiveOutcome.Assumptions);
+        Assert.Contains("ContractKind.Ensures", compiled.GeneratedCode);
+    }
+
+    [SkippableTheory]
+    [InlineData("@string")]
+    [InlineData("String")]
+    [InlineData("@String")]
+    [InlineData("System")]
+    [InlineData("@System")]
+    public void NativeReceiverShadows_DoNotBorrowStaticStringIdentity(string name)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var (compiled, verification) = CompileNative($$"""
+            module NativeBclProof
+              class Widget public
+                func IsNullOrEmpty public (string:s) → bool
+                  !
+                  return false
+              func Probe public (Widget:{{name}}, string:s) → bool
+                !
+                requires s == ""
+                => result == false
+                return {{name}}.IsNullOrEmpty(s)
+            """);
+        Assert.Equal(ContractVerificationStatus.Unsupported, verification.Status);
+        Assert.Contains("ContractKind.Ensures", compiled.GeneratedCode);
+    }
+
+    [SkippableFact]
+    public void StandaloneNativeCalls_RequireSuppliedReceiverOwnership()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+        foreach (var receiver in new[] { "String", "System.String", "@string" })
+        {
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer($$"""
+                module NativeBclProof
+                  func Probe (string:s) → bool
+                    return {{receiver}}.IsNullOrEmpty(s)
+                """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors);
+            var call = Assert.IsType<ExpressionCallNode>(Assert.IsType<ReturnStatementNode>(
+                Assert.Single(module.Functions).Body[0]).Expression);
+            var result = verifier.VerifyPostcondition([("s", "str")], "bool",
+                [Requires(Equal(Ref("s"), Str("")))], Ensures(Equal(Ref("result"), new BoolLiteralNode(default, true))),
+                [new ReturnStatementNode(default, call)]);
+            Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+        }
+        var escapedLegacy = verifier.VerifyPrecondition([], Requires(Call("@string.IsNullOrEmpty", Str(""))));
+        Assert.Equal(ContractVerificationStatus.Unsupported, escapedLegacy.Status);
+    }
+
+    [SkippableTheory]
+    [InlineData("string.Concat<char>(s)")]
+    [InlineData("string.Concat(ref s, \"d\")")]
+    [InlineData("string.Concat(str0: s, str1: \"d\")")]
+    public void ParsedNativeCallModifiers_AreOutsideTheBoundedModel(string expression)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer($$"""
+            module NativeBclProof
+              func Probe (string:s) → string
+                return {{expression}}
+            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors);
+        var call = Assert.IsType<ExpressionCallNode>(Assert.IsType<ReturnStatementNode>(
+            Assert.Single(module.Functions).Body[0]).Expression);
+        Assert.True(call.TypeArguments?.Count > 0
+            || call.ArgumentNames?.Any(name => name != null) == true
+            || call.ArgumentModifiers?.Any(modifier => modifier != null) == true);
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+        var result = verifier.VerifyPostcondition([("s", "str")], "str",
+            [Requires(Equal(Ref("s"), Str("abc")))], Ensures(Equal(Ref("result"), Str("abcd"))),
+            [new ReturnStatementNode(default, call)]);
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+    }
+
+    [SkippableTheory]
+    [InlineData("@string")]
+    [InlineData("String")]
+    [InlineData("@String")]
+    [InlineData("System")]
+    [InlineData("@System")]
+    public void NativeSourceShadows_DoNotBorrowStringModels(string name)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var source = $$"""
+            module NativeBclProof NativeBclProof
+              class {{name}} public
+                func IsNullOrEmpty public static (string:s) → bool
+                  !
+                  return false
+              func Probe public (string:s) → bool
+                !
+                requires s == ""
+                => result == false
+                return {{name}}.IsNullOrEmpty(s)
+            """;
+        var (compiled, verification) = CompileNative(source);
+        Assert.Equal(ContractVerificationStatus.Unsupported, verification.Status);
+        Assert.Contains("ContractKind.Ensures", compiled.GeneratedCode);
+        Assert.Null(InvokeNative(compiled.GeneratedCode, ""));
+    }
+
+    [SkippableTheory]
+    [InlineData("s.StartsWith(\"a\")")]
+    [InlineData("s.EndsWith(\"c\", System.StringComparison.OrdinalIgnoreCase)")]
+    [InlineData("s.Contains('b')")]
+    [InlineData("s.Contains(value: \"b\")")]
+    [InlineData("string.Concat(s, 1).Contains(\"b\")")]
+    [InlineData("Echo(s).Contains(\"b\")")]
+    [InlineData("string.IsNullOrEmpty(Echo(s))")]
+    public void NativeUnmodeledCalls_KeepRuntimeGuards(string expression)
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        var source = $$"""
+            module NativeBclProof
+              func Echo (string:s) → string
+                !
+                return s
+              func Probe public (string:s) → bool
+                ! alloc
+                requires s == "abc"
+                => result == result
+                return {{expression}}
+            """;
+        var (compiled, verification) = CompileNative(source);
+        Assert.Equal(ContractVerificationStatus.Unsupported, verification.Status);
+        Assert.Contains("ContractKind.Ensures", compiled.GeneratedCode);
+        Assert.DoesNotContain("// PROVEN: Postcondition", compiled.GeneratedCode);
+    }
+
+    private static (CompilationResult Compilation, Z3ContractVerificationResult Verification) CompileNative(string source)
+    {
+        var options = new Calor.Compiler.CompilationOptions
+        {
+            VerifyContracts = true,
+            StrictEffects = true,
+            ContractMode = ContractMode.Debug,
+            ElideProvenGuards = true,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+            StatusWriter = TextWriter.Null
+        };
+        var compiled = Program.Compile(source, "native-bcl-proof.calr", options);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        return (compiled, Assert.Single(Assert.Single(options.VerificationResults!.Functions).PostconditionResults));
+    }
+
+    private static Exception? InvokeNative(string code, string input)
+    {
+        var compilation = CSharpCompilation.Create("NativeBcl_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + code)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emit = compilation.Emit(stream);
+        Assert.True(emit.Success, string.Join("\n", emit.Diagnostics));
+        var assembly = Assembly.Load(stream.ToArray());
+        var probe = Assert.Single(assembly.GetTypes().Select(type => type.GetMethod("Probe")).OfType<MethodInfo>());
+        try
+        {
+            probe.Invoke(null, [input]);
+            return null;
+        }
+        catch (TargetInvocationException invocation) when (invocation.InnerException != null)
+        {
+            return invocation.InnerException;
+        }
     }
 }

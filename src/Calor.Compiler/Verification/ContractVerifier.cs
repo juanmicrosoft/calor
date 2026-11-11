@@ -472,7 +472,7 @@ public sealed class ContractVerifier
         if (dot <= 0)
             return null;
         var receiver = _contractBinder.BindVerificationReceiver(
-            new ReferenceNode(call.Span, call.Target[..dot], isVerbatim: true), _contractVariables);
+            new ReferenceNode(call.Span, call.Target[..dot]), _contractVariables);
         if (receiver.Type is not NominalBoundType
             { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String })
             return null;
@@ -563,10 +563,10 @@ public sealed class ContractVerifier
             {
                 var name = call.Target[..dot];
                 var receiver = _contractBinder.BindVerificationReceiver(
-                    new ReferenceNode(call.Span, name, isVerbatim: true), _contractVariables);
+                    new ReferenceNode(call.Span, name), _contractVariables);
                 if (receiver is not BoundTypeReferenceExpression { Type: NominalBoundType { RoslynSymbol: not null } }
                     && !HasSelectedStaticSourceOwner(call))
-                    CollectReferencesInternal(new ReferenceNode(call.Span, name, isVerbatim: true), references, boundVariables);
+                    CollectReferencesInternal(new ReferenceNode(call.Span, name), references, boundVariables);
             }
         }
 

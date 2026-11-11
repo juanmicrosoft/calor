@@ -1114,7 +1114,7 @@ public class Program
                 CancellationToken = options.CancellationToken
             };
             var verificationPass = new ContractVerificationPass(diagnostics, verificationOptions);
-            options.VerificationResults = verificationPass.Verify(ast);
+            options.VerificationResults = verificationPass.Verify(ast, binder.BoundVerificationCalls);
             phaseSw.Stop();
             telemetry?.TrackPhase("Z3Verification", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 

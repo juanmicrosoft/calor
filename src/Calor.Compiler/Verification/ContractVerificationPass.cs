@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Verification.Z3.Cache;
 using System.Runtime.CompilerServices;
@@ -28,6 +29,10 @@ public sealed class ContractVerificationPass
     /// Verifies all contracts in the given module.
     /// </summary>
     public ModuleVerificationResult Verify(ModuleNode module)
+        => Verify(module, null);
+
+    internal ModuleVerificationResult Verify(ModuleNode module,
+        IReadOnlyDictionary<ExpressionNode, BoundCallExpression>? boundCalls)
     {
         // Check if Z3 is available
         if (!Z3ContextFactory.IsAvailable)
@@ -43,18 +48,28 @@ public sealed class ContractVerificationPass
 
         // Call the core verification method which uses Z3 types
         // This is in a separate method to prevent JIT from loading Z3 types when Z3 is unavailable
-        return VerifyCore(module);
+        if (boundCalls == null)
+        {
+            var binder = new Binder(new DiagnosticBag());
+            binder.Bind(module);
+            boundCalls = binder.BoundVerificationCalls;
+        }
+        return VerifyCore(module, boundCalls);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private ModuleVerificationResult VerifyCore(ModuleNode module)
+    private ModuleVerificationResult VerifyCore(ModuleNode module,
+        IReadOnlyDictionary<ExpressionNode, BoundCallExpression> boundCalls)
     {
         var results = new List<FunctionVerificationResult>();
         var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
 
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(
-            ctx, _options.TimeoutMs, userTypeRegistry, module.ShouldCheckIntegerOverflow());
+            ctx, _options.TimeoutMs, userTypeRegistry, module.ShouldCheckIntegerOverflow())
+        {
+            BoundCalls = boundCalls
+        };
         // #778: the cache key/validity is solver-config-aware — pass the live timeout
         // so a cached Unproven from a smaller budget is not served to a larger one.
         using var cache = new VerificationCache(

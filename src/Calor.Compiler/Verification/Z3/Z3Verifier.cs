@@ -73,6 +73,7 @@ public sealed class Z3Verifier : IDisposable
     private readonly uint _timeoutMs;
     private readonly bool _checkIntegerOverflow;
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
+    internal IReadOnlyDictionary<ExpressionNode, Calor.Compiler.Binding.BoundCallExpression>? BoundCalls { get; init; }
     private bool _disposed;
 
     /// <summary>#1413 (S2 R-NUM, amendments 1.3.1 and 1.3.2): whether the checked arithmetic is
@@ -735,6 +736,7 @@ public sealed class Z3Verifier : IDisposable
     {
         var translator = new ContractTranslator(_ctx);
         translator.SetUserTypeRegistry(_userTypeRegistry);
+        translator.BoundCalls = BoundCalls;
         return translator;
     }
 

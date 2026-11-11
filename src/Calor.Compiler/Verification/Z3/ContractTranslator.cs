@@ -74,6 +74,7 @@ public sealed class ContractTranslator
     private readonly List<BoolExpr> _bindingConstraints = [];
     private readonly Binder _receiverBinder = new(new DiagnosticBag());
     private readonly HashSet<ExpressionNode> _bclLengths = new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundCallExpression>? BoundCalls { get; set; }
 
     internal IReadOnlyList<BoolExpr> BindingConstraints => _bindingConstraints;
 
@@ -232,6 +233,9 @@ public sealed class ContractTranslator
                     ?? new FieldAccessNode(field.Span, Normalize(field.Target), field.FieldName, field.FieldNameSpan);
             case CallExpressionNode call:
                 return NormalizeBclCall(call, variables) ?? expression;
+            case ExpressionCallNode { TargetExpression: FieldAccessNode member } call:
+                return NormalizeBclCall(call, member.Target, member.FieldName, call.Arguments,
+                    call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments, variables) ?? expression;
             case BinaryOperationNode binary:
                 return new BinaryOperationNode(binary.Span, binary.Operator, Normalize(binary.Left), Normalize(binary.Right));
             case UnaryOperationNode unary:
@@ -313,28 +317,72 @@ public sealed class ContractTranslator
     private ExpressionNode? NormalizeBclCall(
         CallExpressionNode call, IReadOnlyList<(string Name, string Type)> variables)
     {
-        // Named, by-reference and generic overloads are not part of this bounded model.
-        if (call.ArgumentNames?.Any(name => name != null) == true
-            || call.ArgumentModifiers?.Any(modifier => modifier != null) == true
-            || call.TypeArguments is { Count: > 0 })
-            return null;
         var dot = call.Target.LastIndexOf('.');
-        if (dot <= 0)
+        if (dot <= 0 || BoundCalls == null && call.Target[..dot].Contains('@'))
             return null;
-        var receiver = new ReferenceNode(call.Span, call.Target[..dot], isVerbatim: true);
-        var bound = BindBclReceiver(receiver, variables);
-        if (bound?.Type is not NominalBoundType
-            { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String })
+        return NormalizeBclCall(call, new ReferenceNode(call.Span, call.Target[..dot]),
+            call.Target[(dot + 1)..], call.Arguments, call.ArgumentNames,
+            call.ArgumentModifiers, call.TypeArguments, variables);
+    }
+
+    private ExpressionNode? NormalizeBclCall(
+        ExpressionNode original, ExpressionNode receiver, string method,
+        IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers, IReadOnlyList<string>? typeArguments,
+        IReadOnlyList<(string Name, string Type)> variables)
+    {
+        // Named, by-reference and generic overloads are not part of this bounded model.
+        if (argumentNames?.Any(name => name != null) == true
+            || argumentModifiers?.Any(modifier => modifier != null) == true
+            || typeArguments is { Count: > 0 })
             return null;
-        var method = call.Target[(dot + 1)..];
+        BoundCallExpression? selectedCall = null;
+        BoundExpression? bound;
+        if (BoundCalls != null)
+        {
+            // Missing source ownership is not permission to rebind in an empty scope.
+            if (!BoundCalls.TryGetValue(original, out selectedCall)
+                || selectedCall.IsInaccessibleCall || selectedCall.HasOpaqueOverloads
+                || selectedCall.HasUnresolvedArguments || selectedCall.HasUnknownInferredType
+                || selectedCall.ResolvedSymbol != null)
+                return null;
+            bound = selectedCall.Receiver;
+        }
+        else
+        {
+            // Without a source binder, only supplied values and the predefined keyword
+            // have unambiguous ownership. Aliases and qualified source names need binding.
+            if (original is ExpressionCallNode
+                && receiver is not ReferenceNode { IsVerbatim: false, Name: "string" }
+                && !(receiver is ReferenceNode reference && variables.Any(variable => variable.Name == reference.Name)))
+                return null;
+            bound = BindBclReceiver(receiver, variables);
+        }
+        if (bound == null || (selectedCall != null
+            ? selectedCall.ResolvedMetadataReceiverType?.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_String
+            : bound.Type is not NominalBoundType
+                { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String }))
+            return null;
         var isStatic = bound is BoundTypeReferenceExpression;
-        var args = call.Arguments.ToList();
+        var args = arguments.ToList();
         StringComparisonMode? mode = null;
         if (!isStatic && method is "Contains" or "StartsWith" or "EndsWith" or "IndexOf" or "Equals"
-            && args.Count == 2 && args[1] is ReferenceNode comparison
-            && comparison.Name is "StringComparison.Ordinal" or "System.StringComparison.Ordinal"
-            && !variables.Any(variable => variable.Name == comparison.Name.Split('.')[0])
-            && _userTypeRegistry?.Keys.Any(type => GetSimpleTypeName(type) == "StringComparison") != true)
+            && args.Count == 2
+            && (selectedCall?.Arguments.LastOrDefault() is BoundFieldAccessExpression
+                {
+                    ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
+                    {
+                        IsConst: true, Name: "Ordinal", ConstantValue: 4,
+                        ContainingType: { Name: "StringComparison", ContainingNamespace: { } ns }
+                    } ordinal
+                } && ns.ToDisplayString() == "System"
+                    && selectedCall.ResolvedMetadataMethod is { Parameters.Length: 2 } ordinalMethod
+                    && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                        ordinal.ContainingType, ordinalMethod.Parameters[1].Type)
+                || BoundCalls == null && args[1] is ReferenceNode comparison
+                    && comparison.Name is "StringComparison.Ordinal" or "System.StringComparison.Ordinal"
+                    && !variables.Any(variable => variable.Name == comparison.Name.Split('.')[0])
+                    && _userTypeRegistry?.Keys.Any(type => GetSimpleTypeName(type) == "StringComparison") != true))
         {
             mode = StringComparisonMode.Ordinal;
             args.RemoveAt(1);
@@ -355,12 +403,18 @@ public sealed class ContractTranslator
         };
         if (operation == null)
             return null;
-        var normalizedArguments = call.Arguments.Select(argument =>
+        var normalizedArguments = arguments.Select(argument =>
             NormalizeBclExpression(argument, variables)).ToArray();
-        var selected = _receiverBinder.ResolveVerificationStringCall(
-            new CallExpressionNode(call.Span, call.Target, normalizedArguments),
-            isStatic, mode.HasValue, variables);
-        if (selected is null)
+        var selected = selectedCall?.ResolvedMetadataMethod ?? (BoundCalls == null
+            ? _receiverBinder.ResolveVerificationStringCall(
+                new CallExpressionNode(original.Span, $"string.{method}", normalizedArguments),
+                isStatic, mode.HasValue, variables)
+            : null);
+        if (selected is null || selected.Name != method || selected.IsStatic != isStatic
+            || selected.IsGenericMethod || selected.Parameters.Length != arguments.Count
+            || selected.ContainingType.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_String
+            || selected.Parameters.Any(parameter => parameter.RefKind != Microsoft.CodeAnalysis.RefKind.None
+                || parameter.IsParams))
             return null;
         if (operation is StringOp.Substring or StringOp.SubstringFrom)
         {
@@ -373,7 +427,7 @@ public sealed class ContractTranslator
             return null;
         if (!isStatic)
             args.Insert(0, receiver);
-        return new StringOperationNode(call.Span, operation.Value,
+        return new StringOperationNode(original.Span, operation.Value,
             args.Select(argument => NormalizeBclExpression(argument, variables)).ToArray(), mode);
     }
 

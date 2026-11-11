@@ -107,6 +107,10 @@ public sealed class Binder
     private readonly Dictionary<ExpressionNode, BoundExpression> _boundContractExpressions = new();
     internal IReadOnlyDictionary<ExpressionNode, BoundExpression> BoundContractExpressions =>
         _boundContractExpressions;
+    private readonly Dictionary<ExpressionNode, BoundCallExpression> _boundVerificationCalls =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundCallExpression> BoundVerificationCalls =>
+        _boundVerificationCalls;
     private bool _bindingContract;
     private Verification.ModuleInheritanceResult? _contractInheritance;
     internal Verification.ModuleInheritanceResult? ContractInheritance => _contractInheritance;
@@ -1037,6 +1041,7 @@ public sealed class Binder
         _boundSourceEnumConstants.Clear();
         _boundSourceStaticFieldReads.Clear();
         _boundContractExpressions.Clear();
+        _boundVerificationCalls.Clear();
         CrossModuleCallTargets.Clear();
         SourceExtensionCallTargets.Clear();
         _staticMethodSymbols.Clear();
@@ -4147,6 +4152,8 @@ public sealed class Binder
         }
         if (_bindingContract)
             _boundContractExpressions[expr] = bound;
+        if (expr is CallExpressionNode or ExpressionCallNode && bound is BoundCallExpression call)
+            _boundVerificationCalls[expr] = call;
         if (MayChangeHeap(bound))
             InvalidateByReferenceParameterNarrowing();
         if (bound is BoundFieldAccessExpression

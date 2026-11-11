@@ -149,6 +149,21 @@ Runtime support does not make a source-function call provable by Z3. Such
 contracts remain unsupported for static verification and retain runtime
 guards with verification enabled.
 
+## Bounded string verification
+
+Native calls such as `string.IsNullOrEmpty(s)`, `string.Concat(s, "d")` and
+`s.Substring(1)` can use the verifier's existing string models when binding
+selects the supported .NET string overload. A same-spelled source method or
+shadowed receiver does not inherit that model. Named, generic, by-reference
+and unsupported overloads remain unsupported for verification.
+
+String proofs remain `assumed`, not `proven`, and retain runtime guards.
+Substring models also retain their existing normal-return and index-range
+restrictions. Culture-sensitive comparisons are not modeled; supported
+comparison overloads require the actual `StringComparison.Ordinal` constant.
+Nested calls are supported only when every evaluated receiver and argument
+is itself modeled. This does not add arbitrary method inlining.
+
 ## Quantified contracts
 
 `forall` checks every value in a range; `exists` checks whether at least one
