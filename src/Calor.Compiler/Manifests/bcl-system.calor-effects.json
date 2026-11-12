@@ -224,8 +224,6 @@
       "type": "System.Object",
       "constructors": { "()": [] },
       "methods": {
-        "Equals": [],
-        "GetHashCode": [],
         "GetType": [],
         "ReferenceEquals": [],
         "MemberwiseClone": []

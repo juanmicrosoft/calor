@@ -200,6 +200,17 @@ dispatch or exception helpers. No other Single member receives a contract.
 Metadata argument lookup preserves `float` as `System.Single`, not an
 unresolved placeholder; this type fact grants no additional effects.
 
+`System.Object.Equals(object)` and `GetHashCode()` have no built-in effect
+contract: both are open virtual slots, so their base implementations cannot
+prove arbitrary overrides pure. The static `Object.Equals(object, object)`
+overload is also Unknown. After identity and null checks, its .NET 10 body
+invokes the first operand's virtual `Equals` slot. No overload of either name
+retains pure authority on `System.Object`. `Object.ReferenceEquals` remains
+covered because it compares reference identity without invoking overrides.
+Its argument evaluation effects are still charged. The finite primitive
+`Equals(T)` and `GetHashCode()` contracts above remain separate and unchanged.
+This repair does not establish the safety of other `System.Object` entries.
+
 `System.Nullable<T>` has no type-wide pure default. Its `ToString`, `Equals`,
 and `GetHashCode` overrides can invoke the stored value's methods through a
 constrained virtual call, including callbacks that mutate struct storage.

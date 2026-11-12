@@ -3172,4 +3172,212 @@ public class EffectResolverTests
                 && diagnostic.Message.Contains("get_Value", StringComparison.Ordinal));
         }
     }
+
+    [Fact]
+    public void ObjectDispatchContracts_OpenSlotsAndStaticEqualsCannotBorrowIdentityOrPrimitiveAuthority()
+    {
+        var metadata = StringProbeCompilation("", []);
+        var type = metadata.GetSpecialType(SpecialType.System_Object);
+        var methods = type.GetMembers().OfType<IMethodSymbol>()
+            .Where(method => method.DeclaredAccessibility == Accessibility.Public
+                && method.Name is "Equals" or "GetHashCode").ToArray();
+        Assert.Equal(3, methods.Length);
+        var identity = NumericKey(Assert.Single(type.GetMembers("ReferenceEquals").OfType<IMethodSymbol>()));
+        var primitiveKeys = new[]
+        {
+            SpecialType.System_Int32, SpecialType.System_Int64, SpecialType.System_Double, SpecialType.System_Boolean
+        }.SelectMany(specialType =>
+        {
+            var primitive = metadata.GetSpecialType(specialType);
+            return primitive.GetMembers().OfType<IMethodSymbol>()
+                .Where(method => method.Name == "GetHashCode"
+                    || method.Name == "Equals" && method.Parameters.Length == 1
+                        && SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, primitive))
+                .Select(NumericKey);
+        }).Append(identity).ToArray();
+        foreach (var safeFirst in new[] { false, true })
+        {
+            var resolver = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false));
+            if (safeFirst)
+                foreach (var key in primitiveKeys)
+                    Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(key).Status);
+            foreach (var method in methods.Concat(methods.Reverse()))
+            {
+                Assert.Equal(typeof(object).Assembly.FullName, method.ContainingAssembly.Identity.ToString());
+                Assert.DoesNotContain(method.Locations, location => location.IsInSource);
+                Assert.Equal(!method.IsStatic, method.IsVirtual);
+                Assert.False(method.IsSealed);
+                var key = NumericKey(method);
+                foreach (var lookup in new[] { key, key.WithoutParameterList(),
+                    EffectResolverKey.FromStrings("System.Object", method.Name, ["?"]) })
+                {
+                    var resolution = resolver.Resolve(lookup);
+                    Assert.Equal(EffectResolutionStatus.Unknown, resolution.Status);
+                    Assert.True(resolution.Effects.IsUnknown);
+                    Assert.Same(resolution, resolver.Resolve(lookup));
+                }
+            }
+            foreach (var key in primitiveKeys)
+                Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(key).Status);
+        }
+    }
+
+    [Theory]
+    [InlineData("value.Equals(other)", "bool", "Equals", false)]
+    [InlineData("System.Object.Equals(value, other)", "bool", "Equals", true)]
+    [InlineData("value.GetHashCode()", "int", "GetHashCode", false)]
+    public void ObjectDispatchContracts_SelectedMetadataIsStrictlyRejectedWithoutExecutingSubjects(
+        string expression, string output, string member, bool isStatic)
+    {
+        var source = $$"""
+            module ObjectDispatch
+              func Apply public (object:value, object:other) → {{output}}
+                !
+                return {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics, "object-contract.calr").Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(Calor.Compiler.Analysis.Dataflow.BoundNodeHelpers.DescendantsAndSelf(bound)
+            .OfType<Calor.Compiler.Binding.BoundCallExpression>());
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(SpecialType.System_Object, selected.ContainingType.SpecialType);
+        Assert.Equal(member, selected.Name);
+        Assert.Equal(isStatic, selected.IsStatic);
+        Assert.False(call.HasUnknownInferredType);
+        Assert.Equal(typeof(object).Assembly.FullName, selected.ContainingAssembly.Identity.ToString());
+        Assert.DoesNotContain(selected.Locations, location => location.IsInSource);
+        foreach (var native in StringEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(native, "object-contract.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StrictApi = true,
+                    StrictEffects = true, StatusWriter = TextWriter.Null
+                });
+            Assert.True(result.HasErrors);
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("." + member, StringComparison.Ordinal));
+        }
+        var original = $$"""
+            public static class Target
+            {
+                public static {{output}} Apply(object value, object other) => {{expression}};
+            }
+            """;
+        var conversion = ConvertStringSource(original);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(1, conversion.InteropPreservationCount);
+        var preserved = Calor.Compiler.Program.Compile(conversion.CalorSource!, "object-preserved.calr");
+        Assert.False(preserved.HasErrors, string.Join("\n", preserved.Diagnostics));
+        var metadata = StringProbeCompilation(preserved.GeneratedCode, []);
+        Assert.DoesNotContain(metadata.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var tree = metadata.SyntaxTrees.Single();
+        var invocation = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>());
+        Assert.Equal(selected.ToDisplayString(), Assert.IsAssignableFrom<IMethodSymbol>(
+            metadata.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol).ToDisplayString());
+    }
+
+    [Fact]
+    public void ObjectDispatchContracts_ReferenceEqualsIsAdmittedBeforeIdentityOnlyExecution()
+    {
+        const string source = """
+            module ObjectIdentity
+              module Target
+                func Apply public (object?:value, object?:other) → bool
+                  !
+                  return System.Object.ReferenceEquals(value, other)
+            """;
+        const string witness = """
+
+            public sealed class TrackingObject
+            {
+                public static int Calls;
+                public override bool Equals(object? other)
+                {
+                    Calls++;
+                    throw new System.InvalidOperationException("equals-override");
+                }
+                public override int GetHashCode()
+                {
+                    Calls++;
+                    throw new System.InvalidOperationException("hash-override");
+                }
+            }
+            public static class Probe
+            {
+                public static bool Run()
+                {
+                    var first = new TrackingObject();
+                    var second = new TrackingObject();
+                    return Target.Apply(first, first) && !Target.Apply(first, second)
+                        && Target.Apply(null, null) && !Target.Apply(first, null)
+                        && !Target.Apply(null, first) && TrackingObject.Calls == 0;
+                }
+            }
+            """;
+        foreach (var native in StringEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var compiled = Calor.Compiler.Program.Compile(native, "object-identity.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StrictApi = true,
+                    StrictEffects = true, StatusWriter = TextWriter.Null
+                });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var metadata = StringProbeCompilation(compiled.GeneratedCode, []);
+            var tree = metadata.SyntaxTrees.Single();
+            var selected = Assert.IsAssignableFrom<IMethodSymbol>(metadata.GetSemanticModel(tree).GetSymbolInfo(
+                Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())).Symbol);
+            Assert.Equal(SpecialType.System_Object, selected.ContainingType.SpecialType);
+            Assert.Equal("ReferenceEquals", selected.Name);
+            Assert.True(selected.IsStatic);
+            Assert.False(selected.IsVirtual);
+            Assert.Equal(typeof(object).Assembly.FullName, selected.ContainingAssembly.Identity.ToString());
+            Assert.Equal(EffectResolutionStatus.PureExplicit,
+                new EffectResolver(new ManifestLoader(loadUserLevelManifests: false)).Resolve(NumericKey(selected)).Status);
+            Assert.Equal(true, RunStringProbe(compiled.GeneratedCode + witness, []));
+        }
+    }
+
+    [Theory]
+    [InlineData("System.Object.ReferenceEquals(Mark(value), other)")]
+    [InlineData("System.Object.ReferenceEquals(value, Mark(other))")]
+    [InlineData("System.Object.ReferenceEquals(Mark(value), Mark(other))")]
+    public void ObjectDispatchContracts_IdentityStillChargesArgumentEvaluation(string expression)
+    {
+        var source = $$"""
+            module ObjectEvaluation
+              func Mark (object:value) → object
+                ! cw
+                Console.WriteLine("argument")
+                return value
+              func Read (object:value, object:other) → bool
+                !
+                return {{expression}}
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var options = new Calor.Compiler.CompilationOptions
+            {
+                EnableTypeChecking = typing, VerifyContracts = false, StrictApi = true,
+                StrictEffects = true, StatusWriter = TextWriter.Null
+            };
+            var rejected = Calor.Compiler.Program.Compile(source, "object-evaluation.calr", options);
+            Assert.Empty(rejected.GeneratedCode);
+            Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            var admitted = Calor.Compiler.Program.Compile(
+                source.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal), "object-evaluation.calr", options);
+            Assert.False(admitted.HasErrors, string.Join("\n", admitted.Diagnostics));
+        }
+    }
 }
