@@ -120,11 +120,18 @@ public static class Inventory
 }
 ```
 
-converts natively on every surface (CLI, `calor migrate`, MCP), and the output compiles
-with default options:
+is preserved as one whole-file C# unit by the current default converter. Its
+report records `nullable-oblivious-nested-shape` for `Dictionary<string, int>`
+and `nullable-module-fidelity` when the replacement cannot be certified.
+That is successful preservation, not native conversion.
+
+The earlier native-form listing below is retained as a checked negative example,
+not current CLI output. Independently of the conversion fallback, `int.TryParse`
+has unknown effects: `Calor0411` identifies the call and `Calor0410` rejects its
+use in these functions.
 
 {/* w1-transcript: W1-F1-refout */}
-```calor
+```calor expect=Calor0410,Calor0411
 module Inventory overflow unchecked
   using System.Collections.Generic
 
@@ -162,7 +169,11 @@ module Inventory overflow unchecked
 The outer module label does not add a C# namespace; omitting the namespace keeps
 C#'s global namespace. `overflow unchecked` keeps C#'s default integer overflow behavior.
 
-**What converts natively:**
+**Representable by-reference forms:**
+
+These shapes have native syntax. The enclosing unit must still pass receiving,
+effect and round-trip checks; syntax support alone does not guarantee a native
+conversion.
 
 - `TryParse` and `TryGetValue` with a variable declared earlier (`int count;` then
   `out count`), and the `out _` discard.
@@ -195,7 +206,8 @@ C#'s global namespace. `overflow unchecked` keeps C#'s default integer overflow 
   expression-bodied member (`int Run(int x) => Twice(x);`) the whole member stays
   C#, reported as `method`.
 
-In the tested cases, each shape on this list either keeps its C# or fails with a report.
+Default lossless conversion preserves C# when native checking fails and records
+the reason in its report.
 
 **Flow attributes are kept but have no effect.** An `out` parameter with
 `[NotNullWhen(true)]` converts natively; the original attribute is retained

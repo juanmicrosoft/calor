@@ -131,22 +131,22 @@ fields. See [stable identifiers](/docs/philosophy/stable-identifiers/).
 
 ```calor
 module FizzBuzz
-  func Classify (int:value) → string
-    !
-    if value % 15 == 0
-      return "FizzBuzz"
-    else if value % 3 == 0
-      return "Fizz"
-    else if value % 5 == 0
-      return "Buzz"
-    return value.ToString()
-
-  func Main () → string
-    !
-    return "${Classify(15)}:${Classify(3)}:${Classify(5)}:${Classify(7)}"
+  func Main () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i % 15 == 0
+        Console.WriteLine("FizzBuzz")
+      else if i % 3 == 0
+        Console.WriteLine("Fizz")
+      else if i % 5 == 0
+        Console.WriteLine("Buzz")
+      else
+        Console.WriteLine(i)
 ```
 
-`Main()` returns `FizzBuzz:Fizz:Buzz:7`. Blocks end by dedenting. The
+`Main()` prints the numbers 1 through 100, replacing multiples of three with
+`Fizz`, multiples of five with `Buzz`, and multiples of both with `FizzBuzz`.
+Blocks end by dedenting. The
 [control-flow reference](/docs/syntax-reference/control-flow/) adds loops and
 other branching forms.
 

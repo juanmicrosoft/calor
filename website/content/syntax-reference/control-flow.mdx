@@ -172,26 +172,26 @@ if x > 0
 
 ### FizzBuzz
 
-`Classify` returns the text for one value. `Main` prints values one through
-100. Only `Main` needs the `cw` console-write effect.
+`PrintOne` writes one value. `Main` prints values one through 100. Both declare
+`cw`, the console-write effect.
 
 ```calor
 module FizzBuzz
-  func Classify (int:i) → string
-    !
+  func PrintOne (int:i) → void
+    ! cw
     if i % 15 == 0
-      return "FizzBuzz"
+      Console.WriteLine("FizzBuzz")
     else if i % 3 == 0
-      return "Fizz"
+      Console.WriteLine("Fizz")
     else if i % 5 == 0
-      return "Buzz"
+      Console.WriteLine("Buzz")
     else
-      return i.ToString()
+      Console.WriteLine(i)
 
   func Main () → void
     ! cw
     for i from 1 to 100 step 1
-      Console.WriteLine(Classify(i))
+      PrintOne(i)
 ```
 
 ### Combining a loop and a condition

@@ -2856,4 +2856,61 @@ public class DocDriftCheckerTests
         Assert.Contains("index.md", finding.FilePath);
         Assert.Equal(3, finding.Span.Line);
     }
+
+    [Theory]
+    [InlineData("expressions", "ExpressionPrecedence",
+        "GlobalModule.Main() == (14, 20, 5, 4, 8, 2, 5, 5, true, 11, 2)")]
+    [InlineData("expressions", "ArithmeticBehavior", "GlobalModule.Main() == (42, -2, -1)")]
+    [InlineData("expressions", "ExpressionEvaluation", """
+        ((System.Func<bool>)(() => {
+            var value = GlobalModule.Main();
+            return value.Item1 == (false, true, true, true)
+                && value.Item2 == (5, 7, 8, 100)
+                && System.Linq.Enumerable.SequenceEqual(value.Item3, new[] { 3, 4, 5, 8, 9, 10 });
+        }))()
+        """)]
+    [InlineData("expressions", "CollectionExpressions", "GlobalModule.Main() == (true, true, true, 1, 5)")]
+    [InlineData("inheritance", "InterfaceInheritance", "GlobalModule.Main() == (\"...\", \"Rex\", 7)")]
+    [InlineData("inheritance", "ShapeHierarchy", """
+        ((System.Func<bool>)(() => {
+            var value = GlobalModule.Demo();
+            return value.Item1 == "Circle" && System.Math.Abs(value.Item2 - 78.53975) < 1e-10;
+        }))()
+        """)]
+    [InlineData("string-operations", "StringBasics", "GlobalModule.Main() == (11, \"HELLO WORLD\", 'e', \"hello world!\")")]
+    [InlineData("string-operations", "StringHoles", "GlobalModule.Main() == \"hello Calor:${x}\"")]
+    public void WebsiteValueExamples_ExecuteWithDefaultEnforcement(
+        string page, string module, string expression)
+    {
+        var path = $"website/content/syntax-reference/{page}.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module " + module + "\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal("True", InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
+
+            public static class Probe
+            {
+                public static object? Run() => {{expression}};
+            }
+            """));
+    }
+
+    [Theory]
+    [InlineData("index")]
+    [InlineData("control-flow")]
+    public void WebsiteFizzBuzz_UsesAdmittedConsoleCallsAndPreservesAll100Lines(string page)
+    {
+        var path = $"website/content/syntax-reference/{page}.mdx";
+        var source = ExemplarCompileChecker.ExtractCompletePrograms(
+                File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
+            .Single(program => program.Source.StartsWith("module FizzBuzz\n", StringComparison.Ordinal)).Source;
+        var compiled = Program.Compile(source, path);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var expected = string.Join("\n", Enumerable.Range(1, 100).Select(value =>
+            value % 15 == 0 ? "FizzBuzz" : value % 3 == 0 ? "Fizz" : value % 5 == 0 ? "Buzz"
+                : value.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "\n";
+        Assert.Equal(expected, Observe(compiled.GeneratedCode, "GlobalModule.Main()"));
+    }
 }

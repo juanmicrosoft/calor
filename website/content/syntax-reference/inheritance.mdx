@@ -87,7 +87,7 @@ signatures without bodies.
 
 The declarations below implement both interfaces and inherit `Animal.Speak`.
 The same object can be viewed through its base class and each interface.
-This program returns `"...:Rex:7"`.
+This program returns the tuple `("...", "Rex", 7)`.
 
 ```calor
 module InterfaceInheritance
@@ -112,13 +112,13 @@ module InterfaceInheritance
     func Train () → int
       return 7
 
-  func Main () → string
+  func Main () → (string, string, int)
     ! alloc
     let Dog:dog = new Dog()
     let Animal:animal = dog
     let IPet:pet = dog
     let ITrainable:trainee = dog
-    return "${animal.Speak()}:${pet.Name()}:${trainee.Train()}"
+    return (animal.Speak(), pet.Name(), trainee.Train())
 ```
 
 ### Calls through an interface
@@ -269,10 +269,8 @@ base constructor. `Demo` calls `Describe` through a `Shape` reference.
 
 The abstract `Area` declaration has a pure effect row (`!`). Calls through
 that declaration charge its contract, and an override cannot add effects.
-For radius `5.0`, `Demo` returns `"Circle with area 78.53975"`. The explicit
-invariant culture makes the decimal separator independent of the machine's
-locale. Its getter has an explicit pure effect contract; that contract does
-not cover other `CultureInfo` members.
+For radius `5.0`, `Demo` returns `("Circle", 78.53975)`. The tuple carries the
+name and numeric area without formatting the number as text.
 
 ```calor
 module ShapeHierarchy
@@ -282,8 +280,8 @@ module ShapeHierarchy
       set this._name name
     func Area abstract () → double
       !
-    func Describe virtual () → string
-      return "${this._name} with area ${this.Area().ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+    func Describe virtual () → (string, double)
+      return (this._name, this.Area())
 
   class Circle
     extends Shape
@@ -294,7 +292,7 @@ module ShapeHierarchy
     func Area override () → double
       return 3.14159 * (this._radius * this._radius)
 
-  func Demo () → string
+  func Demo () → (string, double)
     ! alloc, mut
     let Shape:shape = new Circle(5.0)
     return shape.Describe()
