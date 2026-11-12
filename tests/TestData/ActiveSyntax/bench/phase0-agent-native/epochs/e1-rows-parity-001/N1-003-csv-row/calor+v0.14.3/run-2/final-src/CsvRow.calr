@@ -1,59 +1,59 @@
-§M{CsvRow}
-  §F{NeedsQuoting:pub} (str:field) -> bool
-    §E{}
-    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+module CsvRow CsvRow block
+  module CsvRowModule public
+    func NeedsQuoting (string:@field) → bool
+      !
+      return ((@field).Contains(",") || ((@field).Contains("\"") || ((@field).Contains("\r") || (@field).Contains("\n"))))
 
-  §F{EscapeField:pub} (str:field) -> str
-    §E{}
-    §B{needs:bool} §C{NeedsQuoting} §A field §/C
-    §IF needs
-      §B{doubled:str} (replace field "\"" "\"\"")
-      §R (+ "\"" (+ doubled "\""))
-    §R field
+    func EscapeField (string:@field) → string
+      !
+      let bool:needs = NeedsQuoting(@field)
+      if needs
+        let string:doubled = (@field).Replace("\"", "\"\"")
+        return ("\"" + (doubled + "\""))
+      return @field
 
-  §F{JoinRow:pub} (List<str>:fields) -> str
-    §E{}
-    §B{n:i32} §CNT{fields}
-    §B{~result:str} ""
-    §B{~i:i32} 0
-    §WH (< i n)
-      §B{field:str} §IDX fields i
-      §B{esc:str} §C{EscapeField} §A field §/C
-      §IF (> i 0)
-        §ASSIGN result (+ result ",")
-      §ASSIGN result (+ result esc)
-      §ASSIGN i (+ i 1)
-    §R result
+    func JoinRow (List<string>:fields) → string
+      !
+      let int:n = fields . Count
+      var string:result = ""
+      var int:i = 0
+      while (i < n)
+        let string:@field = fields[i]
+        let string:esc = EscapeField(@field)
+        if (i > 0)
+          set result (result + ",")
+        set result (result + esc)
+        set i (i + 1)
+      return result
 
-  §F{SplitRow:pub} (str:line) -> List<str>
-    §E{mut,alloc}
-    §LIST{result:str}
-    §/LIST
-    §B{n:i32} (len line)
-    §B{~i:i32} 0
-    §WH true
-      §B{~current:str} ""
-      §IF (&& (< i n) (equals (substr line i 1) "\""))
-        §ASSIGN i (+ i 1)
-        §WH (< i n)
-          §B{c:str} (substr line i 1)
-          §IF (equals c "\"")
-            §IF (&& (< (+ i 1) n) (equals (substr line (+ i 1) 1) "\""))
-              §ASSIGN current (+ current "\"")
-              §ASSIGN i (+ i 2)
-            §EL
-              §ASSIGN i (+ i 1)
-              §BK
-          §EL
-            §ASSIGN current (+ current c)
-            §ASSIGN i (+ i 1)
-      §EL
-        §WH (&& (< i n) (! (equals (substr line i 1) ",")))
-          §ASSIGN current (+ current (substr line i 1))
-          §ASSIGN i (+ i 1)
-      §PUSH{result} current
-      §IF (&& (< i n) (equals (substr line i 1) ","))
-        §ASSIGN i (+ i 1)
-      §EL
-        §BK
-    §R result
+    func SplitRow (string:line) → List<string>
+      ! mut, alloc
+      let List<string>:result = new List<string>()
+      let int:n = line.Length
+      var int:i = 0
+      while true
+        var string:current = ""
+        if ((i < n) && ((line).Substring(i, 1)).Equals("\""))
+          set i (i + 1)
+          while (i < n)
+            let string:c = (line).Substring(i, 1)
+            if (c).Equals("\"")
+              if (((i + 1) < n) && ((line).Substring((i + 1), 1)).Equals("\""))
+                set current (current + "\"")
+                set i (i + 2)
+              else
+                set i (i + 1)
+                break
+            else
+              set current (current + c)
+              set i (i + 1)
+        else
+          while ((i < n) && (!((line).Substring(i, 1)).Equals(",")))
+            set current (current + (line).Substring(i, 1))
+            set i (i + 1)
+        result.Add(current)
+        if ((i < n) && ((line).Substring(i, 1)).Equals(","))
+          set i (i + 1)
+        else
+          break
+      return result

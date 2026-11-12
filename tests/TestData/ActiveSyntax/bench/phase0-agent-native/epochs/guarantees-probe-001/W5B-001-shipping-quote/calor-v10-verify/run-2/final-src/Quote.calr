@@ -1,35 +1,36 @@
-§M{Quote}
-  §F{BaseFee:pub} (i32:weight) -> i32
-    §E{}
-    §R (* weight 3)
+module Quote Quote block
+  module QuoteModule public
+    func BaseFee (int:weight) → int
+      !
+      return (weight * 3)
 
-  §F{DistanceFee:pub} (i32:distance) -> i32
-    §E{}
-    §R (* distance 2)
+    func DistanceFee (int:distance) → int
+      !
+      return (distance * 2)
 
-  §F{QuoteWithSurcharge:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
-    §E{}
-    §S (<= result cap)
-    §B{total:i32} (+ baseAmount surcharge)
-    §IF (> total cap)
-      §R cap
-    §R total
+    func QuoteWithSurcharge (int:baseAmount, int:surcharge, int:cap) → int
+      !
+      => (result <= cap)
+      let int:total = (baseAmount + surcharge)
+      if (total > cap)
+        return cap
+      return total
 
-  §F{QuoteTotal:pub} (i32:weight, i32:distance, i32:cap) -> i32
-    §E{}
-    §B{baseAmount:i32} §C{BaseFee} §A weight §/C
-    §B{extra:i32} §C{DistanceFee} §A distance §/C
-    §R §C{QuoteWithSurcharge} §A baseAmount §A extra §A cap §/C
+    func QuoteTotal (int:weight, int:distance, int:cap) → int
+      !
+      let int:baseAmount = BaseFee(weight)
+      let int:extra = DistanceFee(distance)
+      return QuoteWithSurcharge(baseAmount, extra, cap)
 
-  §F{QuoteWithFloor:pub} (i32:baseAmount, i32:surcharge, i32:cap, i32:floor) -> i32
-    §E{}
-    §S (>= result floor)
-    §B{capped:i32} §C{QuoteWithSurcharge} §A baseAmount §A surcharge §A cap §/C
-    §IF (>= capped floor)
-      §R capped
-    §EL
-      §R floor
+    func QuoteWithFloor (int:baseAmount, int:surcharge, int:cap, int:floor) → int
+      !
+      => (result >= floor)
+      let int:capped = QuoteWithSurcharge(baseAmount, surcharge, cap)
+      if (capped >= floor)
+        return capped
+      else
+        return floor
 
-  §F{FormatQuote:pub} (i32:amount) -> str
-    §E{}
-    §R (concat "quote: " (str amount))
+    func FormatQuote (int:amount) → string
+      !
+      return string.Concat("quote: ", (amount).ToString())

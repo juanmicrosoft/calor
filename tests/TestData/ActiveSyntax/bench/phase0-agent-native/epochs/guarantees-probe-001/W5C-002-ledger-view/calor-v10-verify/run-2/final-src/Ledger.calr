@@ -1,41 +1,42 @@
-§M{Ledger}
-  §F{EntryLine:pub} (str:label, i32:amount) -> str
-    §E{}
-    §R (+ label (+ "=" §C{amount.ToString} §/C))
+module Ledger Ledger block
+  module LedgerModule public
+    func EntryLine (string:label, int:amount) → string
+      !
+      return (label + ("=" + amount.ToString()))
 
-  §F{AppendEntry:pub} (str:path, str:label, i32:amount) -> void
-    §E{fs:w}
-    §B{line:str} §C{EntryLine} §A label §A amount §/C
-    §B{record:str} (+ line ";")
-    §C{File.AppendAllText} §A path §A record §/C
+    func AppendEntry (string:path, string:label, int:amount) → void
+      ! fs:w
+      let string:line = EntryLine(label, amount)
+      let string:@record = (line + ";")
+      File.AppendAllText(path, @record)
 
-  §F{ReadLedger:pub} (str:path) -> str
-    §E{fs:r}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R ""
-    §R §C{File.ReadAllText} §A path §/C
+    func ReadLedger (string:path) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      return File.ReadAllText(path)
 
-  §F{ReportOf:pub} (str:content) -> str
-    §E{}
-    §R (+ "ledger[" (+ §C{content.Length.ToString} §/C "]"))
+    func ReportOf (string:content) → string
+      !
+      return ("ledger[" + (content.Length.ToString() + "]"))
 
-  §F{BalanceReport:pub} (str:path) -> str
-    §E{fs:r}
-    §B{content:str} §C{ReadLedger} §A path §/C
-    §R §C{ReportOf} §A content §/C
+    func BalanceReport (string:path) → string
+      ! fs:r
+      let string:content = ReadLedger(path)
+      return ReportOf(content)
 
-  §F{HasEntries:pub} (str:path) -> bool
-    §E{fs:r}
-    §B{content:str} §C{ReadLedger} §A path §/C
-    §R (> (len content) 0)
+    func HasEntries (string:path) → bool
+      ! fs:r
+      let string:content = ReadLedger(path)
+      return (content.Length > 0)
 
-  §F{DescribeLedger:pub} (str:path) -> str
-    §E{fs:r}
-    §B{content:str} §C{ReadLedger} §A path §/C
-    §R (+ "ledger: " §C{ReportOf} §A content §/C)
+    func DescribeLedger (string:path) → string
+      ! fs:r
+      let string:content = ReadLedger(path)
+      return ("ledger: " + ReportOf(content))
 
-  §F{LedgerSize:pub} (str:path) -> i32
-    §E{fs:r}
-    §B{content:str} §C{ReadLedger} §A path §/C
-    §R (len content)
+    func LedgerSize (string:path) → int
+      ! fs:r
+      let string:content = ReadLedger(path)
+      return content.Length

@@ -1,60 +1,60 @@
-§M{CsvRow}
-  §F{NeedsQuoting:pub} (str:field) -> bool
-    §E{}
-    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+module CsvRow CsvRow block
+  module CsvRowModule public
+    func NeedsQuoting (string:@field) → bool
+      !
+      return ((@field).Contains(",") || ((@field).Contains("\"") || ((@field).Contains("\r") || (@field).Contains("\n"))))
 
-  §F{EscapeField:pub} (str:field) -> str
-    §E{}
-    §B{nq} §C{NeedsQuoting} §A field §/C
-    §IF nq
-      §R (+ (+ "\"" (replace field "\"" "\"\"")) "\"")
-    §EL
-      §R field
+    func EscapeField (string:@field) → string
+      !
+      let nq = NeedsQuoting(@field)
+      if nq
+        return (("\"" + (@field).Replace("\"", "\"\"")) + "\"")
+      else
+        return @field
 
-  §F{JoinRow:pub} (List<str>:fields) -> str
-    §E{}
-    §B{~result} ""
-    §B{~i} 0
-    §B{n} fields.Count
-    §WH (< i n)
-      §IF (> i 0)
-        §B{~result} (+ result ",")
-      §B{item} §IDX{fields} i
-      §B{esc} §C{EscapeField} §A item §/C
-      §B{~result} (+ result esc)
-      §B{~i} (+ i 1)
-    §R result
+    func JoinRow (List<string>:fields) → string
+      !
+      var result = ""
+      var i = 0
+      let n = fields.Count
+      while (i < n)
+        if (i > 0)
+          var result = (result + ",")
+        let item = fields[i]
+        let esc = EscapeField(item)
+        var result = (result + esc)
+        var i = (i + 1)
+      return result
 
-  §F{SplitRow:pub} (str:line) -> List<str>
-    §E{mut,alloc}
-    §B{fields} §NEW{List<str>} §/NEW
-    §B{~cur} ""
-    §B{~inQuotes} false
-    §B{~i} 0
-    §B{n} (len line)
-    §WH (< i n)
-      §B{ch} (substr line i 1)
-      §IF inQuotes
-        §IF (equals ch "\"")
-          §IF (&& (< (+ i 1) n) (equals (substr line (+ i 1) 1) "\""))
-            §B{~cur} (+ cur "\"")
-            §B{~i} (+ i 2)
-          §EL
-            §B{~inQuotes} false
-            §B{~i} (+ i 1)
-        §EL
-          §B{~cur} (+ cur ch)
-          §B{~i} (+ i 1)
-      §EL
-        §IF (equals ch "\"")
-          §B{~inQuotes} true
-          §B{~i} (+ i 1)
-        §EI (equals ch ",")
-          §PUSH{fields} cur
-          §B{~cur} ""
-          §B{~i} (+ i 1)
-        §EL
-          §B{~cur} (+ cur ch)
-          §B{~i} (+ i 1)
-    §PUSH{fields} cur
-    §R fields
+    func SplitRow (string:line) → List<string>
+      ! mut, alloc
+      let fields = new List<string>()
+      var cur = ""
+      var inQuotes = false
+      var i = 0
+      let n = line.Length
+      while (i < n)
+        let ch = (line).Substring(i, 1)
+        if inQuotes
+          if (ch).Equals("\"")
+            if (((i + 1) < n) && ((line).Substring((i + 1), 1)).Equals("\""))
+              var cur = (cur + "\"")
+              var i = (i + 2)
+            else
+              var inQuotes = false
+              var i = (i + 1)
+          else
+            var cur = (cur + ch)
+            var i = (i + 1)
+        else if (ch).Equals("\"")
+          var inQuotes = true
+          var i = (i + 1)
+        else if (ch).Equals(",")
+          fields.Add(cur)
+          var cur = ""
+          var i = (i + 1)
+        else
+          var cur = (cur + ch)
+          var i = (i + 1)
+      fields.Add(cur)
+      return fields

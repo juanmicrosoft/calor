@@ -1,34 +1,35 @@
-§M{Quota}
-  §F{BaseAllowance:pub} (i32:tier) -> i32
-    §E{}
-    §R (* tier 5)
+module Quota Quota block
+  module QuotaModule public
+    func BaseAllowance (int:tier) → int
+      !
+      return (tier * 5)
 
-  §F{BurstBonus:pub} (i32:priority) -> i32
-    §E{}
-    §R (* priority 2)
+    func BurstBonus (int:priority) → int
+      !
+      return (priority * 2)
 
-  §F{GrantRequests:pub} (i32:requested, i32:maxAllowed) -> i32
-    §E{}
-    §S (<= result maxAllowed)
-    §IF (> requested maxAllowed)
-      §R maxAllowed
-    §R requested
+    func GrantRequests (int:requested, int:maxAllowed) → int
+      !
+      => (result <= maxAllowed)
+      if (requested > maxAllowed)
+        return maxAllowed
+      return requested
 
-  §F{GrantForTier:pub} (i32:tier, i32:priority, i32:maxAllowed) -> i32
-    §E{}
-    §B{allowance:i32} §C{BaseAllowance} §A tier §/C
-    §B{bonus:i32} §C{BurstBonus} §A priority §/C
-    §B{requested:i32} (+ allowance bonus)
-    §R §C{GrantRequests} §A requested §A maxAllowed §/C
+    func GrantForTier (int:tier, int:priority, int:maxAllowed) → int
+      !
+      let int:allowance = BaseAllowance(tier)
+      let int:bonus = BurstBonus(priority)
+      let int:requested = (allowance + bonus)
+      return GrantRequests(requested, maxAllowed)
 
-  §F{GrantWithMinimum:pub} (i32:requested, i32:maxAllowed, i32:minGrant) -> i32
-    §E{}
-    §S (>= result minGrant)
-    §B{capped:i32} §C{GrantRequests} §A requested §A maxAllowed §/C
-    §IF (< capped minGrant)
-      §R minGrant
-    §R capped
+    func GrantWithMinimum (int:requested, int:maxAllowed, int:minGrant) → int
+      !
+      => (result >= minGrant)
+      let int:capped = GrantRequests(requested, maxAllowed)
+      if (capped < minGrant)
+        return minGrant
+      return capped
 
-  §F{FormatGrant:pub} (i32:amount) -> str
-    §E{}
-    §R (concat "granted: " (str amount))
+    func FormatGrant (int:amount) → string
+      !
+      return string.Concat("granted: ", (amount).ToString())

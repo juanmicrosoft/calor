@@ -1,27 +1,28 @@
-§M{Config}
-  §F{FormatEntry:pub} (str:key, str:val) -> str
-    §E{}
-    §R (+ key (+ "=" val))
+module Config Config block
+  module ConfigModule public
+    func FormatEntry (string:key, string:val) → string
+      !
+      return (key + ("=" + val))
 
-  §F{QuoteValue:pub} (str:val) -> str
-    §E{}
-    §R (+ "'" (+ val "'"))
+    func QuoteValue (string:val) → string
+      !
+      return ("'" + (val + "'"))
 
-  §F{FormatConfig:pub} (str:key, str:val) -> str
-    §E{}
-    §B{quoted:str} §C{QuoteValue} §A val §/C
-    §B{line:str} §C{FormatEntry} §A key §A quoted §/C
-    §R line
+    func FormatConfig (string:key, string:val) → string
+      !
+      let string:quoted = QuoteValue(val)
+      let string:line = FormatEntry(key, quoted)
+      return line
 
-  §F{SaveConfig:pub} (str:path, str:key, str:val) -> void
-    §E{fs:w}
-    §B{line:str} §C{FormatConfig} §A key §A val §/C
-    §C{File.WriteAllText} §A path §A line §/C
+    func SaveConfig (string:path, string:key, string:val) → void
+      ! fs:w
+      let string:line = FormatConfig(key, val)
+      File.WriteAllText(path, line)
 
-  §F{FormatSection:pub} (str:name) -> str
-    §E{}
-    §R (+ "[" (+ name "]"))
+    func FormatSection (string:name) → string
+      !
+      return ("[" + (name + "]"))
 
-  §F{LoadConfig:pub} (str:path) -> str
-    §E{fs:r}
-    §R §C{File.ReadAllText} §A path §/C
+    func LoadConfig (string:path) → string
+      ! fs:r
+      return File.ReadAllText(path)

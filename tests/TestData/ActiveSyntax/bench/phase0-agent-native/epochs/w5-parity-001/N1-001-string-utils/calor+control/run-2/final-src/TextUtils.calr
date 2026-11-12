@@ -1,23 +1,24 @@
-§M{TextUtils}
-  §F{Slugify:pub} (str:s) -> str
-    §E{}
-    §B{lower:str} §C{s.ToLowerInvariant} §/C
-    §R §C{lower.Replace} §A " " §A "-" §/C
+module TextUtils TextUtils block
+  module TextUtilsModule public
+    func Slugify (string:s) → string
+      !
+      let string:lower = s.ToLowerInvariant()
+      return lower.Replace(" ", "-")
 
-  §F{Truncate:pub} (str:s, i32:maxLen) -> str
-    §E{}
-    §IF (<= (len s) maxLen)
-      §R s
-    §EI (> maxLen 3)
-      §R (concat (substr s 0 (- maxLen 3)) "...")
-    §EL
-      §R (substr s 0 maxLen)
+    func Truncate (string:s, int:maxLen) → string
+      !
+      if (s.Length <= maxLen)
+        return s
+      else if (maxLen > 3)
+        return string.Concat((s).Substring(0, (maxLen - 3)), "...")
+      else
+        return (s).Substring(0, maxLen)
 
-  §F{WordCount:pub} (str:s) -> i32
-    §E{}
-    §B{trimmed:str} (trim s)
-    §IF (== (len trimmed) 0)
-      §R 0
-    §EL
-      §B{normalized:str} (regex-replace trimmed "\\s+" " ")
-      §R (+ (- (len normalized) (len (replace normalized " " ""))) 1)
+    func WordCount (string:s) → int
+      !
+      let string:trimmed = (s).Trim()
+      if (trimmed.Length == 0)
+        return 0
+      else
+        let string:normalized = System.Text.RegularExpressions.Regex.Replace(trimmed, "\\s+", " ")
+        return ((normalized.Length - ((normalized).Replace(" ", "")).Length) + 1)

@@ -1,30 +1,31 @@
-§M{Inventory}
-  §F{FormatItem:pub} (str:name, i32:count) -> str
-    §E{}
-    §R (+ name (+ " x" §C{count.ToString} §/C))
+module Inventory Inventory block
+  module InventoryModule public
+    func FormatItem (string:name, int:count) → string
+      !
+      return (name + (" x" + count.ToString()))
 
-  §F{CountTotal:pub} (i32:shelf, i32:backroom) -> i32
-    §E{}
-    §R (+ shelf backroom)
+    func CountTotal (int:shelf, int:backroom) → int
+      !
+      return (shelf + backroom)
 
-  §F{FormatStock:pub} (str:name, i32:shelf, i32:backroom) -> str
-    §E{}
-    §B{total:i32} §C{CountTotal} §A shelf §A backroom §/C
-    §B{line:str} §C{FormatItem} §A name §A total §/C
-    §R line
+    func FormatStock (string:name, int:shelf, int:backroom) → string
+      !
+      let int:total = CountTotal(shelf, backroom)
+      let string:line = FormatItem(name, total)
+      return line
 
-  §F{SaveStock:pub} (str:path, str:name, i32:shelf, i32:backroom) -> void
-    §E{fs:w}
-    §B{line:str} §C{FormatStock} §A name §A shelf §A backroom §/C
-    §C{File.WriteAllText} §A path §A line §/C
+    func SaveStock (string:path, string:name, int:shelf, int:backroom) → void
+      ! fs:w
+      let string:line = FormatStock(name, shelf, backroom)
+      File.WriteAllText(path, line)
 
-  §F{FormatRestock:pub} (str:name, i32:needed) -> str
-    §E{}
-    §R (+ "restock " (+ name (+ ": " §C{needed.ToString} §/C)))
+    func FormatRestock (string:name, int:needed) → string
+      !
+      return ("restock " + (name + (": " + needed.ToString())))
 
-  §F{RestockAmount:pub} (i32:shelf, i32:backroom, i32:target) -> i32
-    §E{}
-    §B{total:i32} §C{CountTotal} §A shelf §A backroom §/C
-    §IF (>= total target)
-      §R 0
-    §R (- target total)
+    func RestockAmount (int:shelf, int:backroom, int:target) → int
+      !
+      let int:total = CountTotal(shelf, backroom)
+      if (total >= target)
+        return 0
+      return (target - total)

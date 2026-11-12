@@ -1,19 +1,22 @@
-§M{Inventory}
-  §F{AddItem:pub} (Dictionary<str, i32>:items, str:name, i32:qty) -> void
-    §E{mut}
-    §IF §HAS{items} §KEY name
-      §PUT{items} name (+ §IDX items name qty)
-    §EL
-      §PUT{items} name qty
-  §F{RemoveItem:pub} (Dictionary<str, i32>:items, str:name, i32:qty) -> void
-    §E{mut}
-    §IF §HAS{items} §KEY name
-      §IF (<= (- §IDX items name qty) 0)
-        §REM{items} name
-      §EL
-        §PUT{items} name (- §IDX items name qty)
-  §F{TotalCount:pub} (Dictionary<str, i32>:items) -> i32
-    §B{total} 0
-    §EACHKV{k:v} items
-      §ASSIGN total (+ total v)
-    §R total
+module Inventory Inventory block
+  module InventoryModule public
+    func AddItem (Dictionary<string, int>:items, string:name, int:qty) → void
+      ! mut
+      if items.ContainsKey(name)
+        set items[name] (items[name] + qty)
+      else
+        set items[name] qty
+
+    func RemoveItem (Dictionary<string, int>:items, string:name, int:qty) → void
+      ! mut
+      if items.ContainsKey(name)
+        if ((items[name] - qty) <= 0)
+          items.Remove(name)
+        else
+          set items[name] (items[name] - qty)
+
+    func TotalCount (Dictionary<string, int>:items) → int
+      let total = 0
+      each k, v in items
+        set total (total + v)
+      return total

@@ -1,58 +1,52 @@
-§M{CsvRow}
-  §F{NeedsQuoting:pub} (str:field) -> bool
-    §E{}
-    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+module CsvRow CsvRow block
+  module CsvRowModule public
+    func NeedsQuoting (string:@field) → bool
+      !
+      return ((@field).Contains(",") || ((@field).Contains("\"") || ((@field).Contains("\r") || (@field).Contains("\n"))))
 
-  §F{EscapeField:pub}
-    §I{str:field}
-    §O{str}
-    §E{}
-    §IF §C{NeedsQuoting} §A field §/C
-      §R (concat "\"" (replace field "\"" "\"\"") "\"")
-    §EL
-      §R field
+    func EscapeField (string:@field) → string
+      !
+      if NeedsQuoting(@field)
+        return string.Concat("\"", (@field).Replace("\"", "\"\""), "\"")
+      else
+        return @field
 
-  §F{JoinRow:pub}
-    §I{List<str>:fields}
-    §O{str}
-    §E{alloc,mut}
-    §B{escaped} §NEW{List<str>} §/NEW
-    §EACH{f} fields
-      §PUSH{escaped} §C{EscapeField} §A f §/C
-    §R (join "," escaped)
+    func JoinRow (List<string>:fields) → string
+      ! alloc, mut
+      let escaped = new List<string>()
+      each f in fields
+        escaped.Add(EscapeField(f))
+      return string.Join(",", escaped)
 
-  §F{SplitRow:pub}
-    §I{str:line}
-    §O{List<str>}
-    §E{alloc,mut}
-    §B{result} §NEW{List<str>} §/NEW
-    §B{~field} ""
-    §B{~i} 0
-    §B{~inq} false
-    §B{n} (len line)
-    §WH (< i n)
-      §B{c} (substr line i 1)
-      §IF inq
-        §IF (equals c "\"")
-          §IF (&& (< (+ i 1) n) (equals (substr line (+ i 1) 1) "\""))
-            §ASSIGN field (concat field "\"")
-            §ASSIGN i (+ i 2)
-          §EL
-            §ASSIGN inq false
-            §ASSIGN i (+ i 1)
-        §EL
-          §ASSIGN field (concat field c)
-          §ASSIGN i (+ i 1)
-      §EL
-        §IF (equals c "\"")
-          §ASSIGN inq true
-          §ASSIGN i (+ i 1)
-        §EI (equals c ",")
-          §PUSH{result} field
-          §ASSIGN field ""
-          §ASSIGN i (+ i 1)
-        §EL
-          §ASSIGN field (concat field c)
-          §ASSIGN i (+ i 1)
-    §PUSH{result} field
-    §R result
+    func SplitRow (string:line) → List<string>
+      ! alloc, mut
+      let result = new List<string>()
+      var @field = ""
+      var i = 0
+      var inq = false
+      let n = line.Length
+      while (i < n)
+        let c = (line).Substring(i, 1)
+        if inq
+          if (c).Equals("\"")
+            if (((i + 1) < n) && ((line).Substring((i + 1), 1)).Equals("\""))
+              set @field string.Concat(@field, "\"")
+              set i (i + 2)
+            else
+              set inq false
+              set i (i + 1)
+          else
+            set @field string.Concat(@field, c)
+            set i (i + 1)
+        else if (c).Equals("\"")
+          set inq true
+          set i (i + 1)
+        else if (c).Equals(",")
+          result.Add(@field)
+          set @field ""
+          set i (i + 1)
+        else
+          set @field string.Concat(@field, c)
+          set i (i + 1)
+      result.Add(@field)
+      return result

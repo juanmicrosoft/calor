@@ -1,61 +1,62 @@
-§M{CsvRow}
-  §F{NeedsQuoting:pub} (str:field) -> bool
-    §E{}
-    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+module CsvRow CsvRow block
+  module CsvRowModule public
+    func NeedsQuoting (string:@field) → bool
+      !
+      return ((@field).Contains(",") || ((@field).Contains("\"") || ((@field).Contains("\r") || (@field).Contains("\n"))))
 
-  §F{EscapeField:pub} (str:field) -> str
-    §E{}
-    §IF §C{NeedsQuoting} §A field §/C
-      §B{doubled} (replace field "\"" "\"\"")
-      §R (concat "\"" (concat doubled "\""))
-    §EL
-      §R field
+    func EscapeField (string:@field) → string
+      !
+      if NeedsQuoting(@field)
+        let doubled = (@field).Replace("\"", "\"\"")
+        return string.Concat("\"", string.Concat(doubled, "\""))
+      else
+        return @field
 
-  §F{JoinRow:pub} (List<str>:fields) -> str
-    §E{mut,alloc}
-    §B{~sb} (sb-new)
-    §B{~first} true
-    §EACH{field} fields
-      §IF first
-        §ASSIGN first false
-      §EL
-        §ASSIGN sb (sb-append sb ",")
-      §ASSIGN sb (sb-append sb §C{EscapeField} §A field §/C)
-    §R (sb-tostring sb)
+    func JoinRow (List<string>:fields) → string
+      ! mut, alloc
+      var sb = new System.Text.StringBuilder()
+      var first = true
+      each @field in fields
+        if first
+          set first false
+        else
+          set sb (sb).Append(",")
+        set sb (sb).Append(EscapeField(@field))
+      return (sb).ToString()
 
-  §F{SplitRow:pub} (str:line) -> List<str>
-    §E{mut,alloc}
-    §B{result} §NEW{List<str>} §/NEW
-    §B{~i} 0
-    §B{~n} (len line)
-    §B{~more} true
-    §B{~sb} (sb-new)
-    §B{~inField} true
-    §WH more
-      §ASSIGN sb (sb-new)
-      §IF (&& (< i n) (== (char-code (char-at line i)) 34))
-        §ASSIGN i (+ i 1)
-        §ASSIGN inField true
-        §WH inField
-          §IF (>= i n)
-            §ASSIGN inField false
-          §EI (== (char-code (char-at line i)) 34)
-            §IF (&& (< (+ i 1) n) (== (char-code (char-at line (+ i 1))) 34))
-              §ASSIGN sb (sb-append sb "\"")
-              §ASSIGN i (+ i 2)
-            §EL
-              §ASSIGN i (+ i 1)
-              §ASSIGN inField false
-          §EL
-            §ASSIGN sb (sb-append sb (str (char-at line i)))
-            §ASSIGN i (+ i 1)
-      §EL
-        §WH (&& (< i n) (!= (char-code (char-at line i)) 44))
-          §ASSIGN sb (sb-append sb (str (char-at line i)))
-          §ASSIGN i (+ i 1)
-      §PUSH{result} (sb-tostring sb)
-      §IF (&& (< i n) (== (char-code (char-at line i)) 44))
-        §ASSIGN i (+ i 1)
-      §EL
-        §ASSIGN more false
-    §R result
+    func SplitRow (string:line) → List<string>
+      ! mut, alloc
+      let result = new List<string>()
+      var i = 0
+      var n = line.Length
+      var more = true
+      var sb = new System.Text.StringBuilder()
+      var inField = true
+      while more
+        set sb new System.Text.StringBuilder()
+        if ((i < n) && (((int)(line)[i]) == 34))
+          set i (i + 1)
+          set inField true
+          while inField
+            if (i >= n)
+              set inField false
+            else if (((int)(line)[i]) == 34)
+              if (((i + 1) < n) && (((int)(line)[(i + 1)]) == 34))
+                set sb (sb).Append("\"")
+                set i (i + 2)
+              else
+                set i (i + 1)
+                set inField false
+            else
+              set sb (sb).Append(((line)[i]).ToString())
+              set i (i + 1)
+        else
+          while ((i < n) && (((int)(line)[i]) != 44))
+            set sb (sb).Append(((line)[i]).ToString())
+            set i (i + 1)
+        result.Add((sb).ToString())
+        if ((i < n) && (((int)(line)[i]) == 44))
+          set i (i + 1)
+        else
+          set more false
+      return result

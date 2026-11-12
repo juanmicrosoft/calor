@@ -1,40 +1,41 @@
-§M{Session}
-  §F{IndexLine:pub} (str:sessionId, i32:hits) -> str
-    §E{}
-    §R (+ sessionId (+ "=" §C{hits.ToString} §/C))
+module Session Session block
+  module SessionModule public
+    func IndexLine (string:sessionId, int:hits) → string
+      !
+      return (sessionId + ("=" + hits.ToString()))
 
-  §F{WriteIndex:pub} (str:path, str:sessionId, i32:hits) -> void
-    §E{fs:w}
-    §B{line:str} §C{IndexLine} §A sessionId §A hits §/C
-    §C{File.WriteAllText} §A path §A line §/C
+    func WriteIndex (string:path, string:sessionId, int:hits) → void
+      ! fs:w
+      let string:line = IndexLine(sessionId, hits)
+      File.WriteAllText(path, line)
 
-  §F{ReadIndex:pub} (str:path) -> str
-    §E{fs:r}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R ""
-    §R §C{File.ReadAllText} §A path §/C
+    func ReadIndex (string:path) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      return File.ReadAllText(path)
 
-  §F{MarkActive:pub} (str:sessionId) -> void
-    §E{fs:w}
-    §C{WriteIndex} §A "session-active.txt" §A sessionId §A 1 §/C
+    func MarkActive (string:sessionId) → void
+      ! fs:w
+      WriteIndex("session-active.txt", sessionId, 1)
 
-  §F{LookupSession:pub} (str:path, str:sessionId) -> str
-    §E{fs:r}
-    §B{content:str} §C{ReadIndex} §A path §/C
-    §R (+ sessionId (+ "#" §C{content.Length.ToString} §/C))
+    func LookupSession (string:path, string:sessionId) → string
+      ! fs:r
+      let string:content = ReadIndex(path)
+      return (sessionId + ("#" + content.Length.ToString()))
 
-  §F{HasIndex:pub} (str:path) -> bool
-    §E{fs:r}
-    §B{content:str} §C{ReadIndex} §A path §/C
-    §R (> (len content) 0)
+    func HasIndex (string:path) → bool
+      ! fs:r
+      let string:content = ReadIndex(path)
+      return (content.Length > 0)
 
-  §F{DescribeSession:pub} (str:path, str:sessionId) -> str
-    §E{fs:r}
-    §B{inner:str} §C{LookupSession} §A path §A sessionId §/C
-    §R (+ "session: " inner)
+    func DescribeSession (string:path, string:sessionId) → string
+      ! fs:r
+      let string:inner = LookupSession(path, sessionId)
+      return ("session: " + inner)
 
-  §F{IndexSize:pub} (str:path) -> i32
-    §E{fs:r}
-    §B{content:str} §C{ReadIndex} §A path §/C
-    §R (len content)
+    func IndexSize (string:path) → int
+      ! fs:r
+      let string:content = ReadIndex(path)
+      return content.Length
