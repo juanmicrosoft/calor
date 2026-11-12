@@ -574,7 +574,7 @@ Complete example: [Container](#example-task_29).
 
 ## LINQ query
 
-LINQ uses ordinary postfix calls, including generic calls and chained receivers. Bind predicates as typed lambda values and retain authoritative effect rows. Declare an IEnumerable&lt;T&gt; result with its accurate qualified System.Collections.Generic.IEnumerable&lt;T&gt; type when passing it to metadata-resolved calls: unqualified interface aliases currently leave native ToArray effect resolution unknown. Do not relax effect policy or use casts to conceal that resolution boundary.
+LINQ calls use ordinary postfix syntax, but syntax and metadata resolution do not prove their effects. Enumerable.Where and Enumerable.ToArray currently remain unknown under strict checking, even with a pure typed predicate and fully qualified IEnumerable&lt;T&gt; result. The complete example instead traverses the input once into a private buffer, then copies the matched prefix into an exact-sized result. It preserves encounter order and duplicates without rereading caller-owned entries; it is not LINQ support or deferred enumeration. Its alloc and mut row covers constructing and filling both arrays. Do not relax effect policy or use casts to hide the LINQ boundary.
 
 Syntax: `System.Linq.Enumerable.Where(collection, predicate)`
 
@@ -585,11 +585,11 @@ items.Where(x => x > 5).Select(x => x * 2)
 from item in items where item.Active select item.Name
 ```
 
-Complete example: [linq](#example-complete_linq).
+Complete example: [Stable positive-array filtering (native loop alternative, not LINQ)](#example-complete_linq).
 
 ## string interpolation
 
-Ordinary strings use $&#123;expression&#125; for runtime interpolation, including numeric expressions such as $&#123;1&#125;. Escape the opening marker as \$&#123;0&#125; to keep literal placeholder text. Alignment and format clauses use $&#123;value,4:D2&#125;.
+Ordinary strings use $&#123;expression&#125; for runtime interpolation. Use string, nullable-string, char or bool holes in native teaching examples; nameof also produces a string. Escape the opening marker as \$&#123;0&#125; to keep literal placeholder text. String alignment can use $&#123;name,-8&#125;. Numeric and arbitrary-object formatting can invoke culture or provider callbacks: neither $&#123;value&#125; nor a format clause supplies an authoritative effect contract. A numeric expression such as Math.Max still needs numeric formatting. Do not substitute interpolation for an unproven numeric ToString call or treat compiler admission as proof that formatting is pure.
 
 Syntax: `Inline: "text $&#123;expression&#125; text"`
 
@@ -1147,9 +1147,9 @@ Complete example: [goto](#example-complete_goto).
 
 ## string operations
 
-String operations use ordinary C# property and method syntax. Preserve each selected overload's argument count and comparison mode. Length is text.Length; case conversion and trimming are methods. A one-character Substring is a string, while text[index] is a char. Do not invent extra arguments or replace ordinal comparison with culture-dependent behavior.
+Strings use ordinary C# properties, indexing and method syntax, but only selected overloads have authoritative effect contracts. Length, UTF-16 character access, Contains(char), IndexOf(char), ToUpperInvariant() and ToLowerInvariant() are supported here. Contains(string), Substring, trimming and comparison-mode search overloads remain unknown under strict checking; ordinary syntax is not permission. StringContains keeps its non-null string parameters and pure row by comparing UTF-16 code units directly, including an empty substring. FirstField scans for a comma and copies the prefix into a char array; its alloc and mut row covers that buffer. Neither algorithm substitutes culture-dependent comparison.
 
-Syntax: `string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal)`
+Syntax: `text.Length; text[index]; text.Contains(character); text.IndexOf(character); left + right`
 
 C# equivalents (fragments):
 
@@ -1908,7 +1908,17 @@ StringContains
 module AgentReference37
   func StringContains (string:s, string:sub) → bool
     !
-    return s.Contains(sub)
+    if sub.Length > s.Length
+      return false
+    var int:start = 0
+    while start <= s.Length - sub.Length
+      var int:offset = 0
+      while offset < sub.Length && s[start + offset] == sub[offset]
+        set offset offset + 1
+      if offset == sub.Length
+        return true
+      set start start + 1
+    return false
 ```
 
 ## Example task_38
@@ -2037,11 +2047,18 @@ Strings
 ```calor
 module Strings
   func FirstField (string:line) → string
-    !
-    let int:i = line.IndexOf(",", StringComparison.Ordinal)
-    if i < 0
+    ! alloc, mut
+    var int:end = 0
+    while end < line.Length && line[end] != ','
+      set end end + 1
+    if end == line.Length
       return line
-    return line.Substring(0, i)
+    let char[]:prefix = new char[end]
+    var int:i = 0
+    while i < end
+      set prefix[i] line[i]
+      set i i + 1
+    return new string(prefix)
 ```
 
 ## Example primer_collections
@@ -2275,16 +2292,24 @@ module Resources
 
 ## Example complete_linq
 
-linq
+Stable positive-array filtering (native loop alternative, not LINQ)
 
 ```calor
 module Queries
-  using System.Linq
   func Positive (int[]:values) → int[]
-    ! alloc
-    let Func<int,bool>:predicate ! = (int:x) ! => x > 0
-    let System.Collections.Generic.IEnumerable<int>:filtered = System.Linq.Enumerable.Where<int>(values, predicate)
-    return System.Linq.Enumerable.ToArray<int>(filtered)
+    ! alloc, mut
+    let int[]:buffer = new int[values.Length]
+    var int:count = 0
+    each int:value in values
+      if value > 0
+        set buffer[count] value
+        set count count + 1
+    let int[]:filtered = new int[count]
+    var int:index = 0
+    while index < count
+      set filtered[index] buffer[index]
+      set index index + 1
+    return filtered
 ```
 
 ## Example complete_interpolation

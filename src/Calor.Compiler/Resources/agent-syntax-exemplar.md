@@ -58,16 +58,18 @@ Do not write structural closers or brace bodies for indented lambdas.
 ## Strings
 
 ```
-s.Length                           s.Substring(start, count)
-s.Contains(sub)                    s.IndexOf(sub, StringComparison.Ordinal)
-s.StartsWith(prefix)               s.Replace(oldValue, newValue)
-s.Trim()   s.ToUpper()   s.ToLower()   a.Equals(b)   s.EndsWith(suffix)
-let string:letter = line.Substring(i, 1)    One-character string, not a char
-let char:character = line[i]               A character
+s.Length                              UTF-16 code-unit count
+s.Contains('x')   s.IndexOf('x')        Contracted char overloads, not substring search
+s.ToUpperInvariant()   s.ToLowerInvariant()
+System.String.Equals(a, b)             Contracted ordinal equality
+let char:character = line[i]           A UTF-16 code unit, not a string
+let string:copy = new string(chars)    char[] buffer [needs alloc]
 ```
 
-Preserve argument counts and comparison modes; do not invent overloads or replace an explicit
-ordinal comparison with a culture-dependent overload. Ordinary method names do not capture calls.
+Contracts apply to the selected overload. Contains(string), Substring, trimming and
+comparison-mode searches currently remain unknown under strict checking. The complete
+FirstField program uses an ordinal scan and a buffer, declaring alloc and mut honestly.
+Do not invent overloads or replace ordinal comparison with culture-dependent behavior.
 
 ## Lists and dictionaries
 
@@ -128,11 +130,18 @@ module Files
 ```calor
 module Strings
   func FirstField (string:line) → string
-    !
-    let int:i = line.IndexOf(",", StringComparison.Ordinal)
-    if i < 0
+    ! alloc, mut
+    var int:end = 0
+    while end < line.Length && line[end] != ','
+      set end end + 1
+    if end == line.Length
       return line
-    return line.Substring(0, i)
+    let char[]:prefix = new char[end]
+    var int:i = 0
+    while i < end
+      set prefix[i] line[i]
+      set i i + 1
+    return new string(prefix)
 ```
 
 ```calor

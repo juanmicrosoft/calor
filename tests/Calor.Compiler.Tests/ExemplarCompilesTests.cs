@@ -161,6 +161,112 @@ public class ExemplarCompilesTests
             """));
     }
 
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("", "a")]
+    [InlineData("abc", "")]
+    [InlineData("abc", "abc")]
+    [InlineData("abc", "abcd")]
+    [InlineData("abc", "bc")]
+    [InlineData("abc", "cd")]
+    [InlineData("aaab", "aab")]
+    [InlineData("ababa", "baba")]
+    [InlineData("A", "a")]
+    [InlineData("a\0b", "\0b")]
+    [InlineData("\ud83d\ude00x", "\ude00")]
+    public void TeachingStringContains_PreservesOrdinalSubstringBehavior(string text, string part)
+    {
+        var code = StrictTeachingCode("task_37");
+        var expected = text.Contains(part).ToString();
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(code + $$"""
+
+            public static class Probe
+            {
+                public static object Run() => GlobalModule.StringContains({{CSharpLiteral(text)}}, {{CSharpLiteral(part)}});
+            }
+            """));
+    }
+
+    [Theory]
+    [InlineData("string?:s, string:sub")]
+    [InlineData("string:s, string?:sub")]
+    public void TeachingStringContains_DoesNotBroadenItsNonNullInputContract(string parameters)
+    {
+        var result = Program.Compile(TeachingProgramSource("task_37") + $$"""
+
+              func NullableCaller ({{parameters}}) → bool
+                !
+                return StringContains(s, sub)
+            """, "nullable-teaching.calr.txt", new CompilationOptions { StrictEffects = true });
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0274" && diagnostic.IsError);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(",")]
+    [InlineData(",tail")]
+    [InlineData("head,tail,rest")]
+    [InlineData("no delimiter")]
+    [InlineData("a\0b,tail")]
+    [InlineData("\ud83d\ude00,tail")]
+    public void TeachingFirstField_PreservesOrdinalPrefixBehavior(string line)
+    {
+        var code = StrictTeachingCode("primer_strings");
+        var end = line.IndexOf(",", StringComparison.Ordinal);
+        var expected = end < 0 ? line : line.Substring(0, end);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(code + $$"""
+
+            public static class Probe
+            {
+                public static object Run() => GlobalModule.FirstField({{CSharpLiteral(line)}});
+            }
+            """));
+    }
+
+    [Theory]
+    [InlineData("new int[0]")]
+    [InlineData("new int[] { -3, 0, -1 }")]
+    [InlineData("new int[] { 3, 1, 3 }")]
+    [InlineData("new int[] { -1, 2, 0, 3, 2 }")]
+    [InlineData("new int[] { int.MinValue, int.MaxValue, 0, 1 }")]
+    public void TeachingArrayFilter_PreservesValuesOrderDuplicatesAndInput(string expression)
+    {
+        var code = StrictTeachingCode("complete_linq");
+        Assert.Equal("True", InteropScope.RefOutImplementationTests.Run(code + $$"""
+
+            public static class Probe
+            {
+                public static object Run()
+                {
+                    var input = {{expression}};
+                    var before = (int[])input.Clone();
+                    var expected = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Where(input, value => value > 0));
+                    var actual = GlobalModule.Positive(input);
+                    return System.Linq.Enumerable.SequenceEqual(expected, actual)
+                        && System.Linq.Enumerable.SequenceEqual(before, input);
+                }
+            }
+            """));
+    }
+
+    private static string TeachingProgramSource(string id)
+    {
+        var source = JsonNode.Parse(File.ReadAllText(Path.Combine(TeachingRoot(), ExemplarCompileChecker.TeachingSourcePath)))!;
+        return source["programs"]!.AsArray().Single(program => program!["id"]!.GetValue<string>() == id)!["calor"]!.GetValue<string>();
+    }
+
+    private static string StrictTeachingCode(string id)
+    {
+        var result = Program.Compile(TeachingProgramSource(id), id + ".calr.txt",
+            new CompilationOptions { StrictEffects = true });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code is "Calor0411" or "Calor0419" or "Calor0425");
+        return result.GeneratedCode;
+    }
+
+    private static string CSharpLiteral(string text) =>
+        "\"" + string.Concat(text.Select(character => $"\\u{(int)character:x4}")) + "\"";
+
     [Fact]
     public void TeachingMirrorCheck_RejectsStaleAndMissingOutput()
     {
