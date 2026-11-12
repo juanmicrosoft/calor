@@ -596,6 +596,32 @@ public sealed class CrossModuleVarianceTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InferredRow_CrossFileDeclarationWithoutABodyContractRemainsUnknown(bool declared)
+    {
+        Write("library", $$"""
+            module Library Contracts block
+              module Helpers public
+                func Write internal () → void
+                  {{(declared ? "! cw" : "")}}
+                  System.Console.WriteLine("value")
+            """);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Probe public () → void
+                  ! cw
+                  Contracts.Helpers.Write()
+            """);
+        var (_, diagnostics) = Compile(cache: true);
+        Assert.Equal(!declared, diagnostics.HasErrors);
+        if (!declared)
+            Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
     [InlineData(false, "cw")]
     [InlineData(true, "cw")]
     [InlineData(false, "mut")]

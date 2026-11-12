@@ -58,9 +58,20 @@ For the motivation behind this design, see [Effects & Contracts Enforcement](/ca
 - A function with `§Q` and `§S` but no `§E` is valid and compiles
 - The `throw` effect applies only to intentional `§TH` statements
 
-**Missing §E means: no operational effects allowed**
+**Missing declarations depend on the callable boundary.**
+- Private and internal functions and methods infer their rows from their bodies.
+- Public and protected callable declarations retain their existing pure default.
 - Contract-generated exceptions are not "operational effects"
-- The function body must be free of IO, Mutation, and Nondeterminism
+- Public callers still declare every reachable operational effect.
+
+Non-public inference converges across recursive components and higher-order row
+charges before variance checks. Unknown bodies remain errors in strict mode;
+declaration-only inputs cannot stand in for analyzed bodies. Inferred body rows
+do not grant contracts to open virtual slots or method-group values that can
+dispatch to another implementation. Constructor, accessor and initializer
+contracts are unchanged. Existing explicit non-public annotations remain
+authoritative; parser-level rejection and mandatory boundary annotations are
+not implemented by this inference-engine unit.
 
 ## Unknown External Call Policy
 

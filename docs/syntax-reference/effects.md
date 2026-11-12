@@ -56,6 +56,18 @@ func Name (Type:parameter) → ReturnType
 
 ---
 
+## Inferred Non-public Effects
+
+Private and internal functions and methods can omit their own effect row.
+The compiler infers it from their bodies, including recursive calls. Callers
+still need to cover those effects at public boundaries. An unknown inferred row
+still fails strict checking; inference does not turn it into Pure.
+
+A non-public virtual method's inferred body is not a contract for every possible
+override. Open dispatch and method groups without a declared slot contract remain
+Unknown. Existing explicit non-public annotations are still checked against the
+body; removing that annotation form is a separate, unfinished language change.
+
 ## Effect Rows for Callbacks
 
 When a function accepts another function — a callback, handler, predicate, or

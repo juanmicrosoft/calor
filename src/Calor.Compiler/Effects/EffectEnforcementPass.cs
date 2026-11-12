@@ -172,8 +172,8 @@ public sealed class EffectEnforcementPass
     /// <param name="HasDeclaration">Whether a <c>§E</c> was written. Constructors and
     /// implicit accessors have no <c>§E</c> surface; their declared row is the
     /// intrinsic contract phase 4 checks against.</param>
-    /// <param name="DeclaredRow">The declared row's concrete part (§3.5: an omitted
-    /// row on a declaration is pure).</param>
+    /// <param name="DeclaredRow">The effective own row's concrete part, inferred
+    /// for an unannotated private or internal callable.</param>
     /// <param name="DeclaredVariables">The <c>eff</c> binders the declared row
     /// mentions, by ordinal within the declaration's own <c>eff</c> list (§7).</param>
     /// <param name="InferredRow">The body's computed effects as a row: Concrete,
@@ -379,17 +379,15 @@ public sealed class EffectEnforcementPass
             }
         }
 
+        _varianceModule = module;
+        _varianceTypes = CrossModuleTypes ?? CrossModuleTypeRegistry.Build([module]);
+
         // Phase 2+3: Process SCCs in reverse topological order
         // (Tarjan produces them in reverse topological order already)
         foreach (var scc in _callGraphAnalysis.StronglyConnectedComponents)
         {
             ProcessScc(scc);
         }
-
-        // Phase 3b (D-W2.2): declaration-local effect-variance checks
-        // (override §E ⊆ base §E; implementation §E ⊆ interface §E). External
-        // bases route their overrides to the Assumed channel below.
-        CheckEffectVariance(module);
 
         // Phase 3c (D-W2.3): propagate assumption provenance to callers — a caller
         // of an assumed-effect function inherits the assumption transitively.
@@ -402,10 +400,8 @@ public sealed class EffectEnforcementPass
         // propagated through the call graph.
         CheckRowCompatibility();
 
-        // Phase 3d' (v0.15 E3 slice b, review round 1 finding 1): site-6 charges
-        // reach TRANSITIVE callers. Must run before phase 4, which is where
-        // Calor0410 reads _computedEffects.
-        PropagateInstantiatedCharges();
+        // Inferred rows must include converged higher-order charges before variance.
+        CheckEffectVariance(module);
 
         // Phase 3e (v0.15 E3 slice b): design-doc §5 / P14 — every §LAM's
         // DECLARED row against its BODY's row. After inference, so ρ_body is the
@@ -653,8 +649,8 @@ public sealed class EffectEnforcementPass
     }
 
     /// <summary>
-    /// Calor0406 at one of the two capped sites. The message names the site, the
-    /// cap, and the functions involved so the reader can tell which of the two
+    /// Calor0406 at a capped inference site. The message names the site, the
+    /// cap, and the functions involved so the reader can tell which
     /// loops stopped and what to split; the function list is truncated after
     /// <see cref="MaxNamedFunctionsInNonConvergenceMessage"/> names.
     /// </summary>
@@ -684,6 +680,8 @@ public sealed class EffectEnforcementPass
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
         var declarationOnly = _declarationOnlyRows.TryGetValue(function.Id, out var row);
+        if (declarationOnly && UsesInferredEffects(function))
+            return EffectSet.Unknown;
         if (declarationOnly && function.Preconditions.Count == 0 && function.Postconditions.Count == 0)
             return GetDeclaredEffects(row);
         var assumptions = new List<string>();
@@ -841,8 +839,13 @@ public sealed class EffectEnforcementPass
         var declaredEffects = GetDeclaredEffects(function);
         var computedEffects = _computedEffects.GetValueOrDefault(function.Id, EffectSet.Empty);
 
+        if (UsesInferredEffects(function) && computedEffects.IsUnknown)
+            _diagnostics.Report(function.Span, DiagnosticCode.ForbiddenEffect,
+                $"Function '{function.Name}' uses effect 'unknown'; inferred effects are incomplete. Resolve its calls through authoritative source declarations or effect contracts.",
+                _policy == UnknownCallPolicy.Permissive ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error);
+
         // Check if computed effects are a subset of declared effects
-        if (!computedEffects.IsSubsetOf(declaredEffects))
+        if (!UsesInferredEffects(function) && !computedEffects.IsSubsetOf(declaredEffects))
         {
             var forbidden = computedEffects.Except(declaredEffects).ToList();
 
@@ -986,7 +989,39 @@ public sealed class EffectEnforcementPass
     /// </summary>
     private static readonly EffectSet AccessorContract = EffectSet.From("mut", "alloc");
 
-    private EffectSet GetDeclaredEffects(FunctionNode function) => GetDeclaredEffects(function.Effects);
+    private static bool UsesInferredEffects(FunctionNode function) =>
+        function.Effects == null && function.Visibility is Visibility.Private or Visibility.Internal;
+
+    private EffectSet GetDeclaredEffects(FunctionNode function) =>
+        UsesInferredEffects(function)
+            ? _computedEffects.GetValueOrDefault(function.Id, EffectSet.Unknown)
+            : GetDeclaredEffects(function.Effects);
+
+    private PolyRow CallableRow(FunctionNode function)
+    {
+        if (!UsesInferredEffects(function))
+            return PolyRow.FromDeclaration(function.Effects);
+        if (_callGraphAnalysis.RequiresSourceDispatchProof(function.Id))
+            return PolyRow.Unknown;
+        var variables = System.Collections.Immutable.ImmutableSortedDictionary<int, string>.Empty;
+        if (_chargedVariables.TryGetValue(function.Id, out var charged))
+            variables = variables.AddRange(charged);
+        return new PolyRow(GetDeclaredEffects(function).ToRow(), variables);
+    }
+
+    private PolyRow MethodRow(string ownerName, MethodNode method) =>
+        _callGraphAnalysis.Functions.TryGetValue($"{ownerName}.{method.Id}", out var function)
+            ? CallableRow(function)
+            : method.Effects != null || method.Visibility is not (Visibility.Private or Visibility.Internal)
+                ? PolyRow.FromDeclaration(method.Effects)
+                : PolyRow.Unknown;
+
+    private EffectSet MethodEffects(string ownerName, MethodNode method) =>
+        _callGraphAnalysis.Functions.TryGetValue($"{ownerName}.{method.Id}", out var function)
+            ? GetDeclaredEffects(function)
+            : method.Effects != null || method.Visibility is not (Visibility.Private or Visibility.Internal)
+                ? GetDeclaredEffects(method.Effects)
+                : EffectSet.Unknown;
 
     /// <summary>
     /// Computes the declared effect set from an §E node. A missing declaration is the
@@ -1439,8 +1474,9 @@ public sealed class EffectEnforcementPass
     /// D-W2.2 — declaration-local effect-variance checks (behavioral subtyping):
     /// an override may declare only effects covered by its base method's declared
     /// set (Calor0420), and an interface implementation only effects covered by the
-    /// interface method's declared set (Calor0421). A missing §E declaration is the
-    /// pure contract, consistent with per-function enforcement. Same-compilation
+    /// interface method's declared set (Calor0421). Non-public implementations
+    /// without declarations use their inferred rows; open inferred slots remain
+    /// Unknown rather than acquiring a contract from one body. Same-compilation
     /// declarations participate across files; unresolved bases remain Unknown
     /// (Calor0425). Implementations of external interfaces are not
     /// per-method attributable and are outside the declared-variance surface; calls
@@ -1448,8 +1484,6 @@ public sealed class EffectEnforcementPass
     /// </summary>
     private void CheckEffectVariance(ModuleNode module)
     {
-        _varianceModule = module;
-        _varianceTypes = CrossModuleTypes ?? CrossModuleTypeRegistry.Build([module]);
         // v0.15 E3 slice a, design-doc §4.5 — the permissive DEMOTION is GONE.
         // A `DoesNotFit` verdict is never waived, at any of the six sites, by any
         // flag: `--permissive-effects` waives only "we cannot tell" (Calor0425).
@@ -1468,8 +1502,8 @@ public sealed class EffectEnforcementPass
                 var (baseMethod, baseClassName) = FindBaseMethod(cls, method);
                 if (baseMethod != null)
                 {
-                    var overrideDeclared = GetDeclaredEffects(method.Effects);
-                    var baseDeclared = GetDeclaredEffects(baseMethod.Effects);
+                    var overrideDeclared = MethodEffects(cls.Name, method);
+                    var baseDeclared = MethodEffects(baseClassName ?? cls.Name, baseMethod);
                     // Site 4 (§6.2). ONE relation across all three codes: the same
                     // EffectRow.Fits that answers Calor0424 at sites 1-3 answers
                     // here, and Calor0420 is the site-specific spelling of its
@@ -1480,8 +1514,8 @@ public sealed class EffectEnforcementPass
                     // relation and not by a rank-1-specific branch. Slice a
                     // computed from EffectSet, where a variable contributes
                     // nothing, and therefore never compared them at all.
-                    var overrideRow = PolyRow.FromDeclaration(method.Effects);
-                    var baseRow = PolyRow.FromDeclaration(baseMethod.Effects);
+                    var overrideRow = MethodRow(cls.Name, method);
+                    var baseRow = MethodRow(baseClassName ?? cls.Name, baseMethod);
                     var verdict = PolyRow.Fits(overrideRow, baseRow);
                     if (verdict == Binding.BoundTypes.EffectFit.DoesNotFit)
                     {
@@ -1556,13 +1590,13 @@ public sealed class EffectEnforcementPass
 
                     if (impl != null)
                     {
-                        var implDeclared = GetDeclaredEffects(impl.Effects);
+                        var implDeclared = MethodEffects(implOwnerName ?? cls.Name, impl);
                         var ifaceDeclared = GetDeclaredEffects(sig.Effects);
                         // Site 5 (§6.2) — same relation, site-specific code.
                         // Site 5, alpha-equivalently (§7.5 R2): the ordinal is
                         // the variable's identity, so `eff e` on the interface
                         // member and `eff f` on the implementation unify.
-                        var implRow = PolyRow.FromDeclaration(impl.Effects);
+                        var implRow = MethodRow(implOwnerName ?? cls.Name, impl);
                         var ifaceRow = PolyRow.FromDeclaration(sig.Effects);
                         var implVerdict = PolyRow.Fits(implRow, ifaceRow);
                         if (implVerdict == Binding.BoundTypes.EffectFit.CannotTell)
@@ -1694,10 +1728,39 @@ public sealed class EffectEnforcementPass
     /// </summary>
     private void CheckRowCompatibility()
     {
-        foreach (var function in _callGraphAnalysis.Functions.Values)
+        if (!_callGraphAnalysis.Functions.Values.Any(UsesInferredEffects))
         {
-            new RowSiteChecker(this, function).Check();
+            foreach (var function in _callGraphAnalysis.Functions.Values)
+                new RowSiteChecker(this, function).Check();
+            PropagateInstantiatedCharges();
+            return;
         }
+
+        var maxRounds = EffectiveSccFixpointIterationCap(_callGraphAnalysis.Functions.Count);
+        for (var round = 0; round < maxRounds; round++)
+        {
+            var checkpoint = _diagnostics.CreateCheckpoint();
+            var before = new Dictionary<string, EffectSet>(_computedEffects, StringComparer.Ordinal);
+            var variableCount = _chargedVariables.Values.Sum(variables => variables.Count);
+            foreach (var scc in _callGraphAnalysis.StronglyConnectedComponents)
+                foreach (var id in scc)
+                    new RowSiteChecker(this, _callGraphAnalysis.Functions[id]).Check();
+            PropagateInstantiatedCharges();
+            if (_diagnostics.Skip(checkpoint.Diagnostics)
+                .Any(diagnostic => diagnostic.Code == DiagnosticCode.EffectInferenceDidNotConverge))
+                return;
+
+            if (variableCount == _chargedVariables.Values.Sum(variables => variables.Count)
+                && _computedEffects.All(pair => before.TryGetValue(pair.Key, out var previous)
+                    && pair.Value.Equals(previous)))
+                return;
+            if (round + 1 < maxRounds)
+                _diagnostics.RestoreCheckpoint(checkpoint);
+        }
+
+        ReportDidNotConverge(_varianceModule.Span, "inferred callable rows", maxRounds, "rounds",
+            _callGraphAnalysis.Functions.Values.Select(function => function.Name),
+            "higher-order inferred rows may be incomplete");
     }
 
     /// <summary>
@@ -2669,7 +2732,7 @@ public sealed class EffectEnforcementPass
             string?[] undetermined,
             TextSpan callSpan)
         {
-            var ownRow = PolyRow.FromDeclaration(callee.Effects);
+            var ownRow = _pass.CallableRow(callee);
             var instantiated = PolyRow.Concrete(ownRow.Row);
             var provenance = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -2755,7 +2818,7 @@ public sealed class EffectEnforcementPass
             var callerOwn = PolyRow.FromDeclaration(_function.Effects);
             foreach (var ordinal in instantiated.Variables.Keys)
             {
-                if (callerOwn.Variables.ContainsKey(ordinal))
+                if (UsesInferredEffects(_function) || callerOwn.Variables.ContainsKey(ordinal))
                 {
                     _pass.RecordVariableCharge(_function.Id, ordinal, BinderName(_function, ordinal));
                     continue;
@@ -2960,7 +3023,7 @@ public sealed class EffectEnforcementPass
                     // carries a row in ITS vocabulary, not the caller's, and
                     // passing it as a value is rank-2 (§7.3, position 6). Unknown
                     // is the honest answer; it fits nothing.
-                    var declaredRow = PolyRow.FromDeclaration(callee.Effects);
+                    var declaredRow = _pass.CallableRow(callee);
                     if (callee.EffectParameters.Count > 0 || declaredRow.IsPolymorphic)
                         return new RowSource(PolyRow.Unknown, $"'{callee.Name}'");
 
@@ -3844,7 +3907,7 @@ public sealed class EffectEnforcementPass
                     {
                         // Method-group argument: charge the referenced internal
                         // function's declared effects.
-                        effects = effects.Union(GetDeclaredEffects(internalFunc.Effects));
+                        effects = effects.Union(CallableEffects(internalFunc));
                     }
                 }
                 else if (IsFunctionValued(reference.Name, valueType)
@@ -3926,7 +3989,7 @@ public sealed class EffectEnforcementPass
                     }
                     else
                     {
-                        effects = effects.Union(GetDeclaredEffects(function.Effects));
+                        effects = effects.Union(CallableEffects(function));
                     }
                 }
 
@@ -4365,15 +4428,10 @@ public sealed class EffectEnforcementPass
                     var internalFunc = FindInternalFunctionByName(reference.Name);
                     if (internalFunc != null)
                     {
-                        // A method group. Its row is its declared §E; effect-
-                        // polymorphic declarations are rank-2 as values (§7.3) and
-                        // are Unknown here, as they are at the six sites.
-                        var declared = PolyRow.FromDeclaration(internalFunc.Effects);
-                        return internalFunc.EffectParameters.Count > 0 || declared.IsPolymorphic
-                            ? (PolyRow.Unknown,
-                                $"'{internalFunc.Name}' is effect-polymorphic and its row cannot be "
-                                + "read as a value")
-                            : (declared, string.Empty);
+                        var row = PolyRow.Concrete(MethodGroupEffects(internalFunc).ToRow());
+                        return (row, row.Row.IsUnknown
+                            ? $"'{internalFunc.Name}' has no determinable method-group row"
+                            : string.Empty);
                     }
 
                     return null;
@@ -6365,7 +6423,7 @@ public sealed class EffectEnforcementPass
                 var topLevel = candidates.Where(function => !function.Id.Contains('.')).ToArray();
                 return (topLevel.Length > 0 ? topLevel : candidates)
                     .Aggregate(EffectSet.Empty, (effects, function) =>
-                        effects.Union(MethodGroupEffects(function.Effects, function.EffectParameters.Count)));
+                        effects.Union(MethodGroupEffects(function)));
             }
 
             // #1176: `this.` and `self.` resolve to the enclosing class, the same way the
@@ -6406,16 +6464,25 @@ public sealed class EffectEnforcementPass
                     .Where(method => method.Name.Equals(name, StringComparison.Ordinal)).ToArray();
                 if (methods.Length > 0)
                     return methods.Aggregate(EffectSet.Empty, (effects, method) =>
-                        effects.Union(MethodGroupEffects(method.Effects, method.EffectParameters.Count)));
+                        effects.Union(_context.Functions.TryGetValue($"{current.Name}.{method.Id}", out var function)
+                            ? MethodGroupEffects(function)
+                            : EffectSet.Unknown));
                 current = ResolveBaseClass(current);
             }
             return null;
         }
 
-        private static EffectSet MethodGroupEffects(EffectsNode? effects, int effectParameterCount) =>
-            effectParameterCount > 0 || effects?.EffectVariables.Count > 0
+        private EffectSet CallableEffects(FunctionNode function) =>
+            UsesInferredEffects(function)
+                ? _context.CallGraph.RequiresSourceDispatchProof(function.Id)
+                    ? EffectSet.Unknown
+                    : _context.ResolveInternalEffects(function.Id)
+                : GetDeclaredEffects(function.Effects);
+
+        private EffectSet MethodGroupEffects(FunctionNode function) =>
+            function.EffectParameters.Count > 0 || function.Effects?.EffectVariables.Count > 0
                 ? EffectSet.Unknown
-                : GetDeclaredEffects(effects);
+                : CallableEffects(function);
 
         // Direct bare-name destinations are checked by RowSiteChecker and carry
         // their row to later invocations. Nested expressions and qualified stores
@@ -6856,7 +6923,7 @@ public sealed class EffectEnforcementPass
                     // source callback; no method spelling or guessed delegate type participates.
                     var effects = InferFromExpression(member.Target);
                     foreach (var callback in selected.Callbacks)
-                        effects = effects.Union(MethodGroupEffects(callback.Effects, callback.EffectParameters.Count));
+                        effects = effects.Union(MethodGroupEffects(callback));
                     var resolved = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
                         Binding.Metadata.MetadataBinderResult.ToBoundType(selected.ReceiverType),
                         selected.Method.Name,
@@ -7470,6 +7537,8 @@ public sealed class EffectEnforcementPass
             // implementation's computed row (the D-W2.2 variance boundary).
             return selected.Declaration switch
             {
+                MethodNode { Effects: null, Visibility: Visibility.Private or Visibility.Internal } =>
+                    UnknownResolvedOperation(selected.Method.ToDisplayString(), span),
                 MethodNode method => GetDeclaredEffects(method.Effects),
                 MethodSignatureNode signature => GetDeclaredEffects(signature.Effects),
                 _ => UnknownResolvedOperation(selected.Method.ToDisplayString(), span)
