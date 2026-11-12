@@ -14,7 +14,7 @@ public class ControlFlowTests
     [InlineData("§IF true\n      §R 1\n    §EL → §R 2")]
     public void Parse_ArrowConditionalStatements_AreRejected(string statement)
     {
-        var source = "§M{Test}\n  §F{Probe:pub} () -> i32\n    " + statement;
+        var source = "module Test\n  func Probe public () → int\n    " + CurrentStatement(statement);
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
@@ -28,7 +28,7 @@ public class ControlFlowTests
     [InlineData("§R §W value\n      §K _ → 1", false)]
     public void Parse_StatementMatchArmsRequireBlocks(string statement, bool hasErrors)
     {
-        var source = "§M{Test}\n  §F{Probe:pub} (i32:value) -> i32\n    " + statement;
+        var source = "module Test\n  func Probe public (int:value) → int\n    " + CurrentStatement(statement);
         var module = Parse(source, out var diagnostics);
         Assert.Equal(hasErrors, diagnostics.HasErrors);
         if (hasErrors)
@@ -65,10 +65,10 @@ public class ControlFlowTests
     public void Parse_ExplicitReturnedMatch_IsAnExpression()
     {
         var source = """
-            §M{Test}
-              §F{Probe:pub} (i32:value) -> i32
-                §R §W value
-                  §K _ → 1
+            module Test
+              func Probe public (int:value) → int
+                return match value
+                  case _ → 1
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -83,10 +83,10 @@ public class ControlFlowTests
     public void Parse_LambdaMatchArm_RequiresArrow(string arrow, bool hasErrors)
     {
         var source = $$"""
-            §M{Test}
-              §F{Probe:pub} (i32:value) -> object
-                §R §W value
-                  §K _ {{arrow}}§LAM{x:i32} x §/LAM
+            module Test
+              func Probe public (int:value) → object
+                return match value
+                  case _ {{arrow}}(int:x) => x
             """;
 
         Parse(source, out var diagnostics);
@@ -95,6 +95,17 @@ public class ControlFlowTests
             Assert.Contains(diagnostics, diagnostic =>
                 diagnostic.Message.Contains("requires →", StringComparison.Ordinal));
     }
+
+    private static string CurrentStatement(string statement) => statement switch
+    {
+        "§IF true → §R 1" => "if true → return 1",
+        "§IF true\n      §R 1\n    §EI false → §R 2" => "if true\n      return 1\n    else if false → return 2",
+        "§IF true\n      §R 1\n    §EL → §R 2" => "if true\n      return 1\n    else → return 2",
+        "§W value\n      §K _ → 1" => "match value\n      case _ → 1",
+        "§W value\n      §K _\n        §R 1" => "match value\n      case _\n        return 1",
+        "§R §W value\n      §K _ → 1" => "return match value\n      case _ → 1",
+        _ => throw new ArgumentOutOfRangeException(nameof(statement), statement, "Unregistered control-flow statement.")
+    };
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
@@ -109,13 +120,10 @@ public class ControlFlowTests
     public void Parse_ForLoop_ReturnsForStatementNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §L{i:0:10:1}
-                      §C{Console.WriteLine}
-                        §A i
-                      §/C
+            module Test
+              func Main public () → void
+                for i from 0 to 10 step 1
+                  Console.WriteLine(i)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -153,13 +161,10 @@ public class ControlFlowTests
     public void Parse_IfStatement_ReturnsIfStatementNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §IF (== x INT:0)
-                      §C{Console.WriteLine}
-                        §A "Zero"
-                      §/C
+            module Test
+              func Main public () → void
+                if x == 0
+                  Console.WriteLine("Zero")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -179,17 +184,12 @@ public class ControlFlowTests
     public void Parse_IfElseStatement_ReturnsIfStatementNodeWithElse()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §IF BOOL:true
-                      §C{Console.WriteLine}
-                        §A "Then"
-                      §/C
-                  §EL
-                      §C{Console.WriteLine}
-                        §A "Else"
-                      §/C
+            module Test
+              func Main public () → void
+                if true
+                  Console.WriteLine("Then")
+                else
+                  Console.WriteLine("Else")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -206,21 +206,14 @@ public class ControlFlowTests
     public void Parse_IfElseIfElse_ReturnsCorrectStructure()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §IF (== x INT:1)
-                      §C{Console.WriteLine}
-                        §A "One"
-                      §/C
-                  §EI (== x INT:2)
-                      §C{Console.WriteLine}
-                        §A "Two"
-                      §/C
-                  §EL
-                      §C{Console.WriteLine}
-                        §A "Other"
-                      §/C
+            module Test
+              func Main public () → void
+                if x == 1
+                  Console.WriteLine("One")
+                else if x == 2
+                  Console.WriteLine("Two")
+                else
+                  Console.WriteLine("Other")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -237,13 +230,10 @@ public class ControlFlowTests
     public void Parse_WhileLoop_ReturnsWhileStatementNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §WH (< x INT:10)
-                      §C{Console.WriteLine}
-                        §A x
-                      §/C
+            module Test
+              func Main public () → void
+                while x < 10
+                  Console.WriteLine(x)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -258,10 +248,9 @@ public class ControlFlowTests
     public void Parse_BindStatement_ReturnsBindStatementNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                §O{void}
-                §B{x:i32} 42
+            module Test
+              func Main public () → void
+                let int:x = 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -278,12 +267,9 @@ public class ControlFlowTests
     public void Parse_BinaryOperation_ReturnsBinaryOperationNode()
     {
         var source = """
-            §M{Test}
-              §F{Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
+            module Test
+              func Add public (int:a, int:b) → int
+                return a + b
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -301,14 +287,11 @@ public class ControlFlowTests
     public void Compile_ForLoop_GeneratesValidCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §L{i:1:10:1}
-                      §C{Console.WriteLine}
-                        §A i
-                      §/C
+            module Test
+              func Main public () → void
+                ! cw
+                for i from 1 to 10 step 1
+                  Console.WriteLine(i)
             """;
 
         var result = Program.Compile(source);
@@ -327,18 +310,13 @@ public class ControlFlowTests
     public void Compile_IfElse_GeneratesValidCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §IF BOOL:true
-                      §C{Console.WriteLine}
-                        §A STR:"Yes"
-                      §/C
-                  §EL
-                      §C{Console.WriteLine}
-                        §A STR:"No"
-                      §/C
+            module Test
+              func Main public () → void
+                ! cw
+                if true
+                  Console.WriteLine("Yes")
+                else
+                  Console.WriteLine("No")
             """;
 
         var result = Program.Compile(source);
@@ -352,14 +330,11 @@ public class ControlFlowTests
     public void Compile_Bind_GeneratesValidCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §B{x} INT:42
-                  §C{Console.WriteLine}
-                    §A x
-                  §/C
+            module Test
+              func Main public () → void
+                ! cw
+                let x = 42
+                Console.WriteLine(x)
             """;
 
         var result = Program.Compile(source);
@@ -373,12 +348,9 @@ public class ControlFlowTests
     public void Compile_BinaryOperation_GeneratesValidCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
+            module Test
+              func Add public (int:a, int:b) → int
+                return a + b
             """;
 
         var result = Program.Compile(source);
@@ -391,11 +363,9 @@ public class ControlFlowTests
     public void Compile_Modulo_GeneratesValidCSharp()
     {
         var source = """
-            §M{Test}
-              §F{IsEven:pub}
-                  §I{i32:n}
-                  §O{bool}
-                  §R (== (% n INT:2) INT:0)
+            module Test
+              func IsEven public (int:n) → bool
+                return n % 2 == 0
             """;
 
         var result = Program.Compile(source);
@@ -408,14 +378,11 @@ public class ControlFlowTests
     public void Parse_DoWhileLoop_ReturnsDoWhileStatementNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DO
-                    §C{Console.WriteLine}
-                      §A x
-                    §/C
-                  §/DO (< x INT:10)
+            module Test
+              func Main public () → void
+                do
+                  Console.WriteLine(x)
+                while x < 10
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -451,16 +418,13 @@ public class ControlFlowTests
     public void Compile_DoWhileLoop_GeneratesValidCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §B{i} INT:0
-                  §DO
-                    §C{Console.WriteLine}
-                      §A i
-                    §/C
-                  §/DO (< i INT:10)
+            module Test
+              func Main public () → void
+                ! cw
+                let i = 0
+                do
+                  Console.WriteLine(i)
+                while i < 10
             """;
 
         var result = Program.Compile(source);
@@ -476,14 +440,12 @@ public class ControlFlowTests
         // Test that mutable §B{~name} inside loop emits assignment on subsequent iterations
         // The ~ prefix indicates mutability, enabling reassignment instead of shadowing
         var source = """
-            §M{Test}
-              §F{SumRange:pub}
-                  §I{i32:n}
-                  §O{i32}
-                  §B{~sum:i32} INT:0
-                  §L{i:1:n:1}
-                      §B{~sum:i32} (+ sum i)
-                  §R sum
+            module Test
+              func SumRange public (int:n) → int
+                var int:sum = 0
+                for i from 1 to n step 1
+                  set sum sum + i
+                return sum
             """;
 
         var result = Program.Compile(source);
@@ -506,15 +468,11 @@ public class ControlFlowTests
         // Note: S-expressions in attributes cannot use INT:1 syntax because ':'
         // is the attribute separator. Use plain literals instead.
         var source = """
-            §M{Test}
-              §F{ProcessArray:pub}
-                  §I{i32:n}
-                  §O{void}
-                  §E{cw}
-                  §L{i:0:(- n 1):1}
-                      §C{Console.WriteLine}
-                        §A i
-                      §/C
+            module Test
+              func ProcessArray public (int:n) → void
+                ! cw
+                for i from 0 to n - 1 step 1
+                  Console.WriteLine(i)
             """;
 
         var result = Program.Compile(source);
@@ -532,17 +490,11 @@ public class ControlFlowTests
         // Note: S-expressions in attributes use plain integer literals (not INT:1 syntax)
         // because ':' is the attribute separator.
         var source = """
-            §M{Test}
-              §F{IterateWithExpressions:pub}
-                  §I{i32:start}
-                  §I{i32:end}
-                  §I{i32:stepSize}
-                  §O{void}
-                  §E{cw}
-                  §L{i:(+ start 1):(- end 1):(* stepSize 2)}
-                      §C{Console.WriteLine}
-                        §A i
-                      §/C
+            module Test
+              func IterateWithExpressions public (int:start, int:end, int:stepSize) → void
+                ! cw
+                for i from start + 1 to end - 1 step stepSize * 2
+                  Console.WriteLine(i)
             """;
 
         var result = Program.Compile(source);
@@ -559,16 +511,11 @@ public class ControlFlowTests
     {
         // Test nested S-expressions: (+ (- a 1) (- b 2))
         var source = """
-            §M{Test}
-              §F{NestedExpr:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{void}
-                  §E{cw}
-                  §L{i:0:(+ (- a 1) (- b 2)):1}
-                      §C{Console.WriteLine}
-                        §A i
-                      §/C
+            module Test
+              func NestedExpr public (int:a, int:b) → void
+                ! cw
+                for i from 0 to a - 1 + (b - 2) step 1
+                  Console.WriteLine(i)
             """;
 
         var result = Program.Compile(source);
@@ -583,16 +530,12 @@ public class ControlFlowTests
     {
         // Test comparison operators in S-expressions
         var source = """
-            §M{Test}
-              §F{CompareTest:pub}
-                  §I{i32:limit}
-                  §O{void}
-                  §E{cw}
-                  §B{~i:i32} INT:0
-                  §WH (<= i limit)
-                      §C{Console.WriteLine}
-                        §A i
-                      §/C
+            module Test
+              func CompareTest public (int:limit) → void
+                ! cw
+                var int:i = 0
+                while i <= limit
+                  Console.WriteLine(i)
             """;
 
         var result = Program.Compile(source);
@@ -606,12 +549,9 @@ public class ControlFlowTests
     {
         // Test logical operators (&&, ||) in S-expressions
         var source = """
-            §M{Test}
-              §F{LogicalTest:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{bool}
-                  §R (&& (> a 0) (< b 100))
+            module Test
+              func LogicalTest public (int:a, int:b) → bool
+                return a > 0 && b < 100
             """;
 
         var result = Program.Compile(source);
@@ -626,16 +566,14 @@ public class ControlFlowTests
         // Test that mutable variable reassignment works correctly in nested if blocks
         // The ~ prefix indicates mutability, enabling reassignment instead of shadowing
         var source = """
-            §M{Test}
-              §F{NestedIfTest:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §B{~result:i32} INT:0
-                  §IF (> x INT:0)
-                      §B{~result:i32} INT:1
-                      §IF (> x INT:10)
-                          §B{~result:i32} INT:2
-                  §R result
+            module Test
+              func NestedIfTest public (int:x) → int
+                var int:result = 0
+                if x > 0
+                  set result 1
+                  if x > 10
+                    set result 2
+                return result
             """;
 
         var result = Program.Compile(source);
@@ -654,14 +592,12 @@ public class ControlFlowTests
     {
         // Test that variables declared in one method don't affect another
         var source = """
-            §M{Test}
-              §CL{TestClass:pub}
-                  §MT{MethodA:pub}
-                      §O{void}
-                      §B{x:i32} INT:1
-                  §MT{MethodB:pub}
-                      §O{void}
-                      §B{x:i32} INT:2
+            module Test
+              class TestClass public
+                func MethodA public () → void
+                  let int:x = 1
+                func MethodB public () → void
+                  let int:x = 2
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -687,15 +623,11 @@ public class ControlFlowTests
     {
         // Test that float literals work in S-expressions
         var source = """
-            §M{Test}
-              §F{FloatTest:pub}
-                  §I{f64:start}
-                  §O{void}
-                  §E{cw}
-                  §L{i:0:(- start 0.5):1}
-                      §C{Console.WriteLine}
-                        §A i
-                      §/C
+            module Test
+              func FloatTest public (double:start) → void
+                ! cw
+                for i from 0 to start - 0.5 step 1
+                  Console.WriteLine(i)
             """;
 
         var result = Program.Compile(source);
@@ -711,14 +643,12 @@ public class ControlFlowTests
         // According to Calor semantics S5-S6: "Inner scope does NOT mutate outer"
         // A bind in an if block should create a new variable that shadows the outer
         var source = """
-            §M{Test}
-              §F{testShadow:pub}
-                  §I{bool:cond}
-                  §O{i32}
-                  §B{x:i32} INT:10
-                  §IF cond
-                      §B{x:i32} INT:20
-                  §R x
+            module Test
+              func testShadow public (bool:cond) → int
+                let int:x = 10
+                if cond
+                  let int:x = 20
+                return x
             """;
 
         var diagnostics = new DiagnosticBag();

@@ -51,7 +51,7 @@ public class TypeSystemTests
     [Fact]
     public void Lexer_RecognizesMatchKeyword()
     {
-        var tokens = Tokenize("§W", out var diagnostics);
+        var tokens = Tokenize("match", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
@@ -73,7 +73,7 @@ public class TypeSystemTests
     [Fact]
     public void Lexer_RecognizesCaseKeyword()
     {
-        var tokens = Tokenize("§K", out var diagnostics);
+        var tokens = Tokenize("case", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
@@ -127,12 +127,11 @@ public class TypeSystemTests
     [Fact]
     public void Parser_ParsesNullableValue()
     {
-        var source = @"
-§M{Test}
-  §F{GetValue:pub}
-      §O{?i32}
-      §R INT:42
-";
+        var source = """
+            module Test
+              func GetValue public () → int?
+                return 42
+            """;
 
         var module = Parse(source, out var diagnostics);
 
@@ -150,12 +149,11 @@ public class TypeSystemTests
     [Fact]
     public void Parser_ParsesNull()
     {
-        var source = @"
-§M{Test}
-  §F{GetNothing:pub}
-      §O{?i32}
-      §R null
-";
+        var source = """
+            module Test
+              func GetNothing public () → int?
+                return null
+            """;
 
         var module = Parse(source, out var diagnostics);
 
@@ -336,11 +334,9 @@ public class TypeSystemTests
     public void Emitter_NullableReturnType_EmitsNullable()
     {
         var source = """
-            §M{Test}
-              §F{FindValue:pub}
-                  §I{i32:id}
-                  §O{?i32}
-                  §R INT:42
+            module Test
+              func FindValue public (int:id) → int?
+                return 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -357,10 +353,9 @@ public class TypeSystemTests
     public void Emitter_NullableStringReturnType_EmitsNullable()
     {
         var source = """
-            §M{Test}
-              §F{FindName:pub}
-                  §O{?str}
-                  §R STR:"hello"
+            module Test
+              func FindName public () → string?
+                return "hello"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -377,10 +372,8 @@ public class TypeSystemTests
     public void Emitter_NullableParameter_EmitsNullable()
     {
         var source = """
-            §M{Test}
-              §F{Process:pub}
-                  §I{?i32:value}
-                  §O{void}
+            module Test
+              func Process public (int?:value) → void
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -419,10 +412,9 @@ public class TypeSystemTests
     public void Emitter_SizedIntReturnType_EmitsCorrectType()
     {
         var source = """
-            §M{Test}
-              §F{GetLong:pub}
-                  §O{i64}
-                  §R INT:100
+            module Test
+              func GetLong public () → long
+                return 100
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -439,10 +431,9 @@ public class TypeSystemTests
     public void Emitter_SizedFloatReturnType_EmitsFloat()
     {
         var source = """
-            §M{Test}
-              §F{GetFloat:pub}
-                  §O{f32}
-                  §R FLOAT:1.5
+            module Test
+              func GetFloat public () → float
+                return 1.5f
             """;
 
         var module = Parse(source, out var diagnostics);

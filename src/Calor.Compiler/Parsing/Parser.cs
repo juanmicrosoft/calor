@@ -6087,14 +6087,14 @@ public sealed class Parser
                 var arrow = Expect(TokenKind.Arrow);
                 if (!expressionContext)
                     _diagnostics.ReportError(arrow.Span, DiagnosticCode.UnexpectedToken,
-                        "Statement match arms require an indented body. Use §K pattern followed by indented statements, or §R §W for a returned match expression.");
+                        "Statement match arms require an indented body. Use 'case pattern' followed by indented statements, or 'return match' for a returned match expression.");
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
             }
-            else if (Check(TokenKind.Lambda))
+            else if (Check(TokenKind.Lambda) || IsNativeLambdaAt(_position))
             {
                 _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                    "A lambda match arm requires → before its expression. Use §K pattern → §LAM... .");
+                    "A lambda match arm requires → before its expression. Use 'case pattern → (type:name) => expression'.");
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
                 if (IsBlockEnd(TokenKind.EndCase)) ExpectBlockEnd(TokenKind.EndCase);
