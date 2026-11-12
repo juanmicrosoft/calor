@@ -4431,7 +4431,7 @@ public sealed class Binder
             {
                 Target: BoundTypeReferenceExpression,
                 ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
-                    { IsStatic: true, Type.TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error },
+                    { IsStatic: true, IsConst: false, Type.TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error },
                 Type: BoundTypes.NominalBoundType { RoslynSymbol: not null }
             } metadataStaticField)
             _boundMetadataStaticFieldReads[expr] = metadataStaticField;

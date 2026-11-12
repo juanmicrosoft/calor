@@ -3559,4 +3559,21 @@ public sealed class NativeMetadataClosureTests
             && item.Message.Contains("'Missing'", StringComparison.Ordinal));
         Assert.Empty(result.GeneratedCode);
     }
+
+    [Fact]
+    public void QualifiedMetadataStaticFields_DoNotAddWarningsToExistingEnumConstants()
+    {
+        const string source = """
+            module ExistingConstantType
+              func Compare () → bool
+                !
+                return StringComparison.Ordinal == StringComparison.Ordinal
+            """;
+        var result = Program.Compile(source, "existing-constant-type.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true, EnforceEffects = true
+        });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, item => item.Code == DiagnosticCode.UndefinedReference);
+    }
 }

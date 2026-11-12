@@ -229,9 +229,9 @@ This is bounded contract coverage, not a proof of the whole BCL.
 Selected metadata constants, such as `System.Math.PI`, do not evaluate their
 namespace/type qualifiers or run a type initializer. This does not grant purity
 to same-spelled source getters or to static readonly fields.
-The type checker also uses the selected type of a static metadata field instead
-of treating its namespace as a variable. This type information is not an effect
-contract: static readonly reads still require independent effect proof.
+The type checker also uses the selected type of a nonconstant static metadata
+field instead of treating its namespace as a variable. This type information is
+not an effect contract: static readonly reads still require independent effect proof.
 
 ## Project-Level Effect Manifests
 
