@@ -432,6 +432,159 @@ public class Issue1173ConverterEffectRowTests
         Assert.All(actual, source => Assert.Equal(expected, source));
     }
 
+    [Theory]
+    [InlineData("private", false)]
+    [InlineData("private", true)]
+    [InlineData("internal", false)]
+    [InlineData("internal", true)]
+    public void ConvertedNonPublicBodiesOmitOwnRowsButStillChargeThePublicBoundary(string visibility, bool isStatic)
+    {
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            using System;
+            public {{(isStatic ? "static " : "")}}class Probe
+            {
+                public {{(isStatic ? "static " : "")}}void Run() { Emit(); }
+                {{visibility}} {{(isStatic ? "static " : "")}}void Emit() { Console.WriteLine(1); }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        foreach (var module in new[] { conversion.Ast!, Parse(conversion.CalorSource!) })
+        {
+            var methods = Assert.Single(module.Classes).Methods;
+            Assert.Null(Assert.Single(methods.Where(method => method.Name == "Emit")).Effects);
+            Assert.Equal("cw", EffectEnforcementPass.GetDeclaredEffects(
+                Assert.Single(methods.Where(method => method.Name == "Run")).Effects).ToDisplayString());
+        }
+        var reparsed = Parse(conversion.CalorSource!);
+        var boundary = Assert.Single(reparsed.Classes.Single().Methods.Where(method => method.Name == "Run"));
+        boundary.Effects = new EffectsNode(boundary.Effects!.Span, new Dictionary<string, string>());
+        var pureBoundary = new CalorEmitter().Emit(reparsed);
+        foreach (var typing in new[] { false, true })
+        {
+            var options = new CompilationOptions
+            {
+                EnableTypeChecking = typing, EnforceEffects = true, StrictEffects = true,
+                UnknownCallPolicy = UnknownCallPolicy.Strict, VerifyContracts = false
+            };
+            var compiled = Program.Compile(conversion.CalorSource!, null, options);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var refused = Program.Compile(pureBoundary, null, options);
+            Assert.Contains(refused.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            Assert.Empty(refused.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("private", false)]
+    [InlineData("internal", false)]
+    [InlineData("private", true)]
+    [InlineData("internal", true)]
+    public void OmittingConvertedOwnRowsRetainsHigherOrderContracts(string visibility, bool returnsCallback)
+    {
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            #nullable enable
+            using System;
+            public static class Probe
+            {
+                {{visibility}} static {{(returnsCallback
+                    ? "Action Helper() { return () => Console.WriteLine(1); }"
+                    : "void Helper(Action callback) { callback(); }")}}
+                public static void Run() { {{(returnsCallback
+                    ? "Helper()();"
+                    : "Helper(() => Console.WriteLine(1));")}} }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        foreach (var module in new[] { conversion.Ast!, Parse(conversion.CalorSource!) })
+        {
+            var methods = Assert.Single(module.Classes).Methods;
+            var helper = Assert.Single(methods.Where(method => method.Name == "Helper"));
+            Assert.Null(helper.Effects);
+            if (returnsCallback)
+                Assert.Equal("cw", EffectEnforcementPass.GetDeclaredEffects(helper.Output!.Row).ToDisplayString());
+            else
+            {
+                Assert.Single(helper.EffectParameters);
+                Assert.Single(Assert.Single(helper.Parameters).Row!.EffectVariables);
+            }
+            Assert.Contains("cw", EffectEnforcementPass.GetDeclaredEffects(
+                Assert.Single(methods.Where(method => method.Name == "Run")).Effects).ToDisplayString());
+        }
+        foreach (var typing in new[] { false, true })
+        {
+            var compiled = Program.Compile(conversion.CalorSource!, null, new CompilationOptions
+            {
+                EnableTypeChecking = typing, StrictEffects = true,
+                UnknownCallPolicy = UnknownCallPolicy.Strict, VerifyContracts = false
+            });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        }
+    }
+
+    [Fact]
+    public void ConvertedInternalAbstractMembersRetainTheirBoundaryRow()
+    {
+        var conversion = Convert(
+            """
+            public abstract class Probe { internal abstract void Emit(); }
+            public class Implementation : Probe
+            {
+                internal override void Emit() { System.Console.WriteLine(1); }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        foreach (var module in new[] { conversion.Ast!, Parse(conversion.CalorSource!) })
+        {
+            var method = Assert.Single(module.Classes.Single(cls => cls.Name == "Probe").Methods);
+            Assert.True(method.IsAbstract);
+            Assert.Equal("cw", EffectEnforcementPass.GetDeclaredEffects(method.Effects).ToDisplayString());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConvertedRowlessHelpersDoNotCertifyUnknownCallsOrOpenVirtualSlots(bool virtualSlot)
+    {
+        var conversion = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy, ValidateRoundTripCSharp = false
+        }).Convert(virtualSlot ? """
+            public class Probe
+            {
+                internal virtual int Read() => 1;
+                public int Run() => Read();
+            }
+            """ : """
+            #nullable enable
+            public class Probe
+            {
+                private static bool Equal(object left, object right) => object.Equals(left, right);
+                public static bool Run(object left, object right) => Equal(left, right);
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Null(Assert.Single(conversion.Ast!.Classes.Single().Methods
+            .Where(method => method.Visibility is Visibility.Private or Visibility.Internal)).Effects);
+        foreach (var typing in new[] { false, true })
+        {
+            var compiled = Program.Compile(conversion.CalorSource!, null, new CompilationOptions
+            {
+                EnableTypeChecking = typing, StrictEffects = true,
+                UnknownCallPolicy = UnknownCallPolicy.Strict, VerifyContracts = false
+            });
+            Assert.Contains(compiled.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+            Assert.Empty(compiled.GeneratedCode);
+        }
+    }
+
     private static ConversionResult Convert(string csharp)
     {
         var conversion = new CSharpToCalorConverter(new ConversionOptions

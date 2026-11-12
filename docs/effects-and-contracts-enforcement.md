@@ -73,6 +73,13 @@ contracts are unchanged. Existing explicit non-public annotations remain
 authoritative; parser-level rejection and mandatory boundary annotations are
 not implemented by this inference-engine unit.
 
+The C# converter omits synthesized own rows on private/internal functions and
+concrete methods. Recompilation infers those bodies rather than trusting a
+printed permission. Callback parameter/return rows and their effect binders
+remain explicit; abstract and extern declarations retain their existing rows.
+Public callers must still cover every reachable effect. This does not implement
+mandatory boundary syntax or removal of authored non-public annotations.
+
 ## Unknown External Call Policy
 
 | Mode              | Behavior                                      | When              |

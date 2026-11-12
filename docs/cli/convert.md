@@ -97,6 +97,12 @@ Aliases, stored or captured callbacks, non-lambda returns, and dispatch contract
 are outside this synthesis unit and retain their existing fail-closed behavior.
 These contracts do not establish whole-program equivalence.
 
+Converted private/internal bodies omit their own inferred rows. Their callback
+parameter and return contracts remain explicit, and public callers still declare
+the effects reached through those helpers. Abstract and extern declarations
+retain their existing boundary rows. Recompilation must still reject an unknown
+body or unproved virtual-slot contract.
+
 ### Generated output and refresh
 
 C#→Calor conversion saves an adjacent `<output>.conversion.json` receipt containing

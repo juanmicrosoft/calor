@@ -1749,10 +1749,10 @@ public sealed class CSharpToCalorConverter
     }
 
     /// <summary>
-    /// Copies synthesised <c>§E</c> rows from the re-parsed module onto the tree
-    /// the converter holds, matching the probe's parsed header spans to the original
-    /// nodes that emitted them. This distinguishes overloads, namespaces and conditional
-    /// branches without depending on transient identities or declaration ordering.
+    /// Copies synthesised boundary rows from the re-parsed module onto the tree
+    /// the converter holds. Non-public bodies omit their own inferred rows, but
+    /// retain callback positions and effect binders. Exact emitted header offsets
+    /// distinguish overloads, namespaces and conditional branches.
     /// Every target must match before any rows are copied.
     /// </summary>
     private static void CopyEffectRows(
@@ -1770,7 +1770,11 @@ public sealed class CSharpToCalorConverter
                 throw new InvalidOperationException(
                     $"Effect-row declaration at {declaration.Span} did not survive the probe emit/reparse.");
             }
-            if (synthesized.Effects != null)
+            if (declaration is FunctionNode { Visibility: Visibility.Private or Visibility.Internal }
+                or MethodNode { Visibility: Visibility.Private or Visibility.Internal,
+                    IsAbstract: false, IsExtern: false })
+                assignments.Add(() => assign(null));
+            else if (synthesized.Effects != null)
                 assignments.Add(() => assign(synthesized.Effects));
             var sourceParameters = synthesized.Declaration switch
             {
@@ -1817,7 +1821,7 @@ public sealed class CSharpToCalorConverter
     /// (declaration, current row, setter). Uses the same reach as the effect pass,
     /// while leaving parser-local identities inside their own trees.
     /// </summary>
-    private static IEnumerable<(AstNode Declaration, EffectsNode? Effects, Action<EffectsNode> Assign)>
+    private static IEnumerable<(AstNode Declaration, EffectsNode? Effects, Action<EffectsNode?> Assign)>
         EnumerateRowSites(ModuleNode module)
     {
         foreach (var function in module.Functions)

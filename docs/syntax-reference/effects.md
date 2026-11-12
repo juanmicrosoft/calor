@@ -68,6 +68,10 @@ override. Open dispatch and method groups without a declared slot contract remai
 Unknown. Existing explicit non-public annotations are still checked against the
 body; removing that annotation form is a separate, unfinished language change.
 
+The C# converter omits synthesized own rows on private/internal bodies. Callback
+parameter and return rows stay explicit, as do existing abstract/extern contracts.
+Public callers still declare every reachable effect.
+
 ## Effect Rows for Callbacks
 
 When a function accepts another function — a callback, handler, predicate, or
