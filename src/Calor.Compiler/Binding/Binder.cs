@@ -6766,6 +6766,8 @@ public sealed class Binder
                     receiver, conditional.MemberName));
         if (call.TargetExpression is FieldAccessNode member)
         {
+            if (TryBindConstructedSourceCall(call, member) is { } constructedCall)
+                return constructedCall;
             if (TryBindExternalSourceCall(call, member) is { } sourceCall)
                 return sourceCall;
             var sourceReceiver = DottedReferenceName(member.Target);
@@ -6820,6 +6822,41 @@ public sealed class Binder
         _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
             _asyncTypeModule!, _diagnostics, ProjectionContractMode,
             crossModuleTypes: CrossModuleTypes, sourcePath: _sourcePath);
+
+    private BoundCallExpression? TryBindConstructedSourceCall(ExpressionCallNode call, FieldAccessNode member)
+    {
+        if (!ResolveSourceCallConversions || _asyncTypeModule is null
+            || DottedReferenceName(member.Target) is not { } receiverName
+            || !receiverName.Contains('<') && !HasVisibleUsingAlias(receiverName.Split('.')[0]))
+            return null;
+        var bindings = SourceCallBindings();
+        if (!bindings.SelectedCalls.TryGetValue(call.Span, out var selected)
+            || !selected.HasCompleteProofContext
+            || selected.Method is not
+                { IsStatic: true, MethodKind: Microsoft.CodeAnalysis.MethodKind.Ordinary,
+                    ContainingType.IsGenericType: true } method
+            || selected.IncludesExtensionReceiver
+            || selected.Arguments.Count != call.Arguments.Count
+            || !selected.Arguments.Select(mapping => mapping.ArgumentIndex).SequenceEqual(
+                Enumerable.Range(0, call.Arguments.Count))
+            || !_functionSymbols.TryGetValue(selected.Declaration, out var function)
+            || !_staticMethodSymbols.Contains(function) || !IsFunctionAccessible(function)
+            || function.ContainingTypeName is not { } ownerName
+            || !_classesByQualifiedName.TryGetValue(ownerName, out var owner))
+            return null;
+
+        // The image selects the declaration and its construction together; a
+        // stripped receiver spelling cannot establish either identity.
+        var receiver = new BoundTypeReferenceExpression(member.Target.Span,
+            receiverName,
+            new BoundTypes.NominalBoundType(method.ContainingType.ToDisplayString(),
+                Metadata.MetadataBinderResult.MapAnnotation(method.ContainingType.NullableAnnotation),
+                _classSymbols[owner], method.ContainingType), _classSymbols[owner]);
+        return BindCallExpression(new CallExpressionNode(call.Span, "<expression-call>",
+            call.Arguments, call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments,
+            member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call,
+            (selected, function));
+    }
 
     private BoundCallExpression? TryBindExternalSourceCall(ExpressionCallNode call, FieldAccessNode member)
     {
@@ -7800,6 +7837,9 @@ public sealed class Binder
         {
             EvaluatedReceiver = isEventCall ? receiver : computedReceiver,
             SelectedSourceMethod = selectedSourceMethod,
+            SourceStaticMethodOwner = selectedSourceMethod is { IsStatic: true, ContainingType.IsGenericType: true }
+                && receiverTypeSymbol is { } sourceOwnerSymbol
+                    ? _classesByQualifiedName.GetValueOrDefault(sourceOwnerSymbol.QualifiedName) : null,
             IsSourceExtensionCall = isSourceExtensionCall,
             ResolvedMetadataMethod = instanceArrayResolution?.Symbol
                 ?? (metadataReceiver is not null || metadataScalarReturn ? bclResolution?.Symbol : null),

@@ -6748,7 +6748,14 @@ public sealed class EffectEnforcementPass
                 var evaluated = receiverEffects
                     .Union(InferFromCallArguments($"<expression>.{member.FieldName}", call.Arguments, call.ArgumentModifiers));
                 if (ids.Count > 0)
+                {
+                    if (bound?.SelectedSourceMethod is { IsStatic: true, ContainingType.IsGenericType: true } sourceMethod)
+                        evaluated = evaluated.Union(
+                            bound.SourceStaticMethodOwner is { } owner
+                                ? InferStaticFieldInitialization(owner, call.Span)
+                                : UnknownResolvedOperation($"{sourceMethod.ContainingType}..cctor", call.Span));
                     return evaluated.Union(InferFromInternalFunctions(ids));
+                }
                 if (bound?.ResolvedMetadataMethod is { } method && bound.Receiver is { } receiver)
                 {
                     var effectReceiver = method.ContainingType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Array

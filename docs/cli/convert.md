@@ -61,6 +61,13 @@ Mixed `#nullable` contexts, unresolved source context, or an uncertified native
 replacement retain the preservation boundary; raw C# is not native recovery.
 Conversion options and the default compilation context do not change.
 
+Static calls on source generic types use the selected constructed method signature,
+not a receiver name with its generic arguments removed. Namespace and alias lookup,
+arity, constraints, overloads, and nullable annotations must still resolve.
+Calls charge both the selected method and its declaring type's initialization
+effects. An unproved initializer remains unknown; this rule grants no new library
+effect permissions.
+
 For directly invoked delegate parameters, conversion can synthesize existing
 effect placeholders (`<! callback0>`) instead of assuming callbacks are pure.
 Each parameter gets its own row variable; invocation charges that row and the

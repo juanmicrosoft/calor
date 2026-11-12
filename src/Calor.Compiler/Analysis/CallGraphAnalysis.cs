@@ -50,7 +50,8 @@ public sealed class CallGraphAnalysis
         bool UsesUserDefinedConversion,
         bool UsesAnonymousFunctionConversion,
         bool IncludesExtensionReceiver,
-        IMethodSymbol? Method = null);
+        IMethodSymbol? Method = null,
+        bool HasCompleteProofContext = false);
 
     internal sealed record MetadataMemberTypeSelection(
         ISymbol Member, INamedTypeSymbol ReceiverType, ITypeSymbol ResultType);
@@ -583,7 +584,8 @@ public sealed class CallGraphAnalysis
                         }
                     }
                     if (operation is IInvocationOperation invocation
-                        && (bindExpressions || companions.Count > 0 || invocation.TargetMethod.IsExtensionMethod))
+                        && (bindExpressions || companions.Count > 0 || invocation.TargetMethod.IsExtensionMethod
+                            || invocation.TargetMethod is { IsStatic: true, ContainingType.IsGenericType: true }))
                         AddCall(invocation, invocation.TargetMethod, invocation.Arguments);
                     if (!bindExpressions)
                         continue;
@@ -1360,7 +1362,8 @@ public sealed class CallGraphAnalysis
                     mappings.OrderBy(mapping => mapping.ArgumentIndex)
                         .Select(mapping => includesReceiver
                             ? mapping with { ArgumentIndex = mapping.ArgumentIndex + 1 } : mapping).ToArray(),
-                    usesUserConversion, usesAnonymousFunctionConversion, includesReceiver, method);
+                    usesUserConversion, usesAnonymousFunctionConversion, includesReceiver, method,
+                    validProofContext);
                 selectedInTree.Add(callSite);
                 if (bindings.SelectedCalls.TryGetValue(callSite, out var existing)
                     && (!ReferenceEquals(existing.Declaration, selection.Declaration)
@@ -1383,7 +1386,8 @@ public sealed class CallGraphAnalysis
                     {
                         UsesUserDefinedConversion = usesUserConversion || existing?.UsesUserDefinedConversion == true,
                         UsesAnonymousFunctionConversion = usesAnonymousFunctionConversion
-                            || existing?.UsesAnonymousFunctionConversion == true
+                            || existing?.UsesAnonymousFunctionConversion == true,
+                        HasCompleteProofContext = validProofContext && existing?.HasCompleteProofContext != false
                     };
             }
 
@@ -2299,6 +2303,22 @@ public sealed class CallGraphAnalysis
         var operatorBindings = ResolveOperatorCalls(ast, contractMode: projectionContractMode,
             singleModuleContext: crossModuleFunctions == null,
             crossModuleTypes: crossModuleTypes, sourcePath: sourcePath);
+        foreach (var (site, call) in boundValues.ComputedMemberCalls)
+        {
+            if (call.SourceStaticMethodOwner is not { } owner)
+                continue;
+            foreach (var constructor in owner.Constructors.Where(constructor => constructor.IsStatic))
+            {
+                var id = $"{owner.Name}.{constructor.Id}";
+                if (!functions.TryGetValue(id, out var initializer))
+                    continue;
+                callerToCallees[site.CallerId].Add((initializer.Name, call.Span));
+                calleeToCallers[id].Add(site.CallerId);
+                var key = new AstCallKey(site.CallerId, initializer.Name, call.Span.Start, call.Span.End);
+                resolvedCallIds[key] = [id];
+                boundCallSites.Add(key);
+            }
+        }
         var operatorCalls = operatorBindings.SourceCalls;
         foreach (var function in functions.Values)
         {
