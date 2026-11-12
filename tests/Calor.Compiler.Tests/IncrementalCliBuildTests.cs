@@ -1173,5 +1173,175 @@ public sealed class NativeProjectCacheTests : IDisposable
         Assert.Equal(coldFields, System.Text.Json.JsonSerializer.Serialize(repeated.Diagnostics.ToArray()));
     }
 
+    [Fact]
+    public void NativeGlobalFunctionFragmentsKeepRealHitsAndExactColdArtifacts()
+    {
+        const string left = "module Left\n  func LeftValue public () → int\n    !\n    return 1\n";
+        const string right = "module Right\n  func RightValue public () → int\n    !\n    return 42\n";
+        Write("left", left);
+        Write("right", right);
+        var initial = Run();
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var rightPath = Path.Combine(_root, "right.g.cs");
+        var originalRight = File.ReadAllText(rightPath);
+
+        Write("left", left.Replace("return 1", "return 11", StringComparison.Ordinal));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal("left.calr", Assert.Single(changed.Result.Compiled).File.Name);
+        Assert.Equal("right.calr", Assert.Single(changed.Result.Skipped).Name);
+        Assert.Equal(originalRight, File.ReadAllText(rightPath));
+        var generated = Directory.GetFiles(_root, "*.g.cs").ToDictionary(path => path, File.ReadAllText);
+        var runtime = Execute();
+        Assert.Equal("System.Int32 LeftValue()=11|System.Int32 RightValue()=42", runtime);
+
+        var cold = Run(clear: true);
+        Assert.False(cold.Result.AnyErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Empty(cold.Result.Skipped);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+        Assert.All(generated, output => Assert.Equal(output.Value, File.ReadAllText(output.Key)));
+        Assert.Equal(runtime, Execute());
+
+        string Execute()
+        {
+            var trees = Directory.GetFiles(_root, "*.g.cs")
+                .Select(path => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(File.ReadAllText(path)));
+            var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "SharedNativeCache_" + Guid.NewGuid().ToString("N"), trees,
+                CodeGen.GeneratedCSharpCompiler.References,
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                    Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            var context = new System.Runtime.Loader.AssemblyLoadContext(null, isCollectible: true);
+            try
+            {
+                stream.Position = 0;
+                var assembly = context.LoadFromStream(stream);
+                var owner = assembly.GetType("GlobalModule", throwOnError: true)!;
+                return string.Join("|", owner.GetMethods(System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly)
+                    .OrderBy(method => method.Name, StringComparer.Ordinal)
+                    .Select(method => $"{method.ReturnType.FullName} {method.Name}()={method.Invoke(null, null)}"));
+            }
+            finally
+            {
+                context.Unload();
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("row")]
+    [InlineData("alias")]
+    [InlineData("conditional-alias")]
+    public void SharedGlobalOwnerStillRevalidatesSourceContractsAndDisabledBranches(string change)
+    {
+        const string library = """
+            module Library
+              global using Result = System.Int32
+              func Pick public (int:value) → Result
+                !
+                return value
+            """ + "\n";
+        var caller = change == "conditional-alias"
+            ? """
+              module Caller
+                func Value public () → int
+                  !
+                  pp NEVER
+                    return Pick(41)
+                  return 7
+              """ + "\n"
+            : """
+              module Caller
+                func Value public () → int
+                  !
+                  return Pick(41)
+              """ + "\n";
+        Write("library", library);
+        Write("caller", caller);
+        var initial = Run();
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+
+        Write("library", change == "row"
+            ? library.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal)
+            : library.Replace("System.Int32", "System.Int64", StringComparison.Ordinal));
+        var changed = Run();
+        Assert.Equal(change != "conditional-alias", changed.Result.AnyErrors);
+        Assert.Empty(changed.Result.Skipped);
+        var cold = Run(clear: true);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+        Assert.Equal(cold.Result.AnyErrors, changed.Result.AnyErrors);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SharedGlobalOwnerRequiresNativeProvenanceInBothSnapshots(bool rawFirst)
+    {
+        const string native = "module Left\n  func LeftValue public () → int\n    !\n    return 1\n";
+        const string payload = "return 2;";
+        var raw = "module Left\n  func LeftValue public () → int\n    !\n"
+            + $"    raw member:cache-proof:Other:opaque%20body {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+        Write("left", rawFirst ? raw : native);
+        Write("right", "module Right\n  func RightValue public () → int\n    !\n    return 42\n");
+        var initial = Run(enforceEffects: false);
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Write("left", rawFirst ? native : raw);
+        var changed = Run(enforceEffects: false);
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Empty(changed.Result.Skipped);
+        Assert.Equal(2, changed.Result.Compiled.Count);
+        var cold = Run(clear: true, enforceEffects: false);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SharedGlobalOwnerInitializationCannotUseMemberNameDisjointness(bool explicitConstructor)
+    {
+        var stateful = explicitConstructor
+            ? """
+              module Library
+                module GlobalModule public partial
+                  field int:Seed public static
+                  ctor stat ()
+                    set Seed 1
+              """ + "\n"
+            : """
+              module Library
+                module GlobalModule public partial
+                  field int:Seed public static = 1
+              """ + "\n";
+        Write("state", stateful);
+        Write("caller", "module Caller\n  func Answer public () → int\n    !\n    return 42\n");
+        var initial = Run(enforceEffects: false);
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Assert.Equal(2, Run(enforceEffects: false).Result.Skipped.Count);
+        var before = BuildStateCache.Load(_root)!;
+        var callerOutput = File.ReadAllText(Path.Combine(_root, "caller.g.cs"));
+        Assert.DoesNotContain("Seed", callerOutput);
+
+        Write("state", stateful.Replace(explicitConstructor ? "Seed 1" : "= 1",
+            explicitConstructor ? "Seed 2" : "= 2", StringComparison.Ordinal));
+        var changed = Run(enforceEffects: false);
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal(before.CrossModuleFunctionMapHash, BuildStateCache.Load(_root)!.CrossModuleFunctionMapHash);
+        Assert.Empty(changed.Result.Skipped);
+        Assert.Equal(2, changed.Result.Compiled.Count);
+        Assert.Equal(callerOutput, File.ReadAllText(Path.Combine(_root, "caller.g.cs")));
+        var cold = Run(clear: true, enforceEffects: false);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

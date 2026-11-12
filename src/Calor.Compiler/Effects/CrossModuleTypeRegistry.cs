@@ -147,10 +147,12 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
     }
 
     internal bool CanReuseIndependentOutput(string sourcePath, string output,
-        IReadOnlyDictionary<string, string> previousOutputs, ContractMode mode)
+        IReadOnlyDictionary<string, string> previousOutputs, ContractMode mode,
+        IReadOnlySet<string>? previousNativeGlobalModules = null)
     {
         if (_sourceHashes is null || _sourceHashes.Count != _sourcePaths.Count
             || _sourcePaths.Count != previousOutputs.Count
+            || _sourcePaths.Keys.Any(module => !HasOnlyNativeNodes(module))
             || !_sourcePaths.Values.Contains(Path.GetFullPath(sourcePath), BuildStateCache.GetPathComparer())
             || !_sourcePaths.Values.All(previousOutputs.ContainsKey))
             return false;
@@ -158,20 +160,26 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in CompanionSources(sourcePath, mode))
         {
-            if (!CollectContainerNames(source.Source, names)
-                || !CollectContainerNames(previousOutputs[source.Path], names))
+            var shared = previousNativeGlobalModules?.Contains(source.Path) == true
+                && IsNativeGlobalModule(source.Module);
+            if (!CollectContainerNames(source.Source, names, shared)
+                || !CollectContainerNames(previousOutputs[source.Path], names, shared))
                 return false;
         }
+        var ownSharedModule = previousNativeGlobalModules?.Contains(sourcePath) == true
+            && IsNativeGlobalModule(_sourcePaths.Single(source =>
+                BuildStateCache.GetPathComparer().Equals(source.Value, Path.GetFullPath(sourcePath))).Key);
         var root = CSharpSyntaxTree.ParseText(output).GetRoot();
         // Inactive branches are disabled trivia, not syntax names.
         if (root.ContainsDiagnostics || HasUnprovenTrivia(root))
             return false;
-        // Type declarations count too: a new companion can complete or collide
-        // with a cached partial owner even without an explicit member access.
+        // Only a proven native function wrapper may share its owner. Its member
+        // names and explicit GlobalModule references still participate in lookup.
         return !root.DescendantNodes().OfType<SimpleNameSyntax>()
                    .Any(name => names.Contains(name.Identifier.ValueText))
             && !root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>()
-                   .Any(type => names.Contains(type.Identifier.ValueText))
+                   .Any(type => names.Contains(type.Identifier.ValueText)
+                       && !(ownSharedModule && IsSharedContainer(type)))
             && !root.DescendantNodes().OfType<DelegateDeclarationSyntax>()
                    .Any(type => names.Contains(type.Identifier.ValueText));
 
@@ -181,7 +189,15 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
                 || trivia.IsDirective && trivia.GetStructure() is not
                     (NullableDirectiveTriviaSyntax or LineDirectiveTriviaSyntax));
 
-        static bool CollectContainerNames(string source, HashSet<string> names)
+        static bool IsSharedContainer(BaseTypeDeclarationSyntax type) =>
+            type is ClassDeclarationSyntax { Parent: CompilationUnitSyntax } cls
+            && cls.Identifier.ValueText == "GlobalModule"
+            && cls.Modifiers.Any(SyntaxKind.StaticKeyword)
+            && cls.Modifiers.Any(SyntaxKind.PartialKeyword)
+            && cls.TypeParameterList is null && cls.BaseList is null
+            && cls.AttributeLists.Count == 0;
+
+        static bool CollectContainerNames(string source, HashSet<string> names, bool shared)
         {
             var root = CSharpSyntaxTree.ParseText(source,
                 new CSharpParseOptions(LanguageVersion.Preview)).GetCompilationUnitRoot();
@@ -201,7 +217,8 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
                             names.Add(name.Identifier.ValueText);
                         return ns.Members.All(Collect);
                     case ClassDeclarationSyntax type when type.Modifiers.Any(SyntaxKind.StaticKeyword)
-                        && !type.Modifiers.Any(SyntaxKind.PartialKeyword)
+                        && (!type.Modifiers.Any(SyntaxKind.PartialKeyword)
+                            || shared && IsSharedContainer(type))
                         && type.TypeParameterList is null && type.BaseList is null
                         && type.AttributeLists.Count == 0:
                         names.Add(type.Identifier.ValueText);
@@ -221,6 +238,22 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
             }
         }
     }
+
+    internal static bool IsNativeGlobalModule(ModuleNode? module) =>
+        module is { Functions.Count: > 0 }
+        && module.Classes.Count == 0 && module.Interfaces.Count == 0
+        && module.Enums.Count == 0 && module.EnumExtensions.Count == 0
+        && module.Delegates.Count == 0 && module.RefinementTypes.Count == 0
+        && module.IndexedTypes.Count == 0
+        && module.Functions.All(function =>
+            CrossModuleFunctionTarget.Create(module, function) is { NamespaceIdentity.Length: 0 })
+        && HasOnlyNativeNodes(module);
+
+    internal static bool HasOnlyNativeNodes(AstNode node) =>
+        node is not (CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode
+            or CompilerDirectiveNode or PreprocessorDirectiveNode
+            or TypePreprocessorBlockNode or MemberPreprocessorBlockNode)
+        && RecursiveAstWalker.GetAllChildren(node).All(HasOnlyNativeNodes);
 
     internal bool MatchesSourceHash(string path, string hash) =>
         _sourceHashes == null

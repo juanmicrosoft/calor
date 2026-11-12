@@ -93,7 +93,12 @@ For multi-file builds, changes to emitted cross-file targets or source paths
 invalidate the project cache. Other source-only edits can preserve unchanged
 outputs only after a conservative independence check against both the old and
 current companion declarations. Unproven cases, including conditional branches,
-recompile rather than reuse a potentially stale output.
+recompile rather than reuse a potentially stale output. Native top-level
+functions may share the compiler-generated `GlobalModule`; reuse still checks
+both the old and current companion member names. Authored partial types, fields,
+and static constructors do not qualify for that shared-owner exception.
+Validation records for warning-bearing files can support that check, but those
+files themselves recompile so their diagnostics are reported again.
 
 ```bash
 calor --input a.calr --input b.calr --cache    # first run: compiles both

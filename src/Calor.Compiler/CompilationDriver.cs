@@ -412,6 +412,7 @@ internal static class CompilationDriver
         string? crossModuleMapHash = null;
         string? crossModuleFunctionMapHash = null;
         Dictionary<string, string>? previousProjectOutputs = null;
+        var previousNativeGlobalModules = new HashSet<string>(BuildStateCache.GetPathComparer());
         if (sources.Count > 1)
         {
             crossModuleMap = BuildCrossModuleFunctionMap(sources, out crossModuleTypes);
@@ -433,7 +434,7 @@ internal static class CompilationDriver
             // changes may spare outputs proven independent of old AND new
             // companion declarations; missing evidence remains a cache miss.
             if (priorState?.CrossModuleFunctionMapHash != crossModuleFunctionMapHash
-                || crossModuleTypes is null || priorFiles.Count != sources.Count
+                || crossModuleTypes is null
                 || cache is null || fullStateDir is null)
                 priorFiles = null;
             else
@@ -444,19 +445,24 @@ internal static class CompilationDriver
                     var (key, _) = BuildStateCache.ComputeRelativePathFromFullProjectDir(
                         source.FullName, fullStateDir);
                     var outputPath = cache.OutputPathFor(source);
-                    if (!priorFiles.TryGetValue(key, out var entry)
-                        || entry.OutputContentHash is null || !File.Exists(outputPath))
+                    var evidence = priorState?.ValidatedOutputs?.GetValueOrDefault(key);
+                    var outputHash = evidence?.OutputContentHash
+                        ?? (priorFiles.Count == sources.Count
+                            ? priorFiles.GetValueOrDefault(key)?.OutputContentHash : null);
+                    if (string.IsNullOrEmpty(outputHash) || !File.Exists(outputPath))
                     {
                         priorFiles = null;
                         break;
                     }
                     var bytes = File.ReadAllBytes(outputPath);
-                    if (BuildStateCache.ComputeContentHash(bytes) != entry.OutputContentHash)
+                    if (BuildStateCache.ComputeContentHash(bytes) != outputHash)
                     {
                         priorFiles = null;
                         break;
                     }
                     previousProjectOutputs[source.FullName] = DecodeSource(bytes);
+                    if (evidence?.IsNativeGlobalModule == true)
+                        previousNativeGlobalModules.Add(source.FullName);
                 }
             }
         }
@@ -499,9 +505,12 @@ internal static class CompilationDriver
                             && (previousProjectOutputs is null
                                 || crossModuleTypes?.CanReuseIndependentOutput(
                                     file.FullName, generated, previousProjectOutputs,
-                                    compilationOptions[file.FullName].ContractMode) == true))
+                                    compilationOptions[file.FullName].ContractMode,
+                                    previousNativeGlobalModules) == true))
                         {
                             newState.Files[relativeKey] = cachedEntry;
+                            if (priorState?.ValidatedOutputs?.TryGetValue(relativeKey, out var evidence) == true)
+                                newState.ValidatedOutputs[relativeKey] = evidence;
                             skipped.Add(file);
                             skippedGeneratedSources.Add(new GeneratedCSharpSource(
                                 generated, outputPath, file.FullName));
@@ -698,6 +707,7 @@ internal static class CompilationDriver
                     var (key, _) = BuildStateCache.ComputeRelativePathFromFullProjectDir(
                         file.FullName, fullStateDir);
                     newState.Files.Remove(key);
+                    newState.ValidatedOutputs.Remove(key);
                     skipped.Remove(file);
                     onFailed?.Invoke(file);
                 }
@@ -792,6 +802,17 @@ internal static class CompilationDriver
 
                 compiled.Add(new FileResult(item.File, item.Result));
                 onCompiled?.Invoke(item.File, item.Result);
+
+                if (newState != null && item.RelativeKey != null && !item.Options.UnsafeTranspileOnly
+                    && item.Result.Ast is { } ast && CrossModuleTypeRegistry.HasOnlyNativeNodes(ast))
+                {
+                    newState.ValidatedOutputs[item.RelativeKey] = new ValidatedOutputEntry
+                    {
+                        OutputContentHash = BuildStateCache.ComputeContentHash(
+                            System.Text.Encoding.UTF8.GetBytes(item.Result.GeneratedCode)),
+                        IsNativeGlobalModule = CrossModuleTypeRegistry.IsNativeGlobalModule(item.Result.Ast)
+                    };
+                }
 
                 // Only diagnostic-clean files are cached: a skipped file emits nothing,
                 // so caching a file with warnings/info would silently drop those

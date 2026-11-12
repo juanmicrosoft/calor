@@ -39,6 +39,15 @@ internal sealed class BuildState
     public string ManifestHash { get; set; } = "";
     public string OutputDirectory { get; set; } = "";
     public Dictionary<string, BuildFileEntry> Files { get; set; } = new();
+    // Validation evidence is not a reusable file entry: warning-bearing outputs
+    // participate in independence proofs but must still compile every time.
+    public Dictionary<string, ValidatedOutputEntry> ValidatedOutputs { get; set; } = new();
+}
+
+internal sealed class ValidatedOutputEntry
+{
+    public string OutputContentHash { get; set; } = "";
+    public bool IsNativeGlobalModule { get; set; }
 }
 
 internal sealed class BuildFileEntry

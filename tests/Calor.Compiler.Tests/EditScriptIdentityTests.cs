@@ -458,6 +458,41 @@ public sealed class EditScriptIdentityTests : IDisposable
             result.Skipped.Count);
     }
 
+    [Theory]
+    [InlineData("missing-output")]
+    [InlineData("modified-output")]
+    [InlineData("missing-validation-evidence")]
+    public void WarningBearingCompanionNeedsTrustedOutputEvidenceBeforeNeighbourReuse(string change)
+    {
+        var script = LoadScript("ES-07-persistent-finding");
+        var workspace = CreateTempDir();
+        SyncWorkspace(workspace, script.Steps[0].SourceDirectory);
+        var initial = RunStep(workspace, script.Steps[0], clearFirst: true);
+        Assert.False(initial.AnyErrors);
+        Assert.NotEmpty(initial.Diagnostics);
+
+        var warningOutput = Path.Combine(workspace, "violating.g.cs");
+        if (change == "missing-output")
+            File.Delete(warningOutput);
+        else if (change == "modified-output")
+            File.AppendAllText(warningOutput, "\n// untrusted output\n");
+        else
+        {
+            var statePath = Path.Combine(workspace, ".calor-build-state.json");
+            var state = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(statePath))!;
+            state.AsObject().Remove("validatedOutputs");
+            File.WriteAllText(statePath, state.ToJsonString());
+        }
+
+        SyncWorkspace(workspace, script.Steps[1].SourceDirectory);
+        var warm = RunStep(workspace, script.Steps[1], clearFirst: false);
+        Assert.Equal(0, warm.SkippedCount);
+        Assert.Equal(3, warm.CompiledCount);
+        var cold = RunStep(workspace, script.Steps[1], clearFirst: true);
+        Assert.Equal(cold.Diagnostics, warm.Diagnostics);
+        Assert.Equal(cold.AnyErrors, warm.AnyErrors);
+    }
+
     private string CreateTempDir()
     {
         var dir = Path.Combine(
