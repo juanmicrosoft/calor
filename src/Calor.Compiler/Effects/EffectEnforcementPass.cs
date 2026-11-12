@@ -6906,6 +6906,8 @@ public sealed class EffectEnforcementPass
                 }
                 if (bound?.ResolvedMetadataMethod is { } method && bound.Receiver is { } receiver)
                 {
+                    if (IsNonnegativeStringLengthFormatting(bound))
+                        return evaluated;
                     var effectReceiver = method.ContainingType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Array
                         && Binding.NullabilityChecker.GetMethodInputArrayType(receiver) is not null
                             ? Binding.Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType)
@@ -7021,6 +7023,39 @@ public sealed class EffectEnforcementPass
                         .Union(RecordAssumption(
                             "calls through an expression-valued target whose callee cannot be resolved"));
             }
+        }
+
+        private static bool IsNonnegativeStringLengthFormatting(BoundCallExpression call)
+        {
+            if (call.IsInaccessibleCall || call.HasOpaqueOverloads || call.HasUnresolvedArguments
+                || call.HasUnknownInferredType || call.Arguments.Count != 0
+                || call.TypeArguments is { Count: > 0 }
+                || call.ResolvedMetadataMethod is not
+                    { Name: "ToString", MethodKind: CS.MethodKind.Ordinary, IsStatic: false,
+                        IsGenericMethod: false, Parameters.Length: 0,
+                        ContainingType.SpecialType: CS.SpecialType.System_Int32,
+                        ReturnType.SpecialType: CS.SpecialType.System_String } method
+                || call.Receiver is not BoundFieldAccessExpression
+                    { HasUnknownInferredType: false,
+                        Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: { } receiverType },
+                        ResolvedMetadataMember: CS.IPropertySymbol
+                            { Name: "Length", IsStatic: false, Parameters.Length: 0,
+                                ContainingType.SpecialType: CS.SpecialType.System_String,
+                                Type.SpecialType: CS.SpecialType.System_Int32,
+                                GetMethod: { MethodKind: CS.MethodKind.PropertyGet } getter } property } length
+                || length.Target.HasUnknownInferredType
+                || method.Locations.Any(location => location.IsInSource)
+                || getter.Locations.Any(location => location.IsInSource))
+                return false;
+
+            // String.Length is nonnegative. Int32.ToString() takes the unsigned
+            // decimal/cache path for these values, before any culture dispatch.
+            // Receiver evaluation and the getter's non-null boundary still apply.
+            return CS.SymbolEqualityComparer.Default.Equals(receiverType, method.ContainingType)
+                && CS.SymbolEqualityComparer.Default.Equals(call.ResolvedMetadataReceiverType, receiverType)
+                && CS.SymbolEqualityComparer.Default.Equals(property.Type, receiverType)
+                && CS.SymbolEqualityComparer.Default.Equals(method.ReturnType, property.ContainingType)
+                && CS.SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, property.ContainingAssembly);
         }
 
         private EffectSet InferSelectedExtensionCallbacks(

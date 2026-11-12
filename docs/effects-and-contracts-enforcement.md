@@ -213,6 +213,18 @@ expression-tree/lambda contexts, other formats and larger results receive no
 new permission. Hole-expression effects remain charged. This is not a manifest
 grant for numeric `ToString`; see [compilation](cli/compile.md).
 
+One contextual exception is a selected `Int32.ToString()` whose receiver is
+the directly bound core-library `String.Length` getter. String lengths are
+nonnegative, so .NET 10 formats them through unsigned decimal conversion
+before any current-culture lookup. Its small-number cache contains only
+runtime-created decimal strings; cache initialization and string allocation
+follow the existing allocation-only convention. Direct and conditional access
+retain receiver evaluation effects and the getter's non-null boundary.
+This is not a general integer contract: locals, constants, array lengths,
+source getters named `Length`, nullable integers, boxed/interface receivers,
+and format/provider overloads do not acquire this proof. Existing source
+initializer and callback authority checks are unchanged.
+
 `System.Convert` has no type default, wildcard, or method-name-wide grant,
 including in the crypto manifest. Only the exact `ToString(string?)`,
 `ToString(bool)`, and `ToString(char)` overloads, with or without an

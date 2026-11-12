@@ -3576,4 +3576,258 @@ public sealed class NativeMetadataClosureTests
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         Assert.DoesNotContain(result.Diagnostics, item => item.Code == DiagnosticCode.UndefinedReference);
     }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void NonnegativeLengthFormatting_RequiresTheSelectedCoreGetterAndParameterlessIntegerMethod(
+        bool conditional, bool typeChecking)
+    {
+        var source = $$"""
+            module LengthFormatting
+              func Read public ({{(conditional ? "string?" : "string")}}:value) → string
+                !
+                return {{(conditional ? "value?.Length.ToString() ?? \"null\"" : "value.Length.ToString()")}}
+            """;
+        foreach (var native in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(native));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.Equal(SpecialType.System_Int32, method.ContainingType.SpecialType);
+            Assert.Equal("ToString", method.Name);
+            Assert.False(method.IsStatic || method.IsGenericMethod);
+            Assert.Empty(method.Parameters);
+            Assert.True(SymbolEqualityComparer.Default.Equals(method.ContainingType, call.ResolvedMetadataReceiverType));
+            var length = Assert.IsType<BoundFieldAccessExpression>(call.Receiver);
+            var property = Assert.IsAssignableFrom<IPropertySymbol>(length.ResolvedMetadataMember);
+            Assert.Equal("Length", property.Name);
+            Assert.Equal(SpecialType.System_String, property.ContainingType.SpecialType);
+            Assert.True(SymbolEqualityComparer.Default.Equals(property.Type, method.ContainingType));
+            Assert.True(SymbolEqualityComparer.Default.Equals(property.ContainingAssembly, method.ContainingAssembly));
+            Assert.DoesNotContain(property.Locations.Concat(method.Locations), location => location.IsInSource);
+            if (conditional)
+                Assert.Empty(Assert.IsType<BoundStructuralExpression>(length.Target).Children);
+            else
+                Assert.IsType<BoundVariableExpression>(length.Target);
+            Assert.Equal(EffectResolutionStatus.Unknown, new EffectResolver().Resolve(
+                EffectResolverKey.FromBoundReceiver(length.Type, method.Name, call.ResolvedParameterTypes)).Status);
+
+            var compiled = Program.Compile(native, "length-formatting.calr", new CompilationOptions
+            {
+                StrictApi = true, StrictEffects = true, EnableTypeChecking = typeChecking
+            });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            var read = CompileAssembly(compiled.GeneratedCode).GetTypes().SelectMany(type => type.GetMethods())
+                .Single(method => method.Name == "Read");
+            foreach (var count in new[] { 0, 1, 299, 300, 65535 })
+                Assert.Equal(count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    read.Invoke(null, [new string('x', count)]));
+            if (conditional)
+                Assert.Equal("null", read.Invoke(null, [null]));
+        }
+    }
+
+    [Theory]
+    [InlineData("Receiver(Argument(value)).Length.ToString()")]
+    [InlineData("Receiver(Argument(value))?.Length.ToString() ?? \"null\"")]
+    public void NonnegativeLengthFormatting_StillChargesEvaluatedReceiverAndArgumentEffects(string expression)
+    {
+        var source = $$"""
+            module LengthEvaluation
+              func Receiver (string:value) → string
+                ! cw
+                System.Console.WriteLine("receiver")
+                return value
+              func Argument (string:value) → string
+                ! cr
+                let string?:line = System.Console.ReadLine()
+                return value
+              func Read (string:value) → string
+                !
+                return {{expression}}
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var rejected = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            foreach (var effect in new[] { "cw", "cr" })
+                Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+                    && diagnostic.Message.Contains($"'{effect}'", StringComparison.Ordinal));
+            Assert.Empty(rejected.GeneratedCode);
+            var admitted = Program.Compile(source.Replace("    !\n", "    ! cw, cr\n", StringComparison.Ordinal),
+                null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.False(admitted.HasErrors, string.Join("\n", admitted.Diagnostics));
+        }
+    }
+
+    [Theory]
+    [InlineData("number.ToString()")]
+    [InlineData("(-1).ToString()")]
+    [InlineData("(1).ToString()")]
+    [InlineData("values.Length.ToString()")]
+    [InlineData("(value.Length + 0).ToString()")]
+    [InlineData("((object)value.Length).ToString()")]
+    [InlineData("((System.IFormattable)value.Length).ToString(null, null)")]
+    [InlineData("value.Length.ToString(\"D\")")]
+    [InlineData("value.Length.ToString(provider)")]
+    [InlineData("System.Convert.ToString(value.Length)")]
+    public void NonnegativeLengthFormatting_DoesNotGrantUnsafeNeighboringCalls(string expression)
+    {
+        var source = $$"""
+            module LengthBoundary
+              func Read (string:value, int:number, int[]:values, int?:nullable, System.IFormatProvider:provider) → string?
+                !
+                return {{expression}}
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void NonnegativeLengthFormatting_DoesNotTransferTheRangeThroughLocalsOrSourceResults()
+    {
+        const string source = """
+            module LengthFlowBoundary
+              func Length (string:value) → int
+                return value.Length
+              func Local (string:value) → string
+                !
+                let int:length = value.Length
+                return length.ToString()
+              func Result (string:value) → string
+                !
+                return Length(value).ToString()
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            foreach (var function in new[] { "Local", "Result" })
+                Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains($"Function '{function}'", StringComparison.Ordinal)
+                    && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("field int:Length public")]
+    [InlineData("property int:Length public\n      get\n        return -1")]
+    public void NonnegativeLengthFormatting_DoesNotTrustSourceMembersNamedLength(string member)
+    {
+        var source = $$"""
+            module LengthLookalike
+              class Text public
+                {{member}}
+              func Read (Text:value) → string
+                !
+                return value.Length.ToString()
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var length = Assert.IsType<BoundFieldAccessExpression>(call.Receiver);
+        Assert.Null(length.ResolvedMetadataMember);
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("", "string?")]
+    [InlineData(" nullable oblivious", "string")]
+    public void NonnegativeLengthFormatting_DoesNotRelaxTheStringReceiverBoundary(string context, string type)
+    {
+        var source = $$"""
+            module LengthNullability{{context}}
+              func Read ({{type}}:value) → string
+                !
+                return value.Length.ToString()
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void NonnegativeLengthFormatting_MissingBindingStaysUnknown()
+    {
+        const string source = """
+            module LengthMissingProof
+              func Read (string:value) → string
+                !
+                unsafe
+                  return value.Length.ToString()
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void NonnegativeLengthFormatting_DoesNotReinterpretNullableIntegerDispatch()
+    {
+        const string source = """
+            module NullableLengthBoundary
+              func Read (int?:value) → string
+                !
+                return value.ToString()
+            """;
+        var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(SpecialType.System_Nullable_T, method.ContainingType.OriginalDefinition.SpecialType);
+        Assert.IsType<BoundVariableExpression>(call.Receiver);
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void NonnegativeLengthFormatting_DoesNotBypassSourceInitializerAuthority()
+    {
+        const string source = """
+            module LengthInitializerAuthority
+              class Holder
+                field string:Value public = "abc".Length.ToString()
+                ctor ()
+              func Make () → Holder
+                ! alloc
+                return new Holder()
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("int.ToString()", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
 }
