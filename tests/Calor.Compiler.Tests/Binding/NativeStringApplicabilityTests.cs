@@ -1,6 +1,11 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
+using Calor.Compiler.Effects.Manifests;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -10,6 +15,220 @@ namespace Calor.Compiler.Tests;
 
 public sealed class NativeStringApplicabilityTests
 {
+    [Theory]
+    [InlineData("ToUpperInvariant()")]
+    [InlineData("ToLowerInvariant()")]
+    [InlineData("ToString()")]
+    [InlineData("Equals(\"safe\")")]
+    [InlineData("Contains('a')")]
+    [InlineData("IndexOf('a')")]
+    [InlineData("Length")]
+    public void StringInstanceReceiver_ContractedMembersRequireNonNullProof(string member)
+    {
+        foreach (var receiver in new[] { "value", "((string)null)", "(value ?? other)", "((string)(object)null)" })
+        {
+            var source = $$"""
+                module StringReceiver
+                  func Use (string?:value, string?:other) → object
+                    !
+                    return {{receiver}}.{{member}}
+                """;
+            var (bound, diagnostics) = Bind(source);
+            var selected = member == "Length"
+                ? Assert.IsAssignableFrom<IPropertySymbol>(Assert.Single(
+                    BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>())
+                    .ResolvedMetadataMember).GetMethod!
+                : Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>())
+                    .ResolvedMetadataMethod!;
+            Assert.NotNull(selected);
+            Assert.Equal(SpecialType.System_String, selected.ContainingType.SpecialType);
+            Assert.False(selected.IsStatic);
+            Assert.Empty(selected.DeclaringSyntaxReferences);
+            var diagnostic = Assert.Single(diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
+            Assert.Contains("Instance receiver", diagnostic.Message);
+            Assert.Equal(receiver, source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+            Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            foreach (var typing in new[] { false, true })
+            foreach (var transpile in new[] { false, true })
+            {
+                var result = Program.Compile(source, "string-receiver.calr", new CompilationOptions
+                {
+                    EnableTypeChecking = typing, UnsafeTranspileOnly = transpile, StrictEffects = true
+                });
+                Assert.True(result.HasErrors);
+                Assert.Contains(result.Diagnostics.Errors, error =>
+                    error.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+                Assert.Empty(result.GeneratedCode);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("return sure.ToUpperInvariant()")]
+    [InlineData("return (\"safe\").ToLowerInvariant()")]
+    [InlineData("return (value ?? \"safe\").ToUpperInvariant()")]
+    [InlineData("return (gate ? sure : \"safe\").Length")]
+    [InlineData("return value?.ToUpperInvariant()")]
+    [InlineData("return value?.Length")]
+    [InlineData("if value != null\n  return value.ToUpperInvariant()\nreturn \"none\"")]
+    [InlineData("if value is string\n  return value.Length\nreturn 0")]
+    [InlineData("if value == null\n  return \"none\"\nreturn value.ToUpperInvariant()")]
+    [InlineData("if string.IsNullOrEmpty(value)\n  return \"none\"\nreturn value.ToUpperInvariant()")]
+    [InlineData("let alias = value\nif alias != null\n  return alias.ToUpperInvariant()\nreturn \"none\"")]
+    [InlineData("return ((string)sure).ToUpperInvariant()")]
+    public void StringInstanceReceiver_ProvenValuesAndGuardsRemainStrictlyAccepted(string body)
+    {
+        var source = """
+            module SafeStringReceiver
+              func Use (string?:value, string:sure, bool:gate) → object
+                !
+            """ + "\n" + string.Join("\n", body.Split('\n').Select(line => "    " + line));
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "safe-receiver.calr",
+                new CompilationOptions { EnableTypeChecking = typing, StrictEffects = true });
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
+            Assert.Contains("string? value, string sure", result.GeneratedCode);
+            Assert.DoesNotContain("ArgumentNullException", result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("if value != null\n  set value null\n  return value.ToUpperInvariant()\nreturn \"none\"")]
+    [InlineData("if value != null\n  Mutate(ref value)\n  return value.ToUpperInvariant()\nreturn \"none\"")]
+    [InlineData("if value != null\n  if gate\n    set value null\n  return value.ToUpperInvariant()\nreturn \"none\"")]
+    [InlineData("if value != null\n  while gate\n    set value null\n  return value.ToUpperInvariant()\nreturn \"none\"")]
+    [InlineData("let alias = value\nif value != null\n  return alias.ToUpperInvariant()\nreturn \"none\"")]
+    public void StringInstanceReceiver_InvalidationDoesNotLeaveAProof(string body)
+    {
+        var source = """
+            module InvalidatedStringReceiver
+              func Mutate (ref string?:value) → void
+                ! mut
+                set value null
+              func Use (string?:input, bool:gate) → object
+                ! mut
+                var string?:value = input
+            """ + "\n" + string.Join("\n", body.Split('\n').Select(line => "    " + line));
+        var (_, diagnostics) = Bind(source);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && diagnostic.Message.Contains("Instance receiver", StringComparison.Ordinal)
+            && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Fact]
+    public void StringInstanceReceiver_DefaultConversionPreservesUnsafeInputRatherThanClaimingNativeSuccess()
+    {
+        var converted = new CSharpToCalorConverter().Convert("""
+            public static class NullableReceiver
+            {
+                public static string? Use(string? value) => value.ToUpperInvariant();
+            }
+            """);
+        var source = Assert.IsType<string>(converted.CalorSource);
+        Assert.Contains("string?", source);
+        var parse = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, parse).TokenizeAllForParser(), parse).Parse();
+        Assert.False(parse.HasErrors, string.Join("; ", parse));
+        Assert.NotEmpty(module.InteropBlocks);
+        Assert.Contains("value.ToUpperInvariant()", source);
+    }
+
+    [Theory]
+    [InlineData("ToUpperInvariant()")]
+    [InlineData("Length")]
+    public void StringInstanceReceiver_ObliviousDeclarationsAreNotNonNullProof(string member)
+    {
+        var source = $$"""
+            module ObliviousStringReceiver nullable oblivious
+              func Use (string:value) → object
+                !
+                return value.{{member}}
+            """;
+        var (_, diagnostics) = Bind(source);
+        var diagnostic = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
+        Assert.Contains("Oblivious", diagnostic.Message);
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        Assert.True(Program.Compile(source).HasErrors);
+    }
+
+    [Fact]
+    public void StringInstanceReceiver_StaticNullHelpersDoNotRequireAnInstanceProof()
+    {
+        const string source = """
+            module StaticStringHelpers
+              func Use (string?:value) → bool
+                !
+                return string.IsNullOrEmpty(value) || string.Equals(value, value)
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.Empty(diagnostics.Errors);
+        var result = Program.Compile(source, null, new CompilationOptions { StrictEffects = true });
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StringInstanceReceiver_NamedStatementAndExpressionNodesShareTheBoundary(bool statement)
+    {
+        const string source = """
+            module NamedStringReceiver
+              func Use (string?:value) → void
+                !
+                value.ToUpperInvariant()
+            """;
+        var diagnostics = new DiagnosticBag();
+        var parsed = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var function = Assert.Single(parsed.Functions);
+        var span = function.Body[0].Span;
+        var receiverSpan = new TextSpan(source.LastIndexOf("value.", StringComparison.Ordinal), 5, 4, 5);
+        var call = statement
+            ? (StatementNode)new CallStatementNode(span, "value.ToUpperInvariant", false, [], new AttributeCollection(),
+                null, null, span, receiverSpan, null)
+            : new ExpressionStatementNode(span, new CallExpressionNode(span, "value.ToUpperInvariant", [],
+                null, null, null, span, receiverSpan));
+        var rewritten = new FunctionNode(function.Span, function.Id, function.Name, function.Visibility,
+            function.Parameters, function.Output, function.Effects, [call], function.Attributes);
+        var module = new ModuleNode(parsed.Span, parsed.Id, parsed.Name, parsed.Usings, [rewritten], parsed.Attributes);
+        new Binder(diagnostics).Bind(module);
+        var diagnostic = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
+        Assert.Equal(receiverSpan, diagnostic.Span);
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+    }
+
+    [Theory]
+    [InlineData("value.ToUpper()")]
+    [InlineData("value.ToLower()")]
+    [InlineData("value.Contains(\"a\")")]
+    public void StringInstanceReceiver_UncontractedNeighborsRemainIndependentlyUnknown(string expression)
+    {
+        var source = $$"""
+            module UnknownStringReceiver
+              func Use (string:value) → object
+                !
+                return {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        new EffectEnforcementPass(diagnostics, strictEffects: true, resolver: new EffectResolver(
+            new ManifestLoader(loadUserLevelManifests: false))).Enforce(module);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        var result = Program.Compile(source, "unknown-receiver.calr",
+            new CompilationOptions { StrictEffects = true });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
     private const string NullableProducer =
         "System.Environment.GetEnvironmentVariable(\"CALOR_N4_UNSET\")";
 

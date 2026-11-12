@@ -924,10 +924,15 @@ public sealed class Binder
         BoundTypes.BoundType target,
         bool isExpandedParams,
         HashSet<(Parsing.TextSpan Span, string ParameterName, string TargetShape)> reported,
-        bool replacesNativeOverloadError = false)
+        bool replacesNativeOverloadError = false,
+        bool isInstanceReceiver = false)
     {
-        if (!NullabilityChecker.IsPossiblyNullAssignedTo(
-                argument, target, BindingReceivingBoundary.MethodArgument, out var arrayMismatch))
+        var arrayMismatch = NullabilityChecker.ArrayMismatch.None;
+        if (isInstanceReceiver
+            ? !argument.HasUnknownInferredType
+                && NullabilityChecker.GetAnnotation(argument.Type) == BoundTypes.NullableAnnotation.NotAnnotated
+            : !NullabilityChecker.IsPossiblyNullAssignedTo(
+                argument, target, BindingReceivingBoundary.MethodArgument, out arrayMismatch))
             return;
 
         var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(target);
@@ -940,6 +945,10 @@ public sealed class Binder
         var message = $"{receivingPosition} '{parameterName}' declares non-nullable {targetShapeLabel} " +
             $"but the value may be null (source annotation: '{DescribeAnnotation(argument)}'). " +
             $"Change the {parameterPart} type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.";
+        if (isInstanceReceiver)
+            message = $"Instance receiver for '{parameterName}' must be proven non-null, " +
+                $"but the value may be null (source annotation: '{DescribeAnnotation(argument)}'). " +
+                "Add an explicit non-null guard, a non-null fallback, or use conditional access.";
         if (arrayMismatch != NullabilityChecker.ArrayMismatch.None)
         {
             var components = arrayMismatch switch
@@ -965,6 +974,22 @@ public sealed class Binder
             message,
             SemanticsVersion.NullabilitySeverityFor(),
             context);
+    }
+
+    private void ValidateStringInstanceReceiver(
+        BoundExpression receiver, Microsoft.CodeAnalysis.IMethodSymbol? method)
+    {
+        if (method is not { IsStatic: false,
+                MethodKind: Microsoft.CodeAnalysis.MethodKind.Ordinary or Microsoft.CodeAnalysis.MethodKind.PropertyGet,
+                ContainingType.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String }
+            || method.Locations.Any(location => location.IsInSource))
+            return;
+
+        // The callvirt null check precedes the contracted body and can dispatch
+        // through exception resource lookup. A selected member is not a receiver proof.
+        ValidateCallArgument(receiver, method.ToDisplayString(),
+            Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType),
+            false, [], isInstanceReceiver: true);
     }
 
     private static BoundTypes.BoundType? TryBuildBclArgumentTarget(Microsoft.CodeAnalysis.ITypeSymbol type)
@@ -2746,6 +2771,12 @@ public sealed class Binder
             receiverSymbol,
             receiverTypeSymbol,
             resolvedTypeName);
+
+        if (resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
+            && receiver is not null)
+            ValidateStringInstanceReceiver(receiver, TryResolveBclCall(
+                $"{receiver.Type.FullyQualifiedName}.{resolvedMethodName}", args,
+                call.ArgumentNames, call.ArgumentModifiers, receiver, call.TypeArguments)?.Symbol);
 
         var boundCall = new BoundCallStatement(
             call.Span,
@@ -4715,6 +4746,8 @@ public sealed class Binder
                     || member is Microsoft.CodeAnalysis.IFieldSymbol { IsConst: true, Type.TypeKind: Microsoft.CodeAnalysis.TypeKind.Enum }
                         && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(namedMemberType, receiverType)))
             {
+                if (member is Microsoft.CodeAnalysis.IPropertySymbol property)
+                    ValidateStringInstanceReceiver(target, property.GetMethod);
                 return new BoundFieldAccessExpression(
                     fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
                     fieldNameSpan: fieldAccess.FieldNameSpan,
@@ -5094,6 +5127,18 @@ public sealed class Binder
             _ => BoundTypes.NullableAnnotation.Oblivious
         };
         BoundTypes.BoundType? resolvedType = callable;
+        if (typeOp.Operation is TypeOp.Cast or TypeOp.As
+            && TryBuildReferenceType(typeOp.TargetType, _currentClassName, _currentNamespaceIdentity,
+                _currentMemberTypeParameters?.Select(parameter => parameter.Name))
+                is { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } stringType)
+        {
+            if (typeOp.Operation == TypeOp.Cast && !operand.HasUnknownInferredType
+                && operand.Type is BoundTypes.NominalBoundType
+                    { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } stringSource)
+                annotation = stringSource.NullableAnnotation;
+            resolvedType = new BoundTypes.NominalBoundType(
+                typeOp.TargetType, annotation, roslynSymbol: stringType.RoslynSymbol);
+        }
         if (typeOp.Operation == TypeOp.Cast && GetTypeParameterConstraints(typeOp.TargetType) is null
             && ResolveSourceType(typeOp.TargetType, _currentClassName, _currentNamespaceIdentity,
                 _currentNamespaceScopeId).Type is { IsEnum: true } enumType)
@@ -7893,6 +7938,8 @@ public sealed class Binder
         }
         else
             ValidateCallArguments(args, resolution, bclResolution);
+        if (receiver is not null)
+            ValidateStringInstanceReceiver(receiver, bclResolution?.Symbol);
         if (bclResolution?.Symbol is { ReducedFrom: not null, ReceiverType: { } reducedReceiver } reduced
             && (computedReceiver ?? receiver) is { } extensionReceiver
             && TryBuildBclArgumentTarget(reducedReceiver) is BoundTypes.GenericInstantiationBoundType

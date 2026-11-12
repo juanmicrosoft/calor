@@ -168,6 +168,17 @@ getter before method entry. Successful copies within the method do not prove
 the whole call safe. The ranged
 `ToCharArray(int,int)` overload also remains Unknown.
 
+Selected metadata String instance calls and getters require a proven non-null
+receiver. This is intentionally stricter than C# nullable warnings: the
+`callvirt` null check runs before the contracted method body, and constructing
+its exception can invoke an overridden `CurrentUICulture.Name` getter.
+Nullable, oblivious, and unknown receivers fail the hard receiving boundary
+(`Calor0274`), even with type checking disabled. Casting null to `string` is
+not proof. Non-null declarations and values, sound flow guards, non-null
+coalescing, and conditional access retain their existing annotations and
+behavior. Static helpers and constructors are not instance receiving
+boundaries; unlisted overloads still need an independent effect contract.
+
 In particular, `ToUpper()` and `ToLower()`, including their `CultureInfo`
 overloads, can invoke user-defined `TextInfo` getters. Culture-sensitive
 comparisons, formatting, and enumerable overloads can also dispatch to user
