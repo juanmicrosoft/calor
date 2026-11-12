@@ -2955,4 +2955,221 @@ public class EffectResolverTests
             Assert.Empty(rejected.GeneratedCode);
         }
     }
+
+    [Fact]
+    public void NullableContracts_SelectedMetadataMembersHaveOnlyFiniteReadAndCopyAuthority()
+    {
+        var compilation = StringProbeCompilation("", []);
+        var definition = compilation.GetSpecialType(SpecialType.System_Nullable_T);
+        var integer = compilation.GetSpecialType(SpecialType.System_Int32);
+        foreach (var safeFirst in new[] { false, true })
+        {
+            var loader = new ManifestLoader(loadUserLevelManifests: false);
+            var resolver = new EffectResolver(loader);
+            resolver.Initialize();
+            var mapping = Assert.Single(loader.LoadedManifests.SelectMany(entry => entry.Manifest.Mappings)
+                .Where(mapping => mapping.Type == "System.Nullable`1"));
+            Assert.Null(mapping.DefaultEffects);
+            Assert.All(mapping.Methods!.Keys, signature => Assert.Contains("(", signature));
+            var types = new[]
+            {
+                definition.Construct(integer),
+                definition.Construct(compilation.GetTypeByMetadataName("System.Guid")!),
+                definition.Construct(compilation.GetTypeByMetadataName("System.ValueTuple`2")!
+                    .Construct(compilation.GetSpecialType(SpecialType.System_Object), integer))
+            };
+            var keys = types.SelectMany(type => type.GetMembers().OfType<IMethodSymbol>()
+                .Where(method => method.DeclaredAccessibility == Accessibility.Public)
+                .Select(method =>
+                {
+                    var kind = method.MethodKind switch
+                    {
+                        MethodKind.Constructor => EffectMemberKind.Constructor,
+                        MethodKind.PropertyGet => EffectMemberKind.Getter,
+                        _ => EffectMemberKind.Method
+                    };
+                    var key = EffectResolverKey.FromBoundReceiver(
+                        Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToBoundType(type),
+                        method.AssociatedSymbol?.Name ?? method.Name,
+                        kind == EffectMemberKind.Getter ? null
+                            : method.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray(), kind);
+                    var safe = kind == EffectMemberKind.Getter && key.MemberName == "HasValue"
+                        || kind == EffectMemberKind.Method && key.MemberName == "GetValueOrDefault"
+                            && (method.Parameters.Length == 0
+                                || method.Parameters.Single().Type.SpecialType == SpecialType.System_Int32)
+                        || kind == EffectMemberKind.Constructor
+                            && method.Parameters is [{ Type.SpecialType: SpecialType.System_Int32 }];
+                    Assert.Equal(typeof(int?).Assembly.FullName, method.ContainingAssembly.Identity.ToString());
+                    Assert.DoesNotContain(method.Locations, location => location.IsInSource);
+                    Assert.Equal("System.Nullable`1", key.DeclaringType);
+                    return (Key: key, Safe: safe);
+                })).ToArray();
+            foreach (var (key, safe) in keys.OrderBy(pair => pair.Safe == safeFirst ? 0 : 1)
+                         .Concat(keys.Reverse()))
+            {
+                var result = resolver.Resolve(key);
+                Assert.Equal(safe ? EffectResolutionStatus.PureExplicit : EffectResolutionStatus.Unknown,
+                    result.Status);
+                Assert.Equal(!safe, result.Effects.IsUnknown);
+                Assert.Same(result, resolver.Resolve(key));
+                if (key.Kind is EffectMemberKind.Method or EffectMemberKind.Constructor)
+                {
+                    Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key.WithoutParameterList()).Status);
+                    Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(EffectResolverKey.FromStrings(
+                        key.DeclaringType, key.MemberName, ["?"], key.Kind)).Status);
+                }
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(EffectResolverKey.FromStrings(
+                    key.DeclaringType, key.MemberName, key.ParameterTypes, EffectMemberKind.Setter)).Status);
+            }
+            Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                EffectResolverKey.FromStrings("System.Nullable`1", "Unmodeled")).Status);
+            Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                EffectResolverKey.FromStrings("System.Nullable`1", "Item", ["System.Int32"],
+                    EffectMemberKind.Getter)).Status);
+        }
+    }
+
+    [Theory]
+    [InlineData("int?", "value.ToString()", "string?", "ToString", "")]
+    [InlineData("int?", "value.GetHashCode()", "int", "GetHashCode", "")]
+    [InlineData("int?", "value.Equals(other)", "bool", "Equals", ", object?:other")]
+    public void NullableContracts_CallbackBearingMembersAreStrictlyRejectedWithoutExecutingSubjects(
+        string type, string expression, string output, string member, string other)
+    {
+        var source = $$"""
+            module NullableFormatting
+              func Render public ({{type}}:value{{other}}) → {{output}}
+                !
+                return {{expression}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics, "nullable-contract.calr").Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(Calor.Compiler.Analysis.Dataflow.BoundNodeHelpers.DescendantsAndSelf(bound)
+            .OfType<Calor.Compiler.Binding.BoundCallExpression>());
+        var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+        Assert.Equal(member, method.Name);
+        Assert.Equal(SpecialType.System_Nullable_T, method.ContainingType.OriginalDefinition.SpecialType);
+        Assert.IsType<Calor.Compiler.Binding.BoundVariableExpression>(call.Receiver);
+        Assert.False(call.HasUnknownInferredType);
+        Assert.Equal(typeof(int?).Assembly.FullName, method.ContainingAssembly.Identity.ToString());
+        var key = EffectResolverKey.FromBoundReceiver(call.Receiver!.Type, method.Name, call.ResolvedParameterTypes);
+        Assert.Equal("System.Nullable`1", key.DeclaringType);
+        Assert.Equal(EffectResolutionStatus.Unknown,
+            new EffectResolver(new ManifestLoader(loadUserLevelManifests: false)).Resolve(key).Status);
+        foreach (var native in StringEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(native, "nullable-contract.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StrictApi = true,
+                    StrictEffects = true, StatusWriter = TextWriter.Null
+                });
+            Assert.True(result.HasErrors);
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("." + member, StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("int?", "value.HasValue", "bool")]
+    [InlineData("int?", "value.GetValueOrDefault()", "int")]
+    [InlineData("int?", "value.GetValueOrDefault(7)", "int")]
+    [InlineData("int", "value", "int?")]
+    public void NullableContracts_FiniteCopiesReadsAndImplicitWrappingRemainStrictlyAdmitted(
+        string type, string expression, string output)
+    {
+        var source = $$"""
+            module NullableCopies
+              func Copy ({{type}}:value) → {{output}}
+                !
+                return {{expression}}
+            """;
+        foreach (var native in StringEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(native, "nullable-copy.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StrictApi = true,
+                    StrictEffects = true, StatusWriter = TextWriter.Null
+                });
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(StringProbeCompilation(result.GeneratedCode, []).GetDiagnostics(),
+                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        }
+    }
+
+    [Theory]
+    [InlineData("Receiver(value).GetValueOrDefault()", "int")]
+    [InlineData("value.GetValueOrDefault(Mark())", "int")]
+    [InlineData("Receiver(value).GetValueOrDefault(Mark())", "int")]
+    public void NullableContracts_SafeMembersRetainReceiverAndArgumentEvaluationEffects(
+        string expression, string output)
+    {
+        var source = $$"""
+            module NullableEvaluation
+              func Receiver (int?:value) → int?
+                ! cw
+                Console.WriteLine("receiver")
+                return value
+              func Mark () → int
+                ! cw
+                Console.WriteLine("argument")
+                return 7
+              func Read (int?:value) → {{output}}
+                !
+                return {{expression}}
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var options = new Calor.Compiler.CompilationOptions
+            {
+                EnableTypeChecking = typing, VerifyContracts = false, StrictApi = true,
+                StrictEffects = true, StatusWriter = TextWriter.Null
+            };
+            var rejected = Calor.Compiler.Program.Compile(source, "nullable-evaluation.calr", options);
+            Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            var accepted = Calor.Compiler.Program.Compile(
+                source.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal), "nullable-evaluation.calr", options);
+            Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+        }
+    }
+
+    [Fact]
+    public void NullableContracts_ThrowingValueGetterIsUnknownWhileGuardedCopiesStayPure()
+    {
+        const string source = """
+            module NullableGuard
+              func Read (int?:value) → int
+                !
+                if value.HasValue
+                  return value.GetValueOrDefault()
+                return 0
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var options = new Calor.Compiler.CompilationOptions
+            {
+                EnableTypeChecking = typing, VerifyContracts = false, StrictApi = true,
+                StrictEffects = true, StatusWriter = TextWriter.Null
+            };
+            var accepted = Calor.Compiler.Program.Compile(source, "nullable-guard.calr", options);
+            Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+            var rejected = Calor.Compiler.Program.Compile(
+                source.Replace("value.GetValueOrDefault()", "value.Value", StringComparison.Ordinal),
+                "nullable-guard.calr", options);
+            Assert.True(rejected.HasErrors);
+            Assert.Empty(rejected.GeneratedCode);
+            Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("get_Value", StringComparison.Ordinal));
+        }
+    }
 }

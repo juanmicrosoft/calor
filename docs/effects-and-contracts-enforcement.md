@@ -200,6 +200,21 @@ dispatch or exception helpers. No other Single member receives a contract.
 Metadata argument lookup preserves `float` as `System.Single`, not an
 unresolved placeholder; this type fact grants no additional effects.
 
+`System.Nullable<T>` has no type-wide pure default. Its `ToString`, `Equals`,
+and `GetHashCode` overrides can invoke the stored value's methods through a
+constrained virtual call, including callbacks that mutate struct storage.
+Even `int?.ToString()` can reach current-culture callbacks for negative values.
+These members remain Unknown; an `object` contract does not authorize them.
+The finite pure entries are the `HasValue` getter, parameterless
+`GetValueOrDefault()`, and the `int`-parameter `GetValueOrDefault` and constructor.
+They only read or copy fields and values. Other parameterized generic copies
+remain conservatively uncontracted: this does not add generic signature matching.
+Receiver and argument evaluation effects are still charged. The `Value` getter
+is not covered, because its empty-value path invokes exception resource helpers.
+Built-in nullable unwrapping casts remain a separate unresolved boundary: they
+do not consult this manifest, although their empty-value lowering can also reach
+`Value`. This is not a general nullable-purity guarantee.
+
 Numeric `Parse`, `TryParse`, and `ToString` overloads remain Unknown.
 `NumberFormatInfo.GetInstance` can call an arbitrary provider's `GetFormat`;
 its current-culture path can call a `CultureInfo` override. Even parameterless

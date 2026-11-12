@@ -233,7 +233,16 @@
     },
     {
       "type": "System.Nullable`1",
-      "defaultEffects": []
+      "methods": {
+        "GetValueOrDefault()": [],
+        "GetValueOrDefault(System.Int32)": []
+      },
+      "getters": {
+        "HasValue": []
+      },
+      "constructors": {
+        "(System.Int32)": []
+      }
     },
     {
       "type": "System.Type",
