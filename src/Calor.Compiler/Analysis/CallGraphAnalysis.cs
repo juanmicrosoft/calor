@@ -107,6 +107,8 @@ public sealed class CallGraphAnalysis
         internal Dictionary<ConstructorNode, IMethodSymbol> ConstructorInitializers { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<NewExpressionNode, IMethodSymbol> SourceConstructors { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<InterpolatedStringExpressionNode, InterpolationFormatting> InterpolationFormats { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<AstNode, IReadOnlyList<InterpolationFormatting>> AdditionFormats { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<ReferenceNode, ClassDefinitionNode?> StaticFieldInitializations { get; } = new(ReferenceEqualityComparer.Instance);
         internal HashSet<ConstructorNode> RecordCopyConstructors { get; } = new(ReferenceEqualityComparer.Instance);
         internal List<Diagnostics.Diagnostic> SourceConstructionErrors { get; } = [];
     }
@@ -135,6 +137,21 @@ public sealed class CallGraphAnalysis
         _operatorBindings.SourceConstructors.GetValueOrDefault(creation);
     internal InterpolationFormatting? SelectedInterpolationFormatting(InterpolatedStringExpressionNode hole) =>
         _operatorBindings.InterpolationFormats.GetValueOrDefault(hole);
+    internal IReadOnlyList<InterpolationFormatting>? SelectedAdditionFormatting(AstNode addition) =>
+        _operatorBindings.AdditionFormats.GetValueOrDefault(addition);
+    internal bool TrySelectedStaticFieldInitialization(ReferenceNode reference, out ClassDefinitionNode? owner) =>
+        _operatorBindings.StaticFieldInitializations.TryGetValue(reference, out owner);
+
+    internal static InterpolationFormatting ConcatenationOperand(IOperation value)
+    {
+        // The built-in string/object operator boxes value operands. Inspect that
+        // selected standard boxing conversion, never an explicit cast or user conversion.
+        if (value is IConversionOperation
+            { IsImplicit: true, OperatorMethod: null, Type.SpecialType: SpecialType.System_Object,
+                Operand.Type.IsValueType: true } boxing)
+            value = boxing.Operand;
+        return new InterpolationFormatting(value.Type, value.ConstantValue is { HasValue: true, Value: null });
+    }
     internal bool IsRecordCopyConstructor(ConstructorNode constructor) =>
         _operatorBindings.RecordCopyConstructors.Contains(constructor);
     internal IReadOnlyList<Diagnostics.Diagnostic> SourceConstructionErrors =>
@@ -174,6 +191,8 @@ public sealed class CallGraphAnalysis
         var conflictingConstructorInitializers = new HashSet<ConstructorNode>(ReferenceEqualityComparer.Instance);
         var conflictingSourceConstructors = new HashSet<NewExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingInterpolationFormats = new HashSet<InterpolatedStringExpressionNode>(ReferenceEqualityComparer.Instance);
+        var conflictingAdditions = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var conflictingStaticFieldReads = new HashSet<ReferenceNode>(ReferenceEqualityComparer.Instance);
         var argumentOwners = new Dictionary<AstNode, (TextSpan Call, int Index)>(ReferenceEqualityComparer.Instance);
         var ambiguousArguments = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
         var sourceArgumentCounts = new Dictionary<TextSpan, int>();
@@ -217,8 +236,10 @@ public sealed class CallGraphAnalysis
         var bindInitialization = EnumerateClasses(module).Any();
         var bindEvents = EnumerateClasses(module).Any(owner => EnumerateEvents(owner).Any(evt => !evt.HasAccessors));
         var bindInterpolation = visited.OfType<InterpolatedStringNode>().Any();
+        var additions = visited.Where(IsAddition).ToArray();
         if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindInitialization
-            && !bindInterpolation && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
+            && !bindInterpolation && additions.Length == 0
+            && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
             return bindings;
 
         void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
@@ -477,10 +498,11 @@ public sealed class CallGraphAnalysis
                         constructor.MetadataName, [], EffectMemberKind.Constructor);
                 }
             }
-            if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindEvents && !bindInterpolation)
+            if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindEvents
+                && !bindInterpolation && additions.Length == 0)
                 return;
 
-            var validProofContext = (bindMemberTypes || bindNullGuards || bindInterpolation) && !compilation.GetDiagnostics().Any(diagnostic =>
+            var validProofContext = (bindMemberTypes || bindNullGuards || bindInterpolation || additions.Length > 0) && !compilation.GetDiagnostics().Any(diagnostic =>
                 diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
             var validMemberContext = bindMemberTypes && validProofContext;
             var selectedInTree = new HashSet<TextSpan>();
@@ -493,6 +515,8 @@ public sealed class CallGraphAnalysis
             var selectedMetadataCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
             var selectedEventUsesInTree = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
             var selectedInterpolationFormatsInTree = new HashSet<InterpolatedStringExpressionNode>(ReferenceEqualityComparer.Instance);
+            var selectedAdditionsInTree = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+            var selectedStaticFieldReadsInTree = new HashSet<ReferenceNode>(ReferenceEqualityComparer.Instance);
 
             foreach (var declaration in root.DescendantNodes().Where(node =>
                          node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax
@@ -510,6 +534,66 @@ public sealed class CallGraphAnalysis
                         continue;
                     foreach (var child in operation.ChildOperations)
                         pending.Push(child);
+                    if (validProofContext && additions.Length > 0)
+                    {
+                        if (operation is IFieldReferenceOperation { Field.IsStatic: true, Field.IsConst: false } fieldRead
+                            && SymbolEqualityComparer.Default.Equals(fieldRead.Field.ContainingAssembly, compilation.Assembly)
+                            && Origin(operation) is ReferenceNode reference)
+                        {
+                            var owner = bindings.InitializationClasses.GetValueOrDefault(
+                                fieldRead.Field.ContainingType.OriginalDefinition);
+                            selectedStaticFieldReadsInTree.Add(reference);
+                            if (conflictingStaticFieldReads.Contains(reference)
+                                || bindings.StaticFieldInitializations.TryGetValue(reference, out var previousOwner)
+                                    && !ReferenceEquals(previousOwner, owner))
+                            {
+                                conflictingStaticFieldReads.Add(reference);
+                                owner = null;
+                            }
+                            bindings.StaticFieldInitializations[reference] = owner;
+                        }
+                        if (Origin(operation) is { } addition && IsAddition(addition)
+                            && operation is IBinaryOperation { OperatorKind: BinaryOperatorKind.Add }
+                                or ICompoundAssignmentOperation { OperatorKind: BinaryOperatorKind.Add })
+                        {
+                            IReadOnlyList<InterpolationFormatting> formats = operation switch
+                            {
+                                IBinaryOperation { OperatorMethod: null, Type.SpecialType: SpecialType.System_String } binary =>
+                                    [ConcatenationOperand(binary.LeftOperand), ConcatenationOperand(binary.RightOperand)],
+                                ICompoundAssignmentOperation { OperatorMethod: null, Type.SpecialType: SpecialType.System_String } concatCompound =>
+                                    [ConcatenationOperand(concatCompound.Target), ConcatenationOperand(concatCompound.Value)],
+                                _ => []
+                            };
+                            if (bindings.AdditionFormats.TryGetValue(addition, out var previous)
+                                && (previous.Count != formats.Count
+                                    || previous.Zip(formats).Any(pair => !SameFormatting(pair.First, pair.Second))))
+                            {
+                                conflictingAdditions.Add(addition);
+                                bindings.AdditionFormats.Remove(addition);
+                            }
+                            else if (!conflictingAdditions.Contains(addition))
+                            {
+                                selectedAdditionsInTree.Add(addition);
+                                bindings.AdditionFormats[addition] = formats;
+                            }
+                            if (operation is IBinaryOperation selected)
+                                AddMethod(operation, selected.OperatorMethod);
+                            else if (operation is ICompoundAssignmentOperation selectedCompound)
+                            {
+                                AddMethod(operation, selectedCompound.OperatorMethod);
+                                AddMethod(operation, selectedCompound.InConversion.MethodSymbol);
+                                AddMethod(operation, selectedCompound.OutConversion.MethodSymbol);
+                            }
+                        }
+                        if (operation is IConversionOperation { OperatorMethod: { } conversion })
+                            for (var parent = operation.Parent; parent != null; parent = parent.Parent)
+                                if (parent is IBinaryOperation { OperatorKind: BinaryOperatorKind.Add }
+                                    or ICompoundAssignmentOperation { OperatorKind: BinaryOperatorKind.Add })
+                                {
+                                    AddMethod(operation, conversion);
+                                    break;
+                                }
+                    }
                     if (validProofContext && operation is IInterpolatedStringOperation
                         { Type.SpecialType: SpecialType.System_String } interpolation
                         && Origin(operation) is InterpolatedStringNode interpolated)
@@ -704,6 +788,19 @@ public sealed class CallGraphAnalysis
             {
                 conflictingInterpolationFormats.Add(hole);
                 bindings.InterpolationFormats.Remove(hole);
+            }
+            foreach (var addition in ranges.Select(range => range.Node).Where(IsAddition)
+                         .Where(addition => !selectedAdditionsInTree.Contains(addition)))
+            {
+                conflictingAdditions.Add(addition);
+                bindings.AdditionFormats.Remove(addition);
+            }
+            foreach (var reference in ranges.Select(range => range.Node).OfType<ReferenceNode>()
+                         .Where(reference => !selectedStaticFieldReadsInTree.Contains(reference)))
+            {
+                conflictingStaticFieldReads.Add(reference);
+                if (bindings.StaticFieldInitializations.ContainsKey(reference))
+                    bindings.StaticFieldInitializations[reference] = null;
             }
             foreach (var member in ranges.Select(range => range.Node).OfType<FieldAccessNode>()
                          .Where(member => !selectedMembersInTree.Contains(member)))
@@ -1557,6 +1654,14 @@ public sealed class CallGraphAnalysis
             }
         }
     }
+
+    internal static bool IsAddition(AstNode node) =>
+        node is BinaryOperationNode { Operator: BinaryOperator.Add }
+            or CompoundAssignmentStatementNode { Operator: CompoundAssignmentOperator.Add };
+
+    private static bool SameFormatting(InterpolationFormatting left, InterpolationFormatting right) =>
+        left.IsNull == right.IsNull && (left.Type is null ? right.Type is null
+            : right.Type is not null && SameType(left.Type, right.Type));
 
     private static bool SameEventType(INamedTypeSymbol left, INamedTypeSymbol right)
     {

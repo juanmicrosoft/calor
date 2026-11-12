@@ -1,3 +1,4 @@
+using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
@@ -317,6 +318,256 @@ public static class NumberFormat
                 diagnostic.Code == DiagnosticCode.UnknownExternalCall
                 && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal));
             Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("double", "return \"\" + value;")]
+    [InlineData("double", "return value + \"\";")]
+    [InlineData("double", "return \"v=\" + value;")]
+    [InlineData("double", "return \"[\" + value + \"]\";")]
+    [InlineData("double", "string result = \"\"; result += value; return result;")]
+    [InlineData("int", "return \"v=\" + value;")]
+    [InlineData("decimal", "return \"v=\" + value;")]
+    [InlineData("float", "return \"v=\" + value;")]
+    [InlineData("uint", "return \"v=\" + value;")]
+    [InlineData("double", "return \"\" + 3.5;")]
+    [InlineData("object", "return \"\" + value;")]
+    [InlineData("T", "return \"\" + value;")]
+    public void StrictConcatenation_UnprovedFormattingIsUnknown(string type, string body)
+    {
+        var source = $$"""
+            #nullable enable
+            public static class ConcatenationBoundary
+            {
+                public static string Render{{(type == "T" ? "<T>" : "")}}({{type}} value) { {{body}} }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "concat-boundary.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("concatenation formatting", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("string", "return \"[\" + value + \"]\";")]
+    [InlineData("string?", "return value + \"\";")]
+    [InlineData("char", "return \"[\" + value + \"]\";")]
+    [InlineData("bool", "return \"[\" + value + \"]\";")]
+    [InlineData("bool", "string result = \"\"; result += value; return result;")]
+    [InlineData("string?", "return \"[\" + null + \"]\";")]
+    [InlineData("bool", "return \"\" + true;")]
+    [InlineData("string", "return \"\" + nameof(value);")]
+    [InlineData("int", "return value + 1 == 2 ? \"yes\" : \"no\";")]
+    public void StrictConcatenation_ClosedFormattingAndArithmeticRemainSupported(string type, string body)
+    {
+        var source = $$"""
+            #nullable enable
+            public static class ConcatenationBoundary
+            {
+                public static string Render({{type}} value) { {{body}} }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "concat-safe.calr",
+                StrictInterpolationOptions(typing));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void StrictConcatenation_FormattingDoesNotEraseOperandEffects()
+    {
+        const string source = """
+            module ConcatenationBoundary
+              func Render public () → string
+                !
+                return "[" + Console.ReadLine() + "]"
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "concat-effects.calr", StrictInterpolationOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cr'", StringComparison.Ordinal));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+                diagnostic.Message.Contains("concatenation formatting", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void StrictConcatenation_UserDefinedAdditionRetainsItsOwnEffects(bool effectful, bool conversion)
+    {
+        var source = $$"""
+            module ConcatenationBoundary
+              class Box
+                {{(conversion ? "op implicit (Box:right) → string" : "op + (string:left, Box:right) → string")}}
+                  {{(effectful ? "! cw" : "!")}}
+                  {{(effectful ? "Console.WriteLine(\"operator\")" : "")}}
+                  return {{(conversion ? "\"\"" : "left")}}
+              func Render public (Box:value) → string
+                !
+                return "" + value
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "concat-operator.calr", StrictInterpolationOptions(typing));
+            Assert.Equal(effectful, result.HasErrors);
+            Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+                diagnostic.Message.Contains("concatenation formatting", StringComparison.Ordinal));
+            if (effectful)
+            {
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+                Assert.Empty(result.GeneratedCode);
+            }
+            else
+                Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("double", true)]
+    [InlineData("bool", false)]
+    [InlineData("char", false)]
+    [InlineData("string", false)]
+    public void StrictConcatenation_SdkCompoundUsesTheSelectedOperation(string type, bool unknown)
+    {
+        var source = $$"""
+            module ConcatenationBoundary
+              func Render public ({{type}}:value) → string
+                !
+                var string:result = ""
+                set result result + value
+                return result
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var function = Assert.Single(module.Functions);
+        var assignment = Assert.IsType<AssignmentStatementNode>(function.Body[1]);
+        var addition = Assert.IsType<BinaryOperationNode>(assignment.Value);
+        var replacement = function.CopyMetadataTo(new FunctionNode(function.Span, function.Id, function.Name,
+            function.Visibility, function.Parameters, function.Output, function.Effects,
+            function.Preconditions, function.Postconditions,
+            [
+                function.Body[0],
+                new CompoundAssignmentStatementNode(assignment.Span, assignment.Target,
+                    CompoundAssignmentOperator.Add, addition.Right),
+                function.Body[2]
+            ], function.Attributes));
+        module = module.With(updated =>
+        {
+            updated.Functions = [replacement];
+            updated.Items = module.Items.Select(item => ReferenceEquals(item, function) ? replacement : item).ToArray();
+        });
+        new EffectEnforcementPass(diagnostics, strictEffects: true).Enforce(module);
+        Assert.Equal(unknown, diagnostics.HasErrors);
+        if (unknown)
+            Assert.Contains(diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("concatenation formatting (double)", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("double", true, false)]
+    [InlineData("bool", false, false)]
+    [InlineData("double", true, true)]
+    [InlineData("bool", false, true)]
+    public void StrictConcatenation_SourceInitializationUsesTheSameBoundary(string type, bool unknown, bool bare)
+    {
+        var source = bare ? $$"""
+            module ConcatenationBoundary
+              class Box
+                field {{type}}:Value static
+                field string:Text static = "" + Value
+                func Render public static () → string
+                  !
+                  return Text
+            """ : $$"""
+            module ConcatenationBoundary
+              class Box
+                field {{type}}:Value static
+                field string:Text static = "" + Value
+              func Render public () → string
+                !
+                return Box.Text
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "concat-initializer.calr", StrictInterpolationOptions(typing));
+            Assert.Equal(unknown, result.HasErrors);
+            if (unknown)
+            {
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                    && diagnostic.Message.Contains("concatenation formatting (double)", StringComparison.Ordinal));
+                Assert.Empty(result.GeneratedCode);
+            }
+            else
+                Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("double", "3.5", true)]
+    [InlineData("bool", "true", false)]
+    public void StrictConcatenation_ExplicitTypeEntryChargesInitialization(
+        string type, string value, bool unknown)
+    {
+        var source = $$"""
+            #nullable enable
+            public class ConcatenationBoundary
+            {
+                private static string Text = "" + {{value}};
+                static ConcatenationBoundary() { }
+                public static string Render(double unused) { return "constant"; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "concat-type-entry.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Equal(unknown, result.HasErrors);
+            if (unknown)
+            {
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                    && diagnostic.Message.Contains($"concatenation formatting ({type})", StringComparison.Ordinal));
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable);
+                Assert.Empty(result.GeneratedCode);
+            }
+            else
+                Assert.NotEmpty(result.GeneratedCode);
         }
     }
 

@@ -151,6 +151,16 @@ when the Roslyn binding image proves their provider-independent types or null
 values. Custom-object, generic, and unresolved holes do not receive a purity
 grant. Effects from evaluating every runtime hole are still charged.
 
+The same boundary applies to Roslyn-selected built-in string concatenation,
+including numeric operands on either side of `+`, chained concatenation, and
+converted `+=` expressions. Standard boxing does not hide a numeric operand's
+formatting dispatch. String, character, Boolean, and proven null operands remain
+supported; custom-object, generic, and unresolved formatting remains Unknown.
+Numeric addition is not string formatting. User-defined operators and operand
+conversions retain their own effect charges, as do operand evaluation,
+assignment targets, and bound source initialization. This includes bare
+static-field reads and explicit static-constructor entry without a field read.
+
 ---
 
 ## Output Convention

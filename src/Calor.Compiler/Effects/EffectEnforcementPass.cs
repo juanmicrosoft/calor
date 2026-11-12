@@ -714,9 +714,11 @@ public sealed class EffectEnforcementPass
         var effects = inferrer.InferFromFunction(function);
         if (declarationOnly)
             effects = effects.Union(GetDeclaredEffects(row));
-        if (context.CurrentConstructor is { Constructor.IsStatic: false } initializing
-            && !_callGraphAnalysis.IsRecordCopyConstructor(initializing.Constructor))
-            effects = effects.Union(inferrer.InferInstanceInitialization(initializing.Owner, function.Span));
+        if (context.CurrentConstructor is { } initializing
+            && (initializing.Constructor.IsStatic
+                || !_callGraphAnalysis.IsRecordCopyConstructor(initializing.Constructor)))
+            effects = effects.Union(inferrer.InferConstructorInitialization(
+                initializing.Owner, initializing.Constructor.IsStatic, function.Span));
         if (context.CurrentConstructor is { Constructor.IsStatic: false }
             && context.CurrentConstructor.Constructor.Initializer != null)
         {
@@ -5969,12 +5971,14 @@ public sealed class EffectEnforcementPass
 
         private readonly HashSet<(ClassDefinitionNode Owner, bool Static)> _activeInitializations = [];
 
-        public EffectSet InferInstanceInitialization(ClassDefinitionNode owner, TextSpan span) =>
-            InferSourceInitialization(owner, isStatic: false, span);
+        public EffectSet InferConstructorInitialization(ClassDefinitionNode owner, bool isStatic, TextSpan span) =>
+            InferSourceInitialization(owner, isStatic, span, initializingConstructor: true);
 
-        private EffectSet InferSourceInitialization(ClassDefinitionNode owner, bool isStatic, TextSpan span)
+        private EffectSet InferSourceInitialization(
+            ClassDefinitionNode owner, bool isStatic, TextSpan span, bool initializingConstructor = false)
         {
-            if (isStatic && _context.CurrentConstructor is { Constructor.IsStatic: true } current
+            if (!initializingConstructor && isStatic
+                && _context.CurrentConstructor is { Constructor.IsStatic: true } current
                 && ReferenceEquals(current.Owner, owner))
                 return EffectSet.Empty;
             var selection = _context.CallGraph.Initialization(owner);
@@ -5987,7 +5991,7 @@ public sealed class EffectEnforcementPass
             {
                 var effects = operations.Aggregate(EffectSet.Empty, (effects, initializer) =>
                     effects.Union(InferInitializationOperation(initializer.Operation, initializer.Preserved, span)));
-                if (isStatic)
+                if (isStatic && !initializingConstructor)
                     effects = effects.Union(InferFromInternalFunctions(owner.Constructors
                         .Where(constructor => constructor.IsStatic).Select(constructor => $"{owner.Name}.{constructor.Id}")));
                 return effects;
@@ -6047,6 +6051,13 @@ public sealed class EffectEnforcementPass
                     return effects;
                 case IArrayCreationOperation:
                     effects = EffectSet.From("alloc");
+                    break;
+                case IBinaryOperation
+                    { OperatorKind: BinaryOperatorKind.Add, OperatorMethod: null, Type.SpecialType: CS.SpecialType.System_String } concat:
+                    effects = InferFormattingEffects(CallGraphAnalysis.ConcatenationOperand(concat.LeftOperand),
+                            "concatenation", span)
+                        .Union(InferFormattingEffects(CallGraphAnalysis.ConcatenationOperand(concat.RightOperand),
+                            "concatenation", span));
                     break;
                 case IArgumentOperation:
                 case IConversionOperation { OperatorMethod: null }:
@@ -6184,6 +6195,10 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromReference(ReferenceNode reference, bool chargeMethodGroup = true)
         {
+            if (_context.CallGraph.TrySelectedStaticFieldInitialization(reference, out var selectedOwner))
+                return selectedOwner is not null
+                    ? InferStaticFieldInitialization(selectedOwner, reference.Span)
+                    : UnknownResolvedOperation("unresolved source field initialization", reference.Span);
             if (_context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, reference.Span)
                 is { SourceStaticFieldOwner: { } sourceOwner })
                 return InferStaticFieldInitialization(sourceOwner, reference.Span);
@@ -6549,6 +6564,15 @@ public sealed class EffectEnforcementPass
                     ? UnknownResolvedOperation($"{key.DeclaringType}.{key.MemberName}", node.Span)
                     : resolution.Effects);
             }
+            if (CallGraphAnalysis.IsAddition(node))
+            {
+                var formats = _context.CallGraph.SelectedAdditionFormatting(node);
+                if (formats is null)
+                    effects = effects.Union(UnknownResolvedOperation("unresolved addition", node.Span));
+                else
+                    foreach (var format in formats)
+                        effects = effects.Union(InferFormattingEffects(format, "concatenation", node.Span));
+            }
             return effects;
         }
 
@@ -6686,18 +6710,24 @@ public sealed class EffectEnforcementPass
                     { Intent: not InterpolationPartIntent.LiteralPlaceholder } exprPart)
                 {
                     effects = effects.Union(InferFromExpression(exprPart.Expression));
-                    var formatting = _context.CallGraph.SelectedInterpolationFormatting(exprPart);
-                    // Numeric formatting can dispatch through CurrentCulture.NumberFormat.
-                    // Only the binding image's closed, provider-independent cases are pure.
-                    if (formatting is not { IsNull: true }
-                        && formatting?.Type?.SpecialType is not (CS.SpecialType.System_String
-                            or CS.SpecialType.System_Char or CS.SpecialType.System_Boolean))
-                        effects = effects.Union(UnknownResolvedOperation(
-                            $"interpolation formatting ({formatting?.Type?.ToDisplayString() ?? "<unresolved>"})",
-                            exprPart.Span));
+                    effects = effects.Union(InferFormattingEffects(
+                        _context.CallGraph.SelectedInterpolationFormatting(exprPart), "interpolation", exprPart.Span));
                 }
             }
             return effects;
+        }
+
+        private EffectSet InferFormattingEffects(
+            CallGraphAnalysis.InterpolationFormatting? formatting, string operation, TextSpan span)
+        {
+            // Numeric formatting can dispatch through CurrentCulture.NumberFormat.
+            // Only the binding image's closed, provider-independent cases are pure.
+            return formatting is { IsNull: true }
+                || formatting?.Type?.SpecialType is CS.SpecialType.System_String
+                    or CS.SpecialType.System_Char or CS.SpecialType.System_Boolean
+                ? EffectSet.Empty
+                : UnknownResolvedOperation(
+                    $"{operation} formatting ({formatting?.Type?.ToDisplayString() ?? "<unresolved>"})", span);
         }
 
         private EffectSet InferFromExpressionCall(ExpressionCallNode call)
