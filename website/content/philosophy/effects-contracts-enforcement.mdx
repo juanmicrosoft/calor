@@ -169,11 +169,13 @@ query a database or send a network request:
 module VisibleConsoleEffect
   func LogRetrieval public (int:id) → int
     ! cw
-    System.Console.WriteLine("Retrieved user ${id}")
+    System.Console.WriteLine("Retrieved user {0}", id)
     return id
 ```
 
 `LogRetrieval(42)` writes `Retrieved user 42` once and returns `42`.
+The Console call performs the formatting under its `cw` contract; the example
+does not assume that numeric interpolation is pure.
 External APIs need selected-call coverage and reviewed effect contracts;
 unknown calls are not automatically pure.
 
@@ -243,7 +245,7 @@ module MissingConsoleEffect
 
   func PrintNotice (int:order) → bool
     ! cw
-    System.Console.WriteLine("Order ${order}")
+    System.Console.WriteLine("Order {0}", order)
     return true
 ```
 
@@ -262,7 +264,7 @@ module DeclaredConsoleEffect
 
   func PrintNotice (int:order) → bool
     ! cw
-    System.Console.WriteLine("Order ${order}")
+    System.Console.WriteLine("Order {0}", order)
     return true
 ```
 
