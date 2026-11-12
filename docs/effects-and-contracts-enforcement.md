@@ -214,6 +214,10 @@ is not covered, because its empty-value path invokes exception resource helpers.
 Built-in nullable unwrapping casts remain a separate unresolved boundary: they
 do not consult this manifest, although their empty-value lowering can also reach
 `Value`. This is not a general nullable-purity guarantee.
+When a lossless conversion's native nullable candidate fails effect checking,
+the production converter preserves the original C# instead. Matching emitted C#
+metadata alone is not enough to certify native Calor. Preservation keeps exact
+source and declared metadata, but receives no native-coverage credit.
 
 Numeric `Parse`, `TryParse`, and `ToString` overloads remain Unknown.
 `NumberFormatInfo.GetInstance` can call an arbitrary provider's `GetFormat`;

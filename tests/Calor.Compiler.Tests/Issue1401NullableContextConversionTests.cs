@@ -1323,4 +1323,68 @@ public sealed class Issue1401NullableContextConversionTests
             Environment.NewLine,
             result.Issues.Select(issue =>
                 $"{issue.Severity}: {issue.Feature}: {issue.Message}"));
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MetadataMatchingNullableCandidate_RefusedEffectsPreserveOriginal052(bool project)
+    {
+        var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+            "tests/TestData/CSharpImport/Level3_Types/052_NullableTypes.cs"));
+        var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false, false);
+        var converter = new CSharpToCalorConverter(options);
+        var conversion = project
+            ? Assert.Single(converter.ConvertProject(source, "052_NullableTypes.cs").Outputs).Conversion
+            : converter.Convert(source, "052_NullableTypes.cs");
+        Assert.True(conversion.Success, FormatIssues(conversion));
+        Assert.Equal("whole-file-preservation", Assert.Single(conversion.Losses).Feature);
+        Assert.Equal(1, conversion.InteropPreservationCount);
+        Assert.Equal(0, conversion.LossySubstitutionCount);
+        Assert.Equal(0, conversion.DropCount);
+        Assert.Equal(ConversionRoundTrip.Verified, conversion.Context.RoundTrip);
+        Assert.Contains(conversion.Issues, issue => issue.Feature == "roundtrip-calor-validation"
+            && issue.Message.Contains("Calor0410", StringComparison.Ordinal)
+            && issue.Message.Contains("'unknown'", StringComparison.Ordinal));
+        foreach (var typing in new[] { false, true })
+        {
+            var compiled = Program.Compile(conversion.CalorSource!, "preserved-052.calr", new CompilationOptions
+            {
+                EnableTypeChecking = typing, StrictEffects = true,
+                UnknownCallPolicy = Effects.UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null
+            });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(source, compiled.GeneratedCode);
+            Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+        }
+    }
+
+    [Fact]
+    public void MetadataMatchingNullableCandidate_ProvedCopyRemainsNative()
+    {
+        const string source = """
+            public static class NullableCopy
+            {
+                public static int Read(int? value) => value.GetValueOrDefault();
+            }
+            """;
+        var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false, false);
+        var converter = new CSharpToCalorConverter(options);
+        foreach (var conversion in new[]
+        {
+            converter.Convert(source, "NullableCopy.cs"),
+            Assert.Single(converter.ConvertProject(source, "NullableCopy.cs").Outputs).Conversion
+        })
+        {
+            Assert.True(conversion.Success, FormatIssues(conversion));
+            Assert.Empty(conversion.Losses);
+            Assert.Equal(0, conversion.InteropPreservationCount);
+            var compiled = Program.Compile(conversion.CalorSource!, "nullable-copy.calr", new CompilationOptions
+            {
+                StrictEffects = true, UnknownCallPolicy = Effects.UnknownCallPolicy.Strict,
+                StatusWriter = TextWriter.Null
+            });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+        }
+    }
 }

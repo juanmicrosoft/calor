@@ -653,11 +653,17 @@ public sealed class CSharpToCalorConverter
         }
 
         // Preserved declarations also inherit the emitted nullable context.
-        if (attempted.Success
-            && attempted.CalorSource is { } current
-            && TryParseModule(current) is { } currentModule
-            && MetadataMatches(new CSharpEmitter().Emit(currentModule), out _))
-            return attempted;
+        if (attempted.Success && attempted.CalorSource is { } current)
+        {
+            var compiledCurrent = Program.Compile(current, sourceFile, new CompilationOptions
+            {
+                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+                ProjectDirectory = _options.ProjectDirectory,
+                CancellationToken = cancellationToken
+            });
+            if (!compiledCurrent.HasErrors && MetadataMatches(compiledCurrent.GeneratedCode, out _))
+                return attempted;
+        }
 
         ConversionResult PreserveUncertifiedModule(string? reason = null, ConversionResult? candidate = null)
         {
