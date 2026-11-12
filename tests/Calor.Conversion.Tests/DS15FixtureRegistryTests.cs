@@ -19,6 +19,7 @@ namespace Calor.Conversion.Tests;
 /// bench/phase0-agent-native/fixtures/d-s1.5/ must be structurally complete, its C# input
 /// must convert to exactly the expected Calor, and both Calor files must compile.
 /// Explicit current project projections compare ordered outputs and compile their C# together.
+/// Current producer observations keep the file label distinct from the original CLR namespace.
 /// Indeterminate (a fixture that will not build) counts as FAILING, per the registration —
 /// which these tests implement by failing on any defect rather than skipping.
 /// The registry is legitimately empty until the first SupportLevel promotion; the
@@ -29,6 +30,10 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
     private static readonly HashSet<string> CurrentExpectationFixtures =
         ["local-function", "conditional-expression-hoisting", "conditional-declaration", "string-interpolation-hole",
             "namespace-topology"];
+
+    private static readonly HashSet<string> CurrentProducerFixtures =
+        ["conditional-access-shape", "conditional-declaration", "string-interpolation-hole",
+            "local-function", "conditional-expression-hoisting", "conditional-using", "char-literal-surrogate"];
 
     private static string CurrentManifestPath(string repoRoot, string name, string original) =>
         name == "conditional-declaration"
@@ -133,7 +138,7 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             new Calor.Compiler.CompilationOptions { EnforceEffects = false });
         Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
         AssertValueTestPasses("conditional-expression-hoisting", compiled.GeneratedCode, "Run", 329,
-            expectedOwner: "Fixture.ConditionalExpressionFixture");
+            expectedOwner: "ConditionalExpressionFixture");
     }
 
     [Fact]
@@ -368,6 +373,17 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
         var expectedPath = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, originalExpectedPath);
         if (name == "conditional-declaration")
             expectedPath = Path.Combine(repoRoot, "tests/TestData/Records/conditional-declaration-current.calr.txt");
+        if (CurrentProducerFixtures.Contains(name))
+        {
+            var historical = Normalize(File.ReadAllText(expectedPath));
+            expectedPath = Path.Combine(repoRoot, "tests/TestData/DS15", $"{name}-current.calr.txt");
+            var current = Normalize(File.ReadAllText(expectedPath));
+            const string historicalHeader = "module Fixture Fixture overflow unchecked\n";
+            const string currentHeader = "module Fixture overflow unchecked\n";
+            Assert.StartsWith(historicalHeader, historical);
+            Assert.StartsWith(currentHeader, current);
+            Assert.Equal(historical[historicalHeader.Length..], current[currentHeader.Length..]);
+        }
         var testPath = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, originalTestPath);
 
         // 2. Manifest: featureKey named; the DIRECTORY is the sanitized form of the key
@@ -471,18 +487,20 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
                     issue.Message);
             }
         }
+        var originalOwner = CurrentProducerFixtures.Contains(name) ? ExpectedOwner(name, valueFixture: false) : null;
         if (name == "conditional-declaration")
         {
             AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!,
-                doc.RootElement.GetProperty("convertedExpectedUndefinedInt").GetInt32(), []);
+                doc.RootElement.GetProperty("convertedExpectedUndefinedInt").GetInt32(), [], originalOwner);
             AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!,
-                doc.RootElement.GetProperty("convertedExpectedDefinedInt").GetInt32(), ["FEATURE"]);
+                doc.RootElement.GetProperty("convertedExpectedDefinedInt").GetInt32(), ["FEATURE"], originalOwner);
         }
         else
         {
-            AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, runtimeExpectedInt);
+            AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, runtimeExpectedInt,
+                expectedOwner: originalOwner);
             if (name == "conditional-using")
-                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, 41, ["FEATURE"]);
+                AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, 41, ["FEATURE"], originalOwner);
         }
         if (certifiedAbsent.ValueKind != JsonValueKind.Null)
         {
@@ -647,19 +665,21 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
         "namespace-single-scope" => "SingleScope.Value",
         "namespace-topology" => "Beta.Value",
         "char-literal-surrogate" => valueFixture
-            ? "SurrogateValueTest.SurrogateValueTestModule" : "Fixture.SurrogateValues",
-        "conditional-access-shape" => "Fixture.ConditionalAccessFixture",
+            ? "SurrogateValueTest.SurrogateValueTestModule" : "SurrogateValues",
+        "conditional-access-shape" => valueFixture
+            ? "Fixture.ConditionalAccessFixture" : "ConditionalAccessFixture",
         "conditional-declaration" => valueFixture
-            ? "ConditionalDeclarationFixture.FixtureOracle" : "Fixture.ConditionalHarness",
-        "conditional-expression-hoisting" => "Fixture.ConditionalExpressionFixture",
-        "conditional-using" => valueFixture ? "FixtureTest.ConditionalValue" : "Fixture.ConditionalValue",
+            ? "ConditionalDeclarationFixture.FixtureOracle" : "ConditionalHarness",
+        "conditional-expression-hoisting" => valueFixture
+            ? "Fixture.ConditionalExpressionFixture" : "ConditionalExpressionFixture",
+        "conditional-using" => valueFixture ? "FixtureTest.ConditionalValue" : "ConditionalValue",
         "initializer-interop" => valueFixture
             ? "InitializerInteropTest.InitializerInteropTest" : "Fixture.InitializerInterop",
-        "local-function" => "Fixture.LocalFunctionFixture",
+        "local-function" => valueFixture ? "Fixture.LocalFunctionFixture" : "LocalFunctionFixture",
         "string-interpolation-formattable" => valueFixture
             ? "InterpolationFormattableTest.FormattableProbe" : "Fixture.InterpolationFormattable",
         "string-interpolation-hole" => valueFixture
-            ? "InterpolationHoleTest.InterpolationHoleTestModule" : "Fixture.InterpolationHole",
+            ? "InterpolationHoleTest.InterpolationHoleTestModule" : "InterpolationHole",
         "string-interpolation-to-string" => valueFixture
             ? "InterpolationToStringTest.InterpolationToStringTestModule" : "Fixture.InterpolationToString",
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unregistered fixture owner.")
