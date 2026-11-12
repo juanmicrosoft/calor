@@ -70,7 +70,8 @@ public sealed class CallGraphAnalysis
 
     internal sealed record InitializationOperation(IOperation Operation, bool Preserved);
 
-    internal sealed record InterpolationFormatting(ITypeSymbol? Type, bool IsNull);
+    internal sealed record InterpolationFormatting(
+        ITypeSymbol? Type, bool IsNull, bool HasBoundedIntegralHexProof = false);
 
     internal sealed record EventStorageSelection(
         EventDefinitionNode Declaration, INamedTypeSymbol DelegateType, bool IsSubscription);
@@ -173,6 +174,94 @@ public sealed class CallGraphAnalysis
             value = boxing.Operand;
         return new InterpolationFormatting(value.Type, value.ConstantValue is { HasValue: true, Value: null });
     }
+
+    internal static InterpolationFormatting InterpolationOperand(IInterpolationOperation hole) =>
+        new(hole.Expression.Type, hole.Expression.ConstantValue is { HasValue: true, Value: null },
+            hole.Parent is IInterpolatedStringOperation interpolation && HasBoundedIntegralHexProof(interpolation));
+
+    private static bool HasBoundedIntegralHexProof(IInterpolatedStringOperation interpolation)
+    {
+        if (interpolation.Type?.SpecialType != SpecialType.System_String
+            || interpolation.SemanticModel?.Compilation is not { } compilation
+            || compilation.GetDiagnostics().Any(diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            return false;
+        for (var parent = interpolation.Parent; parent != null; parent = parent.Parent)
+            if (parent is IInterpolatedStringHandlerCreationOperation or IAnonymousFunctionOperation
+                or IBinaryOperation { OperatorKind: BinaryOperatorKind.Add, Type.SpecialType: SpecialType.System_String }
+                || parent is IConversionOperation conversion
+                    && conversion.Type?.SpecialType is not (SpecialType.System_String or SpecialType.System_Object))
+                return false;
+
+        var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
+        var handler = compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.DefaultInterpolatedStringHandler");
+        if (core.Identity.Version.Major != 10
+            || compilation.GetMetadataReference(core) is not PortableExecutableReference reference
+            || reference.FilePath != typeof(int).Assembly.Location
+            || handler is not { IsRefLikeType: true }
+            || handler.Locations.Any(location => location.IsInSource)
+            || !SymbolEqualityComparer.Default.Equals(handler.ContainingAssembly, core)
+            || !handler.InstanceConstructors.Any(constructor => constructor.Parameters.Length == 2
+                && constructor.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32))
+            || !HasAppendFormat(aligned: false) || !HasAppendFormat(aligned: true))
+            return false;
+
+        // .NET 10's two-argument default handler disables custom providers and rents
+        // at least 256 chars. Bound the whole interpolation so neither hex writing
+        // nor alignment can grow it; X/x with 0-2 digits uses the nonthrowing parser.
+        var length = 0L;
+        foreach (var part in interpolation.Parts)
+        {
+            if (part is IInterpolatedStringTextOperation { Text.ConstantValue: { HasValue: true, Value: string text } })
+                length += text.Length;
+            else if (part is IInterpolationOperation hole
+                && hole.Expression.Type is { } type
+                && SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, core)
+                && hole.FormatString?.ConstantValue is { HasValue: true, Value: string format }
+                && format.Length is >= 1 and <= 3 && format[0] is 'X' or 'x')
+            {
+                var width = type.SpecialType switch
+                {
+                    SpecialType.System_SByte or SpecialType.System_Byte => 2,
+                    SpecialType.System_Int16 or SpecialType.System_UInt16 => 4,
+                    SpecialType.System_Int32 or SpecialType.System_UInt32 => 8,
+                    SpecialType.System_Int64 or SpecialType.System_UInt64 => 16,
+                    _ => 0
+                };
+                if (width == 0)
+                    return false;
+                var precision = 0;
+                foreach (var digit in format.AsSpan(1))
+                {
+                    if (digit is < '0' or > '9')
+                        return false;
+                    precision = precision * 10 + digit - '0';
+                }
+                var alignment = 0;
+                if (hole.Alignment != null)
+                {
+                    if (hole.Alignment.ConstantValue is not { HasValue: true, Value: int selectedAlignment }
+                        || selectedAlignment is < -256 or > 256)
+                        return false;
+                    alignment = Math.Abs(selectedAlignment);
+                }
+                length += Math.Max(Math.Max(width, precision), alignment);
+            }
+            else
+                return false;
+            if (length > 256)
+                return false;
+        }
+        return true;
+
+        bool HasAppendFormat(bool aligned) => handler.GetMembers("AppendFormatted").OfType<IMethodSymbol>()
+            .Any(method => method is { IsGenericMethod: true, Arity: 1, ReturnsVoid: true }
+                && method.Parameters.Length == (aligned ? 3 : 2)
+                && method.Parameters[0].Type is ITypeParameterSymbol { Ordinal: 0 }
+                && (!aligned || method.Parameters[1].Type.SpecialType == SpecialType.System_Int32)
+                && method.Parameters[^1].Type.SpecialType == SpecialType.System_String);
+    }
+
     internal bool IsRecordCopyConstructor(ConstructorNode constructor) =>
         _operatorBindings.RecordCopyConstructors.Contains(constructor);
     internal IReadOnlyList<Diagnostics.Diagnostic> SourceConstructionErrors =>
@@ -641,13 +730,9 @@ public sealed class CallGraphAnalysis
                             for (var index = 0; index < holes.Length; index++)
                             {
                                 var hole = holes[index];
-                                var value = formatted[index].Expression;
-                                var selection = new InterpolationFormatting(value.Type,
-                                    value.ConstantValue is { HasValue: true, Value: null });
+                                var selection = InterpolationOperand(formatted[index]);
                                 if (bindings.InterpolationFormats.TryGetValue(hole, out var previous)
-                                    && (previous.IsNull != selection.IsNull
-                                        || (previous.Type is null ? selection.Type is not null
-                                            : selection.Type is null || !SameType(previous.Type, selection.Type))))
+                                    && !SameFormatting(previous, selection))
                                 {
                                     conflictingInterpolationFormats.Add(hole);
                                     bindings.InterpolationFormats.Remove(hole);
@@ -1731,7 +1816,8 @@ public sealed class CallGraphAnalysis
             or CompoundAssignmentStatementNode { Operator: CompoundAssignmentOperator.Add };
 
     private static bool SameFormatting(InterpolationFormatting left, InterpolationFormatting right) =>
-        left.IsNull == right.IsNull && (left.Type is null ? right.Type is null
+        left.IsNull == right.IsNull && left.HasBoundedIntegralHexProof == right.HasBoundedIntegralHexProof
+            && (left.Type is null ? right.Type is null
             : right.Type is not null && SameType(left.Type, right.Type));
 
     private static bool SameEventType(INamedTypeSymbol left, INamedTypeSymbol right)

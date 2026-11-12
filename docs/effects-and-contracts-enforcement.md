@@ -203,6 +203,16 @@ but invalid input reaches exception resource lookup through the virtual
 `CurrentUICulture.Name` getter. Unlisted overloads, including Boolean
 `TryParse` with its output write, have no purity claim.
 
+Native interpolation has a separate, bounded .NET 10 proof for fixed-width
+integer `X`/`x` holes. Literal formats with zero to two precision digits take
+the bit/hex path for either sign without reading a provider. The complete
+interpolation, including constant alignment, must fit in the default handler's
+initial 256-character buffer. Its selected handler and integer types must be
+the runtime metadata definitions, not source lookalikes. Custom handlers,
+expression-tree/lambda contexts, other formats and larger results receive no
+new permission. Hole-expression effects remain charged. This is not a manifest
+grant for numeric `ToString`; see [compilation](cli/compile.md).
+
 `System.Convert` has no type default, wildcard, or method-name-wide grant,
 including in the crypto manifest. Only the exact `ToString(string?)`,
 `ToString(bool)`, and `ToString(char)` overloads, with or without an

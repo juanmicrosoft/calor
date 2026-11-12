@@ -916,6 +916,107 @@ public class EffectResolverTests
             """);
     }
 
+    [Theory]
+    [InlineData("sbyte", "-128, -1, 0, 42, 127", "0080|00FF|0000|002A|007F")]
+    [InlineData("byte", "0, 42, 255", "0000|002A|00FF")]
+    [InlineData("short", "-32768, -1, 0, 42, 32767", "8000|FFFF|0000|002A|7FFF")]
+    [InlineData("ushort", "0, 42, 65535", "0000|002A|FFFF")]
+    [InlineData("int", "-2147483648, -42, -1, 0, 42, 2147483647",
+        "80000000|FFFFFFD6|FFFFFFFF|0000|002A|7FFFFFFF")]
+    [InlineData("uint", "0U, 42U, 4294967295U", "0000|002A|FFFFFFFF")]
+    [InlineData("long", "-9223372036854775808L, -42L, -1L, 0L, 42L, 9223372036854775807L",
+        "8000000000000000|FFFFFFFFFFFFFFD6|FFFFFFFFFFFFFFFF|0000|002A|7FFFFFFFFFFFFFFF")]
+    [InlineData("ulong", "0UL, 42UL, 18446744073709551615UL", "0000|002A|FFFFFFFFFFFFFFFF")]
+    public void HexInterpolation_ClosedHandlerPathHasNoCultureCallbacksForEitherSign(
+        string type, string values, string expected)
+    {
+        const string interpolation = "$\"{{literal}} {value,8:X4}\"";
+        const string lower = "$\"{value,-20:x16}\"";
+        const string wide = "$\"{value:X99}\"";
+        var source = $$"""
+            public static class Target
+            {
+                public static string Apply({{type}} value) => {{interpolation}};
+                public static string Lower({{type}} value) => {{lower}};
+                public static string Wide({{type}} value) => {{wide}};
+            }
+            """;
+        var metadata = StringProbeCompilation(source, []);
+        var selectedType = metadata.GetTypeByMetadataName("Target")!.GetMembers("Apply")
+            .OfType<IMethodSymbol>().Single().Parameters[0].Type;
+        Assert.Equal(typeof(int).Assembly.FullName, selectedType.ContainingAssembly.Identity.ToString());
+        Assert.DoesNotContain(selectedType.Locations, location => location.IsInSource);
+        Assert.Equal(EffectResolutionStatus.Unknown, new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
+            .Resolve(EffectResolverKey.FromStrings(selectedType.ToDisplayString(), "ToString",
+                ["System.String", "System.IFormatProvider"])).Status);
+        var conversion = ConvertStringSource(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        var direct = $$"""
+            module HexContracts
+              module Target
+                func Apply ({{type}}:value) → string
+                  !
+                  return "{literal} ${value,8:X4}"
+                func Lower ({{type}}:value) → string
+                  !
+                  return "${value,-20:x16}"
+                func Wide ({{type}}:value) → string
+                  !
+                  return "${value:X99}"
+            """;
+        var hex = expected.Split('|');
+        var answers = hex.Select(value => "{literal} " + value.PadLeft(8)).ToArray();
+        var lowerAnswers = hex.Select(value => value.ToLowerInvariant().PadLeft(16, '0').PadRight(20)).ToArray();
+        var wideAnswers = hex.Select(value => value.PadLeft(99, '0')).ToArray();
+        var witness = NumericWitness("HexWitness.Run()", throws: true, providerIsCulture: true)
+            .Replace("public override object GetFormat", """
+                public override System.Globalization.NumberFormatInfo NumberFormat
+                {
+                    get
+                    {
+                        Reads++;
+                        throw new System.InvalidOperationException("numeric-culture-callback");
+                    }
+                    set { throw new System.InvalidOperationException("numeric-culture-callback"); }
+                }
+                public override object GetFormat
+                """, StringComparison.Ordinal)
+            + $$"""
+
+                public static class HexWitness
+                {
+                    public static bool Run()
+                    {
+                        var values = new {{type}}[] { {{values}} };
+                        var answers = new string[] { {{string.Join(", ", answers.Select(value => SymbolDisplay.FormatLiteral(value, true)))}} };
+                        var lower = new string[] { {{string.Join(", ", lowerAnswers.Select(value => SymbolDisplay.FormatLiteral(value, true)))}} };
+                        var wide = new string[] { {{string.Join(", ", wideAnswers.Select(value => SymbolDisplay.FormatLiteral(value, true)))}} };
+                        for (var index = 0; index < values.Length; index++)
+                            if (Target.Apply(values[index]) != answers[index]
+                                || Target.Lower(values[index]) != lower[index]
+                                || Target.Wide(values[index]) != wide[index]) return false;
+                        return true;
+                    }
+                }
+                """;
+        Assert.Equal("True:0", RunStringProbe(source + witness, []));
+        foreach (var native in StringEmissions(direct).Concat(StringEmissions(conversion.CalorSource!)))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(native, "safe-hex.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, EnforceEffects = true, StrictEffects = true,
+                    StrictApi = true, UnknownCallPolicy = UnknownCallPolicy.Strict,
+                    VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.Equal("True:0", RunStringProbe(result.GeneratedCode + witness, []));
+        }
+    }
+
     private static IMethodSymbol SelectedNumericMethod(string source)
     {
         var compilation = StringProbeCompilation(source, []);

@@ -6104,9 +6104,7 @@ public sealed class EffectEnforcementPass
                             "concatenation", span));
                     break;
                 case IInterpolationOperation interpolation:
-                    effects = InferFormattingEffects(new CallGraphAnalysis.InterpolationFormatting(
-                        interpolation.Expression.Type,
-                        interpolation.Expression.ConstantValue is { HasValue: true, Value: null }),
+                    effects = InferFormattingEffects(CallGraphAnalysis.InterpolationOperand(interpolation),
                         "interpolation", span);
                     break;
                 case IInterpolatedStringOperation { Type.SpecialType: CS.SpecialType.System_String }:
@@ -6830,7 +6828,7 @@ public sealed class EffectEnforcementPass
         {
             // Numeric formatting can dispatch through CurrentCulture.NumberFormat.
             // Only the binding image's closed, provider-independent cases are pure.
-            return formatting is { IsNull: true }
+            return formatting is { IsNull: true } or { HasBoundedIntegralHexProof: true }
                 || formatting?.Type?.SpecialType is CS.SpecialType.System_String
                     or CS.SpecialType.System_Char or CS.SpecialType.System_Boolean
                 ? EffectSet.Empty

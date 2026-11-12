@@ -866,6 +866,203 @@ public static class NumberFormat
         }
     }
 
+    [Theory]
+    [InlineData("int", "value,8:X4")]
+    [InlineData("uint", "value:X")]
+    [InlineData("long", "value,-20:x16")]
+    [InlineData("ulong", "value:x00")]
+    [InlineData("short", "value:X99")]
+    [InlineData("ushort", "value,256:x")]
+    [InlineData("sbyte", "value:X0")]
+    [InlineData("byte", "value:x09")]
+    public void StrictInterpolation_BoundedIntegralHexIsProviderIndependent(string type, string hole)
+    {
+        var source = $$"""
+            module HexBoundary
+              func Render public ({{type}}:value) → string
+                !
+                return "${{{hole}}}"
+            """;
+        foreach (var native in HexEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(native, "hex-boundary.calr", HexOptions(typing));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("double", "value:X4")]
+    [InlineData("float", "value:x")]
+    [InlineData("decimal", "value:X4")]
+    [InlineData("object", "value:X4")]
+    [InlineData("int?", "value:X4")]
+    [InlineData("int", "value")]
+    [InlineData("int", "value:D4")]
+    [InlineData("int", "value:XX")]
+    [InlineData("int", "value:X-1")]
+    [InlineData("int", "value:X100")]
+    [InlineData("int", "value,257:X4")]
+    [InlineData("int", "value,-257:X4")]
+    [InlineData("int", "value:X99}|${value:X99}|${value:X99")]
+    public void StrictInterpolation_HexProofDoesNotAuthorizeUnprovedNeighbors(string type, string hole)
+    {
+        var source = $$"""
+            module HexBoundary
+              func Render public ({{type}}:value) → string
+                !
+                return "${{{hole}}}"
+            """;
+        foreach (var native in HexEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(native, "unproved-hex.calr", HexOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void StrictInterpolation_HexProofRetainsEvaluatedHoleEffects()
+    {
+        const string source = """
+            module HexBoundary
+              func Render public () → string
+                !
+                return "${Console.Read(),8:X4}"
+            """;
+        foreach (var native in HexEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(native, "hex-effects.calr", HexOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cr'", StringComparison.Ordinal));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void StrictInterpolation_HexProofDoesNotAuthorizeGenericOrCustomFormatting(bool generic)
+    {
+        var source = $$"""
+            public sealed class Loud : System.IFormattable
+            {
+                public string ToString(string format, System.IFormatProvider provider) => "custom";
+            }
+            public static class HexBoundary
+            {
+                public static string Render{{(generic ? "<T>" : "")}}({{(generic ? "T" : "Loud")}} value) => $"{value:X4}";
+            }
+            """;
+        AssertHexFormattingRejected(source);
+    }
+
+    [Fact]
+    public void StrictInterpolation_HexProofRequiresTheMetadataDefaultHandler()
+    {
+        const string source = """
+            namespace System.Runtime.CompilerServices
+            {
+                [InterpolatedStringHandler]
+                public ref struct DefaultInterpolatedStringHandler
+                {
+                    public DefaultInterpolatedStringHandler(int literalLength, int formattedCount) { }
+                    public void AppendLiteral(string text) { }
+                    public void AppendFormatted<T>(T value, int alignment, string format) { }
+                    public string ToStringAndClear() => "shadow";
+                }
+                public static class HexBoundary
+                {
+                    public static string Render(int value) => $"{value,8:X4}";
+                }
+            }
+            """;
+        AssertHexFormattingRejected(source);
+    }
+
+    [Fact]
+    public void StrictInterpolation_HexInitializerUsesTheSameBoundedProof()
+    {
+        const string source = """
+            module HexBoundary
+              class Box
+                field string:Text static = "${-42,8:X4}"
+                func Render public static () → string
+                  !
+                  return Text
+            """;
+        foreach (var native in HexEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(native, "hex-initializer.calr", HexOptions(typing));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StrictInterpolation_HexProofCannotBorrowFromAnotherLowering(bool expressionTree)
+    {
+        var source = expressionTree ? """
+            public static class HexBoundary
+            {
+                public static System.Linq.Expressions.Expression<System.Func<int, string>> Render() =>
+                    value => $"{value:X4}";
+            }
+            """ : """
+            public static class HexBoundary
+            {
+                public static string Render(int value) => $"{value:X99}" + $"{value:X99}" + $"{value:X99}";
+            }
+            """;
+        AssertHexFormattingRejected(source);
+    }
+
+    private static void AssertHexFormattingRejected(string source)
+    {
+        var conversion = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy })
+            .Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        foreach (var native in HexEmissions(conversion.CalorSource!))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(native, "unproved-hex-context.calr", HexOptions(typing));
+            Assert.True(result.Diagnostics.Errors.Any(diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal)),
+                native + "\n" + string.Join("\n", result.Diagnostics));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    private static string[] HexEmissions(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return [source, new CalorEmitter().Emit(module)];
+    }
+
+    private static CompilationOptions HexOptions(bool typing) => new()
+    {
+        EnableTypeChecking = typing, EnforceEffects = true, StrictEffects = true,
+        StrictApi = true, UnknownCallPolicy = UnknownCallPolicy.Strict,
+        VerifyContracts = false, StatusWriter = TextWriter.Null
+    };
+
     private static CompilationOptions StrictInterpolationOptions(bool typing) => new()
     {
         EnableTypeChecking = typing,
