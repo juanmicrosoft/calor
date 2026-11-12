@@ -6008,6 +6008,7 @@ public sealed class EffectEnforcementPass
         }
 
         private readonly HashSet<(ClassDefinitionNode Owner, bool Static)> _activeInitializations = [];
+        private readonly HashSet<string> _activeInitializationBodies = [];
 
         public EffectSet InferConstructorInitialization(ClassDefinitionNode owner, bool isStatic, TextSpan span) =>
             InferSourceInitialization(owner, isStatic, span, initializingConstructor: true);
@@ -6052,7 +6053,8 @@ public sealed class EffectEnforcementPass
                 case IInstanceReferenceOperation:
                     return effects;
                 case IInvocationOperation call:
-                    effects = InferInitializationMethod(call.TargetMethod, preserved, span);
+                    effects = InferInitializationMethod(call.TargetMethod, preserved, span,
+                        call.Instance, nonVirtualDispatch: !call.IsVirtual);
                     break;
                 case IObjectCreationOperation { Constructor: { } constructor }:
                     // The operation selects the constructor; its effects still
@@ -6075,8 +6077,8 @@ public sealed class EffectEnforcementPass
                     if (field.Field.IsStatic && !field.Field.IsConst)
                         effects = InferSourceInitialization(fieldOwner, isStatic: true, span);
                     break;
-                case IPropertyReferenceOperation { Property.GetMethod: { } getter }:
-                    effects = InferInitializationMethod(getter, preserved, span);
+                case IPropertyReferenceOperation { Property.GetMethod: { } getter } property:
+                    effects = InferInitializationMethod(getter, preserved, span, property.Instance);
                     break;
                 case ISimpleAssignmentOperation
                     { Target: IPropertyReferenceOperation { Property.SetMethod: { } setter } target } assignment:
@@ -6121,21 +6123,33 @@ public sealed class EffectEnforcementPass
             return effects;
         }
 
-        private EffectSet InferInitializationMethod(CS.IMethodSymbol method, bool metadataAllowed, TextSpan span)
+        private EffectSet InferInitializationMethod(
+            CS.IMethodSymbol method, bool metadataAllowed, TextSpan span,
+            CS.IOperation? receiver = null, bool nonVirtualDispatch = false)
         {
+            if (method.Locations.Any(location => location.IsInSource)
+                && (method.IsAbstract
+                    || !method.IsStatic
+                    && (method.ContainingType.TypeKind == CS.TypeKind.Interface
+                        || (method.IsVirtual || method.IsOverride)
+                        && !nonVirtualDispatch && !method.IsSealed && !method.ContainingType.IsSealed
+                        && receiver?.Type is not CS.INamedTypeSymbol { IsSealed: true })))
+                return UnknownResolvedOperation(
+                    $"unproved initializer dispatch '{method.ToDisplayString()}'", span);
             if (method.MethodKind == CS.MethodKind.Constructor
                 && _context.CallGraph.InitializationClass(method.ContainingType) is { } owner)
             {
                 var initialization = InferSourceInitialization(owner, isStatic: true, span);
                 if (_context.CallGraph.InitializationFunction(method) is { } constructorId)
-                    return initialization.Union(InferFromInternalFunctions([constructorId]));
+                    return initialization.Union(InferFromInternalFunctions([constructorId]))
+                        .Union(InferInitializationBodyDispatch(constructorId, span));
                 if (!method.IsImplicitlyDeclared || method.Parameters.Length != 0)
                     return UnknownResolvedOperation(method.ToDisplayString(), span);
                 return initialization.Union(InferImplicitSourceConstructor(owner, span));
             }
             if (_context.CallGraph.InitializationFunction(method) is { } id)
             {
-                var effects = InferFromInternalFunctions([id]);
+                var effects = InferFromInternalFunctions([id]).Union(InferInitializationBodyDispatch(id, span));
                 return method.IsStatic
                     && _context.CallGraph.InitializationClass(method.ContainingType) is { } methodOwner
                         ? effects.Union(InferSourceInitialization(methodOwner, isStatic: true, span))
@@ -6159,6 +6173,55 @@ public sealed class EffectEnforcementPass
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(method.ToDisplayString(), span)
                 : resolution.Effects;
+        }
+
+        private EffectSet InferInitializationBodyDispatch(string functionId, TextSpan span)
+        {
+            if (_context.CallGraph.InitializationBodies(functionId) is not { Count: > 0 } bodies)
+                return UnknownResolvedOperation($"source initializer body '{functionId}'", span);
+            if (!_activeInitializationBodies.Add(functionId))
+                return EffectSet.Empty;
+            try
+            {
+                var effects = EffectSet.Empty;
+                var pending = new Stack<CS.IOperation>(bodies);
+                while (pending.TryPop(out var operation))
+                {
+                    if (operation.Kind == CS.OperationKind.Invalid || operation.Type?.TypeKind == CS.TypeKind.Error)
+                        effects = effects.Union(UnknownResolvedOperation(
+                            $"unresolved initializer body '{functionId}'", span));
+                    var method = operation switch
+                    {
+                        IInvocationOperation call => call.TargetMethod,
+                        IPropertyReferenceOperation property => property.Property.GetMethod,
+                        IObjectCreationOperation creation => creation.Constructor,
+                        IBinaryOperation binary => binary.OperatorMethod,
+                        IUnaryOperation unary => unary.OperatorMethod,
+                        ICompoundAssignmentOperation assignment => assignment.OperatorMethod,
+                        IIncrementOrDecrementOperation increment => increment.OperatorMethod,
+                        IConversionOperation conversion => conversion.OperatorMethod,
+                        _ => null
+                    };
+                    if (method?.Locations.Any(location => location.IsInSource) == true)
+                    {
+                        var receiver = operation switch
+                        {
+                            IInvocationOperation call => call.Instance,
+                            IPropertyReferenceOperation property => property.Instance,
+                            _ => null
+                        };
+                        effects = effects.Union(InferInitializationMethod(method, metadataAllowed: false, span,
+                            receiver, nonVirtualDispatch: operation is IInvocationOperation { IsVirtual: false }));
+                    }
+                    foreach (var child in operation.ChildOperations)
+                        pending.Push(child);
+                }
+                return effects;
+            }
+            finally
+            {
+                _activeInitializationBodies.Remove(functionId);
+            }
         }
 
         private EffectSet InferImplicitSourceConstructor(ClassDefinitionNode owner, TextSpan span)

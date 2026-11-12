@@ -105,6 +105,7 @@ public sealed class CallGraphAnalysis
         internal Dictionary<ClassDefinitionNode, SourceInitialization> Initializations { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<ISymbol, ClassDefinitionNode> InitializationClasses { get; } = new(SymbolEqualityComparer.Default);
         internal Dictionary<ISymbol, string> InitializationFunctions { get; } = new(SymbolEqualityComparer.Default);
+        internal Dictionary<string, List<IOperation>?> InitializationBodies { get; } = [];
         internal Dictionary<ConstructorNode, IMethodSymbol> ConstructorInitializers { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<NewExpressionNode, IMethodSymbol> SourceConstructors { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<InterpolatedStringExpressionNode, InterpolationFormatting> InterpolationFormats { get; } = new(ReferenceEqualityComparer.Instance);
@@ -132,6 +133,8 @@ public sealed class CallGraphAnalysis
         _operatorBindings.InitializationClasses.GetValueOrDefault(type.OriginalDefinition);
     internal string? InitializationFunction(IMethodSymbol method) =>
         _operatorBindings.InitializationFunctions.GetValueOrDefault(method.OriginalDefinition);
+    internal IReadOnlyList<IOperation>? InitializationBodies(string functionId) =>
+        _operatorBindings.InitializationBodies.GetValueOrDefault(functionId);
     internal IMethodSymbol? ConstructorInitializer(ConstructorNode constructor) =>
         _operatorBindings.ConstructorInitializers.GetValueOrDefault(constructor);
     internal IMethodSymbol? SourceConstructor(NewExpressionNode creation) =>
@@ -407,7 +410,17 @@ public sealed class CallGraphAnalysis
                         var origin = emittedCallables[index];
                         methods[method] = origin;
                         if (initializationIds.TryGetValue(origin, out var functionId))
+                        {
                             bindings.InitializationFunctions[method.OriginalDefinition] = functionId;
+                            if (!bindings.InitializationBodies.TryGetValue(functionId, out var bodies))
+                                bindings.InitializationBodies[functionId] = bodies = [];
+                            if (model.GetOperation(declaration) is not { } body
+                                || model.GetDiagnostics(declaration.Span).Any(diagnostic =>
+                                    diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                                bindings.InitializationBodies[functionId] = null;
+                            else
+                                bodies?.Add(body);
+                        }
                         if (origin is ConstructorNode copy && method.ContainingType.IsRecord
                             && method.Parameters is [var original]
                             && SymbolEqualityComparer.Default.Equals(original.Type, method.ContainingType))

@@ -168,6 +168,12 @@ when the type has no explicit static constructor and its method reads no fields.
 String interpolation in initializers uses the same bound hole-type rule as
 interpolation in method bodies. Proven string, char, Boolean and null holes are
 supported; operand and alignment operations retain their effect checks.
+Source instance calls also need dispatch proof: an open virtual call cannot use
+only the selected base declaration's effect row. Bound nonvirtual calls and
+sealed dispatch retain their existing contracts; unavailable getter-body proof
+still produces Unknown.
+The same check follows initializer-reachable source helpers transitively using
+their bound bodies, rather than trusting a source call graph's inferred purity.
 
 ---
 

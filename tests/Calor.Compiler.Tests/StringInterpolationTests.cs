@@ -741,6 +741,131 @@ public static class NumberFormat
         }
     }
 
+    [Theory]
+    [InlineData(false, "virtual", false)]
+    [InlineData(false, "virtual", true)]
+    [InlineData(true, "virtual", false)]
+    [InlineData(true, "virtual", true)]
+    [InlineData(false, "nonvirtual", false)]
+    [InlineData(true, "nonvirtual", false)]
+    [InlineData(false, "sealed-receiver", false)]
+    [InlineData(true, "sealed-receiver", false)]
+    [InlineData(false, "sealed-override", false)]
+    [InlineData(true, "sealed-override", false)]
+    [InlineData(false, "open-pure-override", false)]
+    [InlineData(true, "open-pure-override", false)]
+    [InlineData(false, "sealed-effectful-override", false)]
+    public void StrictInterpolation_InitializerDispatchNeedsBoundAuthority(
+        bool getter, string dispatch, bool fieldRead)
+    {
+        var virtualMember = dispatch != "nonvirtual";
+        var baseMember = getter
+            ? $$"""public {{(virtualMember ? "virtual " : "")}}string Value { get { return "safe"; } }"""
+            : $$"""public {{(virtualMember ? "virtual " : "")}}string Read() { return "safe"; }""";
+        var overrides = dispatch is "virtual" or "sealed-override" or "open-pure-override" or "sealed-effectful-override";
+        var body = dispatch is "virtual" or "sealed-effectful-override"
+            ? """System.Console.WriteLine("effect"); return "effect";""" : """return "safe";""";
+        var sealedOverride = dispatch is "sealed-override" or "sealed-effectful-override";
+        var derivedMember = !overrides ? "" : getter
+            ? $$"""public {{(sealedOverride ? "sealed " : "")}}override string Value { get { {{body}} } }"""
+            : $$"""public {{(sealedOverride ? "sealed " : "")}}override string Read() { {{body}} }""";
+        var authoritative = dispatch is "nonvirtual" or "sealed-receiver" || sealedOverride;
+        var effectful = dispatch == "sealed-effectful-override";
+        var source = $$"""
+            #nullable enable
+            public class Base { {{baseMember}} }
+            public {{(dispatch == "sealed-receiver" ? "sealed " : "")}}class Derived : Base { {{derivedMember}} }
+            public class Holder
+            {
+                private static {{(dispatch == "sealed-receiver" || sealedOverride ? "Derived" : "Base")}} Source = new Derived();
+                private static string Text = $"value={{{(getter ? "Source.Value" : "Source.Read()")}}}";
+                public static string Render() { return {{(fieldRead ? "Text" : "\"constant\"")}}; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        Assert.Equal(0, conversion.DropCount);
+        Assert.Equal(0, conversion.LossySubstitutionCount);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "initializer-dispatch.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Equal(getter || !authoritative || effectful, result.HasErrors);
+            if (!authoritative)
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                    && diagnostic.Message.Contains("unproved initializer dispatch", StringComparison.Ordinal));
+            if (effectful)
+            {
+                Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable
+                    && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            }
+            if (result.HasErrors)
+                Assert.Empty(result.GeneratedCode);
+            else
+                Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("virtual", false, false)]
+    [InlineData("virtual", true, false)]
+    [InlineData("virtual", false, true)]
+    [InlineData("nonvirtual", false, false)]
+    [InlineData("sealed-receiver", false, false)]
+    [InlineData("sealed-override", false, false)]
+    [InlineData("base-qualified", false, false)]
+    public void StrictInterpolation_InitializerHelpersRetainDispatch(
+        string dispatch, bool nestedHelper, bool concatenation)
+    {
+        var source = $$"""
+            #nullable enable
+            public class Base
+            {
+                public {{(dispatch == "nonvirtual" ? "" : "virtual ")}}string Read() { return "safe"; }
+            }
+            public {{(dispatch == "sealed-receiver" ? "sealed " : "")}}class Derived : Base
+            {
+                {{(dispatch == "nonvirtual" ? "" : $$"""public {{(dispatch == "sealed-override" ? "sealed " : "")}}override string Read() { {{(dispatch is "virtual" or "base-qualified" ? """System.Console.WriteLine("effect");""" : "")}} return "text"; }""")}}
+                {{(dispatch == "base-qualified" ? """public string ReadBase() { return base.Read(); }""" : "")}}
+            }
+            public class Holder
+            {
+                private static {{(dispatch is "sealed-receiver" or "sealed-override" or "base-qualified" ? "Derived" : "Base")}} Source = new Derived();
+                private static string ReadSource() { return Source.{{(dispatch == "base-qualified" ? "ReadBase" : "Read")}}(); }
+                {{(nestedHelper ? """private static string ReadAgain() { return ReadSource(); }""" : "")}}
+                private static string Text = {{(concatenation ? "\"value=\" + " + (nestedHelper ? "ReadAgain()" : "ReadSource()") : "$\"value={" + (nestedHelper ? "ReadAgain()" : "ReadSource()") + "}\"")}};
+                public static string Render() { return Text; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Equal(0, conversion.DropCount);
+        Assert.Equal(0, conversion.LossySubstitutionCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "initializer-helper-dispatch.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Equal(dispatch == "virtual", result.HasErrors);
+            if (dispatch == "virtual")
+            {
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                    && diagnostic.Message.Contains("unproved initializer dispatch", StringComparison.Ordinal));
+                Assert.Empty(result.GeneratedCode);
+            }
+            else
+                Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
     private static CompilationOptions StrictInterpolationOptions(bool typing) => new()
     {
         EnableTypeChecking = typing,
