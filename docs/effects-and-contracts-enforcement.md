@@ -222,9 +222,17 @@ They only read or copy fields and values. Other parameterized generic copies
 remain conservatively uncontracted: this does not add generic signature matching.
 Receiver and argument evaluation effects are still charged. The `Value` getter
 is not covered, because its empty-value path invokes exception resource helpers.
-Built-in nullable unwrapping casts remain a separate unresolved boundary: they
-do not consult this manifest, although their empty-value lowering can also reach
-`Value`. This is not a general nullable-purity guarantee.
+Built-in nullable-to-nonnullable value conversions also select this getter for
+effect checking, even though Roslyn reports no user-defined `OperatorMethod`.
+The operation's nullable conversion classification, actual `System.Nullable<T>`
+operand and constructed `Value` member determine the getter catalog key.
+Ordinary expressions and source field/property initializers charge that same
+selected getter, in addition to operand evaluation. Unwrapping therefore remains
+Unknown, including casts following a `HasValue` guard; contextual guarded-value
+precision is not implemented here. Wrapping a value into a nullable type,
+nullable-to-nullable conversions and ordinary nonnullable primitive casts do not
+select `Value`. Source/user-defined conversion authority is unchanged. This is
+not a general nullable-purity guarantee.
 When a lossless conversion's native nullable candidate fails effect checking,
 the production converter preserves the original C# instead. Matching emitted C#
 metadata alone is not enough to certify native Calor. Preservation keeps exact

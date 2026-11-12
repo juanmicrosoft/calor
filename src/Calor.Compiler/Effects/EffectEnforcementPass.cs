@@ -6069,6 +6069,10 @@ public sealed class EffectEnforcementPass
                 case IConversionOperation { OperatorMethod: { } conversion }:
                     effects = InferInitializationMethod(conversion, preserved, span);
                     break;
+                case IConversionOperation conversion
+                    when CallGraphAnalysis.NullableUnwrappingGetter(conversion) is { } nullableGetter:
+                    effects = InferInitializationMethod(nullableGetter, metadataAllowed: true, span);
+                    break;
                 case IBinaryOperation { OperatorMethod: { } binary }:
                     effects = InferInitializationMethod(binary, preserved, span);
                     break;
@@ -6667,7 +6671,9 @@ public sealed class EffectEnforcementPass
             {
                 var resolution = _context.Resolver.Resolve(key);
                 effects = effects.Union(resolution.Status == EffectResolutionStatus.Unknown
-                    ? UnknownResolvedOperation($"{key.DeclaringType}.{key.MemberName}", node.Span)
+                    ? UnknownResolvedOperation(
+                        $"{key.DeclaringType}.{(key.Kind == EffectMemberKind.Getter ? "get_" : "")}{key.MemberName}",
+                        node.Span)
                     : resolution.Effects);
             }
             if (CallGraphAnalysis.IsAddition(node))

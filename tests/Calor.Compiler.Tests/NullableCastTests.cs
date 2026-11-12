@@ -125,4 +125,174 @@ public class Foo
         var invalid = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [42d]));
         Assert.IsType<InvalidCastException>(invalid.InnerException);
     }
+
+    [Theory]
+    [InlineData("int", "int", false)]
+    [InlineData("int", "long", false)]
+    [InlineData("System.Guid", "System.Guid", false)]
+    [InlineData("int", "int", true)]
+    public void BuiltInNullableUnwrapping_ChargesTheSelectedValueGetter(
+        string operandType, string targetType, bool guarded)
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            $"class Probe {{ static {targetType} Read({operandType}? value) => ({targetType})value; }}");
+        var compilation = CSharpCompilation.Create("NullableSelection", [tree],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(compilation.GetDiagnostics(), diagnostic =>
+            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var cast = Assert.Single(tree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.CastExpressionSyntax>());
+        var conversion = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.Operations.IConversionOperation>(
+            compilation.GetSemanticModel(tree).GetOperation(cast));
+        Assert.Null(conversion.OperatorMethod);
+        Assert.True(conversion.GetConversion().IsNullable);
+        var nullable = Assert.IsAssignableFrom<INamedTypeSymbol>(conversion.Operand.Type);
+        Assert.Equal(SpecialType.System_Nullable_T, nullable.OriginalDefinition.SpecialType);
+        Assert.Equal(typeof(int?).Assembly.FullName, nullable.ContainingAssembly.Identity.ToString());
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(Assert.Single(nullable.GetMembers("Value")));
+        var getter = Assert.IsAssignableFrom<IMethodSymbol>(property.GetMethod);
+        Assert.Equal(MethodKind.PropertyGet, getter.MethodKind);
+        Assert.DoesNotContain(getter.Locations, location => location.IsInSource);
+        var key = Calor.Compiler.Effects.EffectResolverKey.FromBoundReceiver(
+            Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToBoundType(nullable),
+            property.MetadataName, null, Calor.Compiler.Effects.EffectMemberKind.Getter);
+        Assert.Equal(Calor.Compiler.Effects.EffectResolutionStatus.Unknown,
+            new Calor.Compiler.Effects.EffectResolver().Resolve(key).Status);
+
+        var source = $$"""
+            module NullableLowering
+              func Unwrap public ({{operandType}}?:value) → {{targetType}}
+                !
+                {{(guarded ? $"if value.HasValue\n      return ({targetType})value\n    return 0" : $"return ({targetType})value")}}
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, NullableLoweringOptions(typed));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("get_Value", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Unwrap'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("int", "int?", "(int?)value")]
+    [InlineData("int?", "long?", "(long?)value")]
+    [InlineData("int", "long", "(long)value")]
+    [InlineData("object", "int?", "(int?)value")]
+    [InlineData("int?", "int", "value.GetValueOrDefault()")]
+    [InlineData("int?", "int", "value.GetValueOrDefault(7)")]
+    [InlineData("int?", "bool", "value.HasValue")]
+    public void NullableLowering_DoesNotWithdrawWrappingOrExactCopyContracts(
+        string operandType, string targetType, string expression)
+    {
+        var source = $$"""
+            module NullableCopies
+              func Copy public ({{operandType}}:value) → {{targetType}}
+                !
+                return {{expression}}
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, NullableLoweringOptions(typed));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        }
+    }
+
+    [Theory]
+    [InlineData("(int)Next(value)", "int", true)]
+    [InlineData("(long?)Next(value)", "long?", false)]
+    [InlineData("(int?)Next(value)", "int?", false)]
+    public void NullableLowering_RetainsOperandEvaluationEffects(
+        string expression, string targetType, bool unwraps)
+    {
+        var source = $$"""
+            module NullableEvaluation
+              func Next (int?:value) → int?
+                ! cw
+                System.Console.WriteLine("operand")
+                return value
+              func Read (int?:value) → {{targetType}}
+                !
+                return {{expression}}
+            """;
+        source = RawCSharpFrame.NormalizeLineEndings(source);
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, NullableLoweringOptions(typed));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Read'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains(unwraps ? "'unknown'" : "'cw'", StringComparison.Ordinal));
+            var declared = Program.Compile(source.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal),
+                null, NullableLoweringOptions(typed));
+            Assert.Equal(unwraps, declared.HasErrors);
+            Assert.Equal(unwraps, declared.Diagnostics.Errors.Any(diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("get_Value", StringComparison.Ordinal)));
+        }
+    }
+
+    [Theory]
+    [InlineData("field int:Value public", "")]
+    [InlineData("field int:Value public static", "")]
+    [InlineData("property int:Value", "\n      get public")]
+    [InlineData("property int:Value static", "\n      get public")]
+    public void NullableLowering_SourceInitializersChargeUnwrappingWithoutForcingInitialization(
+        string declaration, string accessor)
+    {
+        var source = $$"""
+            module NullableInitialization
+              class Holder
+                {{declaration}} = (int)(int?)null{{accessor}}
+              func Make () → Holder
+                ! alloc
+                return new Holder()
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, NullableLoweringOptions(typed));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("Value", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Make'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void NullableLowering_DoesNotReplaceSelectedSourceConversionAuthority()
+    {
+        var source = """
+            module SourceConversion
+              class Number struct
+                op explicit (Number:value) → int
+                  ! cw
+                  System.Console.WriteLine("conversion")
+                  return 7
+              func Read (Number:value) → int
+                !
+                return (int)value
+            """;
+        source = RawCSharpFrame.NormalizeLineEndings(source);
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, NullableLoweringOptions(typed));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Read'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            var declared = Program.Compile(source.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal),
+                null, NullableLoweringOptions(typed));
+            Assert.False(declared.HasErrors, string.Join("\n", declared.Diagnostics));
+        }
+    }
+
+    private static CompilationOptions NullableLoweringOptions(bool typed) => new()
+    {
+        EnableTypeChecking = typed,
+        StrictApi = true,
+        StrictEffects = true,
+        VerifyContracts = false,
+        StatusWriter = TextWriter.Null
+    };
 }

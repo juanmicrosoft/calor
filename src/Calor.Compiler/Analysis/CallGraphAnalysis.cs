@@ -164,6 +164,22 @@ public sealed class CallGraphAnalysis
     internal bool TrySelectedStaticFieldInitialization(ReferenceNode reference, out ClassDefinitionNode? owner) =>
         _operatorBindings.StaticFieldInitializations.TryGetValue(reference, out owner);
 
+    internal static IMethodSymbol? NullableUnwrappingGetter(IConversionOperation conversion)
+    {
+        // Roslyn leaves OperatorMethod null for this built-in conversion, but
+        // lowering still calls the constructed nullable type's Value getter.
+        if (conversion.OperatorMethod is not null || !conversion.GetConversion().IsNullable
+            || conversion.Operand.Type is not INamedTypeSymbol
+                { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+            || nullable.Locations.Any(location => location.IsInSource)
+            || conversion.Type is not { IsValueType: true } target
+            || target.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+            return null;
+        return nullable.GetMembers("Value").OfType<IPropertySymbol>().SingleOrDefault(property =>
+            !property.IsStatic && property.Parameters.Length == 0
+            && SymbolEqualityComparer.Default.Equals(property.Type, nullable.TypeArguments[0]))?.GetMethod;
+    }
+
     internal static InterpolationFormatting ConcatenationOperand(IOperation value)
     {
         // The built-in string/object operator boxes value operands. Inspect that
@@ -336,6 +352,8 @@ public sealed class CallGraphAnalysis
                 RegisterArgument(arguments[index], (node.Span, index));
         }
         var bindExpressions = operators.Length > 0 || visited.OfType<LambdaExpressionNode>().Any();
+        var bindNullableUnwrapping = visited.OfType<TypeOperationNode>().Any(operation =>
+            operation.Operation == TypeOp.Cast);
         var bindSourceExtensions = visited.OfType<ExpressionCallNode>().Any(call =>
             call.TargetExpression is FieldAccessNode);
         var bindNullGuards = visited.OfType<BinaryOperationNode>().Any(binary =>
@@ -347,7 +365,7 @@ public sealed class CallGraphAnalysis
         var bindEvents = EnumerateClasses(module).Any(owner => EnumerateEvents(owner).Any(evt => !evt.HasAccessors));
         var bindInterpolation = visited.OfType<InterpolatedStringNode>().Any();
         var additions = visited.Where(IsAddition).ToArray();
-        if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindInitialization
+        if (!bindExpressions && !bindNullableUnwrapping && !bindNullGuards && !bindMemberTypes && !bindInitialization
             && !bindInterpolation && additions.Length == 0
             && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
             return bindings;
@@ -620,7 +638,8 @@ public sealed class CallGraphAnalysis
                         constructor.MetadataName, [], EffectMemberKind.Constructor);
                 }
             }
-            if (!bindInitialization && !bindExpressions && !bindNullGuards && !bindMemberTypes && !bindEvents
+            if (!bindInitialization && !bindExpressions && !bindNullableUnwrapping
+                && !bindNullGuards && !bindMemberTypes && !bindEvents
                 && !bindInterpolation && additions.Length == 0)
                 return;
 
@@ -853,6 +872,8 @@ public sealed class CallGraphAnalysis
                         && (bindExpressions || companions.Count > 0 || invocation.TargetMethod.IsExtensionMethod
                             || invocation.TargetMethod is { IsStatic: true, ContainingType.IsGenericType: true }))
                         AddCall(invocation, invocation.TargetMethod, invocation.Arguments);
+                    if (operation is IConversionOperation nullableConversion)
+                        AddMethod(operation, NullableUnwrappingGetter(nullableConversion));
                     if (!bindExpressions)
                         continue;
                     if (operation is IObjectCreationOperation { Constructor: { } constructor } creation)
@@ -1793,7 +1814,10 @@ public sealed class CallGraphAnalysis
                         bindings.ExternalCalls[origin] = targets = [];
                     targets.Add(EffectResolverKey.FromBoundReceiver(
                         Binding.Metadata.MetadataBinderResult.ToBoundType(method.ContainingType),
-                        method.MetadataName, method.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray()));
+                        method.AssociatedSymbol is IPropertySymbol property ? property.MetadataName : method.MetadataName,
+                        method.MethodKind == MethodKind.PropertyGet ? null
+                            : method.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray(),
+                        method.MethodKind == MethodKind.PropertyGet ? EffectMemberKind.Getter : EffectMemberKind.Method));
                 }
                 if (origin is ExpressionNode expression && operation is IBinaryOperation or IUnaryOperation
                     && operation.Type is { } resultType)
