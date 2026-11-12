@@ -203,6 +203,22 @@ but invalid input reaches exception resource lookup through the virtual
 `CurrentUICulture.Name` getter. Unlisted overloads, including Boolean
 `TryParse` with its output write, have no purity claim.
 
+`System.Convert` has no type default, wildcard, or method-name-wide grant,
+including in the crypto manifest. Only the exact `ToString(string?)`,
+`ToString(bool)`, and `ToString(char)` overloads, with or without an
+`IFormatProvider`, are covered. String returns its input unchanged, including
+null. Boolean returns a fixed literal. Char allocates a one-code-unit string
+and writes only that new string. All six ignore the provider and ambient
+culture; allocation follows the existing allocation-only convention.
+
+`Convert.ToString(object?)` can call `IConvertible.ToString`,
+`IFormattable.ToString`, or a virtual `object.ToString` override. Numeric
+formatting can reach a provider or current-culture callback, including on
+the parameterless negative-integer path. These overloads remain Unknown,
+not pure because a base implementation or one input happens to be safe.
+All other Convert members, including base64 and hex helpers, remain
+uncontracted; this is not a claim that every omitted overload has an effect.
+
 The dispatch review uses .NET 10 CoreLib source at
 [`0427b9abbe`](https://github.com/dotnet/dotnet/tree/0427b9abbead3fa64c6655eb4290c537397131fa/src/runtime/src/libraries/System.Private.CoreLib/src/System),
 cross-checked against the selected runtime members and their IL.

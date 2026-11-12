@@ -108,9 +108,13 @@
     },
     {
       "type": "System.Convert",
-      "defaultEffects": [],
       "methods": {
-        "*": []
+        "ToString(System.String)": [],
+        "ToString(System.String,System.IFormatProvider)": [],
+        "ToString(System.Boolean)": [],
+        "ToString(System.Boolean,System.IFormatProvider)": [],
+        "ToString(System.Char)": [],
+        "ToString(System.Char,System.IFormatProvider)": []
       }
     },
     {

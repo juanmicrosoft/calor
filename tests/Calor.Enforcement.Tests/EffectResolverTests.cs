@@ -2407,4 +2407,233 @@ public class EffectResolverTests
             }
         }
         """;
+
+    [Fact]
+    public void ConvertContracts_OnlyExactProvedOverloadsSurviveAllManifestAndCacheLayers()
+    {
+        var type = StringProbeCompilation("", []).GetTypeByMetadataName("System.Convert")!;
+        var methods = type.GetMembers().OfType<IMethodSymbol>()
+            .Where(method => method.DeclaredAccessibility == Accessibility.Public).ToArray();
+        foreach (var safeFirst in new[] { false, true })
+        {
+            var loader = new ManifestLoader(loadUserLevelManifests: false);
+            var resolver = new EffectResolver(loader);
+            resolver.Initialize();
+            var mapping = Assert.Single(loader.LoadedManifests.SelectMany(entry => entry.Manifest.Mappings)
+                .Where(mapping => mapping.Type == "System.Convert"));
+            Assert.Null(mapping.DefaultEffects);
+            Assert.Null(mapping.Constructors);
+            Assert.Null(mapping.Getters);
+            Assert.Null(mapping.Setters);
+            Assert.Equal(6, mapping.Methods!.Count);
+            Assert.All(mapping.Methods.Keys, signature => Assert.StartsWith("ToString(", signature));
+            var safeKeys = methods.Where(IsProvedConvertOverload).Select(NumericKey).ToArray();
+            Assert.Equal(6, safeKeys.Length);
+            if (safeFirst)
+                foreach (var key in safeKeys)
+                    Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(key).Status);
+            foreach (var method in methods.Concat(methods.Reverse()))
+            {
+                Assert.Equal(typeof(Convert).Assembly.FullName, method.ContainingAssembly.Identity.ToString());
+                Assert.DoesNotContain(method.Locations, location => location.IsInSource);
+                var key = NumericKey(method);
+                var safe = IsProvedConvertOverload(method);
+                var result = resolver.Resolve(key);
+                Assert.Equal(safe ? EffectResolutionStatus.PureExplicit : EffectResolutionStatus.Unknown, result.Status);
+                Assert.Equal(!safe, result.Effects.IsUnknown);
+                Assert.Same(result, resolver.Resolve(key));
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key.WithoutParameterList()).Status);
+            }
+            foreach (var key in safeKeys)
+            {
+                Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(key).Status);
+                foreach (var kind in new[] { EffectMemberKind.Getter, EffectMemberKind.Setter, EffectMemberKind.Constructor })
+                    Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                        EffectResolverKey.FromStrings("System.Convert", key.MemberName, key.ParameterTypes, kind)).Status);
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                    EffectResolverKey.FromStrings("System.Convert", key.MemberName, ["?"])).Status);
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                    EffectResolverKey.FromStrings("Vendor.Convert", key.MemberName, key.ParameterTypes)).Status);
+            }
+            foreach (var key in new[]
+            {
+                EffectResolverKey.FromStrings("System.Convert", "Uncovered", []),
+                EffectResolverKey.FromStrings("System.Convert", ".ctor", [], EffectMemberKind.Constructor),
+                EffectResolverKey.FromStrings("System.Convert", "ToString", ["System.String", "?"]),
+                EffectResolverKey.FromStrings("System.Convert", "ToString", ["?", "System.IFormatProvider"])
+            })
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key).Status);
+        }
+    }
+
+    [Theory]
+    [InlineData("string?", "null", null)]
+    [InlineData("string?", "\"value\"", "value")]
+    [InlineData("bool", "true", "True")]
+    [InlineData("bool", "false", "False")]
+    [InlineData("char", "'\\0'", "True")]
+    [InlineData("char", "'\\ud800'", "True")]
+    [InlineData("char", "'\\uffff'", "True")]
+    public void ConvertContracts_ProvedControlsAreStrictlyAdmittedBeforeExecution(
+        string type, string argument, string? expected)
+    {
+        foreach (var provider in new[] { false, true })
+        {
+            var expression = $"System.Convert.ToString(value{(provider ? ", provider" : "")})";
+            var source = $$"""
+                #nullable enable
+                public static class Target
+                {
+                    public static string? Apply({{type}} value, System.IFormatProvider provider) => {{expression}};
+                }
+                """;
+            var selected = SelectedConvertMethod(source);
+            Assert.True(IsProvedConvertOverload(selected));
+            var resolution = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
+                .Resolve(NumericKey(selected));
+            Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+            Assert.Contains("embedded:Calor.Compiler.Manifests.bcl-system", resolution.Source);
+            var conversion = ConvertStringSource(source);
+            Assert.True(conversion.Success);
+            Assert.Equal(0, conversion.InteropPreservationCount);
+            var direct = $$"""
+                module ConvertContracts
+                  module Target
+                    func Apply ({{type}}:value, System.IFormatProvider:provider) → string?
+                      !
+                      return {{expression}}
+                """;
+            foreach (var native in StringEmissions(direct).Concat(StringEmissions(conversion.CalorSource!)))
+            foreach (var typing in new[] { false, true })
+            {
+                var result = Calor.Compiler.Program.Compile(native, "safe-convert.calr",
+                    new Calor.Compiler.CompilationOptions
+                    {
+                        EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
+                    });
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+                Assert.Equal(selected.ToDisplayString(), SelectedConvertMethod(result.GeneratedCode).ToDisplayString());
+                foreach (var providerIsCulture in new[] { false, true })
+                {
+                    var call = type switch
+                    {
+                        "string?" => $"object.ReferenceEquals(Target.Apply({argument}, provider), {argument})",
+                        "char" => $"Target.Apply({argument}, provider) == new string({argument}, 1)",
+                        _ => $"Target.Apply({argument}, provider)"
+                    };
+                    var witness = NumericWitness(call, throws: true, providerIsCulture);
+                    var output = (type == "string?" ? "True" : expected) + ":0";
+                    Assert.Equal(output, RunStringProbe(source + witness, []));
+                    Assert.Equal(output, RunStringProbe(result.GeneratedCode + witness, []));
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("object?", "new Loud()", "value")]
+    [InlineData("int", "-1234", "-1234")]
+    [InlineData("long", "-1234L", "-1234")]
+    [InlineData("double", "-1234.5", "-1234.5")]
+    public void ConvertContracts_CallbackOverloadsAreUnknownAndNeverExecuteAfterRefusal(
+        string type, string argument, string expected)
+    {
+        foreach (var provider in new[] { false, true })
+        {
+            var expression = $"System.Convert.ToString(value{(provider ? ", provider" : "")})";
+            var source = $$"""
+                #nullable enable
+                public sealed class Loud
+                {
+                    public override string ToString()
+                    {
+                        System.Console.WriteLine("convert-callback");
+                        return "value";
+                    }
+                }
+                public static class Target
+                {
+                    public static string? Apply({{type}} value, System.IFormatProvider provider) => {{expression}};
+                }
+                """;
+            var selected = SelectedConvertMethod(source);
+            Assert.False(IsProvedConvertOverload(selected));
+            Assert.Equal(EffectResolutionStatus.Unknown,
+                new EffectResolver(new ManifestLoader(loadUserLevelManifests: false)).Resolve(NumericKey(selected)).Status);
+            if (type == "object?")
+            {
+                var witness = """
+
+                    public static class Probe
+                    {
+                        public static string Run()
+                        {
+                            var previous = System.Console.Out;
+                            using var output = new System.IO.StringWriter();
+                            try
+                            {
+                                System.Console.SetOut(output);
+                                var result = Target.Apply(new Loud(), null);
+                                return result + ":" + output.ToString();
+                            }
+                            finally { System.Console.SetOut(previous); }
+                        }
+                    }
+                    """;
+                Assert.Equal("value:convert-callback" + Environment.NewLine, RunStringProbe(source + witness, []));
+            }
+            else
+                foreach (var throws in new[] { false, true })
+                foreach (var providerIsCulture in new[] { false, true })
+                    Assert.Equal(throws ? "throw:1" : expected + ":1", RunStringProbe(source
+                        + NumericWitness($"Target.Apply({argument}, provider)", throws, providerIsCulture), []));
+            var conversion = ConvertStringSource(source);
+            Assert.True(conversion.Success);
+            Assert.Equal(0, conversion.InteropPreservationCount);
+            var direct = $$"""
+                module ConvertContracts
+                  module Target
+                    func Apply ({{type}}:value, System.IFormatProvider:provider) → string?
+                      !
+                      return {{expression}}
+                """;
+            foreach (var native in StringEmissions(direct).Concat(StringEmissions(conversion.CalorSource!)))
+            foreach (var typing in new[] { false, true })
+            {
+                var result = Calor.Compiler.Program.Compile(native, "unknown-convert.calr",
+                    new Calor.Compiler.CompilationOptions
+                    {
+                        EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
+                    });
+                Assert.True(result.HasErrors);
+                Assert.Empty(result.GeneratedCode);
+                Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+                Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                    && diagnostic.Message.Contains("System.Convert.ToString", StringComparison.Ordinal));
+            }
+        }
+    }
+
+    private static bool IsProvedConvertOverload(IMethodSymbol method) =>
+        method.Name == "ToString" && method.Parameters.Length is 1 or 2
+        && method.Parameters[0].Type.SpecialType is SpecialType.System_String or SpecialType.System_Boolean or SpecialType.System_Char
+        && (method.Parameters.Length == 1 || method.Parameters[1].Type.ToDisplayString(
+            SymbolDisplayFormat.FullyQualifiedFormat) == "global::System.IFormatProvider");
+
+    private static IMethodSymbol SelectedConvertMethod(string source)
+    {
+        var compilation = StringProbeCompilation(source, []);
+        Assert.DoesNotContain(compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var method = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Select(node => model.GetSymbolInfo(node).Symbol).OfType<IMethodSymbol>()
+            .Where(symbol => symbol.ContainingType.ToDisplayString() == "System.Convert"));
+        Assert.True(method.IsStatic);
+        Assert.Equal(typeof(Convert).Assembly.FullName, method.ContainingAssembly.Identity.ToString());
+        Assert.DoesNotContain(method.Locations, location => location.IsInSource);
+        return method;
+    }
 }
