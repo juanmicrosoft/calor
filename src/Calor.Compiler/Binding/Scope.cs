@@ -1112,6 +1112,7 @@ public static class TypeIdentity
         "i64" => "System.Int64",
         "long" => "System.Int64",
         "Int64" => "System.Int64",
+        "float" or "FLOAT[bits=32]" => "System.Single",
         "f64" => "System.Double",
         "double" => "System.Double",
         "FLOAT" => "System.Double",

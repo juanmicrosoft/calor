@@ -83,11 +83,18 @@
       }
     },
     {
+      "type": "System.Single",
+      "methods": {
+        "IsNaN(System.Single)": []
+      }
+    },
+    {
       "type": "System.Double",
       "methods": {
         "Equals(System.Double)": [],
         "CompareTo(System.Double)": [],
-        "GetHashCode()": []
+        "GetHashCode()": [],
+        "IsNaN(System.Double)": []
       }
     },
     {

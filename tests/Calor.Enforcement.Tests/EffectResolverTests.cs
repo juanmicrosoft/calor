@@ -2766,4 +2766,193 @@ public class EffectResolverTests
         Assert.DoesNotContain(method.Locations, location => location.IsInSource);
         return method;
     }
+
+    [Theory]
+    [InlineData("float", SpecialType.System_Single)]
+    [InlineData("double", SpecialType.System_Double)]
+    public void FloatingIsNaNContracts_RequireExactMetadataAndExecuteWithoutCultureCallbacks(
+        string type, SpecialType specialType)
+    {
+        var source = $$"""
+            public static class Target
+            {
+                public static bool Apply({{type}} value) => {{type}}.IsNaN(value);
+            }
+            """;
+        var metadata = StringProbeCompilation(source, []);
+        Assert.DoesNotContain(metadata.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var tree = metadata.SyntaxTrees.Single();
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(metadata.GetSemanticModel(tree).GetSymbolInfo(
+            Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())).Symbol);
+        Assert.Equal(specialType, selected.ContainingType.SpecialType);
+        Assert.Equal(typeof(double).Assembly.FullName, selected.ContainingAssembly.Identity.ToString());
+        Assert.True(selected.IsStatic);
+        Assert.False(selected.IsGenericMethod);
+        Assert.DoesNotContain(selected.Locations, location => location.IsInSource);
+        Assert.Equal(SpecialType.System_Boolean, selected.ReturnType.SpecialType);
+        Assert.True(SymbolEqualityComparer.Default.Equals(
+            selected.ContainingType, Assert.Single(selected.Parameters).Type));
+        var resolver = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false));
+        var key = NumericKey(selected);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(key).Status);
+        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key.WithoutParameterList()).Status);
+        foreach (var parameters in new[] { Array.Empty<string>(), new[] { "?" }, new[] { "System.Object" } })
+            Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(EffectResolverKey.FromStrings(
+                selected.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    .Replace("global::", "", StringComparison.Ordinal), "IsNaN", parameters)).Status);
+
+        var conversion = ConvertStringSource(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        var direct = $$"""
+            module FloatingNaN
+              module Target
+                func Apply ({{type}}:value) → bool
+                  !
+                  return {{type}}.IsNaN(value)
+            """;
+        var witness = NumericWitness("FloatingWitness.Run()", throws: true, providerIsCulture: true)
+            .Replace("public override object GetFormat", """
+                public override System.Globalization.NumberFormatInfo NumberFormat
+                {
+                    get
+                    {
+                        Reads++;
+                        throw new System.InvalidOperationException("numeric-culture-callback");
+                    }
+                    set { throw new System.InvalidOperationException("numeric-culture-callback"); }
+                }
+                public override object GetFormat
+                """, StringComparison.Ordinal)
+            + $$"""
+
+                public static class FloatingWitness
+                {
+                    public static bool Run()
+                    {
+                        var values = new {{type}}[] {
+                            {{type}}.NaN, -{{type}}.NaN, {{type}}.NegativeInfinity,
+                            {{type}}.PositiveInfinity, {{type}}.MinValue, {{type}}.MaxValue,
+                            -0.0f, 0.0f, 1.0f
+                        };
+                        for (var index = 0; index < values.Length; index++)
+                            if (Target.Apply(values[index]) != (index < 2)) return false;
+                        return true;
+                    }
+                }
+                """;
+        var originalExecuted = false;
+        foreach (var native in StringEmissions(direct).Concat(StringEmissions(conversion.CalorSource!)))
+        foreach (var typing in new[] { false, true })
+        {
+            var compiled = Calor.Compiler.Program.Compile(native, "floating-nan.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, StrictApi = true, StrictEffects = true,
+                    VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            if (!originalExecuted)
+            {
+                Assert.Equal("True:0", RunStringProbe(source + witness, []));
+                originalExecuted = true;
+            }
+            Assert.Equal("True:0", RunStringProbe(compiled.GeneratedCode + witness, []));
+        }
+    }
+
+    [Theory]
+    [InlineData("float")]
+    [InlineData("double")]
+    public void FloatingIsNaNContracts_StillChargeArgumentEvaluation(string type)
+    {
+        var source = $$"""
+            module FloatingEvaluation
+              func Next ({{type}}:value) → {{type}}
+                ! cw
+                System.Console.WriteLine("value")
+                return value
+              func Read ({{type}}:value) → bool
+                !
+                return {{type}}.IsNaN(Next(value))
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var options = new Calor.Compiler.CompilationOptions
+            {
+                EnableTypeChecking = typing, StrictApi = true, StrictEffects = true,
+                VerifyContracts = false, StatusWriter = TextWriter.Null
+            };
+            var rejected = Calor.Compiler.Program.Compile(source, null, options);
+            Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            Assert.Empty(rejected.GeneratedCode);
+            var admitted = Calor.Compiler.Program.Compile(
+                source.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal), null, options);
+            Assert.False(admitted.HasErrors, string.Join("\n", admitted.Diagnostics));
+        }
+    }
+
+    [Theory]
+    [InlineData("float", "float.Parse(text, provider)", "float")]
+    [InlineData("double", "double.Parse(text, provider)", "double")]
+    [InlineData("float", "value.ToString(provider)", "string")]
+    [InlineData("double", "value.ToString(provider)", "string")]
+    public void FloatingIsNaNContracts_DoNotGrantParsingOrFormatting(
+        string type, string expression, string resultType)
+    {
+        var source = $$"""
+            module FloatingBoundary
+              func Read ({{type}}:value, string:text, System.IFormatProvider:provider) → {{resultType}}
+                !
+                return {{expression}}
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var rejected = Calor.Compiler.Program.Compile(source, null,
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, StrictApi = true, StrictEffects = true,
+                    VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.Contains(rejected.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Empty(rejected.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("Single", "float")]
+    [InlineData("Double", "double")]
+    public void FloatingIsNaNContracts_DoNotReplaceSourceCallAuthority(string name, string type)
+    {
+        var source = $$"""
+            module FloatingShadow System
+              module {{name}}
+                func IsNaN public ({{type}}:value) → bool
+                  ! cw
+                  System.Console.WriteLine("source")
+                  return true
+              func Read ({{type}}:value) → bool
+                !
+                return {{name}}.IsNaN(value)
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var rejected = Calor.Compiler.Program.Compile(source, null,
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, StrictApi = true, StrictEffects = true,
+                    VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            Assert.Empty(rejected.GeneratedCode);
+        }
+    }
 }

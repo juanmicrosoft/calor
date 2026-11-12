@@ -193,6 +193,13 @@ have no default or method-name-wide pure contracts. Their finite coverage is
 These .NET 10 implementations use value comparisons and bit operations;
 Double's NaN and signed-zero helpers do not dispatch to user code.
 
+The exact static `Single.IsNaN(Single)` and `Double.IsNaN(Double)` overloads
+are also covered. Both .NET 10 bodies compare the argument with itself and
+return the unordered result. They have no calls, type initializers, provider
+dispatch or exception helpers. No other Single member receives a contract.
+Metadata argument lookup preserves `float` as `System.Single`, not an
+unresolved placeholder; this type fact grants no additional effects.
+
 Numeric `Parse`, `TryParse`, and `ToString` overloads remain Unknown.
 `NumberFormatInfo.GetInstance` can call an arbitrary provider's `GetFormat`;
 its current-culture path can call a `CultureInfo` override. Even parameterless
