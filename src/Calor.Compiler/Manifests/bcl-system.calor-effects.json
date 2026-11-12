@@ -54,6 +54,9 @@
       },
       "getters": {
         "Length": []
+      },
+      "constructors": {
+        "(System.Char[])": []
       }
     },
     {

@@ -150,8 +150,23 @@ System.Guid::NewGuid() → rand
 `System.String` has no blanket pure contract. Its built-in coverage is limited
 to exact signatures for `IsNullOrEmpty(string)`, `ToUpperInvariant()`,
 `ToLowerInvariant()`, `ToString()`, `Equals(string)`, `Equals(string,string)`,
-`CompareOrdinal(string,string)`, `Contains(char)`, `IndexOf(char)`, and the
-`Length` getter. Unlisted members and overloads remain Unknown.
+`CompareOrdinal(string,string)`, `Contains(char)`, `IndexOf(char)`,
+the `String(char[]?)` constructor, and the `Length` getter.
+Unlisted members and overloads remain Unknown.
+
+`String(char[]?)` copies UTF-16 code units without invoking user code or
+ambient culture. It returns an empty string for null or empty input and
+otherwise copies the array; later array writes cannot change the string.
+It does not validate Unicode sequences and has no argument-error resource
+lookup. Allocation and runtime allocation failure follow the existing
+allocation-only convention, not a guarantee of successful allocation.
+Every other String constructor remains Unknown.
+
+`ToCharArray()` remains Unknown: the call site's null-receiver check can
+trigger exception resource lookup through the virtual `CurrentUICulture.Name`
+getter before method entry. Successful copies within the method do not prove
+the whole call safe. The ranged
+`ToCharArray(int,int)` overload also remains Unknown.
 
 In particular, `ToUpper()` and `ToLower()`, including their `CultureInfo`
 overloads, can invoke user-defined `TextInfo` getters. Culture-sensitive

@@ -17,6 +17,324 @@ namespace Calor.Enforcement.Tests;
 /// </summary>
 public class EffectResolverTests
 {
+    [Fact]
+    public void StringCopyContracts_ExactMetadataKeysCannotAuthorizeOtherOverloadsOrMemberKinds()
+    {
+        var type = StringProbeCompilation("", []).GetSpecialType(SpecialType.System_String);
+        var format = new SymbolDisplayFormat(typeQualificationStyle:
+            SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
+        var candidates = type.GetMembers().OfType<IMethodSymbol>()
+            .Where(method => method.DeclaredAccessibility == Accessibility.Public
+                && (method.MethodKind == MethodKind.Constructor
+                    || method.Name is "ToCharArray" or "Split" or "Contains" or "Compare" or "Format"))
+            .ToArray();
+        foreach (var safeFirst in new[] { false, true })
+        {
+            var loader = new ManifestLoader(loadUserLevelManifests: false);
+            var resolver = new EffectResolver(loader);
+            resolver.Initialize();
+            var mapping = Assert.Single(loader.LoadedManifests.SelectMany(entry => entry.Manifest.Mappings)
+                .Where(mapping => mapping.Type == "System.String"));
+            Assert.Null(mapping.DefaultEffects);
+            Assert.DoesNotContain("*", mapping.Methods!.Keys);
+            Assert.All(mapping.Methods.Keys, signature => Assert.Contains("(", signature));
+            Assert.Equal("(System.Char[])", Assert.Single(mapping.Constructors!).Key);
+            var safeKeys = new[]
+            {
+                EffectResolverKey.FromStrings("System.String", ".ctor", ["System.Char[]"], EffectMemberKind.Constructor)
+            };
+            if (safeFirst)
+                foreach (var key in safeKeys)
+                    Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(key).Status);
+            foreach (var method in candidates.Concat(candidates.Reverse()))
+            {
+                Assert.Equal(typeof(string).Assembly.FullName, method.ContainingAssembly.Identity.ToString());
+                Assert.DoesNotContain(method.Locations, location => location.IsInSource);
+                var constructor = method.MethodKind == MethodKind.Constructor;
+                var parameters = method.Parameters.Select(parameter => parameter.Type.ToDisplayString(format)).ToArray();
+                var key = EffectResolverKey.FromStrings("System.String", method.Name, parameters,
+                    constructor ? EffectMemberKind.Constructor : EffectMemberKind.Method);
+                var safe = constructor
+                    ? parameters.SequenceEqual(new[] { "System.Char[]" })
+                    : method.Name == "Contains" && parameters.SequenceEqual(new[] { "System.Char" });
+                var result = resolver.Resolve(key);
+                Assert.Equal(safe ? EffectResolutionStatus.PureExplicit : EffectResolutionStatus.Unknown, result.Status);
+                Assert.Equal(!safe, result.Effects.IsUnknown);
+                Assert.Same(result, resolver.Resolve(key));
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key.WithoutParameterList()).Status);
+            }
+            foreach (var key in safeKeys)
+            {
+                Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(key).Status);
+                foreach (var kind in new[] { EffectMemberKind.Method, EffectMemberKind.Constructor,
+                    EffectMemberKind.Getter, EffectMemberKind.Setter })
+                {
+                    if (kind != key.Kind)
+                        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                            EffectResolverKey.FromStrings("System.String", key.MemberName, key.ParameterTypes, kind)).Status);
+                }
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                    EffectResolverKey.FromStrings("System.String", key.MemberName, ["?"], key.Kind)).Status);
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                    EffectResolverKey.FromStrings("Vendor.String", key.MemberName, key.ParameterTypes, key.Kind)).Status);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("abc")]
+    [InlineData("\0\u00e9\ud800\udc00\udfff\uffff")]
+    public void StringCopyContracts_CharArrayConstructorIsStrictlyAdmittedBeforeExecution(string? value)
+    {
+        var source = $$"""
+            #nullable enable
+            public static class Target
+            {
+                public static string Apply(char[]? value) => new string(value);
+            }
+            """;
+        var selected = SelectedStringCopyMember(source, constructor: true);
+        Assert.False(selected.IsStatic);
+        Assert.Equal(MethodKind.Constructor, selected.MethodKind);
+        Assert.Equal(".ctor", selected.Name);
+        var parameter = Assert.Single(selected.Parameters);
+        var array = Assert.IsAssignableFrom<IArrayTypeSymbol>(parameter.Type);
+        Assert.Equal(SpecialType.System_Char, array.ElementType.SpecialType);
+        Assert.Equal(1, array.Rank);
+        Assert.Equal(Microsoft.CodeAnalysis.NullableAnnotation.Annotated, parameter.NullableAnnotation);
+        var resolution = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
+            .Resolve(StringCopyKey(selected));
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+        Assert.True(resolution.Effects.IsEmpty);
+        Assert.Contains("embedded:Calor.Compiler.Manifests.bcl-system", resolution.Source);
+        var conversion = ConvertStringSource(source);
+        Assert.True(conversion.Success);
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        foreach (var native in StringEmissions(conversion.CalorSource!))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(native, "safe-string-copy.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.Equal(selected.ToDisplayString(),
+                SelectedStringCopyMember(result.GeneratedCode, constructor: true).ToDisplayString());
+            foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+            foreach (var throws in new[] { false, true })
+            {
+                var witness = StringCopyWitness(value, throws);
+                Assert.Equal("True:0", RunStringProbe(source + witness, symbols));
+                Assert.Equal("True:0", RunStringProbe(result.GeneratedCode + witness, symbols));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void StringCopyContracts_SourceAliasesAndLookalikesAreNotNativeContractEvidence(bool constructor, bool alias)
+    {
+        var name = alias ? "VendorString" : "String";
+        var source = $$"""
+            {{(alias ? "using String = VendorString;" : "")}}
+            public sealed class {{name}}
+            {
+                public static int Calls;
+                public {{name}}() { }
+                {{(constructor ? $"public {name}(char[] value) {{ Calls++; }}" : "")}}
+                public char[] ToCharArray() { Calls++; return null; }
+            }
+            public static class Target
+            {
+                public static {{(constructor ? "String" : "char[]")}} Apply({{(constructor ? "char[]" : "String")}} value) =>
+                    {{(constructor ? "new String(value)" : "value.ToCharArray()")}};
+            }
+            """;
+        var original = StringProbeCompilation(source, []);
+        var tree = original.SyntaxTrees.Single();
+        var call = tree.GetRoot().DescendantNodes().OfType<ArrowExpressionClauseSyntax>().Single().Expression;
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(original.GetSemanticModel(tree).GetSymbolInfo(call).Symbol);
+        Assert.Contains(selected.Locations, location => location.IsInSource);
+        Assert.Equal(SpecialType.None, selected.ContainingType.SpecialType);
+        var conversion = ConvertStringSource(source);
+        Assert.True(conversion.Success);
+        Assert.Equal(1, conversion.InteropPreservationCount);
+        var witness = $$"""
+
+            public static class Probe
+            {
+                public static bool Run()
+                {
+                    {{name}}.Calls = 0;
+                    Target.Apply({{(constructor ? "new char[0]" : $"new {name}()")}});
+                    return {{name}}.Calls == 1;
+                }
+            }
+            """;
+        Assert.Equal(true, RunStringProbe(source + witness, []));
+    }
+
+    [Fact]
+    public void StringCopyContracts_ToCharArrayNullCheckCanInvokeUICultureBeforeMethodEntry()
+    {
+        const string source = """
+            public static class Target
+            {
+                public static char[] Apply(string value) => value.ToCharArray();
+            }
+            """;
+        const string driver = """
+
+            public static class NullWitness
+            {
+                public static bool Run()
+                {
+                    try { Target.Apply(null); return false; }
+                    catch (System.NullReferenceException) { return true; }
+                }
+            }
+            """;
+        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+        {
+            var original = Assert.IsType<string>(RunStringProbe(source + driver
+                + NumericWitness("NullWitness.Run()", throws: false, providerIsCulture: true), symbols));
+            Assert.StartsWith("True:", original);
+            Assert.True(int.Parse(original["True:".Length..], System.Globalization.CultureInfo.InvariantCulture) > 0);
+        }
+        AssertStringRejected(source, """
+            module StringContracts overflow unchecked nullable oblivious
+              module Target
+                func Apply (string:value) → char[]
+                  return value.ToCharArray()
+            """);
+    }
+
+    [Theory]
+    [InlineData(false, "value.ToCharArray()", "string", "char[]")]
+    [InlineData(false, "((string)null).ToCharArray()", "string", "char[]")]
+    [InlineData(false, "value.ToCharArray(0, 1)", "string", "char[]")]
+    [InlineData(true, "new string(value, 0, 1)", "char[]", "string")]
+    [InlineData(true, "new string('x', 1)", "char[]", "string")]
+    [InlineData(false, "value.Contains('x', (System.StringComparison)123)", "string", "bool")]
+    public void StringCopyContracts_UnprovedNeighborsRemainStrictlyRejected(
+        bool constructor, string expression, string parameter, string returnType)
+    {
+        var source = $$"""
+            public static class Target
+            {
+                public static {{returnType}} Apply({{parameter}} value) => {{expression}};
+            }
+            """;
+        var selected = SelectedStringCopyMember(source, constructor);
+        var resolver = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false));
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(EffectResolverKey.FromStrings(
+            "System.String", ".ctor", ["System.Char[]"], EffectMemberKind.Constructor)).Status);
+        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(StringCopyKey(selected)).Status);
+        var conversion = ConvertStringSource(source);
+        Assert.True(conversion.Success);
+        var native = $$"""
+            module StringContracts overflow unchecked nullable oblivious
+              module Target
+                func Apply ({{parameter}}:value) → {{returnType}}
+                  return {{expression}}
+            """;
+        var emissions = StringEmissions(native);
+        if (conversion.InteropPreservationCount == 0)
+            emissions = emissions.Concat(StringEmissions(conversion.CalorSource!)).ToArray();
+        foreach (var emission in emissions)
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(emission, "unknown-string-copy.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.True(result.HasErrors);
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("." + selected.Name, StringComparison.Ordinal));
+        }
+    }
+
+    private static IMethodSymbol SelectedStringCopyMember(string source, bool constructor)
+    {
+        var compilation = StringProbeCompilation(source, []);
+        Assert.DoesNotContain(compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var tree = compilation.SyntaxTrees.Single();
+        var expression = Assert.Single(tree.GetRoot().DescendantNodes()
+            .Where(node => constructor ? node is ObjectCreationExpressionSyntax : node is InvocationExpressionSyntax));
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(compilation.GetSemanticModel(tree).GetSymbolInfo(expression).Symbol);
+        Assert.Equal(SpecialType.System_String, selected.ContainingType.SpecialType);
+        Assert.True(selected.ContainingType.IsSealed);
+        Assert.Equal(typeof(string).Assembly.FullName, selected.ContainingAssembly.Identity.ToString());
+        Assert.DoesNotContain(selected.Locations, location => location.IsInSource);
+        return selected;
+    }
+
+    private static EffectResolverKey StringCopyKey(IMethodSymbol method)
+    {
+        var format = new SymbolDisplayFormat(typeQualificationStyle:
+            SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
+        return EffectResolverKey.FromStrings("System.String", method.Name,
+            method.Parameters.Select(parameter => parameter.Type.ToDisplayString(format)).ToArray(),
+            method.MethodKind == MethodKind.Constructor ? EffectMemberKind.Constructor : EffectMemberKind.Method);
+    }
+
+    private static string StringCopyWitness(string? value, bool throws)
+    {
+        var literal = value == null ? "null" : SymbolDisplay.FormatLiteral(value, quote: true);
+        var chars = value == null ? "null" : "new char[] { "
+            + string.Join(", ", value.Select(character => SymbolDisplay.FormatLiteral(character, quote: true))) + " }";
+        var check = $$"""
+            char[] input = {{chars}};
+            var result = Target.Apply(input);
+            if (result != {{(value == null ? "\"\"" : literal)}}) return false;
+            if (input != null && input.Length > 0) input[0] = '\ufffe';
+            return result == {{(value == null ? "\"\"" : literal)}};
+            """;
+        var culture = NumericWitness("CopyWitness.Run()", throws, providerIsCulture: true)
+            .Replace("public override string Name", """
+                public override System.Globalization.TextInfo TextInfo
+                {
+                    get
+                    {
+                        Reads++;
+                        if (Throw) throw new System.InvalidOperationException("numeric-culture-callback");
+                        return base.TextInfo;
+                    }
+                }
+                public override System.Globalization.CompareInfo CompareInfo
+                {
+                    get
+                    {
+                        Reads++;
+                        if (Throw) throw new System.InvalidOperationException("numeric-culture-callback");
+                        return base.CompareInfo;
+                    }
+                }
+                public override string Name
+                """, StringComparison.Ordinal);
+        return culture + $$"""
+
+            public static class CopyWitness
+            {
+                public static bool Run()
+                {
+                    {{check}}
+                }
+            }
+            """;
+    }
+
     [Theory]
     [InlineData("ToUpper", new string[0])]
     [InlineData("ToLower", new string[0])]
