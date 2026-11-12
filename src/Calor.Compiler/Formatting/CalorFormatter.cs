@@ -439,6 +439,46 @@ internal sealed class LosslessSourceDocument
         return diagnostics;
     }
 
+    internal static DiagnosticBag DiagnoseCanonicalUsage(string source, string filePath, ModuleNode ast)
+    {
+        var document = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath(filePath);
+        foreach (var branch in IfStatementNode.GetCanonicalLiteralReturns(ast).Keys.OrderBy(node => node.Span.Start))
+        {
+            if (branch.ThenBody[0].Span.Line != branch.Span.Line + 1
+                || branch.ElseBody is not [ReturnStatementNode { Expression: { } last }]
+                || branch.Span.Line < 1 || last.Span.Line > document._lines.Length
+                || last.Span.End > source.Length)
+                continue;
+
+            var firstLine = document._lines[branch.Span.Line - 1];
+            var lastLine = document._lines[last.Span.Line - 1];
+            var header = firstLine.Content[(branch.Span.Column - 1)..];
+            if (!header.StartsWith("if ", StringComparison.Ordinal)
+                || document._lines.Skip(branch.Span.Line - 1)
+                    .Take(last.Span.Line - branch.Span.Line + 1)
+                    .Any(line => FindLineCommentStart(line.Content) >= 0))
+                continue;
+
+            var whenTrue = ((ReturnStatementNode)branch.ThenBody[0]).Expression!;
+            var replacement = $"return ({header[3..].Trim()}) ? "
+                + $"{source[whenTrue.Span.Start..whenTrue.Span.End]} : "
+                + source[last.Span.Start..last.Span.End];
+            // Keep later #line mappings identical to the validated input.
+            replacement += string.Concat(Enumerable.Repeat("\n", last.Span.Line - branch.Span.Line));
+            diagnostics.ReportWarningWithFix(
+                new TextSpan(branch.Span.Start, 2, branch.Span.Line, branch.Span.Column),
+                DiagnosticCode.LintConditionalReturn,
+                "Use a conditional expression for a literal return choice",
+                new SuggestedFix("Replace the two literal return branches with one conditional return",
+                    TextEdit.Replace(filePath, branch.Span.Line, branch.Span.Column,
+                        last.Span.Line, last.Span.End - lastLine.Start + 1, replacement),
+                    isSafeToApply: true));
+        }
+        return diagnostics;
+    }
+
     private IReadOnlySet<int> FindTrimmableTrailingWhitespaceLines(string source, out bool lexicalErrors)
     {
         var result = new HashSet<int>();

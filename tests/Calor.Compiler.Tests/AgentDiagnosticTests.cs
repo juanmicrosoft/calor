@@ -612,4 +612,257 @@ public sealed class AgentDiagnosticTests : IDisposable
         Assert.Contains("§R 1", fixedSource);
         Assert.Equal(source.Replace("§/F", "", StringComparison.Ordinal).Replace("§/M", "", StringComparison.Ordinal), fixedSource);
     }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    [InlineData("\r")]
+    public async Task CanonicalLiteralReturn_SharedPatchPreservesBytesAndIsIdempotent(string newline)
+    {
+        var source = string.Join(newline,
+            "module Choices", "  func Pick public (bool:condition) → int",
+            "    !", "    if condition", "      return 1", "    else", "      return 2");
+        var expected = string.Join(newline,
+            "module Choices", "  func Pick public (bool:condition) → int",
+            "    !", "    return (condition) ? 1 : 2", "", "", "");
+        var original = Program.Compile(source, "choice.calr");
+        Assert.False(original.HasErrors, string.Join("\n", original.Diagnostics.Errors));
+        var diagnosis = LosslessSourceDocument.DiagnoseCanonicalUsage(source, "choice.calr", original.Ast!);
+        Assert.Equal(DiagnosticCode.LintConditionalReturn, Assert.Single(diagnosis).Code);
+        Assert.True(Assert.Single(diagnosis.DiagnosticsWithFixes).Fix.IsSafeToApply);
+        var fixedSource = DiagnosticFixes.Repair(source, "choice.calr", new CompilationOptions(),
+            out var repaired, out var applied);
+        Assert.Equal(1, applied);
+        Assert.Equal(expected, fixedSource);
+        Assert.False(repaired.HasErrors, string.Join("\n", repaired.Diagnostics.Errors));
+        Assert.Equal(original.GeneratedCode, repaired.GeneratedCode);
+        Assert.Empty(LosslessSourceDocument.DiagnoseCanonicalUsage(fixedSource, "choice.calr", repaired.Ast!));
+        Assert.Equal(fixedSource, DiagnosticFixes.Repair(fixedSource, "choice.calr",
+            new CompilationOptions(), out _, out var again));
+        Assert.Equal(0, again);
+
+        var lint = await new CheckTool().ExecuteAsync(JsonSerializer.SerializeToElement(
+            new { action = "lint", source, fix = true }));
+        Assert.False(lint.IsError, lint.Content[0].Text);
+        var output = JsonDocument.Parse(lint.Content[0].Text!).RootElement;
+        Assert.Equal(expected, output.GetProperty("fixedCode").GetString());
+        var issue = Assert.Single(output.GetProperty("issues").EnumerateArray());
+        Assert.Equal(DiagnosticCode.LintConditionalReturn, issue.GetProperty("code").GetString());
+        Assert.True(issue.GetProperty("fix").GetProperty("isSafeToApply").GetBoolean());
+        var checkedResult = await new CheckTool().ExecuteAsync(JsonSerializer.SerializeToElement(
+            new { action = "diagnose", source, apply = true }));
+        Assert.False(checkedResult.IsError, checkedResult.Content[0].Text);
+        Assert.Equal(expected, JsonDocument.Parse(checkedResult.Content[0].Text!)
+            .RootElement.GetProperty("fixedSource").GetString());
+
+        var path = Path.Combine(_directory, "choice.calr");
+        var encoding = new UnicodeEncoding(false, true);
+        File.WriteAllText(path, source, encoding);
+        var (lintExit, lintJson, _) = CliTestHarness.RunCli(_directory, "lint", path, "--format", "json");
+        Assert.Equal(1, lintExit);
+        Assert.Equal(DiagnosticCode.LintConditionalReturn, Assert.Single(
+            JsonDocument.Parse(lintJson).RootElement.GetProperty("diagnostics").EnumerateArray())
+            .GetProperty("code").GetString());
+        var (fixExit, _, fixErrors) = CliTestHarness.RunCli(_directory, "lint", path, "--fix", "--format", "json");
+        Assert.True(fixExit == 0, fixErrors);
+        Assert.Equal(encoding.GetPreamble().Concat(encoding.GetBytes(expected)).ToArray(), File.ReadAllBytes(path));
+        File.WriteAllText(path, source, encoding);
+        var (applyExit, _, applyErrors) = CliTestHarness.RunCli(_directory, "fix", path, "--apply", "--format", "json");
+        Assert.True(applyExit == 0, applyErrors);
+        Assert.Equal(expected, File.ReadAllText(path));
+    }
+
+    [Theory]
+    [InlineData("object", "1", "2")]
+    [InlineData("bool", "true", "false")]
+    [InlineData("float", "1.25f", "2.5f")]
+    [InlineData("double", "1.25", "2.5")]
+    [InlineData("decimal", "1.25m", "2.5m")]
+    [InlineData("string", "\"one\"", "\"two\"")]
+    public void CanonicalLiteralReturn_ConverterAndRuntimePreserveTheSelectedValue(
+        string type, string first, string second)
+    {
+        var csharp = $"#nullable enable\npublic static class Probe {{ public static {type} Pick(bool condition) "
+            + $"{{ if (condition) return {first}; else return {second}; }} }}";
+        var conversion = new Migration.CSharpToCalorConverter().Convert(csharp, "choice.cs");
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        var calor = conversion.CalorSource!;
+        Assert.Contains(" ? ", calor);
+        var compiled = CompileNative(calor);
+        Assert.Empty(LosslessSourceDocument.DiagnoseCanonicalUsage(calor, "choice.calr", compiled.Ast!));
+        foreach (var condition in new[] { false, true })
+            Assert.Equal(InvokePick(csharp, condition), InvokePick(compiled.GeneratedCode, condition));
+    }
+
+    private static (Type? Type, object? Value, int? Calls) InvokePick(string csharp, bool condition)
+    {
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+            "Choice_" + Guid.NewGuid().ToString("N"),
+            [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(csharp)],
+            CodeGen.GeneratedCSharpCompiler.References,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emission = compilation.Emit(stream);
+        Assert.True(emission.Success, string.Join("\n", emission.Diagnostics));
+        stream.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
+        try
+        {
+            var types = context.LoadFromStream(stream).GetTypes();
+            var value = types
+                .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                .Single(method => method.Name == "Pick").Invoke(null, [condition]);
+            var calls = types.SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.Static))
+                .SingleOrDefault(field => field.Name == "Calls")?.GetValue(null);
+            return (value?.GetType(), value, calls is int count ? count : null);
+        }
+        finally { context.Unload(); }
+    }
+
+    [Theory]
+    [InlineData("    if condition\n      return 1\n    else\n      return 2U")]
+    [InlineData("    if condition\n      return 1\n    else\n      return \"two\"")]
+    [InlineData("    if condition\n      return 1\n    else\n      return value")]
+    [InlineData("    if condition\n      // keep this explanation\n      return 1\n    else\n      return 2")]
+    [InlineData("    if condition\n      return 1 // keep this explanation\n    else\n      return 2")]
+    public void CanonicalLiteralReturn_LeavesMixedTypesNonliteralBranchesAndCommentsAlone(string body)
+    {
+        var source = "module Choices\n  func Pick public (bool:condition, int:value) → object\n    !\n" + body;
+        var original = CompileNative(source);
+        Assert.Empty(LosslessSourceDocument.DiagnoseCanonicalUsage(source, "choice.calr", original.Ast!));
+        var unchanged = DiagnosticFixes.Repair(source, "choice.calr", new CompilationOptions(), out _, out var applied);
+        Assert.Equal(source, unchanged);
+        Assert.Equal(0, applied);
+    }
+
+    [Fact]
+    public void CanonicalLiteralReturn_WhitespaceAndStructuralFixesDoNotOverlap()
+    {
+        const string source = "module Choices   \n  func Pick public (bool:condition) → int\n"
+            + "    !\n    if condition  \n      return 1  \n    else\n      return 2";
+        var fixedSource = DiagnosticFixes.Repair(source, "choice.calr", new CompilationOptions(),
+            out var result, out var applied);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Equal(4, applied);
+        Assert.Equal("module Choices\n  func Pick public (bool:condition) → int\n"
+            + "    !\n    return (condition) ? 1 : 2\n\n\n", fixedSource);
+    }
+
+    [Theory]
+    [InlineData("byte")]
+    [InlineData("short")]
+    public void CanonicalLiteralReturn_DoesNotIntroduceAnIntConditionalIntoANarrowReturn(string type)
+    {
+        var source = $"module Choices\n  func Pick public (bool:condition) → {type}\n"
+            + "    !\n    if condition\n      return 1\n    else\n      return 2";
+        var original = CompileNative(source);
+        Assert.Empty(LosslessSourceDocument.DiagnoseCanonicalUsage(source, "choice.calr", original.Ast!));
+        Assert.Equal(source, DiagnosticFixes.Repair(source, "choice.calr", new CompilationOptions(),
+            out _, out var applied));
+        Assert.Equal(0, applied);
+    }
+
+    [Fact]
+    public void CanonicalLiteralReturn_PreservesLaterStatementSourceMappings()
+    {
+        const string source = "module Choices\n  func Pick public (bool:condition) → int\n"
+            + "    !\n    if condition\n      return 1\n    else\n      return 2\n"
+            + "  func Other public () → int\n    !\n    return 3";
+        var original = Program.Compile(source, "choice.calr");
+        Assert.False(original.HasErrors, string.Join("\n", original.Diagnostics.Errors));
+        var fixedSource = DiagnosticFixes.Repair(source, "choice.calr", new CompilationOptions(),
+            out var repaired, out var applied);
+        Assert.Equal(1, applied);
+        Assert.Equal(original.GeneratedCode, repaired.GeneratedCode);
+        Assert.Equal(source.Count(c => c == '\n'), fixedSource.Count(c => c == '\n'));
+    }
+
+    [Theory]
+    [InlineData(false, 2)]
+    [InlineData(true, 1)]
+    public void CanonicalLiteralReturn_EvaluatesTheConditionOnceAndRetainsFinally(bool condition, int expected)
+    {
+        const string source = """
+            module Choices
+              module Probe
+                field int:Calls public = 0
+                func Check public (bool:value) → bool
+                  ! mut
+                  set Calls Calls + 1
+                  return value
+                func Pick public (bool:condition) → int
+                  ! mut
+                  try
+                    if Check(condition)
+                      return 1
+                    else
+                      return 2
+                  finally
+                    set Calls Calls + 10
+            """;
+        var original = Program.Compile(source, "choice.calr");
+        Assert.False(original.HasErrors, string.Join("\n", original.Diagnostics.Errors));
+        var fixedSource = DiagnosticFixes.Repair(source, "choice.calr", new CompilationOptions(),
+            out var repaired, out var applied);
+        Assert.Equal(1, applied);
+        Assert.Equal(original.GeneratedCode, repaired.GeneratedCode);
+        Assert.Equal((typeof(int), (object)expected, (int?)11), InvokePick(repaired.GeneratedCode, condition));
+        Assert.Contains("finally", repaired.GeneratedCode);
+        Assert.DoesNotContain("if Check", fixedSource);
+    }
+
+    [Theory]
+    [InlineData(ContractMode.Debug)]
+    [InlineData(ContractMode.Release)]
+    [InlineData(ContractMode.Off)]
+    public void CanonicalLiteralReturn_RetainsThePostcondition(ContractMode mode)
+    {
+        const string source = """
+            module Choices
+              func Pick public (bool:condition) → int
+                !
+                => result == 1
+                if condition
+                  return 1
+                else
+                  return 2
+            """;
+        var options = new CompilationOptions { ContractMode = mode };
+        var original = Program.Compile(source, "choice.calr", options);
+        Assert.False(original.HasErrors, string.Join("\n", original.Diagnostics.Errors));
+        _ = DiagnosticFixes.Repair(source, "choice.calr", options, out var repaired, out var applied);
+        Assert.Equal(1, applied);
+        Assert.Equal(original.GeneratedCode, repaired.GeneratedCode);
+        Assert.Equal(1, InvokePick(repaired.GeneratedCode, true).Value);
+        if (mode == ContractMode.Off)
+            Assert.Equal(2, InvokePick(repaired.GeneratedCode, false).Value);
+        else
+            Assert.Equal("ContractViolationException",
+                Assert.Throws<TargetInvocationException>(() => InvokePick(repaired.GeneratedCode, false))
+                    .InnerException?.GetType().Name);
+    }
+
+    [Fact]
+    public void CanonicalLiteralReturn_DoesNotRewriteAContextuallyTypedLambda()
+    {
+        const string source = """
+            module Choices
+              func Make public () → int
+                !
+                let System.Func<bool, int>:pick = (bool:condition) ! =>
+                  if condition
+                    return 1
+                  else
+                    return 2
+                return 0
+            """;
+        var result = CompileNative(source);
+        Assert.Empty(LosslessSourceDocument.DiagnoseCanonicalUsage(source, "choice.calr", result.Ast!));
+        Assert.Contains("if (condition)", result.GeneratedCode);
+        Assert.Contains("if condition", new Migration.CalorEmitter().Emit(result.Ast!));
+        Assert.Equal(source, DiagnosticFixes.Repair(source, "choice.calr", new CompilationOptions(),
+            out _, out var applied));
+        Assert.Equal(0, applied);
+    }
 }

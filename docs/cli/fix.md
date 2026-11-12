@@ -17,6 +17,12 @@ Known missing effects can offer a native `!` row edit for manual review.
 These edits change a declaration's contract, so safe repair never applies them.
 Unknown call effects offer no row edit: resolve the call's effect contract first.
 
+`Calor1305` offers a conditional return for two branches returning matching
+primitive literals. Safe repair checks the declared return type, leaves comments
+and nonliteral branches alone, and retains blank lines to preserve later source
+mappings. Whitespace edits are applied before an overlapping structural patch.
+Both steps recompile and must retain identical generated C#.
+
 ```bash
 calor fix --apply
 calor fix src/Broken.calr --apply --dry-run --format json

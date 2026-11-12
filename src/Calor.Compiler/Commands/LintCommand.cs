@@ -199,10 +199,18 @@ public static class LintCommand
                     {
                         if (result.FixSuppressedReason == null)
                         {
-                            await SafeSourceFile.WriteFormattedAsync(
-                                result.Snapshot!,
-                                result.FixedContent,
-                                new CalorFormatter());
+                            if (result.HasCanonicalEdits)
+                                await SafeSourceFile.WriteParsedAsync(
+                                    result.Snapshot!, result.FixedContent, persisted =>
+                                    {
+                                        if (!string.Equals(persisted, result.FixedContent, StringComparison.Ordinal))
+                                            throw new InvalidDataException("Persisted source does not match the validated patch.");
+                                    });
+                            else
+                                await SafeSourceFile.WriteFormattedAsync(
+                                    result.Snapshot!,
+                                    result.FixedContent,
+                                    new CalorFormatter());
                             statusOut.WriteLine($"Fixed: {file.Name}");
                             fixedFiles++;
                         }
@@ -330,6 +338,10 @@ public static class LintCommand
             };
         }
 
+        diagnostics.AddRange(LosslessSourceDocument.DiagnoseCanonicalUsage(source, filePath, ast));
+        issues = diagnostics.Select(diagnostic =>
+            new LintIssue(diagnostic.Span.Line, diagnostic.Code, diagnostic.Message)).ToList();
+
         if (!attemptFix)
         {
             return new LintResult
@@ -379,16 +391,22 @@ public static class LintCommand
                 fixSuppressedReason);
         }
 
+        var fixedContent = formatResult.Formatted;
+        if (fixSuppressedReason == null)
+            fixedContent = DiagnosticFixes.Repair(fixedContent, filePath,
+                new CompilationOptions(), out _, out _);
+
         return new LintResult
         {
             ParseSuccess = true,
             ParseErrors = new List<string>(),
             Issues = issues,
             OriginalContent = source,
-            FixedContent = formatResult.Formatted,
+            FixedContent = fixedContent,
             Diagnostics = diagnostics,
             Ast = ast,
             FixSuppressedReason = fixSuppressedReason,
+            HasCanonicalEdits = fixedContent != formatResult.Formatted,
             Snapshot = snapshot
         };
     }
@@ -404,6 +422,7 @@ public static class LintCommand
         public SourceFileSnapshot? Snapshot { get; init; }
         public string? ProcessingError { get; init; }
         public string? FixSuppressedReason { get; init; }
+        public bool HasCanonicalEdits { get; init; }
 
         /// <summary>Parsed module when parsing succeeded; feeds declaration-ID resolution.</summary>
         public Ast.ModuleNode? Ast { get; init; }

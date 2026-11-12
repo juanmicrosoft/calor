@@ -141,6 +141,69 @@ public sealed class IfStatementNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
+    internal ReturnStatementNode? GetCanonicalLiteralReturn(string? returnType)
+    {
+        if (ElseIfClauses.Count != 0
+            || ThenBody is not [ReturnStatementNode { Expression: { } whenTrue }]
+            || ElseBody is not [ReturnStatementNode { Expression: { } whenFalse }])
+            return null;
+
+        // Matching literal types avoid conditional common-type inference changing
+        // a branch's conversion, boxing, overload selection or evaluation.
+        var sameType = (whenTrue, whenFalse) switch
+        {
+            (IntLiteralNode left, IntLiteralNode right) =>
+                left.Width == right.Width && left.Signedness == right.Signedness,
+            (FloatLiteralNode left, FloatLiteralNode right) =>
+                left.IsSingle == right.IsSingle && left.IsDecimal == right.IsDecimal,
+            (DecimalLiteralNode, DecimalLiteralNode) => true,
+            (StringLiteralNode { IsUtf8: false, IsMultiline: false },
+                StringLiteralNode { IsUtf8: false, IsMultiline: false }) => true,
+            (BoolLiteralNode, BoolLiteralNode) => true,
+            _ => false
+        };
+        var literalType = whenTrue switch
+        {
+            IntLiteralNode literal => literal.IsUnsigned
+                ? literal.IsLong ? "ulong" : "uint"
+                : literal.IsLong ? "long" : "int",
+            FloatLiteralNode literal => literal.IsDecimal ? "decimal" : literal.IsSingle ? "float" : "double",
+            DecimalLiteralNode => "decimal",
+            BoolLiteralNode => "bool",
+            StringLiteralNode => "string",
+            _ => null
+        };
+        var target = returnType == null ? null : Migration.TypeMapper.ToSurfaceType(returnType);
+        return sameType && target != null && (target == literalType || target == "object")
+            ? new ReturnStatementNode(Span,
+                new ConditionalExpressionNode(Span, Condition, whenTrue, whenFalse))
+            : null;
+    }
+
+    internal static IReadOnlyDictionary<IfStatementNode, ReturnStatementNode> GetCanonicalLiteralReturns(ModuleNode module)
+    {
+        var result = new Dictionary<IfStatementNode, ReturnStatementNode>();
+        var pending = new Stack<(AstNode Node, string? ReturnType)>();
+        pending.Push((module, null));
+        while (pending.TryPop(out var frame))
+        {
+            var returnType = frame.Node switch
+            {
+                FunctionNode function => function.Output?.TypeName,
+                MethodNode method => method.Output?.TypeName,
+                OperatorOverloadNode op => op.Output?.TypeName,
+                ExpressionNode => null,
+                _ => frame.ReturnType
+            };
+            if (frame.Node is IfStatementNode branch
+                && branch.GetCanonicalLiteralReturn(returnType) is { } canonical)
+                result.Add(branch, canonical);
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(frame.Node))
+                pending.Push((child, returnType));
+        }
+        return result;
+    }
+
 
 }
 

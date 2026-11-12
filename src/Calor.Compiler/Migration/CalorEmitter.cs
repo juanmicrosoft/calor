@@ -21,6 +21,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private int _memberBodyDepth;
     private int _inlineObjectInitializers;
     private int _inlineCollections;
+    private IReadOnlyDictionary<IfStatementNode, ReturnStatementNode> _canonicalLiteralReturns =
+        new Dictionary<IfStatementNode, ReturnStatementNode>();
 
     // How many lambda bodies deep we are emitting. A block lambda nested inside
     // ANOTHER lambda's body must never be hoisted to the enclosing statement:
@@ -73,6 +75,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _inInlineSiblingContext = 0;
         _inlineObjectInitializers = 0;
         _inlineCollections = 0;
+        _canonicalLiteralReturns = IfStatementNode.GetCanonicalLiteralReturns(module);
         Visit(module);
         return _builder.ToString();
     }
@@ -2459,6 +2462,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(IfStatementNode node)
     {
+        if (_canonicalLiteralReturns.TryGetValue(node, out var canonicalReturn))
+            return Visit(canonicalReturn);
+
         var condition = node.Condition.Accept(this);
         EmitIfChain(condition, node.ThenBody, node.ElseIfClauses, 0, node.ElseBody);
         return "";

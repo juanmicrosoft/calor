@@ -164,6 +164,14 @@ four before adding it.
 `if`, `else if` and `else` belong at the same indentation. Each selected branch
 has an indented body. Conditions use ordinary expression precedence.
 
+Use `condition ? first : second` when a condition chooses a value, for example
+`return count > 0 ? "items" : "none"`. Use `if` for statement bodies and side effects.
+`calor lint` reports `Calor1305` for two branches returning matching primitive
+literals. Its safe patch retains comments by leaving commented branches alone,
+keeps later source-line mappings, and does not introduce a wider conditional
+type into a narrow return. The converter emits the same bounded canonical form.
+This rule does not rewrite calls, assignments, lambdas, or mixed-type branches.
+
 ```calor
 if x > 0
   Console.WriteLine("positive")

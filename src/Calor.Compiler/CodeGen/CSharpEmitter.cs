@@ -194,6 +194,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     private int _inlineReturnGuardCounter;
     private ReturnLoweringContext? _currentReturnLowering;
     private string? _currentReturnValueType;
+    private IReadOnlyDictionary<IfStatementNode, ReturnStatementNode> _canonicalLiteralReturns =
+        new Dictionary<IfStatementNode, ReturnStatementNode>();
     private Dictionary<string, string> _parameterTypes = new(StringComparer.Ordinal);
     private readonly HashSet<string> _capturedParameterNames = new(StringComparer.Ordinal);
     private int _contractExpressionDepth;
@@ -785,6 +787,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     private void ResetModuleState(ModuleNode module, string? filePath)
     {
         _emissionContext = new EmissionContext();
+        _canonicalLiteralReturns = IfStatementNode.GetCanonicalLiteralReturns(module);
         _reservedGeneratedIdentifiers = CollectReservedModuleIdentifiers(module);
         _currentClassName = null;
         _currentClassIdentity = null;
@@ -4025,6 +4028,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(IfStatementNode node)
     {
+        if (_canonicalLiteralReturns.TryGetValue(node, out var canonicalReturn))
+            return Visit(canonicalReturn);
+
         var frames = new Stack<(IfStatementNode Node, IReadOnlyList<StatementNode> Body,
             int Statement, int Clause, bool Mapped, bool Nested)>();
         var initialDepth = _statementDepth;
@@ -4047,7 +4053,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
                 {
                     var statement = frame.Body[frame.Statement];
                     frames.Push(frame with { Statement = frame.Statement + 1 });
-                    if (statement is IfStatementNode nested)
+                    if (statement is IfStatementNode nested
+                        && !_canonicalLiteralReturns.ContainsKey(nested))
                     {
                         // Conditional visitors write directly; avoid recursive dispatch.
                         _statementDepth++;

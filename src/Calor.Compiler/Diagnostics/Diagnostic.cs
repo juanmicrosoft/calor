@@ -1214,6 +1214,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string LintProcessingError = "Calor1304";
 
+    /// <summary>
+    /// Warning (lint): a two-branch literal return has a shorter conditional form.
+    /// </summary>
+    public const string LintConditionalReturn = "Calor1305";
+
     // Root compile command (Calor1310-1319)
 
     /// <summary>
@@ -1691,8 +1696,15 @@ internal static class DiagnosticFixes
             options.CancellationToken.ThrowIfCancellationRequested();
             var fixes = result.Diagnostics.DiagnosticsWithFixes.ToList();
             if (!result.HasErrors)
-                fixes.AddRange(Formatting.LosslessSourceDocument.DiagnoseTrailingWhitespace(source, filePath)
-                    .DiagnosticsWithFixes);
+            {
+                var whitespace = Formatting.LosslessSourceDocument.DiagnoseTrailingWhitespace(source, filePath);
+                fixes.AddRange(whitespace.DiagnosticsWithFixes);
+                // Structural edits may cover whitespace edits; apply them on the
+                // next freshly diagnosed snapshot instead of overlapping patches.
+                if (whitespace.Count == 0 && result.Ast is { } ast)
+                    fixes.AddRange(Formatting.LosslessSourceDocument
+                        .DiagnoseCanonicalUsage(source, filePath, ast).DiagnosticsWithFixes);
+            }
             var next = Apply(source, source, filePath, fixes, out var applied);
             if (next == source)
                 break;

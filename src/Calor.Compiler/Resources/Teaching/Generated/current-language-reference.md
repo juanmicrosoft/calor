@@ -236,7 +236,7 @@ Complete example: [Branching](#example-primer_branching).
 
 ## ternary / conditional expression
 
-Conditional expression with two expression branches. Only the selected branch evaluates. Conditional and null-coalescing operators associate right; ordinary binary operators associate left.
+Use a conditional expression when a condition chooses a value; use if for statement bodies and side effects. Only the selected expression branch evaluates. Conditional and null-coalescing operators associate right; ordinary binary operators associate left. Calor1305 offers a safe conditional-return patch for matching primitive literals and compatible declared return types; calls, assignments, lambdas, comments and mixed types are not rewritten.
 
 Syntax: `condition ? trueValue : falseValue`
 

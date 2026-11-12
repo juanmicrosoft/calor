@@ -403,6 +403,10 @@ public sealed class CheckTool : McpToolBase
             };
         }
 
+        diagnostics.AddRange(LosslessSourceDocument.DiagnoseCanonicalUsage(source, "mcp-input.calr", ast));
+        issues = DiagnosticEnvelope.Build(diagnostics).Select(diagnostic =>
+            new LintIssue(diagnostic.Location.Line, diagnostic.Message, diagnostic.Code, diagnostic.Fix)).ToList();
+
         if (!attemptFix)
         {
             return new LintResult
@@ -459,13 +463,18 @@ public sealed class CheckTool : McpToolBase
                 "mcp-input.calr")));
         }
 
+        var fixedContent = formatResult.Formatted;
+        if (fixSuppressedReason == null)
+            fixedContent = DiagnosticFixes.Repair(fixedContent, "mcp-input.calr",
+                new CompilationOptions(), out _, out _);
+
         return new LintResult
         {
             ParseSuccess = true,
             ParseErrors = new List<EnvelopeDiagnostic>(),
             Issues = issues,
             OriginalContent = source,
-            FixedContent = formatResult.Formatted,
+            FixedContent = fixedContent,
             FixDiagnostics = fallbackDiagnostics,
             FixSuppressedReason = fixSuppressedReason
         };
