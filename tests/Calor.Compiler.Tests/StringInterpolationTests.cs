@@ -641,6 +641,106 @@ public static class NumberFormat
         }
     }
 
+    [Theory]
+    [InlineData("true", "", false)]
+    [InlineData("'x'", "", false)]
+    [InlineData("\"text\"", "", false)]
+    [InlineData("Value", "private static string Value = \"text\";", false)]
+    [InlineData("Value", "private static string? Value = null;", false)]
+    [InlineData("true,6:unused", "", false)]
+    [InlineData("Value,6:unused", "private static string Value = \"text\";", false)]
+    [InlineData("3.5", "", true)]
+    [InlineData("-1234", "", true)]
+    [InlineData("3.5,6:N2", "", true)]
+    [InlineData("Value", "private static object Value = true;", true)]
+    public void StrictInterpolation_ImplicitInitializationUsesBoundFormatting(
+        string value, string member, bool unknown)
+    {
+        var source = $$"""
+            #nullable enable
+            public class InterpolationInitializationBoundary
+            {
+                {{member}}
+                private static string Text = $"value={{{value}}}";
+                public static string Render() { return "constant"; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "interpolation-static-initializer.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Equal(unknown, result.HasErrors);
+            if (unknown)
+            {
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                    && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal));
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable);
+                Assert.Empty(result.GeneratedCode);
+            }
+            else
+                Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("null", false)]
+    [InlineData("default(bool)", false)]
+    [InlineData("Missing", true)]
+    public void StrictInterpolation_NativeInitializerLiteralOrUnavailableProof(string value, bool unknown)
+    {
+        var source = $$"""
+            module InterpolationInitializationBoundary
+              class Box
+                field string:Text private static = "value=${{{value}}}"
+                func Render public static () → string
+                  !
+                  return "constant"
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "native-interpolation-static-initializer.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Equal(unknown, result.HasErrors);
+            if (unknown)
+                Assert.Empty(result.GeneratedCode);
+            else
+                Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void StrictInterpolation_ImplicitInitializerRetainsOperandEffects()
+    {
+        const string source = """
+            #nullable enable
+            public class InterpolationInitializationBoundary
+            {
+                private static string Read() { System.Console.WriteLine("effect"); return "text"; }
+                private static string Text = $"value={Read()}";
+                public static string Render() { return "constant"; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "interpolation-static-effects.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
     private static CompilationOptions StrictInterpolationOptions(bool typing) => new()
     {
         EnableTypeChecking = typing,

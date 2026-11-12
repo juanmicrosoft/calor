@@ -6097,6 +6097,14 @@ public sealed class EffectEnforcementPass
                         .Union(InferFormattingEffects(CallGraphAnalysis.ConcatenationOperand(concat.RightOperand),
                             "concatenation", span));
                     break;
+                case IInterpolationOperation interpolation:
+                    effects = InferFormattingEffects(new CallGraphAnalysis.InterpolationFormatting(
+                        interpolation.Expression.Type,
+                        interpolation.Expression.ConstantValue is { HasValue: true, Value: null }),
+                        "interpolation", span);
+                    break;
+                case IInterpolatedStringOperation { Type.SpecialType: CS.SpecialType.System_String }:
+                case IInterpolatedStringTextOperation:
                 case IArgumentOperation:
                 case IConversionOperation { OperatorMethod: null }:
                 case IBinaryOperation { OperatorMethod: null }:

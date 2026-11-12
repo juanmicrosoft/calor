@@ -165,6 +165,9 @@ the same intrinsic mutation/allocation contract as explicit constructors.
 `BeforeFieldInit` permits eager CLR initialization; an empty callback trace from
 one method call is not a purity proof. Uncontracted formatting is refused even
 when the type has no explicit static constructor and its method reads no fields.
+String interpolation in initializers uses the same bound hole-type rule as
+interpolation in method bodies. Proven string, char, Boolean and null holes are
+supported; operand and alignment operations retain their effect checks.
 
 ---
 
