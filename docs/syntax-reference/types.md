@@ -188,6 +188,24 @@ Element and container nullability are different:
 A nullable annotation is not a universal proof that every operation is safe.
 Supported receiving boundaries check nullable input, but arbitrary later
 writes and constructor inputs remain outside the bounded guarantee.
+
+Mandatory receiving checks also cover closed source-defined reference elements
+in the actual .NET `List<T>`, `IList<T>`, `ICollection<T>`, `IEnumerable<T>`,
+`IReadOnlyList<T>` and `IReadOnlyCollection<T>` types. This is a deliberately
+stricter compatibility rule, enforced with or without optional type checking:
+nullable elements cannot enter a non-null element contract, and a nullable
+container must be guarded before non-null receiving. A container guard does not
+validate its elements. Invariant containers also reject nullable-writer aliases
+such as `List<Node>` to `List<Node?>`; covariant read-only targets can accept
+nullable elements. Oblivious annotations do not prove non-nullness.
+
+This extension does not analyze custom generic containers, nested generic
+payloads, type parameters, tuples, delegates or unresolved reference identities.
+Those are unsupported boundaries, not evidence that the receiving contract is
+safe. In particular, a dotted read that remains unbound is not receiving proof
+just because the C# compiler resolves it. Existing string-specific rules and
+external-call effect requirements are unchanged.
+
 See [Nullability and .NET Interop](https://calor.dev/docs/guides/nullability-and-dotnet-interop/)
 for the exact support table and complete safe and rejected examples.
 

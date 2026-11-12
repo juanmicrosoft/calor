@@ -4292,6 +4292,151 @@ public class NullabilityIntegrationTests
             diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosedSourceReferenceGenerics_EnforceReceivingContracts(bool typing)
+    {
+        foreach (var (input, target) in new[]
+        {
+            ("List<Node?>", "List<Node>"),
+            ("IEnumerable<Node?>", "IEnumerable<Node>"),
+            ("List<Node>?", "List<Node>"),
+            ("List<Node>", "List<Node?>")
+        })
+        {
+            foreach (var (statement, output, code) in new[]
+            {
+                ($"let {target}:copy = Identity(values)\n    return copy",
+                    target, DiagnosticCode.NullableToNonNullableBinding),
+                ("return Identity(values)", target, DiagnosticCode.NullableReturnFromNonNullable),
+                ("Take(Identity(values))\n    return values",
+                    input, DiagnosticCode.NullableArgumentToNonNullableParameter)
+            })
+            {
+                AssertClosedReferenceCompilation($$"""
+                    module Receiving
+                      using System.Collections.Generic
+                      class Node
+                        field int:Id public
+                      func Identity ({{input}}:value) → {{input}}
+                        !
+                        return value
+                      func Take ({{target}}:value) → void
+                        !
+                      func Probe ({{input}}:values) → {{output}}
+                        !
+                        {{statement}}
+                    """, typing, code);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosedSourceReferenceGenerics_PreserveCompatibleAndGuardedFlows(bool typing)
+    {
+        foreach (var (input, target, statement, policy) in new[]
+        {
+            ("List<Node>", "List<Node>", "return values", ""),
+            ("List<Node?>", "List<Node?>", "return values", ""),
+            ("List<Node>", "List<Node>?", "return values", ""),
+            ("IEnumerable<Node>", "IEnumerable<Node?>", "return values", ""),
+            ("IEnumerable<Node>", "IEnumerable<object>", "return values", ""),
+            ("List<Node>", "IEnumerable<Node>", "return values", ""),
+            ("List<Node>?", "List<Node>", "if values != null\n      return values\n    throw null", ""),
+            ("List<Node>", "List<Node>", "return values", " nullable oblivious")
+        })
+        {
+            AssertClosedReferenceCompilation($$"""
+                module Receiving{{policy}}
+                  using System.Collections.Generic
+                  class Node
+                    field int:Id public
+                  func Probe ({{input}}:values) → {{target}}
+                    !{{(statement.Contains("throw null", StringComparison.Ordinal) ? " throw" : "")}}
+                    {{statement}}
+                """, typing);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosedSourceReferenceGenerics_CheckDirectAndPreprocessorReturns(bool typing)
+    {
+        foreach (var (input, statement) in new[]
+        {
+            ("List<Node?>", "return values"),
+            ("List<Node>?", "return values"),
+            ("List<Node>", "return null"),
+            ("List<Node?>?", "if values != null\n      return values\n    throw null"),
+            ("List<Node?>", "pp FEATURE\n      return values\n    pp else\n      return values")
+        })
+        {
+            AssertClosedReferenceCompilation($$"""
+                module Receiving
+                  using System.Collections.Generic
+                  class Node
+                    field int:Id public
+                  func Probe ({{input}}:values) → List<Node>
+                    !
+                    {{statement}}
+                """, typing, DiagnosticCode.NullableReturnFromNonNullable);
+        }
+    }
+
+    [Fact]
+    public void ClosedSourceReferenceGenerics_KeepUnsupportedPayloadsAndShadowContainersUnproven()
+    {
+        foreach (var (declaration, type) in new[]
+        {
+            ("class List<T>\n    field int:Id public", "List<Node?>"),
+            ("", "List<List<Node?>>"),
+            ("", "List<Missing>")
+        })
+        {
+            var (bound, diagnostics) = BindSource($$"""
+                module Receiving
+                  using System.Collections.Generic
+                  class Node
+                    field int:Id public
+                  {{declaration}}
+                  func Probe ({{type}}:values) → {{type}}
+                    !
+                    return values
+                """);
+            var function = Assert.Single(bound.Functions);
+            Assert.Null(function.Symbol.Parameters[0].GenericNullabilityType);
+            Assert.DoesNotContain(diagnostics, diagnostic =>
+                diagnostic.Code is DiagnosticCode.NullableToNonNullableBinding
+                    or DiagnosticCode.NullableReturnFromNonNullable
+                    or DiagnosticCode.NullableArgumentToNonNullableParameter);
+        }
+    }
+
+    private static void AssertClosedReferenceCompilation(string source, bool typing, string? code = null)
+    {
+        var parsing = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors, string.Join(Environment.NewLine, parsing));
+        foreach (var emission in new[] { source, new Calor.Compiler.Migration.CalorEmitter().Emit(ast) })
+        {
+            var result = Program.Compile(emission, "receiving.calr",
+                new CompilationOptions { EnableTypeChecking = typing });
+            Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+                diagnostic.Code is DiagnosticCode.UnknownExternalCall
+                    or DiagnosticCode.ForbiddenEffect);
+            if (code is null)
+                Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            else
+                Assert.Contains(result.Diagnostics, diagnostic =>
+                    diagnostic.Code == code && diagnostic.IsError
+                    && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        }
+    }
+
     /// <summary>
     /// §NEW analogue of <see cref="FindFirstBoundCallInFunction"/> —
     /// locates the first <see cref="BoundNewExpression"/> under a

@@ -31,22 +31,34 @@ success/error representation.
 finding. The checks compare supported source and destination shapes; they are
 not general conversions between arbitrary types.
 
-| Shape | Calor 0.22 status | Boundary covered |
+| Shape | Current status | Boundary covered |
 |:------|:-----------------|:-----------------|
 | Scalar STRING (`string`) | Active since Stage A | Initialization, native return, resolved method input |
 | Arrays | Active in Stage B | `string[]?` is a nullable container; `string?[]` has possibly-null STRING elements. Neither satisfies `string[]` at these boundaries; jagged arrays retain separate container/element information |
 | One-level string payloads | Active in Stage B | Matching definitions of `List`, `IList`, `IEnumerable`, `IReadOnlyList`, `ICollection`, `IReadOnlyCollection`; for example `List<string?>` cannot satisfy `List<string>` |
 | Nominal reference types | Active in Stage B when identity is established | `Widget?` cannot satisfy `Widget` when both share a resolved underlying reference identity; this is not a name-based guess that every unknown type is a reference |
-| Other generic payloads, nested generics, unknown nominal identities | Outside the active guarantee | Analysis may retain type information; no promise of Calor0272–0274 coverage |
+| Closed source-reference generic payloads | Active, with or without optional type checking | The six actual .NET collection definitions listed above retain element and container annotations. Nullable elements or containers cannot satisfy non-null receiving contracts. Invariant containers also reject nullable-writer aliases |
+| Other generic payloads, nested generics, delegates, type parameters, unknown nominal identities | Outside the active guarantee | Unsupported boundaries, not non-null proof; no promise of Calor0272–0274 coverage |
 | Mutable assignment/rebinding and constructor inputs | Excluded | Initializing a mutable local is checked; later writes and `new` arguments are not covered by this receiving-boundary guarantee |
 
 Unsupported nullability shapes may still fail ordinary type checking. Absence
 of one of these three diagnostics is not evidence that a value is non-null.
 Array-element checks do not prove that every element created by an allocation
 is initialized to a non-null value.
-Generic payload checks do not enforce the generic container's own nullability:
-that outer annotation is retained as information, but its receiving-boundary
-enforcement is not activated.
+The source-reference generic rule is a deliberate stricter compatibility change,
+not a repair for erased annotations. For example, `List<Widget?>` cannot satisfy
+`List<Widget>`, and `List<Widget>?` requires a container guard before non-null
+receiving. Guarding the container does not validate its elements.
+
+An invariant `List<Widget>` also cannot become `List<Widget?>`: the new alias
+would permit nullable writes that break the original element contract.
+Covariant read-only targets can accept nullable elements. Matching invariant
+contracts and nullable-container targets remain supported.
+
+The older string-generic policy is unchanged: its outer container annotation
+is retained as information, not enforced by this extension. External-call
+effect checks remain independent; a selected metadata method is not permission
+to call an unknown library API.
 
 ## Diagnostics and complete examples
 

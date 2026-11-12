@@ -15,6 +15,7 @@ public sealed class TypeChecker
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceEnumConstants;
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceStaticFieldReads;
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundMetadataConstants;
+    private readonly IReadOnlySet<TextSpan>? _boundGenericReceivingFailures;
     private ModuleNode? _module;
     private Analysis.CallGraphAnalysis.OperatorBindings? _sourceBindings;
     internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
@@ -74,6 +75,17 @@ public sealed class TypeChecker
         IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceEnumConstants = null,
         IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceStaticFieldReads = null,
         IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundMetadataConstants = null)
+        : this(diagnostics, boundAwaits, boundSourceEnumConstants,
+            boundSourceStaticFieldReads, boundMetadataConstants, null)
+    {
+    }
+
+    internal TypeChecker(DiagnosticBag diagnostics,
+        IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? boundAwaits,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceEnumConstants,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceStaticFieldReads,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundMetadataConstants,
+        IReadOnlySet<TextSpan>? boundGenericReceivingFailures)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _env = new TypeEnvironment();
@@ -81,6 +93,7 @@ public sealed class TypeChecker
         _boundSourceEnumConstants = boundSourceEnumConstants;
         _boundSourceStaticFieldReads = boundSourceStaticFieldReads;
         _boundMetadataConstants = boundMetadataConstants;
+        _boundGenericReceivingFailures = boundGenericReceivingFailures;
     }
 
     /// <summary>
@@ -1006,7 +1019,8 @@ public sealed class TypeChecker
                 && !ContainsInferencePlaceholder(returnType)
                 && !IsAssignable(_currentReturnType, returnType)
                 && !(_lambdaBodyDepth == 0
-                    && IsBinderOwnedNullabilityMismatch(_currentReturnType, returnType)))
+                    && (IsBinderOwnedNullabilityMismatch(_currentReturnType, returnType)
+                        || _boundGenericReceivingFailures?.Contains(ret.Expression.Span) == true)))
             {
                 _lambdaReturnInvalid = true;
                 if (!_suppressContextualDiagnostics)
@@ -1381,7 +1395,8 @@ public sealed class TypeChecker
                     ReportDistinctNamedRefinement(bind.Span, varType, initType, $"the binding of '{bind.Name}'");
                 }
                 else if (!IsAssignable(varType, initType)
-                    && !IsBinderOwnedNullabilityMismatch(varType, initType))
+                    && !IsBinderOwnedNullabilityMismatch(varType, initType)
+                    && _boundGenericReceivingFailures?.Contains(bind.Initializer.Span) != true)
                 {
                     _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
                         $"Cannot assign {initType.SurfaceName} to variable of type {varType.SurfaceName}");

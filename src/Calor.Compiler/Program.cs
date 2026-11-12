@@ -855,7 +855,11 @@ public class Program
             phaseSw.Restart();
             var typeChecker = new TypeChecking.TypeChecker(
                 diagnostics, binder.BoundAwaits, binder.BoundSourceEnumConstants,
-                binder.BoundSourceStaticFieldReads, binder.BoundMetadataConstants)
+                binder.BoundSourceStaticFieldReads, binder.BoundMetadataConstants,
+                bindingDiagnostics.Where(diagnostic =>
+                    diagnostic.BindingContext?.Shape == BindingReceivingShape.Generic
+                    && BindingDiagnosticPolicy.IsCompilationError(diagnostic))
+                    .Select(diagnostic => diagnostic.Span).ToHashSet())
             {
                 ProjectionContractMode = options.ContractMode
             };

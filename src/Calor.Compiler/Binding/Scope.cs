@@ -323,7 +323,7 @@ public static class BindingDiagnosticPolicy
                         BindingDiagnosticDisposition.CompilationError,
                         shape == BindingReceivingShape.ScalarString
                             ? "Stage A activates scalar STRING receiving boundaries."
-                            : "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries.",
+                            : "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension.",
                         shape == BindingReceivingShape.ScalarString ? 1385 : 1402)
                     : Analysis(
                         boundary.Item1,
@@ -1364,7 +1364,7 @@ public sealed class VariableSymbol : Symbol
     internal bool HasUnknownInferredType { get; set; }
     internal Microsoft.CodeAnalysis.IArrayTypeSymbol? MetadataArrayResultType { get; set; }
     internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; set; }
-    internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; init; }
+    internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; set; }
     internal VariableSymbol StorageIdentity { get; set; }
 
     /// <summary>

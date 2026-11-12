@@ -956,6 +956,8 @@ public sealed class Binder
                 $"element annotation: '{NullabilityChecker.GetAnnotation(supplied.ElementType)?.ToString() ?? "unsupported"}'). " +
                 "Change the affected receiving annotation or explicitly validate the relevant container/elements.";
         }
+        if (DescribeClosedGenericReceiving(argument, target) is { } genericMessage)
+            message = $"{receivingPosition} '{parameterName}': {genericMessage}";
         var context = BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, target);
         if (replacesNativeOverloadError && context.Shape == BindingReceivingShape.ScalarString)
             context = context with { ReplacesNativeOverloadError = true };
@@ -974,6 +976,12 @@ public sealed class Binder
 
         if (type is Microsoft.CodeAnalysis.IArrayTypeSymbol)
             return Metadata.MetadataBinderResult.ToBoundType(type);
+
+        if (Metadata.MetadataBinderResult.ToBoundType(type) is BoundTypes.GenericInstantiationBoundType
+            { TypeArguments: [BoundTypes.NominalBoundType element] } referenceGeneric
+            && NullabilityChecker.IsReferenceContainerDefinition(referenceGeneric.Definition)
+            && NullabilityChecker.IsClosedSourceReference(element))
+            return referenceGeneric;
 
         var nominal = Metadata.MetadataBinderResult.ToNominalBoundType(type);
         if (nominal.IsKnownReferenceType)
@@ -2532,6 +2540,8 @@ public sealed class Binder
             // Parameter registration precedes source type registration.
             if (TryBuildMethodInputArrayType(symbol.TypeName, out var array))
                 symbol.MethodInputArrayType = array;
+            symbol.GenericNullabilityType = TryBuildClosedReferenceGeneric(symbol.TypeName)
+                ?? symbol.GenericNullabilityType;
             if (!_scope.TryDeclare(symbol))
             {
                 var suggestedName = GenerateUniqueName(symbol.Name);
@@ -2801,6 +2811,7 @@ public sealed class Binder
             _diagnostics.Report(
                 expr.Span,
                 DiagnosticCode.NullableReturnFromNonNullable,
+                DescribeClosedGenericReceiving(expr, stringTarget!) ??
                 $"Return declares non-nullable {targetShapeLabel} but the returned value may be null " +
                 $"(source annotation: '{DescribeAnnotation(expr)}'). " +
                 $"Change the return type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
@@ -3266,6 +3277,7 @@ public sealed class Binder
             _diagnostics.Report(
                 initializer.Span,
                 DiagnosticCode.NullableToNonNullableBinding,
+                DescribeClosedGenericReceiving(initializer, stringTarget!) ??
                 $"Binding '{bind.Name}' declares non-nullable {targetShapeLabel} but its initializer " +
                 $"may be null (source annotation: '{DescribeAnnotation(initializer)}'). " +
                 $"Change the target to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
@@ -3546,6 +3558,12 @@ public sealed class Binder
         out BoundTypes.BoundType? target,
         FunctionSymbol? declaringFunction = null)
     {
+        if (TryBuildClosedReferenceGeneric(bindTypeName, declaringFunction, allowCoreReference: true)
+            is { } referenceGeneric)
+        {
+            target = referenceGeneric;
+            return true;
+        }
         if (TryBuildMethodInputArrayType(bindTypeName, out var arrayTarget, declaringFunction))
         {
             target = arrayTarget;
@@ -3703,6 +3721,11 @@ public sealed class Binder
     {
         target = null;
         var trimmed = bindTypeName.Trim();
+        if (TryBuildClosedReferenceGeneric(trimmed) is { } referenceGeneric)
+        {
+            target = referenceGeneric;
+            return true;
+        }
         if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
             && TypeIdentity.TrySplitGeneric(trimmed.TrimEnd('?'), out _, out _))
         {
@@ -3770,6 +3793,62 @@ public sealed class Binder
             return true;
         }
         return false;
+    }
+
+    private BoundTypes.GenericInstantiationBoundType? TryBuildClosedReferenceGeneric(
+        string spelling, FunctionSymbol? function = null, bool allowCoreReference = false)
+    {
+        if (!ResolveSourceCallConversions)
+            return null;
+        var annotation = _declaredReferenceAnnotation;
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(spelling, out var referent))
+        {
+            spelling = referent;
+            annotation = BoundTypes.NullableAnnotation.Annotated;
+        }
+        if (!TypeIdentity.TrySplitGeneric(spelling, out var name, out var arguments)
+            || arguments.Count != 1 || GetOrCreateMetadataBinder() is not { } metadata)
+            return null;
+        var scope = _currentNamespaceScopeId;
+        var ns = _currentNamespaceIdentity;
+        var owner = _currentClassName;
+        if (function is not null)
+        {
+            _functionNamespaces.TryGetValue(function.Id, out ns);
+            scope = _functionSymbols.FirstOrDefault(pair => pair.Value == function).Key?.NamespaceScopeId;
+            owner = function.ContainingTypeName;
+        }
+        if (owner is not null && _classesByQualifiedName.TryGetValue(owner, out var declaringClass))
+        {
+            ns = declaringClass.NamespaceIdentity;
+            scope = declaringClass.NamespaceScopeId;
+        }
+        if (ResolveSourceType(TypeIdentity.ToLookupName(name, 1), owner, ns, scope).Handled)
+            return null;
+        var resolved = ResolveScopedMetadataType(metadata.Context, name, 1, scope, ns);
+        var definition = resolved.Handled ? resolved.Type
+            : GenericStringContainerWhitelist.Contains(name)
+                ? metadata.Context.TryResolveType($"System.Collections.Generic.{ShortGenericName(name)}`1")
+                : null;
+        if (definition is null)
+            return null;
+        var boundDefinition = Metadata.MetadataBinderResult.ToNominalBoundType(definition);
+        if (!NullabilityChecker.IsReferenceContainerDefinition(boundDefinition))
+            return null;
+        var element = function is null
+            ? TryBuildReferenceType(arguments[0], owner, ns,
+                _currentMemberTypeParameters?.Select(parameter => parameter.Name),
+                allowObject: true, scope)
+            : TryBuildCallableReference(arguments[0], function);
+        if (element is null || !NullabilityChecker.IsClosedSourceReference(element)
+            && !(allowCoreReference && element.RoslynSymbol?.SpecialType
+                is Microsoft.CodeAnalysis.SpecialType.System_Object
+                    or Microsoft.CodeAnalysis.SpecialType.System_String))
+            return null;
+        return new BoundTypes.GenericInstantiationBoundType(
+            new BoundTypes.NominalBoundType(
+                definition.ContainingNamespace + "." + definition.Name, roslynSymbol: definition),
+            [element], annotation);
     }
 
     /// <summary>
@@ -4137,6 +4216,25 @@ public sealed class Binder
                 ($"'{n.QualifiedName}'", $"'?{n.QualifiedName}'"),
             _ => ("'string'", "'?string'"),
         };
+    }
+
+    private static string? DescribeClosedGenericReceiving(
+        BoundExpression source, BoundTypes.BoundType target)
+    {
+        if (target is not BoundTypes.GenericInstantiationBoundType
+            { TypeArguments: [BoundTypes.NominalBoundType receiving] } generic)
+            return null;
+        var supplied = source.GenericNullabilityType ?? source.Type as BoundTypes.GenericInstantiationBoundType;
+        var value = supplied?.TypeArguments.SingleOrDefault() as BoundTypes.NominalBoundType;
+        if (!NullabilityChecker.IsClosedSourceReference(receiving)
+            && (value is null || !NullabilityChecker.IsClosedSourceReference(value)))
+            return null;
+        return $"Reference-generic receiving contract '{generic.Definition.QualifiedName}<{receiving.QualifiedName}>' " +
+            $"requires container annotation '{generic.NullableAnnotation}' and element annotation '{receiving.NullableAnnotation}', " +
+            $"but the supplied annotations are '{supplied?.NullableAnnotation.ToString() ?? "null"}' " +
+            $"and '{value?.NullableAnnotation.ToString() ?? "unsupported"}'. " +
+            "Prove the affected container/elements non-null or use compatible annotations; " +
+            "invariant containers must also preserve the original element contract against nullable writes.";
     }
 
     /// <summary>Trims a possibly fully-qualified container name to its
@@ -7797,6 +7895,13 @@ public sealed class Binder
         }
         else
             ValidateCallArguments(args, resolution, bclResolution);
+        if (bclResolution?.Symbol is { ReducedFrom: not null, ReceiverType: { } reducedReceiver } reduced
+            && (computedReceiver ?? receiver) is { } extensionReceiver
+            && TryBuildBclArgumentTarget(reducedReceiver) is BoundTypes.GenericInstantiationBoundType
+                { TypeArguments: [BoundTypes.NominalBoundType receiverElement] } receiverTarget
+            && NullabilityChecker.IsClosedSourceReference(receiverElement))
+            ValidateCallArgument(extensionReceiver, reduced.ReducedFrom.Parameters[0].Name,
+                receiverTarget, false, []);
         ValidateDirectFunctionArguments(callExpr.Target, receiverSymbol, args, resolution, bclResolution);
         InvalidateMutatingCallArguments(args, argumentModifiers, resolution, bclResolution);
         var callable = isEventCall ? eventStorage.StorageIdentity : computedMethodName == "Invoke"
@@ -7858,8 +7963,11 @@ public sealed class Binder
                 && TryBuildMethodInputArrayType(resolution.Matches[0].ReturnType, out var nativeArray,
                     resolution.Matches[0].Function) ? nativeArray : null),
             GenericNullabilityType = genericNullabilityReturn ?? (resolution.Matches.Count == 1
-                && TryBuildDeclaredNullabilityShape(resolution.Matches[0].ReturnType, out var genericReturn)
-                    ? genericReturn as BoundTypes.GenericInstantiationBoundType : null)
+                ? TryBuildClosedReferenceGeneric(
+                    resolution.Matches[0].ReturnType, resolution.Matches[0].Function)
+                    ?? (TryBuildDeclaredNullabilityShape(resolution.Matches[0].ReturnType, out var genericReturn)
+                        ? genericReturn as BoundTypes.GenericInstantiationBoundType : null)
+                : null)
         };
         return boundCall;
     }
@@ -8546,7 +8654,13 @@ public sealed class Binder
             GetImplicitConversionCost,
             allowNullableStringCompatibility,
             IsBetterNullConversionTarget,
-            ResolveCallableParameterType,
+            (function, type) => arguments is not null
+                && TryBuildClosedReferenceGeneric(type, function) is { } generic
+                && generic.TypeArguments is [BoundTypes.NominalBoundType { Declaration: { } element } payload]
+                    ? $"global::{generic.Definition.QualifiedName}<global::{element.QualifiedName}" +
+                        $"{(payload.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated ? "?" : "")}>" +
+                        $"{(generic.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated ? "?" : "")}"
+                    : ResolveCallableParameterType(function, type),
             arguments is null ? null : (index, parameterType, argumentType) =>
                 GetImplicitArgumentConversionCost(parameterType, argumentType, arguments[index]),
             arguments is null ? null : (index, candidateType, otherType) =>
@@ -8631,6 +8745,16 @@ public sealed class Binder
         var ordinaryCost = GetImplicitConversionCost(parameterType, argumentType);
         if (ordinaryCost is not null)
             return ordinaryCost;
+        if (TryBuildClosedReferenceGeneric(parameterType) is { } receiving
+            && (argument.GenericNullabilityType ?? argument.Type as BoundTypes.GenericInstantiationBoundType)
+                is { } supplied
+            && NullabilityChecker.IsReferenceContainerDefinition(supplied.Definition)
+            && NullabilityChecker.SameGenericDefinition(
+                receiving.Definition.QualifiedName, supplied.Definition.QualifiedName)
+            && receiving.TypeArguments is [BoundTypes.NominalBoundType targetElement]
+            && supplied.TypeArguments is [BoundTypes.NominalBoundType sourceElement]
+            && targetElement.HasSameUnderlyingReferenceType(sourceElement))
+            return 0;
         if (!TryGetSignedIntegerLiteral(argument, out var value))
             return null;
 
@@ -10295,6 +10419,7 @@ public sealed class Binder
                 _diagnostics.Report(
                     resourceExpr.Span,
                     DiagnosticCode.NullableToNonNullableBinding,
+                    DescribeClosedGenericReceiving(resourceExpr, target!) ??
                     $"Using resource '{usingStmt.VariableName}' declares non-nullable {targetShapeLabel} but its initializer " +
                     $"may be null (source annotation: '{DescribeAnnotation(resourceExpr)}'). " +
                     $"Change the target to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
