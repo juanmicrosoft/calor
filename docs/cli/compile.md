@@ -174,6 +174,11 @@ sealed dispatch retain their existing contracts; unavailable getter-body proof
 still produces Unknown.
 The same check follows initializer-reachable source helpers transitively using
 their bound bodies, rather than trusting a source call graph's inferred purity.
+Ordinary open virtual source calls charge the selected declaration's effect row,
+as checked by override/interface effect variance. They cannot substitute one
+implementation's smaller inferred row. Nonvirtual, base-qualified and sealed
+calls retain implementation precision; callback values still carry their
+destination's declared row.
 
 ---
 

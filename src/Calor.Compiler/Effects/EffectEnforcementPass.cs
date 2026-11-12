@@ -3906,6 +3906,8 @@ public sealed class EffectEnforcementPass
                 exactInternalIds = Array.Empty<string>();
             if (exactInternalIds.Count > 0)
             {
+                if (InferSourceDispatchCharge(span, exactInternalIds) is { } dispatch)
+                    return dispatch;
                 var effects = EffectSet.Empty;
                 foreach (var exactInternalId in exactInternalIds)
                 {
@@ -6128,12 +6130,7 @@ public sealed class EffectEnforcementPass
             CS.IOperation? receiver = null, bool nonVirtualDispatch = false)
         {
             if (method.Locations.Any(location => location.IsInSource)
-                && (method.IsAbstract
-                    || !method.IsStatic
-                    && (method.ContainingType.TypeKind == CS.TypeKind.Interface
-                        || (method.IsVirtual || method.IsOverride)
-                        && !nonVirtualDispatch && !method.IsSealed && !method.ContainingType.IsSealed
-                        && receiver?.Type is not CS.INamedTypeSymbol { IsSealed: true })))
+                && !CallGraphAnalysis.HasAuthoritativeSourceDispatch(method, receiver?.Type, nonVirtualDispatch))
                 return UnknownResolvedOperation(
                     $"unproved initializer dispatch '{method.ToDisplayString()}'", span);
             if (method.MethodKind == CS.MethodKind.Constructor
@@ -6898,6 +6895,8 @@ public sealed class EffectEnforcementPass
                     .Union(InferFromCallArguments($"<expression>.{member.FieldName}", call.Arguments, call.ArgumentModifiers));
                 if (ids.Count > 0)
                 {
+                    if (InferSourceDispatchCharge(call.Span, ids) is { } dispatch)
+                        return evaluated.Union(dispatch);
                     if (bound?.SelectedSourceMethod is { IsStatic: true, ContainingType.IsGenericType: true } sourceMethod)
                         evaluated = evaluated.Union(
                             bound.SourceStaticMethodOwner is { } owner
@@ -7415,6 +7414,25 @@ public sealed class EffectEnforcementPass
                         : $"{manifestType}.set_{initializer.PropertyName}",
                     initializer.Value.Span)
                 : resolution.Effects;
+        }
+
+        private EffectSet? InferSourceDispatchCharge(TextSpan span, IReadOnlyCollection<string> functionIds)
+        {
+            if (!_context.CallGraph.TrySourceDispatch(span, out var selected))
+                return functionIds.Any(_context.CallGraph.RequiresSourceDispatchProof)
+                    ? UnknownResolvedOperation("unproved source dispatch", span) : null;
+            if (selected is not { Declaration: not null, HasCompleteProofContext: true })
+                return UnknownResolvedOperation("unproved source dispatch", span);
+            if (selected.IsAuthoritative)
+                return null;
+            // Open dispatch follows its selected slot contract, not one
+            // implementation's computed row (the D-W2.2 variance boundary).
+            return selected.Declaration switch
+            {
+                MethodNode method => GetDeclaredEffects(method.Effects),
+                MethodSignatureNode signature => GetDeclaredEffects(signature.Effects),
+                _ => UnknownResolvedOperation(selected.Method.ToDisplayString(), span)
+            };
         }
 
         private EffectSet InferFromInternalFunctions(IEnumerable<string> functionIds)

@@ -70,6 +70,124 @@ public sealed class NativeEffectHeaderTests
             && diagnostic.Message.Contains("fs:throw"));
     }
 
+    [Theory]
+    [InlineData("virtual", false, false)]
+    [InlineData("virtual", true, false)]
+    [InlineData("virtual", false, true)]
+    [InlineData("virtual", true, true)]
+    [InlineData("virtual-pure-override", false, false)]
+    [InlineData("virtual-pure-override", true, false)]
+    [InlineData("virtual-pure-override", false, true)]
+    [InlineData("virtual-pure-override", true, true)]
+    [InlineData("nonvirtual", false, false)]
+    [InlineData("nonvirtual", true, false)]
+    [InlineData("nonvirtual", false, true)]
+    [InlineData("nonvirtual", true, true)]
+    [InlineData("sealed-receiver", false, false)]
+    [InlineData("sealed-receiver", true, false)]
+    [InlineData("sealed-receiver", false, true)]
+    [InlineData("sealed-receiver", true, true)]
+    [InlineData("sealed-override", false, false)]
+    [InlineData("sealed-override", true, false)]
+    [InlineData("sealed-override", false, true)]
+    [InlineData("sealed-override", true, true)]
+    [InlineData("base-qualified", false, false)]
+    [InlineData("base-qualified", true, false)]
+    [InlineData("base-qualified", false, true)]
+    [InlineData("base-qualified", true, true)]
+    public void OrdinarySourceDispatchPreservesSlotAndImplementationRows(
+        string dispatch, bool chain, bool consoleWriteCaller)
+    {
+        var callerRow = consoleWriteCaller ? "cw" : "";
+        var derivedRow = dispatch is "virtual" or "base-qualified" ? "cw" : "";
+        var source = $$"""
+            module OrdinaryDispatch
+              class Base
+                func Read {{(dispatch == "nonvirtual" ? "" : "virtual")}} () → string
+                  ! cw
+                  return "safe"
+              class Derived {{(dispatch == "sealed-receiver" ? "sealed" : "")}}
+                extends Base
+            {{(dispatch == "nonvirtual" ? "" : $$"""
+                func Read {{(dispatch == "sealed-override" ? "sealed " : "")}}override () → string
+                  ! {{derivedRow}}
+            {{(derivedRow == "" ? "" : "      System.Console.WriteLine(\"effect\")")}}
+                  return "effect"
+            """)}}
+            {{(dispatch != "base-qualified" ? "" : """
+                func ReadBase () → string
+                  !
+                  return base.Read()
+            """)}}
+              class Holder
+                field {{(dispatch is "sealed-receiver" or "sealed-override" or "base-qualified" ? "Derived" : "Base")}}:Source private static = new Derived()
+                func ReadSource private static () → string
+                  ! {{callerRow}}
+                  return Source.{{(dispatch == "base-qualified" ? "ReadBase" : "Read")}}()
+            {{(chain ? $$"""
+                func ReadAgain private static () → string
+                  ! {{callerRow}}
+                  return ReadSource()
+            """ : "")}}
+                func Render static () → string
+                  ! {{callerRow}}
+                  return {{(chain ? "ReadAgain()" : "ReadSource()")}}
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "ordinary-dispatch.calr", new CompilationOptions
+            {
+                EnableTypeChecking = typing, EnforceEffects = true, StrictEffects = true,
+                UnknownCallPolicy = UnknownCallPolicy.Strict, UnsafeTranspileOnly = false,
+                VerifyContracts = false, StatusWriter = TextWriter.Null
+            });
+            Assert.Equal(dispatch is "virtual" or "virtual-pure-override" && !consoleWriteCaller, result.HasErrors);
+            if (result.HasErrors)
+            {
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                    && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+                Assert.Empty(result.GeneratedCode);
+            }
+            else
+                Assert.Empty(result.Diagnostics.Errors);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OrdinarySourceDispatchPreservesModuleCallers(bool interfaceReceiver)
+    {
+        var source = interfaceReceiver ? """
+            module InterfaceCaller Test
+              interface IShape
+                func Describe () → void
+                  ! cw
+              func Draw (IShape:shape) → void
+                ! cw
+                shape.Describe()
+            """ : """
+            module ModuleCaller Test
+              func Helper private (int:x) → int
+                !
+                return x + 1
+              func Main () → int
+                !
+                return Helper(1)
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "ordinary-module-caller.calr", new CompilationOptions
+            {
+                EnableTypeChecking = typing, EnforceEffects = true, StrictEffects = true,
+                UnknownCallPolicy = UnknownCallPolicy.Strict, UnsafeTranspileOnly = false,
+                VerifyContracts = false, StatusWriter = TextWriter.Null
+            });
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        }
+    }
+
     private static ModuleNode Parse(string source)
     {
         var diagnostics = new DiagnosticBag();

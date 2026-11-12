@@ -59,6 +59,9 @@ public sealed class CallGraphAnalysis
     internal sealed record MetadataGetterSelection(
         IPropertySymbol Property, INamedTypeSymbol ReceiverType);
 
+    internal sealed record SourceDispatchSelection(
+        IMethodSymbol Method, AstNode? Declaration, bool IsAuthoritative, bool HasCompleteProofContext);
+
     internal sealed record StableMemberSelection(
         ClassDefinitionNode Owner, PropertyNode Property, bool HasNonNullFlow);
 
@@ -86,6 +89,8 @@ public sealed class CallGraphAnalysis
         internal Dictionary<ExpressionNode, string> ResultTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal List<string> Failures { get; } = [];
         internal Dictionary<TextSpan, SourceCallSelection> SelectedCalls { get; } = [];
+        internal Dictionary<TextSpan, SourceDispatchSelection?> SourceDispatches { get; } = [];
+        internal HashSet<string> FunctionsRequiringDispatchProof { get; } = [];
         internal HashSet<TextSpan> SourceExtensionCalls { get; } = [];
         internal HashSet<TextSpan> ForeignSourceCallSites { get; } = [];
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
@@ -135,6 +140,18 @@ public sealed class CallGraphAnalysis
         _operatorBindings.InitializationFunctions.GetValueOrDefault(method.OriginalDefinition);
     internal IReadOnlyList<IOperation>? InitializationBodies(string functionId) =>
         _operatorBindings.InitializationBodies.GetValueOrDefault(functionId);
+    internal bool TrySourceDispatch(TextSpan span, out SourceDispatchSelection? selection) =>
+        _operatorBindings.SourceDispatches.TryGetValue(span, out selection);
+    internal bool RequiresSourceDispatchProof(string functionId) =>
+        _operatorBindings.FunctionsRequiringDispatchProof.Contains(functionId);
+
+    internal static bool HasAuthoritativeSourceDispatch(
+        IMethodSymbol method, ITypeSymbol? receiver, bool nonVirtualDispatch) =>
+        !method.IsAbstract && (method.IsStatic
+            || method.ContainingType.TypeKind != TypeKind.Interface
+            && (!(method.IsVirtual || method.IsOverride) || nonVirtualDispatch
+                || method.IsSealed || method.ContainingType.IsSealed
+                || receiver is INamedTypeSymbol { IsSealed: true }));
     internal IMethodSymbol? ConstructorInitializer(ConstructorNode constructor) =>
         _operatorBindings.ConstructorInitializers.GetValueOrDefault(constructor);
     internal IMethodSymbol? SourceConstructor(NewExpressionNode creation) =>
@@ -412,6 +429,8 @@ public sealed class CallGraphAnalysis
                         if (initializationIds.TryGetValue(origin, out var functionId))
                         {
                             bindings.InitializationFunctions[method.OriginalDefinition] = functionId;
+                            if (!HasAuthoritativeSourceDispatch(method, null, nonVirtualDispatch: false))
+                                bindings.FunctionsRequiringDispatchProof.Add(functionId);
                             if (!bindings.InitializationBodies.TryGetValue(functionId, out var bodies))
                                 bindings.InitializationBodies[functionId] = bodies = [];
                             if (model.GetOperation(declaration) is not { } body
@@ -512,13 +531,16 @@ public sealed class CallGraphAnalysis
                         constructor.MetadataName, [], EffectMemberKind.Constructor);
                 }
             }
-            if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindEvents
+            if (!bindInitialization && !bindExpressions && !bindNullGuards && !bindMemberTypes && !bindEvents
                 && !bindInterpolation && additions.Length == 0)
                 return;
 
             var validProofContext = (bindMemberTypes || bindNullGuards || bindInterpolation || additions.Length > 0) && !compilation.GetDiagnostics().Any(diagnostic =>
                 diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
             var validMemberContext = bindMemberTypes && validProofContext;
+            var validDispatchContext = !compilation.GetDiagnostics().Any(diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            var selectedDispatchesInTree = new HashSet<TextSpan>();
             var selectedInTree = new HashSet<TextSpan>();
             var selectedNullGuardsInTree = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
             var terminatingGuardsInTree = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
@@ -718,6 +740,30 @@ public sealed class CallGraphAnalysis
                             bindings.BuiltInNullGuardOperations.Remove(guard);
                         }
                     }
+                    if (operation is IInvocationOperation sourceInvocation
+                        && sourceInvocation.TargetMethod.MethodKind == MethodKind.Ordinary
+                        && sourceInvocation.TargetMethod.Locations.Any(location => location.IsInSource)
+                        && Origin(operation) is ExpressionCallNode or CallExpressionNode or CallStatementNode)
+                    {
+                        var site = Origin(operation)!.Span;
+                        var dispatchedMethod = sourceInvocation.TargetMethod;
+                        selectedDispatchesInTree.Add(site);
+                        var selection = new SourceDispatchSelection(dispatchedMethod,
+                            methods.GetValueOrDefault(dispatchedMethod.OriginalDefinition),
+                            HasAuthoritativeSourceDispatch(dispatchedMethod, sourceInvocation.Instance?.Type,
+                                nonVirtualDispatch: !sourceInvocation.IsVirtual), validDispatchContext);
+                        if (bindings.SourceDispatches.TryGetValue(site, out var previous))
+                            bindings.SourceDispatches[site] = previous is null
+                                || !ReferenceEquals(previous.Declaration, selection.Declaration)
+                                    ? null : selection with
+                                    {
+                                        IsAuthoritative = selection.IsAuthoritative && previous.IsAuthoritative,
+                                        HasCompleteProofContext = selection.HasCompleteProofContext
+                                            && previous.HasCompleteProofContext
+                                    };
+                        else
+                            bindings.SourceDispatches[site] = selection;
+                    }
                     if (operation is IInvocationOperation invocation
                         && (bindExpressions || companions.Count > 0 || invocation.TargetMethod.IsExtensionMethod
                             || invocation.TargetMethod is { IsStatic: true, ContainingType.IsGenericType: true }))
@@ -809,6 +855,10 @@ public sealed class CallGraphAnalysis
                 conflictingAdditions.Add(addition);
                 bindings.AdditionFormats.Remove(addition);
             }
+            foreach (var call in ranges.Select(range => range.Node).Where(node =>
+                         node is ExpressionCallNode or CallExpressionNode or CallStatementNode))
+                if (!selectedDispatchesInTree.Contains(call.Span) && bindings.SourceDispatches.ContainsKey(call.Span))
+                    bindings.SourceDispatches[call.Span] = null;
             foreach (var reference in ranges.Select(range => range.Node).OfType<ReferenceNode>()
                          .Where(reference => !selectedStaticFieldReadsInTree.Contains(reference)))
             {
