@@ -3357,4 +3357,104 @@ public sealed class NativeMetadataClosureTests
         Assert.True(result.Success, source + Environment.NewLine + string.Join(Environment.NewLine, result.Diagnostics));
         return Assembly.Load(stream.ToArray());
     }
+
+    [Theory]
+    [InlineData("System . Math . PI", "double", "System.Math", false)]
+    [InlineData("System . Math . PI", "double", "System.Math", true)]
+    [InlineData("System . Int32 . MaxValue", "int", "int", false)]
+    [InlineData("System . Int32 . MaxValue", "int", "int", true)]
+    public void QualifiedMetadataConstants_DoNotEvaluateTheirTypeQualifier(
+        string expression, string type, string owner, bool typeChecking)
+    {
+        var source = $$"""
+            module QualifiedConstant
+              func Read public () → {{type}}
+                !
+                return {{expression}}
+            """;
+        foreach (var native in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(native));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+            Assert.IsType<BoundTypeReferenceExpression>(read.Target);
+            var field = Assert.IsAssignableFrom<IFieldSymbol>(read.ResolvedMetadataMember);
+            Assert.True(field.IsStatic && field.IsConst);
+            Assert.Equal(owner, field.ContainingType.ToDisplayString());
+
+            var compiled = Program.Compile(native, "qualified-constant.calr", new CompilationOptions
+            {
+                StrictApi = true, StrictEffects = true, EnableTypeChecking = typeChecking
+            });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            Assert.Contains(expression.Replace(" . ", ".", StringComparison.Ordinal), compiled.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void QualifiedMetadataReadonlyFields_StillNeedIndependentEffectProof(bool typeChecking)
+    {
+        const string source = """
+            module QualifiedReadonly
+              func Read public () → System.EventArgs
+                !
+                return System . EventArgs . Empty
+            """;
+        var module = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+        var field = Assert.IsAssignableFrom<IFieldSymbol>(read.ResolvedMetadataMember);
+        Assert.True(field.IsStatic && field.IsReadOnly);
+        Assert.False(field.IsConst);
+        var effects = new DiagnosticBag();
+        new EffectEnforcementPass(effects).Enforce(module);
+        Assert.Contains(effects, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains(field.ToDisplayString(), StringComparison.Ordinal));
+        var compiled = Program.Compile(source, "qualified-readonly.calr", new CompilationOptions
+        {
+            StrictApi = true, StrictEffects = true, EnableTypeChecking = typeChecking
+        });
+        Assert.True(compiled.HasErrors);
+        Assert.Empty(compiled.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void QualifiedConstantSpelling_DoesNotHideEvaluatedSourceReceiverEffects(bool typeChecking)
+    {
+        const string source = """
+            module QualifiedShadow
+              class Value
+                field double:PI public
+              class Holder
+                field Value:Math public
+              func Receiver (Holder:value) → Holder
+                ! cw
+                System.Console.WriteLine("receiver")
+                return value
+              func Read public (Holder:System) → double
+                !
+                return Receiver(System) . Math . PI
+            """;
+        var options = new CompilationOptions
+        {
+            StrictApi = true, StrictEffects = true, EnableTypeChecking = typeChecking
+        };
+        var rejected = Program.Compile(source, "qualified-shadow.calr", options);
+        Assert.Contains(rejected.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+        Assert.Empty(rejected.GeneratedCode);
+        var accepted = Program.Compile(source.Replace(
+            "func Read public (Holder:System) → double\n    !",
+            "func Read public (Holder:System) → double\n    ! cw", StringComparison.Ordinal),
+            "qualified-shadow.calr", options);
+        Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
+    }
 }

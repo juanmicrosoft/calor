@@ -5909,7 +5909,9 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromFieldAccess(FieldAccessNode field)
             => _context.CallGraph.MetadataField(_context.CurrentFunctionId, field.Span) is { } metadataField
-                ? InferFromMetadataField(metadataField, InferFromExpression(field.Target), field.Span)
+                ? InferFromMetadataField(metadataField,
+                    metadataField is { IsStatic: true, IsConst: true }
+                        ? EffectSet.Empty : InferFromExpression(field.Target), field.Span)
                 : InferFromMemberAccess(field.Target, field.FieldName, field.Span,
                     _context.CallGraph.SelectedMetadataGetter(field));
 

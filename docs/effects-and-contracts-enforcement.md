@@ -226,6 +226,10 @@ The dispatch review uses .NET 10 CoreLib source at
 cross-checked against the selected runtime members and their IL.
 This is bounded contract coverage, not a proof of the whole BCL.
 
+Selected metadata constants, such as `System.Math.PI`, do not evaluate their
+namespace/type qualifiers or run a type initializer. This does not grant purity
+to same-spelled source getters or to static readonly fields.
+
 ## Project-Level Effect Manifests
 
 Create a `.calor-effects.json` file in your project directory to declare effects for types not covered by the built-in manifests:
