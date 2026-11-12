@@ -859,7 +859,8 @@ public class Program
                 bindingDiagnostics.Where(diagnostic =>
                     diagnostic.BindingContext?.Shape == BindingReceivingShape.Generic
                     && BindingDiagnosticPolicy.IsCompilationError(diagnostic))
-                    .Select(diagnostic => diagnostic.Span).ToHashSet())
+                    .Select(diagnostic => diagnostic.Span).ToHashSet(),
+                binder.BoundMetadataStaticFieldReads)
             {
                 ProjectionContractMode = options.ContractMode
             };

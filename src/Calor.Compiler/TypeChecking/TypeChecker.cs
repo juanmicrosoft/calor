@@ -15,6 +15,7 @@ public sealed class TypeChecker
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceEnumConstants;
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceStaticFieldReads;
     private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundMetadataConstants;
+    private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundMetadataStaticFieldReads;
     private readonly IReadOnlySet<TextSpan>? _boundGenericReceivingFailures;
     private ModuleNode? _module;
     private Analysis.CallGraphAnalysis.OperatorBindings? _sourceBindings;
@@ -85,7 +86,8 @@ public sealed class TypeChecker
         IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceEnumConstants,
         IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceStaticFieldReads,
         IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundMetadataConstants,
-        IReadOnlySet<TextSpan>? boundGenericReceivingFailures)
+        IReadOnlySet<TextSpan>? boundGenericReceivingFailures,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundMetadataStaticFieldReads = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _env = new TypeEnvironment();
@@ -93,6 +95,7 @@ public sealed class TypeChecker
         _boundSourceEnumConstants = boundSourceEnumConstants;
         _boundSourceStaticFieldReads = boundSourceStaticFieldReads;
         _boundMetadataConstants = boundMetadataConstants;
+        _boundMetadataStaticFieldReads = boundMetadataStaticFieldReads;
         _boundGenericReceivingFailures = boundGenericReceivingFailures;
     }
 
@@ -1880,6 +1883,8 @@ public sealed class TypeChecker
             return ResolveTypeName(selectedStaticField.Type.DisplayString, expr.Span);
         if (_boundMetadataConstants?.TryGetValue(expr, out var metadataConstant) == true)
             return ResolveTypeName(metadataConstant.Type.DisplayString, expr.Span);
+        if (_boundMetadataStaticFieldReads?.TryGetValue(expr, out var metadataStaticField) == true)
+            return ResolveTypeName(metadataStaticField.Type.DisplayString, expr.Span);
         return expr switch
         {
             IntLiteralNode => PrimitiveType.Int,

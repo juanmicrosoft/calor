@@ -3457,4 +3457,106 @@ public sealed class NativeMetadataClosureTests
             "qualified-shadow.calr", options);
         Assert.False(accepted.HasErrors, string.Join("\n", accepted.Diagnostics));
     }
+
+    [Theory]
+    [InlineData("System . EventArgs . Empty", "System.EventArgs", "System.EventArgs")]
+    [InlineData("System . String . Empty", "string", "string")]
+    public void QualifiedMetadataStaticFields_TransferTypesWithoutEffectPermission(
+        string expression, string type, string owner)
+    {
+        var source = $$"""
+            module QualifiedFieldType
+              func Read public () → {{type}}
+                !
+                return {{expression}}
+            """;
+        foreach (var native in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var diagnostics = new DiagnosticBag();
+            var bound = new Binder(diagnostics).Bind(Parse(native));
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+            var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+            Assert.IsType<BoundTypeReferenceExpression>(read.Target);
+            var field = Assert.IsAssignableFrom<IFieldSymbol>(read.ResolvedMetadataMember);
+            Assert.True(field.IsStatic && field.IsReadOnly);
+            Assert.False(field.IsConst);
+            Assert.Equal(owner, field.ContainingType.ToDisplayString());
+
+            var typed = Program.Compile(native, "qualified-field-type.calr", new CompilationOptions
+            {
+                EnableTypeChecking = true, EnforceEffects = false
+            });
+            Assert.False(typed.HasErrors, string.Join("\n", typed.Diagnostics));
+            var tree = CSharpSyntaxTree.ParseText(typed.GeneratedCode);
+            var compilation = CSharpCompilation.Create("QualifiedFieldType", [tree],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.DoesNotContain(compilation.GetDiagnostics(), item => item.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            var access = Assert.Single(tree.GetRoot().DescendantNodes()
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax>()
+                .Where(member => member.Name.Identifier.ValueText == "Empty"));
+            var emitted = Assert.IsAssignableFrom<IFieldSymbol>(compilation.GetSemanticModel(tree).GetSymbolInfo(access).Symbol);
+            Assert.Equal(field.ToDisplayString(), emitted.ToDisplayString());
+            Assert.Equal(field.Type.ToDisplayString(), emitted.Type.ToDisplayString());
+
+            foreach (var typeChecking in new[] { false, true })
+            {
+                var strict = Program.Compile(native, "qualified-field-type.calr", new CompilationOptions
+                {
+                    StrictApi = true, StrictEffects = true, EnableTypeChecking = typeChecking
+                });
+                Assert.True(strict.HasErrors);
+                Assert.Empty(strict.GeneratedCode);
+                Assert.DoesNotContain(strict.Diagnostics.Errors, item => item.Code == DiagnosticCode.UndefinedReference);
+                Assert.Contains(strict.Diagnostics, item => item.Code == DiagnosticCode.UnknownExternalCall
+                    && item.Message.Contains(field.ToDisplayString(), StringComparison.Ordinal));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void QualifiedMetadataStaticFieldSpelling_DoesNotHideAValueReceiver(bool typeChecking)
+    {
+        const string source = """
+            module QualifiedFieldShadow
+              class Value
+                field string:Empty public
+              class Holder
+                field Value:String public
+              func Receiver (Holder:value) → Holder
+                ! cw
+                System.Console.WriteLine("receiver")
+                return value
+              func Read public (Holder:System) → string
+                !
+                return Receiver(System) . String . Empty
+            """;
+        var result = Program.Compile(source, "qualified-field-shadow.calr", new CompilationOptions
+        {
+            StrictApi = true, StrictEffects = true, EnableTypeChecking = typeChecking
+        });
+        Assert.Contains(result.Diagnostics.Errors, item => item.Code == DiagnosticCode.ForbiddenEffect
+            && item.Message.Contains("Function 'Read'", StringComparison.Ordinal)
+            && item.Message.Contains("'cw'", StringComparison.Ordinal));
+        Assert.Empty(result.GeneratedCode);
+    }
+
+    [Fact]
+    public void QualifiedMetadataStaticFields_DoNotResolveMissingTypeQualifiers()
+    {
+        const string source = """
+            module MissingFieldType
+              func Read public () → object
+                return Missing . EventArgs . Empty
+            """;
+        var result = Program.Compile(source, "missing-field-type.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true, EnforceEffects = false
+        });
+        Assert.Contains(result.Diagnostics.Errors, item => item.Code == DiagnosticCode.UndefinedReference
+            && item.Message.Contains("'Missing'", StringComparison.Ordinal));
+        Assert.Empty(result.GeneratedCode);
+    }
 }

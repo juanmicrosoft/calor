@@ -126,6 +126,10 @@ public sealed class Binder
         new(ReferenceEqualityComparer.Instance);
     internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundMetadataConstants =>
         _boundMetadataConstants;
+    private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundMetadataStaticFieldReads =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundMetadataStaticFieldReads =>
+        _boundMetadataStaticFieldReads;
     private readonly Dictionary<ExpressionNode, BoundExpression> _boundContractExpressions = new();
     internal IReadOnlyDictionary<ExpressionNode, BoundExpression> BoundContractExpressions =>
         _boundContractExpressions;
@@ -1158,6 +1162,7 @@ public sealed class Binder
         _boundSourceEnumConstants.Clear();
         _boundSourceStaticFieldReads.Clear();
         _boundMetadataConstants.Clear();
+        _boundMetadataStaticFieldReads.Clear();
         _boundContractExpressions.Clear();
         _boundVerificationCalls.Clear();
         CrossModuleCallTargets.Clear();
@@ -4422,6 +4427,14 @@ public sealed class Binder
                     { IsStatic: true, IsConst: true, Type.SpecialType: not Microsoft.CodeAnalysis.SpecialType.None }
             } metadataConstant)
             _boundMetadataConstants[expr] = metadataConstant;
+        if (bound is BoundFieldAccessExpression
+            {
+                Target: BoundTypeReferenceExpression,
+                ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
+                    { IsStatic: true, Type.TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error },
+                Type: BoundTypes.NominalBoundType { RoslynSymbol: not null }
+            } metadataStaticField)
+            _boundMetadataStaticFieldReads[expr] = metadataStaticField;
         return bound;
     }
 
