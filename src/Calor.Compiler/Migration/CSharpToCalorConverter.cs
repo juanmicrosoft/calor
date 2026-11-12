@@ -416,7 +416,7 @@ public sealed class CSharpToCalorConverter
                 result = TryConvertObliviousModule(csharpSource, sourceFile, result,
                     cancellationToken, capturePreservationContext, allowScopedNamespaceImports: true);
             if (!result.Success || result.Losses.Count != 0)
-                return Single("A namespace did not convert entirely natively.");
+                return Single("A namespace did not convert entirely natively.", result);
             outputs.Add(new(scopedImports
                 ? Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr")
                 : GetNamespaceOutputPath(Path.GetFileName(sourceFile ?? "input.cs"), index), result));
@@ -484,11 +484,22 @@ public sealed class CSharpToCalorConverter
             output.Conversion.Context.RoundTrip = ConversionRoundTrip.Verified;
         return new(outputs);
 
-        ProjectConversionResult Single(string? reason = null)
+        ProjectConversionResult Single(string? reason = null, ConversionResult? rejectedCandidate = null)
         {
             var result = ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
             if (reason != null)
                 result.Context.AddWarning(reason + " Retaining the single-file fidelity boundary.", "namespace-split-refused");
+            if (rejectedCandidate != null)
+                foreach (var issue in rejectedCandidate.Issues
+                    .DistinctBy(issue => (issue.Severity, issue.Message, issue.Feature,
+                        issue.Line, issue.Column, issue.Suggestion))
+                    .Where(issue => !result.Issues.Any(existing =>
+                        existing.Severity == issue.Severity && existing.Message == issue.Message
+                        && existing.Feature == issue.Feature && existing.Line == issue.Line
+                        && existing.Column == issue.Column && existing.Suggestion == issue.Suggestion)))
+                    result.Context.AddWarning(
+                        $"Rejected native namespace candidate ({issue.Severity}): {issue.Message}",
+                        issue.Feature, issue.Line, issue.Column, issue.Suggestion);
             return new([new(Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr"), result)]);
         }
     }

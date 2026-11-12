@@ -75,6 +75,10 @@ metadata mismatch. Candidate diagnostics remain warnings after exact original C#
 preservation; they do not mean the rejected native candidate compiled. A metadata
 mismatch is reported only after the generated C# compiles.
 
+Scoped-import fallback retains those candidate diagnostics too. A
+`namespace-split-refused` warning can accompany a nullable receiving error or an
+unknown effect; the namespace label alone does not identify the underlying defect.
+
 Static calls on source generic types use the selected constructed method signature,
 not a receiver name with its generic arguments removed. Namespace and alias lookup,
 arity, constraints, overloads, and nullable annotations must still resolve.

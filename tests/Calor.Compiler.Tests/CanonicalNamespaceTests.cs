@@ -948,6 +948,34 @@ public sealed class CanonicalNamespaceTests
         }
     }
 
+    [Theory]
+    [InlineData("public static int Read(string text) => text.Length;", "Calor0274")]
+    [InlineData("public static bool Equal(object left, object right) => object.Equals(left, right);", "Calor0410")]
+    public void ScopedImportFallbackRetainsTheActualNativeCandidateRefusal(string member, string code)
+    {
+        var source = $$"""
+            namespace Witness
+            {
+                using System;
+                public static class Probe { {{member}} }
+            }
+            """;
+        var project = new CSharpToCalorConverter().ConvertProject(source, "Probe.cs");
+        Assert.True(project.Success);
+        Assert.False(project.IsSplit);
+        var conversion = Assert.Single(project.Outputs).Conversion;
+        Assert.True(conversion.InteropPreservationCount > 0);
+        Assert.Contains(conversion.Issues, issue =>
+            issue.Severity == ConversionIssueSeverity.Warning
+            && issue.Feature == "roundtrip-calor-validation"
+            && issue.Line is > 0 && issue.Column is > 0
+            && issue.Message.Contains("Rejected native namespace candidate", StringComparison.Ordinal)
+            && issue.Message.Contains(code, StringComparison.Ordinal));
+        Assert.Contains(conversion.Ast!.InteropBlocks, block => block.CSharpCode == source);
+        var compiled = Program.Compile(conversion.CalorSource!);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
     private static string QualifiedValueWitness(string expression, bool shadow, string member) => $$"""
         using Root = global::System;
         namespace AliasFidelity;
