@@ -65,38 +65,36 @@
     },
     {
       "type": "System.Int32",
-      "defaultEffects": [],
       "methods": {
-        "Parse": [],
-        "TryParse": [],
-        "ToString": []
+        "Equals(System.Int32)": [],
+        "CompareTo(System.Int32)": [],
+        "GetHashCode()": []
       }
     },
     {
       "type": "System.Int64",
-      "defaultEffects": [],
       "methods": {
-        "Parse": [],
-        "TryParse": [],
-        "ToString": []
+        "Equals(System.Int64)": [],
+        "CompareTo(System.Int64)": [],
+        "GetHashCode()": []
       }
     },
     {
       "type": "System.Double",
-      "defaultEffects": [],
       "methods": {
-        "Parse": [],
-        "TryParse": [],
-        "ToString": []
+        "Equals(System.Double)": [],
+        "CompareTo(System.Double)": [],
+        "GetHashCode()": []
       }
     },
     {
       "type": "System.Boolean",
-      "defaultEffects": [],
       "methods": {
-        "Parse": [],
-        "TryParse": [],
-        "ToString": []
+        "Equals(System.Boolean)": [],
+        "CompareTo(System.Boolean)": [],
+        "GetHashCode()": [],
+        "ToString()": [],
+        "ToString(System.IFormatProvider)": []
       }
     },
     {

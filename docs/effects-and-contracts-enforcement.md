@@ -159,6 +159,29 @@ comparisons, formatting, and enumerable overloads can also dispatch to user
 code. They cannot inherit permission from a safe overload's name. Strict
 compilation rejects unresolved effects rather than guessing a `mut` row.
 
+`System.Int32`, `System.Int64`, `System.Double`, and `System.Boolean` also
+have no default or method-name-wide pure contracts. Their finite coverage is
+`Equals(T)`, `CompareTo(T)` (where `T` is the declaring type), and
+`GetHashCode()`. Boolean additionally covers `ToString()` and
+`ToString(IFormatProvider)`: both return fixed literals and ignore the provider.
+These .NET 10 implementations use value comparisons and bit operations;
+Double's NaN and signed-zero helpers do not dispatch to user code.
+
+Numeric `Parse`, `TryParse`, and `ToString` overloads remain Unknown.
+`NumberFormatInfo.GetInstance` can call an arbitrary provider's `GetFormat`;
+its current-culture path can call a `CultureInfo` override. Even parameterless
+integer formatting reaches that path for negative values. Passing an invariant
+provider at one call site does not justify a contract for every provider.
+Boolean `Parse` is also omitted: successful parsing avoids culture dispatch,
+but invalid input reaches exception resource lookup through the virtual
+`CurrentUICulture.Name` getter. Unlisted overloads, including Boolean
+`TryParse` with its output write, have no purity claim.
+
+The dispatch review uses .NET 10 CoreLib source at
+[`0427b9abbe`](https://github.com/dotnet/dotnet/tree/0427b9abbead3fa64c6655eb4290c537397131fa/src/runtime/src/libraries/System.Private.CoreLib/src/System),
+cross-checked against the selected runtime members and their IL.
+This is bounded contract coverage, not a proof of the whole BCL.
+
 ## Project-Level Effect Manifests
 
 Create a `.calor-effects.json` file in your project directory to declare effects for types not covered by the built-in manifests:

@@ -387,6 +387,343 @@ public class EffectResolverTests
         }
         """;
 
+    [Theory]
+    [InlineData("System.Int32")]
+    [InlineData("System.Int64")]
+    [InlineData("System.Double")]
+    [InlineData("System.Boolean")]
+    public void NumericContracts_ExactAuthorityCannotEscapeThroughDefaultsOverloadsOrCaches(string typeName)
+    {
+        var compilation = StringProbeCompilation("", []);
+        var type = compilation.GetTypeByMetadataName(typeName)!;
+        Assert.Equal(typeof(int).Assembly.FullName, type.ContainingAssembly.Identity.ToString());
+        var methods = type.GetMembers().OfType<IMethodSymbol>()
+            .Where(method => method.DeclaredAccessibility == Accessibility.Public
+                && method.Name is "Parse" or "TryParse" or "ToString" or "Equals" or "CompareTo" or "GetHashCode")
+            .ToArray();
+        foreach (var safeFirst in new[] { false, true })
+        {
+            var loader = new ManifestLoader(loadUserLevelManifests: false);
+            var resolver = new EffectResolver(loader);
+            resolver.Initialize();
+            var mapping = Assert.Single(loader.LoadedManifests.SelectMany(entry => entry.Manifest.Mappings)
+                .Where(mapping => mapping.Type == typeName));
+            Assert.Null(mapping.DefaultEffects);
+            Assert.All(mapping.Methods!.Keys, signature => Assert.Contains("(", signature));
+            var safe = NumericKey(methods.Single(method => method.Name == "GetHashCode"));
+            if (safeFirst)
+                Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(safe).Status);
+            foreach (var method in methods.Concat(methods.Reverse()))
+            {
+                Assert.DoesNotContain(method.Locations, location => location.IsInSource);
+                var key = NumericKey(method);
+                var safeValueOperation = method.Name == "GetHashCode"
+                    || (method.Name is "Equals" or "CompareTo" && method.Parameters.Length == 1
+                        && SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, type))
+                    || (typeName == "System.Boolean" && method.Name == "ToString");
+                var resolution = resolver.Resolve(key);
+                Assert.Equal(safeValueOperation ? EffectResolutionStatus.PureExplicit : EffectResolutionStatus.Unknown,
+                    resolution.Status);
+                Assert.Equal(!safeValueOperation, resolution.Effects.IsUnknown);
+                Assert.Same(resolution, resolver.Resolve(key));
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key.WithoutParameterList()).Status);
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                    EffectResolverKey.FromStrings(typeName, method.Name, ["?"])).Status);
+            }
+            foreach (var key in new[]
+            {
+                EffectResolverKey.FromStrings(typeName, "Uncovered", []),
+                EffectResolverKey.FromStrings(typeName, "ToString", ["System.String"]),
+                EffectResolverKey.FromStrings(typeName, "GetHashCode", kind: EffectMemberKind.Getter),
+                EffectResolverKey.FromStrings(typeName, "GetHashCode", kind: EffectMemberKind.Setter),
+                EffectResolverKey.FromStrings(typeName, ".ctor", [], EffectMemberKind.Constructor),
+                EffectResolverKey.FromStrings("Vendor." + type.Name, "GetHashCode", [])
+            })
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key).Status);
+        }
+    }
+
+    [Theory]
+    [InlineData("int", "value.GetHashCode()", "int", "-1234", "0", "-1234")]
+    [InlineData("int", "value.CompareTo(other)", "int", "-2147483648", "2147483647", "-1")]
+    [InlineData("int", "value.Equals(other)", "bool", "1", "1", "True")]
+    [InlineData("long", "value.GetHashCode()", "int", "-1234L", "0L", "1233")]
+    [InlineData("long", "value.CompareTo(other)", "int", "-1234L", "0L", "-1")]
+    [InlineData("long", "value.Equals(other)", "bool", "1L", "1L", "True")]
+    [InlineData("double", "value.GetHashCode()", "int", "-0.0", "0.0", "0")]
+    [InlineData("double", "value.CompareTo(other)", "int", "double.NaN", "0.0", "-1")]
+    [InlineData("double", "value.CompareTo(other)", "int", "0.0", "double.NaN", "1")]
+    [InlineData("double", "value.Equals(other)", "bool", "double.NaN", "double.NaN", "True")]
+    [InlineData("bool", "value.GetHashCode()", "int", "true", "false", "1")]
+    [InlineData("bool", "value.CompareTo(other)", "int", "false", "true", "-1")]
+    [InlineData("bool", "value.Equals(other)", "bool", "true", "false", "False")]
+    [InlineData("bool", "value.ToString()", "string", "true", "false", "True")]
+    [InlineData("bool", "value.ToString(provider)", "string", "false", "true", "False")]
+    public void NumericContracts_SafeSelectedMembersExecuteWithoutCultureOrProviderCallbacks(
+        string type, string expression, string returnType, string value, string other, string expected)
+    {
+        var source = $$"""
+            public static class Target
+            {
+                public static {{returnType}} Apply({{type}} value, {{type}} other, System.IFormatProvider provider) => {{expression}};
+            }
+            """;
+        var selected = SelectedNumericMethod(source);
+        var resolution = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
+            .Resolve(NumericKey(selected));
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+        Assert.Contains("embedded:Calor.Compiler.Manifests.bcl-system", resolution.Source);
+        var conversion = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "NumericContracts" })
+            .Convert(source);
+        Assert.True(conversion.Success);
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        foreach (var native in StringEmissions(conversion.CalorSource!))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(native, "safe-numeric.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+            foreach (var providerIsCulture in new[] { false, true })
+            {
+                var witness = NumericWitness($"Target.Apply({value}, {other}, provider)", throws: true, providerIsCulture);
+                Assert.Equal(expected + ":0", RunStringProbe(source + witness, symbols));
+                Assert.Equal(expected + ":0", RunStringProbe(result.GeneratedCode + witness, symbols));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("int")]
+    [InlineData("long")]
+    [InlineData("double")]
+    public void NumericContracts_ParsingAndFormattingDispatchInOriginalAndAreStrictlyRejected(string type)
+    {
+        foreach (var (expression, returnType, expected) in new[]
+        {
+            ($"{type}.Parse(\"1234\")", type, "1234"),
+            ($"{type}.Parse(\"1234\", provider)", type, "1234"),
+            ($"{type}.Parse(\"1234\", System.Globalization.NumberStyles.Integer, provider)", type, "1234"),
+            ($"(({type})(-1234)).ToString()", "string", "-1234"),
+            ($"(({type})(-1234)).ToString(provider)", "string", "-1234"),
+            ($"(({type})(-1234)).ToString(\"D\", provider)", "string", "-1234")
+        }.Where(entry => type != "double" || !entry.Item1.Contains("\"D\"", StringComparison.Ordinal)))
+        {
+            var source = $$"""
+                public static class Target
+                {
+                    public static {{returnType}} Apply(System.IFormatProvider provider) => {{expression}};
+                }
+                """;
+            foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+            foreach (var throws in new[] { false, true })
+            foreach (var providerIsCulture in new[] { false, true })
+                Assert.Equal(throws ? "throw:1" : expected + ":1", RunStringProbe(source
+                    + NumericWitness("Target.Apply(provider)", throws, providerIsCulture), symbols));
+            AssertNumericRejected(source, $$"""
+                module NumericContracts overflow unchecked nullable oblivious
+                  module Target
+                    func Apply (System.IFormatProvider:provider) → {{returnType}}
+                      return {{expression}}
+                """);
+        }
+
+        var invariantSource = $$"""
+            public static class Target
+            {
+                public static {{type}} Apply(System.IFormatProvider provider) =>
+                    {{type}}.Parse("1234", System.Globalization.CultureInfo.InvariantCulture);
+            }
+            """;
+        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+            Assert.Equal("1234:0", RunStringProbe(invariantSource
+                + NumericWitness("Target.Apply(provider)", throws: true, providerIsCulture: true), symbols));
+        AssertNumericRejected(invariantSource, $$"""
+            module NumericContracts overflow unchecked
+              module Target
+                func Apply (System.IFormatProvider:provider) → {{type}}
+                  return {{type}}.Parse("1234", System.Globalization.CultureInfo.InvariantCulture)
+            """);
+
+        foreach (var explicitProvider in new[] { false, true })
+        {
+            var arguments = explicitProvider
+                ? "\"1234\", System.Globalization.NumberStyles.Integer, provider, out var value"
+                : "\"1234\", out var value";
+            var source = $$"""
+                public static class Target
+                {
+                    public static bool Apply(System.IFormatProvider provider) => {{type}}.TryParse({{arguments}});
+                }
+                """;
+            Assert.Equal(EffectResolutionStatus.Unknown,
+                new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
+                    .Resolve(NumericKey(SelectedNumericMethod(source))).Status);
+            foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+            foreach (var throws in new[] { false, true })
+            foreach (var providerIsCulture in new[] { false, true })
+                Assert.Equal(throws ? "throw:1" : "True:1", RunStringProbe(source
+                    + NumericWitness("Target.Apply(provider)", throws, providerIsCulture), symbols));
+        }
+    }
+
+    [Fact]
+    public void NumericContracts_BooleanParseSuccessDoesNotProveItsExceptionPathPure()
+    {
+        const string source = """
+            public static class Target
+            {
+                public static bool Apply(System.IFormatProvider provider) => bool.Parse("invalid");
+            }
+            """;
+        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+        {
+            var mutating = Assert.IsType<string>(RunStringProbe(source
+                + NumericWitness("Target.Apply(provider)", throws: false, providerIsCulture: true), symbols));
+            Assert.StartsWith("format:", mutating);
+            Assert.True(int.Parse(mutating["format:".Length..], System.Globalization.CultureInfo.InvariantCulture) > 0);
+            Assert.Equal("throw:1", RunStringProbe(source
+                + NumericWitness("Target.Apply(provider)", throws: true, providerIsCulture: true), symbols));
+            Assert.Equal("True:0", RunStringProbe(source.Replace("\"invalid\"", "\"true\"", StringComparison.Ordinal)
+                + NumericWitness("Target.Apply(provider)", throws: true, providerIsCulture: true), symbols));
+        }
+        AssertNumericRejected(source, """
+            module NumericContracts overflow unchecked
+              module Target
+                func Apply (System.IFormatProvider:provider) → bool
+                  return bool.Parse("invalid")
+            """);
+    }
+
+    private static IMethodSymbol SelectedNumericMethod(string source)
+    {
+        var compilation = StringProbeCompilation(source, []);
+        Assert.DoesNotContain(compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(model.GetSymbolInfo(
+            Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())).Symbol);
+        Assert.Contains(selected.ContainingType.SpecialType, new[]
+        {
+            SpecialType.System_Int32, SpecialType.System_Int64, SpecialType.System_Double, SpecialType.System_Boolean
+        });
+        Assert.Equal(typeof(int).Assembly.FullName, selected.ContainingAssembly.Identity.ToString());
+        Assert.DoesNotContain(selected.Locations, location => location.IsInSource);
+        return selected;
+    }
+
+    private static EffectResolverKey NumericKey(IMethodSymbol method)
+    {
+        var format = new SymbolDisplayFormat(typeQualificationStyle:
+            SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
+        return EffectResolverKey.FromStrings(method.ContainingType.ToDisplayString(format), method.Name,
+            method.Parameters.Select(parameter => parameter.Type.ToDisplayString(format)).ToArray());
+    }
+
+    private static void AssertNumericRejected(string source, string native)
+    {
+        var selected = SelectedNumericMethod(source);
+        Assert.Equal(EffectResolutionStatus.Unknown,
+            new EffectResolver(new ManifestLoader(loadUserLevelManifests: false)).Resolve(NumericKey(selected)).Status);
+        var conversion = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "NumericContracts" })
+            .Convert(source);
+        Assert.True(conversion.Success);
+        Assert.Equal(1, conversion.InteropPreservationCount);
+        foreach (var emission in StringEmissions(native))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(emission, "unknown-numeric.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.True(result.HasErrors);
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("." + selected.Name, StringComparison.Ordinal));
+        }
+    }
+
+    private static string NumericWitness(string call, bool throws, bool providerIsCulture) => $$"""
+
+        public sealed class TrackingNumericCulture : System.Globalization.CultureInfo
+        {
+            public static int Reads;
+            public static bool Throw;
+            public TrackingNumericCulture() : base("") { }
+            public override object GetFormat(System.Type type)
+            {
+                Reads++;
+                if (Throw) throw new System.InvalidOperationException("numeric-culture-callback");
+                return base.GetFormat(type);
+            }
+            public override string Name
+            {
+                get
+                {
+                    Reads++;
+                    if (Throw) throw new System.InvalidOperationException("numeric-culture-callback");
+                    return base.Name;
+                }
+            }
+        }
+        public sealed class TrackingNumericProvider : System.IFormatProvider
+        {
+            public object GetFormat(System.Type type)
+            {
+                TrackingNumericCulture.Reads++;
+                if (TrackingNumericCulture.Throw)
+                    throw new System.InvalidOperationException("numeric-culture-callback");
+                return System.Globalization.NumberFormatInfo.InvariantInfo;
+            }
+        }
+        public static class Probe
+        {
+            public static string Run()
+            {
+                var previous = System.Globalization.CultureInfo.CurrentCulture;
+                var previousUI = System.Globalization.CultureInfo.CurrentUICulture;
+                try
+                {
+                    var culture = new TrackingNumericCulture();
+                    System.Globalization.CultureInfo.CurrentCulture = culture;
+                    System.Globalization.CultureInfo.CurrentUICulture = culture;
+                    System.IFormatProvider provider = {{(providerIsCulture ? "culture" : "new TrackingNumericProvider()")}};
+                    TrackingNumericCulture.Reads = 0;
+                    TrackingNumericCulture.Throw = {{(throws ? "true" : "false")}};
+                    try
+                    {
+                        var value = {{call}};
+                        var reads = TrackingNumericCulture.Reads;
+                        return System.Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)
+                            + ":" + reads.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    catch (System.InvalidOperationException error) when (error.Message == "numeric-culture-callback")
+                    {
+                        var reads = TrackingNumericCulture.Reads;
+                        return "throw:" + reads.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    catch (System.FormatException)
+                    {
+                        var reads = TrackingNumericCulture.Reads;
+                        return "format:" + reads.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                }
+                finally
+                {
+                    System.Globalization.CultureInfo.CurrentCulture = previous;
+                    System.Globalization.CultureInfo.CurrentUICulture = previousUI;
+                }
+            }
+        }
+        """;
+
     [Fact]
     public void Resolve_SelectsSignatureSpecificMethodAndConstructorOverloads()
     {
