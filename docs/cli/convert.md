@@ -277,7 +277,9 @@ directives remain effective.
 With both `Fidelity=Lossy` and `SelectActiveBranchLossy`, single-file conversion
 can retain namespace-local imports in one namespace, including ordinary imports,
 aliases and static imports. Balanced `#region`/`#endregion` trivia is allowed.
-The original semantic context must be complete and valid. Generated C# must
+The original semantic context must be complete and valid. Generated Calor must
+pass strict effect enforcement (`StrictEffects=true`), including rejection of
+unknown callback rows (`Calor0425`). Generated C# must
 compile and retain declared type and nullable-annotation metadata; preserved
 members or substitutions do not qualify. Other active directives and unsupported
 namespace topologies stay closed. Default lossless single-file conversion still

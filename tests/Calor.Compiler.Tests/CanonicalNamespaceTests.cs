@@ -509,6 +509,71 @@ public sealed class CanonicalNamespaceTests
         Assert.Contains(rejected.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect);
     }
 
+    [Fact]
+    public void SelectedBranchLossyImportsRefuseWarningOnlyUnknownCallbackTransport()
+    {
+        const string source = """
+            namespace Witness
+            {
+                using System;
+                public static class Probe
+                {
+                    public static Func<int> Keep(Func<int> callback) { return callback; }
+                }
+            }
+            """;
+        const string native = """
+            module Issue1104DepthSweep Witness block overflow unchecked nullable oblivious
+              namespace using System
+
+              module Probe
+                func Keep (Func<int>:callback) → Func<int>
+                  return callback
+            """;
+        Compile(source);
+        var ordinary = Program.Compile(native);
+        Assert.False(ordinary.HasErrors, string.Join("\n", ordinary.Diagnostics));
+        Assert.Equal(DiagnosticCode.EffectRowUnknown, Assert.Single(ordinary.Diagnostics.Warnings).Code);
+        var strict = Program.Compile(native, null, new CompilationOptions { StrictEffects = true });
+        Assert.Equal(DiagnosticCode.EffectRowUnknown, Assert.Single(strict.Diagnostics.Errors).Code);
+
+        var result = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            ModuleName = "Issue1104DepthSweep"
+        }).Convert(source, "CallbackTransport.cs");
+        Assert.False(result.Success);
+        Assert.Null(result.CalorSource);
+        Assert.Empty(result.Losses);
+        Assert.Equal("failed", result.Paths.RoundTrip);
+        Assert.Contains(result.Issues, issue => issue.Feature == "scoped-namespace-fidelity"
+            && issue.Message.Contains("The return of 'Keep' is function-typed with no effect row"));
+    }
+
+    [Fact]
+    public void SelectedBranchLossyImportsRetainOrdinaryStrictSuccess()
+    {
+        const string source = """
+            namespace Witness
+            {
+                using System;
+                public static class Probe { public static int Echo(int value) { return value; } }
+            }
+            """;
+        var result = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy
+        }).Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+        Assert.Equal("verified", result.Paths.RoundTrip);
+        var strict = Program.Compile(result.CalorSource!, null, new CompilationOptions { StrictEffects = true });
+        Assert.False(strict.HasErrors, string.Join("\n", strict.Diagnostics));
+        Assert.Empty(strict.Diagnostics);
+    }
+
     [Theory]
     [InlineData("#nullable enable")]
     [InlineData("#pragma warning disable CS0168")]

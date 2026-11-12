@@ -1322,6 +1322,7 @@ public sealed class CSharpToCalorConverter
                     {
                         IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
                         ProjectDirectory = _options.ProjectDirectory,
+                        StrictEffects = true,
                         DeferGeneratedOutputValidation = true,
                         CancellationToken = cancellationToken
                     });
