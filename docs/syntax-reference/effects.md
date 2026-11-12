@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Effects
+title: "Effects"
 parent: Syntax Reference
 nav_order: 6
 ---
 
 # Effects
+
+<!-- Generated from website/content/syntax-reference/effects.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Effects declare the side effects a function may have. This is unique to Calor - traditional languages leave side effects implicit.
 
@@ -556,6 +558,6 @@ waiver on their first line.
 
 ## Next
 
-- [Effect manifests and package import](/calor/guides/effect-manifests/) - External call coverage
+- [Effect manifests and package import](/guides/effect-manifests/) - External call coverage
 - [calor query](https://calor.dev/docs/cli/query/) - Ask what a function declares, what it really does, and what a change would break
-- [Adoption Playbook](/calor/guides/adoption-playbook/) - Applying effects in an existing solution
+- [Adoption Playbook](/guides/adoption-playbook/) - Applying effects in an existing solution

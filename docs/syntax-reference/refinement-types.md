@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Refinement Types
+title: "Value Constraints"
 parent: Syntax Reference
 nav_order: 6
 ---
 
 # Value Constraints
+
+<!-- Generated from website/content/syntax-reference/refinement-types.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Use ordinary .NET types and `requires` clauses to constrain function inputs.
 Use `=>` postconditions to describe the result. Retired named refinements,
@@ -113,27 +115,36 @@ If your API needs distinct domain types, use an ordinary class or record and
 design its construction and mutation rules explicitly. A precondition on one
 function is not a substitute for that type's whole lifecycle.
 
-## Runtime checks and verification
+## Explicit proof statements
 
-The [contracts reference](/calor/syntax-reference/contracts/) explains enabled and
-off runtime contract modes. Disabling checks does not make invalid calls safe:
-`SelectPort(0)` then returns `0`, `Transfer(3, 5)` returns `-2`, and empty text
-has length `0`. Null text reaches a body `NullReferenceException`.
+Native `proof condition` states a Boolean obligation at that point in a
+function. It is not a named refinement type or a permanent constraint on a
+mutable local.
 
-Effect enforcement remains independent of runtime contract mode. A pure row
-does not prove a precondition or prevent ordinary body exceptions.
+```calor
+module TransferProofAtPoint
+  func Transfer (int:balance, int:amount) → int
+    !
+    requires balance >= 0
+    requires amount > 0
+    proof balance >= amount
+    return balance - amount
+```
 
-Verifier results must be read with their actual status, assumptions and
-supported expression coverage. Unsupported, timed-out, assumption-dependent or
-vacuous results are not clean proofs. Only an eligible proof from the relevant
-compilation can authorize proof-based guard removal; running a program or seeing
-a successful C# build does not do so.
+`Transfer(10, 3)` returns `7`. Without a discharged verifier obligation, the
+statement emits a runtime check: `Transfer(3, 5)` throws
+`InvalidOperationException`. This is distinct from a failed `requires` guard,
+which throws `ContractViolationException`.
 
-## Proof obligations
+The proof-statement check remains even with `--contract-mode off`; that switch
+disables precondition and postcondition guards, not this explicit statement.
+A successful execution is not a static proof. Optional obligation verification
+and its actual status must be inspected separately before claiming discharge
+or guard removal.
 
-`proof condition` asserts a Boolean condition at a body point. It is not a
-new type or an input declaration. Keep the condition in native expression
-syntax; do not attach a source ID or a historical description header.
+### Proofs over parameters
+
+This version makes `balance >= amount` an entry precondition:
 
 ```calor
 module TransferProof
@@ -145,18 +156,29 @@ module TransferProof
     return balance - amount
 ```
 
-`Transfer(10, 3)` returns `7`. This version states the proof over parameters:
-the obligation solver's support for arbitrary local facts is not implied by
-a successful runtime assertion. Only an eligible proof from this compilation
-can authorize guard removal. `--keep-proven-guards` retains otherwise-emitted
-guards; a timeout or unsupported expression is not a proof.
+`Transfer(10, 3)` returns `7`. With contracts enabled, `Transfer(3, 5)` fails
+the precondition with `ContractViolationException`, before reaching the proof.
+With contracts off, the proof still throws `InvalidOperationException`.
+Moving an obligation between an entry contract and a body statement changes
+failure behavior; the two examples are not equivalent.
 
-Without a proof tracker, this statement emits a guard that throws
-`InvalidOperationException` if false. `--contract-mode off` disables
-precondition and postcondition guards, **not** this standalone proof guard:
-`Transfer(3, 5)` then reaches the proof and throws rather than returning `-2`.
-With ordinary precondition checks enabled, that call fails earlier with
-`ContractViolationException`.
+## Runtime checks and verification
+
+The [contracts reference](https://calor.dev/docs/syntax-reference/contracts/) explains enabled and
+off runtime contract modes. Disabling checks does not make invalid calls safe:
+`SelectPort(0)` then returns `0`, and `Transfer(3, 5)` in the
+`TransferConstraint` example returns `-2`. The separate `TransferProofAtPoint`
+example still throws at its explicit proof statement. Empty text has length
+`0`; null text reaches a body `NullReferenceException`.
+
+Effect enforcement remains independent of runtime contract mode. A pure row
+does not prove a precondition or prevent ordinary body exceptions.
+
+Verifier results must be read with their actual status, assumptions and
+supported expression coverage. Unsupported, timed-out, assumption-dependent or
+vacuous results are not clean proofs. Only an eligible proof from the relevant
+compilation can authorize proof-based guard removal; running a program or seeing
+a successful C# build does not do so.
 
 ## Named and indexed types
 
@@ -186,7 +208,7 @@ obligations on every array operation.
 
 ## See also
 
-- [Contracts](/calor/syntax-reference/contracts/) — preconditions, postconditions and guard modes
-- [Bindings](/calor/syntax-reference/binding/) — immutable and mutable locals
-- [Types](/calor/syntax-reference/types/) — .NET types and nullability
-- [Static verification](/calor/philosophy/static-verification/) — verifier concepts and limitations
+- [Contracts](https://calor.dev/docs/syntax-reference/contracts/) — preconditions, postconditions and guard modes
+- [Bindings](https://calor.dev/docs/syntax-reference/binding/) — immutable and mutable locals
+- [Types](https://calor.dev/docs/syntax-reference/types/) — .NET types and nullability
+- [Static verification](https://calor.dev/docs/philosophy/static-verification/) — verifier concepts and limitations

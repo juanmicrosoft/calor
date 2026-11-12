@@ -7,6 +7,8 @@ order: 4
 Control-flow headers use lowercase words. Indent each body two spaces below its
 header. A dedent ends the body; do not write closing tags or source IDs.
 
+<a id="loops"></a>
+
 ## Counted loops
 
 Calor has two `for` forms with different evaluation rules.
@@ -94,6 +96,8 @@ module WhileAndDo
 The result is `31`: the first loop runs three times, and the second runs once.
 Use `var` and `set` for state that changes across iterations.
 
+<a id="dictionary-iteration"></a>
+
 ## Collection iteration
 
 `each item in collection` visits collection elements. An explicit element type
@@ -170,6 +174,8 @@ if x > 0
     Console.WriteLine("100 or greater")
 ```
 
+<a id="fizzbuzz-complete-example"></a>
+
 ### FizzBuzz
 
 `PrintOne` writes one value. `Main` prints values one through 100. Both declare
@@ -193,6 +199,8 @@ module FizzBuzz
     for i from 1 to 100 step 1
       PrintOne(i)
 ```
+
+<a id="loop-with-conditional"></a>
 
 ### Combining a loop and a condition
 
@@ -315,6 +323,41 @@ module MatchBlocks
 
 `Word(2)` prints `"matched two"` and returns `"two"`. The console-write effect
 is explicit even though the other branches do not print.
+
+## Iterators and yield
+
+Use `yield expression` to produce the next value and `yield break` to stop.
+Both forms stay on one physical line. A bare `yield` is not termination.
+The function's declared return type is the actual iterator carrier.
+
+```calor
+module IteratorValues
+  using System.Collections.Generic
+  func Count () → IEnumerable<int>
+    !
+    yield 1
+    yield 2
+    yield break
+
+  func Main () → int
+    !
+    var int:sum = 0
+    each int:item in Count()
+      set sum sum + item
+    return sum
+```
+
+`Main()` returns `3`. Calling `Count()` produces an enumerable; enumeration
+runs its body. Yields are detected structurally inside loops, matches and
+other statement containers, but a nested lambda's yield does not turn its
+enclosing function into an iterator.
+
+Iterator parameters must be by value, not `ref`, `in` or `out`. C#-illegal
+suspension points are rejected before emission: value-yields in a catch,
+unsafe, fixed or try-with-catch region; every yield in a finally; and yields
+in constructors, property/indexer/event accessors, operators, async callables
+and lambdas. Property and indexer iterators remain fail-closed rather than
+receiving guessed deferred-execution semantics.
 
 ## Identity and refactoring
 

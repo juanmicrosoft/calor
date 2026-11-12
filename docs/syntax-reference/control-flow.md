@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Control Flow
+title: "Control Flow"
 parent: Syntax Reference
 nav_order: 4
 ---
 
 # Control Flow
+
+<!-- Generated from website/content/syntax-reference/control-flow.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Control-flow headers use lowercase words. Indent each body two spaces below its
 header. A dedent ends the body; do not write closing tags or source IDs.
@@ -181,26 +183,26 @@ if x > 0
 
 ### FizzBuzz
 
-`Classify` returns the text for one value. `Main` prints values one through
-100. Only `Main` needs the `cw` console-write effect.
+`PrintOne` writes one value. `Main` prints values one through 100. Both declare
+`cw`, the console-write effect.
 
 ```calor
 module FizzBuzz
-  func Classify (int:i) → string
-    !
+  func PrintOne (int:i) → void
+    ! cw
     if i % 15 == 0
-      return "FizzBuzz"
+      Console.WriteLine("FizzBuzz")
     else if i % 3 == 0
-      return "Fizz"
+      Console.WriteLine("Fizz")
     else if i % 5 == 0
-      return "Buzz"
+      Console.WriteLine("Buzz")
     else
-      return i.ToString()
+      Console.WriteLine(i)
 
   func Main () → void
     ! cw
     for i from 1 to 100 step 1
-      Console.WriteLine(Classify(i))
+      PrintOne(i)
 ```
 
 <a id="loop-with-conditional"></a>
@@ -292,7 +294,7 @@ module HttpStatus
 
 `Main` returns `"Not Found:A:large positive"`. For nullable values, use `??`
 when a missing value needs a fallback. For failures, use exceptions and
-`try`/`catch`; see [Types](/calor/syntax-reference/types/#failure-uses-exceptions).
+`try`/`catch`; see [Types](https://calor.dev/docs/syntax-reference/types/#failure-uses-exceptions).
 
 ### List patterns
 

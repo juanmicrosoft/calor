@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Expressions
+title: "Expressions"
 parent: Syntax Reference
 nav_order: 3
 ---
 
 # Expressions
+
+<!-- Generated from website/content/syntax-reference/expressions.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Calor expressions use infix operators with C# precedence, ordinary postfix calls
 and indexing. Write `a + b`, `items[index]` and `value.Method(argument)`.
@@ -45,15 +47,16 @@ Use parentheses when grouping would otherwise be hard to read.
 
 ```calor
 module ExpressionPrecedence
-  func Main () → string
+  func Main () → (int, int, int, int, int, int, int, int, bool, int, int)
     !
     let int?:missing = null
     let int:coalesced = missing ?? 3 + 4 * 2
     let int:conditional = false ? 1 : true ? 2 : 3
-    return "${2 + 3 * 4}:${(2 + 3) * 4}:${12 - 5 - 2}:${32 / 4 / 2}:${1 << 2 + 1}:${6 & 3}:${6 ^ 3}:${4 | 1}:${!false && true || false}:${coalesced}:${conditional}"
+    return (2 + 3 * 4, (2 + 3) * 4, 12 - 5 - 2, 32 / 4 / 2, 1 << 2 + 1, 6 & 3, 6 ^ 3, 4 | 1, !false && true || false, coalesced, conditional)
 ```
 
-`Main()` returns `14:20:5:4:8:2:5:5:True:11:2`. For example, `1 << 2 + 1`
+`Main()` returns the tuple `(14, 20, 5, 4, 8, 2, 5, 5, true, 11, 2)`.
+For example, `1 << 2 + 1`
 means `1 << (2 + 1)`, and `32 / 4 / 2` means `(32 / 4) / 2`.
 
 ## Arithmetic operators
@@ -84,12 +87,12 @@ module ArithmeticBehavior
     !
     return numerator % denominator
 
-  func Main () → string
+  func Main () → (int, int, int)
     !
-    return "${Increment(41)}:${Divide(-7, 3)}:${Remainder(-7, 3)}"
+    return (Increment(41), Divide(-7, 3), Remainder(-7, 3))
 ```
 
-`Main()` returns `42:-2:-1`. `Increment(2147483647)` throws
+`Main()` returns `(42, -2, -1)`. `Increment(2147483647)` throws
 `OverflowException`, `Divide(1, 0)` throws `DivideByZeroException`, and
 `Divide(-2147483648, -1)` throws `OverflowException`.
 These are body exceptions, not failed runtime contract checks.
@@ -169,7 +172,7 @@ module ExpressionEvaluation
     !
     return left * 10 + right
 
-  func Main () → string
+  func Main () → ((bool, bool, bool, bool), (int, int, int, int), List<int>)
     ! alloc, mut
     let List<int>:trace = new List<int>()
     let bool:andSkipped = false && Record(trace, 1) > 0
@@ -182,10 +185,11 @@ module ExpressionEvaluation
     let int:a = present ?? Record(trace, 7)
     let int:b = missing ?? Record(trace, 8)
     let int:pair = Pair(Record(trace, 9), Record(trace, 10))
-    return "${andSkipped}:${orSkipped}:${andTaken}:${orTaken}:${chosen}:${a}:${b}:${pair}:${trace.Count}:${trace[0]}:${trace[1]}:${trace[2]}:${trace[3]}:${trace[4]}:${trace[5]}"
+    return ((andSkipped, orSkipped, andTaken, orTaken), (chosen, a, b, pair), trace)
 ```
 
-`Main()` returns `False:True:True:True:5:7:8:100:6:3:4:5:8:9:10`.
+`Main()` returns three groups: the booleans `(false, true, true, true)`,
+the integers `(5, 7, 8, 100)`, and the trace list.
 The trace is exactly `3, 4, 5, 8, 9, 10`: skipped branches contribute nothing,
 and each selected expression runs once.
 
@@ -206,8 +210,8 @@ contracts and loop bounds.
 
 A console call needs `cw` in its caller's effect row. Snapshot range bounds
 evaluate once; the semicolon loop form reevaluates its condition.
-See [control flow](/calor/syntax-reference/control-flow/) and
-[contracts](/calor/syntax-reference/contracts/).
+See [control flow](https://calor.dev/docs/syntax-reference/control-flow/) and
+[contracts](https://calor.dev/docs/syntax-reference/contracts/).
 
 ### Expression-valued allocation sizes
 
@@ -255,19 +259,19 @@ module CollectionExpressions
     => result > 0
     return items.Count
 
-  func Main () → string
+  func Main () → (bool, bool, bool, int, int)
     ! alloc, mut
     let List<int>:items = new List<int>()
     items.Add(5)
     let Dictionary<string,int>:ages = new Dictionary<string,int>()
     ages.Add("alice", 30)
-    return "${items.Contains(5)}:${ages.ContainsKey("alice")}:${ages.ContainsValue(30)}:${NonEmptyCount(items)}:${items[0]}"
+    return (items.Contains(5), ages.ContainsKey("alice"), ages.ContainsValue(30), NonEmptyCount(items), items[0])
 ```
 
-`Main()` returns `True:True:True:1:5`.
+`Main()` returns `(true, true, true, 1, 5)`.
 Use an ordinary property read for `Count` or `Length`, not a zero-argument call.
-See [types](/calor/syntax-reference/types/) for collection construction and
-[calls](/calor/syntax-reference/calls/) for metadata overload resolution.
+See [types](https://calor.dev/docs/syntax-reference/types/) for collection construction and
+[calls](https://calor.dev/docs/syntax-reference/calls/) for metadata overload resolution.
 
 ## Native computed member reads
 
@@ -302,6 +306,6 @@ For example, `sizeof(int)` returns `4`. Other types follow C#'s rules for
 
 ## Next
 
-- [Current language](/calor/syntax-reference/current-language/) — generated syntax catalog
-- [String operations](/calor/syntax-reference/string-operations/) — interpolation and string members
-- [Control flow](/calor/syntax-reference/control-flow/) — loops, conditionals and matching
+- [Current language](https://calor.dev/docs/syntax-reference/current-language/) — generated syntax catalog
+- [String operations](https://calor.dev/docs/syntax-reference/string-operations/) — interpolation and string members
+- [Control flow](https://calor.dev/docs/syntax-reference/control-flow/) — loops, conditionals and matching

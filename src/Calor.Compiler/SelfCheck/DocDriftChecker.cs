@@ -283,6 +283,7 @@ public static class DocDriftChecker
 
         var mirrorDocs = new List<MirrorDoc>();
         mirrorDocs.AddRange(LoadTeachingMirrors(root, loadErrors));
+        mirrorDocs.AddRange(LoadSyntaxReferenceMirrors(root, loadErrors));
         var inventory = LoadAstInventoryMirror(root, loadErrors);
         if (inventory != null)
             mirrorDocs.Add(inventory);
@@ -465,6 +466,105 @@ public static class DocDriftChecker
         return true;
     }
 
+    public static string GenerateSyntaxReferenceMarkdown(DocFile source)
+    {
+        var lines = source.Content.Split('\n');
+        var end = Array.FindIndex(lines, 1, line => line.TrimEnd('\r') == "---");
+        if (lines[0].TrimEnd('\r') != "---" || end < 0)
+            throw new InvalidDataException($"Missing syntax-reference front matter in {source.Path}");
+        var header = string.Join("\n", lines.Take(end + 1));
+        var title = Regex.Match(header, "^title: \"(?<value>[^\"\\r\\n]+)\"\\r?$", RegexOptions.Multiline);
+        var order = Regex.Match(header, "^order: (?<value>[0-9]+)\\r?$", RegexOptions.Multiline);
+        if (!title.Success || !order.Success
+            || !Regex.IsMatch(header, "^section: \"syntax-reference\"\\r?$", RegexOptions.Multiline))
+            throw new InvalidDataException($"Invalid syntax-reference metadata in {source.Path}");
+        var fencedLines = WebsiteExampleChecker.ParseFences(source.Content)
+            .SelectMany(fence => Enumerable.Range(fence.OpenLine - 1, fence.CloseLine - fence.OpenLine + 1))
+            .ToHashSet();
+        for (var index = end + 1; index < lines.Length; index++)
+        {
+            if (fencedLines.Contains(index))
+                continue;
+            lines[index] = Regex.Replace(lines[index], @"\]\(/docs/(?<path>[^)\s]+)\)",
+                match => $"](https://calor.dev/docs/{match.Groups["path"].Value})");
+            lines[index] = Regex.Replace(lines[index], "<SupportLevel feature=\"(?<feature>[a-z0-9-]+)\" />", match =>
+            {
+                var feature = Migration.FeatureSupport.GetFeatureInfo(match.Groups["feature"].Value)
+                    ?? throw new InvalidDataException($"Unknown support feature in {source.Path}: {match.Groups["feature"].Value}");
+                return feature.Support.ToString();
+            });
+            if (lines[index].Contains("<SupportLevel", StringComparison.Ordinal))
+                throw new InvalidDataException($"Unsupported support component in {source.Path}");
+        }
+        var isIndex = Path.GetFileName(source.Path) == "index.mdx";
+        var navigation = isIndex
+            ? "nav_order: 4\nhas_children: true\npermalink: /syntax-reference/\n"
+            : $"parent: Syntax Reference\nnav_order: {order.Groups["value"].Value}\n";
+        return "---\nlayout: default\n"
+            + $"title: \"{title.Groups["value"].Value}\"\n{navigation}---\n\n"
+            + $"# {title.Groups["value"].Value}\n\n"
+            + $"<!-- Generated from {source.Path.Replace('\\', '/')} by calor self-check docs --fix. Edit the source, not this file. -->\n"
+            + string.Join("\n", lines.Skip(end + 1));
+    }
+
+    private static IReadOnlyList<MirrorDoc> LoadSyntaxReferenceMirrors(string root, List<Diagnostic> diagnostics)
+    {
+        var sources = LoadDocsInDirectory(root, Path.Combine("website", "content", "syntax-reference"),
+            diagnostics, pattern: "*.mdx").Where(source => Path.GetFileName(source.Path) != "current-language.mdx").ToList();
+        if (sources.Count == 0)
+        {
+            diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                "No canonical syntax-reference pages found", Path.Combine("website", "content", "syntax-reference"), 1, 1));
+            return [];
+        }
+        var mirrors = new List<MirrorDoc>();
+        foreach (var source in sources.OrderBy(source => source.Path, StringComparer.Ordinal))
+        {
+            try
+            {
+                var relative = Path.Combine("docs", "syntax-reference", Path.GetFileNameWithoutExtension(source.Path) + ".md");
+                var path = Path.Combine(root, relative);
+                mirrors.Add(new MirrorDoc(relative, source.Path,
+                    File.Exists(path) ? File.ReadAllText(path) : null, GenerateSyntaxReferenceMarkdown(source)));
+            }
+            catch (InvalidDataException exception)
+            {
+                diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                    $"Cannot generate syntax reference: {exception.Message}", source.Path, 1, 1));
+            }
+        }
+        var directory = Path.Combine(root, "docs", "syntax-reference");
+        if (Directory.Exists(directory))
+        {
+            var names = sources.Select(source => Path.GetFileNameWithoutExtension(source.Path))
+                .Append("current-language").ToHashSet(StringComparer.Ordinal);
+            foreach (var path in Directory.EnumerateFiles(directory, "*.md").Order(StringComparer.Ordinal))
+                if (!names.Contains(Path.GetFileNameWithoutExtension(path)))
+                    diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                        "Syntax-reference mirror has no canonical MDX source", Path.GetRelativePath(root, path), 1, 1));
+        }
+        return mirrors;
+    }
+
+    public static bool RegenerateSyntaxReference(string root, List<Diagnostic> diagnostics)
+    {
+        var mirrors = LoadSyntaxReferenceMirrors(root, diagnostics);
+        if (mirrors.Count == 0 || diagnostics.Count != 0)
+            return false;
+        diagnostics.AddRange(WebsiteExampleChecker.Check(mirrors.Select(mirror =>
+            new DocFile(mirror.SourcePath, mirror.Expected)).ToList()));
+        if (diagnostics.Count != 0)
+            return false;
+        foreach (var mirror in mirrors)
+        {
+            var path = Path.Combine(root, mirror.MirrorPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            if (mirror.Actual != mirror.Expected)
+                File.WriteAllText(path, mirror.Expected, new UTF8Encoding(false));
+        }
+        return true;
+    }
+
     /// <summary>The CLAUDE.md H1 the AGENTS.md transform anchors on.</summary>
     public const string ClaudeTitleAnchor = "# CLAUDE.md — Calor Compiler";
 
@@ -531,7 +631,9 @@ public static class DocDriftChecker
 
     private static void CheckMirror(MirrorDoc mirror, List<Diagnostic> diagnostics)
     {
-        var normalizedActual = mirror.Actual?.Replace("\r\n", "\n");
+        var normalizedActual = mirror.SourcePath.EndsWith(".mdx", StringComparison.Ordinal)
+            ? mirror.Actual
+            : mirror.Actual?.Replace("\r\n", "\n");
         if (normalizedActual == mirror.Expected)
         {
             return;

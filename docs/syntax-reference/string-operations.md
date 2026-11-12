@@ -1,11 +1,13 @@
 ---
 layout: default
-title: String Operations
+title: "String Operations"
 parent: Syntax Reference
-nav_order: 7
+nav_order: 11
 ---
 
 # String Operations
+
+<!-- Generated from website/content/syntax-reference/string-operations.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Use ordinary .NET string members, postfix calls and indexing. Calor strings use
 the same UTF-16 representation as C# strings; `Length` counts code units, not
@@ -15,7 +17,7 @@ displayed characters.
 
 ## Core operations
 
-| Operation | Native Calor |
+| Operation | Calor call syntax |
 |:----------|:-------------|
 | Length | `text.Length` |
 | Case | `text.ToUpperInvariant()`, `text.ToLowerInvariant()` |
@@ -33,18 +35,21 @@ displayed characters.
 
 ```calor
 module StringBasics
-  func Main () → string
+  func Main () → (int, string, char, string)
     !
-    let string:text = "  hello world  ".Trim()
-    return "${text.Length}:${text.ToUpperInvariant()}:${text.Substring(1, 3)}:${text.Replace("world", "Calor")}"
+    let string:text = "hello world"
+    return (text.Length, text.ToUpperInvariant(), text[1], text + "!")
 ```
 
-`Main()` returns `11:HELLO WORLD:ell:hello Calor`. Strings are immutable:
+`Main()` returns `(11, "HELLO WORLD", 'e', "hello world!")`. Strings are immutable:
 methods such as `Trim` and `Replace` return a value rather than changing `text`.
 Arguments and overloads are checked as ordinary .NET calls. There is no separate
 prefix-string-operation syntax or operand-count convention.
 
-<a id="string-comparison-modes"></a>
+Valid call syntax does not grant an effect contract. The current checker still
+reports unknown effects for `Trim`, `Substring`, `Replace` and several comparison
+overloads. `Calor0411` identifies the unknown call; `Calor0410` rejects its use in
+a pure function. Do not disable effect checking to claim native acceptance.
 
 ## Comparison modes
 
@@ -63,7 +68,12 @@ The overloads without a comparison argument do not all behave alike.
 `EndsWith(string)` and `IndexOf(string)` use the current culture.
 `ToUpperInvariant` and `ToLowerInvariant` also avoid the current culture.
 
-```calor
+The following is a checked negative example. The comparison arguments select
+ordinal runtime behavior, but the current effect catalog does not admit these
+overloads as pure. `Calor0411` identifies the calls and `Calor0410` rejects the
+pure function:
+
+```calor expect=Calor0410,Calor0411
 module StringComparisons
   func Main () → string
     !
@@ -71,12 +81,8 @@ module StringComparisons
     return "${text.Contains("WORLD", System.StringComparison.OrdinalIgnoreCase)}:${text.StartsWith("hello", System.StringComparison.Ordinal)}:${text.IndexOf("world", System.StringComparison.Ordinal)}:${System.String.Equals("I", "i", System.StringComparison.OrdinalIgnoreCase)}"
 ```
 
-`Main()` returns `True:True:6:True`.
-
-The distinction is observable, not just a stylistic preference. For example,
-under `hu-HU`, ordinal membership in `"dzsx"` can find `"zsx"` while the
-culture-sensitive `IndexOf` cannot. Do not remove an explicit comparison
-argument while porting a program.
+The corresponding CLR operations produce `True:True:6:True`. The native pure
+function above is rejected; that runtime result is not an admission claim.
 
 Choosing `Ordinal` defines runtime behavior; it does not by itself establish a
 verification proof. Read the verifier's actual outcome. Only an assumption-free,
@@ -150,6 +156,25 @@ A `${...}` hole inside a string holds an expression. It can include alignment
 to right. Formatting normally uses the current .NET culture.
 
 ```calor
+module StringHoles
+  func Greet (string:name) → string
+    !
+    return "hello ${name}:\${x}"
+
+  func Main () → string
+    !
+    return Greet("Calor")
+```
+
+`Main()` returns `hello Calor:${x}`. String-valued holes do not require numeric
+formatting.
+
+Numeric formatting is a separate effect boundary. The current checker does not
+admit arbitrary `double` formatting as pure, including explicit format strings.
+It reports `Calor0411` for the formatting and `Calor0410` for its callers.
+This checked negative example shows the syntax without claiming acceptance:
+
+```calor expect=Calor0410,Calor0411
 module Receipt
   func Line (string:item, double:amount) → string
     !
@@ -160,11 +185,13 @@ module Receipt
     return Line("coffee", 3.5) + ":\${x}"
 ```
 
-Under the invariant or `en-US` culture, `Main()` returns
+At the CLR runtime, under the invariant or `en-US` culture, the corresponding
+interpolation produces
 `coffee  |      3.50|7.0:${x}`. Under `de-DE`, it returns
 `coffee  |      3,50|7,0:${x}`. For culture-independent numeric text, pass
 `System.Globalization.CultureInfo.InvariantCulture` to an appropriate numeric
-`ToString` overload.
+`ToString` overload. That selects formatting behavior; it does not supply a
+missing effect contract.
 
 Escape the dollar sign to write a literal hole: `"\${x}"` contains the four
 characters `${x}` and does not read a variable named `x`.
@@ -207,6 +234,6 @@ do not establish native effect or verification acceptance. With fallback
 disabled, an unsupported conversion fails instead of producing that payload.
 
 `calor feature-check string-interpolation` reports
-the installed compiler's conversion support level. Inspect the conversion
+**Partial**. Inspect the conversion
 report and supply the original references and parse context; a missing target
 type is not evidence that the original overload choice was recovered.

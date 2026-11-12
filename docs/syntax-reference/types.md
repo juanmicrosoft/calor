@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Types
+title: "Types"
 parent: Syntax Reference
 nav_order: 2
 ---
 
 # Types
+
+<!-- Generated from website/content/syntax-reference/types.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Calor uses C# type names, .NET nullable types, ordinary generics, and suffix
 array notation. A declaration's type precedes its name: `int:count`, not
@@ -315,6 +317,6 @@ Types also apply in `requires` and `=>` contract predicates.
 
 ## See also
 
-- [Bindings](/calor/syntax-reference/binding/) — inference, initialization, and mutable locals.
-- [Expressions](/calor/syntax-reference/expressions/) — operators, casts, and precedence.
-- [Calls](/calor/syntax-reference/calls/) — argument and return boundaries.
+- [Bindings](https://calor.dev/docs/syntax-reference/binding/) — inference, initialization, and mutable locals.
+- [Expressions](https://calor.dev/docs/syntax-reference/expressions/) — operators, casts, and precedence.
+- [Calls](https://calor.dev/docs/syntax-reference/calls/) — argument and return boundaries.

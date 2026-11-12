@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Contracts
+title: "Contracts"
 parent: Syntax Reference
 nav_order: 5
 ---
 
 # Contracts
+
+<!-- Generated from website/content/syntax-reference/contracts.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Contracts state what a function requires from its caller and what it guarantees
 on a normal return. Write preconditions with `requires` and postconditions with
@@ -292,6 +294,6 @@ exception in the body rather than inventing a contract attribute.
 
 ## Related references
 
-- [Types](/calor/syntax-reference/types/) — arrays, nullable inputs and exceptions
-- [Effects](/calor/syntax-reference/effects/) — declarations for side effects
+- [Types](https://calor.dev/docs/syntax-reference/types/) — arrays, nullable inputs and exceptions
+- [Effects](https://calor.dev/docs/syntax-reference/effects/) — declarations for side effects
 - [Verification guarantees](https://calor.dev/docs/guides/verification-guarantees/) — proof outcomes and guard removal

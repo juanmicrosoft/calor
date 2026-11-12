@@ -8,6 +8,8 @@ Use ordinary .NET string members, postfix calls and indexing. Calor strings use
 the same UTF-16 representation as C# strings; `Length` counts code units, not
 displayed characters.
 
+<a id="basic-string-operations"></a>
+
 ## Core operations
 
 | Operation | Calor call syntax |
@@ -18,6 +20,8 @@ displayed characters.
 | Search | `text.Contains(part, System.StringComparison.Ordinal)` |
 | Prefix and suffix | `text.StartsWith(prefix, System.StringComparison.Ordinal)`, `text.EndsWith(suffix, System.StringComparison.Ordinal)` |
 | Index | `text.IndexOf(part, System.StringComparison.Ordinal)` |
+| Index from a position | `text.IndexOf(part, start, System.StringComparison.Ordinal)` |
+| Index in a segment | `text.IndexOf(part, start, count, System.StringComparison.Ordinal)` |
 | Slice | `text.Substring(start, length)` |
 | Replace | `text.Replace(oldValue, newValue)` |
 | Concatenate | `left + right` |
@@ -82,6 +86,10 @@ Inconclusive outcomes do not authorize removal. Runtime checks require an enable
 contract mode and supported lowering. See
 [verification guarantees](/docs/guides/verification-guarantees/).
 
+<a id="regex-operations"></a>
+<a id="character-operations"></a>
+<a id="stringbuilder-operations"></a>
+
 ## Regex, characters and StringBuilder
 
 Use `System.Text.RegularExpressions.Regex` for regular expressions, `char`
@@ -103,6 +111,38 @@ module TextTools
 
 `Main()` returns `True:True:Cat`. The effect row declares allocation (`alloc`)
 and mutation (`mut`) for the buffer.
+
+| Purpose | Ordinary .NET operation |
+|:--------|:------------------------|
+| First regex match | `Regex.Match(text, pattern)`; inspect the match's `Success` and `Value` |
+| Regex replacement | `Regex.Replace(text, pattern, replacement)` |
+| Regex split | `Regex.Split(text, pattern)` |
+| Character code | `(int)letter` |
+| Character from code | `(char)code` |
+| Classification | `char.IsLetter(c)`, `char.IsWhiteSpace(c)`, `char.IsUpper(c)`, `char.IsLower(c)` |
+| Character case | `char.ToUpperInvariant(c)`, `char.ToLowerInvariant(c)` |
+| Buffer append | `builder.Append(value)`, `builder.AppendLine(value)` |
+| Buffer edits | `builder.Insert(index, value)`, `builder.Remove(start, count)`, `builder.Clear()` |
+| Buffer size and result | `builder.Length`, `builder.ToString()` |
+
+These are API calls, not special expression operators. Preserve the actual
+receiver type, overload, arguments and effects when composing them.
+`Append` returns the same mutable builder; chaining does not turn mutation
+into an immutable string operation.
+
+## Error handling
+
+`Substring` and indexing throw for invalid bounds. Validate `start >= 0`,
+`count >= 0`, and `start <= text.Length - count` before slicing when those
+values come from untrusted input. Guard nullable receivers before reading
+members; `text != null && text.Length > 0` short circuits, while a non-null
+annotation alone is not a runtime check on .NET callers.
+
+Regex patterns can be invalid or expensive. Use a valid pattern and an
+appropriate timeout for untrusted text; an effect row is not a complexity
+bound. In contracts, use only supported runtime lowering and read the actual
+verifier status rather than assuming every string or regex operation is
+modeled.
 
 ## Interpolated strings
 
@@ -168,6 +208,8 @@ module MissingInterpolationName
 Calls must also fit the enclosing function's effect row. For example,
 `System.Console.ReadLine()` needs `cr`, the console-read effect, even inside a
 hole.
+
+<a id="c-migration"></a>
 
 ## Converting C# interpolation
 

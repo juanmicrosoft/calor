@@ -26,6 +26,10 @@ receiving types.
 | `object` | .NET object reference | An appropriate reference or boxed value |
 | `void` | No returned value | Return types only |
 
+The keyword `object` always names `System.Object`, including as an array
+element type. A source declaration or type parameter named `@object` does
+not shadow that keyword.
+
 Qualified .NET names such as `System.String` can also be used. Calor's former
 aliases, including `i32`, `f64`, and `str`, are not native source spellings.
 The parser reports `Calor0100` for a retired alias:
@@ -48,7 +52,67 @@ func Name public (string:name) → string
 func Price public (double:price, bool:active) → void
 ```
 
+### Constructor arguments
+
+`new Pair(right: "right", left: "left")` calls constructor parameters named
+`right` and `left`; these are not object-initializer properties. Named
+arguments evaluate in source order even when their names reorder the
+parameters. Records use the same construction syntax. The selected constructor
+must actually exist in the source or referenced assembly.
+
+Inside a class, `ctor stat ()` declares its static constructor. It has no
+visibility or parameters. Conversion preserves the constructor and leaves
+its initialization order and exception behavior to the CLR.
+
+C# conversion uses resolved types to distinguish a base class from implemented
+interfaces, including qualified names and aliases. It does not infer that
+distinction from an `I` prefix. An unresolved base kind keeps the declaration
+as preserved C#, without claiming native constructor-effect analysis.
+
+### Numeric and character literals
+
+C# migration resolves a primitive `default` literal from its contextual type
+and emits the corresponding zero or `false`, retaining its numeric width and
+overload selection. In authored native code, use `default(int)` or another
+supported primitive type rather than a bare `default` identifier.
+
+Integer literals accept decimal or hexadecimal digits and `_` separators.
+Use `L`, `U`, or `UL` to request signed 64-bit, unsigned 32-bit or unsigned
+64-bit values. A signed `L` literal never becomes unsigned to accommodate a
+larger value: out-of-range signed literals report `Calor0012`.
+Negative unsigned literals report `Calor0010`.
+
+The lowercase `f` suffix selects a single-precision value, including `42f`
+and `1e-3f`. Fractions or exponents without `f` or `m` are `double`.
+Decimal literals use `m`, as in `18.0000m` or `100m`.
+
+Character literals contain exactly one UTF-16 code unit. Empty or multi-unit
+characters, raw line breaks and invalid escapes report `Calor0112`. Escapes
+include `'\n'`, `'\''`, `'\\'`, `'\u0041'`, `\x` with one to four hexadecimal
+digits, and `\U` with eight digits whose decoded value still fits one code
+unit. Supplementary Unicode characters require strings; escaped surrogate
+code units remain representable. Character subtraction such as `'4' - '0'`
+produces an `int`.
+
+## Anonymous objects
+
+Use `new { Name = expression }` to create an anonymous object. Identifier and
+member projections can omit the name: `new { count, text.Length }`. Use
+`@class` or another escaped identifier for a keyword property name. Members
+evaluate left to right, and their names must be distinct.
+
+Anonymous construction requires `alloc`; effects of member expressions are
+also charged. Nested anonymous objects use the same syntax. Inferred bindings
+retain their member types across aliases. Reading an anonymous member is
+pure, but further operations on its value keep their own effects: reading
+`value.File.Length` still requires `fs:r` when `File` is a `FileInfo`.
+
 ## Arrays
+
+Sized jagged creation uses the allocated rank first: `new int[2][]` allocates
+two slots for inner `int[]` arrays, initially null. `new int[2, 3][]`
+allocates a rectangular array of inner-array slots. Trailing ranks do not
+allocate the inner arrays; creating the outer array still requires `alloc`.
 
 Use `T[]` for a one-dimensional array, `T[,]` for a two-dimensional array,
 and `T[][]` for an array of arrays. Array rank and element type are part of
@@ -68,6 +132,24 @@ module ArrayTypes
 
 `Main()` returns `6`. Array creation requires the `alloc` effect. The
 declaration retains the explicit `int[]` type in generated C#.
+
+Rectangular initializers keep one brace level per dimension. For example,
+`new int[2, 1, 2] { { { 1, 2 } }, { { 3, 4 } } }` creates a rank-three
+array. Omit the sizes with `new int[,,]` to infer them from the braces.
+Written sizes, empty braces and row boundaries are preserved; mismatched
+sizes or ragged rows are rejected rather than padded, flattened or resized.
+Initializer expressions still require their own effects in addition to `alloc`.
+Array elements must fit inline. When migrating C#, a block-bodied lambda element
+is preserved as C# with an `array-element-block` report instead of emitting an
+invalid native initializer.
+
+Reading a source static array field through its type retains the declared rank,
+including inherited fields. Effect checking accounts for all static field and
+property initializers on the declaring type, not just the field being read.
+This path currently supports self-contained primitive and primitive-array
+initializers. Other initializer forms remain unresolved; an enforced read
+cannot silently treat them as pure. Explicit static constructors retain their
+constructor-effect checks.
 
 ## Nullable types
 
@@ -103,6 +185,30 @@ Element and container nullability are different:
 A nullable annotation is not a universal proof that every operation is safe.
 Supported receiving boundaries check nullable input, but arbitrary later
 writes and constructor inputs remain outside the bounded guarantee.
+
+Mandatory receiving checks also cover closed source-defined reference elements
+in the actual .NET `List<T>`, `IList<T>`, `ICollection<T>`, `IEnumerable<T>`,
+`IReadOnlyList<T>` and `IReadOnlyCollection<T>` types. This is a deliberately
+stricter compatibility rule, enforced with or without optional type checking:
+nullable elements cannot enter a non-null element contract, and a nullable
+container must be guarded before non-null receiving. A container guard does not
+validate its elements. Invariant containers also reject nullable-writer aliases
+such as `List<Node>` to `List<Node?>`; covariant read-only targets can accept
+nullable elements. Oblivious annotations do not prove non-nullness.
+
+Selected metadata extension calls retain these annotations when the complete
+C# image resolves the actual source-defined payload. For example, `ToList()`
+preserves nullable elements and requires a non-null receiver. Selection supplies
+typing facts, not an effect contract: `ToList()` remains an unknown-effect call
+and is rejected under strict effect enforcement.
+
+This extension does not analyze custom generic containers, nested generic
+payloads, type parameters, tuples, delegates or unresolved reference identities.
+Those are unsupported boundaries, not evidence that the receiving contract is
+safe. In particular, a dotted read that remains unbound is not receiving proof
+just because the C# compiler resolves it. Existing string-specific rules and
+external-call effect requirements are unchanged.
+
 See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
 for the exact support table and complete safe and rejected examples.
 

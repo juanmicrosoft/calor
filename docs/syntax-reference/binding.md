@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Bindings
+title: "Bindings"
 parent: Syntax Reference
 nav_order: 3
 ---
 
 # Bindings
+
+<!-- Generated from website/content/syntax-reference/binding.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Use `let` for an immutable local binding and `var` for a mutable one.
 An explicit type precedes the name, as it does in a function parameter.
@@ -260,6 +262,6 @@ The converter chooses mutability from the source writes, not from the C#
 
 ## See also
 
-- [Types](/calor/syntax-reference/types/) — C# type spellings.
-- [Expressions](/calor/syntax-reference/expressions/) — initializer expressions and precedence.
-- [Calls](/calor/syntax-reference/calls/) — resolved return types and by-reference arguments.
+- [Types](https://calor.dev/docs/syntax-reference/types/) — C# type spellings.
+- [Expressions](https://calor.dev/docs/syntax-reference/expressions/) — initializer expressions and precedence.
+- [Calls](https://calor.dev/docs/syntax-reference/calls/) — resolved return types and by-reference arguments.

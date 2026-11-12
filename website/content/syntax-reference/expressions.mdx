@@ -11,6 +11,10 @@ Parentheses group an expression; they do not introduce a prefix operation.
 Runtime string holes also accept calls and indexing, as in
 `"${Format(x)}:${labels[0]}"`. Their receivers and indices evaluate in place.
 
+Keywords and operators are case-sensitive. Use the symbolic operators below,
+not word aliases such as `add` or `eq`. Pattern combinators `and`, `or` and
+`not` belong to patterns, not ordinary Boolean expressions.
+
 ## Precedence and grouping
 
 The table runs from strongest to weakest binding.
@@ -204,6 +208,26 @@ evaluate once; the semicolon loop form reevaluates its condition.
 See [control flow](/docs/syntax-reference/control-flow/) and
 [contracts](/docs/syntax-reference/contracts/).
 
+### Expression-valued allocation sizes
+
+Array dimensions are expressions at the allocation site, not quoted source
+text. Their calls retain normal order and short-circuit behavior:
+
+```calor
+module ArrayDimensions
+  func Size (int:n) → int
+    !
+    return n + 1
+
+  func Main () → int
+    ! alloc
+    let int[]:values = new int[Size(2)]
+    return values.Length
+```
+
+`Main()` returns `3`. Moving `Size(2)` ahead of a conditional branch would
+change the program if that helper had effects; syntax migration must not do so.
+
 ## Collection expressions
 
 Collections use ordinary .NET members, not dedicated query tags.
@@ -243,6 +267,31 @@ module CollectionExpressions
 Use an ordinary property read for `Count` or `Length`, not a zero-argument call.
 See [types](/docs/syntax-reference/types/) for collection construction and
 [calls](/docs/syntax-reference/calls/) for metadata overload resolution.
+
+## Native computed member reads
+
+The compiler resolves `(value ?? "none").Length` using the actual
+`System.String` property identity when `value` is a `string?` parameter.
+The same bounded resolution covers conditional string receivers and resolved
+string-returning calls. It does not infer a property's type or purity merely
+from the spelling `Length`.
+
+The receiver runs once. A coalescing fallback or conditional branch runs only
+when selected, and its effects still contribute to the enclosing callable.
+Nullable annotations remain attached to resolved values. Unknown, source,
+foreign, opaque or type-parameter receivers do not acquire a string purity
+contract by using the same member name.
+
+For `value?.Length.ToString()`, the continuation selects `int.ToString()` on
+the underlying `Length` value. The complete result is still nullable: a null
+`value` skips the getter, the call and its arguments. The receiver evaluates
+once. Assigning that nullable result to a non-nullable destination still
+requires a fallback or a separate proof.
+
+Parenthesized conditional receivers such as `(value?.Length).ToString()` remain
+unsupported native postfix forms. They must not be interpreted as the chain
+above: C# invokes `Nullable<int>.ToString()` outside the conditional region,
+which returns an empty string when the lifted value is null.
 
 ## Type intrinsics
 

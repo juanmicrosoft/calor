@@ -110,7 +110,19 @@ Integer arithmetic is checked by default. String operations use ordinary members
 such as `text.Length` and `text.Contains(part, System.StringComparison.Ordinal)`;
 see [string operations](/docs/syntax-reference/string-operations/).
 
-## Effect codes and contracts
+## Effect Codes
+
+| Code | Effect |
+|:-----|:-------|
+| `cw` | Console output |
+| `cr` | Console input |
+| `fs:r` | Filesystem read |
+| `fs:w` | Filesystem write |
+| `net:rw` | Network read/write |
+| `db:rw` | Database read/write |
+| `alloc` | Allocation |
+| `mut` | Heap mutation |
+| `throw` | Explicit exceptions |
 
 An effect row bounds the side effects of a function or callback. Common codes
 include `cw` and `cr` for console output and input, `fs:r` and `fs:w` for
@@ -131,6 +143,33 @@ Plain-text reconciliation refuses ambiguous matches.
 
 Names such as `count` and `items` are ordinary program identifiers, not identity
 fields. See [stable identifiers](/docs/philosophy/stable-identifiers/).
+
+## Documentation comments
+
+Put `///` comments immediately before the declaration they document.
+Consecutive lines form one comment; a blank line or ordinary `//` comment
+ends the association. The formatter preserves documentation comments.
+`--require-docs` and `--strict-api` recognize them.
+
+```calor
+/// Arithmetic helpers.
+module DocumentedArithmetic
+  /// Adds two integers.
+  func Add (int:x, int:y) → int
+    !
+    return x + y
+```
+
+Version annotations also use documentation comments: `/// since 1.0.0`,
+`/// deprecated 2.0.0 Replacement`, and `/// breaking 3.0.0 "Description"`.
+They are not source identity fields. See the
+[generated catalog](/docs/syntax-reference/current-language/#introduction-version-metadata)
+for the supported metadata forms.
+
+Frozen benchmark archives preserve the language originally measured.
+They are historical inputs, not current parser-compatibility examples.
+Active-syntax regression copies do not remeasure those experiments or change
+their ledgers and measured commits.
 
 ## Complete example
 
@@ -167,3 +206,4 @@ other branching forms.
 - [Contracts](/docs/syntax-reference/contracts/) — preconditions, postconditions and runtime guards
 - [Effects](/docs/syntax-reference/effects/) — declarations and callback rows
 - [String operations](/docs/syntax-reference/string-operations/) — strings, regex and formatting
+- [Value constraints](/docs/syntax-reference/refinement-types/) — input contracts and their limits

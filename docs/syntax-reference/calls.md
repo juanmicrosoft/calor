@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Calls
+title: "Calls"
 parent: Syntax Reference
 nav_order: 4
 ---
 
 # Calls
+
+<!-- Generated from website/content/syntax-reference/calls.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Call functions and methods with parentheses and comma-separated arguments, as in
 C#. A call can be a statement that discards its result, or an expression used by
@@ -125,25 +127,35 @@ module RefOutDemo
   func Twice (in int:x) → int
     return x * 2
 
-  func ParseOr (string:text, int:fallback) → int
+  func TryPositive (int:value, out int:result) → bool
+    ! mut
+    set result value
+    return value > 0
+
+  func ReadOr (int:value, int:fallback) → int
+    ! mut
     var int:n = 0
-    if System.Int32.TryParse(text, out n)
+    if TryPositive(value, out n)
       return n
     return fallback
 
-  func IsNumber (string:text) → bool
-    return System.Int32.TryParse(text, out _)
+  func IsPositive (int:value) → bool
+    ! mut
+    return TryPositive(value, out _)
 
   func Main () → int
     ! mut
     var int:count = 1
     Bump(ref count)
-    return count + ParseOr("40", 0)
+    let int:doubled = Twice(in count)
+    return doubled + ReadOr(40, 0)
 ```
 
-`Main()` returns `42`: `Bump` updates `count` to `2` and `ParseOr` returns
-`40`. Calling `Twice(in count)` with that updated count returns `4` without
-changing the caller's storage.
+`Main()` returns `44`: `Bump` updates `count` to `2`, `Twice` returns `4`, and
+`ReadOr` returns `40`. `TryPositive` is a source function, so its body and `mut`
+contract are available to the compiler. External calls such as
+`System.Int32.TryParse` need their own reviewed effect contract; support for
+`out` syntax does not supply one.
 
 The modifier must match the selected parameter. A by-reference argument does
 not fall back to a by-value overload. A mismatch is `Calor0208`.
@@ -188,6 +200,6 @@ module RefOutRejected
 
 ## Related
 
-- [Bindings](/calor/syntax-reference/binding/) — inferred and explicitly typed locals.
-- [Expressions](/calor/syntax-reference/expressions/) — precedence and expression-valued calls.
-- [Effects](/calor/syntax-reference/effects/) — call effects and receiving boundaries.
+- [Bindings](https://calor.dev/docs/syntax-reference/binding/) — inferred and explicitly typed locals.
+- [Expressions](https://calor.dev/docs/syntax-reference/expressions/) — precedence and expression-valued calls.
+- [Effects](https://calor.dev/docs/syntax-reference/effects/) — call effects and receiving boundaries.

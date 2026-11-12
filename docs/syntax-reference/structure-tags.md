@@ -1,18 +1,20 @@
 ---
 layout: default
-title: Structure Tags
+title: "Structure Tags"
 parent: Syntax Reference
 nav_order: 1
 ---
 
 # Structure Tags
 
+<!-- Generated from website/content/syntax-reference/structure-tags.mdx by calor self-check docs --fix. Edit the source, not this file. -->
+
 Calor declarations use lowercase keywords, space-separated headers and
 two-space indentation. The route retains its historical name, but active
 source uses `module`, `func`, `class` and the other native forms below.
 Expressions use infix operators and ordinary calls.
 
-The [generated current-language catalog](/calor/syntax-reference/current-language/)
+The [generated current-language catalog](https://calor.dev/docs/syntax-reference/current-language/)
 is the shared vocabulary reference. Positive complete programs compile with
 normal effect enforcement; negative programs and fragments are explicitly marked.
 
@@ -190,8 +192,8 @@ module FunctionHeaders
 `Main()` returns `10`. `PrintSum(2, 3)` writes `5` followed by a newline.
 `requires` has no native custom-message clause; use an explicit condition
 and exception when an API needs a specific failure message.
-See [contracts](/calor/syntax-reference/contracts/) and
-[effects](/calor/syntax-reference/effects/) for their enforcement boundaries.
+See [contracts](https://calor.dev/docs/syntax-reference/contracts/) and
+[effects](https://calor.dev/docs/syntax-reference/effects/) for their enforcement boundaries.
 
 ## Async Functions
 
@@ -370,7 +372,7 @@ module LocalCallables
 static local function. It does not authorize recursive or mutually recursive
 recipes. The converter lowers only supported C# local-function shapes;
 unsupported shapes remain explicitly preserved C#, not rewritten by guesswork.
-See the catalog's [lambda entry](/calor/syntax-reference/current-language/#lambda-expression).
+See the catalog's [lambda entry](https://calor.dev/docs/syntax-reference/current-language/#lambda-expression).
 
 ## Delegate Definitions
 
@@ -566,7 +568,7 @@ observation is not a native subscription example.
 When migrating a C# program that subscribes to an event, use the converter's
 preservation output and retain its original behavior. Preservation is not
 native authoring support. See the catalog's
-[event entry](/calor/syntax-reference/current-language/#event-definition).
+[event entry](https://calor.dev/docs/syntax-reference/current-language/#event-definition).
 
 ## Input Parameters
 
@@ -594,7 +596,7 @@ module ParameterArrays
     return Total(1, 2, 3) + Add(0)
 ```
 
-`Main()` returns `7`. See [calls](/calor/syntax-reference/calls/) for named
+`Main()` returns `7`. See [calls](https://calor.dev/docs/syntax-reference/calls/) for named
 arguments, caller storage for `ref`/`out`, and their executable examples.
 Attribute metadata on a parameter goes after its name and before its effect
 row or default value.
@@ -641,7 +643,7 @@ module ArrayDeclarations
 `new DataProcessor().ProcessData(new string[] { "a", "b" })` returns `2`;
 `First(new int[][] { new int[] { 7 } })` returns `7`.
 The fields are nullable because this example does not initialize them.
-See [types](/calor/syntax-reference/types/) for construction and nullability.
+See [types](https://calor.dev/docs/syntax-reference/types/) for construction and nullability.
 
 ## Block Structure (Indentation)
 
@@ -670,9 +672,9 @@ closing tags.
 ### Tag Reference
 
 The historical heading is retained for incoming links. Use the
-[generated catalog](/calor/syntax-reference/current-language/) for the full
+[generated catalog](https://calor.dev/docs/syntax-reference/current-language/) for the full
 native declaration vocabulary, and
-[control flow](/calor/syntax-reference/control-flow/) for `if`, `while`,
+[control flow](https://calor.dev/docs/syntax-reference/control-flow/) for `if`, `while`,
 `for`, `each`, `match`, `try` and their continuations.
 
 ## Generics
@@ -755,6 +757,6 @@ saving or a correctness improvement.
 
 ## Next
 
-- [Types](/calor/syntax-reference/types/) — CLR types, arrays and nullable values
+- [Types](https://calor.dev/docs/syntax-reference/types/) — CLR types, arrays and nullable values
 - [Inheritance](https://calor.dev/docs/syntax-reference/inheritance/) — classes and interfaces
-- [Generated catalog](/calor/syntax-reference/current-language/) — shared native forms
+- [Generated catalog](https://calor.dev/docs/syntax-reference/current-language/) — shared native forms

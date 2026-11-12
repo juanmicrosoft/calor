@@ -29,6 +29,9 @@ but every path to a read must assign it first. Generated C# validation still
 checks definite assignment. A local declaration is not a class field; use
 `field` for fields.
 
+<a id="inference-table"></a>
+<a id="examples"></a>
+
 ## Inferred bindings
 
 The binder uses the initializer's bound type. Literal examples include
@@ -193,6 +196,64 @@ Redeclaring a local from the surrounding statement scope reports
 branch types, or a declaration that conditionally changes which outer
 symbol a name refers to, report `Calor0201`. A type annotation is not a
 way to bypass these checks.
+
+## Collection compatibility and scope
+
+An array can implement `IEnumerable<T>` or `IList<T>` without being a
+`List<T>`. `Calor0254` catches supported array-to-concrete-collection
+mismatches in bindings, returns, assignments and same-module call arguments.
+Known array-returning framework calls and declared source return types supply
+this information; a method's name alone does not establish its type.
+
+Normal type checking reports `Calor0202` for this resolved source return type:
+
+```calor expect=Calor0202
+module ArrayIsNotList
+  func Values () → int[]
+    ! alloc
+    return new int[]{1, 2}
+
+  func Main () → void
+    ! alloc
+    let List<int>:items = Values()
+```
+
+Do not treat this targeted diagnostic as complete signature resolution for
+every constructor, operator, external method or lambda. Ordinary compatibility
+checks and generated C# validation still apply. Earlier type checking can
+report `Calor0202` before the targeted pass runs. In particular, a direct array
+initializer assigned to `List<int>` currently reaches generated C# validation
+and reports `Calor1002`, rather than the targeted `Calor0254`.
+
+`Calor0255` rejects a new local that shadows an enclosing local, parameter or
+loop variable. Sibling blocks can independently reuse names, and a local can
+hide a field.
+
+```calor expect=Calor0255
+module ShadowedBinding
+  func Main (int:value) → int
+    if value > 0
+      let int:value = 1
+    return value
+```
+
+A `var` binding whose name already exists in a live scope reassigns that
+storage rather than shadowing it. Prefer `set` when reassignment is intended.
+Its type stays fixed: incompatible mutable rebinds report `Calor0256`, and
+rebinding an immutable local reports `Calor0260`. `Calor0258` rejects duplicate
+immutable declarations in one scope. `Calor0257` rejects writes to
+collection-iteration variables. A type annotation cannot change the type of
+storage that already exists.
+
+## Round-trip
+
+A C# `var x = 42;` converts to `let x = 42` when immutable, and an explicitly
+typed declaration retains its type as `let int:x = 42`. Mutable declarations
+use `var`, with later assignments written as `set x expression`.
+The C# emitter uses `var` for inferred declarations and the named type for
+explicit ones. Formatting does not add a type annotation that was absent.
+The converter chooses mutability from the source writes, not from the C#
+`var` keyword alone.
 
 ## See also
 

@@ -786,7 +786,7 @@ public class DocDriftCheckerTests
         const string path = "website/content/syntax-reference/refinement-types.mdx";
         var source = ExemplarCompileChecker.ExtractCompletePrograms(
                 File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)))
-            .Single(program => program.Source.StartsWith("module TransferProof\n", StringComparison.Ordinal)).Source;
+            .Single(program => program.Source.StartsWith("module TransferProofAtPoint\n", StringComparison.Ordinal)).Source;
         foreach (var mode in new[] { ContractMode.Debug, ContractMode.Release, ContractMode.Off })
         {
             var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
@@ -2912,5 +2912,149 @@ public class DocDriftCheckerTests
             value % 15 == 0 ? "FizzBuzz" : value % 3 == 0 ? "Fizz" : value % 5 == 0 ? "Buzz"
                 : value.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "\n";
         Assert.Equal(expected, Observe(compiled.GeneratedCode, "GlobalModule.Main()"));
+    }
+
+    private const string SyntaxReferenceHeader =
+        "---\ntitle: \"Example\"\nsection: \"syntax-reference\"\norder: 2\n---\n\n";
+
+    [Fact]
+    public void SyntaxReferenceGeneration_RewritesProseButPreservesFenceBytes()
+    {
+        const string code = "~~~csharp\r\nvar url = \"](/docs/example/)\";\r\n"
+            + "var component = \"<SupportLevel feature=\\\"unknown\\\" />\";\r\n~~~\n";
+        var source = new DocFile("website/content/syntax-reference/example.mdx",
+            SyntaxReferenceHeader + "[Types](/docs/syntax-reference/types/)\n"
+            + "<SupportLevel feature=\"string-interpolation\" />\n\n" + code);
+
+        var markdown = DocDriftChecker.GenerateSyntaxReferenceMarkdown(source);
+
+        Assert.Contains("[Types](https://calor.dev/docs/syntax-reference/types/)", markdown);
+        Assert.Contains(Migration.FeatureSupport.GetFeatureInfo("string-interpolation")!.Support.ToString(), markdown);
+        Assert.Contains(code, markdown);
+        Assert.Contains("Edit the source, not this file.", markdown);
+    }
+
+    [Fact]
+    public void SyntaxReferenceGeneration_CodeLineEndingChangesAreMirrorDrift()
+    {
+        var source = new DocFile("website/content/syntax-reference/example.mdx",
+            SyntaxReferenceHeader + "```csharp\r\nvar value = 42;\r\n```\n");
+        var expected = DocDriftChecker.GenerateSyntaxReferenceMarkdown(source);
+        var inputs = new DocDriftInputs
+        {
+            Version = "", LexerKeywords = [], DiagnosticCodes = [],
+            KnownEffectCodes = [], DocumentedEffectCodes = [],
+            MirrorDocs = [new MirrorDoc("docs/syntax-reference/example.md", source.Path,
+                expected.Replace("\r\n", "\n"), expected)]
+        };
+
+        Assert.Equal(DiagnosticCode.DocDriftMirrorOutOfSync, Assert.Single(DocDriftChecker.Check(inputs)).Code);
+    }
+
+    [Fact]
+    public void SyntaxReferenceRegeneration_EmptySourceDirectoryReportsFailure()
+    {
+        var root = NewTempDir();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "website/content/syntax-reference"));
+            var diagnostics = new List<Diagnostic>();
+
+            Assert.False(DocDriftChecker.RegenerateSyntaxReference(root, diagnostics));
+            Assert.Equal(DiagnosticCode.DocDriftMissingInput, Assert.Single(diagnostics).Code);
+            Assert.False(Directory.Exists(Path.Combine(root, "docs")));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void SyntaxReferenceRegeneration_OrphanedMirrorPreventsWrites()
+    {
+        var root = NewTempDir();
+        try
+        {
+            var source = Path.Combine(root, "website/content/syntax-reference/example.mdx");
+            var orphan = Path.Combine(root, "docs/syntax-reference/removed.md");
+            Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(orphan)!);
+            File.WriteAllText(source, SyntaxReferenceHeader);
+            File.WriteAllText(orphan, "retain orphan for review");
+            var diagnostics = new List<Diagnostic>();
+
+            Assert.False(DocDriftChecker.RegenerateSyntaxReference(root, diagnostics));
+            Assert.Equal(DiagnosticCode.DocDriftMissingInput, Assert.Single(diagnostics).Code);
+            Assert.Equal("retain orphan for review", File.ReadAllText(orphan));
+            Assert.False(File.Exists(Path.Combine(root, "docs/syntax-reference/example.md")));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData("missing metadata")]
+    [InlineData("---\ntitle: \"Example\"\nsection: \"wrong\"\norder: 2\n---\n")]
+    [InlineData("---\ntitle: \"Example\"\nsection: \"syntax-reference\"\norder: 2\n---\n<SupportLevel feature=\"unknown\" />")]
+    public void SyntaxReferenceGeneration_RejectsInvalidSource(string source)
+    {
+        Assert.Throws<InvalidDataException>(() => DocDriftChecker.GenerateSyntaxReferenceMarkdown(
+            new DocFile("website/content/syntax-reference/example.mdx", source)));
+    }
+
+    [Theory]
+    [InlineData("module Invalid\n  func Value () → int\n    !\n    return \"wrong\"\n")]
+    [InlineData("module Invalid\n  func Value () → int\n    return (\n")]
+    public void SyntaxReferenceRegeneration_InvalidProgramDoesNotOverwriteMirror(string program)
+    {
+        var root = NewTempDir();
+        try
+        {
+            var source = Path.Combine(root, "website/content/syntax-reference/example.mdx");
+            var mirror = Path.Combine(root, "docs/syntax-reference/example.md");
+            Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(mirror)!);
+            File.WriteAllText(source, SyntaxReferenceHeader + "```calor\n" + program + "```\n");
+            File.WriteAllText(mirror, "retain existing mirror");
+            var diagnostics = new List<Diagnostic>();
+
+            Assert.False(DocDriftChecker.RegenerateSyntaxReference(root, diagnostics));
+            Assert.NotEmpty(diagnostics);
+            Assert.Equal("retain existing mirror", File.ReadAllText(mirror));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void SyntaxReferenceRegeneration_RepairsDriftWithoutRewritingCurrentMirrors()
+    {
+        var root = NewTempDir();
+        try
+        {
+            var relative = "website/content/syntax-reference/example.mdx";
+            var source = Path.Combine(root, relative);
+            var mirror = Path.Combine(root, "docs/syntax-reference/example.md");
+            Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+            var text = SyntaxReferenceHeader
+                + "```calor\nmodule Example\n  func Value () → int\n    !\n    return 42\n```\n";
+            File.WriteAllText(source, text);
+            var diagnostics = new List<Diagnostic>();
+
+            Assert.True(DocDriftChecker.RegenerateSyntaxReference(root, diagnostics), string.Join("\n", diagnostics));
+            Assert.Equal(DocDriftChecker.GenerateSyntaxReferenceMarkdown(new DocFile(relative, text)),
+                File.ReadAllText(mirror));
+            var timestamp = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            File.SetLastWriteTimeUtc(mirror, timestamp);
+            Assert.True(DocDriftChecker.RegenerateSyntaxReference(root, diagnostics));
+            Assert.Equal(timestamp, File.GetLastWriteTimeUtc(mirror));
+
+            File.WriteAllText(mirror, "drift");
+            var inputs = DocDriftChecker.LoadFromRepository(root, []);
+            Assert.Contains(DocDriftChecker.Check(inputs), finding =>
+                finding.Code == DiagnosticCode.DocDriftMirrorOutOfSync
+                && finding.FilePath == Path.Combine("docs", "syntax-reference", "example.md"));
+            Assert.True(DocDriftChecker.RegenerateSyntaxReference(root, diagnostics));
+            Assert.Empty(diagnostics);
+            Assert.Equal(DocDriftChecker.GenerateSyntaxReferenceMarkdown(new DocFile(relative, text)),
+                File.ReadAllText(mirror));
+        }
+        finally { Directory.Delete(root, recursive: true); }
     }
 }

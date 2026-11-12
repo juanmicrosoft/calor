@@ -36,7 +36,7 @@ public static class SelfCheckCommand
 
         var fixOption = new Option<bool>(
             aliases: ["--fix"],
-            description: "Validate complete teaching examples before regenerating mirrors (also AGENTS.md and AST inventory unless --teaching-only), then check");
+            description: "Validate complete teaching examples before regenerating mirrors (also syntax references, AGENTS.md and AST inventory unless --teaching-only), then check");
 
         var teachingOnlyOption = new Option<bool>(
             "--teaching-only",
@@ -59,6 +59,7 @@ public static class SelfCheckCommand
             "`group=` fences compile together, and `output` fences match the real diagnostics (Calor1332-1334). " +
             "(13) registered landing TSX snippets render shared snippets.json code; complete programs and fragments with " +
             "explicit context compile to valid C#, and intended negatives match exact error/warning diagnostics. " +
+            "(14) Markdown syntax references match their canonical website MDX source, including fenced code bytes. " +
             "Suppress an intentional-meta-notation finding by putting <!-- drift:ignore --> on the " +
             "preceding line (see docs/cli/self-check.md). Exits 1 when drift is found")
         {
@@ -92,7 +93,8 @@ public static class SelfCheckCommand
         {
             var inventoryErrors = new List<Diagnostic>();
             if ((!teachingOnly && !DocDriftChecker.RegenerateAstInventory(resolvedRoot, inventoryErrors))
-                || !DocDriftChecker.RegenerateTeachingResources(resolvedRoot, inventoryErrors))
+                || !DocDriftChecker.RegenerateTeachingResources(resolvedRoot, inventoryErrors)
+                || (!teachingOnly && !DocDriftChecker.RegenerateSyntaxReference(resolvedRoot, inventoryErrors)))
             {
                 WriteDiagnostics(inventoryErrors, format, resolvedRoot, teachingOnly);
                 return 2;

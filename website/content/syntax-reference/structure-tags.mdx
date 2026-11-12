@@ -13,6 +13,16 @@ The [generated current-language catalog](/docs/syntax-reference/current-language
 is the shared vocabulary reference. Positive complete programs compile with
 normal effect enforcement; negative programs and fragments are explicitly marked.
 
+## Raw C# blocks
+
+The converter can preserve unsupported C# at its owning compilation-unit,
+member or statement boundary. Its counted raw frames retain the payload's
+length, bytes and scope; they are preservation output, not a way to claim
+native syntax support or verified effects. Do not handwrite payload wrappers
+or move namespace-local imports into a different scope.
+Retain the original references and parse context when converting; missing
+metadata is not evidence that a replacement is equivalent.
+
 ## Modules
 
 The first `module` labels the compilation unit. It is **not** a namespace or
@@ -29,6 +39,37 @@ emit in `GlobalModule`. With namespace `Demo`, root functions emit in
 `Demo.DemoModule`. The label itself does not become a CLR type.
 `block` requests a block namespace instead of a file-scoped namespace; it does
 not change the namespace's CLR identity.
+
+### Oblivious nullability
+
+The file header can end with `nullable oblivious`, independently of
+`overflow checked` or `overflow unchecked`. Without this field, the existing
+checked nullability rules remain unchanged.
+
+```calor
+module Legacy nullable oblivious
+  func Find public (string:key) → string
+    !
+    return null
+```
+
+In this module, an unannotated reference declaration makes no non-null promise:
+its C# metadata has `NullableAnnotation.None`. Explicit `string?` still has
+`Annotated` metadata. The policy also applies inside arrays and generic arguments;
+it does not change CLR types or turn an unknown value into a non-null value.
+Passing an oblivious value to a non-null receiving parameter still requires
+a genuine non-null proof, such as an explicit check. An array initializer can
+establish that proof for the container through a selected non-null return or
+array creation. It does not strengthen element annotations or change declared
+metadata. Reassignment or a call that may rebind the array invalidates the proof.
+A deferred body cannot rely on its creation-time proof for a captured mutable binding.
+This is a file-wide annotation context, not a way to disable
+Calor's receiving, type, or effect checks.
+
+Generated C# disables only nullable **annotations**, while enabling nullable
+warnings. It suppresses `CS8669`, the generated-code warning for explicit `?`
+in an annotation-disabled context; receiving/type/effect errors are not suppressed.
+Mixed lexical annotation contexts are not represented by this header.
 
 ### Named static containers
 
@@ -52,10 +93,15 @@ module StructureModules Demo
 `Demo.DemoModule.Main()` returns `42`; the nested container is
 `Demo.Arithmetic`, not `Demo.StructureModules.Arithmetic`.
 
+<a id="namespace-scopes"></a>
+<a id="using-directives"></a>
+
 ### Namespace and import scope
 
-Imports appear inside the file module. They are compilation-unit imports,
-even when indented under a header that names a namespace.
+Imports appear inside the file module. Ordinary `using` directives are
+compilation-unit imports, even under a header that names a namespace.
+`namespace using` places an import inside that named namespace; it is not a
+namespace declaration or block. It requires a named namespace in the module header.
 
 ```calor
 module BlockNamespace Demo.Tools block
@@ -72,14 +118,23 @@ module BlockNamespace Demo.Tools block
 The class is `Demo.Tools.Box`, and `new Demo.Tools.Box().Read()` returns `42`.
 The alias names `System.Text`; `Builder` is a nullable `StringBuilder` field.
 Other import forms include `using System.Text` and `global using System`.
+For namespace-local lookup, write `namespace using System.Text`,
+`namespace using static System.Math`, or `namespace using Text = System.Text`.
+Local aliases can shadow compilation-unit aliases without changing either target.
 
 **Namespace preservation boundary:** the native header represents one
-namespace scope. Multiple namespace declarations, nested namespaces, and
-namespace-scoped imports are not native authoring forms here. Conversion
-preserves those original C# compilation units rather than flattening their
-scope or moving imports. Do not replace such output with a single native
-header and claim equivalent lookup behavior. Converter-preserved C# is not
-native language coverage, and raw payloads are not handwritten examples.
+namespace scope. `ConvertProject` and `migrate --split-namespaces` can retain
+resolved imports in their original compilation-unit or namespace-local scope.
+Single-result `Convert` and `convert` retain the whole-file preservation boundary
+for namespace-local imports. Multiple namespace declarations,
+nested namespaces, and conditional or unsupported scoped-import topology still
+require preservation. Missing original names or references also prevent native
+scoped-import conversion; implicit generated imports are not a repair.
+A projection that changes declared type or nullability metadata also stays
+preserved, rather than receiving native credit.
+Do not flatten these boundaries and claim equivalent lookup behavior.
+Converter-preserved C# is not native language coverage, and raw payloads are not
+handwritten examples.
 
 ## Functions
 

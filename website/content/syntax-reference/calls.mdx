@@ -22,6 +22,11 @@ factory.Create().Compute(argument())
 Always write `()` for a zero-argument call. There are no implicit arguments,
 argument tags, or call-closing tags. Generic type arguments use C# type names.
 
+Built-in type aliases can receive static calls: `string.Concat(left, right)`
+and `int.Parse(text)` refer to .NET types. A verbatim name such as `@string`
+instead refers to a declaration named `string`; `@string.Length` reads that
+value's member. Calor-to-Calor emission preserves this distinction.
+
 The callee can be an expression, including a member chain or a delegate value.
 Arguments are evaluated in source order, even when named arguments refer to
 parameters in a different order. A receiver or argument with side effects is

@@ -11,8 +11,10 @@ permalink: /cli/self-check/
 Machine-checks agent-facing documentation against the compiler
 implementation and exits nonzero when they contradict each other
 ("doc drift"). Current agent teaching resources are generated from
-`src/Calor.Compiler/Resources/Teaching/reference.json`. Other documentation
-is still authored separately. Prose or behavioral inaccuracies outside the
+`src/Calor.Compiler/Resources/Teaching/reference.json`. Syntax-reference pages are
+authored in `website/content/syntax-reference/*.mdx`; their Markdown copies in
+`docs/syntax-reference/` are generated. Other documentation is still authored
+separately. Prose or behavioral inaccuracies outside the
 checked forms below will not be caught.
 
 ```bash
@@ -28,7 +30,8 @@ calor self-check docs --teaching-only --fix # validate, regenerate, then check
 references, and compilation of the primer and every complete reference program.
 E2E reference loading uses this scoped gate before copying the reference.
 It is not a repository-wide documentation result. Without this option,
-`--fix` also regenerates the agent manual and AST inventory, then runs the full check.
+`--fix` also regenerates the syntax references, agent manual and AST inventory,
+then runs the full check.
 Before writing any teaching mirror, `--fix` validates that every authored teaching
 program declares a complete module and compiles to valid C#. Invalid examples leave
 all existing teaching mirrors unchanged and create no new ones.
@@ -74,7 +77,7 @@ Findings use the `Calor1320`–`Calor1334` band (see
 | Required files/sections are present and readable | `Calor1326` |
 | Every implemented `Calor13xx` code is listed in `docs/cli/structured-output.md`'s table | `Calor1327` |
 | Every complete-program example still parses (see below) | `Calor1328` |
-| Generated mirrors (agent manual, AST inventory and teaching resources) match their authored sources | `Calor1329` |
+| Generated mirrors (syntax references, agent manual, AST inventory and teaching resources) match their authored sources | `Calor1329` |
 | Every complete `module` program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) | `Calor1330` |
 | Every complete declaration example in the agent-task reference compiles to valid C# | `Calor1330` |
 | The exemplar never binds an array-returning BCL call to a generic collection type (the E1a trap) | `Calor1331` |
@@ -251,6 +254,14 @@ The check runs on every PR as a step of the `test` job in
 `.github/workflows/test.yml`, reusing that job's build.
 
 ## Generated mirror docs (AGENTS.md)
+
+The syntax-reference Markdown pages are generated from their matching website
+MDX pages. Edit the MDX source and run `calor self-check docs --fix`. The
+`current-language` page remains generated from the teaching JSON, not from MDX.
+Reference generation validates the complete examples before writing any
+reference mirror. It preserves fenced code bytes, resolves support-level
+components through the feature registry, and converts public links for
+repository readers. A missing, stale or hand-edited mirror fails `Calor1329`.
 
 `AGENTS.md` is a **generated** derivative of `CLAUDE.md` — identical content with
 the H1 title swapped and a "generated" banner — so the two agent manuals cannot
