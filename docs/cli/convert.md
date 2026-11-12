@@ -36,6 +36,10 @@ CLR namespaces, type names, or static containers.
 The API's `ConversionOptions.ModuleName` overrides only this file label.
 Original global and named CLR namespace owners remain unchanged.
 
+Standalone interpolation holes containing `null` or `default(bool)` convert
+natively, including in field initializers. This does not broaden C#-form call
+arguments, custom handler support, or numeric formatting effect contracts.
+
 ### Compilation context
 
 Conversion and generated-output validation default to an implicit `System`

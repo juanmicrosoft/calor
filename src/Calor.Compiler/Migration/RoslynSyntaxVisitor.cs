@@ -16449,7 +16449,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     // enclosing statement and outside any enclosing conditional.
                     // A hole outside the native subset is kept as its original C# text (§CS{...}),
                     // reported as interop, rather than mixing C# and Calor syntax in one hole.
-                    var interpExpr = IsNativeHole(interp.Expression)
+                    var scalarLiteral = interp.Expression.IsKind(SyntaxKind.NullLiteralExpression)
+                        || interp.Expression is DefaultExpressionSyntax
+                        {
+                            Type: PredefinedTypeSyntax { Keyword.RawKind: (int)SyntaxKind.BoolKeyword }
+                        };
+                    var interpExpr = scalarLiteral || IsNativeHole(interp.Expression)
                         ? ConvertExpression(interp.Expression)
                         : PreserveInterpolationHole(interp.Expression);
                     parts.Add(new InterpolatedStringExpressionNode(

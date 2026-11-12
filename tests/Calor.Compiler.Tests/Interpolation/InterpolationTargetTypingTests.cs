@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Microsoft.CodeAnalysis;
@@ -364,6 +365,48 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
         output.WriteLine(compilation.GeneratedCode);
         Assert.Equal(expected, Execute(compilation.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData("null", false)]
+    [InlineData("null", true)]
+    [InlineData("default(bool)", false)]
+    [InlineData("default(bool)", true)]
+    public void StandaloneScalarHole_ConvertsNativelyAndPassesStrictEffects(string expression, bool initializer)
+    {
+        var interpolation = "$\"value={" + expression + "}\"";
+        var member = initializer ? "private static string Text = " + interpolation + ";" : "";
+        var returned = initializer ? "Text" : interpolation;
+        var source = $$"""
+            #nullable enable
+            public class ScalarHole
+            {
+                {{member}}
+                public static string Render() { return {{returned}}; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "standalone-scalar-hole.calr",
+                new CompilationOptions
+                {
+                    EnableTypeChecking = typing,
+                    EnforceEffects = true,
+                    StrictEffects = true,
+                    UnknownCallPolicy = UnknownCallPolicy.Strict,
+                    UnsafeTranspileOnly = false,
+                    VerifyContracts = false,
+                    StatusWriter = TextWriter.Null
+                });
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            Assert.Empty(result.Diagnostics);
+            Assert.NotEmpty(result.GeneratedCode);
+        }
     }
 
     [Fact]
