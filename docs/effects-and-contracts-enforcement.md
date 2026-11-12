@@ -216,6 +216,8 @@ culture; allocation follows the existing allocation-only convention.
 formatting can reach a provider or current-culture callback, including on
 the parameterless negative-integer path. These overloads remain Unknown,
 not pure because a base implementation or one input happens to be safe.
+Wrapping an uncontracted call in interpolation or string addition does not
+make it pure.
 All other Convert members, including base64 and hex helpers, remain
 uncontracted; this is not a claim that every omitted overload has an effect.
 

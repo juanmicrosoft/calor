@@ -2615,6 +2615,35 @@ public class EffectResolverTests
         }
     }
 
+    [Theory]
+    [InlineData("\"${System.Convert.ToString(value)}\"")]
+    [InlineData("System.Convert.ToString(value) + \":suffix\"")]
+    public void ConvertContracts_StringResultsCannotLaunderNumericFormatting(string expression)
+    {
+        var source = $$"""
+            module ConvertFormatting
+              func Render (int:value) → string
+                !
+                return {{expression}}
+            """;
+        foreach (var native in StringEmissions(source))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(native, "convert-formatting.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StrictApi = true,
+                    StrictEffects = true, StatusWriter = TextWriter.Null
+                });
+            Assert.True(result.HasErrors);
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("System.Convert.ToString", StringComparison.Ordinal));
+        }
+    }
+
     private static bool IsProvedConvertOverload(IMethodSymbol method) =>
         method.Name == "ToString" && method.Parameters.Length is 1 or 2
         && method.Parameters[0].Type.SpecialType is SpecialType.System_String or SpecialType.System_Boolean or SpecialType.System_Char
