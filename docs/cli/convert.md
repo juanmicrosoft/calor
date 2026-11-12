@@ -39,6 +39,7 @@ Original global and named CLR namespace owners remain unchanged.
 Standalone interpolation holes containing `null` or `default(bool)` convert
 natively, including in field initializers. This does not broaden C#-form call
 arguments, custom handler support, or numeric formatting effect contracts.
+Commented holes retain the existing preservation boundary.
 
 ### Compilation context
 

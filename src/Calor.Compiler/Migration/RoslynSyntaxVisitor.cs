@@ -16449,11 +16449,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     // enclosing statement and outside any enclosing conditional.
                     // A hole outside the native subset is kept as its original C# text (§CS{...}),
                     // reported as interop, rather than mixing C# and Calor syntax in one hole.
-                    var scalarLiteral = interp.Expression.IsKind(SyntaxKind.NullLiteralExpression)
+                    var scalarLiteral = (interp.Expression.IsKind(SyntaxKind.NullLiteralExpression)
                         || interp.Expression is DefaultExpressionSyntax
                         {
                             Type: PredefinedTypeSyntax { Keyword.RawKind: (int)SyntaxKind.BoolKeyword }
-                        };
+                        }) && !HasInterpolationHoleComment(interp.Expression);
                     var interpExpr = scalarLiteral || IsNativeHole(interp.Expression)
                         ? ConvertExpression(interp.Expression)
                         : PreserveInterpolationHole(interp.Expression);
@@ -16545,13 +16545,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _ => false
     };
 
+    private static bool HasInterpolationHoleComment(ExpressionSyntax expression) =>
+        expression.DescendantTrivia().Any(trivia =>
+            trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia));
+
     private ExpressionNode PreserveInterpolationHole(ExpressionSyntax expression)
     {
         var code = expression.WithoutTrivia().ToString();
         var line = expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-        if (code.Contains('\n') || code.Contains('\r')
-            || expression.DescendantTrivia().Any(trivia =>
-                trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)))
+        if (code.Contains('\n') || code.Contains('\r') || HasInterpolationHoleComment(expression))
         {
             // Multi-line holes and holes with comments cannot sit inside a one-line Calor string.
             throw EscalateExpression(expression, "string-interpolation-hole");
