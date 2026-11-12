@@ -518,9 +518,15 @@ public sealed class CSharpToCalorConverter
         return namespaces;
     }
 
-    private static bool CanConvertScopedNamespaceImports(CompilationUnitSyntax root)
+    private static bool CanConvertScopedNamespaceImports(
+        CompilationUnitSyntax root, bool allowRegionDirectives = false)
         => root.SyntaxTree.Options.Kind == SourceCodeKind.Regular
-           && !root.ContainsDiagnostics && !root.ContainsDirectives
+           && !root.ContainsDiagnostics
+           && (!root.ContainsDirectives || allowRegionDirectives
+               && root.DescendantTrivia(descendIntoTrivia: true)
+                   .Where(trivia => trivia.IsDirective)
+                   .All(trivia => trivia.GetStructure() is
+                       RegionDirectiveTriviaSyntax or EndRegionDirectiveTriviaSyntax))
            && root.AttributeLists.Count == 0 && root.Externs.Count == 0
            && root.Members.Count == 1
            && root.Members[0] is BaseNamespaceDeclarationSyntax scope
@@ -1031,7 +1037,15 @@ public sealed class CSharpToCalorConverter
             if (namespaceFeature != null)
                 context.RecordFeatureUsage(namespaceFeature);
 
+            var lossyScopedImports = namespaceStart == null && !allowScopedNamespaceImports
+                && _options.Fidelity == ConversionFidelity.Lossy
+                && _options.PreprocessorMode == PreprocessorConversionMode.SelectActiveBranchLossy
+                && _options.ValidateRoundTripCSharp
+                && CanConvertScopedNamespaceImports(root, allowRegionDirectives: true)
+                && root.Usings.All(directive => directive.UnsafeKeyword.IsKind(SyntaxKind.None)
+                    && directive.NamespaceOrType is NameSyntax);
             if (namespaceStart == null && RequiresWholeFileNamespaceInterop(root)
+                && !lossyScopedImports
                 && !(allowScopedNamespaceImports && CanConvertScopedNamespaceImports(root)))
             {
                 if (!context.PreservesCSharp)
@@ -1072,6 +1086,26 @@ public sealed class CSharpToCalorConverter
             catch
             {
                 // Semantic model creation is best-effort; proceed without it
+            }
+
+            if (lossyScopedImports)
+            {
+                if (semanticModel == null || _options.References.Any(reference => !File.Exists(reference.Path)))
+                    context.AddError("Scoped namespace imports require the original semantic context and supplied references.",
+                        "scoped-namespace-source-validation");
+                else
+                    foreach (var error in semanticModel.Compilation.GetDiagnostics(cancellationToken)
+                        .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+                        context.AddError($"Original C# cannot convert scoped imports ({error.Id}): {error.GetMessage()}",
+                            "scoped-namespace-source-validation",
+                            error.Location.GetLineSpan().StartLinePosition.Line + 1);
+                if (context.HasErrors)
+                    return new ConversionResult { Success = false, Context = context, Duration = DateTime.UtcNow - startTime };
+
+                // This path admits no lexical nullable directives, so a single
+                // module context can retain annotation-disabled declarations.
+                obliviousModule = !semanticModel!.GetNullableContext(root.SpanStart)
+                    .HasFlag(NullableContext.AnnotationsEnabled);
             }
 
             // Visit C# AST and build Calor AST
@@ -1157,7 +1191,8 @@ public sealed class CSharpToCalorConverter
             // standalone compile also fails when the file only depends on a sibling
             // file, and under PassthroughOnError a rescue that cannot recover would
             // refuse a conversion lossy mode used to complete.
-            var roundTripGate = namespaceStart == null && !allowScopedNamespaceImports && _options.ValidateRoundTripCSharp
+            var roundTripGate = namespaceStart == null && !allowScopedNamespaceImports
+                && !lossyScopedImports && _options.ValidateRoundTripCSharp
                 && (_options.Fidelity == ConversionFidelity.Lossless
                     || _options.PreprocessorMode
                         == PreprocessorConversionMode.SelectActiveBranchLossy);
@@ -1254,7 +1289,8 @@ public sealed class CSharpToCalorConverter
             ValidateLosslessRoundTrip(
                 calorSource,
                 context,
-                namespaceStart == null && !allowScopedNamespaceImports && _options.ValidateRoundTripCSharp,
+                namespaceStart == null && !allowScopedNamespaceImports
+                    && !lossyScopedImports && _options.ValidateRoundTripCSharp,
                 parseOptions,
                 effectiveOutputKind,
                 _options.NullableContextOptions
@@ -1272,6 +1308,46 @@ public sealed class CSharpToCalorConverter
                     column: span.Character + 1,
                     feature: "active-error-directive");
             }
+
+            if (lossyScopedImports && !context.HasErrors)
+            {
+                if (context.Losses.Any(loss => loss.Kind is
+                    ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback
+                    or ConversionLossKind.FallbackTodo or ConversionLossKind.Dropped))
+                    context.AddError("Scoped namespace imports require native declarations and bodies, not preservation or substitutions.",
+                        "scoped-namespace-fidelity");
+                else
+                {
+                    var compiled = Program.Compile(calorSource, sourceFile, new CompilationOptions
+                    {
+                        IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+                        ProjectDirectory = _options.ProjectDirectory,
+                        DeferGeneratedOutputValidation = true,
+                        CancellationToken = cancellationToken
+                    });
+                    foreach (var error in compiled.Diagnostics.Errors)
+                        context.AddError($"Native scoped imports failed Calor compilation: {error.Message}",
+                            "scoped-namespace-fidelity", error.Span.Line, error.Span.Column);
+                    if (!compiled.HasErrors)
+                    {
+                        var generatedTree = CSharpSyntaxTree.ParseText(
+                            compiled.GeneratedCode, parseOptions,
+                            syntaxTree.FilePath, cancellationToken: cancellationToken);
+                        var generatedCompilation = semanticModel!.Compilation.ReplaceSyntaxTree(syntaxTree, generatedTree);
+                        foreach (var error in generatedCompilation.GetDiagnostics(cancellationToken)
+                            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+                            context.AddError($"Native scoped imports failed C# validation ({error.Id}): {error.GetMessage()}",
+                                "scoped-namespace-fidelity");
+                        if (!DeclaredTypeMetadata(semanticModel, root).SequenceEqual(
+                                DeclaredTypeMetadata(generatedCompilation.GetSemanticModel(generatedTree),
+                                    generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal))
+                            context.AddError("Native scoped imports changed declared type/nullability metadata.",
+                                "scoped-namespace-fidelity");
+                    }
+                }
+            }
+            if (lossyScopedImports)
+                context.RoundTrip = context.HasErrors ? ConversionRoundTrip.Failed : ConversionRoundTrip.Verified;
 
             var destructiveLosses = context.Losses.Count(loss => loss.IsSemanticLoss);
             if (_options.Fidelity == ConversionFidelity.Lossless && destructiveLosses > 0)
@@ -1296,8 +1372,8 @@ public sealed class CSharpToCalorConverter
             return new ConversionResult
             {
                 Success = !context.HasErrors,
-                CalorSource = calorSource,
-                Ast = calorAst,
+                CalorSource = lossyScopedImports && context.HasErrors ? null : calorSource,
+                Ast = lossyScopedImports && context.HasErrors ? null : calorAst,
                 Context = context,
                 Duration = DateTime.UtcNow - startTime
             };

@@ -318,6 +318,237 @@ public sealed class CanonicalNamespaceTests
     }
 
     [Theory]
+    [InlineData(false, "using Picks;", "Item", NullableContextOptions.Disable)]
+    [InlineData(true, "using Picks;", "Item", NullableContextOptions.Enable)]
+    [InlineData(false, "using Choice = Picks.Item;", "Choice", NullableContextOptions.Enable)]
+    [InlineData(true, "using Choice = Picks.Item;", "Choice", NullableContextOptions.Disable)]
+    [InlineData(false, "using static Helpers;", "Item", NullableContextOptions.Disable)]
+    [InlineData(true, "using static Helpers;", "Item", NullableContextOptions.Enable)]
+    public void SelectedBranchLossyImportsKeepLexicalBindingAndDeclaredAnnotations(
+        bool fileScoped, string import, string typeName, NullableContextOptions nullableContext)
+    {
+        const string companions = """
+            namespace Picks { public class Item {} }
+            namespace Witness.Picks { public class Item {} }
+            public static class Helpers { public class Item {} }
+            namespace Witness { public static class Helpers { public class Item {} } }
+            """;
+        var source = $$"""
+            #region outer
+            using Choice = System.Int16;
+            namespace Witness{{(fileScoped ? ";" : " {")}}
+            #region imports
+            {{import}}
+            #endregion
+            public class Probe
+            {
+                public {{typeName}} Echo({{typeName}} value) { return value; }
+                public string Text(string value) { return value; }
+                public string? Maybe(string? value) { return value; }
+            }
+            {{(fileScoped ? "" : "}")}}
+            #endregion
+            """;
+        var options = new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            NullableContextOptions = nullableContext,
+            AdditionalSemanticSyntaxTrees = [CSharpSyntaxTree.ParseText(companions, new CSharpParseOptions(LanguageVersion.Preview))]
+        };
+        var result = new CSharpToCalorConverter(options).Convert(source, "Imports.cs");
+        Assert.True(result.Success, string.Join("\n", result.Issues.Concat<object>(result.Losses)));
+        Assert.Empty(result.Losses);
+        Assert.Equal("verified", result.Paths.RoundTrip);
+        var original = CompileWithCompanions(source, companions).WithOptions(
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: nullableContext));
+        var originalTree = original.SyntaxTrees.First();
+        foreach (var native in new[] { result.CalorSource!, new CalorEmitter().Emit(Parse(result.CalorSource!)) })
+        {
+            var module = Parse(native);
+            Assert.Empty(module.InteropBlocks);
+            Assert.Equal(2, module.Usings.Count);
+            Assert.Null(module.Usings[0].NamespaceScopeId);
+            Assert.Equal(module.NamespaceScopes.Single().Id, module.Usings[1].NamespaceScopeId);
+            Assert.Equal(fileScoped, module.NamespaceScopes.Single().IsFileScoped);
+            var compiled = Program.Compile(native, null, new CompilationOptions { DeferGeneratedOutputValidation = true });
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+            var generated = CompileWithCompanions(compiled.GeneratedCode, companions);
+            var generatedTree = generated.SyntaxTrees.First();
+            Assert.Equal(CSharpToCalorConverter.DeclaredTypeMetadata(original.GetSemanticModel(originalTree),
+                    originalTree.GetCompilationUnitRoot()),
+                CSharpToCalorConverter.DeclaredTypeMetadata(generated.GetSemanticModel(generatedTree),
+                    generatedTree.GetCompilationUnitRoot()));
+            var echo = Assert.Single(generated.GetTypeByMetadataName("Witness.Probe")!.GetMembers("Echo").OfType<IMethodSymbol>());
+            Assert.Equal(import.Contains("Helpers") ? "Witness.Helpers.Item" : "Witness.Picks.Item",
+                echo.ReturnType.ToDisplayString());
+        }
+    }
+
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 2)]
+    public void SelectedBranchLossyImportsUseRoslynSelectionAndRecordEveryRemovedDirective(bool defined, int expected)
+    {
+        const string source = """
+            namespace Witness
+            {
+                using System;
+            #if ALT
+                public class Probe { public int Read() { return 2; } }
+            #else
+            #nullable enable
+                public class Probe { public int Read() { return 1; } }
+            #endif
+            }
+            """;
+        // The active nullable directive remains closed; only an inactive one may
+        // be removed by the already-explicit selected-branch policy.
+        var result = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            DefinedSymbols = defined ? ["ALT"] : []
+        }).Convert(source);
+        if (!defined)
+        {
+            Assert.False(result.Success);
+            Assert.Null(result.CalorSource);
+            Assert.Contains(result.Issues, issue => issue.Feature == "namespace-topology");
+            return;
+        }
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Equal(3, result.Losses.Count(loss => loss.Kind == ConversionLossKind.PreprocessorStripped));
+        Assert.Contains(result.Losses, loss => loss.Kind == ConversionLossKind.DirectiveRemoved
+            && loss.Feature == "nullable-directive");
+        Assert.Equal(["ALT"], result.Metadata.DefinedSymbols);
+        Assert.Contains($"return {expected}", result.CalorSource);
+        Assert.Equal("verified", result.Paths.RoundTrip);
+    }
+
+    [Theory]
+    [InlineData("namespace Witness { using System; public class Probe { public Missing Echo(Missing value) { return value; } } }")]
+    [InlineData("namespace Witness { using System.Threading; using System.Timers; public class Probe { public Timer Echo(Timer value) { return value; } } }")]
+    [InlineData("namespace Witness { using System; public class Probe { public int Read() { return \"wrong\"; } } }")]
+    public void SelectedBranchLossyImportsRefuseInvalidAmbiguousOrIncompleteContext(string source)
+    {
+        var result = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy
+        }).Convert(source);
+        Assert.False(result.Success);
+        Assert.Null(result.CalorSource);
+        Assert.Contains(result.Issues, issue => issue.Feature == "scoped-namespace-source-validation");
+    }
+
+    [Fact]
+    public void SelectedBranchLossyImportsRequireSuppliedReferencesAndRealValidation()
+    {
+        const string source = "namespace Witness { using System; public class Probe {} }";
+        var missing = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            References = [new ConversionReference(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".dll"), [])]
+        }).Convert(source);
+        Assert.False(missing.Success);
+        Assert.Null(missing.CalorSource);
+        Assert.Contains(missing.Issues, issue => issue.Feature == "scoped-namespace-source-validation");
+        var deferred = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            ValidateRoundTripCSharp = false
+        }).Convert(source);
+        Assert.False(deferred.Success);
+        Assert.Null(deferred.CalorSource);
+        Assert.Contains(deferred.Issues, issue => issue.Feature == "namespace-topology");
+    }
+
+    [Fact]
+    public void SelectedBranchLossyImportsDoNotCountPreservedBodiesAsNative()
+    {
+        const string source = """
+            namespace Witness
+            {
+                using System;
+                public static class Probe { public static object Read() { return global::System.EventArgs.Empty; } }
+            }
+            """;
+        var result = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy
+        }).Convert(source);
+        Assert.False(result.Success);
+        Assert.Null(result.CalorSource);
+        Assert.Contains(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Contains(result.Issues, issue => issue.Feature == "scoped-namespace-fidelity");
+    }
+
+    [Fact]
+    public void SelectedBranchLossyImportsKeepStrictEffectChecks()
+    {
+        const string source = """
+            namespace Witness
+            {
+                using System;
+                public static class Probe { public static void Read() { Console.WriteLine("not pure"); } }
+            }
+            """;
+        var result = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy
+        }).Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+        Assert.Contains("! cw", result.CalorSource);
+        var rejected = Program.Compile(result.CalorSource!.Replace("! cw", "!", StringComparison.Ordinal));
+        Assert.Contains(rejected.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Theory]
+    [InlineData("#nullable enable")]
+    [InlineData("#pragma warning disable CS0168")]
+    [InlineData("#warning keep warning")]
+    [InlineData("#error keep error")]
+    [InlineData("#line 20 \"other.cs\"")]
+    [InlineData("#region unclosed")]
+    [InlineData("#endregion")]
+    public void SelectedBranchLossyImportsDoNotAdmitOtherDirectivesOrUnbalancedRegions(string directive)
+    {
+        var result = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy
+        }).Convert($"namespace Witness {{\nusing System;\n{directive}\npublic class Probe {{}}\n}}");
+        Assert.False(result.Success);
+        Assert.Null(result.CalorSource);
+        Assert.NotEmpty(result.Issues);
+    }
+
+    [Theory]
+    [InlineData("namespace Witness { using System; class Probe {} } namespace Other { class Item {} }")]
+    [InlineData("namespace Witness { using System; namespace Nested { class Probe {} } }")]
+    [InlineData("namespace Witness { using Pair = (int X, int Y); class Probe {} }")]
+    [InlineData("namespace Witness { using unsafe Pointer = int*; class Probe {} }")]
+    [InlineData("extern alias Library; namespace Witness { using System; class Probe {} }")]
+    [InlineData("[assembly: System.Reflection.AssemblyTitle(\"test\")] namespace Witness { using System; class Probe {} }")]
+    public void SelectedBranchLossyImportsKeepUnsupportedTopologiesClosed(string source)
+    {
+        var result = new CSharpToCalorConverter(new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy
+        }).Convert(source);
+        Assert.False(result.Success);
+        Assert.Null(result.CalorSource);
+        Assert.Contains(result.Issues, issue => issue.Feature == "namespace-topology");
+    }
+
+    [Theory]
     [InlineData("module Imports\n  namespace using System")]
     [InlineData("module Imports Witness\n  namespace global using System")]
     [InlineData("module Imports Witness\n  namespace\n  using System")]

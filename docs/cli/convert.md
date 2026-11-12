@@ -274,6 +274,16 @@ Inactive `#nullable`, `#pragma`, `#warning`, `#error`, `#line`, `#define`, and
 `#undef` directives are removed individually with distinct losses; active
 directives remain effective.
 
+With both `Fidelity=Lossy` and `SelectActiveBranchLossy`, single-file conversion
+can retain namespace-local imports in one namespace, including ordinary imports,
+aliases and static imports. Balanced `#region`/`#endregion` trivia is allowed.
+The original semantic context must be complete and valid. Generated C# must
+compile and retain declared type and nullable-annotation metadata; preserved
+members or substitutions do not qualify. Other active directives and unsupported
+namespace topologies stay closed. Default lossless single-file conversion still
+preserves these lexical import scopes as whole-file C#, rather than rewriting them.
+This explicit lossy path is not a claim of default native corpus acceptance.
+
 Compiler-affecting directives (`#nullable`, `#pragma`, `#warning`, `#error`,
 and `#line`) are preserved verbatim in source order. They remain explicit raw
 interop boundaries in the loss ledger. A preserved `#error` correctly makes
