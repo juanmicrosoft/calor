@@ -64,6 +64,12 @@ Mixed `#nullable` contexts, unresolved source context, or an uncertified native
 replacement retain the preservation boundary; raw C# is not native recovery.
 Conversion options and the default compilation context do not change.
 
+When this native candidate fails validation, conversion issues retain the compiler
+code, message, and location in the generated Calor or C#, rather than reporting a
+metadata mismatch. Candidate diagnostics remain warnings after exact original C#
+preservation; they do not mean the rejected native candidate compiled. A metadata
+mismatch is reported only after the generated C# compiles.
+
 Static calls on source generic types use the selected constructed method signature,
 not a receiver name with its generic arguments removed. Namespace and alias lookup,
 arity, constraints, overloads, and nullable annotations must still resolve.

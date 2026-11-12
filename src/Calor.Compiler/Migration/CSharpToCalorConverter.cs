@@ -640,13 +640,14 @@ public sealed class CSharpToCalorConverter
         if (!before.Any(record => record.Contains("[None]", StringComparison.Ordinal)))
             return attempted;
 
-        bool MetadataMatches(string generated)
+        bool MetadataMatches(string generated, out Diagnostic[] errors)
         {
             var generatedTree = CSharpSyntaxTree.ParseText(generated, parseOptions,
                 cancellationToken: cancellationToken);
             var compilation = original.ReplaceSyntaxTree(tree, generatedTree);
-            return !compilation.GetDiagnostics(cancellationToken).Any(diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error)
+            errors = compilation.GetDiagnostics(cancellationToken)
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+            return errors.Length == 0
                 && before.SequenceEqual(DeclaredTypeMetadata(compilation.GetSemanticModel(generatedTree),
                     generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal);
         }
@@ -655,18 +656,40 @@ public sealed class CSharpToCalorConverter
         if (attempted.Success
             && attempted.CalorSource is { } current
             && TryParseModule(current) is { } currentModule
-            && MetadataMatches(new CSharpEmitter().Emit(currentModule)))
+            && MetadataMatches(new CSharpEmitter().Emit(currentModule), out _))
             return attempted;
 
-        ConversionResult PreserveUnrepresentedMetadata()
+        ConversionResult PreserveUncertifiedModule(string? reason = null, ConversionResult? candidate = null)
         {
-            if (!attempted.Success)
-                return attempted;
-            attempted.Context.AddWarning(
-                "The native projection changed declared type/nullability metadata; "
-                + "a single oblivious module context could not certify a faithful replacement.",
-                "nullable-module-fidelity");
-            return PreserveOriginal(source, sourceFile, attempted, cancellationToken);
+            if (reason != null)
+                attempted.Context.AddWarning(reason, "nullable-module-fidelity");
+            var result = attempted.Success
+                ? PreserveOriginal(source, sourceFile, attempted, cancellationToken)
+                : attempted;
+            // Candidate-only diagnostics explain the rejection, not the original preservation path.
+            var prefix = attempted.Success ? "Before whole-file preservation (Warning): " : "";
+            if (candidate != null)
+            {
+                foreach (var issue in candidate.Issues
+                    .DistinctBy(issue => (issue.Severity, issue.Message, issue.Feature,
+                        issue.Line, issue.Column, issue.Suggestion))
+                    .Where(issue => !attempted.Issues.Any(existing =>
+                        existing.Severity == issue.Severity && existing.Message == issue.Message
+                        && existing.Feature == issue.Feature && existing.Line == issue.Line
+                        && existing.Column == issue.Column && existing.Suggestion == issue.Suggestion)))
+                    result.Context.AddWarning(
+                        $"{prefix}Oblivious module candidate ({issue.Severity}): {issue.Message}",
+                        issue.Feature, issue.Line, issue.Column, issue.Suggestion);
+                foreach (var loss in candidate.Losses
+                    .DistinctBy(loss => (loss.Kind, loss.Feature, loss.Description, loss.Line))
+                    .Where(loss => !attempted.Losses.Any(existing =>
+                        existing.Kind == loss.Kind && existing.Feature == loss.Feature
+                        && existing.Description == loss.Description && existing.Line == loss.Line)))
+                    result.Context.AddWarning(
+                        $"{prefix}Oblivious module candidate ({loss.Kind}): {loss.Description}",
+                        loss.Feature, loss.Line);
+            }
+            return result;
         }
 
         // One module policy cannot represent lexical changes of annotation context.
@@ -674,14 +697,18 @@ public sealed class CSharpToCalorConverter
                 .Any(trivia => trivia.GetStructure() is NullableDirectiveTriviaSyntax)
             || root.DescendantNodes().OfType<TypeSyntax>().Any(type =>
                 model.GetNullableContext(type.SpanStart).HasFlag(NullableContext.AnnotationsEnabled)))
-            return PreserveUnrepresentedMetadata();
+            return PreserveUncertifiedModule(
+                "A single oblivious module context cannot represent the original lexical nullable contexts; "
+                + "the native replacement could not be certified.");
 
         var candidate = ConvertCore(source, sourceFile, cancellationToken, capturePreservationContext,
             originalSemanticModel: model, allowScopedNamespaceImports: allowScopedNamespaceImports,
             obliviousModule: true);
         if (!candidate.Success || candidate.InteropPreservationCount != 0 || candidate.Losses.Count != 0
             || candidate.CalorSource is not { } native)
-            return PreserveUnrepresentedMetadata();
+            return PreserveUncertifiedModule(
+                "The oblivious module candidate did not produce successful, entirely native Calor; "
+                + "the native replacement could not be certified.", candidate);
         // Reparse the actual deliverable and enforce the normal binder/effect
         // checks. No deferred or unchecked output can authorize this recovery.
         var compiled = Program.Compile(native, sourceFile, new CompilationOptions
@@ -690,8 +717,29 @@ public sealed class CSharpToCalorConverter
             ProjectDirectory = _options.ProjectDirectory,
             CancellationToken = cancellationToken
         });
-        if (compiled.HasErrors || !MetadataMatches(compiled.GeneratedCode))
-            return PreserveUnrepresentedMetadata();
+        if (compiled.HasErrors)
+        {
+            foreach (var error in compiled.Diagnostics.Errors)
+                attempted.Context.AddWarning(
+                    $"Native oblivious module failed Calor compilation ({error.Code}): {error.Message}",
+                    "roundtrip-calor-validation", error.Span.Line, error.Span.Column);
+            return PreserveUncertifiedModule(candidate: candidate);
+        }
+        if (!MetadataMatches(compiled.GeneratedCode, out var generatedErrors))
+        {
+            if (generatedErrors.Length == 0)
+                return PreserveUncertifiedModule(
+                    "The native projection changed declared type/nullability metadata; "
+                    + "a single oblivious module context could not certify a faithful replacement.", candidate);
+            foreach (var error in generatedErrors)
+            {
+                var span = error.Location.GetLineSpan().StartLinePosition;
+                attempted.Context.AddWarning(
+                    $"Native oblivious module failed C# validation ({error.Id}): {error.GetMessage()}",
+                    "roundtrip-csharp-validation", span.Line + 1, span.Character + 1);
+            }
+            return PreserveUncertifiedModule(candidate: candidate);
+        }
         candidate.Context.RoundTrip = ConversionRoundTrip.Verified;
         return candidate;
     }
@@ -2520,7 +2568,7 @@ public sealed class CSharpToCalorConverter
         foreach (var diagnostic in compileResult.Diagnostics.Errors)
         {
             fail(
-                $"Generated Calor failed compilation: {diagnostic.Message}",
+                $"Generated Calor failed compilation ({diagnostic.Code}): {diagnostic.Message}",
                 "roundtrip-calor-validation",
                 diagnostic.Span.Line,
                 diagnostic.Span.Column);

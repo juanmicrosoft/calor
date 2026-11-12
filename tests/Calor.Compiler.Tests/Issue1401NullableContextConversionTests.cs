@@ -200,6 +200,109 @@ public sealed class Issue1401NullableContextConversionTests
     }
 
     [Theory]
+    [InlineData("\"value=\" + value")]
+    [InlineData("$\"{value:F2}\"")]
+    public void ObliviousCandidate_EffectFailureReportsCompilerDiagnosticInsteadOfMetadataMismatch(string expression)
+    {
+        var source = "public static class Fixture\r\n{\r\n"
+            + $"    public static string Render(double value) => {expression};\r\n"
+            + "}\r\n// exact original EOF";
+        var result = new CSharpToCalorConverter().Convert(source, "Formatting.cs");
+
+        Assert.True(result.Success, FormatIssues(result));
+        Assert.Equal("whole-file-preservation", Assert.Single(result.Losses).Feature);
+        Assert.Equal(ConversionRoundTrip.Verified, result.Context.RoundTrip);
+        var issue = Assert.Single(result.Issues, issue => issue.Feature == "roundtrip-calor-validation");
+        Assert.Equal(ConversionIssueSeverity.Warning, issue.Severity);
+        Assert.Contains("Native oblivious module failed Calor compilation (Calor0410):", issue.Message);
+        Assert.Contains("'Render'", issue.Message);
+        Assert.Contains("'unknown'", issue.Message);
+        Assert.True(issue.Line > 0);
+        Assert.True(issue.Column > 0);
+        Assert.DoesNotContain(result.Issues, issue => issue.Feature == "nullable-module-fidelity");
+        var compiled = Program.Compile(result.CalorSource!, "preserved.calr", new CompilationOptions
+        {
+            StrictEffects = true,
+            UnknownCallPolicy = Effects.UnknownCallPolicy.Strict
+        });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(source, compiled.GeneratedCode);
+        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+    }
+
+    [Fact]
+    public void ObliviousCandidate_FailedConversionRetainsItsDistinctIssues()
+    {
+        const string source = "public static class Fixture { public static string Echo(string value) => value; }";
+        var converter = new CSharpToCalorConverter
+        {
+            ParseValidatorOverride = calor => !calor.Contains("nullable oblivious", StringComparison.Ordinal)
+        };
+        var result = converter.Convert(source, "Candidate.cs");
+
+        Assert.True(result.Success, FormatIssues(result));
+        Assert.Equal("whole-file-preservation", Assert.Single(result.Losses).Feature);
+        Assert.Equal(ConversionTrigger.UnsupportedConstruct, Assert.Single(result.Losses).Trigger);
+        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation"
+            && issue.Message.Contains(
+                "Oblivious module candidate (Error): Generated Calor failed mandatory parse validation.",
+                StringComparison.Ordinal));
+        Assert.Contains(result.Issues, issue => issue.Feature == "nullable-module-fidelity"
+            && issue.Message.Contains("did not produce successful, entirely native Calor", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Issues, issue =>
+            issue.Message.Contains("changed declared type/nullability metadata", StringComparison.Ordinal));
+        Assert.Equal(result.Issues.Count, result.Issues
+            .DistinctBy(issue => (issue.Severity, issue.Message, issue.Feature,
+                issue.Line, issue.Column, issue.Suggestion)).Count());
+        var compiled = Program.Compile(result.CalorSource!, "preserved.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(source, compiled.GeneratedCode);
+    }
+
+    [Fact]
+    public void ObliviousCandidate_MixedContextsReportTheUnrepresentablePolicy()
+    {
+        const string source = """
+            #nullable disable
+            public static class Fixture {
+                public static string Unknown(string value) => value;
+            #nullable enable
+                public static string Known(string value) => value;
+            }
+            """;
+        var result = new CSharpToCalorConverter().Convert(source, "Mixed.cs");
+
+        Assert.True(result.Success, FormatIssues(result));
+        Assert.Contains(result.Issues, issue => issue.Feature == "nullable-module-fidelity"
+            && issue.Message.Contains("cannot represent the original lexical nullable contexts", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Issues, issue =>
+            issue.Message.Contains("changed declared type/nullability metadata", StringComparison.Ordinal));
+        var compiled = Program.Compile(result.CalorSource!, "preserved.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(source, compiled.GeneratedCode);
+        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+    }
+
+    [Fact]
+    public void ObliviousCandidate_MissingSourceContextRemainsExplicitAndUnverified()
+    {
+        const string source = "public static class Fixture { public static Missing Echo(string value) => null; }";
+        var result = new CSharpToCalorConverter().Convert(source, "Missing.cs");
+
+        Assert.True(result.Success, FormatIssues(result));
+        Assert.Equal("whole-file-preservation", Assert.Single(result.Losses).Feature);
+        Assert.Equal(ConversionRoundTrip.Failed, result.Context.RoundTrip);
+        Assert.Contains(result.Issues, issue => issue.Feature == "roundtrip-csharp-validation"
+            && issue.Message.Contains("CS0246", StringComparison.Ordinal)
+            && issue.Line > 0 && issue.Column > 0);
+        Assert.DoesNotContain(result.Issues, issue => issue.Feature == "nullable-module-fidelity");
+        var compiled = Program.Compile(result.CalorSource!, "preserved.calr",
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(source, compiled.GeneratedCode);
+    }
+
+    [Theory]
     [InlineData("062_OptionalParameters.cs", false)]
     [InlineData("062_OptionalParameters.cs", true)]
     [InlineData("075_ExtensionMethods.cs", false)]
