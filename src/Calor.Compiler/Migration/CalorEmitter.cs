@@ -358,7 +358,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.DeclaredSemanticsVersion != null)
         {
-            AppendLine($"§SEMVER{{{node.DeclaredSemanticsVersion}}}");
+            AppendLine($"semver \"{node.DeclaredSemanticsVersion}\"");
         }
         foreach (var assumption in node.Assumptions) Visit(assumption);
         foreach (var invariant in node.Invariants) Visit(invariant);

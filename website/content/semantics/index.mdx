@@ -95,7 +95,7 @@ The [backend specification](/docs/semantics/dotnet-backend/) defines exactly how
 The [versioning reference](/docs/semantics/versioning/) distinguishes:
 
 - **Compatibility policy**: MAJOR.MINOR.PATCH and a retained comparison API
-- **Current native source**: Uses the installed compiler, with no source-version gate
+- **Current native source**: May declare `semver "2.0.0"`; mismatched majors are refused
 - **Historical declarations**: Not syntax to copy into current modules
 - **Upgrade checks**: Pin the compiler and rerun affected programs
 
@@ -136,7 +136,7 @@ separate ordinarily enforced native programs with CLR execution controls.
 | S7 | `IntegerOverflow_Traps` | Overflow throws `OverflowException` |
 | S8 | `NumericConversion_IntToFloat` | Implicit widening works |
 | S10 | `RequiresFails_ThrowsContractViolation` | Contracts throw with function ID |
-| S11 | `SemanticsVersionMismatch_EmitsDiagnostic` | Historical declaration checking; no current native source-version gate |
+| S11 | `NativeSemanticsVersion_EnforcesCompatibility` | Native declaration checks major/minor compatibility |
 
 ---
 

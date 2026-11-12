@@ -80,8 +80,8 @@ The backend spec (`dotnet-backend.md`) defines exactly how Calor semantics map t
 Agents can be prompted against specific rules. The versioning spec (`versioning.md`) describes:
 
 - **Semantic Versioning**: MAJOR.MINOR.PATCH with clear upgrade rules
-- **Current native source**: Uses the installed compiler; no source-version declaration is implemented
-- **Compatibility helpers**: Classify supplied versions, not an admitted native source-version gate
+- **Current native source**: May declare `semver "2.0.0"` in a module
+- **Compatibility gate**: Refuses mismatched majors; warns for a newer minor
 - **Migration Path**: Clear guidance for upgrading between versions
 
 ---
@@ -128,7 +128,7 @@ and verification suites. This table is not an exhaustive coverage inventory:
 | S7 | `IntegerOverflow_Traps` | Overflow throws `OverflowException` |
 | S8 | `NumericConversion_IntToFloat` | Implicit widening works |
 | S10 | `RequiresFails_ThrowsContractViolation` | Contracts throw with function ID |
-| S11 | `SemanticsVersionMismatch_EmitsDiagnostic` | Historical declaration check; not a native source-version gate |
+| S11 | `NativeSemanticsVersion_EnforcesCompatibility` | Native declaration checks major/minor compatibility |
 
 ---
 

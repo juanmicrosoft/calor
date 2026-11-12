@@ -88,7 +88,7 @@ public enum TokenKind
     Continue,
     Goto,
     Label,
-    SemVer,             // §SEMVER{MAJOR.MINOR.PATCH} - module semantics-version declaration
+    SemVer,             // semver "MAJOR.MINOR.PATCH" - module semantics-version declaration
     Bind,
     Let,
     From,

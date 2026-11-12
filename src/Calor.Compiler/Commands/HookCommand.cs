@@ -306,7 +306,7 @@ public static class HookCommand
                                   "  - Integer overflow TRAPS (throws OverflowException)\n" +
                                   "  - Evaluation is strictly left-to-right\n" +
                                   $"  - This compiler implements semantics v{SemanticsVersion.VersionString}\n" +
-                                  "  - Pin the compiler version; native source has no semantics-version declaration\n\n" +
+                                  $"  - Pin the compiler version and declare semver \"{SemanticsVersion.VersionString}\" in the module\n\n" +
                                   "Use /calor skill for syntax, /calor-semantics for behavior rules.";
 
                 return (1, blockReason, suggestedPath);

@@ -1163,27 +1163,32 @@ public sealed class Parser
             }
             if (Check(TokenKind.SemVer))
             {
-                // §SEMVER{MAJOR.MINOR.PATCH} — the module's declared semantics
-                // version. Compatibility against SemanticsVersion.Current is
-                // decided here, at parse time, so every consumer of the parser
-                // (compile, LSP, self-check, MCP) refuses a retired-major file
-                // (roadmap §3.3 decision 1, #1084 item 1).
                 var semverToken = Advance();
+                string? versionText = null;
+                if (Check(TokenKind.StrLiteral) && Current.Span.Line == semverToken.Span.Line)
+                {
+                    var literal = Advance();
+                    if (literal.Value is string text && literal.Text == $"\"{text}\"")
+                        versionText = text;
+                }
+                if (!IsAtEnd && Current.Span.Line == semverToken.Span.Line)
+                {
+                    versionText = null;
+                    while (!IsAtEnd && Current.Span.Line == semverToken.Span.Line)
+                        Advance();
+                }
                 if (sawSemVer)
                 {
                     // Keyed on "seen", not on the stored value, so a malformed
                     // first directive followed by a valid one is still a duplicate.
                     _diagnostics.ReportError(semverToken.Span,
                         DiagnosticCode.SemanticsVersionInvalidDeclaration,
-                        "§SEMVER may be declared only once per module.");
+                        "'semver' may be declared only once per module.");
                 }
                 else
                 {
                     sawSemVer = true;
-                    // A null Value means the lexer already reported the malformed
-                    // shape (bracket form, missing or unterminated braces).
-                    if (semverToken.Value is string versionText
-                        && SemanticsVersion.ReportDeclaredVersion(_diagnostics, semverToken.Span, versionText))
+                    if (SemanticsVersion.ReportDeclaredVersion(_diagnostics, semverToken.Span, versionText))
                     {
                         declaredSemanticsVersion = versionText;
                     }

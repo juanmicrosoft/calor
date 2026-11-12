@@ -4,9 +4,9 @@ Version: 2.0.0
 
 This document specifies how Calor semantics are versioned and how version compatibility is managed.
 
-Current native source has **no semantics-version declaration syntax**. Pin the
-compiler package and test upgrades. The compatibility helpers and historical
-declaration checks described below do not provide a native source-version gate.
+Native modules may declare `semver "2.0.0"` to check language-semantics
+compatibility. This is separate from the compiler package version. Pin the
+compiler package and test upgrades as well.
 
 ---
 
@@ -96,12 +96,11 @@ that demote conditional proofs and retain their runtime guards remain in place.
 
 ### 3.1 Module Declaration
 
-Native modules use the installed compiler's semantics. There is no native
-declaration that requests another version or checks compatibility with a
-source-specified version. This program uses the installed rules:
+Declare the expected language semantics in the module body:
 
 ```calor
 module InstalledSemantics
+  semver "2.0.0"
   func Next public (int:value) → int
     !
     return value + 1
@@ -111,20 +110,20 @@ module InstalledSemantics
 
 ### 3.2 Syntax
 
-Do not add a retired section tag, an invented module-header version field or
-a comment expecting it to select semantics. The retained declaration-reporting
-helper accepts exact three-part versions: three runs of ASCII digits separated
-by dots. Caret/range forms, shortened versions, signs, whitespace and prerelease
-suffixes are rejected by that helper with `Calor0702`. This API is not a native
-source declaration.
+Use one `semver "MAJOR.MINOR.PATCH"` line per module. The argument is an ordinary,
+single-line string literal containing three runs of ASCII digits separated by
+dots. Caret/range forms, shortened versions, signs, whitespace, prerelease
+suffixes, interpolation, UTF-8 suffixes and trailing tokens are rejected with
+`Calor0702`. A duplicate declaration is also `Calor0702`; a malformed first
+declaration cannot be replaced by a later one. Retired section tags remain errors.
 
 ### 3.3 Modules That Declare Nothing
 
 Ordinary native modules do not need a version declaration. The write hook
 recommends pinning the compiler instead of adding retired syntax.
 `calor hook validate-calr-content` checks current lexer/parser errors without
-blocking the write. It does not check types, effects, runtime behavior or
-source-version compatibility.
+blocking the write. Parser diagnostics include version compatibility; the hook
+does not check types, effects or runtime behavior.
 
 ---
 
@@ -161,8 +160,8 @@ a proof that an arbitrary program compiles or behaves identically.
 - Default behavior changes
 - Removed constructs
 
-The compatibility helper classifies 1.x and 2.x as incompatible. Native source
-currently has no declaration through which to request that comparison.
+The parser rejects a declaration of 1.x or 3.x on the 2.x compiler with
+`Calor0701`. This does not select an older execution mode.
 
 ---
 
@@ -183,9 +182,9 @@ public static class SemanticsVersion
 }
 ```
 
-They do not establish source-version checking in `calor build`, the language
-server, `calor self-check docs` or MCP tools. Native source has no admitted
-declaration channel.
+The parser checks native declarations through `SemanticsVersion.ReportDeclaredVersion`.
+Compilation, language-server parsing, documentation checks and MCP compilation
+therefore share the same compatibility verdict.
 
 ### 5.2 Diagnostic Codes
 
@@ -193,12 +192,12 @@ declaration channel.
 |------|----------|-----------|
 | Calor0700 | Warning | Same major, declared minor newer than the compiler's (might work) |
 | Calor0701 | Error | Declared major differs from the compiler's — older **or** newer |
-| Calor0702 | Error | Historical declaration is malformed or duplicated |
+| Calor0702 | Error | Declaration is malformed or duplicated |
 
 ### 5.3 Checking Logic
 
-The helper requires matching majors. Its historical declaration-reporting path
-refuses an older major rather than silently reinterpreting it under newer rules.
+The parser requires matching majors. It refuses an older major rather than
+silently reinterpreting it under newer rules.
 That is roadmap
 §3.3 decision 1 ("fail-closed; no silent reinterpretation, and no
 dual-semantics mode to maintain"), tracked as
@@ -221,7 +220,7 @@ public static VersionCompatibility CheckCompatibility(Version declared)
 ```
 
 `SemanticsVersion.ReportDeclaredVersion` turns that verdict into diagnostics.
-Retired source syntax is rejected before it can establish native compatibility.
+Native `semver` declarations use this path; retired source syntax remains rejected.
 
 ---
 
@@ -240,8 +239,8 @@ compatible. The historical declaration parser and fail-closed refusal arrived in
 that commit is not an ancestor of v0.14.0-v0.14.2, but is an ancestor of
 [v0.15.0 (`3bb2601e`)](https://github.com/juanmicrosoft/calor/tree/3bb2601e3ff83597ddf2f27dcc334b6399ab97ea).
 That parser refused modules declaring `1.x` or `0.x` with `Calor0701`, not an
-`Info` compilation mode. Native source does not currently expose an equivalent
-declaration. No automated semantics migration tool is supplied; broader
+`Info` compilation mode. Native source now exposes the equivalent compatibility
+gate through `semver "MAJOR.MINOR.PATCH"`. No automated semantics migration tool is supplied; broader
 migration work remains tracked in #1084.
 
 ### Version 1.0.0
@@ -320,8 +319,8 @@ safety. Do not copy the retired declaration into current source.
 ### 8.2 Mixed-Version Projects
 
 There is no dual-semantics mode. Native modules in a compilation use the
-installed compiler. The absence of a source-version gate is not proof that
-arbitrarily mixed historical sources have been migrated safely.
+installed compiler. A compatible declaration is not proof that arbitrarily
+mixed historical sources have been migrated safely.
 
 ---
 
@@ -350,7 +349,7 @@ public static class SemanticsVersion
         return VersionCompatibility.Compatible;
     }
 
-    // Parses historical declaration text, applies CheckCompatibility, and reports
+    // Checks native declaration text, applies CheckCompatibility, and reports
     // Calor0700 / Calor0701 / Calor0702 into the diagnostic bag.
     public static bool ReportDeclaredVersion(
         DiagnosticBag diagnostics, TextSpan span, string? versionText);
@@ -377,28 +376,30 @@ public const string SemanticsVersionInvalidDeclaration = "Calor0702"; // Error
 
 ### 9.3 Where the Directive Lives
 
-The former section-tag parser and emitter admitted the declaration at module
-level. Current native parsing does not expose that syntax, and the retained
-`ModuleNode.DeclaredSemanticsVersion` property is not evidence that native
-source can populate it. Do not infer a production gate from the token kind,
-AST property or compatibility API alone.
+`semver` is a module-body declaration. The parser validates its ordinary string
+argument and populates `ModuleNode.DeclaredSemanticsVersion`. The Calor emitter
+retains it on round trip. The native versioning tests exercise compilation,
+refusal, recovery, duplicate detection and emission rather than only the
+compatibility helper.
 
 ---
 
 ## 10. Test Cases
 
-The historical `VersioningTests` inputs used the retired declaration syntax.
-They do not establish a native end-to-end gate. The matrix below describes
-the compatibility/declaration helpers for semantics 2.0.0:
+The historical `VersioningTests` retain their original version payloads through
+a test-local wrapper adapter. The appended `NativeSemanticsVersion_*` cases use
+native source directly. Historical diagnostic-spelling assertions remain
+separate; they do not justify restoring retired syntax.
+The matrix below describes native declarations for semantics 2.0.0:
 
-| Version supplied to the helpers | Result |
+| Declared version | Result |
 |-----------------|--------|
 | No native declaration | Uses installed semantics; no source-version comparison |
 | 2.0.0, 2.0.5 | Compatible |
-| 2.1.0 | Declaration helper reports Warning (Calor0700) |
+| 2.1.0 | Parser reports Warning (Calor0700) |
 | 1.0.0, 1.9.9, 0.9.0 | Error (Calor0701) with migration pointer to #1084 |
 | 3.0.0, 99.0.0 | Error (Calor0701), "upgrade the compiler" |
-| `^1.0.0`, `2`, `2.0` | Declaration helper reports Error (Calor0702) |
+| `^1.0.0`, `2`, `2.0` | Parser reports Error (Calor0702) |
 
 Example — compatibility API, not a source declaration:
 
@@ -407,8 +408,8 @@ SemanticsVersion.CheckCompatibility(new Version(1, 0, 0))
     == VersionCompatibility.Incompatible
 ```
 
-The historical declaration parser also rejected duplicate declarations, even
-when the first was malformed. Native source cannot use that retired parser
+The native parser rejects duplicate declarations even when the first is malformed.
+The historical section-tag parser is not an alternate syntax
 route. Its rejection of retired syntax must not be reported as a successful
 older-major compatibility check.
 

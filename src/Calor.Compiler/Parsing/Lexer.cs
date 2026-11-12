@@ -22,6 +22,7 @@ public sealed class Lexer
     private static readonly Dictionary<string, TokenKind> CanonicalKeywords = new(StringComparer.Ordinal)
     {
         ["module"] = TokenKind.Module,
+        ["semver"] = TokenKind.SemVer,
         ["class"] = TokenKind.Class,
         ["record"] = TokenKind.Record,
         ["interface"] = TokenKind.Interface,
