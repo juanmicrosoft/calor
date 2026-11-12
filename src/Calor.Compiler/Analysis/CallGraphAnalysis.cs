@@ -67,6 +67,8 @@ public sealed class CallGraphAnalysis
 
     internal sealed record InitializationOperation(IOperation Operation, bool Preserved);
 
+    internal sealed record InterpolationFormatting(ITypeSymbol? Type, bool IsNull);
+
     internal sealed record EventStorageSelection(
         EventDefinitionNode Declaration, INamedTypeSymbol DelegateType, bool IsSubscription);
 
@@ -104,6 +106,7 @@ public sealed class CallGraphAnalysis
         internal Dictionary<ISymbol, string> InitializationFunctions { get; } = new(SymbolEqualityComparer.Default);
         internal Dictionary<ConstructorNode, IMethodSymbol> ConstructorInitializers { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<NewExpressionNode, IMethodSymbol> SourceConstructors { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<InterpolatedStringExpressionNode, InterpolationFormatting> InterpolationFormats { get; } = new(ReferenceEqualityComparer.Instance);
         internal HashSet<ConstructorNode> RecordCopyConstructors { get; } = new(ReferenceEqualityComparer.Instance);
         internal List<Diagnostics.Diagnostic> SourceConstructionErrors { get; } = [];
     }
@@ -130,6 +133,8 @@ public sealed class CallGraphAnalysis
         _operatorBindings.ConstructorInitializers.GetValueOrDefault(constructor);
     internal IMethodSymbol? SourceConstructor(NewExpressionNode creation) =>
         _operatorBindings.SourceConstructors.GetValueOrDefault(creation);
+    internal InterpolationFormatting? SelectedInterpolationFormatting(InterpolatedStringExpressionNode hole) =>
+        _operatorBindings.InterpolationFormats.GetValueOrDefault(hole);
     internal bool IsRecordCopyConstructor(ConstructorNode constructor) =>
         _operatorBindings.RecordCopyConstructors.Contains(constructor);
     internal IReadOnlyList<Diagnostics.Diagnostic> SourceConstructionErrors =>
@@ -168,6 +173,7 @@ public sealed class CallGraphAnalysis
         var conflictingMetadataCalls = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
         var conflictingConstructorInitializers = new HashSet<ConstructorNode>(ReferenceEqualityComparer.Instance);
         var conflictingSourceConstructors = new HashSet<NewExpressionNode>(ReferenceEqualityComparer.Instance);
+        var conflictingInterpolationFormats = new HashSet<InterpolatedStringExpressionNode>(ReferenceEqualityComparer.Instance);
         var argumentOwners = new Dictionary<AstNode, (TextSpan Call, int Index)>(ReferenceEqualityComparer.Instance);
         var ambiguousArguments = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
         var sourceArgumentCounts = new Dictionary<TextSpan, int>();
@@ -210,8 +216,9 @@ public sealed class CallGraphAnalysis
         var bindMemberTypes = visited.OfType<FieldAccessNode>().Any();
         var bindInitialization = EnumerateClasses(module).Any();
         var bindEvents = EnumerateClasses(module).Any(owner => EnumerateEvents(owner).Any(evt => !evt.HasAccessors));
+        var bindInterpolation = visited.OfType<InterpolatedStringNode>().Any();
         if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindInitialization
-            && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
+            && !bindInterpolation && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
             return bindings;
 
         void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
@@ -470,10 +477,10 @@ public sealed class CallGraphAnalysis
                         constructor.MetadataName, [], EffectMemberKind.Constructor);
                 }
             }
-            if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindEvents)
+            if (!bindExpressions && !bindNullGuards && !bindMemberTypes && !bindEvents && !bindInterpolation)
                 return;
 
-            var validProofContext = (bindMemberTypes || bindNullGuards) && !compilation.GetDiagnostics().Any(diagnostic =>
+            var validProofContext = (bindMemberTypes || bindNullGuards || bindInterpolation) && !compilation.GetDiagnostics().Any(diagnostic =>
                 diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
             var validMemberContext = bindMemberTypes && validProofContext;
             var selectedInTree = new HashSet<TextSpan>();
@@ -485,6 +492,7 @@ public sealed class CallGraphAnalysis
             var selectedMethodGroupCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
             var selectedMetadataCallsInTree = new HashSet<ExpressionCallNode>(ReferenceEqualityComparer.Instance);
             var selectedEventUsesInTree = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+            var selectedInterpolationFormatsInTree = new HashSet<InterpolatedStringExpressionNode>(ReferenceEqualityComparer.Instance);
 
             foreach (var declaration in root.DescendantNodes().Where(node =>
                          node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax
@@ -502,6 +510,35 @@ public sealed class CallGraphAnalysis
                         continue;
                     foreach (var child in operation.ChildOperations)
                         pending.Push(child);
+                    if (validProofContext && operation is IInterpolatedStringOperation
+                        { Type.SpecialType: SpecialType.System_String } interpolation
+                        && Origin(operation) is InterpolatedStringNode interpolated)
+                    {
+                        var holes = interpolated.Parts.OfType<InterpolatedStringExpressionNode>()
+                            .Where(hole => hole.Intent != InterpolationPartIntent.LiteralPlaceholder).ToArray();
+                        var formatted = interpolation.Parts.OfType<IInterpolationOperation>().ToArray();
+                        if (holes.Length == formatted.Length)
+                            for (var index = 0; index < holes.Length; index++)
+                            {
+                                var hole = holes[index];
+                                var value = formatted[index].Expression;
+                                var selection = new InterpolationFormatting(value.Type,
+                                    value.ConstantValue is { HasValue: true, Value: null });
+                                if (bindings.InterpolationFormats.TryGetValue(hole, out var previous)
+                                    && (previous.IsNull != selection.IsNull
+                                        || (previous.Type is null ? selection.Type is not null
+                                            : selection.Type is null || !SameType(previous.Type, selection.Type))))
+                                {
+                                    conflictingInterpolationFormats.Add(hole);
+                                    bindings.InterpolationFormats.Remove(hole);
+                                }
+                                else if (!conflictingInterpolationFormats.Contains(hole))
+                                {
+                                    selectedInterpolationFormatsInTree.Add(hole);
+                                    bindings.InterpolationFormats[hole] = selection;
+                                }
+                            }
+                    }
                     if (operation is IEventReferenceOperation eventReference
                         && Origin(operation) is { } eventUse
                         && events.TryGetValue(eventReference.Event.OriginalDefinition, out var eventOrigin)
@@ -659,6 +696,14 @@ public sealed class CallGraphAnalysis
             {
                 conflictingEventUses.Add(use);
                 bindings.EventStorageUses.Remove(use);
+            }
+            foreach (var hole in ranges.Select(range => range.Node).OfType<InterpolatedStringNode>()
+                         .SelectMany(interpolated => interpolated.Parts.OfType<InterpolatedStringExpressionNode>())
+                         .Where(hole => hole.Intent != InterpolationPartIntent.LiteralPlaceholder
+                             && !selectedInterpolationFormatsInTree.Contains(hole)))
+            {
+                conflictingInterpolationFormats.Add(hole);
+                bindings.InterpolationFormats.Remove(hole);
             }
             foreach (var member in ranges.Select(range => range.Node).OfType<FieldAccessNode>()
                          .Where(member => !selectedMembersInTree.Contains(member)))

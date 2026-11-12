@@ -6682,9 +6682,19 @@ public sealed class EffectEnforcementPass
             var effects = EffectSet.Empty;
             foreach (var part in interpolated.Parts)
             {
-                if (part is InterpolatedStringExpressionNode exprPart)
+                if (part is InterpolatedStringExpressionNode
+                    { Intent: not InterpolationPartIntent.LiteralPlaceholder } exprPart)
                 {
                     effects = effects.Union(InferFromExpression(exprPart.Expression));
+                    var formatting = _context.CallGraph.SelectedInterpolationFormatting(exprPart);
+                    // Numeric formatting can dispatch through CurrentCulture.NumberFormat.
+                    // Only the binding image's closed, provider-independent cases are pure.
+                    if (formatting is not { IsNull: true }
+                        && formatting?.Type?.SpecialType is not (CS.SpecialType.System_String
+                            or CS.SpecialType.System_Char or CS.SpecialType.System_Boolean))
+                        effects = effects.Union(UnknownResolvedOperation(
+                            $"interpolation formatting ({formatting?.Type?.ToDisplayString() ?? "<unresolved>"})",
+                            exprPart.Span));
                 }
             }
             return effects;

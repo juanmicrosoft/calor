@@ -142,6 +142,15 @@ and honors `AllowUnsafeBlocks`, `OutputType`, `DefineConstants`, and
 `<CalorTranspileOnly>true</CalorTranspileOnly>` provides the same unsafe
 behavior as the CLI; the default is `false`.
 
+Effect checking also covers formatting performed by interpolation. A numeric
+hole can invoke a custom `CurrentCulture.NumberFormat` getter even when evaluating
+the number has no effects. The compiler does not prove that dispatch pure, so it charges
+Unknown (`Calor0411`, and `Calor0410` in a pure function), including format and
+alignment variants. String, character, Boolean, and null holes remain supported
+when the Roslyn binding image proves their provider-independent types or null
+values. Custom-object, generic, and unresolved holes do not receive a purity
+grant. Effects from evaluating every runtime hole are still charged.
+
 ---
 
 ## Output Convention

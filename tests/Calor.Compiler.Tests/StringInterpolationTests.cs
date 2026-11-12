@@ -1,5 +1,6 @@
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -222,4 +223,111 @@ public static class NumberFormat
         Assert.StartsWith("Value: ", expected);
         Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(compilationResult.GeneratedCode + probe));
     }
+
+    [Theory]
+    [InlineData("double", "value")]
+    [InlineData("double", "value:F2")]
+    [InlineData("double", "value,8")]
+    [InlineData("decimal", "value,-10:N2")]
+    [InlineData("int", "value")]
+    [InlineData("long", "value:D3")]
+    [InlineData("uint", "value:X")]
+    [InlineData("float", "value")]
+    [InlineData("double", "3.5")]
+    [InlineData("double", "value + 1")]
+    [InlineData("object", "value")]
+    [InlineData("T", "value")]
+    public void StrictInterpolation_UnprovedFormattingIsUnknown(string type, string hole)
+    {
+        var source = $$"""
+            #nullable enable
+            public static class InterpolationBoundary
+            {
+                public static string Render{{(type == "T" ? "<T>" : "")}}({{type}} value) => $"{{{hole}}}";
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "interpolation-boundary.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("string", "value")]
+    [InlineData("string?", "value,8")]
+    [InlineData("char", "value,-4")]
+    [InlineData("bool", "value")]
+    [InlineData("bool", "value,8:ignored")]
+    [InlineData("string", "\"text\"")]
+    [InlineData("bool", "true")]
+    [InlineData("string", "nameof(value)")]
+    public void StrictInterpolation_ClosedProviderIndependentHolesRemainSupported(string type, string hole)
+    {
+        var source = $$"""
+            #nullable enable
+            public static class InterpolationBoundary
+            {
+                public static string Render({{type}} value) => $"[{{{hole}}}]";
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "interpolation-safe.calr",
+                StrictInterpolationOptions(typing));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void StrictInterpolation_FormattingDoesNotEraseHoleExpressionEffects()
+    {
+        const string source = """
+            module InterpolationBoundary
+              func Render public () → string
+                !
+                return "${Console.ReadLine()}"
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "interpolation-effects.calr", StrictInterpolationOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cr'", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+            result = Program.Compile(source.Replace("${Console.ReadLine()}", "${Console.ReadLine()}|${Console.Read()}",
+                StringComparison.Ordinal), "interpolation-effects.calr", StrictInterpolationOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    private static CompilationOptions StrictInterpolationOptions(bool typing) => new()
+    {
+        EnableTypeChecking = typing,
+        EnforceEffects = true,
+        StrictEffects = true,
+        UnknownCallPolicy = UnknownCallPolicy.Strict,
+        UnsafeTranspileOnly = false,
+        VerifyContracts = false,
+        StatusWriter = TextWriter.Null
+    };
 }
