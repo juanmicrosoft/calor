@@ -199,6 +199,12 @@ validate its elements. Invariant containers also reject nullable-writer aliases
 such as `List<Node>` to `List<Node?>`; covariant read-only targets can accept
 nullable elements. Oblivious annotations do not prove non-nullness.
 
+Selected metadata extension calls retain these annotations when the complete
+C# image resolves the actual source-defined payload. For example, `ToList()`
+preserves nullable elements and requires a non-null receiver. Selection supplies
+typing facts, not an effect contract: `ToList()` remains an unknown-effect call
+and is rejected under strict effect enforcement.
+
 This extension does not analyze custom generic containers, nested generic
 payloads, type parameters, tuples, delegates or unresolved reference identities.
 Those are unsupported boundaries, not evidence that the receiving contract is

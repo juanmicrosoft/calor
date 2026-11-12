@@ -406,13 +406,11 @@ public sealed class Binder
 
         Metadata.MetadataBinderResult? ResolveContextualCall()
         {
-            if (contextualCall is null || !ResolveSourceCallConversions || _asyncTypeModule is null
-                || !args.Any(argument => argument.Type is BoundTypes.FunctionBoundType
-                    || argument is BoundVariableExpression
-                        { Variable: { IsTypeInferred: true, FunctionType: not null } }))
+            if (contextualCall is null || !ResolveSourceCallConversions || _asyncTypeModule is null)
                 return null;
-            SourceCallBindings();
-            return _sourceCallConversions.ContextualMetadataCalls.TryGetValue(contextualCall, out var selected)
+            // Only the complete image can name source payloads inside metadata
+            // containers. Its selected signature is typing evidence, not an effect grant.
+            return SourceCallBindings().ContextualMetadataCalls.TryGetValue(contextualCall, out var selected)
                 ? selected : null;
         }
     }

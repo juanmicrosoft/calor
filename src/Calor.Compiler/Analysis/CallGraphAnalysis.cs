@@ -879,20 +879,33 @@ public sealed class CallGraphAnalysis
 
             void AddContextualMetadataCall(IInvocationOperation invocation)
             {
-                if (invocation.IsImplicit || invocation.Syntax is not InvocationExpressionSyntax syntax
+                if (invocation.IsImplicit || invocation.Syntax is not InvocationExpressionSyntax
+                    { Expression: MemberAccessExpressionSyntax access } syntax
                     || Origin(invocation) is not ExpressionCallNode { TargetExpression: FieldAccessNode member } origin
                     || model.GetSymbolInfo(syntax).Symbol is not IMethodSymbol
                         { IsExtensionMethod: true } method
                     || method.ReducedFrom is null && !method.IsStatic
                     || method.Locations.Any(location => location.IsInSource)
-                    || !method.Parameters.Any(parameter => parameter.Type.TypeKind == TypeKind.Delegate)
                     || HasErrorType(method.ReturnType) || method.Parameters.Any(parameter => HasErrorType(parameter.Type))
                     || conflictingMetadataCalls.Contains(origin))
+                    return;
+
+                var receiver = model.GetTypeInfo(access.Expression).Type;
+                if (receiver is null || HasErrorType(receiver)
+                    || !method.Parameters.Any(parameter => parameter.Type.TypeKind == TypeKind.Delegate)
+                        && ((!IsClosedSourceContainer(receiver)
+                                && !IsClosedSourceContainer(method.ReturnType)
+                                && !method.Parameters.Any(parameter => IsClosedSourceContainer(parameter.Type)))
+                            || HasOpenType(receiver) || HasOpenType(method.ReturnType)
+                            || method.TypeArguments.Any(HasOpenType)
+                            || method.Parameters.Any(parameter => HasOpenType(parameter.Type))))
                     return;
 
                 var mappings = new List<Binding.Metadata.MetadataCallArgument>();
                 foreach (var argument in invocation.Arguments)
                 {
+                    if (argument is { ArgumentKind: ArgumentKind.DefaultValue, IsImplicit: true })
+                        continue;
                     if (argument.ArgumentKind != ArgumentKind.Explicit || argument.Parameter is not { } parameter
                         || HasUserDefinedConversion(argument.Value)
                         || Origin(argument.Value) is not ExpressionNode supplied
@@ -908,20 +921,32 @@ public sealed class CallGraphAnalysis
                     if (owner.Index < 0 || owner.Index >= origin.Arguments.Count
                         || !ReferenceEquals(origin.Arguments[owner.Index], supplied))
                         return;
+                    var selectedParameter = method.Parameters[parameter.Ordinal - (method.ReducedFrom is null ? 0 : 1)];
                     mappings.Add(new Binding.Metadata.MetadataCallArgument(
-                        owner.Index, parameter, parameter.Type, IsExpandedParams: false));
+                        owner.Index, selectedParameter, selectedParameter.Type, IsExpandedParams: false));
                 }
                 if (mappings.Count != origin.Arguments.Count
                     || mappings.Select(mapping => mapping.ArgumentIndex).Distinct().Count() != origin.Arguments.Count)
                     return;
                 var selection = Binding.Metadata.MetadataBinderResult.CreateResolved(method,
-                    mappings.OrderBy(mapping => mapping.ArgumentIndex).ToArray());
+                    mappings.OrderBy(mapping => mapping.ArgumentIndex).ToArray()) with { ReceiverType = receiver };
                 selectedMetadataCallsInTree.Add(origin);
                 if (bindings.ContextualMetadataCalls.TryGetValue(origin, out var previous)
-                    && (!SymbolEqualityComparer.IncludeNullability.Equals(previous.Symbol, method)
-                        || !SameContextualType(previous.Symbol!.ReturnType, method.ReturnType)
+                    && (!SymbolEqualityComparer.Default.Equals(
+                            previous.Symbol!.ReducedFrom?.OriginalDefinition ?? previous.Symbol.OriginalDefinition,
+                            method.ReducedFrom?.OriginalDefinition ?? method.OriginalDefinition)
+                        || (previous.Symbol.ReducedFrom is null) != (method.ReducedFrom is null)
+                        || previous.Symbol.TypeArguments.Length != method.TypeArguments.Length
+                        || !previous.Symbol.TypeArguments.Zip(method.TypeArguments).All(pair =>
+                            SameContextualType(pair.First, pair.Second))
+                        || previous.ReceiverType is not { } previousReceiver
+                        || !SameContextualType(previousReceiver, receiver)
+                        || !SameContextualType(previous.Symbol.ReturnType, method.ReturnType)
+                        || previous.Symbol.Parameters.Length != method.Parameters.Length
                         || !previous.Symbol.Parameters.Zip(method.Parameters).All(pair =>
-                            SameContextualType(pair.First.Type, pair.Second.Type))
+                            pair.First.RefKind == pair.Second.RefKind
+                            && SameContextualType(pair.First.Type, pair.Second.Type))
+                        || previous.Arguments.Count != selection.Arguments.Count
                         || !previous.Arguments.Zip(selection.Arguments).All(pair =>
                             pair.First.ArgumentIndex == pair.Second.ArgumentIndex
                             && pair.First.Parameter.Ordinal == pair.Second.Parameter.Ordinal
@@ -934,14 +959,50 @@ public sealed class CallGraphAnalysis
                     bindings.ContextualMetadataCalls[origin] = selection;
             }
 
+            static bool IsClosedSourceContainer(ITypeSymbol type) =>
+                Binding.Metadata.MetadataBinderResult.ToBoundType(type) is Binding.BoundTypes.GenericInstantiationBoundType
+                    { TypeArguments: [Binding.BoundTypes.NominalBoundType element] } container
+                && NullabilityChecker.IsReferenceContainerDefinition(container.Definition)
+                && NullabilityChecker.IsClosedSourceReference(element)
+                && element.RoslynSymbol is { IsGenericType: false };
+
+            static bool HasOpenType(ITypeSymbol type) => type is ITypeParameterSymbol
+                || type is INamedTypeSymbol named && (named.IsUnboundGenericType
+                    || named.TypeArguments.Any(HasOpenType)
+                    || named.ContainingType is { } owner && HasOpenType(owner))
+                || type is IArrayTypeSymbol array && HasOpenType(array.ElementType);
+
             static bool SameContextualType(ITypeSymbol left, ITypeSymbol right) =>
-                SymbolEqualityComparer.IncludeNullability.Equals(left, right)
-                && left.NullableAnnotation == right.NullableAnnotation
-                && (left is not INamedTypeSymbol named || right is INamedTypeSymbol other
-                    && named.TypeArguments.Zip(other.TypeArguments).All(pair =>
-                        SameContextualType(pair.First, pair.Second)))
-                && (left is not IArrayTypeSymbol array || right is IArrayTypeSymbol otherArray
-                    && SameContextualType(array.ElementType, otherArray.ElementType));
+                left.TypeKind == right.TypeKind && left.NullableAnnotation == right.NullableAnnotation
+                && (left, right) switch
+                {
+                    (INamedTypeSymbol named, INamedTypeSymbol other) =>
+                        SameContextualDefinition(named.OriginalDefinition, other.OriginalDefinition)
+                        && (named.ContainingType is null ? other.ContainingType is null
+                            : other.ContainingType is { } owner && SameContextualType(named.ContainingType, owner))
+                        && named.TypeArguments.Length == other.TypeArguments.Length
+                        && named.TypeArguments.Zip(other.TypeArguments).All(pair =>
+                            SameContextualType(pair.First, pair.Second)),
+                    (IArrayTypeSymbol array, IArrayTypeSymbol other) =>
+                        array.Rank == other.Rank && SameContextualType(array.ElementType, other.ElementType),
+                    _ => SymbolEqualityComparer.IncludeNullability.Equals(left, right)
+                };
+
+            static bool SameContextualDefinition(INamedTypeSymbol left, INamedTypeSymbol right)
+            {
+                if (left.DeclaringSyntaxReferences.IsEmpty || right.DeclaringSyntaxReferences.IsEmpty)
+                    return SymbolEqualityComparer.Default.Equals(left, right);
+                // Each configuration has its own source symbols. Compare their
+                // actual image declarations, not just equally spelled type names.
+                return left.MetadataName == right.MetadataName
+                    && Equals(left.ContainingAssembly.Identity, right.ContainingAssembly.Identity)
+                    && left.ContainingNamespace.ToDisplayString() == right.ContainingNamespace.ToDisplayString()
+                    && left.DeclaringSyntaxReferences.Length == right.DeclaringSyntaxReferences.Length
+                    && left.DeclaringSyntaxReferences.Zip(right.DeclaringSyntaxReferences).All(pair =>
+                        pair.First.Span == pair.Second.Span
+                        && pair.First.SyntaxTree.FilePath == pair.Second.SyntaxTree.FilePath
+                        && pair.First.SyntaxTree.GetText().ContentEquals(pair.Second.SyntaxTree.GetText()));
+            }
 
             void BindInitializations()
             {

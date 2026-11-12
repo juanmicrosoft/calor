@@ -18,6 +18,234 @@ namespace Calor.Compiler.Tests;
 public sealed class ComputedCallExpressionTests
 {
     [Theory]
+    [InlineData("IEnumerable<Node?>", false, DiagnosticCode.NullableReturnFromNonNullable)]
+    [InlineData("List<Node?>", false, DiagnosticCode.NullableReturnFromNonNullable)]
+    [InlineData("List<Node>?", false, DiagnosticCode.NullableArgumentToNonNullableParameter)]
+    [InlineData("IEnumerable<Node>", false, null)]
+    [InlineData("List<Node>", false, null)]
+    [InlineData("List<Node>?", true, null)]
+    [InlineData("IEnumerable<Node>?", true, null)]
+    [InlineData("List<Node?>", true, DiagnosticCode.NullableReturnFromNonNullable)]
+    public void ContextualSourceGenericNullability_ToListRetainsSelectedFactsWithoutEffectPermission(
+        string input, bool guarded, string? receivingError)
+    {
+        var source = $$"""
+            module ContextualSource Calls
+              using System.Linq
+              using System.Collections.Generic
+              class Node
+                field int:Id public
+              func Use ({{input}}:values) → List<Node>
+                ! throw
+                {{(guarded ? "if values != null\n      return values.ToList()\n    throw null" : "return values.ToList()")}}
+            """;
+        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        {
+            var (ast, bound, diagnostics) = Bind(candidate);
+            var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+            var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.NotNull(selected.ReducedFrom);
+            Assert.Equal("System.Linq.Enumerable", selected.ContainingType.ToDisplayString());
+            Assert.Empty(selected.DeclaringSyntaxReferences);
+            var payload = Assert.IsAssignableFrom<INamedTypeSymbol>(Assert.Single(selected.TypeArguments));
+            Assert.Equal("Calls.Node", payload.ToDisplayString().TrimEnd('?'));
+            Assert.True(Assert.Single(payload.Locations).IsInSource);
+            Assert.Equal(input.Contains("Node?", StringComparison.Ordinal)
+                ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
+                : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated, payload.NullableAnnotation);
+            var receiver = Assert.IsAssignableFrom<INamedTypeSymbol>(call.ResolvedMetadataReceiverType);
+            Assert.Equal(input.StartsWith("List", StringComparison.Ordinal) ? "List" : "IEnumerable", receiver.Name);
+            Assert.Same(call.Receiver, call.EvaluatedReceiver);
+            Assert.Empty(call.Arguments);
+            Assert.Empty(call.ArgumentParameterIndices!);
+            var result = Assert.IsType<BoundTypes.GenericInstantiationBoundType>(call.GenericNullabilityType);
+            Assert.True(SymbolEqualityComparer.IncludeNullability.Equals(payload,
+                Assert.IsType<BoundTypes.NominalBoundType>(Assert.Single(result.TypeArguments)).RoslynSymbol));
+            if (receivingError is null)
+                Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code is
+                    DiagnosticCode.NullableReturnFromNonNullable or DiagnosticCode.NullableArgumentToNonNullableParameter);
+            else
+                Assert.Contains(diagnostics, diagnostic => diagnostic.Code == receivingError
+                    && diagnostic.IsError && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+
+            var effects = new DiagnosticBag();
+            new EffectEnforcementPass(effects, resolver: new EffectResolver(
+                new ManifestLoader(loadUserLevelManifests: false))).Enforce(ast);
+            Assert.Contains(effects, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.Contains(effects, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            foreach (var typing in new[] { false, true })
+            {
+                var compiled = Program.Compile(candidate, "contextual-source.calr",
+                    new CompilationOptions { EnableTypeChecking = typing });
+                Assert.True(compiled.HasErrors);
+                if (receivingError is not null)
+                    Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == receivingError
+                        && diagnostic.IsError && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+                else
+                {
+                    Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code is
+                        DiagnosticCode.NullableReturnFromNonNullable or DiagnosticCode.NullableArgumentToNonNullableParameter);
+                    Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("values.Concat(second: values)", new[] { 0 })]
+    [InlineData("Enumerable.Concat(second: values, first: values)", new[] { 1, 0 })]
+    [InlineData("Enumerable.ToList(source: values)", new[] { 0 })]
+    public void ContextualSourceGenericNullability_PreservesTheSelectedNamedMap(string expression, int[] indices)
+    {
+        var source = $$"""
+            module ContextualNamedSource
+              using System.Linq
+              using System.Collections.Generic
+              class Node
+              func Use (IEnumerable<Node>:values) → object
+                !
+                return {{expression}}
+            """;
+        var (ast, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.NotNull(call.ResolvedMetadataMethod);
+        Assert.Equal(indices, call.ArgumentParameterIndices);
+        var selection = Assert.Single(CallGraphAnalysis.ResolveOperatorCalls(ast).ContextualMetadataCalls).Value;
+        Assert.Equal(indices, selection.Arguments.Select(argument => argument.Parameter.Ordinal));
+        Assert.All(selection.Arguments, argument => Assert.True(SymbolEqualityComparer.IncludeNullability.Equals(
+            argument.TargetType, argument.Parameter.Type)));
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("invalid-image")]
+    [InlineData("invalid-configuration")]
+    [InlineData("ambiguous")]
+    [InlineData("user-conversion")]
+    [InlineData("field-receiver")]
+    public void ContextualSourceGenericNullability_UnsupportedContextsStayUnselected(string boundary)
+    {
+        var source = $$"""
+            module RejectedContextualSource
+              using System.Linq
+              using System.Collections.Generic
+              class Node
+              {{(boundary == "ambiguous" ? """
+              module First
+                func ToList (this IEnumerable<Node>:value) → List<Node>
+                  !
+                  return null
+              module Second
+                func ToList (this IEnumerable<Node>:value) → List<Node>
+                  !
+                  return null
+              """.Replace("\n", "\n  ", StringComparison.Ordinal) : "")}}
+              class Holder
+                field List<Node>:Values public
+                op implicit (Holder:value) → IEnumerable<Node>
+                  !
+                  return null
+              func Use (IEnumerable<Node>:values, Holder:holder) → object
+                !
+                {{(boundary == "invalid-image" ? "let marker = Missing()" : "")}}
+                {{(boundary == "invalid-configuration" ? "pp FEATURE\n      let marker = Missing()\n    pp else\n      let marker = 0" : "")}}
+                return {{(boundary switch
+                {
+                    "missing" => "values.Missing()",
+                    "user-conversion" => "Enumerable.ToList(holder)",
+                    "field-receiver" => "holder.Values.ToList()",
+                    _ => "values.ToList()"
+                })}}
+            """;
+        var (ast, bound, _) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
+            call => call.ResolvedMethodName is "Missing" or "ToList");
+        Assert.Null(call.ResolvedMetadataMethod);
+        if (boundary == "ambiguous")
+        {
+            var image = CSharpCompilation.Create("AmbiguousSourceContainers",
+                [CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(ast))], GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.Contains(image.GetDiagnostics(), diagnostic => diagnostic.Id == "CS0121");
+        }
+        var compiled = Program.Compile(source);
+        Assert.True(compiled.HasErrors);
+    }
+
+    [Fact]
+    public void ContextualSourceGenericNullability_StillEvaluatesReceiverArgumentsAndCallback()
+    {
+        const string source = """
+            module ContextualSourceEvaluation
+              using System.Linq
+              using System.Collections.Generic
+              class Node
+              func Receiver (IEnumerable<Node>:values) → IEnumerable<Node>
+                ! cw
+                System.Console.WriteLine("receiver")
+                return values
+              func Argument (IEnumerable<Node>:values) → IEnumerable<Node>
+                ! cw
+                System.Console.WriteLine("argument")
+                return values
+              func Loud (Node:value) → Node
+                ! cw
+                System.Console.WriteLine("callback")
+                return value
+              func Use (IEnumerable<Node>:values) → List<Node>
+                !
+                return Receiver(values).Concat(second: Argument(values)).Select((Node:value) ! cw => Loud(value)).ToList()
+            """;
+        var (_, bound, diagnostics) = Bind(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().ToArray();
+        Assert.Equal(new[] { "Concat", "Select", "ToList" }, calls
+            .Where(call => call.ResolvedMetadataMethod?.ContainingType.ToDisplayString() == "System.Linq.Enumerable")
+            .Select(call => call.ResolvedMetadataMethod!.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(new[] { "Argument", "Loud", "Receiver" }, calls
+            .Where(call => call.ResolvedSymbol is not null).Select(call => call.ResolvedSymbol!.Name)
+            .Order(StringComparer.Ordinal));
+        var compiled = Program.Compile(source);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        var permissive = Program.Compile(source, null, new CompilationOptions
+        {
+            UnknownCallPolicy = UnknownCallPolicy.Permissive,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.Contains(permissive.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContextualSourceGenericNullability_ConfigurationIdentityIsNotANameGuess(bool conflicting)
+    {
+        var source = $$"""
+            module ContextualSourceConfigurations Cases
+              using System.Linq
+              using System.Collections.Generic
+              pp FEATURE
+                using Selected = {{(conflicting ? "Cases.Other" : "Cases")}}.Node
+              pp else
+                using Selected = Cases.Node
+              class Node
+              class Other
+                class Node
+              func Use (IEnumerable<Selected>:values) → object
+                !
+                return values.ToList()
+            """;
+        var ast = Parse(source);
+        Assert.Equal(!conflicting, CallGraphAnalysis.ResolveOperatorCalls(ast).ContextualMetadataCalls.Count == 1);
+        var (_, bound, _) = Bind(source);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
+        Assert.Equal(!conflicting, call.ResolvedMetadataMethod is not null);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
