@@ -129,6 +129,23 @@ Contextual lambda calls can reuse the selected invocation from Calor's annotated
 C# emission only when its native origin and all active configurations are valid.
 The compiler does not guess a `Func` signature to choose a lambda overload.
 
+The built-in manifest no longer grants unconditional purity to
+`System.Linq.Enumerable`, including through a `System.Linq` namespace default.
+Enumeration can call user-defined enumerators, callbacks, and comparers. Even a
+deferred operator with an identity callback can dispatch to user code when it
+throws: on .NET 10, `Select(null, identity)` can read the virtual
+`CultureInfo.CurrentUICulture.Name` while constructing its argument exception.
+A pure callback therefore does not prove that the operator is pure.
+
+The extension provider remains discoverable, but its unproven methods resolve to
+Unknown. No signatures are retained, including `Empty<T>()` and
+`AsEnumerable<T>(source)`; their omission is conservative, not a claim that these
+two methods have the same behavior as enumeration. Strict compilation rejects
+Unknown effects through the existing policy. Conversion may preserve the original
+C# instead; preservation or refusal is not native support. The current manifest
+schema cannot restrict a contract to nonnull inputs, one concrete enumerator, or
+one invariant culture provider.
+
 ## Manifest Search Locations
 
 Manifests are loaded from multiple locations (later sources override earlier):

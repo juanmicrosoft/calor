@@ -1776,4 +1776,317 @@ public class EffectResolverTests
         Assert.Equal("Calor0421", DiagnosticCode.InterfaceEffectVariance);
         Assert.Equal("Calor0423", DiagnosticCode.AccessorEffectContractUnavailable);
     }
+
+    [Fact]
+    public void EnumerableContracts_RuntimeOverloadsAndIncompleteKeysCannotBorrowPurity()
+    {
+        var compilation = StringProbeCompilation("", []);
+        var type = compilation.GetTypeByMetadataName("System.Linq.Enumerable")!;
+        Assert.Equal(typeof(Enumerable).Assembly.FullName, type.ContainingAssembly.Identity.ToString());
+        var methods = type.GetMembers().OfType<IMethodSymbol>()
+            .Where(method => method.DeclaredAccessibility == Accessibility.Public && method.IsStatic)
+            .ToArray();
+        Assert.NotEmpty(methods);
+        foreach (var warm in new[] { false, true })
+        {
+            var loader = new ManifestLoader(loadUserLevelManifests: false);
+            var resolver = new EffectResolver(loader);
+            resolver.Initialize();
+            Assert.True(Assert.Single(loader.LoadedManifests.SelectMany(entry => entry.Manifest.Mappings)
+                .Where(mapping => mapping.Type == "System.Linq.Enumerable")).ExtensionProvider);
+            if (warm)
+                Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(
+                    EffectResolverKey.FromStrings("System.String", "Contains", ["System.Char"])).Status);
+            foreach (var definition in methods.Concat(methods.Reverse()))
+            {
+                Assert.DoesNotContain(definition.Locations, location => location.IsInSource);
+                var method = definition.IsGenericMethod
+                    ? definition.Construct(Enumerable.Repeat<ITypeSymbol>(
+                        compilation.GetSpecialType(SpecialType.System_Int32), definition.Arity).ToArray())
+                    : definition;
+                var key = LinqKey(method);
+                foreach (var probe in new[]
+                {
+                    key, key.WithoutParameterList(),
+                    EffectResolverKey.FromStrings(key.DeclaringType, key.MemberName, ["?"]),
+                    EffectResolverKey.FromStrings("Vendor.Enumerable", key.MemberName, key.ParameterTypes?.ToArray()),
+                    EffectResolverKey.FromStrings("int[]", key.MemberName, ["?"],
+                        kind: EffectMemberKind.Extension),
+                    EffectResolverKey.FromBoundReceiver(new ArrayBoundType(new NominalBoundType("INT")),
+                        key.MemberName, kind: EffectMemberKind.Extension)
+                })
+                {
+                    var resolution = resolver.Resolve(probe);
+                    Assert.Equal(EffectResolutionStatus.Unknown, resolution.Status);
+                    Assert.True(resolution.Effects.IsUnknown);
+                    Assert.True(resolution.Effects.ToRow().IsUnknown);
+                }
+                Assert.Same(resolver.Resolve(key), resolver.Resolve(key));
+            }
+            foreach (var kind in new[] { EffectMemberKind.Method, EffectMemberKind.Getter,
+                EffectMemberKind.Setter, EffectMemberKind.Constructor })
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+                    EffectResolverKey.FromStrings("System.Linq.Enumerable", "Uncovered", [], kind)).Status);
+        }
+    }
+
+    [Fact]
+    public void EnumerableContracts_NullSelectAndWhereDispatchAmbientCultureInOriginalAndAreRejected()
+    {
+        const string source = """
+            using System.Linq;
+            public static class Target
+            {
+                public static System.Collections.Generic.IEnumerable<int> Apply(System.Collections.Generic.IEnumerable<int> source)
+                {
+            #if LINQ_ALT
+                    return source.Where(value => true);
+            #else
+                    return source.Select(value => value);
+            #endif
+                }
+            }
+            """;
+        foreach (var symbols in new string[][] { [], ["LINQ_ALT"] })
+        foreach (var throws in new[] { false, true })
+        {
+            var witness = LinqNullWitness.Replace("$THROW$", throws ? "true" : "false", StringComparison.Ordinal)
+                .Replace("$METHOD$", symbols.Length == 0 ? "Select" : "Where", StringComparison.Ordinal);
+            var observed = Assert.IsType<int[]>(RunStringProbe(source + witness, symbols));
+            Assert.All(observed.Take(2), hits => Assert.True(hits > 0));
+            if (throws)
+                Assert.Equal(new[] { 1, 1 }, observed.Take(2));
+            Assert.Equal(new[] { 1, 1 }, observed.Skip(2));
+        }
+        AssertLinqRejected(source, """
+            module LinqContracts overflow unchecked nullable oblivious
+              using System.Linq
+              module Target
+                func Apply public (System.Collections.Generic.IEnumerable<int>:source) → System.Collections.Generic.IEnumerable<int>
+                  !
+                  pp LINQ_ALT
+                    return source.Where((int:value) => true)
+                  pp else
+                    return source.Select((int:value) => value)
+            """);
+    }
+
+    [Theory]
+    [InlineData("GetEnumerator")]
+    [InlineData("MoveNext")]
+    [InlineData("Current")]
+    [InlineData("Dispose")]
+    [InlineData("ToList")]
+    [InlineData("Selector")]
+    [InlineData("Comparer")]
+    public void EnumerableContracts_UserEnumerationCallbacksAndComparersExecuteOnlyInOriginal(string stage)
+    {
+        var expression = stage switch
+        {
+            "Current" => "source.ToArray().Length",
+            "ToList" => "source.ToList().Count",
+            "Selector" => "source.Select(selector).ToArray().Length",
+            "Comparer" => "source.OrderBy(value => value, comparer).ToArray().Length",
+            _ => "source.Count()"
+        };
+        var source = $$"""
+            using System.Linq;
+            public static class Target
+            {
+                public static int Apply(System.Collections.Generic.IEnumerable<int> source,
+                    System.Func<int, int> selector, System.Collections.Generic.IComparer<int> comparer)
+                    => {{expression}};
+            }
+            """;
+        var witness = LinqUserCodeWitness.Replace("$STAGE$", stage == "ToList" ? "GetEnumerator" : stage,
+            StringComparison.Ordinal);
+        foreach (var symbols in new string[][] { [], ["LINQ_ALT"] })
+            Assert.Equal(1, RunStringProbe(source + witness, symbols));
+        AssertLinqRejected(source, $$"""
+            module LinqContracts overflow unchecked nullable oblivious
+              using System.Linq
+              module Target
+                func Apply public (System.Collections.Generic.IEnumerable<int>:source, System.Func<int,int>:selector, System.Collections.Generic.IComparer<int>:comparer) → int
+                  !
+                  return {{expression.Replace("value => value", "(int:value) => value", StringComparison.Ordinal)}}
+            """);
+    }
+
+    [Fact]
+    public void EnumerableContracts_SourceAliasRemainsSourceCodeRatherThanBuiltinAuthority()
+    {
+        const string source = """
+            using Enumerable = VendorEnumerable;
+            public static class VendorEnumerable
+            {
+                public static int Calls;
+                public static int Select(int value) { Calls++; return value; }
+            }
+            public static class Probe
+            {
+                public static int Run() => Enumerable.Select(7);
+            }
+            """;
+        var compilation = StringProbeCompilation(source, []);
+        var tree = compilation.SyntaxTrees.Single();
+        var selected = Assert.IsAssignableFrom<IMethodSymbol>(compilation.GetSemanticModel(tree).GetSymbolInfo(
+            Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())).Symbol);
+        Assert.Contains(selected.Locations, location => location.IsInSource);
+        Assert.Equal("VendorEnumerable", selected.ContainingType.Name);
+        Assert.Equal(EffectResolutionStatus.Unknown,
+            new EffectResolver(new ManifestLoader(loadUserLevelManifests: false)).Resolve(LinqKey(selected)).Status);
+        Assert.Equal(7, RunStringProbe(source, []));
+        var conversion = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "LinqContracts" }).Convert(source);
+        Assert.True(conversion.Success);
+        var run = conversion.Ast!.Classes.Single(type => type.Name == "Probe").Methods.Single();
+        Assert.Contains(EffectEnforcementPass.GetDeclaredEffects(run.Effects).Effects,
+            effect => effect.Kind == EffectKind.Mutation);
+    }
+
+    private static void AssertLinqRejected(string source, string native)
+    {
+        foreach (var symbols in new string[][] { [], ["LINQ_ALT"] })
+        {
+            var compilation = StringProbeCompilation(source, symbols);
+            Assert.DoesNotContain(compilation.GetDiagnostics(),
+                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            var tree = compilation.SyntaxTrees.Single();
+            var model = compilation.GetSemanticModel(tree);
+            var selected = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Select(node => model.GetSymbolInfo(node).Symbol).OfType<IMethodSymbol>().ToArray();
+            Assert.NotEmpty(selected);
+            foreach (var method in selected)
+            {
+                Assert.Equal(typeof(Enumerable).Assembly.FullName, method.ContainingAssembly.Identity.ToString());
+                Assert.Equal("System.Linq.Enumerable", method.ContainingType.ToDisplayString());
+                Assert.DoesNotContain(method.Locations, location => location.IsInSource);
+                var provider = method.ReducedFrom?.Construct(method.TypeArguments.ToArray()) ?? method;
+                Assert.Equal(EffectResolutionStatus.Unknown,
+                    new EffectResolver(new ManifestLoader(loadUserLevelManifests: false)).Resolve(LinqKey(provider)).Status);
+            }
+        }
+        var conversion = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "LinqContracts" }).Convert(source);
+        Assert.True(conversion.Success);
+        Assert.True(conversion.InteropPreservationCount > 0);
+        foreach (var emission in StringEmissions(native))
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(emission, "unknown-linq.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.True(result.HasErrors);
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && (diagnostic.Message.Contains(".Count", StringComparison.Ordinal)
+                    || diagnostic.Message.Contains(".Select", StringComparison.Ordinal)
+                    || diagnostic.Message.Contains(".Where", StringComparison.Ordinal)
+                    || diagnostic.Message.Contains(".ToList", StringComparison.Ordinal)
+                    || diagnostic.Message.Contains(".ToArray", StringComparison.Ordinal)
+                    || diagnostic.Message.Contains(".OrderBy", StringComparison.Ordinal)));
+        }
+    }
+
+    private static EffectResolverKey LinqKey(IMethodSymbol method)
+    {
+        var format = new SymbolDisplayFormat(
+            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+            genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters);
+        return EffectResolverKey.FromStrings(method.ContainingType.ToDisplayString(format), method.Name,
+            method.Parameters.Select(parameter => parameter.Type.ToDisplayString(format)).ToArray());
+    }
+
+    private const string LinqNullWitness = """
+
+        public sealed class LinqBoundaryException : System.Exception { }
+        public sealed class LinqBoundaryCulture : System.Globalization.CultureInfo
+        {
+            public static int Hits;
+            public static bool Active;
+            public LinqBoundaryCulture() : base("") { }
+            public override string Name
+            {
+                get
+                {
+                    if (Active)
+                    {
+                        Hits++;
+                        if ($THROW$) throw new LinqBoundaryException();
+                    }
+                    return base.Name;
+                }
+            }
+        }
+        public static class Probe
+        {
+            public static int[] Run()
+            {
+                var saved = System.Globalization.CultureInfo.CurrentUICulture;
+                var culture = new LinqBoundaryCulture();
+                var hits = new int[2];
+                var errors = new System.Exception[2];
+                System.Globalization.CultureInfo.CurrentUICulture = culture;
+                LinqBoundaryCulture.Active = true;
+                try
+                {
+                    for (int pass = 0; pass < 2; pass++)
+                    {
+                        LinqBoundaryCulture.Hits = 0;
+                        try { Target.Apply(null); }
+                        catch (LinqBoundaryException error) { errors[pass] = error; }
+                        catch (System.ArgumentNullException error) { errors[pass] = error; }
+                        hits[pass] = LinqBoundaryCulture.Hits;
+                    }
+                }
+                finally
+                {
+                    LinqBoundaryCulture.Active = false;
+                    System.Globalization.CultureInfo.CurrentUICulture = saved;
+                }
+                return new[] { hits[0], hits[1],
+                    errors[0].StackTrace.Contains("Enumerable.$METHOD$") ? 1 : 0,
+                    errors[1].StackTrace.Contains("Enumerable.$METHOD$") ? 1 : 0 };
+            }
+        }
+        """;
+
+    private const string LinqUserCodeWitness = """
+
+        public sealed class LinqDispatchException : System.Exception { }
+        public sealed class LinqSource : System.Collections.Generic.IEnumerable<int>, System.Collections.Generic.IEnumerator<int>
+        {
+            public int Current { get { Probe.Touch("Current"); return 1; } }
+            object System.Collections.IEnumerator.Current => Current;
+            public System.Collections.Generic.IEnumerator<int> GetEnumerator() { Probe.Touch("GetEnumerator"); return this; }
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+            private int index;
+            public bool MoveNext() { Probe.Touch("MoveNext"); return index++ == 0; }
+            public void Reset() { index = 0; }
+            public void Dispose() { Probe.Touch("Dispose"); }
+        }
+        public sealed class LinqComparer : System.Collections.Generic.IComparer<int>
+        {
+            public int Compare(int left, int right) { Probe.Touch("Comparer"); return left.CompareTo(right); }
+        }
+        public static class Probe
+        {
+            private static int hits;
+            public static void Touch(string stage)
+            {
+                if (stage == "$STAGE$") { hits++; throw new LinqDispatchException(); }
+            }
+            public static int Run()
+            {
+                System.Collections.Generic.IEnumerable<int> source =
+                    "$STAGE$" == "Selector" || "$STAGE$" == "Comparer" ? new[] { 2, 1 } : new LinqSource();
+                try { Target.Apply(source, value => { Touch("Selector"); return value; }, new LinqComparer()); }
+                catch (LinqDispatchException) { return hits; }
+                catch (System.InvalidOperationException error) when (error.InnerException is LinqDispatchException) { return hits; }
+                return -1;
+            }
+        }
+        """;
 }
