@@ -435,6 +435,7 @@ public sealed class EffectEnforcementPass
             else
                 CheckEffects(function);
         }
+        CheckImplicitStaticInitializers(module);
 
         // Phase 5 (v0.15 E5, design-doc §8.5): project the per-declaration
         // result. Read-only over what phases 2-4 left behind — this is a
@@ -686,30 +687,9 @@ public sealed class EffectEnforcementPass
         if (declarationOnly && function.Preconditions.Count == 0 && function.Postconditions.Count == 0)
             return GetDeclaredEffects(row);
         var assumptions = new List<string>();
-        var context = new InferenceContext(
-            _resolver, _computedEffects,
-            _callGraphAnalysis.Functions,
-            _callGraphAnalysis.FunctionNameToId,
-            _callGraphAnalysis.MethodNameToIds,
-            _callGraphAnalysis,
-            sccMembers, _policy, _strictEffects, _diagnostics, function.Id,
-            _crossModuleFunctionNames,
-            _classesByName, _interfacesByName, _delegateTypeNames,
+        var context = CreateInferenceContext(function.Id, sccMembers,
             _ownerClassByFunctionId.GetValueOrDefault(function.Id),
-            _constructorsByFunctionId.GetValueOrDefault(function.Id),
-            ResolveInternalEffectsOnDemand,
-            assumptions)
-        {
-            RecordLambdaBody = (lambda, functionId, body, reasons) =>
-                _lambdaBodyRows[lambda] = new LambdaBodyFact(functionId, body, reasons),
-            RecordLocalFunctionBody = (local, body, reasons) =>
-                _localFunctionBodies[local] = (body, reasons),
-            LambdaBodyRow = LambdaBodyRow,
-            Invocations = _invocations,
-            AstResolution = AstResolution,
-            EnclosingTypeParameters = _ownerClassByFunctionId.TryGetValue(function.Id, out var owner)
-                ? ReturnShape.GetCallableTypeParameters(owner, _module) : [],
-        };
+            _constructorsByFunctionId.GetValueOrDefault(function.Id), assumptions);
         var inferrer = new EffectInferrer(context);
         var effects = inferrer.InferFromFunction(function);
         if (declarationOnly)
@@ -743,6 +723,51 @@ public sealed class EffectEnforcementPass
         return effects;
     }
 
+    private InferenceContext CreateInferenceContext(
+        string functionId, HashSet<string> sccMembers, ClassDefinitionNode? owner,
+        ConstructorDeclaration? constructor, List<string> assumptions) =>
+        new(
+            _resolver, _computedEffects,
+            _callGraphAnalysis.Functions,
+            _callGraphAnalysis.FunctionNameToId,
+            _callGraphAnalysis.MethodNameToIds,
+            _callGraphAnalysis,
+            sccMembers, _policy, _strictEffects, _diagnostics, functionId,
+            _crossModuleFunctionNames,
+            _classesByName, _interfacesByName, _delegateTypeNames,
+            owner, constructor,
+            ResolveInternalEffectsOnDemand,
+            assumptions)
+        {
+            RecordLambdaBody = (lambda, lambdaFunctionId, body, reasons) =>
+                _lambdaBodyRows[lambda] = new LambdaBodyFact(lambdaFunctionId, body, reasons),
+            RecordLocalFunctionBody = (local, body, reasons) =>
+                _localFunctionBodies[local] = (body, reasons),
+            LambdaBodyRow = LambdaBodyRow,
+            Invocations = _invocations,
+            AstResolution = AstResolution,
+            EnclosingTypeParameters = owner is not null
+                ? ReturnShape.GetCallableTypeParameters(owner, _module) : [],
+        };
+
+    private void CheckImplicitStaticInitializers(ModuleNode module)
+    {
+        foreach (var owner in CallGraphAnalysis.EnumerateClasses(module))
+        {
+            if (_callGraphAnalysis.Initialization(owner) is { HasImplicitStaticConstructor: false })
+                continue;
+            var assumptions = new List<string>();
+            var context = CreateInferenceContext($"{owner.Name}..cctor", [], owner, null, assumptions);
+            var effects = new EffectInferrer(context).InferConstructorInitialization(
+                owner, isStatic: true, owner.Span);
+            CheckImplicitEffects(effects, assumptions, owner,
+                DiagnosticCode.ConstructorEffectContractUnavailable,
+                $"implicit static initializer '{owner.Name}..cctor'",
+                EffectSet.From("mut", "alloc"),
+                "intrinsic initialization mutation/allocation ('mut', 'alloc')");
+        }
+    }
+
     private EffectSet ResolveInternalEffectsOnDemand(string functionId)
     {
         if (_computedEffects.TryGetValue(functionId, out var computed))
@@ -773,6 +798,19 @@ public sealed class EffectEnforcementPass
         string intrinsicDescription)
     {
         var computedEffects = _computedEffects.GetValueOrDefault(function.Id, EffectSet.Empty);
+        CheckImplicitEffects(computedEffects, _assumedEffects.GetValueOrDefault(function.Id) ?? [],
+            declaration, diagnosticCode, displayName, intrinsicEffects, intrinsicDescription);
+    }
+
+    private void CheckImplicitEffects(
+        EffectSet computedEffects,
+        IReadOnlyList<string> reasons,
+        AstNode declaration,
+        string diagnosticCode,
+        string displayName,
+        EffectSet intrinsicEffects,
+        string intrinsicDescription)
+    {
         var forbidden = computedEffects.Except(intrinsicEffects).ToList();
         if (forbidden.Count > 0)
         {
@@ -787,7 +825,7 @@ public sealed class EffectEnforcementPass
                 DiagnosticSeverity.Error);
         }
 
-        if (_assumedEffects.TryGetValue(function.Id, out var reasons) && reasons.Count > 0)
+        if (reasons.Count > 0)
         {
             _diagnostics.Report(
                 declaration.Span,

@@ -76,7 +76,8 @@ public sealed class CallGraphAnalysis
         IReadOnlyList<InitializationOperation>? Instance,
         IReadOnlyList<InitializationOperation>? Static,
         IMethodSymbol? BaseConstructor,
-        bool IsValueType = false);
+        bool IsValueType = false,
+        bool HasImplicitStaticConstructor = false);
 
     internal sealed class OperatorBindings
     {
@@ -1223,7 +1224,11 @@ public sealed class CallGraphAnalysis
                             diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     {
                         foreach (var invalid in parts)
-                            bindings.Initializations[invalid.Origin] = new SourceInitialization(null, null, null);
+                            bindings.Initializations[invalid.Origin] = new SourceInitialization(
+                                null, null, null, type.IsValueType,
+                                type.StaticConstructors.Any(constructor => constructor.IsImplicitlyDeclared)
+                                || bindings.Initializations.GetValueOrDefault(invalid.Origin)
+                                    is { HasImplicitStaticConstructor: true });
                         continue;
                     }
                     var instance = new List<InitializationOperation>();
@@ -1274,8 +1279,11 @@ public sealed class CallGraphAnalysis
                         .Where(constructor => constructor.Parameters.Length == 0
                             && compilation.IsSymbolAccessibleWithin(constructor, type)).Take(2).ToArray();
                     var baseConstructor = baseConstructors is [var selectedBase] ? selectedBase : null;
+                    var hasImplicitStaticConstructor = type.StaticConstructors.Any(constructor =>
+                        constructor.IsImplicitlyDeclared);
                     if (bindings.Initializations.TryGetValue(part.Origin, out var previous))
                     {
+                        hasImplicitStaticConstructor |= previous.HasImplicitStaticConstructor;
                         validInstance &= previous.Instance != null;
                         validStatic &= previous.Static != null;
                         if (previous.Instance != null) instance.AddRange(previous.Instance);
@@ -1286,7 +1294,7 @@ public sealed class CallGraphAnalysis
                     }
                     bindings.Initializations[part.Origin] = new SourceInitialization(
                         validInstance ? instance : null, validStatic ? statics : null, baseConstructor,
-                        type.IsValueType);
+                        type.IsValueType, hasImplicitStaticConstructor);
                     if (part.Origin is { BaseClass: not null, RecordPrimaryConstructor: { Initializer: null } primary }
                         && baseConstructor != null)
                         bindings.ConstructorInitializers[primary] = baseConstructor;

@@ -160,6 +160,11 @@ Numeric addition is not string formatting. User-defined operators and operand
 conversions retain their own effect charges, as do operand evaluation,
 assignment targets, and bound source initialization. This includes bare
 static-field reads and explicit static-constructor entry without a field read.
+Implicit static initializers are also checked at their type declaration, against
+the same intrinsic mutation/allocation contract as explicit constructors.
+`BeforeFieldInit` permits eager CLR initialization; an empty callback trace from
+one method call is not a purity proof. Uncontracted formatting is refused even
+when the type has no explicit static constructor and its method reads no fields.
 
 ---
 

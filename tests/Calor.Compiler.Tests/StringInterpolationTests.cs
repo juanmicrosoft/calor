@@ -571,6 +571,76 @@ public static class NumberFormat
         }
     }
 
+    [Theory]
+    [InlineData("string", "\"\" + 3.5", false, true)]
+    [InlineData("string", "\"\" + -1234", false, true)]
+    [InlineData("string", "\"\" + 3.5", true, true)]
+    [InlineData("string", "\"\" + true", false, false)]
+    [InlineData("string", "\"\" + default(bool)", false, false)]
+    [InlineData("string", "\"\" + 'x'", false, false)]
+    [InlineData("string", "\"\" + \"text\"", false, false)]
+    [InlineData("string", "\"\" + null", false, false)]
+    [InlineData("int", "1 + 2", false, false)]
+    [InlineData("int[]", "new int[] { 1, 2 }", false, false)]
+    [InlineData("string", "\"\" + Read()", false, false)]
+    public void StrictConcatenation_ImplicitStaticInitializationIsCheckedAtDeclaration(
+        string type, string initializer, bool property, bool unknown)
+    {
+        var source = $$"""
+            #nullable enable
+            public class StaticInitializationBoundary
+            {
+                private static {{type}} Text{{(property ? " { get; }" : "")}} = {{initializer}};
+                {{(initializer == "\"\" + Read()" ? "private static bool Read() { return true; }" : "")}}
+                public static string Render(double unused) { return "constant"; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "implicit-static-initializer.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Equal(unknown, result.HasErrors);
+            if (unknown)
+            {
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                    && diagnostic.Message.Contains("concatenation formatting", StringComparison.Ordinal));
+                Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable
+                    && diagnostic.Message.Contains("implicit static initializer", StringComparison.Ordinal));
+                Assert.Empty(result.GeneratedCode);
+            }
+            else
+                Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void StrictConcatenation_ImplicitStaticInitializationDoesNotNeedAnExecutableMethod()
+    {
+        const string source = """
+            module StaticInitializationBoundary
+              class Box
+                field string:Text private static = "" + 3.5
+            """;
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(source, "implicit-static-declaration.calr",
+                StrictInterpolationOptions(typing));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("concatenation formatting (double)", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable
+                && diagnostic.Message.Contains("implicit static initializer", StringComparison.Ordinal));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
     private static CompilationOptions StrictInterpolationOptions(bool typing) => new()
     {
         EnableTypeChecking = typing,
