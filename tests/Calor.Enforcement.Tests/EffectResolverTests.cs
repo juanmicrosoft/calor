@@ -1,7 +1,13 @@
+using System.Runtime.Loader;
 using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Effects.Manifests;
+using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Enforcement.Tests;
@@ -11,6 +17,376 @@ namespace Calor.Enforcement.Tests;
 /// </summary>
 public class EffectResolverTests
 {
+    [Theory]
+    [InlineData("ToUpper", new string[0])]
+    [InlineData("ToLower", new string[0])]
+    [InlineData("ToUpper", new[] { "System.Globalization.CultureInfo" })]
+    [InlineData("ToLower", new[] { "System.Globalization.CultureInfo" })]
+    [InlineData("Compare", new[] { "System.String", "System.String" })]
+    [InlineData("StartsWith", new[] { "System.String" })]
+    [InlineData("IndexOf", new[] { "System.String" })]
+    [InlineData("Equals", new[] { "System.String", "System.StringComparison" })]
+    [InlineData("Contains", new[] { "System.String", "System.StringComparison" })]
+    [InlineData("Concat", new[] { "System.Object" })]
+    [InlineData("Concat", new[] { "System.Collections.Generic.IEnumerable`1<System.String>" })]
+    [InlineData("Join", new[] { "System.String", "System.Collections.Generic.IEnumerable`1<System.String>" })]
+    [InlineData("Format", new[] { "System.IFormatProvider", "System.String", "System.Object[]" })]
+    [InlineData("ToString", new[] { "System.IFormatProvider" })]
+    [InlineData("Uncovered", new string[0])]
+    public void StringContracts_LeaveUnprovenOverloadsUnknown(string member, string[] parameters)
+    {
+        var resolver = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false));
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.String", member, parameters));
+        Assert.Equal(EffectResolutionStatus.Unknown, result.Status);
+        Assert.True(result.Effects.IsUnknown);
+    }
+
+    [Fact]
+    public void StringContracts_PartialAndCachedLookupsCannotBorrowAnotherOverloadsPermission()
+    {
+        var safe = EffectResolverKey.FromStrings("System.String", "Contains", ["System.Char"]);
+        var unresolved = new[]
+        {
+            safe.WithoutParameterList(),
+            EffectResolverKey.FromStrings("System.String", "Contains", ["?"]),
+            EffectResolverKey.FromStrings("System.String", "Contains", ["System.String"]),
+            EffectResolverKey.FromStrings("Vendor.String", "Contains", ["System.Char"]),
+            EffectResolverKey.FromStrings("System.String", "Length", kind: EffectMemberKind.Setter),
+            EffectResolverKey.FromStrings("System.String", "Length"),
+            EffectResolverKey.FromStrings("System.String", ".ctor", ["System.Char", "System.Int32"],
+                EffectMemberKind.Constructor)
+        };
+        foreach (var safeFirst in new[] { false, true })
+        {
+            var resolver = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false));
+            if (safeFirst)
+                Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(safe).Status);
+            foreach (var key in unresolved.Concat(unresolved.Reverse()))
+                Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key).Status);
+            var resolution = resolver.Resolve(safe);
+            Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+            Assert.Same(resolution, resolver.Resolve(safe));
+        }
+    }
+
+    [Theory]
+    [InlineData("string.IsNullOrEmpty(\"\")", "bool", true)]
+    [InlineData("\"a\".ToUpperInvariant()", "string", "A")]
+    [InlineData("\"\\u00e9\".ToUpperInvariant()", "string", "\u00c9")]
+    [InlineData("\"A\".ToLowerInvariant()", "string", "a")]
+    [InlineData("\"\\u00c9\".ToLowerInvariant()", "string", "\u00e9")]
+    [InlineData("\"a\".ToString()", "string", "a")]
+    [InlineData("\"a\".Equals(\"a\")", "bool", true)]
+    [InlineData("string.Equals(\"a\", \"a\")", "bool", true)]
+    [InlineData("string.CompareOrdinal(\"a\", \"b\") < 0", "bool", true)]
+    [InlineData("\"abc\".Contains('b')", "bool", true)]
+    [InlineData("\"\".Contains('b')", "bool", false)]
+    [InlineData("\"abc\".IndexOf('b')", "int", 1)]
+    [InlineData("\"\".IndexOf('b')", "int", -1)]
+    [InlineData("\"abc\".Length", "int", 3)]
+    public void StringContracts_SafeSelectedMembersHaveExactAuthorityAndExecute(
+        string expression, string returnType, object expected)
+    {
+        var csharp = $"public static class Probe {{ public static {returnType} Run() => {expression}; }}";
+        var compilation = StringProbeCompilation(csharp, []);
+        var model = compilation.GetSemanticModel(compilation.SyntaxTrees.Single());
+        var selected = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
+            .Where(node => node is InvocationExpressionSyntax or MemberAccessExpressionSyntax)
+            .Select(node => model.GetSymbolInfo(node).Symbol)
+            .First(symbol => symbol is IMethodSymbol or IPropertySymbol);
+        Assert.NotNull(selected);
+        Assert.Equal(SpecialType.System_String, selected.ContainingType.SpecialType);
+        Assert.Equal(typeof(string).Assembly.FullName, selected.ContainingAssembly.Identity.ToString());
+        Assert.DoesNotContain(selected.Locations, location => location.IsInSource);
+        var format = new SymbolDisplayFormat(typeQualificationStyle:
+            SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
+        var method = selected as IMethodSymbol;
+        var key = EffectResolverKey.FromStrings("System.String", selected.Name,
+            method?.Parameters.Select(parameter => parameter.Type.ToDisplayString(format)).ToArray(),
+            method == null ? EffectMemberKind.Getter : EffectMemberKind.Method);
+        var resolution = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false)).Resolve(key);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+        Assert.True(resolution.Effects.IsEmpty);
+        Assert.Contains("embedded:Calor.Compiler.Manifests.bcl-system", resolution.Source);
+
+        var conversion = ConvertStringSource(csharp);
+        Assert.True(conversion.Success);
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        var hostileCulture = CultureProbe.Replace("public static class Probe", "public static class CultureWitness",
+                StringComparison.Ordinal)
+            .Replace("public TrackingCulture() : base(\"\") { }", """
+                public TrackingCulture() : base("") { }
+                public override object GetFormat(System.Type type)
+                {
+                    Reads++;
+                    throw new System.InvalidOperationException("culture-callback");
+                }
+                public override System.Globalization.CompareInfo CompareInfo
+                {
+                    get { Reads++; throw new System.InvalidOperationException("culture-callback"); }
+                }
+                """, StringComparison.Ordinal)
+            .Replace("return result + \":\" + reads;",
+                "return System.Convert.ToString(result, System.Globalization.CultureInfo.InvariantCulture)"
+                + " + \":\" + reads.ToString(System.Globalization.CultureInfo.InvariantCulture);", StringComparison.Ordinal)
+            .Replace("$CALL$", "Probe.Run()", StringComparison.Ordinal)
+            .Replace("$THROW$", "true", StringComparison.Ordinal);
+        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+        {
+            Assert.Equal(expected, RunStringProbe(csharp, symbols));
+            Assert.Equal(expected + ":0", RunStringProbe(csharp + hostileCulture, symbols, "CultureWitness"));
+            foreach (var native in StringEmissions(conversion.CalorSource!))
+            foreach (var typeChecking in new[] { false, true })
+            {
+                var result = Calor.Compiler.Program.Compile(native, "safe-string.calr",
+                    new Calor.Compiler.CompilationOptions
+                    {
+                        EnableTypeChecking = typeChecking, VerifyContracts = false, StatusWriter = TextWriter.Null
+                    });
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+                Assert.Equal(expected, RunStringProbe(result.GeneratedCode, symbols));
+                Assert.Equal(expected + ":0",
+                    RunStringProbe(result.GeneratedCode + hostileCulture, symbols, "CultureWitness"));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("value.ToUpper()", "a", "A")]
+    [InlineData("value.ToLower()", "A", "a")]
+    [InlineData("value.ToUpper(culture)", "a", "A")]
+    [InlineData("value.ToLower(culture)", "A", "a")]
+    public void StringContracts_CultureDispatchMutatesOrThrowsInOriginalAndIsStrictlyRejected(
+        string expression, string input, string output)
+    {
+        var csharp = $$"""
+            public static class Target
+            {
+                public static string Apply(string value, System.Globalization.CultureInfo culture) => {{expression}};
+            }
+            """;
+        foreach (var throws in new[] { false, true })
+        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+        {
+            var driver = CultureProbe.Replace("$CALL$", $"Target.Apply(\"{input}\", culture)", StringComparison.Ordinal)
+                .Replace("$THROW$", throws ? "true" : "false", StringComparison.Ordinal);
+            Assert.Equal(throws ? "throw:1" : output + ":1", RunStringProbe(csharp + driver, symbols));
+        }
+        AssertStringRejected(csharp, $$"""
+            module StringContracts overflow unchecked nullable oblivious
+              module Target
+                func Apply (string:value, System.Globalization.CultureInfo:culture) → string
+                  return {{expression}}
+            """);
+    }
+
+    [Theory]
+    [InlineData("value.CompareTo(other)", "-1")]
+    [InlineData("string.Compare(value, other, false, culture)", "-1")]
+    [InlineData("value.IndexOf(other)", "1")]
+    public void StringContracts_ComparisonDispatchAlsoStaysUnknown(string expression, string expected)
+    {
+        var csharp = $$"""
+            #nullable enable
+            public static class Target
+            {
+                public static int Apply(string value, string other, System.Globalization.CultureInfo culture) => {{expression}};
+            }
+            """;
+        foreach (var throws in new[] { false, true })
+        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+        {
+            var driver = CultureProbe.Replace("System.Globalization.TextInfo TextInfo",
+                    "System.Globalization.CompareInfo CompareInfo", StringComparison.Ordinal)
+                .Replace("base.TextInfo", "base.CompareInfo", StringComparison.Ordinal)
+                .Replace("$CALL$", "Target.Apply(\"abc\", \"b\", culture)", StringComparison.Ordinal)
+                .Replace("$THROW$", throws ? "true" : "false", StringComparison.Ordinal);
+            Assert.Equal(throws ? "throw:1" : expected + ":1", RunStringProbe(csharp + driver, symbols));
+        }
+        AssertStringRejected(csharp, $$"""
+            module StringContracts overflow unchecked
+              module Target
+                func Apply (string:value, string:other, System.Globalization.CultureInfo:culture) → int
+                  return {{expression}}
+            """, expectedInterop: 0);
+    }
+
+    [Fact]
+    public void StringContracts_OriginalLinqChainDoesNotAcquirePureCallbackPermission()
+    {
+        foreach (var throws in new[] { false, true })
+        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+        {
+            var driver = CultureProbe.Replace("$CALL$",
+                    "string.Join(\",\", new Transform().GetNames(new System.Collections.Generic.List<string> { \"a\", \"b\" }))",
+                    StringComparison.Ordinal)
+                .Replace("$THROW$", throws ? "true" : "false", StringComparison.Ordinal);
+            Assert.Equal(throws ? "throw:1" : "A,B:2", RunStringProbe(OriginalStringLinq + driver, symbols));
+        }
+        AssertStringRejected(OriginalStringLinq, """
+            module Test_05_03 overflow unchecked
+              using System.Linq
+              using System.Collections.Generic
+
+              class Transform
+                func GetNames (List<string>:items) → List<string>
+                  return (items.Where((string:s) => (s.Length > 0))).Select((string:s) => (s).ToUpper()).OrderBy((string:s) => s).ToList()
+            """);
+    }
+
+    [Fact]
+    public void StringContracts_SourceAliasCannotStealBuiltinSignatureAuthority()
+    {
+        var conversion = ConvertStringSource("""
+            using String = VendorString;
+            public class VendorString
+            {
+                public static int Calls;
+                public static bool IsNullOrEmpty(string value) { Calls++; return false; }
+            }
+            public class Probe
+            {
+                public static bool Run() => String.IsNullOrEmpty("");
+            }
+            """);
+        Assert.True(conversion.Success);
+        var run = conversion.Ast!.Classes.Single(type => type.Name == "Probe").Methods.Single();
+        Assert.Contains(EffectEnforcementPass.GetDeclaredEffects(run.Effects).Effects,
+            effect => effect.Kind == EffectKind.Mutation);
+        var result = Calor.Compiler.Program.Compile(conversion.CalorSource!, "shadow-string.calr",
+            new Calor.Compiler.CompilationOptions { VerifyContracts = false, StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.Equal(false, RunStringProbe(result.GeneratedCode, []));
+    }
+
+    private static void AssertStringRejected(string csharp, string nativeSource, int expectedInterop = 1)
+    {
+        var original = StringProbeCompilation(csharp, []);
+        var tree = original.SyntaxTrees.Single();
+        var model = original.GetSemanticModel(tree);
+        var selected = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Select(node => model.GetSymbolInfo(node).Symbol).OfType<IMethodSymbol>()
+            .Where(method => method.ContainingType.SpecialType == SpecialType.System_String));
+        Assert.Equal(typeof(string).Assembly.FullName, selected.ContainingAssembly.Identity.ToString());
+        Assert.DoesNotContain(selected.Locations, location => location.IsInSource);
+        var conversion = ConvertStringSource(csharp);
+        Assert.True(conversion.Success);
+        Assert.Equal(expectedInterop, conversion.InteropPreservationCount);
+        var emissions = StringEmissions(nativeSource);
+        if (expectedInterop == 0)
+            emissions = emissions.Concat(StringEmissions(conversion.CalorSource!)).ToArray();
+        foreach (var native in emissions)
+        foreach (var typeChecking in new[] { false, true })
+        {
+            var result = Calor.Compiler.Program.Compile(native, "unknown-string.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnableTypeChecking = typeChecking, VerifyContracts = false, StatusWriter = TextWriter.Null
+                });
+            Assert.True(result.HasErrors);
+            Assert.Empty(result.GeneratedCode);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("." + selected.Name, StringComparison.Ordinal));
+        }
+    }
+
+    private static string[] StringEmissions(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return [source, new CalorEmitter().Emit(ast)];
+    }
+
+    private static ConversionResult ConvertStringSource(string source) =>
+        new CSharpToCalorConverter(new ConversionOptions { ModuleName = "StringContracts" }).Convert(source);
+
+    private static CSharpCompilation StringProbeCompilation(string source, string[] symbols) =>
+        CSharpCompilation.Create("StringProbe_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(preprocessorSymbols: symbols))],
+            TestHarness.CompilationReferences,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+    private static object? RunStringProbe(string source, string[] symbols, string typeName = "Probe")
+    {
+        using var stream = new MemoryStream();
+        var result = StringProbeCompilation(source, symbols).Emit(stream);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        stream.Position = 0;
+        var context = new AssemblyLoadContext("string-probe", isCollectible: true);
+        try
+        {
+            var assembly = context.LoadFromStream(stream);
+            return assembly.GetType(typeName)!.GetMethod("Run")!.Invoke(null, null);
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
+    private const string CultureProbe = """
+
+        public sealed class TrackingCulture : System.Globalization.CultureInfo
+        {
+            public static int Reads;
+            public static bool ThrowOnRead;
+            public TrackingCulture() : base("") { }
+            public override System.Globalization.TextInfo TextInfo
+            {
+                get
+                {
+                    Reads++;
+                    if (ThrowOnRead) throw new System.InvalidOperationException("culture-callback");
+                    return base.TextInfo;
+                }
+            }
+        }
+        public static class Probe
+        {
+            public static string Run()
+            {
+                var previous = System.Globalization.CultureInfo.CurrentCulture;
+                var culture = new TrackingCulture();
+                System.Globalization.CultureInfo.CurrentCulture = culture;
+                TrackingCulture.Reads = 0;
+                TrackingCulture.ThrowOnRead = $THROW$;
+                try
+                {
+                    try
+                    {
+                        var result = $CALL$;
+                        var reads = TrackingCulture.Reads;
+                        return result + ":" + reads;
+                    }
+                    catch (System.InvalidOperationException error) when (error.Message == "culture-callback")
+                    {
+                        return "throw:" + TrackingCulture.Reads;
+                    }
+                }
+                finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
+            }
+        }
+        """;
+
+    private const string OriginalStringLinq = """
+        using System.Linq;
+        using System.Collections.Generic;
+
+        public class Transform
+        {
+            public List<string> GetNames(List<string> items)
+            {
+                return items.Where(s => s.Length > 0)
+                            .Select(s => s.ToUpper())
+                            .OrderBy(s => s)
+                            .ToList();
+            }
+        }
+        """;
+
     [Fact]
     public void Resolve_SelectsSignatureSpecificMethodAndConstructorOverloads()
     {

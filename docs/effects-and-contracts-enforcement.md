@@ -147,6 +147,18 @@ System.DateTime::get_UtcNow() → time
 System.Guid::NewGuid() → rand
 ```
 
+`System.String` has no blanket pure contract. Its built-in coverage is limited
+to exact signatures for `IsNullOrEmpty(string)`, `ToUpperInvariant()`,
+`ToLowerInvariant()`, `ToString()`, `Equals(string)`, `Equals(string,string)`,
+`CompareOrdinal(string,string)`, `Contains(char)`, `IndexOf(char)`, and the
+`Length` getter. Unlisted members and overloads remain Unknown.
+
+In particular, `ToUpper()` and `ToLower()`, including their `CultureInfo`
+overloads, can invoke user-defined `TextInfo` getters. Culture-sensitive
+comparisons, formatting, and enumerable overloads can also dispatch to user
+code. They cannot inherit permission from a safe overload's name. Strict
+compilation rejects unresolved effects rather than guessing a `mut` row.
+
 ## Project-Level Effect Manifests
 
 Create a `.calor-effects.json` file in your project directory to declare effects for types not covered by the built-in manifests:

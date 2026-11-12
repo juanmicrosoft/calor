@@ -41,9 +41,19 @@
     },
     {
       "type": "System.String",
-      "defaultEffects": [],
       "methods": {
-        "*": []
+        "IsNullOrEmpty(System.String)": [],
+        "ToUpperInvariant()": [],
+        "ToLowerInvariant()": [],
+        "ToString()": [],
+        "Equals(System.String)": [],
+        "Equals(System.String,System.String)": [],
+        "CompareOrdinal(System.String,System.String)": [],
+        "Contains(System.Char)": [],
+        "IndexOf(System.Char)": []
+      },
+      "getters": {
+        "Length": []
       }
     },
     {
