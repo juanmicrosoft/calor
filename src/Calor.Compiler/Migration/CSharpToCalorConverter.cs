@@ -651,8 +651,8 @@ public sealed class CSharpToCalorConverter
                     generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal);
         }
 
-        if (attempted.Success && attempted.InteropPreservationCount == 0
-            && attempted.Losses.Count == 0
+        // Preserved declarations also inherit the emitted nullable context.
+        if (attempted.Success
             && attempted.CalorSource is { } current
             && TryParseModule(current) is { } currentModule
             && MetadataMatches(new CSharpEmitter().Emit(currentModule)))
@@ -660,8 +660,7 @@ public sealed class CSharpToCalorConverter
 
         ConversionResult PreserveUnrepresentedMetadata()
         {
-            if (!attempted.Success || attempted.InteropPreservationCount != 0
-                || attempted.Losses.Count != 0)
+            if (!attempted.Success)
                 return attempted;
             attempted.Context.AddWarning(
                 "The native projection changed declared type/nullability metadata; "

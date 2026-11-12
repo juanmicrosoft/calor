@@ -56,7 +56,10 @@ It retains explicit nullable annotations, including nested array and generic
 annotations, instead of replacing unknown reference types with nullable types.
 The converter admits this replacement only after strict compilation of the
 actual emitted/reparsed Calor, C# compilation, and an exact comparison of declared
-owner/type/nullability metadata. Already faithful native output is retained.
+owner/type/nullability metadata. Already faithful native or preserved output is retained.
+Post-validation fallback also checks declaration metadata: unchanged C# text can
+inherit a different nullable context. If that context changes declaration semantics,
+lossless conversion preserves the original compilation unit instead.
 Mixed `#nullable` contexts, unresolved source context, or an uncertified native
 replacement retain the preservation boundary; raw C# is not native recovery.
 Conversion options and the default compilation context do not change.

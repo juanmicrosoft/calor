@@ -199,6 +199,84 @@ public sealed class Issue1401NullableContextConversionTests
         Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
     }
 
+    [Theory]
+    [InlineData("062_OptionalParameters.cs", false)]
+    [InlineData("062_OptionalParameters.cs", true)]
+    [InlineData("075_ExtensionMethods.cs", false)]
+    [InlineData("075_ExtensionMethods.cs", true)]
+    public void PostValidationFallback_RetainsOriginalObliviousDeclarations(
+        string fileName, bool evaluated)
+    {
+        var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+            "tests", "TestData", "CSharpImport", "Level4_Methods", fileName));
+        var project = new CSharpToCalorConverter(PreservationOptions(evaluated))
+            .ConvertProject(source, fileName);
+        var converted = Assert.Single(project.Outputs).Conversion;
+        Assert.True(converted.Success, FormatIssues(converted));
+        Assert.True(converted.InteropPreservationCount > 0);
+        Assert.Equal(0, converted.LossySubstitutionCount);
+        Assert.Equal(0, converted.DropCount);
+        var compiled = Program.Compile(converted.CalorSource!, "preserved.calr",
+            new CompilationOptions
+            {
+                StrictEffects = true,
+                UnknownCallPolicy = Effects.UnknownCallPolicy.Strict
+            });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+        Assert.Equal(source, compiled.GeneratedCode);
+        Assert.Contains(converted.Losses, loss => loss.Feature == "whole-file-preservation");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PostValidationFallback_RetainsCallbackMetadataAndFaithfulBoundaries(bool nullableAlias)
+    {
+        var source = $$"""
+            #nullable enable
+            using {{(nullableAlias ? "Callback = System.Func<string, string>" : "System")}};
+            namespace N {
+                public static class Keepme { public static int Value() => 1; }
+                public class Breakme {
+                    public string Apply({{(nullableAlias ? "Callback" : "Func<string, string>")}} callback, string value) => callback(value);
+                }
+            }
+            """;
+        var converter = new CSharpToCalorConverter(PreservationOptions(evaluated: true))
+        {
+            ParseValidatorOverride = calor =>
+                !Parsing.RawCSharpFrame.MaskForAnalysis(calor)
+                    .Contains("Breakme", StringComparison.Ordinal)
+        };
+        var converted = converter.Convert(source, "Callbacks.cs");
+
+        Assert.True(converted.Success, FormatIssues(converted));
+        var compiled = Program.Compile(converted.CalorSource!, "callbacks.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+        Assert.Equal("post-validation-fallback", Assert.Single(converted.Losses).Feature);
+        Assert.Equal("Keepme", Assert.Single(converted.Ast!.Classes).Name);
+    }
+
+    private static ConversionOptions PreservationOptions(bool evaluated)
+    {
+        var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(
+            false, false, false, false, false, false);
+        if (evaluated)
+        {
+            options.NullableContextOptions = NullableContextOptions.Disable;
+            options.ReferencesAreComplete = true;
+            options.References = GeneratedCSharpCompiler.References.Select(reference =>
+            {
+                var image = Assert.IsAssignableFrom<PortableExecutableReference>(reference);
+                Assert.NotNull(image.FilePath);
+                return new ConversionReference(image.FilePath, image.Properties.Aliases);
+            }).ToArray();
+        }
+        return options;
+    }
+
     private static string[] DeclaredMetadata(string source)
     {
         var tree = CSharpSyntaxTree.ParseText(source);
