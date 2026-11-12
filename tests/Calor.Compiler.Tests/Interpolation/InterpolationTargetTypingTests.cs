@@ -427,6 +427,25 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
         Assert.Contains("/* scalar-marker */", conversion.CalorSource);
     }
 
+    [Theory]
+    [InlineData("default(/** scalar-marker */bool)")]
+    [InlineData("default(\n/** scalar-marker */\nbool)")]
+    [InlineData("\n/** scalar-marker */\nnull")]
+    public void StandaloneScalarHole_DocumentationCommentsRetainThePreservationBoundary(string expression)
+    {
+        var source = $$"""
+            #nullable enable
+            public class ScalarHole
+            {
+                public static string Render() { return $"value={{{expression}}}"; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        Assert.NotEqual(0, conversion.InteropPreservationCount);
+        Assert.Contains(expression, conversion.CalorSource);
+    }
+
     [Fact]
     public void NativeHole_StringArgumentWithACSharpOnlyEscape_StaysRaw()
     {

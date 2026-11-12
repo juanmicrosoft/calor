@@ -16547,7 +16547,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private static bool HasInterpolationHoleComment(ExpressionSyntax expression) =>
         expression.DescendantTrivia().Any(trivia =>
-            trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia));
+            trivia.Kind() is SyntaxKind.SingleLineCommentTrivia or SyntaxKind.MultiLineCommentTrivia
+                or SyntaxKind.SingleLineDocumentationCommentTrivia or SyntaxKind.MultiLineDocumentationCommentTrivia);
 
     private ExpressionNode PreserveInterpolationHole(ExpressionSyntax expression)
     {
