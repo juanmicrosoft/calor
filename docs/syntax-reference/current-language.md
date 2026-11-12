@@ -1150,9 +1150,9 @@ Complete example: [goto](#example-complete_goto).
 
 ## string operations
 
-Strings use ordinary C# properties, indexing and method syntax, but only selected overloads have authoritative effect contracts. Length, UTF-16 character access, Contains(char), IndexOf(char), ToUpperInvariant() and ToLowerInvariant() are supported here. Contains(string), Substring, trimming and comparison-mode search overloads remain unknown under strict checking; ordinary syntax is not permission. StringContains keeps its non-null string parameters and pure row by comparing UTF-16 code units directly, including an empty substring. FirstField scans for a comma and copies the prefix into a char array; its alloc and mut row covers that buffer. Neither algorithm substitutes culture-dependent comparison.
+Strings use ordinary C# properties, indexing and method syntax, but only selected overloads have authoritative effect contracts. Concatenation with left + right is supported and pure when both operands are strings. Length, UTF-16 character access, Contains(char), IndexOf(char), ToUpperInvariant() and ToLowerInvariant() are supported here. string.Concat(a, b) and comparison-mode searches such as text.IndexOf(value, StringComparison.Ordinal) are ordinary call syntax, but their strict effect contracts are unavailable. These calls, Contains(string), Substring and trimming remain unknown under strict checking; syntax is not permission. StringContains keeps its non-null string parameters and pure row by comparing UTF-16 code units directly, including an empty substring. FirstField scans for a comma and copies the prefix into a char array; its alloc and mut row covers that buffer. Neither algorithm substitutes culture-dependent comparison.
 
-Syntax: `text.Length; text[index]; text.Contains(character); text.IndexOf(character); left + right`
+Syntax: `Pure string addition: left + right. Supported string access and char overloads: text.Length; text[index]; text.Contains(character); text.IndexOf(character). Ordinary syntax only (strict effect contract unavailable): string.Concat(a, b); text.IndexOf(value, StringComparison.Ordinal).`
 
 C# equivalents (fragments):
 
