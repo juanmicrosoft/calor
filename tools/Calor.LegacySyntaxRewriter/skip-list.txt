@@ -1,0 +1,6 @@
+# Literals the oracle accepts but whose rewrite turns a passing test into a failing one.
+# Format: <repo-relative path>:<line of the literal in the legacy original>  <reason>
+#
+# The legacy source never parsed, so the test passed vacuously (no calls collected). The
+# native rewrite parses, and Console.WriteLine and Math.Abs come back unresolved.
+tests/Calor.Enforcement.Tests/EffectsSuggestTests.cs:804  exposes-latent-failure

@@ -23,12 +23,20 @@ internal sealed class Log : IDisposable
         _writer?.WriteLine($"rewritten\t{_exclusions.Relative(path)}\t{line}\t{kind}\t");
     }
 
+    /// <summary>Skip reasons recorded since the last <see cref="BeginFile"/>.</summary>
+    public List<string> FileReasons { get; } = [];
+
+    public void BeginFile() => FileReasons.Clear();
+
     public void Skip(string path, int line, string reason, string? detail)
     {
         Skipped++;
+        FileReasons.Add(reason);
         SkipReasons[reason] = SkipReasons.GetValueOrDefault(reason) + 1;
         _writer?.WriteLine($"skipped\t{_exclusions.Relative(path)}\t{line}\t{reason}\t{Clean(detail)}");
     }
+
+    public string Relative(string path) => _exclusions.Relative(path);
 
     private static string Clean(string? s) => (s ?? "").Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ');
 

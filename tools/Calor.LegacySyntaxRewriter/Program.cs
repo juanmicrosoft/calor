@@ -5,7 +5,7 @@ public static class Program
     private const string Usage = """
         usage:
           calor-legacy-rewriter calr [--write] [--include-registered] [--log out.tsv] <file-or-dir>...
-          calor-legacy-rewriter cs   [--write] [--log out.tsv] <file-or-dir>...
+          calor-legacy-rewriter cs   [--write] [--log out.tsv] [--skip-list skip.txt] <file-or-dir>...
           calor-legacy-rewriter literal <file.cs> <line>  print the §-bearing literal on that line
           calor-legacy-rewriter probe <file.calr>        print the native rewrite (or the oracle failure)
           calor-legacy-rewriter legacy-cs <file.calr>    C# from the legacy parse (today's emitter)
@@ -24,10 +24,12 @@ public static class Program
         var write = args.Contains("--write");
         var includeRegistered = args.Contains("--include-registered");
         string? logPath = null;
+        string? skipListPath = null;
         var paths = new List<string>();
         for (var i = 1; i < args.Length; i++)
         {
             if (args[i] == "--log") logPath = args[++i];
+            else if (args[i] == "--skip-list") skipListPath = args[++i];
             else if (!args[i].StartsWith("--", StringComparison.Ordinal)) paths.Add(args[i]);
         }
 
@@ -54,7 +56,13 @@ public static class Program
                 ? Directory.EnumerateFiles(path, "*" + extension, SearchOption.AllDirectories)
                 : [path])
             .Select(Path.GetFullPath).Distinct().Order(StringComparer.Ordinal).ToList();
-        var literalRewriter = new CSharpLiteralRewriter(log, cache);
+        // Skip list: "relative/path.cs:LINE  reason" per line ('#' comments); LINE is the
+        // literal's line in the original file.
+        var skipList = skipListPath == null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : File.ReadAllLines(skipListPath).Select(l => l.Split('#')[0].Trim()).Where(l => l.Length > 0)
+                .Select(l => l.Split(' ', 2)[0]).ToHashSet(StringComparer.Ordinal);
+        var literalRewriter = new CSharpLiteralRewriter(log, cache, skipList);
         foreach (var file in files)
         {
             var excluded = exclusions.Reason(file, includeRegistered);

@@ -26,12 +26,25 @@ internal sealed class CSharpLiteralRewriter
     ];
 
     private readonly Log _log;
+    private readonly HashSet<string> _skipList;
+
+    /// <summary>
+    /// Skip reasons that leave legacy text in a file on purpose (the literal is a pattern,
+    /// a key or a rejection input). Any other skip means the file still holds legacy
+    /// programs, so its fragments' consumers are probably legacy too.
+    /// </summary>
+    private static readonly HashSet<string> IntentionalLegacy = new(StringComparer.Ordinal)
+    {
+        "legacy-rejection-test", "lookup-key", "string-inspection-argument", "theory-data-collision",
+        "legacy-pattern-use", "skip-list",
+    };
     private readonly Dictionary<string, RewriteResult> _cache;
     private readonly FragmentRewriter _fragments;
 
-    public CSharpLiteralRewriter(Log log, Dictionary<string, RewriteResult> cache)
+    public CSharpLiteralRewriter(Log log, Dictionary<string, RewriteResult> cache, HashSet<string> skipList)
     {
         _log = log;
+        _skipList = skipList;
         _cache = cache;
         _fragments = new FragmentRewriter(cache);
     }
@@ -46,8 +59,19 @@ internal sealed class CSharpLiteralRewriter
         var tree = CSharpSyntaxTree.ParseText(file.Text, new CSharpParseOptions(LanguageVersion.Preview), path);
         var root = tree.GetRoot();
         var fileNewline = TextFile.UniformNewline(file.Text) ?? "\n";
-        var edits = new List<(TextSpan Span, string Text)>();
+        _log.BeginFile();
+        var relative = _log.Relative(path);
+        var edits = new List<(TextSpan Span, string Text, int Line, string Kind)>();
+        var fragmentEdits = new HashSet<TextSpan>();
         var handledChains = new HashSet<SyntaxNode>();
+        // String values used as switch/case keys in this file: a literal equal to one is a
+        // lookup key (often a legacy→current fixture table), not a program to rewrite.
+        var keys = root.DescendantNodes()
+            .Where(n => n is ConstantPatternSyntax or CaseSwitchLabelSyntax)
+            .SelectMany(n => n.DescendantTokens())
+            .Where(t => t.IsKind(SyntaxKind.StringLiteralToken) || t.IsKind(SyntaxKind.SingleLineRawStringLiteralToken)
+                || t.IsKind(SyntaxKind.MultiLineRawStringLiteralToken))
+            .Select(t => t.ValueText).ToHashSet(StringComparer.Ordinal);
 
         foreach (var interpolated in root.DescendantNodes().OfType<InterpolatedStringExpressionSyntax>())
         {
@@ -70,10 +94,34 @@ internal sealed class CSharpLiteralRewriter
                 continue;
             }
 
+            if (_skipList.Contains($"{relative}:{line}"))
+            {
+                _log.Skip(path, line, "skip-list", null);
+                continue;
+            }
+
+            if (literal.Ancestors().Any(a => a is InterpolatedStringExpressionSyntax))
+            {
+                _log.Skip(path, line, "inside-interpolated-template", null);
+                continue;
+            }
+
+            if (keys.Contains(token.ValueText))
+            {
+                _log.Skip(path, line, "lookup-key", null);
+                continue;
+            }
+
             var marker = RejectionMarker(literal);
             if (marker != null)
             {
                 _log.Skip(path, line, "legacy-rejection-test", marker);
+                continue;
+            }
+            var patternUse = LegacyPatternUse(literal);
+            if (patternUse != null)
+            {
+                _log.Skip(path, line, "legacy-pattern-use", patternUse);
                 continue;
             }
 
@@ -97,43 +145,48 @@ internal sealed class CSharpLiteralRewriter
                     continue;
                 }
                 var value = string.Concat(pieces.Select(piece => ((LiteralExpressionSyntax)piece).Token.ValueText));
-                var native = RewriteValue(path, line, value);
+                var native = RewriteValue(path, line, value, out var isFragment);
                 if (native == null)
                     continue;
                 var newline = TextFile.UniformNewline(value) ?? "\n";
-                edits.Add((chain.Span, EncodeChain(chain, pieces, TextFile.Shape(native, value, newline), newline, file.Text)));
-                _log.Rewritten(path, line, "concatenation");
-                RewrittenLiterals++;
+                if (isFragment)
+                    fragmentEdits.Add(chain.Span);
+                edits.Add((chain.Span, EncodeChain(chain, pieces, TextFile.Shape(native, value, newline), newline, file.Text),
+                    line, "concatenation"));
                 continue;
             }
 
             var original = token.ValueText;
+            var fragment = false;
             string? replacement;
             string expected;
             if (token.IsKind(SyntaxKind.StringLiteralToken))
             {
                 var verbatim = token.Text.StartsWith('@');
                 var newline = TextFile.UniformNewline(original) ?? (verbatim ? fileNewline : "\n");
-                var native = RewriteValue(path, line, original);
+                var native = RewriteValue(path, line, original, out var isFragment);
                 if (native == null)
                     continue;
+                fragment = isFragment;
                 expected = Preserve(original, TextFile.Shape(native, original, newline));
                 replacement = verbatim ? EncodeVerbatim(expected) : EncodeRegular(expected);
             }
             else if (token.IsKind(SyntaxKind.MultiLineRawStringLiteralToken))
             {
                 var newline = TextFile.UniformNewline(token.Text) ?? fileNewline;
-                var native = RewriteValue(path, line, original);
+                var native = RewriteValue(path, line, original, out var isFragment);
                 if (native == null)
                     continue;
+                fragment = isFragment;
                 expected = TextFile.Shape(native, original, newline);
                 replacement = EncodeMultiLineRaw(token.Text, expected, newline);
             }
             else
             {
-                var native = RewriteValue(path, line, original);
+                var native = RewriteValue(path, line, original, out var isFragment);
                 if (native == null)
                     continue;
+                fragment = isFragment;
                 expected = TextFile.Shape(native, original, "\n");
                 if (expected.Contains('\n'))
                 {
@@ -149,15 +202,34 @@ internal sealed class CSharpLiteralRewriter
                 _log.Skip(path, line, "encoding-check-failed", null);
                 continue;
             }
-            edits.Add((token.Span, replacement));
-            _log.Rewritten(path, line, token.Kind().ToString());
+            if (fragment)
+                fragmentEdits.Add(token.Span);
+            edits.Add((token.Span, replacement, line, token.Kind().ToString()));
+        }
+
+        DropTheoryDataCollisions(root, edits, path);
+
+        // Fragments are only meaningful inside their consumer. If the file keeps legacy
+        // programs (anything but intentional legacy), keep its fragments legacy as well.
+        var blocking = _log.FileReasons.FirstOrDefault(reason => !IntentionalLegacy.Contains(reason));
+        if (blocking != null)
+        {
+            foreach (var edit in edits.Where(e => fragmentEdits.Contains(e.Span)).ToList())
+            {
+                edits.Remove(edit);
+                _log.Skip(path, edit.Line, "fragment-context-legacy", blocking);
+            }
+        }
+        foreach (var edit in edits)
+        {
+            _log.Rewritten(path, edit.Line, edit.Kind);
             RewrittenLiterals++;
         }
 
         if (edits.Count == 0 || !write)
             return;
         var builder = new StringBuilder(file.Text);
-        foreach (var (span, text) in edits.OrderByDescending(edit => edit.Span.Start))
+        foreach (var (span, text, _, _) in edits.OrderByDescending(edit => edit.Span.Start))
         {
             builder.Remove(span.Start, span.Length);
             builder.Insert(span.Start, text);
@@ -174,10 +246,11 @@ internal sealed class CSharpLiteralRewriter
         file.Write(result);
     }
 
-    private string? RewriteValue(string path, int line, string value)
+    private string? RewriteValue(string path, int line, string value, out bool isFragment)
     {
         var trimmed = value.TrimStart();
         RewriteResult result;
+        isFragment = false;
         if (trimmed.StartsWith("§M{", StringComparison.Ordinal) || trimmed.StartsWith("§M ", StringComparison.Ordinal)
             || trimmed.StartsWith("///", StringComparison.Ordinal))
         {
@@ -186,6 +259,7 @@ internal sealed class CSharpLiteralRewriter
         }
         else
         {
+            isFragment = true;
             result = _fragments.Rewrite(value);
         }
         if (!result.Ok)
@@ -203,6 +277,42 @@ internal sealed class CSharpLiteralRewriter
         while (i < original.Length && original[i] is '\r' or '\n')
             i++;
         return original[..i] + shaped;
+    }
+
+    /// <summary>
+    /// Two distinct legacy inputs can print to the same native text (e.g. §ASSIGN §IDX and
+    /// §SETIDX). When rewriting would make two data attributes of one method identical, the
+    /// method's attribute edits are dropped so no theory case is silently merged.
+    /// </summary>
+    private void DropTheoryDataCollisions(SyntaxNode root, List<(TextSpan Span, string Text, int Line, string Kind)> edits, string path)
+    {
+        foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
+        {
+            var attributes = method.AttributeLists.SelectMany(list => list.Attributes).ToList();
+            if (attributes.Count < 2)
+                continue;
+            var inMethod = edits.Where(e => attributes.Any(a => a.Span.Contains(e.Span))).ToList();
+            if (inMethod.Count == 0)
+                continue;
+            var rendered = attributes.Select(attribute =>
+            {
+                var text = attribute.ToString();
+                foreach (var edit in inMethod.Where(e => attribute.Span.Contains(e.Span)).OrderByDescending(e => e.Span.Start))
+                {
+                    var offset = edit.Span.Start - attribute.SpanStart;
+                    text = text[..offset] + edit.Text + text[(offset + edit.Span.Length)..];
+                }
+                return text;
+            }).ToList();
+            var originalDistinct = attributes.Select(a => a.ToString()).Distinct(StringComparer.Ordinal).Count();
+            if (rendered.Distinct(StringComparer.Ordinal).Count() == originalDistinct)
+                continue;
+            foreach (var edit in inMethod)
+            {
+                edits.Remove(edit);
+                _log.Skip(path, edit.Line, "theory-data-collision", method.Identifier.ValueText);
+            }
+        }
     }
 
     /// <summary>
@@ -243,6 +353,50 @@ internal sealed class CSharpLiteralRewriter
             default:
                 return null;
         }
+    }
+
+    /// <summary>
+    /// A literal stored in a variable, field or property that some code then searches or
+    /// edits with legacy patterns (`Source.Replace("§F{C:pub}...", ...)`): the patterns stay
+    /// legacy, so the stored text must too.
+    /// </summary>
+    private static string? LegacyPatternUse(LiteralExpressionSyntax literal)
+    {
+        string? name = null;
+        SyntaxNode? scope = null;
+        foreach (var ancestor in literal.Ancestors())
+        {
+            if (ancestor is VariableDeclaratorSyntax declarator)
+            {
+                name = declarator.Identifier.ValueText;
+                scope = declarator.Parent?.Parent is FieldDeclarationSyntax field
+                    ? field.Parent
+                    : declarator.FirstAncestorOrSelf<MemberDeclarationSyntax>() as SyntaxNode
+                      ?? declarator.FirstAncestorOrSelf<LocalFunctionStatementSyntax>();
+                break;
+            }
+            if (ancestor is PropertyDeclarationSyntax property)
+            {
+                name = property.Identifier.ValueText;
+                scope = property.Parent;
+                break;
+            }
+            if (ancestor is StatementSyntax or MemberDeclarationSyntax)
+                break;
+        }
+        if (name == null || scope == null)
+            return null;
+        foreach (var invocation in scope.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            if (invocation.Expression is not MemberAccessExpressionSyntax
+                {
+                    Expression: IdentifierNameSyntax receiver, Name: var method
+                } || receiver.Identifier.ValueText != name || !InspectionMethods.Contains(method.Identifier.ValueText))
+                continue;
+            if (invocation.ArgumentList.Arguments.Any(argument => argument.ToString().Contains('§')))
+                return $"{name}.{method.Identifier.ValueText}(\"§...\")";
+        }
+        return null;
     }
 
     private static string? RejectionMarker(SyntaxNode node)
