@@ -76,19 +76,22 @@ public class NonConvergenceTests
     /// observable as its Calor0410.
     /// </summary>
     private const string ThreeHopRank1Chain = """
-        §M{M}
-          §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-            §E{e}
-            §R §C{g}
-          §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
-            §E{cw}
-            §R §C{Run} §A h §/C
-          §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
-            §E{cw}
-            §R §C{Outer} §A q §/C
-          §F{Top2:pub} (Func<i32>:r §E{cw}) -> i32
-            §E{}
-            §R §C{Top} §A r §/C
+        module M M block
+          func Run <! e> (Func<int>:g ! e) → int
+            ! e
+            return g()
+
+          func Outer (Func<int>:h ! cw) → int
+            ! cw
+            return Run(h)
+
+          func Top (Func<int>:q ! cw) → int
+            ! cw
+            return Outer(q)
+
+          func Top2 (Func<int>:r ! cw) → int
+            !
+            return Top(r)
         """;
 
     /// <summary>
@@ -98,42 +101,47 @@ public class NonConvergenceTests
     /// <c>Top3</c>'s missing Calor0410.
     /// </summary>
     private const string FourHopRank1Chain = """
-        §M{M}
-          §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-            §E{e}
-            §R §C{g}
-          §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
-            §E{cw}
-            §R §C{Run} §A h §/C
-          §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
-            §E{cw}
-            §R §C{Outer} §A q §/C
-          §F{Top2:pub} (Func<i32>:r §E{cw}) -> i32
-            §E{cw}
-            §R §C{Top} §A r §/C
-          §F{Top3:pub} (Func<i32>:s §E{cw}) -> i32
-            §E{}
-            §R §C{Top2} §A s §/C
+        module M M block
+          func Run <! e> (Func<int>:g ! e) → int
+            ! e
+            return g()
+
+          func Outer (Func<int>:h ! cw) → int
+            ! cw
+            return Run(h)
+
+          func Top (Func<int>:q ! cw) → int
+            ! cw
+            return Outer(q)
+
+          func Top2 (Func<int>:r ! cw) → int
+            ! cw
+            return Top(r)
+
+          func Top3 (Func<int>:s ! cw) → int
+            !
+            return Top2(s)
         """;
 
     private const string SelfRecursive = """
-        §M{M}
-          §F{Fact:pub} (i32:n) -> i32
-            §E{cw}
-            §C{Console.WriteLine} §A "step" §/C
-            §IF (<= n 1)
-              §R 1
-            §R (* n §C{Fact} §A (- n 1) §/C)
+        module M M block
+          func Fact (int:n) → int
+            ! cw
+            Console.WriteLine("step")
+            if (n <= 1)
+              return 1
+            return (n * Fact((n - 1)))
         """;
 
     private const string NoRecursionNoRows = """
-        §M{M}
-          §F{Leaf:pub} () -> void
-            §E{cw}
-            §C{Console.WriteLine} §A "leaf" §/C
-          §F{Root:pub} () -> void
-            §E{cw}
-            §C{Leaf} §/C
+        module M M block
+          func Leaf () → void
+            ! cw
+            Console.WriteLine("leaf")
+
+          func Root () → void
+            ! cw
+            Leaf()
         """;
 
     // Frozen inputs above retain the original theory identities. These native
@@ -245,7 +253,7 @@ public class NonConvergenceTests
     /// </summary>
     private static string Ring(int n)
     {
-        var sb = new StringBuilder("§M{M}\n");
+        var sb = new StringBuilder("module M M block\n");
         for (var i = 1; i <= n; i++)
         {
             var next = i == n ? 1 : i + 1;
@@ -267,7 +275,7 @@ public class NonConvergenceTests
     /// </summary>
     private static string DoubleChain(int n)
     {
-        var sb = new StringBuilder("§M{M}\n");
+        var sb = new StringBuilder("module M M block\n");
         for (var i = 1; i <= n; i++)
         {
             sb.Append($"  §F{{A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
@@ -749,16 +757,16 @@ public class NonConvergenceTests
     public void Permissive_StillWaives_UnknownChargedCalor0410()
     {
         const string source = """
-            §M{UnknownCharge}
-              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
-                §E{e}
-                §R (+ §C{stage} §/C §C{stage} §/C)
+            module UnknownCharge UnknownCharge block
+              func RunTwice <! e> (Func<int>:stage ! e) → int
+                ! e
+                return (stage() + stage())
 
-              §CL{Holder:pub}
-                §FLD{Func<i32>:stage:priv} §E{cw}
-                §MT{Twice:pub} () -> i32
-                  §E{}
-                  §R §C{RunTwice} §A this.stage §/C
+              class Holder
+                field Func<int>:stage private ! cw
+                func Twice () → int
+                  !
+                  return RunTwice(this.stage)
             """;
 
         const string currentNativeSource = """

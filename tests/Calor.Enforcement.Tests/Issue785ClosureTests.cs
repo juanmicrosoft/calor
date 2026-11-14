@@ -15,15 +15,14 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{CreateInt:pub}
-                §O{void}
-                §E{alloc,cw}
-                §B{w:Example.Widget} §NEW{Example.Widget} §A INT:1 §/NEW
-              §F{CreateString:pub}
-                §O{void}
-                §E{alloc,fs:r}
-                §B{w:Example.Widget} §NEW{Example.Widget} §A STR:"x" §/NEW
+            module Test Test block
+              func CreateInt () → void
+                ! alloc, cw
+                let Example.Widget:w = new Example.Widget(1)
+
+              func CreateString () → void
+                ! alloc, fs:r
+                let Example.Widget:w = new Example.Widget("x")
             """,
             """
             {
@@ -48,11 +47,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{Create:pub}
-                §O{void}
-                §E{alloc}
-                §B{x:Missing.Widget} §NEW{Missing.Widget} §/NEW
+            module Test Test block
+              func Create () → void
+                ! alloc
+                let Missing.Widget:x = new Missing.Widget()
             """);
 
         Assert.Contains(diagnostics,
@@ -68,17 +66,15 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §CL{Person:pub}
-                §FLD{str:_name:priv}
-                §CTOR{pub}
-                  §I{str:name}
-                  §ASSIGN §THIS._name name
-                §/CTOR
-              §F{Create:pub}
-                §O{void}
-                §E{alloc,mut}
-                §B{p:Person} §NEW{Person} §A STR:"Ada" §/NEW
+            module Test Test block
+              class Person
+                field string:_name private
+                ctor (string:name)
+                  set this . _name name
+
+              func Create () → void
+                ! alloc, mut
+                let Person:p = new Person("Ada")
             """);
 
         Assert.DoesNotContain(diagnostics.Errors,
@@ -91,11 +87,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §CL{Reporter:pub}
-                §CTOR{pub}
-                  §P "created"
-                §/CTOR
+            module Test Test block
+              class Reporter
+                ctor ()
+                  Console.WriteLine("created")
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -108,13 +103,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{Create:pub}
-                §O{void}
-                §E{alloc,mut}
-                §B{p:Example.Person} §NEW{Example.Person}
-                  §INIT{Name} STR:"Ada"
-                §/NEW
+            module Test Test block
+              func Create () → void
+                ! alloc, mut
+                let Example.Person:p = new Example.Person() { Name = "Ada" }
             """,
             """
             {
@@ -162,19 +154,15 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §CL{Person:pub}
-                §PROP{Name:str:pub}
-                  §SET
-                    §P "setting"
-                  §/SET
-                §/PROP
-              §F{Create:pub}
-                §O{void}
-                §E{alloc,mut}
-                §B{p:Person} §NEW{Person}
-                  §INIT{Name} STR:"Ada"
-                §/NEW
+            module Test Test block
+              class Person
+                property string:Name
+                  set
+                    Console.WriteLine("setting")
+
+              func Create () → void
+                ! alloc, mut
+                let Person:p = new Person() { Name = "Ada" }
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -190,12 +178,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{Use:pub}
-                §O{void}
-                §E{alloc}
-                §USE{r:Example.Resource} §NEW{Example.Resource} §/NEW
-                §/USE
+            module Test Test block
+              func Use () → void
+                ! alloc
+                using Example.Resource:r = new Example.Resource()
             """,
             """
             {
@@ -220,13 +206,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{Use:pub}
-                §I{Missing.Resource:r}
-                §O{void}
-                §E{}
-                §USE{x:Missing.Resource} r
-                §/USE
+            module Test Test block
+              func Use (Missing.Resource:r) → void
+                !
+                using Missing.Resource:x = r
             """);
 
         Assert.Contains(diagnostics,
@@ -386,14 +369,14 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{WriteLine:pub}
-                §O{void}
-                §E{}
-              §F{Run:pub}
-                §O{void}
-                §E{}
-                §C{Console.WriteLine} §A STR:"external" §/C
+            module Test Test block
+              func WriteLine () → void
+                !
+                return
+
+              func Run () → void
+                !
+                Console.WriteLine("external")
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -406,18 +389,19 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §CL{Base:pub}
-                §CTOR{pub}
-                  §P "base"
-                §/CTOR
-              §CL{Derived:Base:pub}
-                §CTOR{pub}
-                §/CTOR
-              §F{Create:pub}
-                §O{void}
-                §E{alloc}
-                §B{x:Derived} §NEW{Derived} §/NEW
+            module Test Test block
+              class Base
+                ctor ()
+                  Console.WriteLine("base")
+
+              class Derived internal
+                extends Base
+
+                ctor ()
+
+              func Create () → void
+                ! alloc
+                let Derived:x = new Derived()
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -466,13 +450,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{Run:pub}
-                §O{void}
-                §E{alloc}
-                §C{Example.Api.Transform}
-                  §A §NEW{Example.Box<i32>} §/NEW
-                §/C
+            module Test Test block
+              func Run () → void
+                ! alloc
+                Example.Api.Transform(new Example.Box<int>())
             """,
             """
             {
@@ -537,20 +518,19 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{Read:pub}
-                §I{Derived:x}
-                §O{void}
-                §E{}
-                §B{value:str} x.Name
-              §CL{Base:pub}
-                §PROP{Name:str:pub}
-                  §GET
-                    §P "get"
-                    §R STR:"value"
-                  §/GET
-                §/PROP
-              §CL{Derived:Base:pub}
+            module Test Test block
+              func Read (Derived:x) → void
+                !
+                let string:value = x.Name
+
+              class Base
+                property string:Name
+                  get
+                    Console.WriteLine("get")
+                    return "value"
+
+              class Derived internal
+                extends Base
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -563,14 +543,15 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §CL{Base:pub}
-                §CTOR{pub}
-                  §P "instance"
-                §/CTOR
-              §CL{Derived:Base:pub}
-                §CTOR{stat}
-                §/CTOR
+            module Test Test block
+              class Base
+                ctor ()
+                  Console.WriteLine("instance")
+
+              class Derived internal
+                extends Base
+
+                ctor stat ()
             """);
 
         Assert.DoesNotContain(diagnostics.Errors,
@@ -631,13 +612,11 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{Use:pub}
-                §I{Vendor.Widget:w}
-                §O{void}
-                §E{mut}
-                §B{name:str} w.Name
-                §ASSIGN w.Name STR:"updated"
+            module Test Test block
+              func Use (Vendor.Widget:w) → void
+                ! mut
+                let string:name = w.Name
+                set w.Name "updated"
             """,
             """
             {
@@ -663,11 +642,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{Test}
-              §F{Create:pub}
-                §O{void}
-                §E{}
-                §B{[i32]:items} §ARR{items:1}
+            module Test Test block
+              func Create () → void
+                !
+                let int[]:items = new items[1]
             """);
 
         Assert.Contains(diagnostics.Errors,

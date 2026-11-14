@@ -54,13 +54,10 @@ public class EffectRowSyntaxTests
         // declares no effects of its own. On main the §F section loop reads the
         // §E as the DECLARATION's row, so `Apply` would be declared `cw`.
         const string source = """
-            §M{P1}
-              §F{Apply:pub}
-                §I{Func<i32,i32>:transform} §E{cw}
-                §I{i32:value}
-                §O{i32}
-                §E{}
-                §R value
+            module P1 P1 block
+              func Apply (Func<int, int>:transform ! cw, int:value) → int
+                !
+                return value
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -204,10 +201,10 @@ public class EffectRowSyntaxTests
     public void Position1_DeclarationRow_Parses()
     {
         var module = Parse("""
-            §M{P}
-              §F{F:pub} () -> void
-                §E{cw}
-                §P "x"
+            module P P block
+              func F () → void
+                ! cw
+                Console.WriteLine("x")
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -218,10 +215,10 @@ public class EffectRowSyntaxTests
     public void Position2_LambdaRow_Parses()
     {
         var module = Parse("""
-            §M{P}
-              §F{Main:pub} () -> void
-                §E{}
-                §B{f} §LAM{x:i32} §E{} (+ x INT:1) §/LAM
+            module P P block
+              func Main () → void
+                !
+                let f = (int:x) ! => (x + 1)
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -234,13 +231,13 @@ public class EffectRowSyntaxTests
     public void Position3_DelegateRow_Parses()
     {
         var module = Parse("""
-            §M{P}
-              §DEL{Handler}
-                §I{i32:x}
-                §O{void}
-                §E{cw}
-              §F{Main:pub} () -> void
-                §E{}
+            module P P block
+              delegate Handler (int:x) → void
+                ! cw
+
+              func Main () → void
+                !
+                return
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -252,12 +249,10 @@ public class EffectRowSyntaxTests
     public void Position4_ParameterTagRow_Parses()
     {
         var module = Parse("""
-            §M{P}
-              §F{Apply:pub}
-                §I{Func<i32,i32>:transform} §E{cw}
-                §O{i32}
-                §E{cw}
-                §R INT:0
+            module P P block
+              func Apply (Func<int, int>:transform ! cw) → int
+                ! cw
+                return 0
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -270,10 +265,10 @@ public class EffectRowSyntaxTests
         // Executed baseline X9c: twelve Calor0100 on main, starting
         // "Expected CloseParen but found Effects".
         var module = Parse("""
-            §M{P}
-              §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-                §E{cw}
-                §R INT:0
+            module P P block
+              func Apply (Func<int, int>:transform ! cw, int:value) → int
+                ! cw
+                return 0
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -287,20 +282,19 @@ public class EffectRowSyntaxTests
     public void Position6_ReturnRow_ParsesInBothSpellings()
     {
         var tagged = Parse("""
-            §M{P}
-              §F{Make:pub}
-                §O{Func<i32>} §E{cw}
-                §E{cw}
-                §R §LAM{} INT:0 §/LAM
+            module P P block
+              func Make () → Func<int> ! cw
+                ! cw
+                return () => 0
             """, out var d1);
         Assert.False(d1.HasErrors);
         Assert.NotNull(Assert.Single(tagged.Functions).Output!.Row);
 
         var arrowed = Parse("""
-            §M{P}
-              §F{Make:pub} () -> Func<i32> §E{cw}
-                §E{cw}
-                §R §LAM{} INT:0 §/LAM
+            module P P block
+              func Make () → Func<int> ! cw
+                ! cw
+                return () => 0
             """, out var d2);
         Assert.False(d2.HasErrors);
         Assert.NotNull(Assert.Single(arrowed.Functions).Output!.Row);
@@ -311,10 +305,10 @@ public class EffectRowSyntaxTests
     {
         // Executed baseline Y3a: sixteen Calor0100 on main.
         var module = Parse("""
-            §M{P}
-              §F{Main:pub} () -> void
-                §E{}
-                §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32} (+ x INT:1) §/LAM
+            module P P block
+              func Main () → void
+                !
+                let Func<int, int>:f ! cw = (int:x) => (x + 1)
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -328,11 +322,12 @@ public class EffectRowSyntaxTests
         // Executed baseline X9b: four Calor0100 on main, which is what disproved
         // Draft v1's claim that §FLD already parsed a row (§14.1).
         var module = Parse("""
-            §M{P}
-              §CL{C:pub}
-                §FLD{Action<i32>:onChange:priv} §E{cw}
-                §MT{M:pub} () -> void
-                  §E{}
+            module P P block
+              class C
+                field Action<int>:onChange private ! cw
+                func M () → void
+                  !
+                  return
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -459,10 +454,10 @@ public class EffectRowSyntaxTests
         // meanings, so the parser must keep them distinguishable even though this
         // slice does not yet act on the difference.
         var module = Parse("""
-            §M{P}
-              §F{Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
-                §E{}
-                §R INT:0
+            module P P block
+              func Apply (Func<int, int>:a !, Func<int, int>:b) → int
+                !
+                return 0
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);

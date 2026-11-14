@@ -149,12 +149,12 @@ public class EffectEnforcementTests
     public void MultipleEffects_AllMustBeDeclared()
     {
         var source = @"
-§M{Test}
-  §F{PrintAndRead:pub}
-      §O{str}
-      §P ""Enter your name: ""
-      §B{str:name} STR:""placeholder""
-      §R name
+module Test Test block
+  func PrintAndRead () → string
+    !
+    Console.WriteLine(""Enter your name: "")
+    let string:name = ""placeholder""
+    return name
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -173,12 +173,10 @@ public class EffectEnforcementTests
     public void PureFunction_WithNoEffects_Compiles()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -194,10 +192,10 @@ public class EffectEnforcementTests
     public void ConsolePrint_RequiresCwEffect()
     {
         var source = @"
-§M{Test}
-  §F{TestPrint:pub}
-      §O{void}
-      §P ""test""
+module Test Test block
+  func TestPrint () → void
+    !
+    Console.WriteLine(""test"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -249,19 +247,12 @@ public class EffectEnforcementTests
     {
         // Static LINQ calls like Enumerable.Range should resolve via type mapping
         var source = @"
-§M{Test}
-  §F{MakeRange:pub}
-      §O{void}
-      §C{Enumerable.Range}
-        §A INT:1
-        §A INT:10
-      §/C
-      §C{Enumerable.Empty}
-      §/C
-      §C{Enumerable.Repeat}
-        §A INT:0
-        §A INT:5
-      §/C
+module Test Test block
+  func MakeRange () → void
+    !
+    Enumerable.Range(1, 10)
+    Enumerable.Empty()
+    Enumerable.Repeat(0, 5)
 ";
         var result = TestHarness.Compile(source);
 
@@ -274,14 +265,11 @@ public class EffectEnforcementTests
     {
         // OfType<T> calls should be recognized as pure
         var source = @"
-§M{Test}
-  §F{FilterTypes:pub}
-      §I{List<object>:items}
-      §O{void}
-      §C{items.OfType}
-      §/C
-      §C{items.Cast}
-      §/C
+module Test Test block
+  func FilterTypes (List<object>:items) → void
+    !
+    items.OfType()
+    items.Cast()
 ";
         var result = TestHarness.Compile(source);
 
@@ -294,11 +282,11 @@ public class EffectEnforcementTests
     {
         // §MT method inside §CL using §P without declaring cw should fail
         var source = @"
-§M{Test}
-  §CL{MyService:pub}
-      §MT{PrintHello:pub}
-          §O{void}
-          §P ""Hello from method""
+module Test Test block
+  class MyService
+    func PrintHello () → void
+      !
+      Console.WriteLine(""Hello from method"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -319,12 +307,11 @@ public class EffectEnforcementTests
     {
         // §MT method inside §CL using §P with cw declared should pass
         var source = @"
-§M{Test}
-  §CL{MyService:pub}
-      §MT{PrintHello:pub}
-          §O{void}
-          §E{cw}
-          §P ""Hello from method""
+module Test Test block
+  class MyService
+    func PrintHello () → void
+      ! cw
+      Console.WriteLine(""Hello from method"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -366,13 +353,11 @@ public class EffectEnforcementTests
     {
         // §MT method calling Console.WriteLine without §E{cw} should fail
         var source = @"
-§M{Test}
-  §CL{Logger:pub}
-      §MT{Log:pub}
-          §O{void}
-          §C{Console.WriteLine}
-            §A STR:""log message""
-          §/C
+module Test Test block
+  class Logger
+    func Log () → void
+      !
+      Console.WriteLine(""log message"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -393,13 +378,11 @@ public class EffectEnforcementTests
     {
         // §MT method with only pure operations should compile
         var source = @"
-§M{Test}
-  §CL{Calculator:pub}
-      §MT{Add:pub}
-          §I{i32:a}
-          §I{i32:b}
-          §O{i32}
-          §R (+ a b)
+module Test Test block
+  class Calculator
+    func Add (int:a, int:b) → int
+      !
+      return (a + b)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -419,13 +402,11 @@ public class EffectEnforcementTests
         // §CTOR that assigns to §THIS fields should NOT be flagged for mut effect
         // since constructors can't declare effects and field assignment is their purpose
         var source = @"
-§M{Test}
-  §CL{Person:pub}
-      §FLD{str:_name:priv}
-      §CTOR{pub}
-        §I{str:name}
-        §ASSIGN §THIS._name name
-      §/CTOR
+module Test Test block
+  class Person
+    field string:_name private
+    ctor (string:name)
+      set this . _name name
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -448,12 +429,11 @@ public class EffectEnforcementTests
         // unknown-call chain and fails closed under the default strict policy.
         // (Pre-W2 this test pinned the delegate hole: it asserted no failure.)
         var source = @"
-§M{Test}
-  §CL{Mapper:pub}
-      §MT{Apply:pub}
-          §I{i32:value}
-          §O{i32}
-          §R §C{transform} §A value §/C
+module Test Test block
+  class Mapper
+    func Apply (int:value) → int
+      !
+      return transform(value)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -475,11 +455,10 @@ public class EffectEnforcementTests
         // WS-W2 (D-W2.1): under --strict-effects an unresolvable bare-name
         // invocation is a hard Calor0411 error (pre-W2: warning only).
         var source = @"
-§M{Test}
-  §F{UseDelegate:pub}
-      §O{void}
-      §C{callback}
-      §/C
+module Test Test block
+  func UseDelegate () → void
+    !
+    callback()
 ";
         var options = new CompilationOptions
         {
@@ -504,19 +483,18 @@ public class EffectEnforcementTests
     public void OverloadedInternalCall_ChargesOnlyResolvedSymbol()
     {
         var source = @"
-§M{Test}
-  §F{Work:pub}
-      §I{i32:value}
-      §O{i32}
-      §R value
-  §F{Work:pub}
-      §I{str:value}
-      §O{void}
-      §E{cw}
-      §P value
-  §F{Caller:pub}
-      §O{i32}
-      §R §C{Work} §A INT:1 §/C
+module Test Test block
+  func Work (int:value) → int
+    !
+    return value
+
+  func Work (string:value) → void
+    ! cw
+    Console.WriteLine(value)
+
+  func Caller () → int
+    !
+    return Work(1)
 ";
 
         var result = TestHarness.Compile(NativeSource(source, """
@@ -542,19 +520,18 @@ public class EffectEnforcementTests
     public void UnresolvedInternalOverload_ReportsNoMatchWithoutChargingFirstFunction()
     {
         var source = @"
-§M{Test}
-  §F{Work:pub}
-      §I{i32:value}
-      §O{i32}
-      §R value
-  §F{Work:pub}
-      §I{str:value}
-      §O{void}
-      §E{cw}
-      §P value
-  §F{Caller:pub}
-      §O{void}
-      §C{Work} §A BOOL:true §/C
+module Test Test block
+  func Work (int:value) → int
+    !
+    return value
+
+  func Work (string:value) → void
+    ! cw
+    Console.WriteLine(value)
+
+  func Caller () → void
+    !
+    Work(true)
 ";
 
         var result = TestHarness.Compile(NativeSource(source, """
@@ -580,14 +557,16 @@ public class EffectEnforcementTests
     public void PreprocessorWrappedMethod_ParticipatesInBoundCallGraph()
     {
         var source = @"
-§M{Test}
-  §CL{Worker:pub}
-      §PP{FEATURE}
-          §MT{Do:pub} () -> i32
-              §R 1
-      §/PP{FEATURE}
-      §MT{Run:pub} () -> i32
-          §R §C{Do} §/C
+module Test Test block
+  class Worker
+    pp FEATURE
+      func Do () → int
+        !
+        return 1
+
+    func Run () → int
+      !
+      return Do()
 ";
 
         var result = TestHarness.Compile(source);
@@ -604,17 +583,15 @@ public class EffectEnforcementTests
         // Function calls a pure method on another class in the same module.
         // Should resolve as an internal call, NOT produce Calor0411.
         var source = @"
-§M{Test}
-  §CL{Calculator:pub}
-      §MT{Add:pub}
-          §I{i32:a}
-          §I{i32:b}
-          §O{i32}
-          §R (+ a b)
-  §F{UseCalculator:pub}
-      §I{Calculator:_calc}
-      §O{i32}
-      §R §C{_calc.Add} §A INT:1 §A INT:2 §/C
+module Test Test block
+  class Calculator
+    func Add (int:a, int:b) → int
+      !
+      return (a + b)
+
+  func UseCalculator (Calculator:_calc) → int
+    !
+    return _calc.Add(1, 2)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -637,19 +614,15 @@ public class EffectEnforcementTests
         // Function calls a method with cw effect on another class.
         // The caller must declare cw or the effect should propagate as an error.
         var source = @"
-§M{Test}
-  §CL{Logger:pub}
-      §MT{Log:pub}
-          §I{str:message}
-          §O{void}
-          §E{cw}
-          §P message
-  §F{DoWork:pub}
-      §I{Logger:_logger}
-      §O{void}
-      §C{_logger.Log}
-        §A STR:""hello""
-      §/C
+module Test Test block
+  class Logger
+    func Log (string:message) → void
+      ! cw
+      Console.WriteLine(message)
+
+  func DoWork (Logger:_logger) → void
+    !
+    _logger.Log(""hello"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -674,20 +647,15 @@ public class EffectEnforcementTests
     {
         // Function calls a method with cw effect and properly declares cw.
         var source = @"
-§M{Test}
-  §CL{Logger:pub}
-      §MT{Log:pub}
-          §I{str:message}
-          §O{void}
-          §E{cw}
-          §P message
-  §F{DoWork:pub}
-      §I{Logger:_logger}
-      §O{void}
-      §E{cw}
-      §C{_logger.Log}
-        §A STR:""hello""
-      §/C
+module Test Test block
+  class Logger
+    func Log (string:message) → void
+      ! cw
+      Console.WriteLine(message)
+
+  func DoWork (Logger:_logger) → void
+    ! cw
+    _logger.Log(""hello"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -709,21 +677,17 @@ public class EffectEnforcementTests
     {
         // Method in one class calls a method in another class (both §MT).
         var source = @"
-§M{Test}
-  §CL{Printer:pub}
-      §MT{PrintMessage:pub}
-          §I{str:msg}
-          §O{void}
-          §E{cw}
-          §P msg
-  §CL{App:pub}
-      §FLD{Printer:_printer:priv}
-      §MT{Run:pub}
-          §O{void}
-          §E{cw}
-          §C{_printer.PrintMessage}
-            §A STR:""hello""
-          §/C
+module Test Test block
+  class Printer
+    func PrintMessage (string:msg) → void
+      ! cw
+      Console.WriteLine(msg)
+
+  class App
+    field Printer:_printer private
+    func Run () → void
+      ! cw
+      _printer.PrintMessage(""hello"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -747,20 +711,17 @@ public class EffectEnforcementTests
     {
         // Method in one class calls effectful method in another without declaring the effect.
         var source = @"
-§M{Test}
-  §CL{Printer:pub}
-      §MT{PrintMessage:pub}
-          §I{str:msg}
-          §O{void}
-          §E{cw}
-          §P msg
-  §CL{App:pub}
-      §FLD{Printer:_printer:priv}
-      §MT{Run:pub}
-          §O{void}
-          §C{_printer.PrintMessage}
-            §A STR:""hello""
-          §/C
+module Test Test block
+  class Printer
+    func PrintMessage (string:msg) → void
+      ! cw
+      Console.WriteLine(msg)
+
+  class App
+    field Printer:_printer private
+    func Run () → void
+      !
+      _printer.PrintMessage(""hello"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -786,26 +747,23 @@ public class EffectEnforcementTests
     {
         // A → B → C chain across three classes. Effect should propagate from C to A.
         var source = @"
-§M{Test}
-  §CL{ServiceC:pub}
-      §MT{WriteOutput:pub}
-          §O{void}
-          §E{cw}
-          §P ""output""
-  §CL{ServiceB:pub}
-      §FLD{ServiceC:_c:priv}
-      §MT{Process:pub}
-          §O{void}
-          §E{cw}
-          §C{_c.WriteOutput}
-          §/C
-  §CL{ServiceA:pub}
-      §FLD{ServiceB:_b:priv}
-      §MT{Execute:pub}
-          §O{void}
-          §E{cw}
-          §C{_b.Process}
-          §/C
+module Test Test block
+  class ServiceC
+    func WriteOutput () → void
+      ! cw
+      Console.WriteLine(""output"")
+
+  class ServiceB
+    field ServiceC:_c private
+    func Process () → void
+      ! cw
+      _c.WriteOutput()
+
+  class ServiceA
+    field ServiceB:_b private
+    func Execute () → void
+      ! cw
+      _b.Process()
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -838,25 +796,20 @@ public class EffectEnforcementTests
         // With the multi-map, ambiguous bare names fall through to external resolution
         // (which produces Calor0411 in strict mode). The caller declares cw to be safe.
         var source = @"
-§M{Test}
-  §CL{PureService:pub}
-      §MT{Process:pub}
-          §I{str:data}
-          §O{str}
-          §R data
-  §CL{EffectfulService:pub}
-      §MT{Process:pub}
-          §I{str:data}
-          §O{void}
-          §E{cw}
-          §P data
-  §F{DoWork:pub}
-      §I{str:input}
-      §O{void}
-      §E{cw}
-      §C{_a.Process}
-        §A STR:""hello""
-      §/C
+module Test Test block
+  class PureService
+    func Process (string:data) → string
+      !
+      return data
+
+  class EffectfulService
+    func Process (string:data) → void
+      ! cw
+      Console.WriteLine(data)
+
+  func DoWork (string:input) → void
+    ! cw
+    _a.Process(""hello"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -889,21 +842,20 @@ public class EffectEnforcementTests
         // When only one class defines a method name, cross-class resolution should still work
         // even with the multi-map (the method name is unambiguous).
         var source = @"
-§M{Test}
-  §CL{Calculator:pub}
-      §MT{Compute:pub}
-          §I{i32:x}
-          §O{i32}
-          §R (+ x 1)
-  §CL{OtherService:pub}
-      §MT{Format:pub}
-          §I{str:s}
-          §O{str}
-          §R s
-  §F{UseCalc:pub}
-      §I{Calculator:_calc}
-      §O{i32}
-      §R §C{_calc.Compute} §A INT:5 §/C
+module Test Test block
+  class Calculator
+    func Compute (int:x) → int
+      !
+      return (x + 1)
+
+  class OtherService
+    func Format (string:s) → string
+      !
+      return s
+
+  func UseCalc (Calculator:_calc) → int
+    !
+    return _calc.Compute(5)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -935,13 +887,10 @@ public class EffectEnforcementTests
         // A Calor function calls ILogger.LogInformation and declares cw effect.
         // Should compile without Calor0411 (unknown external call).
         var source = @"
-§M{Test}
-  §F{LogSomething:pub}
-      §O{void}
-      §E{cw}
-      §C{ILogger.LogInformation}
-        §A STR:""Processing request""
-      §/C
+module Test Test block
+  func LogSomething () → void
+    ! cw
+    ILogger.LogInformation(""Processing request"")
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -955,12 +904,10 @@ public class EffectEnforcementTests
     {
         // A Calor function calls DbContext.SaveChanges and declares db:w effect.
         var source = @"
-§M{Test}
-  §F{SaveData:pub}
-      §O{void}
-      §E{db:w}
-      §C{DbContext.SaveChanges}
-      §/C
+module Test Test block
+  func SaveData () → void
+    ! db:w
+    DbContext.SaveChanges()
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -974,13 +921,10 @@ public class EffectEnforcementTests
     {
         // A Calor function calls IConfiguration.GetSection and declares env:r effect.
         var source = @"
-§M{Test}
-  §F{ReadConfig:pub}
-      §O{void}
-      §E{env:r}
-      §C{IConfiguration.GetSection}
-        §A STR:""ConnectionStrings""
-      §/C
+module Test Test block
+  func ReadConfig () → void
+    ! env:r
+    IConfiguration.GetSection(""ConnectionStrings"")
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -994,11 +938,10 @@ public class EffectEnforcementTests
     {
         // A Calor function calls ControllerBase.Ok — should be pure.
         var source = @"
-§M{Test}
-  §F{GetResult:pub}
-      §O{void}
-      §C{ControllerBase.Ok}
-      §/C
+module Test Test block
+  func GetResult () → void
+    !
+    ControllerBase.Ok()
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -1013,11 +956,10 @@ public class EffectEnforcementTests
         // A Calor function calls DbContext.SaveChanges but does NOT declare db:w.
         // Should produce Calor0410 (forbidden effect), NOT Calor0411 (unknown).
         var source = @"
-§M{Test}
-  §F{SaveData:pub}
-      §O{void}
-      §C{DbContext.SaveChanges}
-      §/C
+module Test Test block
+  func SaveData () → void
+    !
+    DbContext.SaveChanges()
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -1034,21 +976,13 @@ public class EffectEnforcementTests
         // A realistic function that calls multiple framework methods in STRICT mode.
         // This verifies the full pipeline: declared effects match computed effects.
         var source = @"
-§M{Test}
-  §F{HandleRequest:pub}
-      §O{void}
-      §E{cw,db:w,env:r}
-      §C{ILogger.LogInformation}
-        §A STR:""Starting request""
-      §/C
-      §C{IConfiguration.GetSection}
-        §A STR:""AppSettings""
-      §/C
-      §C{DbContext.SaveChanges}
-      §/C
-      §C{ILogger.LogInformation}
-        §A STR:""Request complete""
-      §/C
+module Test Test block
+  func HandleRequest () → void
+    ! cw, db:w, env:r
+    ILogger.LogInformation(""Starting request"")
+    IConfiguration.GetSection(""AppSettings"")
+    DbContext.SaveChanges()
+    ILogger.LogInformation(""Request complete"")
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -1080,12 +1014,12 @@ public class EffectEnforcementTests
     public void SelfRecursiveFunction_IsNotAnUnknownCallTarget()
     {
         const string source = """
-            §M{Rec}
-              §F{Fact:pub} (i32:n) -> i32
-                §E{}
-                §IF (<= n 1)
-                  §R 1
-                §R (* n §C{Fact} (- n 1))
+            module Rec Rec block
+              func Fact (int:n) → int
+                !
+                if (n <= 1)
+                  return 1
+                return (n * Fact((n - 1)))
             """;
 
         var result = TestHarness.Compile(NativeSource(source, """
@@ -1111,12 +1045,12 @@ public class EffectEnforcementTests
     public void SelfRecursiveFunction_WithUndeclaredEffect_StillFails()
     {
         const string source = """
-            §M{RecUndecl}
-              §F{Countdown:pub} (i32:n) -> void
-                §E{}
-                §P n
-                §IF (> n 0)
-                  §C{Countdown} (- n 1)
+            module RecUndecl RecUndecl block
+              func Countdown (int:n) → void
+                !
+                Console.WriteLine(n)
+                if (n > 0)
+                  Countdown((n - 1))
             """;
 
         var result = TestHarness.Compile(NativeSource(source, """
@@ -1139,12 +1073,12 @@ public class EffectEnforcementTests
     public void SelfRecursiveFunction_DeclaredEffect_IsAccepted()
     {
         const string source = """
-            §M{RecEff}
-              §F{Countdown:pub} (i32:n) -> void
-                §E{cw}
-                §P n
-                §IF (> n 0)
-                  §C{Countdown} (- n 1)
+            module RecEff RecEff block
+              func Countdown (int:n) → void
+                ! cw
+                Console.WriteLine(n)
+                if (n > 0)
+                  Countdown((n - 1))
             """;
 
         var result = TestHarness.Compile(NativeSource(source, """
@@ -1187,12 +1121,11 @@ public class EffectEnforcementTests
     public void E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee()
     {
         var source = @"
-§M{BoundReceiverProbe}
-  §F{Go:pub}
-    §O{str}
-    §E{rand}
-    §B{g} §C{System.Guid.NewGuid} §/C
-    §R §C{g.ToString} §/C
+module BoundReceiverProbe BoundReceiverProbe block
+  func Go () → string
+    ! rand
+    let g = System.Guid.NewGuid()
+    return g.ToString()
 ";
         var result = TestHarness.Compile(source);
 
@@ -1222,14 +1155,13 @@ public class EffectEnforcementTests
     public void E1Slice2b_LocalShadowsFieldAndTheStringPathIsWrong_TheBoundTypeWins()
     {
         var source = @"
-§M{ShadowProbe}
-  §CL{Box:pub}
-    §FLD{x:Random:priv}
-    §MT{Go:pub}
-      §O{str}
-      §E{rand}
-      §B{x} §C{System.Guid.NewGuid} §/C
-      §R §C{x.ToString} §/C
+module ShadowProbe ShadowProbe block
+  class Box
+    field x:Random private
+    func Go () → string
+      ! rand
+      let x = System.Guid.NewGuid()
+      return x.ToString()
 ";
         var result = TestHarness.Compile(source);
 
@@ -1270,12 +1202,10 @@ public class EffectEnforcementTests
     public void E1Slice2b_UnresolvedBoundReceiver_FailsClosed()
     {
         var source = @"
-§M{UnresolvedProbe}
-  §F{Go:pub}
-    §I{Mystery:m}
-    §O{void}
-    §E{}
-    §C{m.DoWork} §/C
+module UnresolvedProbe UnresolvedProbe block
+  func Go (Mystery:m) → void
+    !
+    m.DoWork()
 ";
         var result = TestHarness.CompileWithEffects(NativeSource(source, """
             module UnresolvedProbe UnresolvedProbe
@@ -1328,12 +1258,12 @@ public class EffectEnforcementTests
     public void E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel()
     {
         var source = @"
-§M{VetoReach}
-  §F{Go:pub}
-    §E{}
-    §B{u} §C{Mystery.Make} §/C
-    §C{u.Run} §/C
-    §C{u} §/C
+module VetoReach VetoReach block
+  func Go ()
+    !
+    let u = Mystery.Make()
+    u.Run()
+    u()
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module VetoReach VetoReach
@@ -1385,11 +1315,11 @@ public class EffectEnforcementTests
     public void E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse()
     {
         var withoutReceiverUse = NativeSource(@"
-§M{VetoControl}
-  §F{Go:pub}
-    §E{}
-    §B{u} §C{Mystery.Make} §/C
-    §C{u} §/C
+module VetoControl VetoControl block
+  func Go ()
+    !
+    let u = Mystery.Make()
+    u()
 ", """
             module VetoControl VetoControl
               func Go public ()
@@ -1398,12 +1328,12 @@ public class EffectEnforcementTests
                 u()
             """);
         var withReceiverUse = NativeSource(@"
-§M{VetoReach}
-  §F{Go:pub}
-    §E{}
-    §B{u} §C{Mystery.Make} §/C
-    §C{u.Run} §/C
-    §C{u} §/C
+module VetoReach VetoReach block
+  func Go ()
+    !
+    let u = Mystery.Make()
+    u.Run()
+    u()
 ", """
             module VetoReach VetoReach
               func Go public ()
@@ -1445,12 +1375,10 @@ public class EffectEnforcementTests
     public void E1Slice2b_FunctionTypedParameterAsBareTarget_UsesTheAstParameterType()
     {
         var source = @"
-§M{BareTargetProbe}
-  §F{Go:pub}
-    §I{Func<i32>:make}
-    §O{i32}
-    §E{}
-    §R §C{make} §/C
+module BareTargetProbe BareTargetProbe block
+  func Go (Func<int>:make) → int
+    !
+    return make()
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module BareTargetProbe BareTargetProbe

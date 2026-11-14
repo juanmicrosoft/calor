@@ -43,9 +43,10 @@ public class EffectRowLatticeTests
         // and that is a PROMISE, not an absence of information. 390 of the 886
         // committed files rely on it.
         var compiled = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Pure:pub} () -> i32
-                §R INT:1
+            module M M block
+              func Pure () → int
+                !
+                return 1
             """, """
             module M M
               func Pure public () → int
@@ -64,10 +65,10 @@ public class EffectRowLatticeTests
         // exactly the laundering rows exist to close: the caller could hand in a
         // printing callback and the pure declaration would still compile.
         var parameter = BindSingleParameter(NativeSource("""
-            §M{M}
-              §F{Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
-                §E{}
-                §R value
+            module M M block
+              func Apply (Func<int, int>:transform, int:value) → int
+                !
+                return value
             """, """
             module M M
               func Apply public (Func<int,int>:transform ! unknown, int:value) → int
@@ -93,10 +94,10 @@ public class EffectRowLatticeTests
         // Unknown, or §5's inferred-lambda rule is dead on arrival — Y9a is that
         // exact shape. The initializer's row is known, so it is used.
         var binding = BindSingleLocal(NativeSource("""
-            §M{M}
-              §F{Main:pub} () -> void
-                §E{cw}
-                §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
+            module M M block
+              func Main () → void
+                ! cw
+                let f = (int:x) ! cw => (x + 1)
             """, """
             module M M
               func Main public () → void
@@ -117,10 +118,10 @@ public class EffectRowLatticeTests
         // (MAJOR 2): it was called _OnABindingWithNoInitializer_IsUnknown while
         // plainly having one, which left §3.5's bare-binding row unpinned.
         var binding = BindSingleLocal(NativeSource("""
-            §M{M}
-              §F{Main:pub} () -> void
-                §E{}
-                §B{f:Func<i32,i32>} §LAM{x:i32} §E{} x §/LAM
+            module M M block
+              func Main () → void
+                !
+                let Func<int, int>:f = (int:x) ! => x
             """, """
             module M M
               func Main public () → void
@@ -147,10 +148,10 @@ public class EffectRowLatticeTests
         // b read "Unknown" off the ABSENCE of a type; the row itself is the
         // durable assertion and is what this pins now.
         var binding = BindSingleLocal(NativeSource("""
-            §M{M}
-              §F{Main:pub} () -> void
-                §E{}
-                §B{~f:Func<i32,i32>}
+            module M M block
+              func Main () → void
+                !
+                var Func<int, int>:f
             """, """
             module M M
               func Main public () → void
@@ -218,10 +219,10 @@ public class EffectRowLatticeTests
         // a body, so it is checked at BindBindStatement rather than in the
         // declaration sweep; this pins that the rule reaches it.
         var compiled = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Main:pub} () -> void
-                §E{}
-                §B{n:i32} §E{cw} INT:1
+            module M M block
+              func Main () → void
+                !
+                let int:n ! cw = 1
             """, """
             module M M
               func Main public () → void
@@ -241,9 +242,9 @@ public class EffectRowLatticeTests
         // Position 8's half. X9b proves the FORM parses since slice a; this
         // proves the row still has to land somewhere a row can go.
         var compiled = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §CL{Holder:pub}
-                §FLD{i32:count:priv} §E{cw}
+            module M M block
+              class Holder
+                field int:count private ! cw
             """, """
             module M M
               class Holder public
@@ -259,12 +260,10 @@ public class EffectRowLatticeTests
         // The control. Without it the pin above would pass on a compiler that
         // reported Calor0405 for EVERY row.
         var compiled = TestHarness.Compile("""
-            §M{M}
-              §F{Apply:pub}
-                §I{Func<i32,i32>:transform} §E{cw}
-                §O{i32}
-                §E{cw}
-                §R INT:1
+            module M M block
+              func Apply (Func<int, int>:transform ! cw) → int
+                ! cw
+                return 1
             """);
 
         Assert.DoesNotContain(
@@ -347,9 +346,10 @@ public class EffectRowLatticeTests
         // Discriminating revert: restore `!IsFunctionTypedSpelling` as the test
         // and this reports again.
         var compiled = TestHarness.Compile("""
-            §M{M}
-              §F{Apply:pub} (SomeAliasFromElsewhere:h §E{cw}) -> void
-                §E{cw}
+            module M M block
+              func Apply (SomeAliasFromElsewhere:h ! cw) → void
+                ! cw
+                return
             """);
 
         Assert.DoesNotContain(compiled.Diagnostics,
@@ -593,10 +593,10 @@ public class EffectRowLatticeTests
         // carries ρ_decl, the declaration being the contract. Slice a parsed the
         // annotation and threw it away; here it reaches the type.
         var binding = BindSingleLocal(NativeSource("""
-            §M{M}
-              §F{Main:pub} () -> void
-                §E{cw}
-                §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
+            module M M block
+              func Main () → void
+                ! cw
+                let f = (int:x) ! cw => (x + 1)
             """, """
             module M M
               func Main public () → void
@@ -617,10 +617,10 @@ public class EffectRowLatticeTests
         // sound placeholder: it fits nothing, so no check can pass on the
         // strength of a row that has not been computed.
         var binding = BindSingleLocal(NativeSource("""
-            §M{M}
-              §F{Main:pub} () -> void
-                §E{cw}
-                §B{f} §LAM{x:i32} (+ x INT:1) §/LAM
+            module M M block
+              func Main () → void
+                ! cw
+                let f = (int:x) => (x + 1)
             """, """
             module M M
               func Main public () → void
@@ -854,13 +854,14 @@ public class EffectRowLatticeTests
         // and this fixture goes SILENT — no Calor0425, no Calor0424, a clean
         // compile of a program nothing was ever known about.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
-                §E{}
-                §R value
-              §F{Main:pub} (Func<i32,i32>:opaque) -> i32
-                §E{}
-                §R §C{Apply} §A opaque §A INT:1 §/C
+            module M M block
+              func Apply (Func<int, int>:transform !, int:value) → int
+                !
+                return value
+
+              func Main (Func<int, int>:opaque) → int
+                !
+                return Apply(opaque, 1)
             """, """
             module M M
               func Apply public (Func<int,int>:transform !, int:value) → int
@@ -887,13 +888,14 @@ public class EffectRowLatticeTests
         // the site goes quiet — without this half, a checker that emitted
         // Calor0425 unconditionally would pass every assertion above.
         var rowed = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
-                §E{}
-                §R value
-              §F{Main:pub} (Func<i32,i32>:opaque §E{}) -> i32
-                §E{}
-                §R §C{Apply} §A opaque §A INT:1 §/C
+            module M M block
+              func Apply (Func<int, int>:transform !, int:value) → int
+                !
+                return value
+
+              func Main (Func<int, int>:opaque !) → int
+                !
+                return Apply(opaque, 1)
             """, """
             module M M
               func Apply public (Func<int,int>:transform !, int:value) → int
@@ -963,14 +965,15 @@ public class EffectRowLatticeTests
         // Discriminating revert: report at both the source and the destination
         // of a hop and this reads 4.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-                §E{cw}
-                §R value
-              §F{Pick:pub} (Func<i32,i32>:a) -> Func<i32,i32> §E{cw}
-                §E{cw}
-                §B{used:i32} §C{Apply} §A a §A INT:1 §/C
-                §R a
+            module M M block
+              func Apply (Func<int, int>:transform ! cw, int:value) → int
+                ! cw
+                return value
+
+              func Pick (Func<int, int>:a) → Func<int, int> ! cw
+                ! cw
+                let int:used = Apply(a, 1)
+                return a
             """, """
             module M M
               func Apply public (Func<int,int>:transform ! cw, int:value) → int

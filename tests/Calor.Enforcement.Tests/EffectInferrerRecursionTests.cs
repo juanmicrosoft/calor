@@ -164,9 +164,9 @@ public class EffectInferrerRecursionTests
         // own type. The parameter gives the receiver a type, so the arguments
         // ARE typed and the cycle is entered.
         var source = NativeCounterpart("""
-            §M{SelfCycle}
-              §F{Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
-                §B{~x} §C{scheduler.MarkFailure} §A x §/C
+            module SelfCycle SelfCycle block
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                var x = scheduler.MarkFailure(x)
             """, """
             module SelfCycle SelfCycle
               func Loop private (FailureAwareBatchScheduler:scheduler) → void
@@ -675,9 +675,9 @@ public class EffectInferrerRecursionTests
         // Enforce call — nothing resets them, and a caller that enforces twice
         // with one pass sees the sum. Pinned so the doc and the name agree.
         var (_, bound) = Enforce(NativeCounterpart("""
-            §M{Empty}
-              §F{Run:priv} () -> void
-                §P "hello"
+            module Empty Empty block
+              func Run private () → void
+                Console.WriteLine("hello")
             """, """
             module Empty Empty
               func Run private () → void
@@ -697,9 +697,9 @@ public class EffectInferrerRecursionTests
         var bound = new EffectEnforcementPass.AstResolutionBound();
         var pass = new EffectEnforcementPass(new DiagnosticBag()) { AstResolution = bound };
         var source = NativeCounterpart("""
-            §M{SelfCycle}
-              §F{Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
-                §B{~x} §C{scheduler.MarkFailure} §A x §/C
+            module SelfCycle SelfCycle block
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                var x = scheduler.MarkFailure(x)
             """, """
             module SelfCycle SelfCycle
               func Loop private (FailureAwareBatchScheduler:scheduler) → void
@@ -785,7 +785,7 @@ public class EffectInferrerRecursionTests
     private static string Chain(int links)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("§M{Chain}");
+        sb.AppendLine("module Chain Chain block");
         sb.AppendLine("  §F{Run:priv} (List<i32>:items) -> void");
         for (var i = 1; i <= links; i++)
             sb.AppendLine($"    §B{{{Link(i)}}} §C{{{(i == 1 ? "items" : Link(i - 1))}.Where}} §/C");
@@ -814,7 +814,7 @@ public class EffectInferrerRecursionTests
     private static string NestedChain(int links)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("§M{Nested}");
+        sb.AppendLine("module Nested Nested block");
         sb.AppendLine("  §F{Run:priv} (List<i32>:items, bool:flag) -> void");
         for (var i = 1; i <= links; i++)
         {
