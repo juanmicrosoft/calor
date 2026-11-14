@@ -26,12 +26,14 @@ internal static partial class CSharpEquivalence
     {
         cs = ContractHead().Replace(cs, "$1\"<function-id>\", Calor.Runtime.ContractKind.");
         cs = ContractSpan().Replace(cs, "startOffset: 0, length: 0, sourceFile: $1, line: 0, column: 0");
+        cs = ObligationId().Replace(cs, "Proof obligation [<obligation-id>");
         return cs;
     }
 
     private static IEnumerable<string> Fingerprint(string cs)
     {
-        var root = new EmptyNamespacePruner().Visit(CSharpSyntaxTree.ParseText(cs).GetRoot());
+        var root = new TrailingReturnPruner().Visit(
+            new EmptyNamespacePruner().Visit(CSharpSyntaxTree.ParseText(cs).GetRoot()));
         foreach (var token in root.DescendantTokens(descendIntoTrivia: true))
             yield return ((int)token.Kind()).ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + token.Text;
     }
@@ -50,6 +52,29 @@ internal static partial class CSharpEquivalence
                && node.AttributeLists.Count == 0
                && !node.DescendantTrivia().Any(t => t.IsDirective);
     }
+
+    /// <summary>
+    /// A bare `return;` as the last statement of a void (or async Task/ValueTask) method's body is a no-op. The
+    /// native printer writes `return` for a legacy function with an empty body (native
+    /// bodies cannot be empty), and today's emitter keeps it.
+    /// </summary>
+    private sealed class TrailingReturnPruner : CSharpSyntaxRewriter
+    {
+        public override SyntaxNode? VisitMethodDeclaration(Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax node)
+        {
+            node = (Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax)base.VisitMethodDeclaration(node)!;
+            var returnsNothing = node.ReturnType is Microsoft.CodeAnalysis.CSharp.Syntax.PredefinedTypeSyntax { Keyword.RawKind: (int)SyntaxKind.VoidKeyword }
+                || node.Modifiers.Any(SyntaxKind.AsyncKeyword)
+                   && node.ReturnType.ToString() is "Task" or "ValueTask" or "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask";
+            if (returnsNothing
+                && node.Body is { Statements: [.., Microsoft.CodeAnalysis.CSharp.Syntax.ReturnStatementSyntax { Expression: null } last] } body)
+                return node.WithBody(body.WithStatements(body.Statements.Remove(last)));
+            return node;
+        }
+    }
+
+    [GeneratedRegex(@"Proof obligation \[[^\]: ]+")]
+    private static partial Regex ObligationId();
 
     [GeneratedRegex("""(new Calor\.Runtime\.ContractViolationException\((?:"(?:[^"\\]|\\.)*", )?)"(?:[^"\\]|\\.)*", Calor\.Runtime\.ContractKind\.""")]
     private static partial Regex ContractHead();

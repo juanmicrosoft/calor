@@ -37,9 +37,11 @@ A candidate native text is accepted only if all of these hold:
 2. **C# equivalence.** Today's `CSharpEmitter` is run on a fresh legacy AST and on the native
    AST. The two outputs must have the same Roslyn token sequence (kind and exact text, so every
    literal is compared exactly; directive trivia included). Whitespace and comments are
-   ignored, empty namespace declarations are dropped, and contract-violation metadata that
-   necessarily changes is masked: the function id argument (legacy ids such as `f001` cannot be
-   written in native source; tooling owns identities) and the `startOffset/length/line/column`
+   ignored, empty namespace declarations are dropped, a bare `return;` ending a void (or async
+   Task/ValueTask) method is dropped (the printer writes `return` for an empty legacy body), and
+   metadata that necessarily changes is masked: the contract-violation function id argument and
+   proof-obligation ids (legacy ids such as `f001` and parser auto ids cannot be written in
+   native source; tooling owns identities) and the contract `startOffset/length/line/column`
    source position.
 3. **Effect equivalence.** Every effect row in both trees (callable rows and type rows,
    traversal order) must match. The only tolerated difference is a public function/method
@@ -69,6 +71,7 @@ $R cs --log cs.tsv tests/Calor.Enforcement.Tests
 $R cs --write tests/Calor.Enforcement.Tests
 
 # Debugging one input
+$R literal Foo.cs 42        # value of the §-bearing literal on line 42
 $R probe file.calr          # native text, or the oracle failure (REWRITER_DUMP=dir saves both C# texts)
 $R legacy-cs file.calr      # C# from the legacy parse
 $R native-cs file.calr      # C# from today's parse
@@ -83,7 +86,12 @@ trailing newline are preserved) and the encoded literal is decoded again and com
 intended value. A `+` chain of plain string literals is rewritten as one unit and re-emitted
 one line per literal with the original operator placement. Values that are not complete
 modules go through `FragmentRewriter` (wrap in a minimal module, rewrite, unwrap), still under
-the full oracle. Skipped and logged: interpolated strings, chains with non-literal operands,
+the full oracle; the unwrap is checked against the exact native wrapper header, and only
+fragments whose first line is at their minimum indentation are attempted (continuation lines of
+helper-inserted fragments are absolute columns). Skipped and logged: interpolated strings,
+chains with non-literal operands, literals passed to text-inspection methods (`Contains`,
+`DoesNotContain`, `Replace`, `Split`, `Equal`, `StartsWith`, ...) or compared with `==`
+(they are patterns over other text, usually emitter output),
 and every literal in a member that tests legacy rejection (its text mentions `Calor0003`,
 `Calor0006`, `Calor0007`, `Calor0830`, the corresponding diagnostic names, "Legacy section
 marker", "is removed", "retired", "backtick" or "legacy"; for a field or property, the members

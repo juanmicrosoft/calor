@@ -6,6 +6,7 @@ public static class Program
         usage:
           calor-legacy-rewriter calr [--write] [--include-registered] [--log out.tsv] <file-or-dir>...
           calor-legacy-rewriter cs   [--write] [--log out.tsv] <file-or-dir>...
+          calor-legacy-rewriter literal <file.cs> <line>  print the §-bearing literal on that line
           calor-legacy-rewriter probe <file.calr>        print the native rewrite (or the oracle failure)
           calor-legacy-rewriter legacy-cs <file.calr>    C# from the legacy parse (today's emitter)
           calor-legacy-rewriter native-cs <file.calr>    C# from today's parse
@@ -33,6 +34,7 @@ public static class Program
         switch (command)
         {
             case "probe": return Probe(paths[0]);
+            case "literal": return Literal(paths[0], int.Parse(paths[1], System.Globalization.CultureInfo.InvariantCulture));
             case "legacy-cs": return LegacyCSharp(paths[0]);
             case "native-cs": return NativeCSharp(paths[0]);
             case "calr":
@@ -112,6 +114,21 @@ public static class Program
             if (r.Candidate != null) File.WriteAllText(Path.Combine(dump, "native.calr"), r.Candidate);
             if (r.CsLegacy != null) File.WriteAllText(Path.Combine(dump, "legacy.cs"), r.CsLegacy);
             if (r.CsNative != null) File.WriteAllText(Path.Combine(dump, "native.cs"), r.CsNative);
+        }
+        return 1;
+    }
+
+    /// <summary>Prints the value of the first §-bearing string literal on a line of a C# file.</summary>
+    private static int Literal(string path, int line)
+    {
+        var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(File.ReadAllText(path));
+        foreach (var token in tree.GetRoot().DescendantTokens())
+        {
+            if (token.GetLocation().GetLineSpan().StartLinePosition.Line + 1 == line && token.ValueText.Contains('§'))
+            {
+                Console.Write(token.ValueText);
+                return 0;
+            }
         }
         return 1;
     }

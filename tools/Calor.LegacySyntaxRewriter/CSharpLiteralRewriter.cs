@@ -79,6 +79,13 @@ internal sealed class CSharpLiteralRewriter
 
             // String concatenation chains are rewritten as one unit.
             var chain = ChainRoot(literal);
+            var inspection = InspectionUse((ExpressionSyntax?)chain ?? literal);
+            if (inspection != null)
+            {
+                if (chain == null || handledChains.Add(chain))
+                    _log.Skip(path, line, "string-inspection-argument", inspection);
+                continue;
+            }
             if (chain != null)
             {
                 if (!handledChains.Add(chain))
@@ -196,6 +203,46 @@ internal sealed class CSharpLiteralRewriter
         while (i < original.Length && original[i] is '\r' or '\n')
             i++;
         return original[..i] + shaped;
+    }
+
+    /// <summary>
+    /// Methods that search, compare or edit text. A literal passed to one of them is a
+    /// pattern over some other text (usually emitter output), not a program; rewriting it
+    /// in isolation is not meaning-preserving.
+    /// </summary>
+    private static readonly HashSet<string> InspectionMethods = new(StringComparer.Ordinal)
+    {
+        "Contains", "DoesNotContain", "StartsWith", "EndsWith", "IndexOf", "LastIndexOf", "IndexOfAny",
+        "Replace", "Split", "Equal", "NotEqual", "Matches", "DoesNotMatch", "IsMatch", "Match", "Count",
+        "Trim", "TrimStart", "TrimEnd", "Substring", "Remove", "Insert", "Same", "NotSame",
+        "Equals", "CompareOrdinal", "Compare", "Escape", "Single", "Any", "All", "Where", "First",
+    };
+
+    private static string? InspectionUse(ExpressionSyntax expression)
+    {
+        SyntaxNode node = expression;
+        while (node.Parent is ParenthesizedExpressionSyntax)
+            node = node.Parent;
+        switch (node.Parent)
+        {
+            case ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax invocation } }:
+            {
+                var name = invocation.Expression switch
+                {
+                    MemberAccessExpressionSyntax member => member.Name.Identifier.ValueText,
+                    IdentifierNameSyntax id => id.Identifier.ValueText,
+                    GenericNameSyntax generic => generic.Identifier.ValueText,
+                    _ => null
+                };
+                return name != null && InspectionMethods.Contains(name) ? name : null;
+            }
+            case MemberAccessExpressionSyntax member when member.Expression == node:
+                return InspectionMethods.Contains(member.Name.Identifier.ValueText) ? "receiver of " + member.Name.Identifier.ValueText : null;
+            case BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression) || binary.IsKind(SyntaxKind.NotEqualsExpression):
+                return "==";
+            default:
+                return null;
+        }
     }
 
     private static string? RejectionMarker(SyntaxNode node)
