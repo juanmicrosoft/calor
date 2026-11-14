@@ -92,11 +92,10 @@ public class DottedNameRoundTripTests
     public void Compile_DottedReference_EmitsCorrectly()
     {
         var calor = """
-            §M{DottedRef}
-              §F{Area:pub}
-                  §I{f64:r}
-                  §O{f64}
-                  §R (* Math.PI (* r r))
+            module DottedRef DottedRef block
+              func Area (double:r) → double
+                !
+                return (Math.PI * (r * r))
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -112,10 +111,10 @@ public class DottedNameRoundTripTests
     public void Compile_EnumDottedReference_EmitsCorrectly()
     {
         var calor = """
-            §M{EnumRef}
-              §F{GetMode:pub}
-                  §O{i32}
-                  §R StringComparison.Ordinal
+            module EnumRef EnumRef block
+              func GetMode () → int
+                !
+                return StringComparison.Ordinal
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -132,12 +131,12 @@ public class DottedNameRoundTripTests
     public void Compile_MultipleDottedReferences_AllPreserved()
     {
         var calor = """
-            §M{MultiDot}
-              §F{Constants:pub}
-                  §O{f64}
-                  §B{pi} Math.PI
-                  §B{e} Math.E
-                  §R (+ pi e)
+            module MultiDot MultiDot block
+              func Constants () → double
+                !
+                let pi = Math.PI
+                let e = Math.E
+                return (pi + e)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -261,10 +260,10 @@ public class DottedNameRoundTripTests
     {
         // Verify the lexer/parser creates ReferenceNode (not FieldAccessNode) for dotted names
         var calor = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{f64}
-                  §R Math.PI
+            module Test Test block
+              func Get () → double
+                !
+                return Math.PI
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -312,10 +311,10 @@ public class DottedNameRoundTripTests
     {
         // ReferenceNode path (from Calor source)
         var calor = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{f64}
-                  §R Math.PI
+            module Test Test block
+              func Get () → double
+                !
+                return Math.PI
             """;
 
         var fromCalor = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -349,10 +348,10 @@ public class DottedNameRoundTripTests
     public void Compile_DeepDottedName_Works()
     {
         var calor = """
-            §M{Deep}
-              §F{Get:pub}
-                  §O{str}
-                  §R System.Environment.NewLine
+            module Deep Deep block
+              func Get () → string
+                !
+                return System.Environment.NewLine
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -368,10 +367,10 @@ public class DottedNameRoundTripTests
     public void Compile_DottedNameInExpression_Works()
     {
         var calor = """
-            §M{Expr}
-              §F{Tau:pub}
-                  §O{f64}
-                  §R (* 2.0 Math.PI)
+            module Expr Expr block
+              func Tau () → double
+                !
+                return (2.0 * Math.PI)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -387,11 +386,10 @@ public class DottedNameRoundTripTests
     public void Compile_DottedNameInCondition_Works()
     {
         var calor = """
-            §M{Cond}
-              §F{IsMax:pub}
-                  §I{i32:x}
-                  §O{bool}
-                  §R (== x int.MaxValue)
+            module Cond Cond block
+              func IsMax (int:x) → bool
+                !
+                return (x == int.MaxValue)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions

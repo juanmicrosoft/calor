@@ -30,11 +30,11 @@ public class ArrayToCollectionBindTests
     }
 
     private const string ReadAllLinesToList =
-        "§M{Files}\n" +
-        "  §F{CountLines:pub} (str:path) -> i32\n" +
-        "    §E{fs:r}\n" +
-        "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
-        "    §R (len lines)\n";
+        "module Files Files block\n" +
+        "  func CountLines (string:path) → int\n" +
+        "    ! fs:r\n" +
+        "    let List<string>:lines = File.ReadAllLines(path)\n" +
+        "    return lines.Length\n";
 
     private static bool HasArrayTrap(IReadOnlyList<Diagnostic> diags) =>
         diags.Any(d => d.Code == DiagnosticCode.BindArrayToConcreteCollection);
@@ -59,11 +59,11 @@ public class ArrayToCollectionBindTests
     public void ReadAllLines_BoundToArrayForm_IsAccepted()
     {
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{CountLines:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §R (len lines)\n");
+            "module Files Files block\n" +
+            "  func CountLines (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    let string[]:lines = File.ReadAllLines(path)\n" +
+            "    return lines.Length\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -73,14 +73,15 @@ public class ArrayToCollectionBindTests
     {
         // Generality beyond the BCL list: a user function declared -> [str].
         var diags = Validate(
-            "§M{Test}\n" +
-            "  §F{GetItems:pub} (str:path) -> [str]\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{File.ReadAllLines} §A path §/C\n" +
-            "  §F{Use:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{items:List<str>} §C{GetItems} §A path §/C\n" +
-            "    §R (len items)\n");
+            "module Test Test block\n" +
+            "  func GetItems (string:path) → string[]\n" +
+            "    ! fs:r\n" +
+            "    return File.ReadAllLines(path)\n" +
+            "\n" +
+            "  func Use (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    let List<string>:items = GetItems(path)\n" +
+            "    return items.Length\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -91,11 +92,11 @@ public class ArrayToCollectionBindTests
         // C# DOES allow array -> IEnumerable<T>/IList<T>/… — only the concrete
         // classes are rejected. The check must not over-fire on interfaces.
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{Read:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{lines:IEnumerable<str>} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §R INT:0\n");
+            "module Files Files block\n" +
+            "  func Read (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    let IEnumerable<string>:lines = File.ReadAllLines(path)\n" +
+            "    return 0\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -105,12 +106,15 @@ public class ArrayToCollectionBindTests
     {
         // A List<str> bound to something that is not an array must not fire.
         var diags = Validate(
-            "§M{Test}\n" +
-            "  §F{Make:pub} () -> List<str>\n" +
-            "    §R §C{MakeList} §/C\n" +
-            "  §F{Use:pub} () -> i32\n" +
-            "    §B{items:List<str>} §C{Make} §/C\n" +
-            "    §R INT:0\n");
+            "module Test Test block\n" +
+            "  func Make () → List<string>\n" +
+            "    !\n" +
+            "    return MakeList()\n" +
+            "\n" +
+            "  func Use () → int\n" +
+            "    !\n" +
+            "    let List<string>:items = Make()\n" +
+            "    return 0\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -121,10 +125,10 @@ public class ArrayToCollectionBindTests
         // §R returning an array from a List<str>-typed function (#724). This is the
         // signature variant the exemplar's own trap text warns about.
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{Get:pub} (str:path) -> List<str>\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{File.ReadAllLines} §A path §/C\n");
+            "module Files Files block\n" +
+            "  func Get (string:path) → List<string>\n" +
+            "    ! fs:r\n" +
+            "    return File.ReadAllLines(path)\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -133,10 +137,10 @@ public class ArrayToCollectionBindTests
     public void ReturnPosition_ArrayFormReturnType_IsAccepted()
     {
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{Get:pub} (str:path) -> [str]\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{File.ReadAllLines} §A path §/C\n");
+            "module Files Files block\n" +
+            "  func Get (string:path) → string[]\n" +
+            "    ! fs:r\n" +
+            "    return File.ReadAllLines(path)\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -146,12 +150,12 @@ public class ArrayToCollectionBindTests
     {
         // §ASSIGN reassigning an array into a List<str>-typed mutable variable (#724).
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{Count:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{~items:List<str>}\n" +
-            "    §ASSIGN items §C{File.ReadAllLines} §A path §/C\n" +
-            "    §R (len items)\n");
+            "module Files Files block\n" +
+            "  func Count (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    var List<string>:items\n" +
+            "    set items File.ReadAllLines(path)\n" +
+            "    return items.Length\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -160,12 +164,12 @@ public class ArrayToCollectionBindTests
     public void AssignPosition_ArrayFormVariable_IsAccepted()
     {
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{Count:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{~items:[str]}\n" +
-            "    §ASSIGN items §C{File.ReadAllLines} §A path §/C\n" +
-            "    §R (len items)\n");
+            "module Files Files block\n" +
+            "  func Count (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    var string[]:items\n" +
+            "    set items File.ReadAllLines(path)\n" +
+            "    return items.Length\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -176,13 +180,13 @@ public class ArrayToCollectionBindTests
         // Regression: the pass must recurse into §EACH bodies — file/dir iteration
         // is the exact idiom where this trap occurs (PR #726 review finding 1).
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{Scan:pub} (str:dir) -> i32\n" +
-            "    §E{fs:rw}\n" +
-            "    §B{dirs:[str]} §C{Directory.GetDirectories} §A dir §/C\n" +
-            "    §EACH{d} dirs\n" +
-            "      §B{lines:List<str>} §C{File.ReadAllLines} §A d §/C\n" +
-            "    §R INT:0\n");
+            "module Files Files block\n" +
+            "  func Scan (string:dir) → int\n" +
+            "    ! fs:rw\n" +
+            "    let string[]:dirs = Directory.GetDirectories(dir)\n" +
+            "    each d in dirs\n" +
+            "      let List<string>:lines = File.ReadAllLines(d)\n" +
+            "    return 0\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -192,12 +196,12 @@ public class ArrayToCollectionBindTests
     {
         // §ASSIGN targeting a class field declared as a concrete collection.
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §CL{Store:pub}\n" +
-            "    §FLD{List<str>:items:priv}\n" +
-            "    §MT{Load:pub} (str:path) -> void\n" +
-            "      §E{fs:r}\n" +
-            "      §ASSIGN items §C{File.ReadAllLines} §A path §/C\n");
+            "module Files Files block\n" +
+            "  class Store\n" +
+            "    field List<string>:items private\n" +
+            "    func Load (string:path) → void\n" +
+            "      ! fs:r\n" +
+            "      set items File.ReadAllLines(path)\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -206,12 +210,12 @@ public class ArrayToCollectionBindTests
     public void AssignToArrayFormField_IsAccepted()
     {
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §CL{Store:pub}\n" +
-            "    §FLD{[str]:items:priv}\n" +
-            "    §MT{Load:pub} (str:path) -> void\n" +
-            "      §E{fs:r}\n" +
-            "      §ASSIGN items §C{File.ReadAllLines} §A path §/C\n");
+            "module Files Files block\n" +
+            "  class Store\n" +
+            "    field string[]:items private\n" +
+            "    func Load (string:path) → void\n" +
+            "      ! fs:r\n" +
+            "      set items File.ReadAllLines(path)\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -224,14 +228,14 @@ public class ArrayToCollectionBindTests
         // The outer §ASSIGN of an array into an outer [str] variable is correct and
         // must NOT be flagged by the inner shadow's type.
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{Do:pub} (str:path, bool:flag) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{~x:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §IF (== flag true)\n" +
-            "      §B{x:List<str>} §C{MakeList} §/C\n" +
-            "    §ASSIGN x §C{File.ReadAllLines} §A path §/C\n" +
-            "    §R INT:0\n");
+            "module Files Files block\n" +
+            "  func Do (string:path, bool:flag) → int\n" +
+            "    ! fs:r\n" +
+            "    var string[]:x = File.ReadAllLines(path)\n" +
+            "    if (flag == true)\n" +
+            "      let List<string>:x = MakeList()\n" +
+            "    set x File.ReadAllLines(path)\n" +
+            "    return 0\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -242,12 +246,14 @@ public class ArrayToCollectionBindTests
         // #725: an array argument passed where a user function declares a
         // List<str> parameter (the call nested inside a return expression).
         var diags = Validate(
-            "§M{T}\n" +
-            "  §F{Take:pub} (List<str>:items) -> i32\n" +
-            "    §R (len items)\n" +
-            "  §F{Use:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+            "module T T block\n" +
+            "  func Take (List<string>:items) → int\n" +
+            "    !\n" +
+            "    return items.Length\n" +
+            "\n" +
+            "  func Use (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    return Take(File.ReadAllLines(path))\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -256,12 +262,14 @@ public class ArrayToCollectionBindTests
     public void ArgumentPosition_ArrayFormParam_IsAccepted()
     {
         var diags = Validate(
-            "§M{T}\n" +
-            "  §F{Take:pub} ([str]:items) -> i32\n" +
-            "    §R (len items)\n" +
-            "  §F{Use:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+            "module T T block\n" +
+            "  func Take (string[]:items) → int\n" +
+            "    !\n" +
+            "    return items.Length\n" +
+            "\n" +
+            "  func Use (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    return Take(File.ReadAllLines(path))\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -270,12 +278,14 @@ public class ArrayToCollectionBindTests
     public void ArgumentPosition_InCallStatement_IsRejected()
     {
         var diags = Validate(
-            "§M{T}\n" +
-            "  §F{Take:pub} (List<str>:items) -> void\n" +
-            "    §P (len items)\n" +
-            "  §F{Use:pub} (str:path) -> void\n" +
-            "    §E{fs:r}\n" +
-            "    §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+            "module T T block\n" +
+            "  func Take (List<string>:items) → void\n" +
+            "    !\n" +
+            "    Console.WriteLine(items.Length)\n" +
+            "\n" +
+            "  func Use (string:path) → void\n" +
+            "    ! fs:r\n" +
+            "    Take(File.ReadAllLines(path))\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -286,25 +296,33 @@ public class ArrayToCollectionBindTests
         // Two arity-based overloads of Take: the 1-arg takes List<str> (reject),
         // the 2-arg's first param is [str] (accept). The call resolves by arity.
         var oneArg = Validate(
-            "§M{T}\n" +
-            "  §F{Take:pub} (List<str>:items) -> i32\n" +
-            "    §R (len items)\n" +
-            "  §F{Take:pub} ([str]:items, i32:n) -> i32\n" +
-            "    §R n\n" +
-            "  §F{Use:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+            "module T T block\n" +
+            "  func Take (List<string>:items) → int\n" +
+            "    !\n" +
+            "    return items.Length\n" +
+            "\n" +
+            "  func Take (string[]:items, int:n) → int\n" +
+            "    !\n" +
+            "    return n\n" +
+            "\n" +
+            "  func Use (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    return Take(File.ReadAllLines(path))\n");
         Assert.True(HasArrayTrap(oneArg));
 
         var twoArg = Validate(
-            "§M{T}\n" +
-            "  §F{Take:pub} (List<str>:items) -> i32\n" +
-            "    §R (len items)\n" +
-            "  §F{Take:pub} ([str]:items, i32:n) -> i32\n" +
-            "    §R n\n" +
-            "  §F{Use:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §A INT:0 §/C\n");
+            "module T T block\n" +
+            "  func Take (List<string>:items) → int\n" +
+            "    !\n" +
+            "    return items.Length\n" +
+            "\n" +
+            "  func Take (string[]:items, int:n) → int\n" +
+            "    !\n" +
+            "    return n\n" +
+            "\n" +
+            "  func Use (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    return Take(File.ReadAllLines(path), 0)\n");
         Assert.False(HasArrayTrap(twoArg));
     }
 
@@ -312,13 +330,18 @@ public class ArrayToCollectionBindTests
     public void ReturnTypeLookup_UsesCallableArityInsteadOfBareName()
     {
         var diagnostics = Validate(
-            "§M{T}\n" +
-            "  §F{Load:pub} () -> [str]\n" +
-            "    §R §C{File.ReadAllLines} §A STR:\"data.txt\" §/C\n" +
-            "  §F{Load:pub} (i32:count) -> List<str>\n" +
-            "    §R §NEW{List<str>} §/NEW\n" +
-            "  §F{Use:pub} () -> void\n" +
-            "    §B{items:List<str>} §C{Load} §/C\n");
+            "module T T block\n" +
+            "  func Load () → string[]\n" +
+            "    !\n" +
+            "    return File.ReadAllLines(\"data.txt\")\n" +
+            "\n" +
+            "  func Load (int:count) → List<string>\n" +
+            "    !\n" +
+            "    return new List<string>()\n" +
+            "\n" +
+            "  func Use () → void\n" +
+            "    !\n" +
+            "    let List<string>:items = Load()\n");
 
         Assert.True(HasArrayTrap(diagnostics));
     }
@@ -327,21 +350,31 @@ public class ArrayToCollectionBindTests
     public void ReturnTypeLookup_UsesExactSameArityOverloadParameterTypes()
     {
         var arraySelected = Validate(
-            "§M{T}\n" +
-            "  §F{Load:pub} (i32:selector) -> [str]\n" +
-            "    §R §C{File.ReadAllLines} §A STR:\"data.txt\" §/C\n" +
-            "  §F{Load:pub} (str:selector) -> List<str>\n" +
-            "    §R §NEW{List<str>} §/NEW\n" +
-            "  §F{Use:pub} () -> void\n" +
-            "    §B{items:List<str>} §C{Load} §A INT:1 §/C\n");
+            "module T T block\n" +
+            "  func Load (int:selector) → string[]\n" +
+            "    !\n" +
+            "    return File.ReadAllLines(\"data.txt\")\n" +
+            "\n" +
+            "  func Load (string:selector) → List<string>\n" +
+            "    !\n" +
+            "    return new List<string>()\n" +
+            "\n" +
+            "  func Use () → void\n" +
+            "    !\n" +
+            "    let List<string>:items = Load(1)\n");
         var listSelected = Validate(
-            "§M{T}\n" +
-            "  §F{Load:pub} (i32:selector) -> [str]\n" +
-            "    §R §C{File.ReadAllLines} §A STR:\"data.txt\" §/C\n" +
-            "  §F{Load:pub} (str:selector) -> List<str>\n" +
-            "    §R §NEW{List<str>} §/NEW\n" +
-            "  §F{Use:pub} () -> void\n" +
-            "    §B{items:List<str>} §C{Load} §A STR:\"list\" §/C\n");
+            "module T T block\n" +
+            "  func Load (int:selector) → string[]\n" +
+            "    !\n" +
+            "    return File.ReadAllLines(\"data.txt\")\n" +
+            "\n" +
+            "  func Load (string:selector) → List<string>\n" +
+            "    !\n" +
+            "    return new List<string>()\n" +
+            "\n" +
+            "  func Use () → void\n" +
+            "    !\n" +
+            "    let List<string>:items = Load(\"list\")\n");
 
         Assert.True(HasArrayTrap(arraySelected));
         Assert.False(HasArrayTrap(listSelected));
@@ -354,15 +387,19 @@ public class ArrayToCollectionBindTests
         // free function's signature. Here the module-level call resolves to the
         // FREE function (array param) — correct code — and must NOT be flagged.
         var diags = Validate(
-            "§M{T}\n" +
-            "  §F{Take:pub} ([str]:items) -> i32\n" +
-            "    §R (len items)\n" +
-            "  §CL{Helper:pub}\n" +
-            "    §MT{Take:pub} (List<str>:items) -> i32\n" +
-            "      §R (len items)\n" +
-            "  §F{Use:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+            "module T T block\n" +
+            "  func Take (string[]:items) → int\n" +
+            "    !\n" +
+            "    return items.Length\n" +
+            "\n" +
+            "  class Helper\n" +
+            "    func Take (List<string>:items) → int\n" +
+            "      !\n" +
+            "      return items.Length\n" +
+            "\n" +
+            "  func Use (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    return Take(File.ReadAllLines(path))\n");
 
         Assert.False(HasArrayTrap(diags));
     }
@@ -373,15 +410,19 @@ public class ArrayToCollectionBindTests
         // The mirror of the above: inside the class, an unqualified §C{Take}
         // resolves to the class's own method (List<str> param) → still flagged.
         var diags = Validate(
-            "§M{T}\n" +
-            "  §F{Take:pub} ([str]:items) -> i32\n" +   // free function with array param
-            "    §R (len items)\n" +
-            "  §CL{Helper:pub}\n" +
-            "    §MT{Take:pub} (List<str>:items) -> i32\n" +
-            "      §R (len items)\n" +
-            "    §MT{Use:pub} (str:path) -> i32\n" +
-            "      §E{fs:r}\n" +
-            "      §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+            "module T T block\n" +
+            "  func Take (string[]:items) → int\n" +
+            "    !\n" +
+            "    return items.Length\n" +
+            "\n" +
+            "  class Helper\n" +
+            "    func Take (List<string>:items) → int\n" +
+            "      !\n" +
+            "      return items.Length\n" +
+            "\n" +
+            "    func Use (string:path) → int\n" +
+            "      ! fs:r\n" +
+            "      return Take(File.ReadAllLines(path))\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -392,14 +433,16 @@ public class ArrayToCollectionBindTests
         // Finding 3 (statement expression slots): a call in an §IF condition is a
         // scanned expression position, not a silently-skipped one.
         var diags = Validate(
-            "§M{T}\n" +
-            "  §F{Take:pub} (List<str>:items) -> bool\n" +
-            "    §R (> (len items) 0)\n" +
-            "  §F{Use:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §IF §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n" +
-            "      §R 1\n" +
-            "    §R 0\n");
+            "module T T block\n" +
+            "  func Take (List<string>:items) → bool\n" +
+            "    !\n" +
+            "    return (items.Length > 0)\n" +
+            "\n" +
+            "  func Use (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    if Take(File.ReadAllLines(path))\n" +
+            "      return 1\n" +
+            "    return 0\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -409,11 +452,11 @@ public class ArrayToCollectionBindTests
     {
         // Generality on the collection side: not just List<T>.
         var diags = Validate(
-            "§M{Files}\n" +
-            "  §F{Read:pub} (str:dir) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{names:HashSet<str>} §C{Directory.GetFiles} §A dir §/C\n" +
-            "    §R INT:0\n");
+            "module Files Files block\n" +
+            "  func Read (string:dir) → int\n" +
+            "    ! fs:r\n" +
+            "    let HashSet<string>:names = Directory.GetFiles(dir)\n" +
+            "    return 0\n");
 
         Assert.True(HasArrayTrap(diags));
     }
@@ -425,13 +468,16 @@ public class ArrayToCollectionBindTests
         // heuristic: here File.ReadAllLines is a user method returning List<str>
         // (not an array), so binding it to List<str> is correct — no false Calor0254.
         var diags = Validate(
-            "§M{Shadow}\n" +
-            "  §CL{File:pub}\n" +
-            "    §MT{ReadAllLines:pub} (str:path) -> List<str>\n" +
-            "      §R §C{MakeList} §/C\n" +
-            "  §F{Use:pub} (str:path) -> i32\n" +
-            "    §B{items:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §R INT:0\n");
+            "module Shadow Shadow block\n" +
+            "  class File\n" +
+            "    func ReadAllLines (string:path) → List<string>\n" +
+            "      !\n" +
+            "      return MakeList()\n" +
+            "\n" +
+            "  func Use (string:path) → int\n" +
+            "    !\n" +
+            "    let List<string>:items = File.ReadAllLines(path)\n" +
+            "    return 0\n");
 
         Assert.False(HasArrayTrap(diags));
     }

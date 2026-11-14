@@ -293,13 +293,13 @@ namespace Test
     {
         // Parse Calor §SYNC directly, verify AST
         var calorSource = @"
-§M{Test}
-    §CL{Foo:pub}
-        §FLD{object:_obj:priv}
-        §MT{Bar:pub}
-            §SYNC (_obj)
-              §B{~x:i32} INT:1
-            §/SYNC
+module Test Test block
+  class Foo
+    field object:_obj private
+    func Bar ()
+      !
+      lock _obj
+        var int:x = 1
 ";
         var compileResult = Program.Compile(calorSource, "sync-test.calr", new CompilationOptions
         {
@@ -349,13 +349,14 @@ namespace Test
     {
         // Parse Calor with §U inside §PP directly
         var calorSource = @"
-§M{Test}
-    §PP{NET6_0_OR_GREATER}
-    §U{System.Text.Json}
-    §/PP{NET6_0_OR_GREATER}
-    §CL{Foo:pub}
-        §MT{Bar:pub}
-            §B{~x:i32} INT:1
+module Test Test block
+  pp NET6_0_OR_GREATER
+    using System.Text.Json
+
+  class Foo
+    func Bar ()
+      !
+      var int:x = 1
 ";
         var compileResult = Program.Compile(calorSource, "conditional-using.calr", new CompilationOptions
         {

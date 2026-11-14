@@ -675,12 +675,11 @@ public class SimplificationTests
     public void Integration_ParseAndSimplify()
     {
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:x}
-      §O{bool}
-      §Q (&& true (>= x INT:0))
-      §R true
+module Test Test block
+  func TestFunc (int:x) → bool
+    !
+    requires (true && (x >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -727,12 +726,11 @@ public class SimplificationTests
     public void Integration_NoSimplificationNeeded()
     {
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:x}
-      §O{bool}
-      §Q (>= x INT:0)
-      §R true
+module Test Test block
+  func TestFunc (int:x) → bool
+    !
+    requires (x >= 0)
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -749,12 +747,11 @@ public class SimplificationTests
     public void Integration_QuantifierBodySimplification()
     {
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((i i32)) true)
-      §R true
+module Test Test block
+  func TestFunc (int:n) → bool
+    !
+    requires (forall int:i where true : true)
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);

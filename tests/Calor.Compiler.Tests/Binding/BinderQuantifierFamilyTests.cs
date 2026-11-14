@@ -187,9 +187,10 @@ public class BinderQuantifierFamilyTests
         // just forall — `(exists ((v T)) body)` from real source.
         // The explicit i32 maximum preserves j > x while requesting a finite runtime check.
         const string source = """
-            §M{Test}
-              §F{Probe:pub} (i32:x) -> bool
-                §R (exists ((j i32)) (&& (> j x) (<= j INT:2147483647)))
+            module Test Test block
+              func Probe (int:x) → bool
+                !
+                return (exists int:j where (j > x) : (j <= 2147483647))
             """;
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions

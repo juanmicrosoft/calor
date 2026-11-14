@@ -1,5 +1,5 @@
-§M{Test}
-  §F{GetPositive:pub} (i32:n) -> i32
-    §S (> result 0)
-    §R n
-
+module Test Test block
+  func GetPositive (int:n) → int
+    !
+    => (result > 0)
+    return n

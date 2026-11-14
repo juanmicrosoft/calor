@@ -63,11 +63,10 @@ public class GoldenFileTests
     public void Golden_DivisionByLiteralZero_ProducesError()
     {
         var source = @"
-§M{Test}
-  §F{DivByZero:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:0)";
+module Test Test block
+  func DivByZero (int:x) → int
+    !
+    return (x / 0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, $"Parse errors: {string.Join(", ", parseDiag.Select(d => d.Message))}");
@@ -89,11 +88,10 @@ public class GoldenFileTests
     public void Golden_ModuloByLiteralZero_ProducesError()
     {
         var source = @"
-§M{Test}
-  §F{ModByZero:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (% x INT:0)";
+module Test Test block
+  func ModByZero (int:x) → int
+    !
+    return (x % 0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -115,12 +113,10 @@ public class GoldenFileTests
     public void Golden_DivisionByUncheckedParameter_ProducesWarning()
     {
         var source = @"
-§M{Test}
-  §F{UncheckedDiv:pub}
-      §I{i32:x}
-      §I{i32:divisor}
-      §O{i32}
-      §R (/ x divisor)";
+module Test Test block
+  func UncheckedDiv (int:x, int:divisor) → int
+    !
+    return (x / divisor)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -142,11 +138,10 @@ public class GoldenFileTests
     public void Golden_DivisionByNonZeroConstant_NoDiagnostic()
     {
         var source = @"
-§M{Test}
-  §F{SafeDiv:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:7)";
+module Test Test block
+  func SafeDiv (int:x) → int
+    !
+    return (x / 7)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -168,14 +163,12 @@ public class GoldenFileTests
     public void Golden_DivisionWithNotEqualZeroGuard_NoDiagnostic()
     {
         var source = @"
-§M{Test}
-  §F{GuardedDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF (!= y INT:0)
-          §R (/ x y)
-      §R INT:0";
+module Test Test block
+  func GuardedDiv (int:x, int:y) → int
+    !
+    if (y != 0)
+      return (x / y)
+    return 0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, $"Parse errors: {string.Join(", ", parseDiag.Select(d => d.Message))}");
@@ -205,15 +198,12 @@ public class GoldenFileTests
     public void Golden_MultipleDivisionsUnchecked_ProducesMultipleWarnings()
     {
         var source = @"
-§M{Test}
-  §F{MultiDiv:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §I{i32:c}
-      §O{i32}
-      §B{x:i32} (/ a b)
-      §B{y:i32} (/ x c)
-      §R y";
+module Test Test block
+  func MultiDiv (int:a, int:b, int:c) → int
+    !
+    let int:x = (a / b)
+    let int:y = (x / c)
+    return y";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -242,12 +232,10 @@ public class GoldenFileTests
     public void Golden_NoTaintSources_NoVulnerabilities()
     {
         var source = @"
-§M{Test}
-  §F{SafeArith:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ x y)";
+module Test Test block
+  func SafeArith (int:x, int:y) → int
+    !
+    return (x + y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -266,13 +254,13 @@ public class GoldenFileTests
     public void Golden_ConstantsOnly_NoVulnerabilities()
     {
         var source = @"
-§M{Test}
-  §F{Constants:pub}
-      §O{i32}
-      §B{a:i32} INT:1
-      §B{b:i32} INT:2
-      §B{c:i32} (+ a b)
-      §R c";
+module Test Test block
+  func Constants () → int
+    !
+    let int:a = 1
+    let int:b = 2
+    let int:c = (a + b)
+    return c";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -393,12 +381,10 @@ public class GoldenFileTests
     public void Golden_BugPatternRunner_DetectsDivisionByZero()
     {
         var source = @"
-§M{Test}
-  §F{Buggy:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (/ x y)";
+module Test Test block
+  func Buggy (int:x, int:y) → int
+    !
+    return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -419,13 +405,12 @@ public class GoldenFileTests
     public void Golden_BugPatternRunner_SafeCode_NoErrors()
     {
         var source = @"
-§M{Test}
-  §F{Safe:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{y:i32} (+ x INT:1)
-      §B{z:i32} (* y INT:2)
-      §R z";
+module Test Test block
+  func Safe (int:x) → int
+    !
+    let int:y = (x + 1)
+    let int:z = (y * 2)
+    return z";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -447,16 +432,13 @@ public class GoldenFileTests
     public void Golden_BugPatternRunner_MultipleBugs_AllDetected()
     {
         var source = @"
-§M{Test}
-  §F{MultiBug:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §I{i32:c}
-      §O{i32}
-      §B{x:i32} (/ a b)
-      §B{y:i32} (/ x c)
-      §B{z:i32} (% y b)
-      §R z";
+module Test Test block
+  func MultiBug (int:a, int:b, int:c) → int
+    !
+    let int:x = (a / b)
+    let int:y = (x / c)
+    let int:z = (y % b)
+    return z";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -485,11 +467,10 @@ public class GoldenFileTests
     public void Golden_VerificationPass_SimpleFunction_Completes()
     {
         var source = @"
-§M{Test}
-  §F{Simple:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x INT:1)";
+module Test Test block
+  func Simple (int:x) → int
+    !
+    return (x + 1)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -509,12 +490,10 @@ public class GoldenFileTests
     public void Golden_VerificationPass_BuggyFunction_DetectsBug()
     {
         var source = @"
-§M{Test}
-  §F{Buggy:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (/ x y)";
+module Test Test block
+  func Buggy (int:x, int:y) → int
+    !
+    return (x / y)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -534,20 +513,18 @@ public class GoldenFileTests
     public void Golden_VerificationPass_MultipleFunctions_AllAnalyzed()
     {
         var source = @"
-§M{Test}
-  §F{Func1:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x
-  §F{Func2:pub}
-      §I{i32:y}
-      §O{i32}
-      §R (+ y INT:1)
-  §F{Func3:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)";
+module Test Test block
+  func Func1 (int:x) → int
+    !
+    return x
+
+  func Func2 (int:y) → int
+    !
+    return (y + 1)
+
+  func Func3 (int:a, int:b) → int
+    !
+    return (a / b)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -579,7 +556,7 @@ public class GoldenFileTests
     public void Golden_EmptyModule_NoCrash()
     {
         var source = @"
-§M{Test}";
+module Test Test block";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -599,11 +576,10 @@ public class GoldenFileTests
     public void Golden_DeeplyNestedExpression_Completes()
     {
         var source = @"
-§M{Test}
-  §F{Nested:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (+ (+ (+ (+ x INT:1) INT:2) INT:3) INT:4)";
+module Test Test block
+  func Nested (int:x) → int
+    !
+    return ((((x + 1) + 2) + 3) + 4)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -623,12 +599,10 @@ public class GoldenFileTests
     public void Golden_DivisionInNestedExpression_Detected()
     {
         var source = @"
-§M{Test}
-  §F{NestedDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ INT:1 (+ INT:2 (/ x y)))";
+module Test Test block
+  func NestedDiv (int:x, int:y) → int
+    !
+    return (1 + (2 + (x / y)))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -648,16 +622,13 @@ public class GoldenFileTests
     public void Golden_MultipleBindings_AllChecked()
     {
         var source = @"
-§M{Test}
-  §F{MultiBinds:pub}
-      §I{i32:divisor1}
-      §I{i32:divisor2}
-      §I{i32:divisor3}
-      §O{i32}
-      §B{a:i32} (/ INT:100 divisor1)
-      §B{b:i32} (/ INT:200 divisor2)
-      §B{c:i32} (/ INT:300 divisor3)
-      §R (+ a (+ b c))";
+module Test Test block
+  func MultiBinds (int:divisor1, int:divisor2, int:divisor3) → int
+    !
+    let int:a = (100 / divisor1)
+    let int:b = (200 / divisor2)
+    let int:c = (300 / divisor3)
+    return (a + (b + c))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -685,16 +656,13 @@ public class GoldenFileTests
     public void Golden_BugInThenBranch_Detected()
     {
         var source = @"
-§M{Test}
-  §F{ThenBug:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §I{bool:cond}
-      §O{i32}
-      §IF cond
-          §R (/ x y)
-      §EL
-          §R INT:0";
+module Test Test block
+  func ThenBug (int:x, int:y, bool:cond) → int
+    !
+    if cond
+      return (x / y)
+    else
+      return 0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -714,16 +682,13 @@ public class GoldenFileTests
     public void Golden_BugInElseBranch_Detected()
     {
         var source = @"
-§M{Test}
-  §F{ElseBug:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §I{bool:cond}
-      §O{i32}
-      §IF cond
-          §R INT:0
-      §EL
-          §R (/ x y)";
+module Test Test block
+  func ElseBug (int:x, int:y, bool:cond) → int
+    !
+    if cond
+      return 0
+    else
+      return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -743,17 +708,13 @@ public class GoldenFileTests
     public void Golden_BugsInBothBranches_BothDetected()
     {
         var source = @"
-§M{Test}
-  §F{BothBugs:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §I{i32:z}
-      §I{bool:cond}
-      §O{i32}
-      §IF cond
-          §R (/ x y)
-      §EL
-          §R (/ x z)";
+module Test Test block
+  func BothBugs (int:x, int:y, int:z, bool:cond) → int
+    !
+    if cond
+      return (x / y)
+    else
+      return (x / z)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -777,15 +738,13 @@ public class GoldenFileTests
     public void Golden_BugInLoopBody_Detected()
     {
         var source = @"
-§M{Test}
-  §F{LoopBug:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §B{result:i32} INT:0
-      §L{i:0:10:1}
-          §B{temp:i32} (/ x y)
-      §R result";
+module Test Test block
+  func LoopBug (int:x, int:y) → int
+    !
+    let int:result = 0
+    for i from 0 to 10 step 1
+      let int:temp = (x / y)
+    return result";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -811,13 +770,11 @@ public class GoldenFileTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{Test}
-  §F{PrecondDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §Q (!= y INT:0)
-      §R (/ x y)";
+module Test Test block
+  func PrecondDiv (int:x, int:y) → int
+    !
+    requires (y != 0)
+    return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -847,11 +804,10 @@ public class GoldenFileTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{Test}
-  §F{LiteralZero:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:0)";
+module Test Test block
+  func LiteralZero (int:x) → int
+    !
+    return (x / 0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);

@@ -1,14 +1,14 @@
-§M{Impure}
-  §F{LogAndDouble:pub} (i32:x) -> i32
-    §E{cw}
-    §C{Console.WriteLine} §A x §/C
-    §R (* x 2)
+module Impure Impure block
+  func LogAndDouble (int:x) → int
+    ! cw
+    Console.WriteLine(x)
+    return (x * 2)
 
-  §F{ComputeWithLogging:pub} (i32:a, i32:b) -> i32
-    §E{cw}
-    §C{Console.WriteLine} §A "Computing..." §/C
-    §R (+ a b)
+  func ComputeWithLogging (int:a, int:b) → int
+    ! cw
+    Console.WriteLine("Computing...")
+    return (a + b)
 
-  §F{NoContractAdd:pub} (i32:x, i32:y) -> i32
-    §R (+ x y)
-
+  func NoContractAdd (int:x, int:y) → int
+    !
+    return (x + y)

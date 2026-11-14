@@ -32,16 +32,18 @@ public class V017Round4FindingsTests
     public void CyclicTypeParameterConstraints_Report_InsteadOfOverflowingTheStack()
     {
         var result = Compile("""
-            §M{Cyc}
-              §CL{Box:pub}<T,U>
-                §WHERE T : U
-                §WHERE U : T
-                §MT{Take:pub} (str:s) -> i32
-                  §E{}
-                  §R INT:1
-                §MT{Go:pub} (T:a) -> i32
-                  §E{}
-                  §R §C{Take} §A a §/C
+            module Cyc Cyc block
+              class Box<T,U>
+                where T : U
+                where U : T
+
+                func Take (string:s) → int
+                  !
+                  return 1
+
+                func Go (T:a) → int
+                  !
+                  return Take(a)
             """);
 
         // Reaching this line at all is the finding: before the fix the test
@@ -96,13 +98,14 @@ public class V017Round4FindingsTests
     public void UndeclaredNominalArgument_IsStillSuppressed()
     {
         var result = Compile("""
-            §M{Probe}
-              §F{Take:pub} (str:s) -> i32
-                §E{}
-                §R INT:1
-              §F{Go:pub} (NotDeclaredAnywhere:x) -> i32
-                §E{}
-                §R §C{Take} §A x §/C
+            module Probe Probe block
+              func Take (string:s) → int
+                !
+                return 1
+
+              func Go (NotDeclaredAnywhere:x) → int
+                !
+                return Take(x)
             """);
 
         Assert.DoesNotContain(
@@ -158,16 +161,17 @@ public class V017Round4FindingsTests
     public void PatternVariable_ShadowsModuleFunction_AndIsNotQualified()
     {
         var result = Compile("""
-            §M{RefProbe}
-              §F{value:pub} () -> i32
-                §E{}
-                §R INT:7
-              §CL{Holder:pub}
-                §MT{Use:pub} (any:o) -> i32
-                  §E{}
-                  §IF (is o i32 value)
-                    §R value
-                  §R INT:0
+            module RefProbe RefProbe block
+              func value () → int
+                !
+                return 7
+
+              class Holder
+                func Use (object:o) → int
+                  !
+                  if (o is int value)
+                    return value
+                  return 0
             """);
 
         Assert.Contains("return value;", result.GeneratedCode);

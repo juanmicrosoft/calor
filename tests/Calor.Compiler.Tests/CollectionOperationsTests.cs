@@ -165,11 +165,10 @@ public class CollectionOperationsTests
     public void Parse_ListCreation_Empty_ReturnsListNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{list1:i32}
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:list1 = new List<int>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -193,14 +192,10 @@ public class CollectionOperationsTests
     public void Parse_ListCreation_WithElements_ReturnsListNodeWithElements()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{list1:i32}
-                    1
-                    2
-                    3
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:list1 = new List<int>() { 1, 2, 3 }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -224,11 +219,10 @@ public class CollectionOperationsTests
     public void Parse_DictionaryCreation_Empty_ReturnsDictNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{dict1:str:i32}
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:dict1 = new Dictionary<string, int>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -252,13 +246,10 @@ public class CollectionOperationsTests
     public void Parse_DictionaryCreation_WithEntries_ReturnsDictNodeWithEntries()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{dict1:str:i32}
-                    §KV "one" 1
-                    §KV "two" 2
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:dict1 = new Dictionary<string, int>() { { "one", 1 }, { "two", 2 } }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -282,11 +273,10 @@ public class CollectionOperationsTests
     public void Parse_SetCreation_Empty_ReturnsSetNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{set1:str}
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<string>:set1 = new HashSet<string>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -309,13 +299,10 @@ public class CollectionOperationsTests
     public void Parse_SetCreation_WithElements_ReturnsSetNodeWithElements()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{set1:str}
-                    "apple"
-                    "banana"
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<string>:set1 = new HashSet<string>() { "apple", "banana" }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -339,10 +326,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionPush_ReturnsPushNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §PUSH{list1} 42
+            module Test Test block
+              func Main () → void
+                !
+                list1.Add(42)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -359,10 +346,10 @@ public class CollectionOperationsTests
     public void Parse_DictionaryPut_ReturnsPutNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §PUT{dict1} "key" 42
+            module Test Test block
+              func Main () → void
+                !
+                set dict1["key"] 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -379,10 +366,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionRemove_ReturnsRemoveNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §REM{coll1} "item"
+            module Test Test block
+              func Main () → void
+                !
+                coll1.Remove("item")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -399,10 +386,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionClear_ReturnsClearNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §CLR{coll1}
+            module Test Test block
+              func Main () → void
+                !
+                coll1.Clear()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -419,10 +406,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionInsert_ReturnsInsertNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §INS{list1} 0 "first"
+            module Test Test block
+              func Main () → void
+                !
+                list1.Insert(0, "first")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -439,10 +426,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionSetIndex_ReturnsSetIndexNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §SETIDX{list1} 0 42
+            module Test Test block
+              func Main () → void
+                !
+                set list1[0] 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -463,10 +450,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionContains_Value_ReturnsContainsNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{bool}
-                  §R §HAS{list1} 42
+            module Test Test block
+              func Main () → bool
+                !
+                return list1.Contains(42)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -487,10 +474,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionContains_Key_ReturnsContainsNodeWithKeyMode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{bool}
-                  §R §HAS{dict1} §KEY "mykey"
+            module Test Test block
+              func Main () → bool
+                !
+                return dict1.ContainsKey("mykey")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -511,10 +498,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionContains_DictValue_ReturnsContainsNodeWithDictValueMode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{bool}
-                  §R §HAS{dict1} §VAL 42
+            module Test Test block
+              func Main () → bool
+                !
+                return dict1.ContainsValue(42)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -539,10 +526,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionCount_ReturnsCountNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{i32}
-                  §R §CNT myList
+            module Test Test block
+              func Main () → int
+                !
+                return myList . Count
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -565,11 +552,11 @@ public class CollectionOperationsTests
     public void Parse_DictionaryForeach_ReturnsDictForeachNode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACHKV{k:v} dict1
-                      §P k
+            module Test Test block
+              func Main () → void
+                !
+                each k, v in dict1
+                  Console.WriteLine(k)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -594,14 +581,10 @@ public class CollectionOperationsTests
     public void Emit_ListCreation_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{nums:i32}
-                    1
-                    2
-                    3
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:nums = new List<int>() { 1, 2, 3 }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -619,13 +602,10 @@ public class CollectionOperationsTests
     public void Emit_DictionaryCreation_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{ages:str:i32}
-                    §KV "alice" 30
-                    §KV "bob" 25
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:ages = new Dictionary<string, int>() { { "alice", 30 }, { "bob", 25 } }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -641,13 +621,10 @@ public class CollectionOperationsTests
     public void Emit_SetCreation_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{items:str}
-                    "apple"
-                    "banana"
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<string>:items = new HashSet<string>() { "apple", "banana" }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -664,10 +641,10 @@ public class CollectionOperationsTests
     public void Emit_CollectionPush_GeneratesAddCall()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §PUSH{myList} 42
+            module Test Test block
+              func Main () → void
+                !
+                myList.Add(42)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -683,10 +660,10 @@ public class CollectionOperationsTests
     public void Emit_DictionaryPut_GeneratesIndexerAssignment()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §PUT{myDict} "key" 42
+            module Test Test block
+              func Main () → void
+                !
+                set myDict["key"] 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -702,10 +679,10 @@ public class CollectionOperationsTests
     public void Emit_CollectionRemove_GeneratesRemoveCall()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §REM{myColl} "item"
+            module Test Test block
+              func Main () → void
+                !
+                myColl.Remove("item")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -721,10 +698,10 @@ public class CollectionOperationsTests
     public void Emit_CollectionClear_GeneratesClearCall()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §CLR{myColl}
+            module Test Test block
+              func Main () → void
+                !
+                myColl.Clear()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -740,10 +717,10 @@ public class CollectionOperationsTests
     public void Emit_CollectionInsert_GeneratesInsertCall()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §INS{myList} 0 "first"
+            module Test Test block
+              func Main () → void
+                !
+                myList.Insert(0, "first")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -759,10 +736,10 @@ public class CollectionOperationsTests
     public void Emit_CollectionContainsKey_GeneratesContainsKeyCall()
     {
         var source = """
-            §M{Test}
-              §F{HasKey:pub}
-                  §O{bool}
-                  §R §HAS{myDict} §KEY "testKey"
+            module Test Test block
+              func HasKey () → bool
+                !
+                return myDict.ContainsKey("testKey")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -778,10 +755,10 @@ public class CollectionOperationsTests
     public void Emit_CollectionContainsValue_GeneratesContainsValueCall()
     {
         var source = """
-            §M{Test}
-              §F{HasValue:pub}
-                  §O{bool}
-                  §R §HAS{myDict} §VAL 42
+            module Test Test block
+              func HasValue () → bool
+                !
+                return myDict.ContainsValue(42)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -797,11 +774,11 @@ public class CollectionOperationsTests
     public void Emit_DictionaryForeach_GeneratesDeconstructingForeach()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACHKV{key:value} myDict
-                      §P key
+            module Test Test block
+              func Main () → void
+                !
+                each key, value in myDict
+                  Console.WriteLine(key)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -817,10 +794,10 @@ public class CollectionOperationsTests
     public void Emit_CollectionCount_GeneratesCountProperty()
     {
         var source = """
-            §M{Test}
-              §F{GetLength:pub}
-                  §O{i32}
-                  §R §CNT myList
+            module Test Test block
+              func GetLength () → int
+                !
+                return myList . Count
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -901,11 +878,10 @@ public class CollectionOperationsTests
     public void Parse_EmptyList_ReturnsListNodeWithNoElements()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{empty:str}
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<string>:empty = new List<string>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -922,11 +898,10 @@ public class CollectionOperationsTests
     public void Parse_EmptyDictionary_ReturnsDictNodeWithNoEntries()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{empty:str:i32}
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:empty = new Dictionary<string, int>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -943,11 +918,10 @@ public class CollectionOperationsTests
     public void Parse_EmptyHashSet_ReturnsSetNodeWithNoElements()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{empty:i32}
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<int>:empty = new HashSet<int>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -964,15 +938,12 @@ public class CollectionOperationsTests
     public void Emit_EmptyCollections_GeneratesEmptyInitializers()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{emptyList:i32}
-                  §/LIST
-                  §DICT{emptyDict:str:str}
-                  §/DICT
-                  §HSET{emptySet:bool}
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:emptyList = new List<int>()
+                let Dictionary<string, string>:emptyDict = new Dictionary<string, string>()
+                let HashSet<bool>:emptySet = new HashSet<bool>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -990,12 +961,10 @@ public class CollectionOperationsTests
     public void Parse_CollectionWithSingleElement_ReturnsCorrectCount()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{single:i32}
-                    42
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:single = new List<int>() { 42 }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1012,12 +981,10 @@ public class CollectionOperationsTests
     public void Parse_DictionaryWithSingleEntry_ReturnsCorrectCount()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{single:str:i32}
-                    §KV "key" 1
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:single = new Dictionary<string, int>() { { "key", 1 } }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1034,16 +1001,15 @@ public class CollectionOperationsTests
     public void Parse_MultipleCollectionOperations_InSequence()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{nums:i32}
-                  §/LIST
-                  §PUSH{nums} 1
-                  §PUSH{nums} 2
-                  §INS{nums} 0 0
-                  §REM{nums} 1
-                  §CLR{nums}
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:nums = new List<int>()
+                nums.Add(1)
+                nums.Add(2)
+                nums.Insert(0, 0)
+                nums.Remove(1)
+                nums.Clear()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1058,13 +1024,10 @@ public class CollectionOperationsTests
     public void Emit_CollectionWithExpressionElements_GeneratesCorrectCode()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{nums:i32}
-                    (+ 1 2)
-                    (* 3 4)
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:nums = new List<int>() { (1 + 2), (3 * 4) }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1085,10 +1048,10 @@ public class CollectionOperationsTests
     public void Effect_CollectionPush_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §PUSH{list1} 42
+            module Test Test block
+              func Main () → void
+                !
+                list1.Add(42)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1105,10 +1068,10 @@ public class CollectionOperationsTests
     public void Effect_DictionaryPut_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §PUT{dict1} "key" 42
+            module Test Test block
+              func Main () → void
+                !
+                set dict1["key"] 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1125,10 +1088,10 @@ public class CollectionOperationsTests
     public void Effect_CollectionRemove_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §REM{coll1} "item"
+            module Test Test block
+              func Main () → void
+                !
+                coll1.Remove("item")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1145,10 +1108,10 @@ public class CollectionOperationsTests
     public void Effect_CollectionClear_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §CLR{coll1}
+            module Test Test block
+              func Main () → void
+                !
+                coll1.Clear()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1165,10 +1128,10 @@ public class CollectionOperationsTests
     public void Effect_CollectionInsert_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §INS{list1} 0 "first"
+            module Test Test block
+              func Main () → void
+                !
+                list1.Insert(0, "first")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1185,10 +1148,10 @@ public class CollectionOperationsTests
     public void Effect_CollectionSetIndex_ReportsMutationWhenNotDeclared()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §SETIDX{list1} 0 42
+            module Test Test block
+              func Main () → void
+                !
+                set list1[0] 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1205,10 +1168,10 @@ public class CollectionOperationsTests
     public void Effect_CollectionContains_NoMutationReported()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{bool}
-                  §R §HAS{list1} 42
+            module Test Test block
+              func Main () → bool
+                !
+                return list1.Contains(42)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1225,13 +1188,10 @@ public class CollectionOperationsTests
     public void Effect_ListCreation_NoMutationReported()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{nums:i32}
-                    1
-                    2
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:nums = new List<int>() { 1, 2 }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1252,14 +1212,10 @@ public class CollectionOperationsTests
     public void RoundTrip_ListCreation_EmitsValidCalor()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{nums:i32}
-                    1
-                    2
-                    3
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:nums = new List<int>() { 1, 2, 3 }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1285,13 +1241,10 @@ public class CollectionOperationsTests
     public void RoundTrip_DictionaryCreation_EmitsValidCalor()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{ages:str:i32}
-                    §KV "alice" 30
-                    §KV "bob" 25
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:ages = new Dictionary<string, int>() { { "alice", 30 }, { "bob", 25 } }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1317,13 +1270,10 @@ public class CollectionOperationsTests
     public void RoundTrip_HashSetCreation_EmitsValidCalor()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{tags:str}
-                    "important"
-                    "urgent"
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<string>:tags = new HashSet<string>() { "important", "urgent" }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1349,15 +1299,15 @@ public class CollectionOperationsTests
     public void RoundTrip_CollectionOperations_EmitsValidCalor()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §PUSH{nums} 42
-                  §PUT{dict} "key" 99
-                  §INS{nums} 0 1
-                  §REM{nums} 42
-                  §CLR{dict}
-                  §SETIDX{nums} 0 10
+            module Test Test block
+              func Main () → void
+                !
+                nums.Add(42)
+                set dict["key"] 99
+                nums.Insert(0, 1)
+                nums.Remove(42)
+                dict.Clear()
+                set nums[0] 10
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1379,12 +1329,11 @@ public class CollectionOperationsTests
     public void RoundTrip_DictionaryForeach_EmitsValidCalor()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §EACHKV{k:v} myDict
-                      §P k
+            module Test Test block
+              func Main () → void
+                ! cw
+                each k, v in myDict
+                  Console.WriteLine(k)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1415,11 +1364,10 @@ public class CollectionOperationsTests
     public void Parse_ListOfLists_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{outer:List<i32>}
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<List<int>>:outer = new List<List<int>>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1436,11 +1384,10 @@ public class CollectionOperationsTests
     public void Emit_ListOfLists_GeneratesNestedListType()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{matrix:List<i32>}
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<List<int>>:matrix = new List<List<int>>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1456,11 +1403,10 @@ public class CollectionOperationsTests
     public void Parse_DictionaryWithListValue_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{grouped:str:List<i32>}
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, List<int>>:grouped = new Dictionary<string, List<int>>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1478,11 +1424,10 @@ public class CollectionOperationsTests
     public void Emit_DictionaryWithListValue_GeneratesCorrectType()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{grouped:str:List<i32>}
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, List<int>>:grouped = new Dictionary<string, List<int>>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1498,11 +1443,10 @@ public class CollectionOperationsTests
     public void Parse_SetOfSets_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{nestedSet:HashSet<str>}
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<HashSet<string>>:nestedSet = new HashSet<HashSet<string>>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1519,11 +1463,10 @@ public class CollectionOperationsTests
     public void Emit_SetOfSets_GeneratesNestedSetType()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{nestedSet:HashSet<str>}
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<HashSet<string>>:nestedSet = new HashSet<HashSet<string>>()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1543,10 +1486,10 @@ public class CollectionOperationsTests
     public void Parse_ArrayAccess_ReturnsArrayAccessNode()
     {
         var source = """
-            §M{Test}
-              §F{GetFirst:pub}
-                  §O{i32}
-                  §R §IDX myList 0
+            module Test Test block
+              func GetFirst () → int
+                !
+                return myList[0]
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1565,10 +1508,10 @@ public class CollectionOperationsTests
     public void Emit_ArrayAccess_GeneratesIndexerAccess()
     {
         var source = """
-            §M{Test}
-              §F{GetFirst:pub}
-                  §O{i32}
-                  §R §IDX myList 0
+            module Test Test block
+              func GetFirst () → int
+                !
+                return myList[0]
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1584,10 +1527,10 @@ public class CollectionOperationsTests
     public void RoundTrip_ArrayAccess_EmitsValidCalor()
     {
         var source = """
-            §M{Test}
-              §F{GetFirst:pub}
-                  §O{i32}
-                  §R §IDX myList 0
+            module Test Test block
+              func GetFirst () → int
+                !
+                return myList[0]
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1613,14 +1556,10 @@ public class CollectionOperationsTests
     public void TypeCheck_ListCreation_ValidElements_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                    3
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2, 3 }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1636,14 +1575,10 @@ public class CollectionOperationsTests
     public void TypeCheck_ListCreation_InvalidElement_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    "invalid"
-                    3
-                  §/LIST
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, "invalid", 3 }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1660,13 +1595,10 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryCreation_ValidEntries_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{ages:str:i32}
-                    §KV "alice" 30
-                    §KV "bob" 25
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:ages = new Dictionary<string, int>() { { "alice", 30 }, { "bob", 25 } }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1682,13 +1614,10 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryCreation_InvalidKeyType_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{ages:str:i32}
-                    §KV 123 30
-                    §KV "bob" 25
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:ages = new Dictionary<string, int>() { { 123, 30 }, { "bob", 25 } }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1705,12 +1634,10 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryCreation_InvalidValueType_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{ages:str:i32}
-                    §KV "alice" "thirty"
-                  §/DICT
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:ages = new Dictionary<string, int>() { { "alice", "thirty" } }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1727,13 +1654,10 @@ public class CollectionOperationsTests
     public void TypeCheck_SetCreation_ValidElements_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{fruits:str}
-                    "apple"
-                    "banana"
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<string>:fruits = new HashSet<string>() { "apple", "banana" }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1749,13 +1673,10 @@ public class CollectionOperationsTests
     public void TypeCheck_SetCreation_InvalidElement_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §HSET{fruits:str}
-                    "apple"
-                    42
-                  §/HSET
+            module Test Test block
+              func Main () → void
+                !
+                let HashSet<string>:fruits = new HashSet<string>() { "apple", 42 }
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1772,14 +1693,11 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionPush_ValidValue_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                  §/LIST
-                  §PUSH{numbers} 3
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2 }
+                numbers.Add(3)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1795,14 +1713,11 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionPush_InvalidValue_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                  §/LIST
-                  §PUSH{numbers} "invalid"
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2 }
+                numbers.Add("invalid")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1819,13 +1734,11 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryPut_ValidKeyValue_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{ages:str:i32}
-                    §KV "alice" 30
-                  §/DICT
-                  §PUT{ages} "bob" 25
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:ages = new Dictionary<string, int>() { { "alice", 30 } }
+                set ages["bob"] 25
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1841,13 +1754,11 @@ public class CollectionOperationsTests
     public void TypeCheck_DictionaryPut_InvalidKey_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{ages:str:i32}
-                    §KV "alice" 30
-                  §/DICT
-                  §PUT{ages} 123 25
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:ages = new Dictionary<string, int>() { { "alice", 30 } }
+                set ages[123] 25
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1864,14 +1775,11 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionSetIndex_ValidIndex_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                  §/LIST
-                  §SETIDX{numbers} 0 99
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2 }
+                set numbers[0] 99
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1887,14 +1795,11 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionSetIndex_InvalidValue_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                  §/LIST
-                  §SETIDX{numbers} 0 "invalid"
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2 }
+                set numbers[0] "invalid"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1911,10 +1816,10 @@ public class CollectionOperationsTests
     public void TypeCheck_UndefinedCollection_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §PUSH{undefined} 1
+            module Test Test block
+              func Main () → void
+                !
+                undefined.Add(1)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1931,14 +1836,11 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionInsert_ValidIndexAndValue_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                  §/LIST
-                  §INS{numbers} 0 99
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2 }
+                numbers.Insert(0, 99)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1954,14 +1856,11 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionClear_ValidCollection_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                  §/LIST
-                  §CLR{numbers}
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2 }
+                numbers.Clear()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1977,14 +1876,11 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionRemove_ValidValue_NoErrors()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                  §/LIST
-                  §REM{numbers} 1
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2 }
+                numbers.Remove(1)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2000,14 +1896,11 @@ public class CollectionOperationsTests
     public void TypeCheck_CollectionRemove_InvalidValue_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                  §/LIST
-                  §REM{numbers} "invalid"
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2 }
+                numbers.Remove("invalid")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2028,16 +1921,12 @@ public class CollectionOperationsTests
     public void Parse_ForeachOverList_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                    3
-                  §/LIST
-                  §EACH{n} numbers
-                      §P n
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2, 3 }
+                each n in numbers
+                  Console.WriteLine(n)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2052,16 +1941,12 @@ public class CollectionOperationsTests
     public void Emit_ForeachOverList_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{numbers:i32}
-                    1
-                    2
-                    3
-                  §/LIST
-                  §EACH{n} numbers
-                      §P n
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:numbers = new List<int>() { 1, 2, 3 }
+                each n in numbers
+                  Console.WriteLine(n)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2078,16 +1963,13 @@ public class CollectionOperationsTests
     public void Parse_DictionaryForeachKV_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{scores:str:i32}
-                    §KV "alice" 100
-                    §KV "bob" 85
-                  §/DICT
-                  §EACHKV{name:score} scores
-                      §P name
-                      §P score
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:scores = new Dictionary<string, int>() { { "alice", 100 }, { "bob", 85 } }
+                each name, score in scores
+                  Console.WriteLine(name)
+                  Console.WriteLine(score)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2107,15 +1989,12 @@ public class CollectionOperationsTests
     public void Emit_DictionaryForeachKV_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §DICT{scores:str:i32}
-                    §KV "alice" 100
-                    §KV "bob" 85
-                  §/DICT
-                  §EACHKV{name:score} scores
-                      §P name
+            module Test Test block
+              func Main () → void
+                !
+                let Dictionary<string, int>:scores = new Dictionary<string, int>() { { "alice", 100 }, { "bob", 85 } }
+                each name, score in scores
+                  Console.WriteLine(name)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2132,19 +2011,15 @@ public class CollectionOperationsTests
     public void Emit_CollectionWithMultipleOperations_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §LIST{data:i32}
-                    1
-                    2
-                    3
-                  §/LIST
-                  §PUSH{data} 4
-                  §INS{data} 0 0
-                  §SETIDX{data} 2 99
-                  §REM{data} 1
-                  §CLR{data}
+            module Test Test block
+              func Main () → void
+                !
+                let List<int>:data = new List<int>() { 1, 2, 3 }
+                data.Add(4)
+                data.Insert(0, 0)
+                set data[2] 99
+                data.Remove(1)
+                data.Clear()
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2165,15 +2040,11 @@ public class CollectionOperationsTests
     public void Parse_CollectionContainsExpression_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{bool}
-                  §LIST{items:i32}
-                    1
-                    2
-                    3
-                  §/LIST
-                  §R §HAS{items} 2
+            module Test Test block
+              func Main () → bool
+                !
+                let List<int>:items = new List<int>() { 1, 2, 3 }
+                return items.Contains(2)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2190,15 +2061,11 @@ public class CollectionOperationsTests
     public void Emit_CollectionContainsExpression_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{bool}
-                  §LIST{items:i32}
-                    1
-                    2
-                    3
-                  §/LIST
-                  §R §HAS{items} 2
+            module Test Test block
+              func Main () → bool
+                !
+                let List<int>:items = new List<int>() { 1, 2, 3 }
+                return items.Contains(2)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2214,13 +2081,11 @@ public class CollectionOperationsTests
     public void Parse_DictionaryContainsKey_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{bool}
-                  §DICT{cache:str:i32}
-                    §KV "test" 42
-                  §/DICT
-                  §R §HAS{cache} §KEY "test"
+            module Test Test block
+              func Main () → bool
+                !
+                let Dictionary<string, int>:cache = new Dictionary<string, int>() { { "test", 42 } }
+                return cache.ContainsKey("test")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2238,13 +2103,11 @@ public class CollectionOperationsTests
     public void Emit_DictionaryContainsKey_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{bool}
-                  §DICT{cache:str:i32}
-                    §KV "test" 42
-                  §/DICT
-                  §R §HAS{cache} §KEY "test"
+            module Test Test block
+              func Main () → bool
+                !
+                let Dictionary<string, int>:cache = new Dictionary<string, int>() { { "test", 42 } }
+                return cache.ContainsKey("test")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2260,15 +2123,11 @@ public class CollectionOperationsTests
     public void Parse_CollectionCount_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{i32}
-                  §LIST{items:i32}
-                    1
-                    2
-                    3
-                  §/LIST
-                  §R §CNT items
+            module Test Test block
+              func Main () → int
+                !
+                let List<int>:items = new List<int>() { 1, 2, 3 }
+                return items . Count
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2284,15 +2143,11 @@ public class CollectionOperationsTests
     public void Emit_CollectionCount_GeneratesCorrectCSharp()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{i32}
-                  §LIST{items:i32}
-                    1
-                    2
-                    3
-                  §/LIST
-                  §R §CNT items
+            module Test Test block
+              func Main () → int
+                !
+                let List<int>:items = new List<int>() { 1, 2, 3 }
+                return items . Count
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2308,12 +2163,11 @@ public class CollectionOperationsTests
     public void EffectSystem_CollectionMutations_TracksMutation()
     {
         var source = """
-            §M{Test}
-              §F{TestFunc:pub}
-                  §O{void}
-                  §LIST{a:i32}
-                  §/LIST
-                  §PUSH{a} 1
+            module Test Test block
+              func TestFunc () → void
+                !
+                let List<int>:a = new List<int>()
+                a.Add(1)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2336,10 +2190,10 @@ public class CollectionOperationsTests
     {
         // §IDX arr 0 (correct format) should parse to ArrayAccessNode
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{i32}
-                  §R §IDX args 0
+            module Test Test block
+              func Get () → int
+                !
+                return args[0]
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2372,10 +2226,10 @@ public class CollectionOperationsTests
     {
         // §IDX{arr} 0 (brace format) is valid — the attribute provides the array reference
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{i32}
-                  §R §IDX{arr} 0
+            module Test Test block
+              func Get () → int
+                !
+                return arr[0]
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2393,10 +2247,10 @@ public class CollectionOperationsTests
     public void RoundTrip_ArrayAccess_EmitsAndReparsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{GetFirst:pub}
-                  §O{i32}
-                  §R §IDX myList 0
+            module Test Test block
+              func GetFirst () → int
+                !
+                return myList[0]
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2444,11 +2298,11 @@ public class CollectionOperationsTests
     public void Parse_ForeachWithoutIndex_IndexIsNull()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACH{item:i32} items
-                      §P item
+            module Test Test block
+              func Main () → void
+                !
+                each int:item in items
+                  Console.WriteLine(item)
             """;
 
         var module = Parse(source, out var diagnostics);

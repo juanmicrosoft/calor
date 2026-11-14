@@ -1,14 +1,16 @@
-§M{ViolationDetected}
-  §F{BadPostcondition:pub} (i32:x) -> i32
-    §S (> result x)
-    §R x
+module ViolationDetected ViolationDetected block
+  func BadPostcondition (int:x) → int
+    !
+    => (result > x)
+    return x
 
-  §F{ImpossibleContract:pub} (i32:x) -> i32
-    §S (> (+ x 1) (+ x 2))
-    §R (+ x 1)
+  func ImpossibleContract (int:x) → int
+    !
+    => ((x + 1) > (x + 2))
+    return (x + 1)
 
-  §F{DivisionBug:pub} (i32:a, i32:b) -> i32
-    §Q (!= b 0)
-    §S (> (/ a b) a)
-    §R (/ a b)
-
+  func DivisionBug (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => ((a / b) > a)
+    return (a / b)

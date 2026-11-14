@@ -50,11 +50,11 @@ public class ClassMemberBindingTests
     public void BindMethod_SimpleMethod_ProducesMethod()
     {
         var source = @"
-§M{Test}
-    §CL{Calculator:pub}
-        §MT{Add:pub} (i32:x, i32:y) -> i32
-            §E{}
-            §R (+ x y)
+module Test Test block
+  class Calculator
+    func Add (int:x, int:y) → int
+      !
+      return (x + y)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -71,14 +71,15 @@ public class ClassMemberBindingTests
     public void BindMethod_OverloadedMethods_AllBound()
     {
         var source = @"
-§M{Test}
-    §CL{Converter:pub}
-        §MT{Convert:pub} (i32:x) -> str
-            §E{}
-            §R (str x)
-        §MT{Convert:pub} (i32:x, str:format) -> str
-            §E{}
-            §R (str x)
+module Test Test block
+  class Converter
+    func Convert (int:x) → string
+      !
+      return (x).ToString()
+
+    func Convert (int:x, string:format) → string
+      !
+      return (x).ToString()
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -92,9 +93,10 @@ public class ClassMemberBindingTests
     public void BindMethod_AbstractMethod_NotBound()
     {
         var source = @"
-§M{Test}
-    §CL{Base:pub:abs}
-        §MT{DoWork:pub:abs}
+module Test Test block
+  class Base abstract
+    func DoWork abstract ()
+      !
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -109,12 +111,11 @@ public class ClassMemberBindingTests
     public void BindConstructor_WithFieldAssignment_FieldResolves()
     {
         var source = @"
-§M{Test}
-    §CL{Widget:pub}
-        §FLD{i32:_count:priv}
-        §CTOR{pub} (i32:count)
-          §ASSIGN _count count
-        §/CTOR
+module Test Test block
+  class Widget
+    field int:_count private
+    ctor (int:count)
+      set _count count
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -131,12 +132,12 @@ public class ClassMemberBindingTests
     public void BindConstructor_FieldInScope_NoUndefinedReference()
     {
         var source = @"
-§M{Test}
-    §CL{Widget:pub}
-        §FLD{i32:_count:priv}
-        §MT{UseCount:pub}
-            §E{}
-            §C{Console.WriteLine} §A _count §/C
+module Test Test block
+  class Widget
+    field int:_count private
+    func UseCount ()
+      !
+      Console.WriteLine(_count)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -151,22 +152,29 @@ public class ClassMemberBindingTests
     public void InheritedFields_ResolveAcrossHierarchy_WithVisibilityAndIdentity()
     {
         var source = """
-            §M{Test}
-              §CL{Base:pub}
-                §FLD{i32:shared:prot}
-                §FLD{i32:publicValue:pub}
-                §FLD{i32:internalValue:int}
-              §CL{Middle:Base:pub}
-                §FLD{i32:secret:priv}
-              §CL{Derived:Middle:pub}
-                §MT{Use:pub} () -> i32
-                  §B{bare:i32} shared
-                  §B{viaThis:i32} §THIS.shared
-                  §B{viaBase:i32} §BASE.shared
-                  §B{viaPublic:i32} §THIS.publicValue
-                  §B{viaInternal:i32} §BASE.internalValue
-                  §B{hidden:object} §BASE.secret
-                  §R (+ bare (+ viaThis viaBase))
+            module Test Test block
+              class Base
+                field int:shared protected
+                field int:publicValue
+                field int:internalValue internal
+
+              class Middle internal
+                extends Base
+
+                field int:secret private
+
+              class Derived internal
+                extends Middle
+
+                func Use () → int
+                  !
+                  let int:bare = shared
+                  let int:viaThis = this . shared
+                  let int:viaBase = base . shared
+                  let int:viaPublic = this . publicValue
+                  let int:viaInternal = base . internalValue
+                  let object:hidden = base . secret
+                  return (bare + (viaThis + viaBase))
             """;
 
         var bound = Bind(source, out var diagnostics);
@@ -226,14 +234,12 @@ public class ClassMemberBindingTests
     public void BindPropertyAccessor_Getter_ProducesPropertyGetter()
     {
         var source = @"
-§M{Test}
-    §CL{Config:pub}
-        §FLD{str:_name:priv}
-        §PROP{Name:str:pub}
-          §GET{pub}
-            §R _name
-          §/GET
-        §/PROP
+module Test Test block
+  class Config
+    field string:_name private
+    property string:Name
+      get public
+        return _name
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -247,17 +253,14 @@ public class ClassMemberBindingTests
     public void BindPropertyAccessor_Setter_HasImplicitValueParam()
     {
         var source = @"
-§M{Test}
-    §CL{Config:pub}
-        §FLD{str:_name:priv}
-        §PROP{Name:str:pub}
-          §GET{pub}
-            §R _name
-          §/GET
-          §SET{pub}
-            §ASSIGN _name value
-          §/SET
-        §/PROP
+module Test Test block
+  class Config
+    field string:_name private
+    property string:Name
+      get public
+        return _name
+      set public
+        set _name value
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -356,12 +359,12 @@ public class ClassMemberBindingTests
         // When a parameter has the same name as a field, bare name references
         // resolve to the parameter (innermost scope wins)
         var source = @"
-§M{Test}
-    §CL{Foo:pub}
-        §FLD{i32:x:priv}
-        §MT{Set:pub} (i32:x)
-            §E{}
-            §C{Console.WriteLine} §A x §/C
+module Test Test block
+  class Foo
+    field int:x private
+    func Set (int:x)
+      !
+      Console.WriteLine(x)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -400,12 +403,12 @@ public class ClassMemberBindingTests
     public void BindAssignment_InMethod_ProducesBoundAssignment()
     {
         var source = @"
-§M{Test}
-    §CL{Counter:pub}
-        §FLD{i32:_count:priv}
-        §MT{Increment:pub}
-            §E{}
-            §ASSIGN _count (+ _count 1)
+module Test Test block
+  class Counter
+    field int:_count private
+    func Increment ()
+      !
+      set _count (_count + 1)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -421,11 +424,11 @@ public class ClassMemberBindingTests
         // If we encounter an AST node type the Binder doesn't handle,
         // it should produce BoundUnsupportedStatement + Calor0931, not throw
         var source = @"
-§M{Test}
-    §CL{MyClass:pub}
-        §MT{DoWork:pub}
-            §E{}
-            §C{Console.WriteLine} §A ""hello"" §/C
+module Test Test block
+  class MyClass
+    func DoWork ()
+      !
+      Console.WriteLine(""hello"")
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -441,9 +444,10 @@ public class ClassMemberBindingTests
     public void TopLevelFunction_HasCorrectMemberKind()
     {
         var source = @"
-§M{Test}
-    §F{add:pub} (i32:x, i32:y) -> i32
-        §R (+ x y)
+module Test Test block
+  func add (int:x, int:y) → int
+    !
+    return (x + y)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -456,23 +460,21 @@ public class ClassMemberBindingTests
     public void AllMemberKinds_CorrectlyClassified()
     {
         var source = @"
-§M{Test}
-    §CL{MyClass:pub}
-        §FLD{i32:_x:priv}
-        §MT{Foo:pub}
-            §E{}
-            §C{Console.WriteLine} §A ""hello"" §/C
-        §CTOR{pub} (i32:x)
-          §ASSIGN _x x
-        §/CTOR
-        §PROP{X:i32:pub}
-          §GET{pub}
-            §R _x
-          §/GET
-          §SET{pub}
-            §ASSIGN _x value
-          §/SET
-        §/PROP
+module Test Test block
+  class MyClass
+    field int:_x private
+    func Foo ()
+      !
+      Console.WriteLine(""hello"")
+
+    ctor (int:x)
+      set _x x
+
+    property int:X
+      get public
+        return _x
+      set public
+        set _x value
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -495,11 +497,11 @@ public class ClassMemberBindingTests
     public void ContractInference_SkipsClassMembers()
     {
         var source = @"
-§M{Test}
-    §CL{Math:pub}
-        §MT{Divide:pub} (i32:x, i32:y) -> i32
-            §E{}
-            §R (/ x y)
+module Test Test block
+  class Math
+    func Divide (int:x, int:y) → int
+      !
+      return (x / y)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -523,11 +525,11 @@ public class ClassMemberBindingTests
         // If a class has methods that fail to bind, they should produce diagnostics
         // but not be added to the functions list
         var source = @"
-§M{Test}
-    §CL{Good:pub}
-        §MT{WorkingMethod:pub}
-            §E{}
-            §C{Console.WriteLine} §A ""ok"" §/C
+module Test Test block
+  class Good
+    func WorkingMethod ()
+      !
+      Console.WriteLine(""ok"")
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -543,9 +545,10 @@ public class ClassMemberBindingTests
     public void ConditionalExpression_BothBranchesPreserved()
     {
         var source = @"
-§M{Test}
-    §F{abs:pub} (i32:x) -> i32
-        §R (? (>= x 0) x (- 0 x))
+module Test Test block
+  func abs (int:x) → int
+    !
+    return ((x >= 0) ? x : (0 - x))
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -567,12 +570,12 @@ public class ClassMemberBindingTests
     public void BindForeach_InMethod_ProducesBoundForeach()
     {
         var source = @"
-§M{Test}
-    §CL{Processor:pub}
-        §MT{Process:pub} (List<str>:items)
-            §E{}
-            §EACH{item:str} items
-                §C{Console.WriteLine} §A item §/C
+module Test Test block
+  class Processor
+    func Process (List<string>:items)
+      !
+      each string:item in items
+        Console.WriteLine(item)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -602,13 +605,12 @@ public class ClassMemberBindingTests
     public void BindUsing_InMethod_ProducesBoundUsing()
     {
         var source = @"
-§M{Test}
-    §CL{FileHandler:pub}
-        §MT{ReadFile:pub} (str:path) -> str
-            §E{}
-            §USE{reader:StreamReader} §C{File.OpenText} §A path §/C
-              §R §C{reader.ReadToEnd} §/C
-            §/USE
+module Test Test block
+  class FileHandler
+    func ReadFile (string:path) → string
+      !
+      using StreamReader:reader = File.OpenText(path)
+        return reader.ReadToEnd()
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -731,9 +733,10 @@ public class ClassMemberBindingTests
     public void DecimalLiteral_NotMisparsedAsZero()
     {
         var source = @"
-§M{Test}
-    §F{convert:pub} (dec:amount) -> dec
-        §R (/ amount DEC:100)
+module Test Test block
+  func convert (decimal:amount) → decimal
+    !
+    return (amount / 100m)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -758,11 +761,11 @@ public class ClassMemberBindingTests
         // End-to-end: parse → bind → analyze → assert Calor0920 found
         // Uses ReportOnlyVerified=false to see heuristic findings
         var source = @"
-§M{Test}
-    §CL{Calculator:pub}
-        §MT{Divide:pub} (i32:x, i32:y) -> i32
-            §E{}
-            §R (/ x y)
+module Test Test block
+  class Calculator
+    func Divide (int:x, int:y) → int
+      !
+      return (x / y)
 ";
         var module = Parse(source, out var parseDiags);
         Assert.False(parseDiags.HasErrors, $"Parse errors: {string.Join(", ", parseDiags.Errors.Select(e => e.Message))}");
@@ -780,13 +783,12 @@ public class ClassMemberBindingTests
     {
         // Constructor with : base(args) — initializer args should be visible to analysis
         var source = @"
-§M{Test}
-    §CL{Widget:pub}
-        §FLD{i32:_value:priv}
-        §CTOR{pub} (i32:v)
-          §BASE §A v §/BASE
-          §ASSIGN _value v
-        §/CTOR
+module Test Test block
+  class Widget
+    field int:_value private
+    ctor (int:v)
+      base(v)
+      set _value v
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -805,20 +807,19 @@ public class ClassMemberBindingTests
     public void StaticMethod_BareInstanceFieldsAndProperties_AreRejectedButStaticMembersResolve()
     {
         var source = @"
-§M{Test}
-    §CL{Utils:pub}
-        §FLD{i32:instanceField:priv}
-        §FLD{i32:StaticField:priv:stat}
-        §PROP{InstanceProperty:i32:pub}
-          §GET
-        §/PROP
-        §PROP{StaticProperty:i32:pub:stat}
-          §GET
-        §/PROP
-        §MT{Use:pub:stat} () -> i32
-            §B{fieldValue:i32} instanceField
-            §B{propertyValue:i32} InstanceProperty
-            §R (+ StaticField StaticProperty)
+module Test Test block
+  class Utils
+    field int:instanceField private
+    field int:StaticField private static
+    property int:InstanceProperty
+      get
+    property int:StaticProperty static
+      get
+    func Use static () → int
+      !
+      let int:fieldValue = instanceField
+      let int:propertyValue = InstanceProperty
+      return (StaticField + StaticProperty)
 ";
 
         var bound = Bind(source, out var diagnostics);
@@ -868,16 +869,17 @@ public class ClassMemberBindingTests
     public void StaticAndInstanceParameterlessConstructors_CoexistAndNewUsesInstanceConstructor()
     {
         var source = @"
-§M{Test}
-    §CL{Widget:pub}
-        §CTOR{stat}
-          §P STR:""static""
-        §/CTOR
-        §CTOR{pub}
-          §P STR:""instance""
-        §/CTOR
-    §F{Create:pub} () -> Widget
-      §R §NEW{Widget} §/NEW
+module Test Test block
+  class Widget
+    ctor stat ()
+      Console.WriteLine(""static"")
+
+    ctor ()
+      Console.WriteLine(""instance"")
+
+  func Create () → Widget
+    !
+    return new Widget()
 ";
 
         var bound = Bind(source, out var diagnostics);
@@ -912,12 +914,12 @@ public class ClassMemberBindingTests
     public void StaticMethod_ThisExpression_DoesNotResolve()
     {
         var source = @"
-§M{Test}
-    §CL{Utils:pub}
-        §FLD{i32:_counter:priv}
-        §MT{StaticMethod:pub:stat}
-            §E{}
-            §C{Console.WriteLine} §A §THIS §/C
+module Test Test block
+  class Utils
+    field int:_counter private
+    func StaticMethod static ()
+      !
+      Console.WriteLine(this)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);

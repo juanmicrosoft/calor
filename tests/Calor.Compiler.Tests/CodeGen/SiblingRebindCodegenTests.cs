@@ -114,14 +114,15 @@ public class SiblingRebindCodegenTests
     public void StatementMatch_ArmBindingCannotEscapeSwitch()
     {
         var result = Program.Compile("""
-            §M{SwitchScope}
-              §F{Probe:pub} (i32:x) -> i32
-                §W x
-                  §K 1
-                    §B{v:i32} 10
-                  §K _
-                    §B{v:i32} 20
-                §R v
+            module SwitchScope SwitchScope block
+              func Probe (int:x) → int
+                !
+                match x
+                  case 1
+                    let int:v = 10
+                  case _
+                    let int:v = 20
+                return v
             """, "escape.calr");
         Assert.True(result.HasErrors);
         Assert.Empty(result.GeneratedCode);
@@ -139,9 +140,16 @@ public class SiblingRebindCodegenTests
     public void SiblingMutableRebind_ReDeclaresInEachBlock()
     {
         var cs = Emit(
-            "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
-            "    §IF (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n");
+            "module S S block\n" +
+            "  func Do (bool:a, bool:b) → int\n" +
+            "    !\n" +
+            "    if (a == true)\n" +
+            "      var int:x = 1\n" +
+            "      return x\n" +
+            "    if (b == true)\n" +
+            "      var int:x = 2\n" +
+            "      return x\n" +
+            "    return 0\n");
 
         // Two independent declarations in the two sibling blocks — not a reassignment
         // of an out-of-scope local.
@@ -152,8 +160,15 @@ public class SiblingRebindCodegenTests
     public void AccumulatorRebind_StaysAReassignment()
     {
         var cs = Emit(
-            "§M{S}\n  §F{Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n    §B{~i} 2\n" +
-            "    §WH (<= i n)\n      §B{~result} (* result i)\n      §B{~i} (+ i 1)\n    §R result\n");
+            "module S S block\n" +
+            "  func Fact (int:n) → int\n" +
+            "    !\n" +
+            "    var result = 1\n" +
+            "    var i = 2\n" +
+            "    while (i <= n)\n" +
+            "      var result = (result * i)\n" +
+            "      var i = (i + 1)\n" +
+            "    return result\n");
 
         // Declared once, reassigned inside the loop (no shadowing re-declaration).
         Assert.Single(Regex.Matches(cs, @"\b(var|int) result = 1"));

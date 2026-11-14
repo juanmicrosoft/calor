@@ -56,12 +56,12 @@ public class ContractSimplificationRuntimeTests
         Assert.Equal(7, Invoke(nested, 0));
         Assert.Equal(7, Invoke(nested, 2));
         var nullableArray = Compile("""
-            §M{TypedContracts}
-              §CL{NullableDomain:pub}
-                §MT{Check:pub} (i32[]?:x) -> i32
-                  §E{}
-                  §Q (forall ((i i32)) (-> (&& (!= x null) (&& (>= i INT:0) (< i x.Length))) true))
-                  §R INT:7
+            module TypedContracts TypedContracts block
+              class NullableDomain
+                func Check (int[]?:x) → int
+                  !
+                  requires (forall int:i where ((x != null) && ((i >= 0) && (i < x.Length))) : true)
+                  return 7
             """, verify, rejectNullableWarnings: true);
         var domainType = nullableArray.GetType("TypedContracts.NullableDomain")!;
         var domain = Activator.CreateInstance(domainType);
@@ -438,17 +438,18 @@ public class ContractSimplificationRuntimeTests
         }
 
         var nullable = Compile("""
-            §M{TypedContracts}
-              §F{Check:pub} (i32:x) -> i64?
-                §E{}
-                §R x
+            module TypedContracts TypedContracts block
+              func Check (int:x) → long?
+                !
+                return x
             """, verify);
         Assert.Equal(3L, Assert.IsType<long>(Invoke(nullable, 3)));
         var lambda = Compile("""
-            §M{TypedContracts}
-              §F{Check:pub} (i32:x) -> Func<i64?>
-                §E{}
-                §R §LAM{} §R x §/LAM
+            module TypedContracts TypedContracts block
+              func Check (int:x) → Func<long?>
+                !
+                return () =>
+                  return x
             """, verify);
         var factory = Assert.IsType<Func<long?>>(Invoke(lambda, 3));
         Assert.Equal(3L, factory());
@@ -509,18 +510,24 @@ public class ContractSimplificationRuntimeTests
     public void PrimaryReceivers_PreserveBaseAndConditionalChains(bool verify)
     {
         const string source = """
-            §M{ReceiverChains}
-              §CL{Parent:pub}
-                §FLD{i32:Value:pub}
-              §CL{Derived:pub}
-                §EXT{Parent}
-                §MT{Read:pub} () -> i32
-                  §R §BASE.Value
-              §CL{Node:pub}
-                §FLD{Node:Child:pub}
-                §FLD{i32:Value:pub}
-              §F{Check:pub} (Node:x) -> i32?
-                §R x?.Child .Value
+            module ReceiverChains ReceiverChains block
+              class Parent
+                field int:Value
+
+              class Derived
+                extends Parent
+
+                func Read () → int
+                  !
+                  return base . Value
+
+              class Node
+                field Node:Child
+                field int:Value
+
+              func Check (Node:x) → int?
+                !
+                return x?.Child . Value
             """;
         const string harness = """
             public static class Caller

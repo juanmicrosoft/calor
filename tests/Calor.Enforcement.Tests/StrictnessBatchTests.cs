@@ -29,12 +29,10 @@ public class StrictnessBatchTests
     public void DelegateInvocation_FunctionTypedParameter_WithoutRow_IsUnknown()
     {
         var source = @"
-§M{Test}
-  §F{Apply:pub}
-      §I{Func<i32,i32>:transform}
-      §I{i32:value}
-      §O{i32}
-      §R §C{transform} §A value §/C
+module Test Test block
+  func Apply (Func<int, int>:transform, int:value) → int
+    !
+    return transform(value)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -53,11 +51,11 @@ public class StrictnessBatchTests
     public void DelegateInvocation_LambdaBoundLocal_ChargesInferredRow()
     {
         var source = @"
-§M{Test}
-  §F{UseLambda:pub}
-      §O{i32}
-      §B{f} §LAM{x:i32} (+ x 1) §/LAM
-      §R §C{f} §A INT:1 §/C
+module Test Test block
+  func UseLambda () → int
+    !
+    let f = (int:x) => (x + 1)
+    return f(1)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -75,12 +73,10 @@ public class StrictnessBatchTests
     public void DelegateInvocation_UnderPermissiveEffects_Calor0425IsSuppressed()
     {
         var source = @"
-§M{Test}
-  §F{Apply:pub}
-      §I{Func<i32,i32>:transform}
-      §I{i32:value}
-      §O{i32}
-      §R §C{transform} §A value §/C
+module Test Test block
+  func Apply (Func<int, int>:transform, int:value) → int
+    !
+    return transform(value)
 ";
         var result = TestHarness.CompileWithEffects(NativeSource(source, """
             module Test Test
@@ -101,14 +97,13 @@ public class StrictnessBatchTests
     {
         // The delegate error must NOT hit same-module bare-name calls.
         var source = @"
-§M{Test}
-  §F{Helper:priv}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x 1)
-  §F{Main:pub}
-      §O{i32}
-      §R §C{Helper} §A INT:1 §/C
+module Test Test block
+  func Helper private (int:x) → int
+    return (x + 1)
+
+  func Main () → int
+    !
+    return Helper(1)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -132,12 +127,11 @@ public class StrictnessBatchTests
         // Now it routes through the unknown-call chain (Calor0411 + worst-case
         // effects → Calor0410) under the default strict policy.
         var source = @"
-§M{Test}
-  §CL{Mapper:pub}
-      §MT{Apply:pub}
-          §I{i32:value}
-          §O{i32}
-          §R §C{transform} §A value §/C
+module Test Test block
+  class Mapper
+    func Apply (int:value) → int
+      !
+      return transform(value)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -162,17 +156,18 @@ public class StrictnessBatchTests
     public void OverrideWithBroaderEffects_IsError()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}
-      §MT{Render:pub:virt}
-          §O{void}
-          §E{}
-  §CL{Derived:pub}
-      §EXT{Base}
-      §MT{Render:pub:over}
-          §O{void}
-          §E{cw}
-          §P ""laundered""
+module Test Test block
+  class Base
+    func Render virtual () → void
+      !
+      return
+
+  class Derived
+    extends Base
+
+    func Render override () → void
+      ! cw
+      Console.WriteLine(""laundered"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -195,14 +190,18 @@ public class StrictnessBatchTests
     public void GenericOverrideWithAlphaEquivalentTypeParameters_IsMatchedForVariance()
     {
         var source = """
-            §M{Test}
-              §CL{Base:pub}
-                §MT{Render<T>:pub:virt} (T:value) -> void
-                  §E{}
-              §CL{Derived:Base:pub}
-                §MT{Render<U>:pub:over} (U:value) -> void
-                  §E{cw}
-                  §P "laundered"
+            module Test Test block
+              class Base
+                func Render<T> virtual (T:value) → void
+                  !
+                  return
+
+              class Derived internal
+                extends Base
+
+                func Render<U> override (U:value) → void
+                  ! cw
+                  Console.WriteLine("laundered")
             """;
 
         var result = TestHarness.Compile(NativeSource(source, """
@@ -226,18 +225,18 @@ public class StrictnessBatchTests
     public void OverrideWithSubsetEffects_Compiles()
     {
         var source = @"
-§M{Test}
-  §CL{Base:pub}
-      §MT{Render:pub:virt}
-          §O{void}
-          §E{cw,fs:w}
-          §P ""base""
-  §CL{Derived:pub}
-      §EXT{Base}
-      §MT{Render:pub:over}
-          §O{void}
-          §E{cw}
-          §P ""derived""
+module Test Test block
+  class Base
+    func Render virtual () → void
+      ! cw, fs:w
+      Console.WriteLine(""base"")
+
+  class Derived
+    extends Base
+
+    func Render override () → void
+      ! cw
+      Console.WriteLine(""derived"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -260,17 +259,17 @@ public class StrictnessBatchTests
     public void InterfaceImplementationWithBroaderEffects_IsError()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRenderer}
-      §MT{Render}
-          §O{void}
-          §E{}
-  §CL{ConsoleRenderer:pub}
-      §IMPL{IRenderer}
-      §MT{Render:pub}
-          §O{void}
-          §E{cw}
-          §P ""rendering""
+module Test Test block
+  interface IRenderer
+    func Render () → void
+      !
+
+  class ConsoleRenderer
+    implements IRenderer
+
+    func Render () → void
+      ! cw
+      Console.WriteLine(""rendering"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -293,17 +292,17 @@ public class StrictnessBatchTests
     public void InterfaceImplementationWithinDeclaredEffects_Compiles()
     {
         var source = @"
-§M{Test}
-  §IFACE{IRenderer}
-      §MT{Render}
-          §O{void}
-          §E{cw}
-  §CL{ConsoleRenderer:pub}
-      §IMPL{IRenderer}
-      §MT{Render:pub}
-          §O{void}
-          §E{cw}
-          §P ""rendering""
+module Test Test block
+  interface IRenderer
+    func Render () → void
+      ! cw
+
+  class ConsoleRenderer
+    implements IRenderer
+
+    func Render () → void
+      ! cw
+      Console.WriteLine(""rendering"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -327,12 +326,13 @@ public class StrictnessBatchTests
         // Base class is external C# (not in this module): variance cannot be
         // checked, so the assumed channel is Calor0425 (§13.1's `:260` rewrite).
         var source = @"
-§M{Test}
-  §CL{MyController:pub}
-      §EXT{SomeExternalBase}
-      §MT{Handle:pub:over}
-          §O{void}
-          §E{}
+module Test Test block
+  class MyController
+    extends SomeExternalBase
+
+    func Handle override () → void
+      !
+      return
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -479,12 +479,10 @@ var x = 1;
         // pass strict enforcement. With no type information the call routes
         // through the unknown-call chain (fail loud), not the purged name list.
         var source = @"
-§M{Test}
-  §F{AddItem:pub}
-      §O{void}
-      §C{items.Add}
-        §A INT:1
-      §/C
+module Test Test block
+  func AddItem () → void
+    !
+    items.Add(1)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
@@ -504,13 +502,11 @@ var x = 1;
         // With a typed receiver the manifest resolves List`1.Add = mut: the
         // caller must declare mut (and gets Calor0410, not Calor0411, without it).
         var missing = @"
-§M{Test}
-  §F{AddItem:pub}
-      §O{void}
-      §B{List<i32>:items} §NEW{List<i32>} §/NEW
-      §C{items.Add}
-        §A INT:1
-      §/C
+module Test Test block
+  func AddItem () → void
+    !
+    let List<int>:items = new List<int>()
+    items.Add(1)
 ";
         var failing = TestHarness.Compile(NativeSource(missing, """
             module Test Test
@@ -595,25 +591,23 @@ var x = 1;
         // function is resolved as the VALUE, so the DECOY'S row governs — row-less
         // ⇒ Calor0425 + Calor0410 'unknown' — never the shadowed pure function's.
         var source = @"
-§M{Shadow}
-  §F{Helper:pub}
-      §O{i32}
-      §E{}
-      §R INT:1
-  §F{Loud:pub}
-      §O{i32}
-      §E{cw}
-      §P ""laundered""
-      §R INT:2
-  §F{Go:pub}
-      §I{Func<i32>:Helper}
-      §O{i32}
-      §E{}
-      §R §C{Helper} §/C
-  §F{Main:pub}
-      §O{void}
-      §E{}
-      §B{r:i32} §C{Go} §A Loud §/C
+module Shadow Shadow block
+  func Helper () → int
+    !
+    return 1
+
+  func Loud () → int
+    ! cw
+    Console.WriteLine(""laundered"")
+    return 2
+
+  func Go (Func<int>:Helper) → int
+    !
+    return Helper()
+
+  func Main () → void
+    !
+    let int:r = Go(Loud)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Shadow Shadow
@@ -647,13 +641,11 @@ var x = 1;
         // Review C1 (statement leg): effects inside a §PP conditional block are
         // charged (union of branches) — a §PP body is never silently pure.
         var source = @"
-§M{PpHole}
-  §F{Sneaky:pub}
-      §O{void}
-      §E{}
-      §PP{DEBUG}
-      §C{Console.WriteLine} ""hidden effect""
-      §/PP{DEBUG}
+module PpHole PpHole block
+  func Sneaky () → void
+    !
+    pp DEBUG
+      Console.WriteLine(""hidden effect"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module PpHole PpHole
@@ -675,14 +667,12 @@ var x = 1;
         // Review C1 (member leg): a class method wrapped in a class-level §PP
         // block must not escape enforcement.
         var source = @"
-§M{PPM}
-  §CL{Logger:pub}
-      §PP{DEBUG}
-      §MT{Sneak:pub}
-          §O{void}
-          §E{}
-          §C{Console.WriteLine} §A ""pp-wrapped method effect"" §/C
-      §/PP{DEBUG}
+module PPM PPM block
+  class Logger
+    pp DEBUG
+      func Sneak () → void
+        !
+        Console.WriteLine(""pp-wrapped method effect"")
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module PPM PPM
@@ -706,22 +696,23 @@ var x = 1;
         // in-module method is variance-checked (Calor0421) — inheritance must
         // not launder through interface dispatch.
         var source = @"
-§M{InheritLaunder}
-  §IFACE{IQuiet}
-      §MT{Run}
-          §O{void}
-          §E{}
-  §CL{Loud:pub}
-      §MT{Run:pub}
-          §O{void}
-          §E{cw}
-          §P ""runs loud""
-  §CL{Sneaky:pub}
-      §EXT{Loud}
-      §IMPL{IQuiet}
-      §MT{Noop:pub}
-          §O{void}
-          §E{}
+module InheritLaunder InheritLaunder block
+  interface IQuiet
+    func Run () → void
+      !
+
+  class Loud
+    func Run () → void
+      ! cw
+      Console.WriteLine(""runs loud"")
+
+  class Sneaky
+    extends Loud
+    implements IQuiet
+
+    func Noop () → void
+      !
+      return
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module InheritLaunder InheritLaunder
@@ -751,17 +742,18 @@ var x = 1;
         // Review C3 (external arm): §IMPL satisfied only by a member inherited
         // from an external base is surfaced as Calor0425 (§13.1's `:607`).
         var source = @"
-§M{ExtImpl}
-  §IFACE{IQuiet}
-      §MT{Run}
-          §O{void}
-          §E{}
-  §CL{Bridge:pub}
-      §EXT{SomeExternalBase}
-      §IMPL{IQuiet}
-      §MT{Other:pub}
-          §O{void}
-          §E{}
+module ExtImpl ExtImpl block
+  interface IQuiet
+    func Run () → void
+      !
+
+  class Bridge
+    extends SomeExternalBase
+    implements IQuiet
+
+    func Other () → void
+      !
+      return
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module ExtImpl ExtImpl
@@ -787,18 +779,15 @@ var x = 1;
         // function) charges that function's declared effects at the passing
         // site — ConvertAll and friends can no longer launder it.
         var source = @"
-§M{HigherOrder}
-  §F{LoudMap:pub}
-      §I{i32:x}
-      §O{i32}
-      §E{cw}
-      §P ""mapping""
-      §R x
-  §F{Go:pub}
-      §I{List<i32>:items}
-      §O{void}
-      §E{}
-      §B{r} §C{items.ConvertAll} §A LoudMap §/C
+module HigherOrder HigherOrder block
+  func LoudMap (int:x) → int
+    ! cw
+    Console.WriteLine(""mapping"")
+    return x
+
+  func Go (List<int>:items) → void
+    !
+    let r = items.ConvertAll(LoudMap)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module HigherOrder HigherOrder
@@ -1016,24 +1005,19 @@ var x = 1;
         // be captured by an in-module method-name collision — it goes to the
         // unknown chain (fail loud), for both single and chained receivers.
         var source = @"
-§M{RC}
-  §CL{Helper:pub}
-      §MT{Refresh:pub}
-          §O{i32}
-          §E{}
-          §R INT:1
-  §F{GoSingle:pub}
-      §I{SomeExternal:svc}
-      §O{void}
-      §E{}
-      §C{svc.Refresh}
-      §/C
-  §F{GoChained:pub}
-      §I{SomeExternal:svc}
-      §O{void}
-      §E{}
-      §C{svc.conn.Refresh}
-      §/C
+module RC RC block
+  class Helper
+    func Refresh () → int
+      !
+      return 1
+
+  func GoSingle (SomeExternal:svc) → void
+    !
+    svc.Refresh()
+
+  func GoChained (SomeExternal:svc) → void
+    !
+    svc.conn.Refresh()
 ";
         var result = TestHarness.Compile(source);
 
@@ -1054,18 +1038,16 @@ var x = 1;
         // Companion: a receiver statically typed as the in-module declaring
         // class still resolves (declared-§E charge) — no unknown-call noise.
         var source = @"
-§M{RC2}
-  §CL{Helper:pub}
-      §MT{Refresh:pub}
-          §O{i32}
-          §E{}
-          §R INT:1
-  §F{Go:pub}
-      §O{void}
-      §E{alloc}
-      §B{h:Helper} §NEW{Helper} §/NEW
-      §C{h.Refresh}
-      §/C
+module RC2 RC2 block
+  class Helper
+    func Refresh () → int
+      !
+      return 1
+
+  func Go () → void
+    ! alloc
+    let Helper:h = new Helper()
+    h.Refresh()
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module RC2 RC2
@@ -1091,13 +1073,10 @@ var x = 1;
         // Review M1 / v0.15 E4 (§13.1): `§C f §A x §/C` is the same invocation as
         // `§C{f}` — the row of `f` is charged; row-less ⇒ Calor0425 + 0410 'unknown'.
         var source = @"
-§M{Wrap}
-  §F{Apply:pub}
-      §I{Func<i32,i32>:f}
-      §I{i32:x}
-      §O{i32}
-      §E{}
-      §R §C f §A x §/C
+module Wrap Wrap block
+  func Apply (Func<int, int>:f, int:x) → int
+    !
+    return f(x)
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Wrap Wrap
@@ -1117,15 +1096,15 @@ var x = 1;
         // Review M1 / v0.15 E4 (§13.1): invoking the RESULT of a call (`GetF()()`)
         // charges the callee's declared RETURN row; `§O` with no row ⇒ Calor0425.
         var source = @"
-§M{E}
-  §F{GetF:pub}
-      §O{Func<i32>}
-      §E{}
-      §R §LAM{} §R INT:1 §/LAM
-  §F{Go:pub}
-      §O{i32}
-      §E{}
-      §R §C §C{GetF} §/C §/C
+module E E block
+  func GetF () → Func<int>
+    !
+    return () =>
+      return 1
+
+  func Go () → int
+    !
+    return (GetF())()
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module E E
@@ -1229,11 +1208,11 @@ var x = 1;
     public void RowMismatch_AtAssignment_IsError()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
             """, """
             module M M
               func Main (Func<int,int>:src ! cw) → int
@@ -1251,11 +1230,11 @@ var x = 1;
     public void RowMismatch_AtAssignment_Compiles()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{cw} src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                let Func<int, int>:f ! cw = src
+                return 1
             """, """
             module M M
               func Main (Func<int,int>:src ! cw) → int
@@ -1275,11 +1254,11 @@ var x = 1;
         // The source carries no row, so nothing is known about it. Not a
         // mismatch — an undecidable hop.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Main:pub} (Func<i32,i32>:src) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
             """, """
             module M M
               func Main (Func<int,int>:src ! unknown) → int
@@ -1306,12 +1285,12 @@ var x = 1;
         // Two Calor0424s here, and both are wanted: one for the initializer
         // (site 1's first half) and one for the re-assignment.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{~f:Func<i32,i32>} §E{} src
-                §ASSIGN f src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                var Func<int, int>:f ! = src
+                set f src
+                return 1
             """, """
             module M M
               func Main (Func<int,int>:src ! cw) → int
@@ -1330,12 +1309,12 @@ var x = 1;
     public void RowMismatch_AtReassignment_Compiles()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{~f:Func<i32,i32>} §E{cw} src
-                §ASSIGN f src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                var Func<int, int>:f ! cw = src
+                set f src
+                return 1
             """, """
             module M M
               func Main (Func<int,int>:src ! cw) → int
@@ -1359,12 +1338,12 @@ var x = 1;
         // and that limit is recorded in the method's doc comment rather than
         // silently relied on.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §CL{Holder:pub}
-                §FLD{Func<i32,i32>:cb:priv} §E{}
-                §MT{Set:pub} (Func<i32,i32>:src §E{cw}) -> void
-                  §E{}
-                  §ASSIGN cb src
+            module M M block
+              class Holder
+                field Func<int, int>:cb private !
+                func Set (Func<int, int>:src ! cw) → void
+                  !
+                  set cb src
             """, """
             module M M
               class Holder
@@ -1471,10 +1450,10 @@ var x = 1;
     public void RowMismatch_AtReturn_IsError()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{}
-                §E{}
-                §R src
+            module M M block
+              func Pick (Func<int, int>:src ! cw) → Func<int, int> !
+                !
+                return src
             """, """
             module M M
               func Pick (Func<int,int>:src ! cw) → Func<int,int> !
@@ -1491,10 +1470,10 @@ var x = 1;
     public void RowMismatch_AtReturn_Compiles()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{cw}
-                §E{}
-                §R src
+            module M M block
+              func Pick (Func<int, int>:src ! cw) → Func<int, int> ! cw
+                !
+                return src
             """, """
             module M M
               func Pick (Func<int,int>:src ! cw) → Func<int,int> ! cw
@@ -1511,10 +1490,10 @@ var x = 1;
     public void RowMismatch_AtReturn_CannotTell()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Pick:pub} (Func<i32,i32>:src) -> Func<i32,i32> §E{cw}
-                §E{}
-                §R src
+            module M M block
+              func Pick (Func<int, int>:src) → Func<int, int> ! cw
+                !
+                return src
             """, """
             module M M
               func Pick (Func<int,int>:src ! unknown) → Func<int,int> ! cw
@@ -1539,14 +1518,18 @@ var x = 1;
     public void RowMismatch_AtOverride_IsError()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §CL{Base:pub}
-                §MT{Render:pub:virt} () -> void
-                  §E{}
-              §CL{Derived:Base:pub}
-                §MT{Render:pub:over} () -> void
-                  §E{cw}
-                  §P "laundered"
+            module M M block
+              class Base
+                func Render virtual () → void
+                  !
+                  return
+
+              class Derived internal
+                extends Base
+
+                func Render override () → void
+                  ! cw
+                  Console.WriteLine("laundered")
             """, """
             module M M
               class Base
@@ -1569,15 +1552,18 @@ var x = 1;
     public void RowMismatch_AtOverride_Compiles()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §CL{Base:pub}
-                §MT{Render:pub:virt} () -> void
-                  §E{cw,fs:w}
-                  §P "base"
-              §CL{Derived:Base:pub}
-                §MT{Render:pub:over} () -> void
-                  §E{cw}
-                  §P "derived"
+            module M M block
+              class Base
+                func Render virtual () → void
+                  ! cw, fs:w
+                  Console.WriteLine("base")
+
+              class Derived internal
+                extends Base
+
+                func Render override () → void
+                  ! cw
+                  Console.WriteLine("derived")
             """, """
             module M M
               class Base
@@ -1602,15 +1588,17 @@ var x = 1;
     public void RowMismatch_AtInterfaceImpl_IsError()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §IFACE{IRenderer}
-                §MT{Render} () -> void
-                  §E{}
-              §CL{ConsoleRenderer:pub}
-                §IMPL{IRenderer}
-                §MT{Render:pub} () -> void
-                  §E{cw}
-                  §P "rendering"
+            module M M block
+              interface IRenderer
+                func Render () → void
+                  !
+
+              class ConsoleRenderer
+                implements IRenderer
+
+                func Render () → void
+                  ! cw
+                  Console.WriteLine("rendering")
             """, """
             module M M
               interface IRenderer
@@ -1633,15 +1621,17 @@ var x = 1;
     public void RowMismatch_AtInterfaceImpl_Compiles()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §IFACE{IRenderer}
-                §MT{Render} () -> void
-                  §E{cw}
-              §CL{ConsoleRenderer:pub}
-                §IMPL{IRenderer}
-                §MT{Render:pub} () -> void
-                  §E{cw}
-                  §P "rendering"
+            module M M block
+              interface IRenderer
+                func Render () → void
+                  ! cw
+
+              class ConsoleRenderer
+                implements IRenderer
+
+                func Render () → void
+                  ! cw
+                  Console.WriteLine("rendering")
             """, """
             module M M
               interface IRenderer
@@ -1682,17 +1672,19 @@ var x = 1;
         // Discriminating revert: delete the InstantiateAndCharge call in
         // CheckArgumentSite and `UsePure` is silently charged nothing.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
-                §E{e}
-                §R x
-              §F{Announce:pub} (i32:x) -> i32
-                §E{cw}
-                §P x
-                §R x
-              §F{UsePure:pub} () -> i32
-                §E{}
-                §R §C{Map} §A INT:1 §A Announce §/C
+            module M M block
+              func Map <! e> (int:x, Func<int, int>:f ! e) → int
+                ! e
+                return x
+
+              func Announce (int:x) → int
+                ! cw
+                Console.WriteLine(x)
+                return x
+
+              func UsePure () → int
+                !
+                return Map(1, Announce)
             """, """
             module M M
               func Map <! e> (int:x, Func<int,int>:f ! e) → int
@@ -1722,16 +1714,18 @@ var x = 1;
         // The `_Compiles` half the gap pin promised: `Double` in place of
         // `Announce`, so `e := Concrete(∅)` and `Map`'s instantiated row is pure.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
-                §E{e}
-                §R x
-              §F{Double:pub} (i32:x) -> i32
-                §E{}
-                §R (* x INT:2)
-              §F{UsePure:pub} () -> i32
-                §E{}
-                §R §C{Map} §A INT:1 §A Double §/C
+            module M M block
+              func Map <! e> (int:x, Func<int, int>:f ! e) → int
+                ! e
+                return x
+
+              func Double (int:x) → int
+                !
+                return (x * 2)
+
+              func UsePure () → int
+                !
+                return Map(1, Double)
             """, """
             module M M
               func Map <! e> (int:x, Func<int,int>:f ! e) → int
@@ -1759,13 +1753,14 @@ var x = 1;
         // Calor0425." Here `cb` is a function-typed parameter with NO row, so its
         // row is Unknown (§3.5) and the variable cannot be solved.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
-                §E{e}
-                §R x
-              §F{Use:pub} (Func<i32,i32>:cb) -> i32
-                §E{}
-                §R §C{Map} §A INT:1 §A cb §/C
+            module M M block
+              func Map <! e> (int:x, Func<int, int>:f ! e) → int
+                ! e
+                return x
+
+              func Use (Func<int, int>:cb) → int
+                !
+                return Map(1, cb)
             """, """
             module M M
               func Map <! e> (int:x, Func<int,int>:f ! e) → int
@@ -1824,13 +1819,14 @@ var x = 1;
         // Discriminating revert: compare binders by NAME and this reports that
         // 'Outer' uses effect variable 'b'.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
-                §E{b}
-                §R INT:0
-              §F{Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
-                §E{a}
-                §R §C{Inner} §A h §/C
+            module M M block
+              func Inner <! b> (Func<int>:g ! b) → int
+                ! b
+                return 0
+
+              func Outer <! a> (Func<int>:h ! a) → int
+                ! a
+                return Inner(h)
             """, """
             module M M
               func Inner <! b> (Func<int>:g ! b) → int
@@ -1856,13 +1852,14 @@ var x = 1;
         // caller has not promised. That is an undeclared effect, spelled in
         // today's Calor0410 shape.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
-                §E{b}
-                §R INT:0
-              §F{Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
-                §E{}
-                §R §C{Inner} §A h §/C
+            module M M block
+              func Inner <! b> (Func<int>:g ! b) → int
+                ! b
+                return 0
+
+              func Outer <! a> (Func<int>:h ! a) → int
+                !
+                return Inner(h)
             """, """
             module M M
               func Inner <! b> (Func<int>:g ! b) → int
@@ -1972,16 +1969,18 @@ var x = 1;
         // Discriminating revert: delete the PropagateInstantiatedCharges call and
         // `Top` goes silent.
         const string source = """
-            §M{M}
-              §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{e}
-                §R §C{g}
-              §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
-                §E{cw}
-                §R §C{Run} §A h §/C
-              §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
-                §E{}
-                §R §C{Outer} §A q §/C
+            module M M block
+              func Run <! e> (Func<int>:g ! e) → int
+                ! e
+                return g()
+
+              func Outer (Func<int>:h ! cw) → int
+                ! cw
+                return Run(h)
+
+              func Top (Func<int>:q ! cw) → int
+                !
+                return Outer(q)
             """;
 
         var strict = TestHarness.Compile(NativeSource(source, """
@@ -2033,19 +2032,22 @@ var x = 1;
         // PropagateInstantiatedCharges with one sweep over the seed set and this
         // fails while the two-hop pin above still passes.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{e}
-                §R §C{g}
-              §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
-                §E{cw}
-                §R §C{Run} §A h §/C
-              §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
-                §E{cw}
-                §R §C{Outer} §A q §/C
-              §F{Top2:pub} (Func<i32>:r §E{cw}) -> i32
-                §E{}
-                §R §C{Top} §A r §/C
+            module M M block
+              func Run <! e> (Func<int>:g ! e) → int
+                ! e
+                return g()
+
+              func Outer (Func<int>:h ! cw) → int
+                ! cw
+                return Run(h)
+
+              func Top (Func<int>:q ! cw) → int
+                ! cw
+                return Outer(q)
+
+              func Top2 (Func<int>:r ! cw) → int
+                !
+                return Top(r)
             """, """
             module M M
               func Run <! e> (Func<int>:g ! e) → int
@@ -2112,13 +2114,14 @@ var x = 1;
         // Discriminating revert: move `if (arguments.Count == 0) return;` back
         // above the binder-count check and this goes silent.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{NoBinder:pub}<eff e> () -> i32
-                §E{e}
-                §R INT:0
-              §F{Use:pub} () -> i32
-                §E{}
-                §R §C{NoBinder} §/C
+            module M M block
+              func NoBinder <! e> () → int
+                ! e
+                return 0
+
+              func Use () → int
+                !
+                return NoBinder()
             """, """
             module M M
               func NoBinder <! e> () → int
@@ -2148,16 +2151,17 @@ var x = 1;
         // Discriminating revert: compute the extras from the names again and both
         // assertions below fail.
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §IFACE{IThing}
-                §MT{Handle}<eff e, eff f> (Func<i32>:next §E{f}) -> i32
-                  §E{f}
+            module M M block
+              interface IThing
+                func Handle <! e,! f> (Func<int>:next ! f) → int
+                  ! f
 
-              §CL{Impl:pub}
-                §IMPL{IThing}
-                §MT{Handle:pub}<eff f, eff e> (Func<i32>:next §E{f}) -> i32
-                  §E{f}
-                  §R INT:0
+              class Impl
+                implements IThing
+
+                func Handle <! f,! e> (Func<int>:next ! f) → int
+                  ! f
+                  return 0
             """, """
             module M M
               interface IThing
@@ -2190,11 +2194,11 @@ var x = 1;
         // route Calor0424 through the policy check, or restore the
         // varianceSeverity demotion at EffectEnforcementPass.cs:517-519.
         var assignment = Permissive(NativeSource("""
-            §M{M}
-              §F{Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
             """, """
             module M M
               func Main (Func<int,int>:src ! cw) → int
@@ -2222,10 +2226,10 @@ var x = 1;
             d => d.Code == DiagnosticCode.EffectRowMismatch);
 
         var @return = Permissive(NativeSource("""
-            §M{M}
-              §F{Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{}
-                §E{}
-                §R src
+            module M M block
+              func Pick (Func<int, int>:src ! cw) → Func<int, int> !
+                !
+                return src
             """, """
             module M M
               func Pick (Func<int,int>:src ! cw) → Func<int,int> !
@@ -2240,14 +2244,18 @@ var x = 1;
         // error. No test asserted the demotion, and no committed .calr depends
         // on it.
         var @override = Permissive(NativeSource("""
-            §M{M}
-              §CL{Base:pub}
-                §MT{Render:pub:virt} () -> void
-                  §E{}
-              §CL{Derived:Base:pub}
-                §MT{Render:pub:over} () -> void
-                  §E{cw}
-                  §P "laundered"
+            module M M block
+              class Base
+                func Render virtual () → void
+                  !
+                  return
+
+              class Derived internal
+                extends Base
+
+                func Render override () → void
+                  ! cw
+                  Console.WriteLine("laundered")
             """, """
             module M M
               class Base
@@ -2265,15 +2273,17 @@ var x = 1;
             d => d.Code == DiagnosticCode.OverrideEffectVariance);
 
         var impl = Permissive(NativeSource("""
-            §M{M}
-              §IFACE{IRenderer}
-                §MT{Render} () -> void
-                  §E{}
-              §CL{ConsoleRenderer:pub}
-                §IMPL{IRenderer}
-                §MT{Render:pub} () -> void
-                  §E{cw}
-                  §P "rendering"
+            module M M block
+              interface IRenderer
+                func Render () → void
+                  !
+
+              class ConsoleRenderer
+                implements IRenderer
+
+                func Render () → void
+                  ! cw
+                  Console.WriteLine("rendering")
             """, """
             module M M
               interface IRenderer
@@ -2299,11 +2309,11 @@ var x = 1;
         // waiver for "we do not know" is honest; a waiver for "we know it is
         // wrong" is not, and the test above is that half.
         const string source = """
-            §M{M}
-              §F{Main:pub} (Func<i32,i32>:src) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
             """;
 
         Assert.Contains(TestHarness.Compile(NativeSource(source, """
@@ -2335,11 +2345,11 @@ var x = 1;
             UnsafeTranspileOnly = true,
         };
         var result = TestHarness.Compile(NativeSource("""
-            §M{M}
-              §F{Main:pub} (Func<i32,i32>:src) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
             """, """
             module M M
               func Main (Func<int,int>:src ! unknown) → int
@@ -2485,10 +2495,10 @@ var x = 1;
         // clause), by FULL equality. X9c's shape with the row deleted — PP-E1's
         // L7 class.
         var result = TestHarness.Compile("""
-            §M{X9}
-              §F{Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
-                §E{cw}
-                §R §C{transform} §A value §/C
+            module X9 X9 block
+              func Apply (Func<int, int>:transform, int:value) → int
+                ! cw
+                return transform(value)
             """);
 
         var diagnostic = Assert.Single(result.Diagnostics.Warnings
@@ -2512,11 +2522,12 @@ var x = 1;
         // lambda-bound local is CHARGED, so a declaration narrower than it is
         // Calor0410 — with §10.1's provenance naming the local.
         var result = TestHarness.Compile(NativeSource("""
-            §M{Y9}
-              §F{Narrow:pub} () -> void
-                §E{}
-                §B{g} §LAM{} §P "hi" §/LAM
-                §C{g} §/C
+            module Y9 Y9 block
+              func Narrow () → void
+                !
+                let g = () =>
+                  Console.WriteLine("hi")
+                g()
             """, """
             module Y9 Y9
               func Narrow () → void
@@ -2565,12 +2576,12 @@ var x = 1;
         // concrete part is empty, and nothing is reported — this is what makes
         // the four A3 fixtures exit 0 with zero diagnostics (A-1.11).
         var result = TestHarness.Compile(NativeSource("""
-            §M{MiddlewareAfter}
-              §F{RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{e}
-                §B{first:i32} §C{g}
-                §B{second:i32} §C{g}
-                §R (+ first second)
+            module MiddlewareAfter MiddlewareAfter block
+              func RunTwice <! e> (Func<int>:g ! e) → int
+                ! e
+                let int:first = g()
+                let int:second = g()
+                return (first + second)
             """, """
             module MiddlewareAfter MiddlewareAfter
               func RunTwice <! e> (Func<int>:g ! e) → int
@@ -2597,10 +2608,10 @@ var x = 1;
         // know it is wrong", not "we cannot tell" (§4.5), and the binder does
         // not catch it (measured: `§C{x}` on an i32 parameter binds clean).
         const string source = """
-            §M{P1}
-              §F{Go:pub} (i32:x) -> i32
-                §E{}
-                §R §C{x} §/C
+            module P1 P1 block
+              func Go (int:x) → int
+                !
+                return x()
             """;
 
         foreach (var result in new[] { TestHarness.Compile(source), Permissive(source) })
@@ -2625,10 +2636,10 @@ var x = 1;
         // Unknown (Calor0425, fails closed) rather than Calor0418. Pre-E4 this
         // drew Calor0418 "value 'cb' (declared type 'MyExternalDelegate')".
         var result = TestHarness.Compile(NativeSource("""
-            §M{P2}
-              §F{Go:pub} (MyExternalDelegate:cb) -> void
-                §E{}
-                §C{cb} §/C
+            module P2 P2 block
+              func Go (MyExternalDelegate:cb) → void
+                !
+                cb()
             """, """
             module P2 P2
               func Go (MyExternalDelegate:cb) → void
@@ -2650,11 +2661,11 @@ var x = 1;
         // DECLARED row is the value's row (§4.4), and invoking it charges that
         // row, with provenance, and reports nothing further.
         const string source = """
-            §M{F15}
-              §F{Main:pub} (Func<i32,i32>:opaque) -> i32
-                §E{}
-                §B{g:Func<i32,i32>} §E{cw} opaque
-                §R §C{g} §A INT:1 §/C
+            module F15 F15 block
+              func Main (Func<int, int>:opaque) → int
+                !
+                let Func<int, int>:g ! cw = opaque
+                return g(1)
             """;
 
         var strict = TestHarness.Compile(NativeSource(source, """
@@ -3199,13 +3210,14 @@ var x = 1;
         // syntax. Unknown never yields DoesNotFit on either side: this is
         // Calor0425, not Calor0424 with a leaked "(binder #0)".
         var result = TestHarness.Compile(NativeSource("""
-            §M{F6}
-              §F{RunTwice:pub} (Func<i32>:g) -> i32
-                §E{}
-                §R INT:0
-              §F{Handle:pub}<eff e> (Func<i32>:next §E{e}) -> i32
-                §E{e}
-                §R §C{RunTwice} §A next §/C
+            module F6 F6 block
+              func RunTwice (Func<int>:g) → int
+                !
+                return 0
+
+              func Handle <! e> (Func<int>:next ! e) → int
+                ! e
+                return RunTwice(next)
             """, """
             module F6 F6
               func RunTwice (Func<int>:g ! unknown) → int
@@ -3315,16 +3327,16 @@ var x = 1;
     public void UnnameableArgument_IsChargedUnknown_NotSilentlyDropped()
     {
         var result = TestHarness.Compile(NativeSource("""
-            §M{FailClosed}
-              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
-                §E{e}
-                §R (+ §C{stage} §/C §C{stage} §/C)
+            module FailClosed FailClosed block
+              func RunTwice <! e> (Func<int>:stage ! e) → int
+                ! e
+                return (stage() + stage())
 
-              §CL{Holder:pub}
-                §FLD{Func<i32>:stage:priv} §E{cw}
-                §MT{Twice:pub} () -> i32
-                  §E{}
-                  §R §C{RunTwice} §A this.stage §/C
+              class Holder
+                field Func<int>:stage private ! cw
+                func Twice () → int
+                  !
+                  return RunTwice(this.stage)
             """, """
             module FailClosed FailClosed
               func RunTwice <! e> (Func<int>:stage ! e) → int

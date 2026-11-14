@@ -1,7 +1,7 @@
-§M{Test}
-  §F{Abs:pub} (i32:n) -> i32
-    §S (>= result 0)
-    §IF (< n 0)
-      §R (- 0 n)
-    §R n
-
+module Test Test block
+  func Abs (int:n) → int
+    !
+    => (result >= 0)
+    if (n < 0)
+      return (0 - n)
+    return n

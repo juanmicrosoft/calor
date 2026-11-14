@@ -87,9 +87,10 @@ public class FormatCommandTests : IDisposable
     public void Format_SingleFile_ProducesFormattedOutput()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -105,12 +106,10 @@ public class FormatCommandTests : IDisposable
     public void Format_SingleFile_OutputIsDeterministic()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-        §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -131,9 +130,10 @@ public class FormatCommandTests : IDisposable
     {
         // Format the same source twice
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
         var filePath1 = CreateTestFile("test1.calr", source);
         var filePath2 = CreateTestFile("test2.calr", source);
@@ -152,9 +152,10 @@ public class FormatCommandTests : IDisposable
     public void Format_NotFormatted_OriginalDiffersFromFormatted()
     {
         // Source with inconsistent formatting (extra whitespace, etc.)
-        var source = @"§M{Test}
-  §F{Main:pub}
-    §O{void}";
+        var source = @"module Test Test block
+  func Main () → void
+    !
+    return";
         var filePath = CreateTestFile("test.calr", source);
 
         var result = FormatFile(filePath);
@@ -173,9 +174,10 @@ public class FormatCommandTests : IDisposable
     public void Format_WriteMode_ModifiesFile()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
         var filePath = CreateTestFile("test.calr", source);
         var originalContent = File.ReadAllText(filePath);
@@ -194,12 +196,10 @@ public class FormatCommandTests : IDisposable
     public void Format_WriteMode_PreservesSemantics()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-        §R (+ x y)
+module Test Test block
+  func Add (int:x, int:y) → int
+    !
+    return (x + y)
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -268,7 +268,7 @@ public class FormatCommandTests : IDisposable
     public void Format_CalorExtension_Processes()
     {
         var source = @"
-§M{Test}
+module Test Test block
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -293,7 +293,7 @@ public class FormatCommandTests : IDisposable
     public void Format_CaseInsensitiveExtension_Processes()
     {
         var source = @"
-§M{Test}
+module Test Test block
 ";
         // Test with uppercase extension
         var filePath = CreateTestFile("test.CALR", source);
@@ -314,13 +314,13 @@ public class FormatCommandTests : IDisposable
     public void Format_MultipleFiles_AllProcessed()
     {
         var source1 = @"
-§M{Test1}
+module Test1 Test1 block
 ";
         var source2 = @"
-§M{Test2}
+module Test2 Test2 block
 ";
         var source3 = @"
-§M{Test3}
+module Test3 Test3 block
 ";
         var file1 = CreateTestFile("test1.calr", source1);
         var file2 = CreateTestFile("test2.calr", source2);

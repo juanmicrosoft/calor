@@ -44,10 +44,10 @@ public class ConvertFormatEnvelopeTests : IDisposable
     /// <summary>Unformatted but valid (trailing whitespace forces a reformat).</summary>
     private string WriteUnformattedCalr(string name = "unformatted.calr")
         => WriteFile(name,
-            "§M{Demo}\n" +
-            "  §F{Main:pub} () -> void\n" +
-            "    §E{cw}\n" +
-            "    §P \"hi\"   \n");
+            "module Demo Demo block\n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"hi\")\n");
 
     private static JsonElement ParseAndValidate(string stdOut, string expectedCommand)
     {
@@ -178,9 +178,10 @@ public class ConvertFormatEnvelopeTests : IDisposable
     public void Lint_ReadOnlySemanticError_ReportsIssuesWithoutParseFailure()
     {
         var source =
-            "§M{LintReadOnly}\n" +
-            "  §F{Main:pub} () -> void\n" +
-            "    §P \"missing effect\"   \n";
+            "module LintReadOnly LintReadOnly block\n" +
+            "  func Main () → void\n" +
+            "    !\n" +
+            "    Console.WriteLine(\"missing effect\")\n";
         var file = WriteFile("lint-read-only.calr", source);
 
         var (exitCode, stdOut, stdErr) =
@@ -206,9 +207,10 @@ public class ConvertFormatEnvelopeTests : IDisposable
     public void LintFix_SemanticError_SuppressesWriteWithWarningAndExitOne()
     {
         var source =
-            "§M{LintFix}\n" +
-            "  §F{Main:pub} () -> void\n" +
-            "    §P \"missing effect\"   \n";
+            "module LintFix LintFix block\n" +
+            "  func Main () → void\n" +
+            "    !\n" +
+            "    Console.WriteLine(\"missing effect\")\n";
         var file = WriteFile("lint-fix.calr", source);
 
         var (exitCode, stdOut, stdErr) =

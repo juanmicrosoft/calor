@@ -1,5 +1,5 @@
-§M{Test}
-  §F{PureFunctionWithUnknownCall:pub} (i32:x) -> i32
-    §C{UnknownLib.Calculate} §A x §/C
-    §R x
-
+module Test Test block
+  func PureFunctionWithUnknownCall (int:x) → int
+    !
+    UnknownLib.Calculate(x)
+    return x

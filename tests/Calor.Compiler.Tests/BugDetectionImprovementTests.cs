@@ -36,12 +36,10 @@ public class BugDetectionImprovementTests
     public void CompileCalor_RunsAnalysis_DetectsDivisionByZero()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var ctx = new EvaluationContext
         {
@@ -61,13 +59,11 @@ public class BugDetectionImprovementTests
     public void CompileCalor_WithContracts_NoFalsePositives()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)
 ";
         var ctx = new EvaluationContext
         {
@@ -87,17 +83,14 @@ public class BugDetectionImprovementTests
     public void CompileCalor_AnalysisResult_HasFunctionCount()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
-  §F{Mul:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (* a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
+
+  func Mul (int:a, int:b) → int
+    !
+    return (a * b)
 ";
         var ctx = new EvaluationContext
         {
@@ -117,12 +110,10 @@ public class BugDetectionImprovementTests
     {
         // Division by parameter should produce a warning but not an error
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var ctx = new EvaluationContext
         {
@@ -206,21 +197,17 @@ public class BugDetectionImprovementTests
     public void EvaluateBuggyCode_DivideByZero_CalorDetects()
     {
         var buggySource = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var fixedSource = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)
 ";
         var calc = new ErrorDetectionCalculator();
         var bug = new BugDescription
@@ -246,12 +233,10 @@ public class BugDetectionImprovementTests
     public void DivisionByParameter_WithoutPrecondition_EmitsWarning()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -280,13 +265,11 @@ public class BugDetectionImprovementTests
     public void DivisionByParameter_WithPrecondition_NoDiagnostic()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -319,11 +302,10 @@ public class BugDetectionImprovementTests
     public void DivisionByConstant_NoDiagnostic()
     {
         var source = @"
-§M{Test}
-  §F{Half:pub}
-      §I{i32:a}
-      §O{i32}
-      §R (/ a 2)
+module Test Test block
+  func Half (int:a) → int
+    !
+    return (a / 2)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -352,12 +334,10 @@ public class BugDetectionImprovementTests
     public void SuggestedFix_ContainsValidContractText()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -392,14 +372,13 @@ public class BugDetectionImprovementTests
     public void ForLoop_WithoutRealBoundedAccess_DoesNotWarn()
     {
         var source = @"
-§M{Test}
-  §F{Sum:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{~total:i32} INT:0
-      §L{i:0:n:1}
-          §B{~total:i32} (+ total i)
-      §R total
+module Test Test block
+  func Sum (int:n) → int
+    !
+    var int:total = 0
+    for i from 0 to n step 1
+      var int:total = (total + i)
+    return total
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -428,14 +407,13 @@ public class BugDetectionImprovementTests
     {
         // When the bound is subtracted by 1, no warning
         var source = @"
-§M{Test}
-  §F{Sum:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{~total:i32} INT:0
-      §L{i:0:(- n 1):1}
-          §B{~total:i32} (+ total i)
-      §R total
+module Test Test block
+  func Sum (int:n) → int
+    !
+    var int:total = 0
+    for i from 0 to (n - 1) step 1
+      var int:total = (total + i)
+    return total
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -464,14 +442,13 @@ public class BugDetectionImprovementTests
     {
         // Loop to a literal bound, body doesn't use loop var
         var source = @"
-§M{Test}
-  §F{Count:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{~total:i32} INT:0
-      §L{i:0:10:1}
-          §B{~total:i32} (+ total 1)
-      §R total
+module Test Test block
+  func Count (int:n) → int
+    !
+    var int:total = 0
+    for i from 0 to 10 step 1
+      var int:total = (total + 1)
+    return total
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -504,12 +481,10 @@ public class BugDetectionImprovementTests
     public void DivisionFunction_InfersNonZeroPrecondition()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -528,13 +503,11 @@ public class BugDetectionImprovementTests
     public void FunctionWithExistingContract_NoInference()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -552,12 +525,10 @@ public class BugDetectionImprovementTests
     public void InferredContract_HasSuggestedFix()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -580,12 +551,10 @@ public class BugDetectionImprovementTests
     public void BugScenario_DivideByZero_CalorDetects()
     {
         var buggySource = @"
-§M{UnsafeMath}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module UnsafeMath UnsafeMath block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var ctx = new EvaluationContext
         {
@@ -608,11 +577,11 @@ public class BugDetectionImprovementTests
     public void BugScenario_NullDeref_CalorDetects()
     {
         var buggySource = @"
-§M{UnsafeNullable}
-  §F{GetValue:pub}
-      §O{i32}
-      §B{maybeVal:i32[]} null
-      §R §LEN maybeVal
+module UnsafeNullable UnsafeNullable block
+  func GetValue () → int
+    !
+    let int[]:maybeVal = null
+    return maybeVal.Length
 ";
         var module = Parse(buggySource, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -635,12 +604,10 @@ public class BugDetectionImprovementTests
     public void BugScenario_Overflow_CalorDetects()
     {
         var buggySource = @"
-§M{UnsafeAdd}
-  §F{AddLarge:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module UnsafeAdd UnsafeAdd block
+  func AddLarge (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var ctx = new EvaluationContext
         {
@@ -660,12 +627,10 @@ public class BugDetectionImprovementTests
     public void BugScenario_MissingContract_CalorDetects()
     {
         var buggySource = @"
-§M{UnsafeDivide}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module UnsafeDivide UnsafeDivide block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var ctx = new EvaluationContext
         {
@@ -691,13 +656,11 @@ public class BugDetectionImprovementTests
     public void VerificationAnalysisPass_ExtractsPreconditionGuardedParams()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -719,12 +682,10 @@ public class BugDetectionImprovementTests
     public void VerificationAnalysisPass_ContractInference_WhenEnabled()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -751,11 +712,10 @@ public class BugDetectionImprovementTests
     {
         // Function that just returns a parameter should infer §S (== result param)
         var source = @"
-§M{Test}
-  §F{Identity:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x
+module Test Test block
+  func Identity (int:x) → int
+    !
+    return x
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -776,11 +736,10 @@ public class BugDetectionImprovementTests
     {
         // Function that returns x * x should infer §S (>= result 0)
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (* x x)
+module Test Test block
+  func Square (int:x) → int
+    !
+    return (x * x)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -807,12 +766,10 @@ public class BugDetectionImprovementTests
         // report Success=true because they parse and bind correctly. Analysis
         // findings are informational, not compilation failures.
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return (a / b)
 ";
         var ctx = new EvaluationContext
         {
@@ -840,12 +797,10 @@ public class BugDetectionImprovementTests
         // A well-formed Calor program with module, function, name, output, body,
         // and parameters should achieve a structure score of 1.0
         var source = @"
-§M{MathOps}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module MathOps MathOps block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var ctx = new EvaluationContext
         {
@@ -867,12 +822,10 @@ public class BugDetectionImprovementTests
         // With both fixes applied, a well-formed Calor program should achieve
         // a GenerationAccuracy ratio >= 1.0 compared to C#
         var source = @"
-§M{MathOps}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module MathOps MathOps block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var csharpSource = @"
 using System;
@@ -902,23 +855,22 @@ namespace MathOps {
         // IsPrime was one of the 3 failing programs in v0.3.0.
         // It should succeed after the fix.
         var source = @"
-§M{PrimeCheck}
-  §F{IsPrime:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (> n 0)
-      §IF (<= n 1)
-        §R false
-      §IF (<= n 3)
-        §R true
-      §IF (== (% n 2) 0)
-        §R false
-      §L{i:3:1000:2}
-          §IF (> (* i i) n)
-            §R true
-          §IF (== (% n i) 0)
-            §R false
-      §R true
+module PrimeCheck PrimeCheck block
+  func IsPrime (int:n) → bool
+    !
+    requires (n > 0)
+    if (n <= 1)
+      return false
+    if (n <= 3)
+      return true
+    if ((n % 2) == 0)
+      return false
+    for i from 3 to 1000 step 2
+      if ((i * i) > n)
+        return true
+      if ((n % i) == 0)
+        return false
+    return true
 ";
         var ctx = new EvaluationContext
         {
@@ -1011,17 +963,16 @@ namespace MathOps {
     public void EdgeCaseCoverage_ProgramWithEarlyReturnGuards_DetectsGuards()
     {
         var source = @"
-§M{Test}
-  §F{IsPrime:pub}
-      §I{i32:n}
-      §O{bool}
-      §IF (<= n 1)
-        §R false
-      §IF (<= n 3)
-        §R true
-      §IF (== (% n 2) 0)
-        §R false
-      §R true
+module Test Test block
+  func IsPrime (int:n) → bool
+    !
+    if (n <= 1)
+      return false
+    if (n <= 3)
+      return true
+    if ((n % 2) == 0)
+      return false
+    return true
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1037,15 +988,14 @@ namespace MathOps {
     public void EdgeCaseCoverage_ProgramWithBoundaryChecks_DetectsBoundaries()
     {
         var source = @"
-§M{Test}
-  §F{Clamp:pub}
-      §I{i32:n}
-      §O{i32}
-      §IF (< n 0)
-        §R INT:0
-      §IF (== n 1)
-        §R INT:1
-      §R n
+module Test Test block
+  func Clamp (int:n) → int
+    !
+    if (n < 0)
+      return 0
+    if (n == 1)
+      return 1
+    return n
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1060,14 +1010,13 @@ namespace MathOps {
     public void EdgeCaseCoverage_ProgramWithElseBranches_DetectsCompleteness()
     {
         var source = @"
-§M{Test}
-  §F{Abs:pub}
-      §I{i32:n}
-      §O{i32}
-      §IF (< n 0)
-          §R (- 0 n)
-      §EL
-          §R n
+module Test Test block
+  func Abs (int:n) → int
+    !
+    if (n < 0)
+      return (0 - n)
+    else
+      return n
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1082,19 +1031,16 @@ namespace MathOps {
     public void EdgeCaseCoverage_ProgramWithContracts_DetectsContractCoverage()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §S (>= result 0)
-      §R (/ a b)
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => (result >= 0)
+    return (a / b)
+
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1109,12 +1055,10 @@ namespace MathOps {
     public void EdgeCaseCoverage_MinimalProgram_ScoresLow()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1133,14 +1077,13 @@ namespace MathOps {
     {
         // Match expression (inside return) with wildcard pattern
         var source = @"
-§M{Test}
-  §F{Describe:pub}
-      §I{i32:x}
-      §O{str}
-      §R §W x
-          §K 1 → ""one""
-          §K 2 → ""two""
-          §K _ → ""other""
+module Test Test block
+  func Describe (int:x) → string
+    !
+    return match x
+      case 1 → ""one""
+      case 2 → ""two""
+      case _ → ""other""
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1156,15 +1099,14 @@ namespace MathOps {
     {
         // Match statement (not inside return) with wildcard pattern
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W x
-            §K 1
-              §R INT:10
-            §K _
-              §R INT:0
+module Test Test block
+  func Test (int:x) → int
+    !
+    match x
+      case 1
+        return 10
+      case _
+        return 0
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1180,14 +1122,13 @@ namespace MathOps {
     {
         // A Calor program with → §R conditional returns should score higher than base
         var source = @"
-§M{Test}
-  §F{Factorial:pub}
-      §I{i32:n}
-      §O{i32}
-      §Q (>= n 0)
-      §IF (<= n 1)
-        §R INT:1
-      §R (* n §C{Factorial} §A (- n 1) §/C)
+module Test Test block
+  func Factorial (int:n) → int
+    !
+    requires (n >= 0)
+    if (n <= 1)
+      return 1
+    return (n * Factorial((n - 1)))
 ";
         var ctx = new EvaluationContext
         {
@@ -1210,23 +1151,19 @@ namespace MathOps {
         // A program with actual defensive patterns should get the analysis signal bonus
         // but a minimal program without them should not
         var defensiveSource = @"
-§M{Test}
-  §F{SafeDiv:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §IF (<= b 1)
-        §R INT:0
-      §R (/ a b)
+module Test Test block
+  func SafeDiv (int:a, int:b) → int
+    !
+    requires (b != 0)
+    if (b <= 1)
+      return 0
+    return (a / b)
 ";
         var minimalSource = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var defensiveCtx = new EvaluationContext
         {
@@ -1268,19 +1205,17 @@ class C {
 }";
         // Calor with all patterns
         var calorSource = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §S (>= result 0)
-      §IF (<= b 1)
-        §R INT:0
-      §IF (> a 0)
-          §R (/ a b)
-      §EL
-          §R INT:0
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => (result >= 0)
+    if (b <= 1)
+      return 0
+    if (a > 0)
+      return (a / b)
+    else
+      return 0
 ";
         var ctx = new EvaluationContext
         {

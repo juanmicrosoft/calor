@@ -18,21 +18,23 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "DivisionUnsafe",
             """
-            §M{DivisionUnsafe}
-              §F{Run:pub} () -> i32
-                §B{~divisor:i32} INT:1
-                §ASSIGN divisor INT:0
-                §R (/ INT:10 divisor)
+            module DivisionUnsafe DivisionUnsafe block
+              func Run () → int
+                !
+                var int:divisor = 1
+                set divisor 0
+                return (10 / divisor)
             """,
             DiagnosticCode.DivisionByZero,
             typeof(DivideByZeroException)),
         OracleCase.ThrowsWithArguments(
             "NonNegativePreconditionAllowsZero",
             """
-            §M{NonNegativePreconditionAllowsZero}
-              §F{Run:pub} (i32:divisor) -> i32
-                §Q (>= divisor INT:0)
-                §R (/ INT:10 divisor)
+            module NonNegativePreconditionAllowsZero NonNegativePreconditionAllowsZero block
+              func Run (int:divisor) → int
+                !
+                requires (divisor >= 0)
+                return (10 / divisor)
             """,
             DiagnosticCode.DivisionByZero,
             typeof(DivideByZeroException),
@@ -40,42 +42,46 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "DivisionSafe",
             """
-            §M{DivisionSafe}
-              §F{Run:pub} () -> i32
-                §B{divisor:i32} INT:2
-                §R (/ INT:10 divisor)
+            module DivisionSafe DivisionSafe block
+              func Run () → int
+                !
+                let int:divisor = 2
+                return (10 / divisor)
             """,
             DiagnosticCode.DivisionByZero,
             5),
         OracleCase.Returns(
             "DivisionInConstantFalseBranch",
             """
-            §M{DivisionInConstantFalseBranch}
-              §F{Run:pub} () -> i32
-                §B{divisor:i32} INT:0
-                §IF (< INT:1 INT:0)
-                  §R (/ INT:10 divisor)
-                §R INT:7
+            module DivisionInConstantFalseBranch DivisionInConstantFalseBranch block
+              func Run () → int
+                !
+                let int:divisor = 0
+                if (1 < 0)
+                  return (10 / divisor)
+                return 7
             """,
             DiagnosticCode.DivisionByZero,
             7),
         OracleCase.Returns(
             "ConditionalDeadArm",
             """
-            §M{ConditionalDeadArm}
-              §F{Run:pub} () -> i32
-                §B{divisor:i32} INT:0
-                §R (? BOOL:true INT:7 (/ INT:10 divisor))
+            module ConditionalDeadArm ConditionalDeadArm block
+              func Run () → int
+                !
+                let int:divisor = 0
+                return (true ? 7 : (10 / divisor))
             """,
             DiagnosticCode.DivisionByZero,
             7),
         OracleCase.ThrowsWithArguments(
             "ConditionalVariableBugArm",
             """
-            §M{ConditionalVariableBugArm}
-              §F{Run:pub} (bool:condition) -> i32
-                §B{divisor:i32} INT:0
-                §R (? condition INT:7 (/ INT:10 divisor))
+            module ConditionalVariableBugArm ConditionalVariableBugArm block
+              func Run (bool:condition) → int
+                !
+                let int:divisor = 0
+                return (condition ? 7 : (10 / divisor))
             """,
             DiagnosticCode.DivisionByZero,
             typeof(DivideByZeroException),
@@ -83,30 +89,33 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "ShortCircuitFalseAnd",
             """
-            §M{ShortCircuitFalseAnd}
-              §F{Run:pub} () -> bool
-                §B{divisor:i32} INT:0
-                §R (&& BOOL:false (== (/ INT:10 divisor) INT:0))
+            module ShortCircuitFalseAnd ShortCircuitFalseAnd block
+              func Run () → bool
+                !
+                let int:divisor = 0
+                return (false && ((10 / divisor) == 0))
             """,
             DiagnosticCode.DivisionByZero,
             false),
         OracleCase.Returns(
             "ShortCircuitTrueOr",
             """
-            §M{ShortCircuitTrueOr}
-              §F{Run:pub} () -> bool
-                §B{divisor:i32} INT:0
-                §R (|| BOOL:true (== (/ INT:10 divisor) INT:0))
+            module ShortCircuitTrueOr ShortCircuitTrueOr block
+              func Run () → bool
+                !
+                let int:divisor = 0
+                return (true || ((10 / divisor) == 0))
             """,
             DiagnosticCode.DivisionByZero,
             true),
         OracleCase.ThrowsWithArguments(
             "ShortCircuitVariableAnd",
             """
-            §M{ShortCircuitVariableAnd}
-              §F{Run:pub} (bool:condition) -> bool
-                §B{divisor:i32} INT:0
-                §R (&& condition (== (/ INT:10 divisor) INT:0))
+            module ShortCircuitVariableAnd ShortCircuitVariableAnd block
+              func Run (bool:condition) → bool
+                !
+                let int:divisor = 0
+                return (condition && ((10 / divisor) == 0))
             """,
             DiagnosticCode.DivisionByZero,
             typeof(DivideByZeroException),
@@ -114,101 +123,111 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "DecimalDivisionSafe",
             """
-            §M{DecimalDivisionSafe}
-              §F{Run:pub} () -> dec
-                §B{divisor:dec} (- DEC:0.5 DEC:0.2)
-                §R (/ DEC:1 divisor)
+            module DecimalDivisionSafe DecimalDivisionSafe block
+              func Run () → decimal
+                !
+                let decimal:divisor = (0.5m - 0.2m)
+                return (1m / divisor)
             """,
             DiagnosticCode.DivisionByZero,
             1m / 0.3m),
         OracleCase.Throws(
             "DecimalDivisionUnsafe",
             """
-            §M{DecimalDivisionUnsafe}
-              §F{Run:pub} () -> dec
-                §B{divisor:dec} (- DEC:0.5 DEC:0.5)
-                §R (/ DEC:1 divisor)
+            module DecimalDivisionUnsafe DecimalDivisionUnsafe block
+              func Run () → decimal
+                !
+                let decimal:divisor = (0.5m - 0.5m)
+                return (1m / divisor)
             """,
             DiagnosticCode.DivisionByZero,
             typeof(DivideByZeroException)),
         OracleCase.Throws(
             "BoundsUnsafe",
             """
-            §M{BoundsUnsafe}
-              §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32:2}
-                §R §IDX items INT:2
+            module BoundsUnsafe BoundsUnsafe block
+              func Run () → int
+                !
+                let int[]:items = new int[2]
+                return items[2]
             """,
             DiagnosticCode.IndexOutOfBounds,
             typeof(IndexOutOfRangeException)),
         OracleCase.Returns(
             "BoundsSafe",
             """
-            §M{BoundsSafe}
-              §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32} §A INT:4 §A INT:7 §/ARR
-                §R §IDX items INT:1
+            module BoundsSafe BoundsSafe block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 4, 7 }
+                return items[1]
             """,
             DiagnosticCode.IndexOutOfBounds,
             7),
         OracleCase.Throws(
             "OverflowUnsafe",
             """
-            §M{OverflowUnsafe}
-              §F{Run:pub} () -> i32
-                §B{~value:i32} INT:2147483647
-                §ASSIGN value (+ value INT:1)
-                §R value
+            module OverflowUnsafe OverflowUnsafe block
+              func Run () → int
+                !
+                var int:value = 2147483647
+                set value (value + 1)
+                return value
             """,
             DiagnosticCode.IntegerOverflow,
             typeof(OverflowException)),
         OracleCase.Returns(
             "OverflowSafe",
             """
-            §M{OverflowSafe}
-              §F{Run:pub} () -> i32
-                §B{value:i32} (+ INT:40 INT:2)
-                §R value
+            module OverflowSafe OverflowSafe block
+              func Run () → int
+                !
+                let int:value = (40 + 2)
+                return value
             """,
             DiagnosticCode.IntegerOverflow,
             42),
         OracleCase.Throws(
             "MinValueRemainderOverflow",
             """
-            §M{MinValueRemainderOverflow}
-              §F{Run:pub} () -> i32
-                §B{value:i32} INT:-2147483648
-                §B{divisor:i32} INT:-1
-                §R (% value divisor)
+            module MinValueRemainderOverflow MinValueRemainderOverflow block
+              func Run () → int
+                !
+                let int:value = -2147483648
+                let int:divisor = -1
+                return (value % divisor)
             """,
             DiagnosticCode.IntegerOverflow,
             typeof(OverflowException)),
         OracleCase.Throws(
             "DecimalToIntCastOverflow",
             """
-            §M{DecimalToIntCastOverflow}
-              §F{Run:pub} () -> i32
-                §B{value:dec} DEC:79228162514264337593543950335
-                §R (cast i32 value)
+            module DecimalToIntCastOverflow DecimalToIntCastOverflow block
+              func Run () → int
+                !
+                let decimal:value = 79228162514264337593543950335m
+                return ((int)value)
             """,
             DiagnosticCode.IntegerOverflow,
             typeof(OverflowException)),
         OracleCase.Throws(
             "NarrowingIntegralCastTraps",
             """
-            §M{NarrowingIntegralCastTraps}
-              §F{Run:pub} () -> i32
-                §B{value:i64} INT:2147483648
-                §R (cast i32 value)
+            module NarrowingIntegralCastTraps NarrowingIntegralCastTraps block
+              func Run () → int
+                !
+                let long:value = 2147483648L
+                return ((int)value)
             """,
             DiagnosticCode.IntegerOverflow,
             typeof(OverflowException)),
         OracleCase.ReturnsWithArguments(
             "SameSymbolSubtraction",
             """
-            §M{SameSymbolSubtraction}
-              §F{Run:pub} (i32:value) -> i32
-                §R (- value value)
+            module SameSymbolSubtraction SameSymbolSubtraction block
+              func Run (int:value) → int
+                !
+                return (value - value)
             """,
             DiagnosticCode.IntegerOverflow,
             0,
@@ -216,9 +235,10 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "SameSymbolZeroDivisor",
             """
-            §M{SameSymbolZeroDivisor}
-              §F{Run:pub} (i32:value) -> i32
-                §R (/ INT:1 (- value value))
+            module SameSymbolZeroDivisor SameSymbolZeroDivisor block
+              func Run (int:value) → int
+                !
+                return (1 / (value - value))
             """,
             DiagnosticCode.DivisionByZero,
             typeof(DivideByZeroException),
@@ -226,72 +246,80 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Returns(
             "ShiftCountMaskedToZero",
             """
-            §M{ShiftCountMaskedToZero}
-              §F{Run:pub} () -> i32
-                §R (<< INT:2147483647 INT:32)
+            module ShiftCountMaskedToZero ShiftCountMaskedToZero block
+              func Run () → int
+                !
+                return (2147483647 << 32)
             """,
             DiagnosticCode.IntegerOverflow,
             int.MaxValue),
         OracleCase.Wraps(
             "ShiftCountMaskedToOne",
             """
-            §M{ShiftCountMaskedToOne}
-              §F{Run:pub} () -> i32
-                §R (<< INT:2147483647 INT:33)
+            module ShiftCountMaskedToOne ShiftCountMaskedToOne block
+              func Run () → int
+                !
+                return (2147483647 << 33)
             """,
             DiagnosticCode.IntegerOverflow,
             -2),
         OracleCase.Wraps(
             "NegativeShiftCountUsesLowBits",
             """
-            §M{NegativeShiftCountUsesLowBits}
-              §F{Run:pub} () -> i32
-                §R (<< INT:2147483647 INT:-1)
+            module NegativeShiftCountUsesLowBits NegativeShiftCountUsesLowBits block
+              func Run () → int
+                !
+                return (2147483647 << -1)
             """,
             DiagnosticCode.IntegerOverflow,
             int.MinValue),
         OracleCase.Throws(
             "NullableArrayUnsafe",
             """
-            §M{NullableArrayUnsafe}
-              §F{Run:pub} () -> i32
-                §B{items:i32[]} null
-                §R §LEN items
+            module NullableArrayUnsafe NullableArrayUnsafe block
+              func Run () → int
+                !
+                let int[]:items = null
+                return items.Length
             """,
             DiagnosticCode.NullDereference,
             typeof(NullReferenceException)),
         OracleCase.Returns(
             "NullableArraySafe",
             """
-            §M{NullableArraySafe}
-              §F{Run:pub} () -> i32
-                §B{items:i32[]} §ARR{i32} §A INT:1 §/ARR
-                §R §LEN items
+            module NullableArraySafe NullableArraySafe block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 1 }
+                return items.Length
             """,
             DiagnosticCode.NullDereference,
             1),
         OracleCase.Returns(
             "NullFirstArrayGuardSafe",
             """
-            §M{NullFirstArrayGuardSafe}
-              §F{Run:pub} () -> i32
-                §B{items:i32[]} §ARR{i32} §A INT:1 §/ARR
-                §IF (== null items)
-                  §R INT:0
-                §R §LEN items
+            module NullFirstArrayGuardSafe NullFirstArrayGuardSafe block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 1 }
+                if (null == items)
+                  return 0
+                return items.Length
             """,
             DiagnosticCode.NullDereference,
             1),
         OracleCase.ThrowsWithArguments(
             "UnknownNullableArrayConditionalArm",
             """
-            §M{UnknownNullableArrayConditionalArm}
-              §F{Make:priv} () -> i32[]
-                §R null
-              §F{Run:pub} (bool:condition) -> i32
-                §B{known:i32[]} §ARR{i32} §A INT:1 §/ARR
-                §B{items:i32[]} (? condition known §C{Make} §/C)
-                §R §LEN items
+            module UnknownNullableArrayConditionalArm UnknownNullableArrayConditionalArm block
+              func Make private () → int[]
+                return null
+
+              func Run (bool:condition) → int
+                !
+                let int[]:known = new int[] { 1 }
+                let int[]:items = (condition ? known : Make())
+                return items.Length
             """,
             DiagnosticCode.NullDereference,
             typeof(NullReferenceException),
@@ -299,11 +327,12 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "ExcludedZeroDivisionOverflow",
             """
-            §M{ExcludedZeroDivisionOverflow}
-              §F{Run:pub} (i32:divisor) -> i32
-                §IF (== divisor INT:0)
-                  §R INT:0
-                §R (+ (/ INT:-2147483648 divisor) INT:1)
+            module ExcludedZeroDivisionOverflow ExcludedZeroDivisionOverflow block
+              func Run (int:divisor) → int
+                !
+                if (divisor == 0)
+                  return 0
+                return ((-2147483648 / divisor) + 1)
             """,
             DiagnosticCode.IntegerOverflow,
             typeof(OverflowException),
@@ -311,100 +340,107 @@ public class BugPatternRuntimeOracleTests
         OracleCase.Throws(
             "OffByOneUnsafe",
             """
-            §M{OffByOneUnsafe}
-              §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §/ARR
-                §B{length:i32} §LEN items
-                §B{~sum:i32} INT:0
-                §L{i:0:length:1}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module OffByOneUnsafe OffByOneUnsafe block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 1, 2 }
+                let int:length = items.Length
+                var int:sum = 0
+                for i from 0 to length step 1
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.OffByOne,
             typeof(IndexOutOfRangeException)),
         OracleCase.Returns(
             "OffByOneSafe",
             """
-            §M{OffByOneSafe}
-              §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §/ARR
-                §B{length:i32} §LEN items
-                §B{upper:i32} (- length INT:1)
-                §B{~sum:i32} INT:0
-                §L{i:0:upper:1}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module OffByOneSafe OffByOneSafe block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 1, 2 }
+                let int:length = items.Length
+                let int:upper = (length - 1)
+                var int:sum = 0
+                for i from 0 to upper step 1
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.OffByOne,
             3),
         OracleCase.Throws(
             "ComputedNegativeStepUnsafe",
             """
-            §M{ComputedNegativeStepUnsafe}
-              §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §A INT:3 §/ARR
-                §B{length:i32} §LEN items
-                §B{~sum:i32} INT:0
-                §L{i:length:0:(- 0 1)}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module ComputedNegativeStepUnsafe ComputedNegativeStepUnsafe block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 1, 2, 3 }
+                let int:length = items.Length
+                var int:sum = 0
+                for i from length to 0 step (0 - 1)
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.OffByOne,
             typeof(IndexOutOfRangeException)),
         OracleCase.Returns(
             "ComputedNegativeStepSafe",
             """
-            §M{ComputedNegativeStepSafe}
-              §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §A INT:3 §/ARR
-                §B{length:i32} §LEN items
-                §B{upper:i32} (- length INT:1)
-                §B{~sum:i32} INT:0
-                §L{i:upper:0:(- 0 1)}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module ComputedNegativeStepSafe ComputedNegativeStepSafe block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 1, 2, 3 }
+                let int:length = items.Length
+                let int:upper = (length - 1)
+                var int:sum = 0
+                for i from upper to 0 step (0 - 1)
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.OffByOne,
             6),
         OracleCase.Returns(
             "StepTwoSkipsEndpoint",
             """
-            §M{StepTwoSkipsEndpoint}
-              §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §A INT:3 §/ARR
-                §B{length:i32} §LEN items
-                §B{~sum:i32} INT:0
-                §L{i:0:length:2}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module StepTwoSkipsEndpoint StepTwoSkipsEndpoint block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 1, 2, 3 }
+                let int:length = items.Length
+                var int:sum = 0
+                for i from 0 to length step 2
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.OffByOne,
             4),
         OracleCase.Throws(
             "StepTwoReachesEndpoint",
             """
-            §M{StepTwoReachesEndpoint}
-              §F{Run:pub} () -> i32
-                §B{[i32]:items} §ARR{i32} §A INT:1 §A INT:2 §A INT:3 §A INT:4 §/ARR
-                §B{length:i32} §LEN items
-                §B{~sum:i32} INT:0
-                §L{i:0:length:2}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module StepTwoReachesEndpoint StepTwoReachesEndpoint block
+              func Run () → int
+                !
+                let int[]:items = new int[] { 1, 2, 3, 4 }
+                let int:length = items.Length
+                var int:sum = 0
+                for i from 0 to length step 2
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.OffByOne,
             typeof(IndexOutOfRangeException)),
         OracleCase.ReturnsWithArguments(
             "CanonicalEmptyArrayLoop",
             """
-            §M{CanonicalEmptyArrayLoop}
-              §F{Run:pub} (i32[]:items) -> i32
-                §B{length:i32} §LEN items
-                §B{upper:i32} (- length INT:1)
-                §B{~sum:i32} INT:0
-                §L{i:0:upper:1}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module CanonicalEmptyArrayLoop CanonicalEmptyArrayLoop block
+              func Run (int[]:items) → int
+                !
+                let int:length = items.Length
+                let int:upper = (length - 1)
+                var int:sum = 0
+                for i from 0 to upper step 1
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.IndexOutOfBounds,
             0,
@@ -412,13 +448,14 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "CanonicalUpperAdjacentUnsafe",
             """
-            §M{CanonicalUpperAdjacentUnsafe}
-              §F{Run:pub} (i32[]:items) -> i32
-                §B{length:i32} §LEN items
-                §B{~sum:i32} INT:0
-                §L{i:0:length:1}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module CanonicalUpperAdjacentUnsafe CanonicalUpperAdjacentUnsafe block
+              func Run (int[]:items) → int
+                !
+                let int:length = items.Length
+                var int:sum = 0
+                for i from 0 to length step 1
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.IndexOutOfBounds,
             typeof(IndexOutOfRangeException),
@@ -426,14 +463,15 @@ public class BugPatternRuntimeOracleTests
         OracleCase.ThrowsWithArguments(
             "CanonicalLowerAdjacentUnsafe",
             """
-            §M{CanonicalLowerAdjacentUnsafe}
-              §F{Run:pub} (i32[]:items) -> i32
-                §B{length:i32} §LEN items
-                §B{upper:i32} (- length INT:1)
-                §B{~sum:i32} INT:0
-                §L{i:-1:upper:1}
-                  §ASSIGN sum (+ sum §IDX items i)
-                §R sum
+            module CanonicalLowerAdjacentUnsafe CanonicalLowerAdjacentUnsafe block
+              func Run (int[]:items) → int
+                !
+                let int:length = items.Length
+                let int:upper = (length - 1)
+                var int:sum = 0
+                for i from -1 to upper step 1
+                  set sum (sum + items[i])
+                return sum
             """,
             DiagnosticCode.IndexOutOfBounds,
             typeof(IndexOutOfRangeException),

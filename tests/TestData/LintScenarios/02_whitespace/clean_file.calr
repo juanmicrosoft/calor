@@ -1,5 +1,4 @@
-§M{Clean}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "Hello"
-
+module Clean Clean block
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello")

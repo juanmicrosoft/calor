@@ -34,11 +34,11 @@ public class EffectsSuggestTests
     public void Collector_FindsExternalCalls()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §C{Console.WriteLine} §A STR:""test"" §/C
-      §C{MyService.Process} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    Console.WriteLine(""test"")
+    MyService.Process()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -51,12 +51,12 @@ public class EffectsSuggestTests
     public void Collector_DeduplicatesCalls()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §C{Console.WriteLine} §A STR:""a"" §/C
-      §C{Console.WriteLine} §A STR:""b"" §/C
-      §C{Console.WriteLine} §A STR:""c"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    Console.WriteLine(""a"")
+    Console.WriteLine(""b"")
+    Console.WriteLine(""c"")
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -68,11 +68,11 @@ public class EffectsSuggestTests
     public void Collector_ExpandsShortNames()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §C{File.ReadAllText} §A STR:""test.txt"" §/C
-      §C{HttpClient.GetAsync} §A STR:""url"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    File.ReadAllText(""test.txt"")
+    HttpClient.GetAsync(""url"")
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -85,11 +85,11 @@ public class EffectsSuggestTests
     public void Collector_WalksClassMethods()
     {
         var source = @"
-§M{Test}
-  §CL{MyClass:pub}
-      §MT{DoWork:pub}
-          §O{void}
-          §C{ExternalService.Call} §/C
+module Test Test block
+  class MyClass
+    func DoWork () → void
+      !
+      ExternalService.Call()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -101,11 +101,11 @@ public class EffectsSuggestTests
     public void Collector_ResolvesVariableTypes()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{r} §NEW{Random} §/NEW
-      §C{r.Next} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let r = new Random()
+    r.Next()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -118,14 +118,14 @@ public class EffectsSuggestTests
     public void Collector_UsesBoundReceiverIdentityForShadowedNames()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{r} §NEW{Random} §/NEW
-      §IF BOOL:true
-          §B{r} §NEW{HttpClient} §/NEW
-          §C{r.GetAsync} §A STR:""/"" §/C
-      §C{r.Next} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let r = new Random()
+    if true
+      let r = new HttpClient()
+      r.GetAsync(""/"")
+    r.Next()
 ";
         var module = Parse(source);
 
@@ -182,13 +182,13 @@ public class EffectsSuggestTests
     public void E1_ExitPin_ReceiverTypeKnownOnlyThroughMetadata_Resolves()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{g} §C{System.Guid.NewGuid} §/C
-      §C{g.ToString} §/C
-      §B{line} §C{System.Console.ReadLine} §/C
-      §C{line.Trim} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let g = System.Guid.NewGuid()
+    g.ToString()
+    let line = System.Console.ReadLine()
+    line.Trim()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -211,11 +211,11 @@ public class EffectsSuggestTests
     public void Collector_InferredBinding_ResolvesReceiverFromBoundType()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
-      §C{sb.Append} §A STR:""x"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let sb = new System.Text.StringBuilder()
+    sb.Append(""x"")
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -245,18 +245,19 @@ public class EffectsSuggestTests
     public void Collector_UnresolvedReceiver_IsReportedWithoutGuessedType()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{x} §C{Unknown.Make} §/C
-      §C{x.Run} §/C
-      §B{a} §NEW{Random} §/NEW
-      §C{a.b.Chain} §/C
-      §C{foo.Bar} §/C
-  §CL{Holder:pub}
-      §MT{Write:pub}
-          §O{void}
-          §C{this.sb.Append} §A STR:""x"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let x = Unknown.Make()
+    x.Run()
+    let a = new Random()
+    a.b.Chain()
+    foo.Bar()
+
+  class Holder
+    func Write () → void
+      !
+      this.sb.Append(""x"")
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -301,11 +302,11 @@ public class EffectsSuggestTests
     public void Collector_FunctionTypedReceiver_IsUnresolved()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{f} §LAM{x:i32} (+ x 1) §/LAM
-      §C{f.Invoke} §A INT:1 §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let f = (int:x) => (x + 1)
+    f.Invoke(1)
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -324,11 +325,10 @@ public class EffectsSuggestTests
     public void Collector_ArrayReceiver_ResolvesToSystemArray()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §I{i32[]:arr}
-      §O{void}
-      §C{arr.Clone} §/C
+module Test Test block
+  func DoWork (int[]:arr) → void
+    !
+    arr.Clone()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -351,14 +351,16 @@ public class EffectsSuggestTests
     public void Collector_CalorClassStaticReceiver_ResolvesThroughTypeSymbol()
     {
         var source = @"
-§M{Test}
-  §CL{Helper:pub}
-      §MT{Run:pub}
-          §O{void}
-  §F{DoWork:pub}
-      §O{void}
-      §C{Helper.Run} §/C
-      §C{OrderRepo.Save} §/C
+module Test Test block
+  class Helper
+    func Run () → void
+      !
+      return
+
+  func DoWork () → void
+    !
+    Helper.Run()
+    OrderRepo.Save()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -424,14 +426,15 @@ public class EffectsSuggestTests
     public void E1_Slice2a_UnboundDottedHead_YieldsNullReceiverAndUnresolvedCall()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §C{foo.Bar} §/C
-  §CL{Holder:pub}
-      §MT{Write:pub}
-          §O{void}
-          §C{this.sb.Append} §A STR:""x"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    foo.Bar()
+
+  class Holder
+    func Write () → void
+      !
+      this.sb.Append(""x"")
 ";
         var module = Parse(source);
         var (bound, _) = Bind(module);
@@ -457,11 +460,11 @@ public class EffectsSuggestTests
     public void E1_Slice2a_MetadataOnlyReceiver_CarriesNominalBoundTypeOnReceiver()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{g} §C{System.Guid.NewGuid} §/C
-      §C{g.ToString} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let g = System.Guid.NewGuid()
+    g.ToString()
 ";
         var module = Parse(source);
         var (bound, _) = Bind(module);
@@ -505,11 +508,11 @@ public class EffectsSuggestTests
     public void E1_Slice2a_UnresolvedReceiver_ReportsCalor0270OnceAndIsNeverResolved()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{x} §C{Unknown.Make} §/C
-      §C{x.Run} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let x = Unknown.Make()
+    x.Run()
 ";
         var module = Parse(source);
         var (bound, diagnostics) = Bind(module);
@@ -543,15 +546,15 @@ public class EffectsSuggestTests
     public void E1_Slice2a_ReceiverShapes_AreTheFourDocumentedOnes()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
-      §C{sb.Append} §A STR:""x"" §/C
-      §B{a} §NEW{Random} §/NEW
-      §C{a.b.c.Chain} §/C
-      §C{System.Console.WriteLine} §A STR:""y"" §/C
-      §C{foo.Bar} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let sb = new System.Text.StringBuilder()
+    sb.Append(""x"")
+    let a = new Random()
+    a.b.c.Chain()
+    System.Console.WriteLine(""y"")
+    foo.Bar()
 ";
         var module = Parse(source);
         var (bound, diagnostics) = Bind(module);
@@ -601,15 +604,15 @@ public class EffectsSuggestTests
     public void E1_Slice2a_Calor0270_FiresOnlyForActionableReceiverShapes()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{x} §C{Unknown.Make} §/C
-      §C{x.Run} §/C
-      §B{a} §NEW{Random} §/NEW
-      §C{a.b.Chain} §/C
-      §B{_chainIsValid042} §C{Unknown.Make} §/C
-      §C{_chainIsValid042.Run} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let x = Unknown.Make()
+    x.Run()
+    let a = new Random()
+    a.b.Chain()
+    let _chainIsValid042 = Unknown.Make()
+    _chainIsValid042.Run()
 ";
         var module = Parse(source);
         var (bound, diagnostics) = Bind(module);
@@ -681,18 +684,18 @@ public class EffectsSuggestTests
     public void E1_Slice2a_ReceiverAndReceiverSymbol_DoNotDrift()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
-      §C{sb.Append} §A STR:""x"" §/C
-      §B{x} §C{Unknown.Make} §/C
-      §C{x.Run} §/C
-      §B{a} §NEW{Random} §/NEW
-      §C{a.b.Chain} §/C
-      §C{System.Console.WriteLine} §A STR:""y"" §/C
-      §C{foo.Bar} §/C
-      §C{Helper} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let sb = new System.Text.StringBuilder()
+    sb.Append(""x"")
+    let x = Unknown.Make()
+    x.Run()
+    let a = new Random()
+    a.b.Chain()
+    System.Console.WriteLine(""y"")
+    foo.Bar()
+    Helper()
 ";
         var module = Parse(source);
         var (bound, _) = Bind(module);
@@ -745,10 +748,10 @@ public class EffectsSuggestTests
     public void Collector_TagsConstructors()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{x} §NEW{HttpClient} §/NEW
+module Test Test block
+  func DoWork () → void
+    !
+    let x = new HttpClient()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -764,15 +767,15 @@ public class EffectsSuggestTests
     public void InternalFunction_NotIncludedWhenFiltered()
     {
         var source = @"
-§M{Test}
-  §F{Helper:pub}
-      §O{void}
-      §C{Console.WriteLine} §A STR:""internal"" §/C
-  §F{Main:pub}
-      §O{void}
-      §C{Helper}
-      §/C
-      §C{ExternalService.DoWork} §/C
+module Test Test block
+  func Helper () → void
+    !
+    Console.WriteLine(""internal"")
+
+  func Main () → void
+    !
+    Helper()
+    ExternalService.DoWork()
 ";
         var module = Parse(source);
         var callGraph = CallGraphAnalysis.Build(module);
@@ -825,12 +828,10 @@ public class EffectsSuggestTests
     public void NoExternalCalls_ProducesEmptyList()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -1002,12 +1003,11 @@ public class EffectsSuggestTests
     {
         // Step 1: Source with an unknown external call
         var source = @"
-§M{Test}
-  §F{ProcessOrder:pub}
-      §O{void}
-      §E{cw}
-      §C{Console.WriteLine} §A STR:""Starting"" §/C
-      §C{OrderRepo.Save} §/C
+module Test Test block
+  func ProcessOrder () → void
+    ! cw
+    Console.WriteLine(""Starting"")
+    OrderRepo.Save()
 ";
         // Step 2: Collect unresolved calls (simulating what suggest does)
         var module = Parse(source);
@@ -1053,12 +1053,11 @@ public class EffectsSuggestTests
 
         // Step 6: Full compilation should succeed with correct effect declarations
         var fullSource = @"
-§M{Test}
-  §F{ProcessOrder:pub}
-      §O{void}
-      §E{cw,db:w}
-      §C{Console.WriteLine} §A STR:""Starting"" §/C
-      §C{OrderRepo.Save} §/C
+module Test Test block
+  func ProcessOrder () → void
+    ! cw, db:w
+    Console.WriteLine(""Starting"")
+    OrderRepo.Save()
 ";
         var compileResult = TestHarness.CompileWithEffects(fullSource, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Permissive);
@@ -1084,19 +1083,18 @@ public class EffectsSuggestTests
     {
         // File A defines a helper function
         var sourceA = @"
-§M{Helpers}
-  §F{FormatName:pub}
-      §I{str:name}
-      §O{str}
-      §R name
+module Helpers Helpers block
+  func FormatName (string:name) → string
+    !
+    return name
 ";
         // File B calls the helper + an external type
         var sourceB = @"
-§M{App}
-  §F{ProcessUser:pub}
-      §O{void}
-      §C{FormatName} §A STR:""test"" §/C
-      §C{ExternalApi.Submit} §/C
+module App App block
+  func ProcessUser () → void
+    !
+    FormatName(""test"")
+    ExternalApi.Submit()
 ";
         var moduleA = Parse(sourceA);
         var moduleB = Parse(sourceB);
@@ -1133,11 +1131,11 @@ public class EffectsSuggestTests
     public void Constructor_CollectedWithTypeNameAndCtorKind()
     {
         var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{svc} §NEW{OrderService} §/NEW
-      §B{client} §NEW{HttpClient} §/NEW
+module Test Test block
+  func DoWork () → void
+    !
+    let svc = new OrderService()
+    let client = new HttpClient()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);

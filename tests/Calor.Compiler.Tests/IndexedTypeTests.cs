@@ -306,12 +306,9 @@ public sealed class IndexedTypeTests
     public void Generate_ArrayAccessOnNonIndexedType_CreatesRuntimeBoundsObligation()
     {
         var source = """
-            §M{Test}
-              §F{Sum:priv}
-                  §I{[i32]:items}
-                  §I{i32:i}
-                  §O{i32}
-                  §R §IDX items i
+            module Test Test block
+              func Sum private (int[]:items, int:i) → int
+                return items[i]
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -705,9 +702,10 @@ public sealed class IndexedTypeTests
     public async Task BoundsCheckTool_NoIndexedTypes_ReturnsEmptyAccessSites()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
+            module Test Test block
+              func Main () → void
+                !
+                return
             """;
 
         var tool = new Calor.Compiler.Mcp.Tools.RefineTool();
@@ -727,9 +725,10 @@ public sealed class IndexedTypeTests
     public async Task BoundsCheckTool_WithFunctionIdFilter_AcceptsParameter()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
+            module Test Test block
+              func Main () → void
+                !
+                return
             """;
 
         var tool = new Calor.Compiler.Mcp.Tools.RefineTool();

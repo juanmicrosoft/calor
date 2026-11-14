@@ -257,8 +257,8 @@ public class Test
     public void Parser_StModifier_OnClass_SetsIsStatic()
     {
         var source = @"
-§M{Test}
-  §M{Helper}";
+module Test Test block
+  module Helper internal";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.True(cls.IsStatic);
@@ -268,9 +268,11 @@ public class Test
     public void Parser_StModifier_OnMethod_SetsIsStatic()
     {
         var source = @"
-§M{Test}
-  §CL{Helper}
-    §MT{Greet:pub:st}";
+module Test Test block
+  class Helper internal
+    func Greet static ()
+      !
+      return";
         var module = ParseModule(source);
         var method = module.Classes[0].Methods[0];
         Assert.True(method.Modifiers.HasFlag(Calor.Compiler.Ast.MethodModifiers.Static));
@@ -280,8 +282,8 @@ public class Test
     public void Parser_StModifier_OnClass_EmitsStaticInCSharp()
     {
         var source = @"
-§M{Test}
-  §M{Helper}";
+module Test Test block
+  module Helper internal";
         var csharp = ParseAndEmit(source);
         Assert.Contains("static class Helper", csharp);
     }
@@ -403,11 +405,11 @@ public class Test
     public void TypeMapper_DecRoundtripsToDecimal()
     {
         var source = @"
-§M{Test}
-  §CL{Calc}
-    §MT{GetPrice:pub}
-        §O{dec}
-        §R 0";
+module Test Test block
+  class Calc internal
+    func GetPrice () → decimal
+      !
+      return 0";
         var csharp = ParseAndEmit(source);
         Assert.Contains("decimal", csharp);
     }
@@ -420,10 +422,11 @@ public class Test
     public void Parser_NewExpression_EmptyParens_ParsesWithoutError()
     {
         var source = @"
-§M{Test}
-  §CL{MyClass}
-    §MT{Create:pub}
-        §R §NEW{MyClass}()§/NEW";
+module Test Test block
+  class MyClass internal
+    func Create ()
+      !
+      return new MyClass()";
         var module = ParseModule(source);
         Assert.NotNull(module);
     }
@@ -432,15 +435,17 @@ public class Test
     public void Parser_NewExpression_EmptyParens_EquivalentToWithout()
     {
         var sourceWithParens = @"
-§M{Test}
-  §CL{MyClass}
-    §MT{Create:pub}
-        §R §NEW{MyClass}()§/NEW";
+module Test Test block
+  class MyClass internal
+    func Create ()
+      !
+      return new MyClass()";
         var sourceWithout = @"
-§M{Test}
-  §CL{MyClass}
-    §MT{Create:pub}
-        §R §NEW{MyClass}§/NEW";
+module Test Test block
+  class MyClass internal
+    func Create ()
+      !
+      return new MyClass()";
         var csharp1 = ParseAndEmit(sourceWithParens);
         var csharp2 = ParseAndEmit(sourceWithout);
 
@@ -467,8 +472,8 @@ public class Test
     public void Parser_StructAlone_IsNotStatic()
     {
         var source = @"
-§M{Test}
-  §CL{Point:struct}";
+module Test Test block
+  class Point internal struct";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.False(cls.IsStatic, "struct alone should not be static");
@@ -483,10 +488,11 @@ public class Test
     public void Parser_NewExpression_EmptyParens_WithTrailingMemberAccess()
     {
         var source = @"
-§M{Test}
-  §CL{MyClass}
-    §MT{GetName:pub}
-        §R §NEW{MyClass}()§/NEW.ToString";
+module Test Test block
+  class MyClass internal
+    func GetName ()
+      !
+      return new MyClass() . ToString";
         var csharp = ParseAndEmit(source);
         // Should produce new MyClass().ToString() in the output
         Assert.Contains("new MyClass()", csharp);
@@ -893,10 +899,10 @@ public class Test
     public void IDX_SimpleRef_ParsesAndEmitsValidCSharp()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~result:str} §IDX{words} 0
+module Test Test block
+  func Main () → void
+    !
+    var string:result = words[0]
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("words[0]", result);
@@ -1114,13 +1120,11 @@ public class Test
     public void CalorParser_TernaryLispSyntax_ParsesCorrectly()
     {
         var calor = """
-            §M{TestModule}
-                §CL{Test}
-                    §MT{Max:pub}
-                        §I{i32:a}
-                        §I{i32:b}
-                        §O{i32}
-                        §R (? (> a b) a b)
+            module TestModule TestModule block
+              class Test internal
+                func Max (int:a, int:b) → int
+                  !
+                  return ((a > b) ? a : b)
             """;
 
         var diagnostics = new DiagnosticBag();

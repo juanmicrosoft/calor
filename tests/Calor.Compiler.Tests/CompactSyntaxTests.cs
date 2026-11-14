@@ -178,14 +178,11 @@ public class CompactSyntaxTests
     {
         // Old verbose format with separate §GET/§SET tags
         var source = """
-            §M{Test}
-              §CL{Person}
-                §PROP{Name:str:pub}
-                §GET
-                §/GET
-                §SET{priv}
-                §/SET
-                §/PROP
+            module Test Test block
+              class Person internal
+                property string:Name
+                  get
+                  set private
             """;
 
         var (original, formatted, reparsed) = FormatAndReparse(source);
@@ -236,10 +233,10 @@ public class CompactSyntaxTests
     {
         // §F{vis} instead of §F{name:vis}
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                §O{void}
-                §R
+            module Test Test block
+              func Main () → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -256,12 +253,10 @@ public class CompactSyntaxTests
     public void IdentityFree_Function_UsesParserLocalIdentity()
     {
         var source = """
-            §M{Test}
-              §F{Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R (+ a b)
+            module Test Test block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -280,10 +275,10 @@ public class CompactSyntaxTests
     {
         // When open tag uses auto-generated ID, closing tag can omit the ID
         var source = """
-            §M{Test}
-              §F{Hello:pub}
-                §O{void}
-                §R
+            module Test Test block
+              func Hello () → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -298,9 +293,9 @@ public class CompactSyntaxTests
     {
         // §CL{Person} instead of §CL{Person}
         var source = """
-            §M{Test}
-              §CL{Person}
-                §FLD{str:Name:pub}
+            module Test Test block
+              class Person internal
+                field string:Name
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -434,12 +429,11 @@ public class CompactSyntaxTests
     {
         // §EN{Color} instead of §EN{Color}
         var source = """
-            §M{Test}
-              §EN{Color}
-              Red = 0
-              Green = 1
-              Blue = 2
-              §/EN
+            module Test Test block
+              enum Color
+                Red = 0
+                Green = 1
+                Blue = 2
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -456,11 +450,9 @@ public class CompactSyntaxTests
     {
         // §CTOR{pub} instead of §CTOR{pub}
         var source = """
-            §M{Test}
-              §CL{Widget}
-                §CTOR{pub}
-                §I{str:name}
-                §/CTOR
+            module Test Test block
+              class Widget internal
+                ctor (string:name)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -479,11 +471,11 @@ public class CompactSyntaxTests
         // §MT{DoWork:pub} instead of §MT{DoWork:pub}
         // The parser detects "pub" as a visibility keyword and shifts
         var source = """
-            §M{Test}
-              §CL{Worker}
-                §MT{DoWork:pub}
-                  §O{void}
-                  §R
+            module Test Test block
+              class Worker internal
+                func DoWork () → void
+                  !
+                  return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -501,10 +493,10 @@ public class CompactSyntaxTests
     {
         // Under indent-only form, dedent terminates the block — no closer needed
         var source = """
-            §M{Test}
-              §F{Hello:pub}
-                §O{void}
-                §R
+            module Test Test block
+              func Hello () → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -522,9 +514,10 @@ public class CompactSyntaxTests
     public void InlineSig_Function_SingleParam()
     {
         var source = """
-            §M{Test}
-              §F{Square:pub} (i32:x) -> i32
-                §R (* x x)
+            module Test Test block
+              func Square (int:x) → int
+                !
+                return (x * x)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -543,9 +536,10 @@ public class CompactSyntaxTests
     public void InlineSig_Function_MultipleParams()
     {
         var source = """
-            §M{Test}
-              §F{Add:pub} (i32:a, i32:b) -> i32
-                §R (+ a b)
+            module Test Test block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -563,9 +557,10 @@ public class CompactSyntaxTests
     public void InlineSig_Function_GenericParam()
     {
         var source = """
-            §M{Test}
-              §F{First:pub} (List<i32>:items) -> i32
-                §R 0
+            module Test Test block
+              func First (List<int>:items) → int
+                !
+                return 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -581,9 +576,10 @@ public class CompactSyntaxTests
     public void InlineSig_Function_NullableParam()
     {
         var source = """
-            §M{Test}
-              §F{OrDefault:pub} (i32?:value) -> i32
-                §R 0
+            module Test Test block
+              func OrDefault (int?:value) → int
+                !
+                return 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -601,9 +597,10 @@ public class CompactSyntaxTests
     public void InlineSig_Function_ArrayParam()
     {
         var source = """
-            §M{Test}
-              §F{Sum:pub} ([i32]:values) -> i32
-                §R 0
+            module Test Test block
+              func Sum (int[]:values) → int
+                !
+                return 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -618,10 +615,10 @@ public class CompactSyntaxTests
     public void InlineSig_Function_NoReturnType()
     {
         var source = """
-            §M{Test}
-              §F{PrintHello:pub} ()
-                §E{cw}
-                §C{Console.WriteLine} "hello"
+            module Test Test block
+              func PrintHello ()
+                ! cw
+                Console.WriteLine("hello")
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -638,10 +635,11 @@ public class CompactSyntaxTests
     public void InlineSig_Method_InClassContext()
     {
         var source = """
-            §M{Test}
-              §CL{Calculator}
-                §MT{Add:pub} (i32:a, i32:b) -> i32
-                  §R (+ a b)
+            module Test Test block
+              class Calculator internal
+                func Add (int:a, int:b) → int
+                  !
+                  return (a + b)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -659,12 +657,11 @@ public class CompactSyntaxTests
     public void InlineSig_Constructor_WithParams()
     {
         var source = """
-            §M{Test}
-              §CL{Person}
-                §FLD{str:_name:priv}
-                §CTOR{pub} (str:name)
-                §C{Console.WriteLine} name
-                §/CTOR
+            module Test Test block
+              class Person internal
+                field string:_name private
+                ctor (string:name)
+                  Console.WriteLine(name)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -681,9 +678,10 @@ public class CompactSyntaxTests
     public void InlineSig_EmptyParamsWithReturn()
     {
         var source = """
-            §M{Test}
-              §F{GetZero:pub} () -> i32
-                §R 0
+            module Test Test block
+              func GetZero () → int
+                !
+                return 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -699,11 +697,12 @@ public class CompactSyntaxTests
     public void InlineSig_WithContracts()
     {
         var source = """
-            §M{Test}
-              §F{Divide:pub} (i32:a, i32:b) -> i32
-                §Q (!= b 0)
-                §S (>= result 0)
-                §R (/ a b)
+            module Test Test block
+              func Divide (int:a, int:b) → int
+                !
+                requires (b != 0)
+                => (result >= 0)
+                return (a / b)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -721,12 +720,10 @@ public class CompactSyntaxTests
     {
         // Verbose form with §I/§O tags
         var source = """
-            §M{Test}
-              §F{Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R (+ a b)
+            module Test Test block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
             """;
 
         var (original, formatted, reparsed) = FormatAndReparse(source);
@@ -753,14 +750,11 @@ public class CompactSyntaxTests
     public void InlineSig_RoundTrip_Constructor()
     {
         var source = """
-            §M{Test}
-              §CL{Widget}
-                §FLD{str:_name:priv}
-                §CTOR{pub}
-                §I{str:name}
-                §I{i32:count}
-                §C{Console.WriteLine} name
-                §/CTOR
+            module Test Test block
+              class Widget internal
+                field string:_name private
+                ctor (string:name, int:count)
+                  Console.WriteLine(name)
             """;
 
         var (original, formatted, reparsed) = FormatAndReparse(source);
@@ -829,23 +823,18 @@ public class CompactSyntaxTests
     {
         // Verbose old-format source
         var source = """
-            §M{Test}
-              §CL{DataHolder}
-                §FLD{str:_label:priv}
-                §PROP{Value:i32:pub}
-                §GET
-                §/GET
-                §SET
-                §/SET
-                §/PROP
-                §CTOR{pub}
-                §I{str:label}
-                §I{i32:value}
-                §C{Console.WriteLine} label
-                §/CTOR
-                §MT{GetLabel:pub}
-                  §O{str}
-                  §R "label"
+            module Test Test block
+              class DataHolder internal
+                field string:_label private
+                property int:Value
+                  get
+                  set
+                ctor (string:label, int:value)
+                  Console.WriteLine(label)
+
+                func GetLabel () → string
+                  !
+                  return "label"
             """;
 
         var (original, formatted, reparsed) = FormatAndReparse(source);
@@ -878,26 +867,18 @@ public class CompactSyntaxTests
     {
         // Verbose source with lots of redundancy
         var source = """
-            §M{Test}
-              §CL{Item}
-                §PROP{Name:string:pub}
-                §GET
-                §/GET
-                §SET{priv}
-                §/SET
-                §/PROP
-                §PROP{Value:int:pub}
-                §GET
-                §/GET
-                §SET
-                §/SET
-                §/PROP
-              §F{Main:pub}
-                §I{string:name}
-                §I{int:count}
-                §O{void}
-                §E{cw}
-                §C{Console.WriteLine} name
+            module Test Test block
+              class Item internal
+                property string:Name
+                  get
+                  set private
+                property int:Value
+                  get
+                  set
+
+              func Main (string:name, int:count) → void
+                ! cw
+                Console.WriteLine(name)
             """;
 
         var (_, formatted, _) = FormatAndReparse(source);

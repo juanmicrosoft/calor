@@ -1,10 +1,11 @@
-§M{Visibility}
-  §F{PublicFunc:pub} () -> void
-    §R
+module Visibility Visibility block
+  func PublicFunc () → void
+    !
+    return
 
-  §F{PrivateFunc:priv} () -> void
-    §R
+  func PrivateFunc private () → void
+    return
 
-  §F{AnotherPublic:pub} (i32:x) -> i32
-    §R x
-
+  func AnotherPublic (int:x) → int
+    !
+    return x

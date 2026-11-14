@@ -9,7 +9,7 @@ public sealed class IdsCommandTests : IDisposable
 {
     private readonly string _directory = Path.GetFullPath(Path.Combine(
         ".calor-test-workspaces", $"ids-command-{Guid.NewGuid():N}"));
-    private const string Source = "§M{Test}\n  §F{Foo:pub} () -> void\n";
+    private const string Source = "module Test Test block\n  func Foo () → void\n    !\n    return\n";
 
     public IdsCommandTests()
     {
@@ -96,7 +96,7 @@ public sealed class IdsCommandTests : IDisposable
         var store = new DeclarationIdentityStore(_directory);
         store.Sync(registration == "registered" ? [file] : []);
         string? beforeSidecar = File.ReadAllText(store.SidecarPath);
-        const string updated = "§M{Test}\n  §F{Bar:pub} () -> void\n";
+        const string updated = "module Test Test block\n  func Bar () → void\n    !\n    return\n";
         if (registration == "missing") File.Delete(file);
         var next = store.Preview(
             [new(file, registration == "missing" ? null : Source, updated)]);
@@ -267,7 +267,7 @@ public sealed class IdsCommandTests : IDisposable
     public void Check_AmbiguousRename_ReportsIdentityFailureAndLeavesSnapshotsUntouched()
     {
         var file = WriteSource();
-        const string source = "§M{Test}\n  §F{A:pub} () -> void\n  §F{B:pub} () -> void\n";
+        const string source = "module Test Test block\n  func A () → void\n    !\n    return\n\n  func B () → void\n    !\n    return\n";
         File.WriteAllText(file, source);
         var store = new DeclarationIdentityStore(_directory);
         store.Sync([file]);

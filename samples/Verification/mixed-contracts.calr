@@ -1,21 +1,24 @@
-§M{MixedContracts}
-  §F{SafeDivide:pub} (i32:a, i32:b) -> i32
-    §Q (!= b 0)
-    §S (!= b 0)
-    §R (/ a b)
+module MixedContracts MixedContracts block
+  func SafeDivide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => (b != 0)
+    return (a / b)
 
-  §F{SumArray:pub} (i32:n) -> i32
-    §Q (>= n 0)
-    §R 0
+  func SumArray (int:n) → int
+    !
+    requires (n >= 0)
+    return 0
 
-  §F{Increment:pub} (i32:x) -> i32
-    §S (== result (+ x 1))
-    §R (+ x 1)
+  func Increment (int:x) → int
+    !
+    => (result == (x + 1))
+    return (x + 1)
 
-  §F{ClampPositive:pub} (i32:x) -> i32
-    §S (>= result 0)
-    §IF (< x 0)
-      §R 0
-    §EL
-      §R x
-
+  func ClampPositive (int:x) → int
+    !
+    => (result >= 0)
+    if (x < 0)
+      return 0
+    else
+      return x

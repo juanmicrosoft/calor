@@ -179,7 +179,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Parser_OmittedVisibility_StillDefaultsWithoutDiagnostic()
     {
-        var module = Parse("§M{V}\n  §CL{K:pub}\n    §FLD{i32:x}\n    §MT{A} () -> i32\n      §R 1\n", out var diagnostics);
+        var module = Parse("module V V block\n  class K\n    field int:x private\n    func A private () → int\n      return 1\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(Visibility.Private, module.Classes.Single().Fields.Single().Visibility);
@@ -188,7 +188,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Parser_CompactEventHeader_AsDocumented_Parses()
     {
-        var module = Parse("§M{V}\n  §CL{K:pub}\n    §EVT{Click:pub:EventHandler}\n", out var diagnostics);
+        var module = Parse("module V V block\n  class K\n    event EventHandler:Click\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         var evt = module.Classes.Single().Events.Single();
@@ -200,7 +200,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Emitter_ProtectedShortForm_EmitsProtectedNotPrivate()
     {
-        var result = Compile("§M{V}\n  §CL{K:pub}\n    §MT{A:prot} () -> i32\n      §R 1\n");
+        var result = Compile("module V V block\n  class K\n    func A protected () → int\n      !\n      return 1\n");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => e.Message)));
         Assert.Contains("protected int A()", result.GeneratedCode);

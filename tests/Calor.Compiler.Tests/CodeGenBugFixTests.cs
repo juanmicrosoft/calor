@@ -17,11 +17,10 @@ public class CodeGenBugFixTests
     {
         // §IDX{args} 1 should generate args[1], NOT new object[] { args }[1]
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §I{[str]:args}
-      §O{void}
-      §B{~result:str} §IDX{args} 1
+module Test Test block
+  func Main (string[]:args) → void
+    !
+    var string:result = args[1]
 ";
 
         var result = ParseAndEmit(source);
@@ -35,10 +34,10 @@ public class CodeGenBugFixTests
     {
         // §NEW{Dictionary<char,str>} should generate new Dictionary<char, string>()
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~dict} §NEW{Dictionary<char,str>}
+module Test Test block
+  func Main () → void
+    !
+    var dict = new Dictionary<char, string>()
 ";
 
         var result = ParseAndEmit(source);
@@ -52,10 +51,10 @@ public class CodeGenBugFixTests
     {
         // Backward compat: §NEW{Dictionary:char:str} should still work
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~dict} §NEW{Dictionary:char:str}
+module Test Test block
+  func Main () → void
+    !
+    var dict = new Dictionary<char, string>()
 ";
 
         var result = ParseAndEmit(source);
@@ -68,10 +67,10 @@ public class CodeGenBugFixTests
     {
         // §B{ConsoleKeyInfo:keyPressed} should generate ConsoleKeyInfo keyPressed
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
+module Test Test block
+  func Main () → void
+    !
+    let ConsoleKeyInfo:keyPressed = Console.ReadKey()
 ";
 
         var result = ParseAndEmit(source);
@@ -85,10 +84,10 @@ public class CodeGenBugFixTests
     {
         // Backward compat: §B{~name:str} should still work as name:type format
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~name:str} ""hello""
+module Test Test block
+  func Main () → void
+    !
+    var string:name = ""hello""
 ";
 
         var result = ParseAndEmit(source);
@@ -101,10 +100,10 @@ public class CodeGenBugFixTests
     {
         // The array value carries the element type, not the binding name.
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{[char]:buf1} §ARR{char:100}
+module Test Test block
+  func Main () → void
+    !
+    let char[]:buf1 = new char[100]
 ";
 
         var result = ParseAndEmit(source);
@@ -117,10 +116,10 @@ public class CodeGenBugFixTests
     public void Bug4_ArrayCreationWithSeparateBindingName_StillWorks()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{[i32]:arr1} §ARR{i32:10}
+module Test Test block
+  func Main () → void
+    !
+    let int[]:arr1 = new int[10]
 ";
 
         var result = ParseAndEmit(source);
@@ -133,15 +132,13 @@ public class CodeGenBugFixTests
     {
         // §PROP{MaxCharCount:i32:pub:over} should generate public override int MaxCharCount
         var source = @"
-§M{Test}
-  §CL{MyClass:pub}
-      §EXT{BaseClass}
-      §PROP{MaxCharCount:i32:pub:over}
-        §GET
-        §/GET
-        §SET
-        §/SET
-      §/PROP
+module Test Test block
+  class MyClass
+    extends BaseClass
+
+    property int:MaxCharCount override
+      get
+      set
 ";
 
         var result = ParseAndEmit(source);
@@ -153,14 +150,11 @@ public class CodeGenBugFixTests
     public void Bug5_PropertyWithVirtualModifier_GeneratesVirtualKeyword()
     {
         var source = @"
-§M{Test}
-  §CL{MyClass:pub}
-      §PROP{Name:str:pub:virt}
-        §GET
-        §/GET
-        §SET
-        §/SET
-      §/PROP
+module Test Test block
+  class MyClass
+    property string:Name virtual
+      get
+      set
 ";
 
         var result = ParseAndEmit(source);
@@ -173,14 +167,11 @@ public class CodeGenBugFixTests
     {
         // Backward compat: property with no 5th position should work as before
         var source = @"
-§M{Test}
-  §CL{MyClass:pub}
-      §PROP{Count:i32:pub}
-        §GET
-        §/GET
-        §SET
-        §/SET
-      §/PROP
+module Test Test block
+  class MyClass
+    property int:Count
+      get
+      set
 ";
 
         var result = ParseAndEmit(source);
@@ -195,13 +186,10 @@ public class CodeGenBugFixTests
     {
         // §C{fn} §A §NEW{Type1} §A §NEW{Type2} §/C should generate fn(new Type1(), new Type2())
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §C{DoWork}
-        §A §NEW{StringBuilder}
-        §A §NEW{List}
-      §/C
+module Test Test block
+  func Main () → void
+    !
+    DoWork(new StringBuilder(), new List())
 ";
 
         var result = ParseAndEmit(source);
@@ -217,10 +205,10 @@ public class CodeGenBugFixTests
     {
         // (char-lit "Y") should generate 'Y'
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~ch:char} (char-lit ""Y"")
+module Test Test block
+  func Main () → void
+    !
+    var char:ch = 'Y'
 ";
 
         var result = ParseAndEmit(source);
@@ -237,13 +225,10 @@ public class CodeGenBugFixTests
         // it belongs to the enclosing §C. To pass args to §NEW inside §C,
         // use the §/NEW closure pattern with a separate §B.
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §C{Process}
-        §A §NEW{Widget}
-        §A ""extra""
-      §/C
+module Test Test block
+  func Main () → void
+    !
+    Process(new Widget(), ""extra"")
 ";
 
         var result = ParseAndEmit(source);
@@ -257,10 +242,10 @@ public class CodeGenBugFixTests
     {
         // Outside of §C arg context, §NEW should still consume §A tokens normally
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~obj} §NEW{Widget} §A ""hello"" §A 42 §/NEW
+module Test Test block
+  func Main () → void
+    !
+    var obj = new Widget(""hello"", 42)
 ";
 
         var result = ParseAndEmit(source);
@@ -273,10 +258,10 @@ public class CodeGenBugFixTests
     {
         // (char-lit "'") should produce '\'' not '''
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~ch:char} (char-lit ""'"")
+module Test Test block
+  func Main () → void
+    !
+    var char:ch = '\''
 ";
 
         var result = ParseAndEmit(source);
@@ -290,10 +275,10 @@ public class CodeGenBugFixTests
     {
         // (char-lit "\\") should produce '\\'
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §B{~ch:char} (char-lit "\\")
+            module Test Test block
+              func Main () → void
+                !
+                var char:ch = '\\'
             """;
 
         var result = ParseAndEmit(source);
@@ -309,10 +294,10 @@ public class CodeGenBugFixTests
         // and we fall through to {name:type} format.
         // This means: HttpClient is the name, MyClient is the type.
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{HttpClient:MyClient} §NEW{MyClient}
+module Test Test block
+  func Main () → void
+    !
+    let MyClient:HttpClient = new MyClient()
 ";
 
         var result = ParseAndEmit(source);
@@ -327,10 +312,10 @@ public class CodeGenBugFixTests
         // §B{StringBuilder:StringBuilder} — both are PascalCase and identical
         // Falls through to {name:type} format, which works correctly
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{StringBuilder:StringBuilder} §NEW{StringBuilder}
+module Test Test block
+  func Main () → void
+    !
+    let StringBuilder:StringBuilder = new StringBuilder()
 ";
 
         var result = ParseAndEmit(source);
@@ -342,10 +327,10 @@ public class CodeGenBugFixTests
     public void Bug4_ArrayCreationWithUserType_IsUnambiguous()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{Buffer:MyArray} §ARR{Buffer:10}
+module Test Test block
+  func Main () → void
+    !
+    let MyArray:Buffer = new Buffer[10]
 ";
 
         var result = ParseAndEmit(source);
@@ -368,63 +353,37 @@ public class CodeGenBugFixTests
         // Bug 6: §C{fn} §A §NEW{X} §A §NEW{Y} §/C multiple NEWs in call
         // Bug 7: (char-lit "Y") char literal
         var source = @"
-§M{Transliterator}
+module Transliterator Transliterator block
+  using System
+  using System.Collections.Generic
+  using System.Text
+  class TransliteratorBase abstract
+    property string:Name abstract
+      get
 
-  §U{System}
-  §U{System.Collections.Generic}
-  §U{System.Text}
+  class CyrillicToLatin
+    extends TransliteratorBase
 
-  §CL{TransliteratorBase:pub:abs}
-      §PROP{Name:str:pub:abs}
-        §GET
-        §/GET
-      §/PROP
+    field string:_mappings private
+    property string:Name override
+      get
+    ctor (string:name)
+      set this . _mappings name
 
-  §CL{CyrillicToLatin:pub}
-      §EXT{TransliteratorBase}
-
-      §FLD{str:_mappings:priv}
-
-      §PROP{Name:str:pub:over}
-        §GET
-        §/GET
-      §/PROP
-
-      §CTOR{pub}
-        §I{str:name}
-        §ASSIGN §THIS._mappings name
-      §/CTOR
-
-      §MT{Transliterate:pub}
-          §I{str:input}
-          §O{str}
-          §E{cw,cr}
-
-          §B{~dict} §NEW{Dictionary<char,str>}
-          §B{[char]:buf} §ARR{char:256}
-          §B{~sb} §NEW{StringBuilder}
-          §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
-
-          §L{i:0:(len input):1}
-              §B{char:ch} §IDX{input} i
-              §IF (== ch (char-lit ""Y""))
-                  §C{sb.Append}
-                    §A ""Y""
-                  §/C
-              §EL
-                  §C{sb.Append}
-                    §A ch
-                  §/C
-
-          §C{Console.WriteLine}
-            §A ""{0} {1}""
-            §A §NEW{StringBuilder}
-            §A §NEW{StringBuilder}
-          §/C
-
-          §R §C{sb.ToString} §/C
-
-
+    func Transliterate (string:input) → string
+      ! cw, cr
+      var dict = new Dictionary<char, string>()
+      let char[]:buf = new char[256]
+      var sb = new StringBuilder()
+      let ConsoleKeyInfo:keyPressed = Console.ReadKey()
+      for i from 0 to input.Length step 1
+        let char:ch = input[i]
+        if (ch == 'Y')
+          sb.Append(""Y"")
+        else
+          sb.Append(ch)
+      Console.WriteLine(""{0} {1}"", new StringBuilder(), new StringBuilder())
+      return sb.ToString()
 ";
 
         var result = ParseAndEmit(source);
@@ -709,10 +668,10 @@ public class CodeGenBugFixTests
     {
         // (char-lit "\n") should be valid — escape sequences are single characters
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~ch:char} (char-lit ""\n"")
+module Test Test block
+  func Main () → void
+    !
+    var char:ch = '\n'
 ";
 
         // Should parse without errors
@@ -903,10 +862,10 @@ public class CodeGenBugFixTests
     {
         // §ARR{nums:i32} 1 2 3 §/ARR → 3 elements, no size
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR
+module Test Test block
+  func Main () → void
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
         var module = ParseModule(source);
         var func = Assert.Single(module.Functions);
@@ -923,10 +882,10 @@ public class CodeGenBugFixTests
     {
         // §ARR at statement level (no §B wrapper)
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR
+module Test Test block
+  func Main () → void
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
         var diagnostics = ParseWithDiagnostics(source);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -937,10 +896,10 @@ public class CodeGenBugFixTests
     {
         // §A-prefixed elements still work
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{[i32]:nums} §ARR{i32} §A 1 §A 2 §A 3 §/ARR
+module Test Test block
+  func Main () → void
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("new int[]", result);
@@ -954,10 +913,10 @@ public class CodeGenBugFixTests
     {
         // Bare element syntax → correct C# generation
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR
+module Test Test block
+  func Main () → void
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("new int[]", result);
@@ -970,10 +929,10 @@ public class CodeGenBugFixTests
     public void Array_SizedArray_StillWorks()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{[i32]:arr1} §ARR{i32:10}
+module Test Test block
+  func Main () → void
+    !
+    let int[]:arr1 = new int[10]
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("new int[10]", result);
@@ -1003,10 +962,10 @@ public class CodeGenBugFixTests
     {
         // Initialized array in return (expression context) should emit inline §ARR, not break
         var source = @"
-§M{Test}
-  §F{GetNums:pub}
-      §O{[i32]}
-      §R §ARR{i32} 1 2 3 §/ARR
+module Test Test block
+  func GetNums () → int[]
+    !
+    return new int[] { 1, 2, 3 }
 ";
         var module = ParseModule(source);
         var calorEmitter = new Migration.CalorEmitter();
@@ -1022,10 +981,10 @@ public class CodeGenBugFixTests
     {
         // return new int[] { 1, 2, 3 } → parse → emit C# should produce correct code
         var source = @"
-§M{Test}
-  §F{GetNums:pub}
-      §O{[i32]}
-      §R §ARR{i32} 1 2 3 §/ARR
+module Test Test block
+  func GetNums () → int[]
+    !
+    return new int[] { 1, 2, 3 }
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("return new int[]", result);
@@ -1043,13 +1002,11 @@ public class CodeGenBugFixTests
     {
         // Named modules retain the original C# static type name.
         var source = @"
-§M{Test}
-  §M{Utils}
-      §MT{Add:pub:stat}
-          §I{i32:a}
-          §I{i32:b}
-          §O{i32}
-          §R (+ a b)
+module Test Test block
+  module Utils internal
+    func Add (int:a, int:b) → int
+      !
+      return (a + b)
 ";
         var result = ParseAndEmit(source);
 
@@ -1060,13 +1017,11 @@ public class CodeGenBugFixTests
     public void NamedModule_StaticMethod_RemainsCallable()
     {
         var source = @"
-§M{Test}
-  §M{Utils}
-      §MT{Add:pub:stat}
-          §I{i32:a}
-          §I{i32:b}
-          §O{i32}
-          §R (+ a b)
+module Test Test block
+  module Utils internal
+    func Add (int:a, int:b) → int
+      !
+      return (a + b)
 ";
         var result = ParseAndEmit(source);
 
@@ -1077,13 +1032,11 @@ public class CodeGenBugFixTests
     public void NamedModule_ExplicitStaticMember_EmitsNoDuplicateModifier()
     {
         var source = @"
-§M{Test}
-  §M{Utils}
-      §MT{Add:pub:stat}
-          §I{i32:a}
-          §I{i32:b}
-          §O{i32}
-          §R (+ a b)
+module Test Test block
+  module Utils internal
+    func Add (int:a, int:b) → int
+      !
+      return (a + b)
 ";
         var result = ParseAndEmit(source);
 
@@ -1095,10 +1048,10 @@ public class CodeGenBugFixTests
     {
         // §CL{Point:struct} should NOT produce a static class
         var source = @"
-§M{Test}
-  §CL{Point:struct}
-      §FLD{i32:X:pub}
-      §FLD{i32:Y:pub}
+module Test Test block
+  class Point internal struct
+    field int:X
+    field int:Y
 ";
         var result = ParseAndEmit(source);
 

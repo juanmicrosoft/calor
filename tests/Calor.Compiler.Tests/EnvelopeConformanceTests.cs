@@ -149,7 +149,7 @@ public class EnvelopeConformanceTests
     [InlineData(true)]
     public void DeclarationId_WithoutSidecar_DoesNotExposeLocalHandles(bool canonicalLookingLocalId)
     {
-        const string source = "§M{Demo}\n";
+        const string source = "module Demo Demo block\n";
         var file = Path.Combine(Path.GetTempPath(), "calor-unregistered-" + Guid.NewGuid().ToString("N") + ".calr");
         var compilation = Program.Compile(source, file);
         Assert.False(compilation.HasErrors);
@@ -172,7 +172,7 @@ public class EnvelopeConformanceTests
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        var source = "§M{Demo}\n  §F{Dec:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (> result 10)\n    §R (- x 1)\n";
+        var source = "module Demo Demo block\n  func Dec (int:x) → int\n    !\n    requires (x > 0)\n    => (result > 10)\n    return (x - 1)\n";
         var options = new CompilationOptions
         {
             VerifyContracts = true,

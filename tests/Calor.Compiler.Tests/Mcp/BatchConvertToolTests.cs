@@ -225,7 +225,7 @@ public class BatchConvertToolTests
             File.Move(first, moved);
             File.WriteAllText(moved, "\n§M{Test}\n  §F{Renamed:pub} () -> void\n    §B{x}\n");
             var added = Path.Combine(root, "active", "Added.calr");
-            File.WriteAllText(added, "§M{Added}\n  §F{Bar:pub} () -> i32\n    §R 1\n");
+            File.WriteAllText(added, "module Added Added block\n  func Bar () → int\n    !\n    return 1\n");
             var repeated = await Run(moved, added);
             Assert.Equal(2, repeated.GetProperty("totalFiles").GetInt32());
             var results = repeated.GetProperty("files").EnumerateArray().ToArray();
@@ -294,16 +294,16 @@ public class BatchConvertToolTests
         try
         {
             var path = Path.Combine(root, "Input.calr");
-            File.WriteAllText(path, "§M{Test}\n  §F{Original:pub} () -> i32\n    §R 1\n");
+            File.WriteAllText(path, "module Test Test block\n  func Original () → int\n    !\n    return 1\n");
             var args = JsonSerializer.SerializeToElement(new { action = "compile", projectPath = root, summary });
             Assert.False((await _tool.ExecuteAsync(args)).IsError);
             var sidecar = new DeclarationIdentityStore(root).SidecarPath;
             if (ambiguous)
-                File.WriteAllText(path, "§M{Test}\n  §F{First:pub} () -> i32\n    §R 1\n  §F{Second:pub} () -> i32\n    §R 1\n");
+                File.WriteAllText(path, "module Test Test block\n  func First () → int\n    !\n    return 1\n\n  func Second () → int\n    !\n    return 1\n");
             else
                 File.WriteAllText(sidecar, "{broken");
             var added = Path.Combine(root, "Added.calr");
-            File.WriteAllText(added, "§M{Added}\n  §F{Other:pub} () -> i32\n    §R 2\n");
+            File.WriteAllText(added, "module Added Added block\n  func Other () → int\n    !\n    return 2\n");
             var before = File.ReadAllBytes(sidecar);
             var source = File.ReadAllBytes(path);
             var addedSource = File.ReadAllBytes(added);

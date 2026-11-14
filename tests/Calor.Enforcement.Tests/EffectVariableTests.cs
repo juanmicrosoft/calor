@@ -36,10 +36,10 @@ public class EffectVariableTests
         // cascade starting "Expected Greater but found Identifier" — `eff e` is new
         // syntax (§7.2).
         var module = Parse("""
-            §M{X6}
-              §F{Map:pub}<T, U, eff e> (Func<i32,i32>:f §E{e}, i32:v) -> i32
-                §E{e}
-                §R INT:0
+            module X6 X6 block
+              func Map <T,U,! e> (Func<int, int>:f ! e, int:v) → int
+                ! e
+                return 0
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -61,9 +61,10 @@ public class EffectVariableTests
         // Z4 (`§F{M:pub}<eff> (eff:x) -> void`) compiles on main; the one-token
         // lookahead in ParseOptionalTypeParameterList must keep it compiling.
         var module = Parse("""
-            §M{Z4}
-              §F{M:pub}<eff> (eff:x) -> void
-                §E{}
+            module Z4 Z4 block
+              func M<eff> (eff:x) → void
+                !
+                return
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -116,10 +117,10 @@ public class EffectVariableTests
         // which §7.3 already permits, which is why §9's seventh insertion point
         // stayed at zero cost.
         var module = Parse("""
-            §M{W1}
-              §IFACE{IH}
-                §MT{Handle}<eff e> (Func<i32>:next §E{e}) -> i32
-                  §E{e}
+            module W1 W1 block
+              interface IH
+                func Handle <! e> (Func<int>:next ! e) → int
+                  ! e
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -138,10 +139,10 @@ public class EffectVariableTests
         // §7.2(b): the variable resolves BEFORE EffectCodes.TryParseCompact, so a
         // bound name never reaches the taxonomy lookup.
         var module = Parse("""
-            §M{S}
-              §F{M:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{cw, e}
-                §R INT:0
+            module S S block
+              func M <! e> (Func<int>:g ! e) → int
+                ! cw, e
+                return 0
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -298,10 +299,10 @@ public class EffectVariableTests
         // all. The honest pin is that no row is produced — not a Calor0404 the
         // compiler has no way to reach.
         var module = Parse("""
-            §M{R}
-              §F{M:pub}<eff e> (List<Func<i32,i32>>:fs §E{e}) -> i32
-                §E{e}
-                §R INT:0
+            module R R block
+              func M <! e> (List<Func<int, int>>:fs ! e) → int
+                ! e
+                return 0
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -325,13 +326,14 @@ public class EffectVariableTests
         // to slice a's boolean `IsEffectVariableInScope`) and both rows read -1,
         // which unifies with nothing.
         var module = Parse("""
-            §M{Alpha}
-              §F{A:pub}<eff e> (Func<i32>:f §E{e}) -> i32
-                §E{e}
-                §R INT:0
-              §F{B:pub}<eff zzz> (Func<i32>:f §E{zzz}) -> i32
-                §E{zzz}
-                §R INT:0
+            module Alpha Alpha block
+              func A <! e> (Func<int>:f ! e) → int
+                ! e
+                return 0
+
+              func B <! zzz> (Func<int>:f ! zzz) → int
+                ! zzz
+                return 0
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -359,16 +361,17 @@ public class EffectVariableTests
         // SpikeVerdictTests.A3Fixtures_AreExactlyZeroCalor0418_PostE4,
         // which compiles the frozen fixture and asserts zero Calor0421.
         var module = Parse("""
-            §M{MiddlewareAlpha}
-              §IFACE{IPipelineBehavior}
-                §MT{Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
-                  §E{e}
+            module MiddlewareAlpha MiddlewareAlpha block
+              interface IPipelineBehavior
+                func Handle <! e> (int:request, Func<int>:next ! e) → int
+                  ! e
 
-              §CL{PassThroughBehavior:pub}
-                §IMPL{IPipelineBehavior}
-                §MT{Handle:pub}<eff f> (i32:request, Func<i32>:next §E{f}) -> i32
-                  §E{f}
-                  §R §C{next} §/C
+              class PassThroughBehavior
+                implements IPipelineBehavior
+
+                func Handle <! f> (int:request, Func<int>:next ! f) → int
+                  ! f
+                  return next()
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -391,13 +394,14 @@ public class EffectVariableTests
         // it did, `<T, eff e>` (combined position 1) and `<eff e>` (position 0)
         // would stop unifying for a reason that has nothing to do with effects.
         var module = Parse("""
-            §M{Mixed}
-              §F{A:pub}<T, eff e> (Func<i32>:f §E{e}) -> i32
-                §E{e}
-                §R INT:0
-              §F{B:pub}<eff e> (Func<i32>:f §E{e}) -> i32
-                §E{e}
-                §R INT:0
+            module Mixed Mixed block
+              func A <T,! e> (Func<int>:f ! e) → int
+                ! e
+                return 0
+
+              func B <! e> (Func<int>:f ! e) → int
+                ! e
+                return 0
             """, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);

@@ -203,10 +203,11 @@ public class WeakeningCheckCliTests : IDisposable
     public void WideLiteral_WeakeningIsDeterminate()
     {
         const string bigFrozen = """
-            §M{Big}
-              §F{B:pub} (i64:a) -> i64
-                §S (&& (>= result 0) (<= result 4000000000))
-                §R a
+            module Big Big block
+              func B (long:a) → long
+                !
+                => ((result >= 0) && (result <= 4000000000L))
+                return a
             """;
         var frozen = WriteFile("frozen.calr", bigFrozen);
         var final_ = WriteFile("final.calr", bigFrozen.Replace("4000000000", "8000000000"));

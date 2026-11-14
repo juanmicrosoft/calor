@@ -31,15 +31,14 @@ public class CliElisionDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "square.calr");
         File.WriteAllText(path, """
-            §M{Test}
-              §CL{Calc:pub}
-                §MT{Square:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q (>= x 0)
-                  §Q (<= x 46340)
-                  §S (>= result 0)
-                  §R (* x x)
+            module Test Test block
+              class Calc
+                func Square (int:x) → int
+                  !
+                  requires (x >= 0)
+                  requires (x <= 46340)
+                  => (result >= 0)
+                  return (x * x)
             """);
         return path;
     }

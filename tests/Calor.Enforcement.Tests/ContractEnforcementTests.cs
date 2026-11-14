@@ -235,14 +235,12 @@ public class ContractEnforcementTests
     {
         // B1 scenario: Function with contracts but no effects is valid
         var source = @"
-§M{Test}
-  §F{SafeAdd:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (>= a INT:0)
-      §S (>= result a)
-      §R (+ a b)
+module Test Test block
+  func SafeAdd (int:a, int:b) → int
+    !
+    requires (a >= 0)
+    => (result >= a)
+    return (a + b)
 ";
         source = NoEffectsCurrentNativeProgram;
         var result = TestHarness.Compile(source);

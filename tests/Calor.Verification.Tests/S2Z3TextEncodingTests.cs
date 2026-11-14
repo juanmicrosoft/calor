@@ -91,11 +91,11 @@ public sealed class S2Z3TextEncodingTests
         // R1-STR-OPS-COUNT-INDEX-003: s.Substring(1, 1) throws for s.Length < 2.
         Assert.Throws<ArgumentOutOfRangeException>(() => "".Substring(1, 1));
         const string source = """
-            §M{R1Case}
-              §F{Probe:pub} (str:s) -> i32
-                §E{}
-                §S (== result INT:4)
-                §R (len (substr s INT:1 INT:1))
+            module R1Case R1Case block
+              func Probe (string:s) → int
+                !
+                => (result == 4)
+                return ((s).Substring(1, 1)).Length
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         Assert.Equal(ProofStatus.Refuted, outcome.Status);
@@ -111,11 +111,11 @@ public sealed class S2Z3TextEncodingTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => "a".Substring(2));
         const string source = """
-            §M{M}
-              §F{Probe:pub} (str:s) -> i32
-                §E{}
-                §S (== result INT:5)
-                §R (len (substr s INT:2))
+            module M M block
+              func Probe (string:s) → int
+                !
+                => (result == 5)
+                return ((s).Substring(2)).Length
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         Assert.Equal(ProofStatus.Refuted, outcome.Status);
@@ -131,12 +131,12 @@ public sealed class S2Z3TextEncodingTests
     {
         // Review round 2 witness: every normal return produces 1; s = "" throws in .NET.
         const string source = """
-            §M{M}
-              §F{Probe:pub} (str:s) -> i32
-                §E{}
-                §S (== result INT:1)
-                §B{i:i32} INT:1
-                §R (len (substr s i INT:1))
+            module M M block
+              func Probe (string:s) → int
+                !
+                => (result == 1)
+                let int:i = 1
+                return ((s).Substring(i, 1)).Length
             """;
         Assert.NotEqual(ProofStatus.Refuted, VerifySinglePostcondition(source).EffectiveOutcome.Status);
     }
@@ -195,11 +195,11 @@ public sealed class S2Z3TextEncodingTests
     {
         // The emitted call ignores the start index, so the solver must not model one.
         const string source = """
-            §M{M}
-              §F{Probe:pub} () -> i32
-                §E{}
-                §S (== result INT:4)
-                §R (indexof STR:"abcabc" STR:"b" INT:3 :ordinal)
+            module M M block
+              func Probe () → int
+                !
+                => (result == 4)
+                return ("abcabc").IndexOf("b", 3, StringComparison.Ordinal)
             """;
         Assert.Equal(ProofStatus.Unsupported, VerifySinglePostcondition(source).EffectiveOutcome.Status);
     }
@@ -208,13 +208,13 @@ public sealed class S2Z3TextEncodingTests
     public void SubstringOverALocal_IsUnsupported()
     {
         const string source = """
-            §M{M}
-              §F{Probe:pub} (str:s) -> i32
-                §E{}
-                §Q (== s STR:"ab")
-                §S (== result INT:1)
-                §B{i:i32} INT:1
-                §R (len (substr s i INT:1))
+            module M M block
+              func Probe (string:s) → int
+                !
+                requires (s == "ab")
+                => (result == 1)
+                let int:i = 1
+                return ((s).Substring(i, 1)).Length
             """;
         // Review round 3: a range over a body local is not modeled (no substitution).
         Assert.Equal(ProofStatus.Unsupported, VerifySinglePostcondition(source).EffectiveOutcome.Status);
@@ -227,14 +227,14 @@ public sealed class S2Z3TextEncodingTests
         // throws; substituting the literal 1 for i would wrap to start 0.
         Assert.Throws<ArgumentOutOfRangeException>(() => "".Substring(1, 0));
         const string source = """
-            §M{M}
-              §F{Probe:pub} (u32:x, str:s) -> i32
-                §E{}
-                §Q (== x UINT:4294967295)
-                §Q (== s STR:"")
-                §S (== result INT:1)
-                §B{i:i32} INT:1
-                §R (len (substr s (? (> (+ x i) LONG:4294967295) INT:1 INT:0) INT:0))
+            module M M block
+              func Probe (uint:x, string:s) → int
+                !
+                requires (x == 4294967295U)
+                requires (s == "")
+                => (result == 1)
+                let int:i = 1
+                return ((s).Substring((((x + i) > 4294967295L) ? 1 : 0), 0)).Length
             """;
         Assert.NotEqual(ProofStatus.Refuted, VerifySinglePostcondition(source).EffectiveOutcome.Status);
     }
@@ -244,13 +244,13 @@ public sealed class S2Z3TextEncodingTests
     {
         // Review round 3 witness: the substring runs once, at the binding, not in the arms.
         const string source = """
-            §M{M}
-              §F{Probe:pub} (str:s, bool:c) -> i32
-                §E{}
-                §Q (== s STR:"ab")
-                §S (== result INT:1)
-                §B{t:str} (substr s INT:1 INT:1)
-                §R (? c (len t) (len t))
+            module M M block
+              func Probe (string:s, bool:c) → int
+                !
+                requires (s == "ab")
+                => (result == 1)
+                let string:t = (s).Substring(1, 1)
+                return (c ? t.Length : t.Length)
             """;
         Assert.Equal(ProofStatus.Assumed, VerifySinglePostcondition(source).EffectiveOutcome.Status);
     }
@@ -286,11 +286,11 @@ public sealed class S2Z3TextEncodingTests
     public void SubstringInConditionalPosition_IsUnsupported()
     {
         const string source = """
-            §M{M}
-              §F{Probe:pub} (str:s, bool:c) -> i32
-                §E{}
-                §S (== result INT:4)
-                §R (? c (len (substr s INT:1 INT:1)) INT:4)
+            module M M block
+              func Probe (string:s, bool:c) → int
+                !
+                => (result == 4)
+                return (c ? ((s).Substring(1, 1)).Length : 4)
             """;
         Assert.Equal(ProofStatus.Unsupported, VerifySinglePostcondition(source).EffectiveOutcome.Status);
     }

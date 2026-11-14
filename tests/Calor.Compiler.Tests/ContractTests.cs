@@ -68,12 +68,11 @@ public class ContractTests
     public void Parser_ParsesRequiresContract()
     {
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x INT:0)
-      §R (* x x)
+module Test Test block
+  func Square (int:x) → int
+    !
+    requires (x >= 0)
+    return (x * x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -93,12 +92,11 @@ public class ContractTests
     public void Parser_ParsesEnsuresContract()
     {
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §S (>= result INT:0)
-      §R (* x x)
+module Test Test block
+  func Square (int:x) → int
+    !
+    => (result >= 0)
+    return (x * x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -118,15 +116,13 @@ public class ContractTests
     public void Parser_ParsesMultipleContracts()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b INT:0)
-      §Q (>= a INT:0)
-      §S (>= result INT:0)
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    requires (a >= 0)
+    => (result >= 0)
+    return (a / b)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -231,12 +227,11 @@ public class ContractTests
     public void Emitter_EmitsFunctionWithPrecondition()
     {
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x INT:0)
-      §R (* x x)
+module Test Test block
+  func Square (int:x) → int
+    !
+    requires (x >= 0)
+    return (x * x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -254,12 +249,11 @@ public class ContractTests
     public void Emitter_EmitsFunctionWithPostcondition()
     {
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §S (>= result INT:0)
-      §R (* x x)
+module Test Test block
+  func Square (int:x) → int
+    !
+    => (result >= 0)
+    return (x * x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -281,12 +275,11 @@ public class ContractTests
     public void ContractVerifier_AcceptsValidPrecondition()
     {
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x INT:0)
-      §R (* x x)
+module Test Test block
+  func Square (int:x) → int
+    !
+    requires (x >= 0)
+    return (x * x)
 ";
 
         var module = Parse(source, out var parseDiags);

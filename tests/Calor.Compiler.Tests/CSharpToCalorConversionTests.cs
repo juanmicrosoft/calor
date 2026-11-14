@@ -2561,11 +2561,11 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithVrAbbreviation_SetsVirtual()
     {
         var calorSource = """
-            §M{TestModule}
-                §CL{Base:pub}
-                    §MT{GetName:pub:vr}
-                        §O{str}
-                        §R "base"
+            module TestModule TestModule block
+              class Base
+                func GetName virtual () → string
+                  !
+                  return "base"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2584,12 +2584,13 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithOvAbbreviation_SetsOverride()
     {
         var calorSource = """
-            §M{TestModule}
-                §CL{Derived:pub}
-                    §EXT{Base}
-                    §MT{GetName:pub:ov}
-                        §O{str}
-                        §R "derived"
+            module TestModule TestModule block
+              class Derived
+                extends Base
+
+                func GetName override () → string
+                  !
+                  return "derived"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2608,13 +2609,11 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithStAbbreviation_SetsStatic()
     {
         var calorSource = """
-            §M{TestModule}
-                §M{Utils:pub}
-                    §MT{Add:pub:st}
-                        §I{i32:a}
-                        §I{i32:b}
-                        §O{i32}
-                        §R (+ a b)
+            module TestModule TestModule block
+              module Utils
+                func Add (int:a, int:b) → int
+                  !
+                  return (a + b)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2659,10 +2658,12 @@ public class CSharpToCalorConversionTests
     public void Parse_ClassWithStAbbreviation_SetsIsStaticTrue()
     {
         var calorSource = """
-            §M{TestModule}
-                §F{Main:pub}
-                    §O{void}
-                §M{Foo:pub}
+            module TestModule TestModule block
+              func Main () → void
+                !
+                return
+
+              module Foo
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -3788,7 +3789,7 @@ public class CSharpToCalorConversionTests
     {
         // Directly test the lexer with a large hex value
         var diagnostics = new DiagnosticBag();
-        var source = "§EN{Test}\nVal = 0xFFFFFFFF\n§/EN";
+        var source = "enum Test\n  Val = 0xFFFFFFFF";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));

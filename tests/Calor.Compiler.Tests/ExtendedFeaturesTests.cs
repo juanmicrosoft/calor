@@ -207,11 +207,11 @@ public class ExtendedFeaturesTests
     {
         // Use quoted values for version
         var source = @"
-§M{Test}
-  §F{NewMethod:pub}
-      §SN{""1.5.0""}
-      §O{i32}
-      §R 42
+module Test Test block
+  /// since 1.5.0
+  func NewMethod () → int
+    !
+    return 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -227,11 +227,11 @@ public class ExtendedFeaturesTests
     {
         // v2 positional format: {version:replacement}
         var source = @"
-§M{Test}
-  §F{OldMethod:pub}
-      §DP{""1.5.0"":NewMethod}
-      §O{i32}
-      §R 42
+module Test Test block
+  /// deprecated 1.5.0 NewMethod
+  func OldMethod () → int
+    !
+    return 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -248,11 +248,11 @@ public class ExtendedFeaturesTests
     {
         // v2 positional format: {version:replacement}
         var source = @"
-§M{Test}
-  §F{OldMethod:pub}
-      §DP{""1.5.0"":NewMethod}
-      §O{i32}
-      §R 42
+module Test Test block
+  /// deprecated 1.5.0 NewMethod
+  func OldMethod () → int
+    !
+    return 42
 ";
 
         var module = Parse(source, out var diagnostics);

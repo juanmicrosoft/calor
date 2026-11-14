@@ -1,4 +1,4 @@
-§M{Single}
-  §F{One:pub} () -> i32
-    §R 1
-
+module Single Single block
+  func One () → int
+    !
+    return 1

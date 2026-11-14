@@ -190,12 +190,10 @@ public class PostConversionFixerTests
     public void Fix_AlreadyValidSource_ReturnsUnmodified()
     {
         var source = """
-            §M{Test}
-              §F{Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
+            module Test Test block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
             """;
 
         var result = _fixer.Fix(source);
@@ -238,11 +236,10 @@ public class PostConversionFixerTests
         // The converter sometimes leaks C# null-conditional into Calor output.
         // If the fixer can't handle it perfectly, it should at least not crash.
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §I{str:name}
-                  §O{i32}
-                  §R (len name)
+            module Test Test block
+              func Foo (string:name) → int
+                !
+                return name.Length
             """;
 
         // This source is already valid — just verify fixer doesn't break it

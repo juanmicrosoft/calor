@@ -229,7 +229,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         // Z3 finds a counterexample (e.g. x = 1 → result = 0).
         var file = Path.Combine(_tempDir, "refutable.calr");
         File.WriteAllText(file,
-            "§M{Demo}\n  §F{Dec:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (> result 10)\n    §R (- x 1)\n");
+            "module Demo Demo block\n  func Dec (int:x) → int\n    !\n    requires (x > 0)\n    => (result > 10)\n    return (x - 1)\n");
         return file;
     }
 
@@ -238,7 +238,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         // §S (>= x 1) follows directly from §Q (> x 0) for §R x.
         var file = Path.Combine(_tempDir, "provable.calr");
         File.WriteAllText(file,
-            "§M{Demo}\n  §F{Ok:pub} (i32:x) -> i32\n    §Q (> x 0)\n    §S (>= x 1)\n    §R x\n");
+            "module Demo Demo block\n  func Ok (int:x) → int\n    !\n    requires (x > 0)\n    => (x >= 1)\n    return x\n");
         return file;
     }
 
@@ -310,7 +310,7 @@ public class EnvelopeEarlyExitTests : IDisposable
             d => d.GetProperty("severity").GetString() == "error");
     }
 
-    private const string ValidSource = "\u00a7M{T}\n  \u00a7F{Main:pub} () -> void\n    \u00a7E{cw}\n    \u00a7P \"hi\"\n";
+    private const string ValidSource = "module T T block\n  func Main () → void\n    ! cw\n    Console.WriteLine(\"hi\")\n";
 
     [Fact]
     public void FormatWrite_Json_EnabledWithoutExperimental_EmitsEnvelope()

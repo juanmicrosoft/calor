@@ -1,5 +1,6 @@
-§M{OutcomeRefuted}
-  §F{Dec:pub} (i32:x) -> i32
-    §Q (> x 0)
-    §S (> result 10)
-    §R (- x 1)
+module OutcomeRefuted OutcomeRefuted block
+  func Dec (int:x) → int
+    !
+    requires (x > 0)
+    => (result > 10)
+    return (x - 1)

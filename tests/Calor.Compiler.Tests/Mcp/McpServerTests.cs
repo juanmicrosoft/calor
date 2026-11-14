@@ -716,7 +716,7 @@ public class McpServerTests
     {
         // Test the full MCP server flow with diagnose tool
         // MCP uses newline-delimited JSON (NDJSON)
-        var source = "§M{Test} §F{Add} §O{i32} §R (abss -5)";
+        var source = "module Test Test block\n  func Add private () → int\n    return (abss - 5)";
         var jsonSource = JsonSerializer.Serialize(source); // Properly escape for JSON
         var inputMessage = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"calor_check\",\"arguments\":{{\"source\":{jsonSource}}}}}}}\n";
 

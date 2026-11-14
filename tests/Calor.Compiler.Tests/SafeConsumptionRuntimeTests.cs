@@ -575,10 +575,10 @@ public sealed class SafeConsumptionRuntimeTests
     public void VarPattern_PreservesNullableOperandAndIsRejectedOnNonNullableReturn()
     {
         const string source = """
-            §M{Consumption}
-              §F{Probe:pub} (?str:input) -> str
-                §E{}
-                §R (? (is input var text) text "fallback")
+            module Consumption Consumption block
+              func Probe (string?:input) → string
+                !
+                return ((input is var text) ? text : "fallback")
             """;
         var (_, diagnostics) = Bind(source);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);

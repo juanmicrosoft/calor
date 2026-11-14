@@ -1,31 +1,33 @@
-§M{WhenFilter}
-  §F{FilteredHandler:pub} (i32:code) -> str
-    §TR
-      §TH "Error"
-    §CA{Exception:ex} WHEN (== code 42)
-      §R "special"
-    §CA{Exception:ex}
-      §R "general"
+module WhenFilter WhenFilter block
+  func FilteredHandler (int:code) → string
+    !
+    try
+      throw "Error"
+    catch Exception:ex when (code == 42)
+      return "special"
+    catch Exception:ex
+      return "general"
 
-  §F{MultipleFilters:pub} (i32:value) -> str
-    §TR
-      §TH "Error"
-    §CA{Exception:ex} WHEN (< value 0)
-      §R "negative"
-    §CA{Exception:ex} WHEN (== value 0)
-      §R "zero"
-    §CA{Exception:ex} WHEN (> value 100)
-      §R "large"
-    §CA{Exception:ex}
-      §R "normal"
+  func MultipleFilters (int:value) → string
+    !
+    try
+      throw "Error"
+    catch Exception:ex when (value < 0)
+      return "negative"
+    catch Exception:ex when (value == 0)
+      return "zero"
+    catch Exception:ex when (value > 100)
+      return "large"
+    catch Exception:ex
+      return "normal"
 
-  §F{FilterWithLogicalOps:pub} (i32:x, i32:y) -> str
-    §TR
-      §TH "Error"
-    §CA{Exception:ex} WHEN (&& (> x 0) (> y 0))
-      §R "both positive"
-    §CA{Exception:ex} WHEN (|| (< x 0) (< y 0))
-      §R "at least one negative"
-    §CA{Exception:ex}
-      §R "default"
-
+  func FilterWithLogicalOps (int:x, int:y) → string
+    !
+    try
+      throw "Error"
+    catch Exception:ex when ((x > 0) && (y > 0))
+      return "both positive"
+    catch Exception:ex when ((x < 0) || (y < 0))
+      return "at least one negative"
+    catch Exception:ex
+      return "default"

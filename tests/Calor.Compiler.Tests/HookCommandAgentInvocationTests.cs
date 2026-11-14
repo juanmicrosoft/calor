@@ -103,7 +103,7 @@ public class HookCommandAgentInvocationTests
     [Fact]
     public async Task PreToolUseHook_AllowsCalrWrite_ReturnsOk()
     {
-        var toolInput = BuildWriteToolInput("/tmp/whatever.calr", "§M{Whatever}\n");
+        var toolInput = BuildWriteToolInput("/tmp/whatever.calr", "module Whatever Whatever block\n");
 
         var (exitCode, stdOut, stdErr) = await RunHookAsync("validate-write", toolInput);
 

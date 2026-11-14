@@ -1,4 +1,4 @@
-§M{Reader}
-  §F{ReadCount:pub} (Holder.Box:box) -> i32
-    §E{}
-    §R box.count
+module Reader Reader block
+  func ReadCount (Holder.Box:box) → int
+    !
+    return box.count

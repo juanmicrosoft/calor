@@ -326,10 +326,10 @@ public sealed class McpCompileGateTests : IDisposable
         // CrossModuleEnforcement_StillRunsWithEffectsOff_AndAgreesWithTheCli.
         var violating = CreateTempDir();
         File.WriteAllText(Path.Combine(violating, "leaky.calr"), """
-            §M{Leaky}
-              §F{Speak:pub} () -> void
-                §E{}
-                §P "cw without declaring it"
+            module Leaky Leaky block
+              func Speak () → void
+                !
+                Console.WriteLine("cw without declaring it")
             """);
         var effectsOn = await CallTool(violating, "calor_compile", JsonSerializer.Serialize(new
         {

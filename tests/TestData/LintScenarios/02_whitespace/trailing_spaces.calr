@@ -1,4 +1,4 @@
-§M{Test}
-  §F{Main:pub} () -> void
-    §P "Hello"
-
+module Test Test block
+  func Main () → void
+    !
+    Console.WriteLine("Hello")

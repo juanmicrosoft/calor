@@ -98,10 +98,10 @@ public class TypeCheckerDefectTests
     public void ObjectIsATopType_NotAUniversalEscape()
     {
         // Everything assigns TO object...
-        AssertNoErrors("§M{S}\n  §F{Do:pub} () -> void\n    §E{}\n    §B{o:object} STR:\"a\"\n    §R\n");
+        AssertNoErrors("module S S block\n  func Do () → void\n    !\n    let object:o = \"a\"\n    return\n");
 
         // ...and nothing assigns FROM it without a cast, which is what C# requires.
-        var result = Check("§M{S}\n  §F{Do:pub} (object:o) -> void\n    §E{}\n    §B{n:i32} o\n    §R\n");
+        var result = Check("module S S block\n  func Do (object:o) → void\n    !\n    let int:n = o\n    return\n");
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("Cannot assign"));
     }
 
@@ -114,14 +114,14 @@ public class TypeCheckerDefectTests
     [Fact]
     public void DeclaredGenericParameter_IsNotWarnedAbout()
     {
-        var result = Check("§M{S}\n  §F{Identity<T>:pub} (T:value) -> T\n    §R value\n");
+        var result = Check("module S S block\n  func Identity<T> (T:value) → T\n    !\n    return value\n");
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
     }
 
     /// <summary>PUSH must stay silent on a receiver the checker cannot model, like its siblings.</summary>
     [Fact]
     public void PushOnUnmodeledReceiver_IsNotAnError()
-        => AssertNoErrors("§M{S}\n  §F{Do:pub} (SomeUnknownBag:items) -> void\n    §E{mut}\n    §PUSH{items} INT:1\n    §R\n");
+        => AssertNoErrors("module S S block\n  func Do (SomeUnknownBag:items) → void\n    ! mut\n    items.Add(1)\n    return\n");
 
     [Theory]
     [InlineData("[str]")]   // the collection-literal spelling in the syntax reference
@@ -174,7 +174,7 @@ public class TypeCheckerDefectTests
     public void DecimalMixedWithFloat_IsRejected()
     {
         var result = Check(
-            "§M{S}\n  §F{Do:pub} (decimal:d, f64:x) -> void\n    §E{}\n    §B{r:decimal} (+ d x)\n    §R\n");
+            "module S S block\n  func Do (decimal:d, double:x) → void\n    !\n    let decimal:r = (d + x)\n    return\n");
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("decimal"));
     }
@@ -188,13 +188,13 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SwitchExpressionPatternVariable_IsBound()
         => AssertNoErrors("""
-            §M{S}
-              §F{Do:pub} (i32:diff) -> i32
-                §E{}
-                §B{result:i32} §W diff
-                  §K §VAR{d} §WHEN (> d 0) → d
-                  §K _ → 0
-                §R result
+            module S S block
+              func Do (int:diff) → int
+                !
+                let int:result = match diff
+                  case var d when (d > 0) → d
+                  case _ → 0
+                return result
             """);
 
     /// <summary>
@@ -205,11 +205,11 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SetIndexOnArray_IsAccepted()
         => AssertNoErrors("""
-            §M{S}
-              §F{Do:pub} (i32[]:xs, i32:i, i32:v) -> i32
-                §E{mut}
-                §SETIDX{xs} i v
-                §R INT:0
+            module S S block
+              func Do (int[]:xs, int:i, int:v) → int
+                ! mut
+                set xs[i] v
+                return 0
             """);
 
     /// <summary>
@@ -221,7 +221,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SizedType_MismatchEchoesTheWrittenWidth()
     {
-        var result = Check("§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i64} STR:\"a\"\n    §R INT:0\n");
+        var result = Check("module S S block\n  func Do () → int\n    !\n    let long:x = \"a\"\n    return 0\n");
 
         var error = Assert.Single(result.Diagnostics.Errors);
         Assert.Contains("i64", error.Message);
@@ -236,7 +236,7 @@ public class TypeCheckerDefectTests
     /// </summary>
     [Fact]
     public void StringConcatenation_IsNotAnArithmeticError()
-        => AssertNoErrors("§M{S}\n  §F{Do:pub} () -> str\n    §E{}\n    §R (+ STR:\"hello\" STR:\"world\")\n");
+        => AssertNoErrors("module S S block\n  func Do () → string\n    !\n    return (\"hello\" + \"world\")\n");
 
     // ---- References the checker mistook for variables ----
 
@@ -258,7 +258,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void BareUnknownIdentifier_IsStillReported()
     {
-        var result = Check("§M{S}\n  §F{Do:pub} () -> i32\n    §E{}\n    §R nonexistent_xyz\n");
+        var result = Check("module S S block\n  func Do () → int\n    !\n    return nonexistent_xyz\n");
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Message.Contains("Undefined variable 'nonexistent_xyz'"));
     }
@@ -275,19 +275,19 @@ public class TypeCheckerDefectTests
     public void UnknownCallResult_DoesNotCascadeIntoAConditionError()
     {
         AssertNoErrors("""
-            §M{S}
-              §F{Do:pub} (str:path) -> i32
-                §E{fs:r}
-                §B{ok:bool} §C{File.Exists} §A path §/C
-                §IF (== ok BOOL:true)
-                  §R INT:1
-                §R INT:0
+            module S S block
+              func Do (string:path) → int
+                ! fs:r
+                let bool:ok = File.Exists(path)
+                if (ok == true)
+                  return 1
+                return 0
             """);
     }
 
     [Fact]
     public void UnknownReceiver_DoesNotCascadeIntoAFieldAccessError()
-        => AssertNoErrors("§M{S}\n  §F{Do:pub} () -> void\n    §E{}\n    §B{v:object} System.Environment.NewLine\n    §R\n");
+        => AssertNoErrors("module S S block\n  func Do () → void\n    !\n    let object:v = System.Environment.NewLine\n    return\n");
 
     // ---- Diagnostics that belong to another pass ----
 
@@ -327,15 +327,16 @@ public class TypeCheckerDefectTests
     public void ModuleDeclaredTypes_AreNotReportedAsUnknown()
     {
         var result = Check("""
-            §M{ClsTest}
-              §CL{Point:pub}
-                §FLD{i32:X:pub}
-                §CTOR{pub} (i32:x)
-                  §ASSIGN X x
-              §F{Use:pub} () -> void
-                §E{}
-                §B{p:Point} §NEW{Point} §A INT:3 §/NEW
-                §R
+            module ClsTest ClsTest block
+              class Point
+                field int:X
+                ctor (int:x)
+                  set X x
+
+              func Use () → void
+                !
+                let Point:p = new Point(3)
+                return
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
@@ -348,7 +349,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void UndeclaredType_IsStillReported()
     {
-        var result = Check("§M{S}\n  §F{Do:pub} () -> void\n    §E{}\n    §B{x:NoSuchTypeXyz} STR:\"a\"\n    §R\n");
+        var result = Check("module S S block\n  func Do () → void\n    !\n    let NoSuchTypeXyz:x = \"a\"\n    return\n");
         Assert.Contains(result.Diagnostics, d => d.Message.Contains("'NoSuchTypeXyz' is not known"));
     }
 
@@ -362,18 +363,19 @@ public class TypeCheckerDefectTests
     public void PreprocessorWrappedAndNestedDeclarations_AreNotReportedAsUnknown()
     {
         var result = Check("""
-            §M{PpTest}
-              §PP{DEBUG}
-                §CL{Dbg:pub}
-                  §FLD{i32:N:pub}
-              §/PP{DEBUG}
-              §CL{Outer:pub}
-                §CL{Inner:pub}
-                  §FLD{i32:M:pub}
-              §F{Use:pub} (Dbg:d) -> void
-                §E{}
-                §B{i:Outer.Inner}
-                §R
+            module PpTest PpTest block
+              pp DEBUG
+                class Dbg
+                  field int:N
+
+              class Outer
+                class Inner
+                  field int:M
+
+              func Use (Dbg:d) → void
+                !
+                let Outer.Inner:i
+                return
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
@@ -390,14 +392,15 @@ public class TypeCheckerDefectTests
     public void BareNestedTypeName_IsStillReported()
     {
         var result = Check("""
-            §M{NestTest}
-              §CL{Outer:pub}
-                §CL{Inner:pub}
-                  §FLD{i32:M:pub}
-              §F{Use:pub} () -> void
-                §E{}
-                §B{i:Inner}
-                §R
+            module NestTest NestTest block
+              class Outer
+                class Inner
+                  field int:M
+
+              func Use () → void
+                !
+                let Inner:i
+                return
             """);
 
         Assert.Contains(result.Diagnostics, d => d.Message.Contains("'Inner' is not known"));

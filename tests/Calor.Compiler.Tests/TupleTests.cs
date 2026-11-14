@@ -20,12 +20,13 @@ public class TupleTests
     public void Parse_TupleReturnType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{TupleType}
-              §M{Tuples:pub}
-                §MT{GetMinMax:pub:stat} (i32:a, i32:b) -> (i32, i32)
-                  §IF (< a b)
-                    §R (a, b)
-                  §R (b, a)
+            module TupleType TupleType block
+              module Tuples
+                func GetMinMax (int:a, int:b) → (int, int)
+                  !
+                  if (a < b)
+                    return (a, b)
+                  return (b, a)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -43,10 +44,11 @@ public class TupleTests
     public void Parse_NamedTupleReturnType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{TupleType}
-              §M{Tuples:pub}
-                §MT{GetPerson:pub:stat} () -> (str Name, i32 Age)
-                  §R ("Alice", 30)
+            module TupleType TupleType block
+              module Tuples
+                func GetPerson () → (string Name, int Age)
+                  !
+                  return ("Alice", 30)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -62,10 +64,11 @@ public class TupleTests
     public void Parse_TupleParameterType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{TupleType}
-              §M{Tuples:pub}
-                §MT{GetFirst:pub:stat} ((i32, i32):tuple) -> i32
-                  §R tuple.Item1
+            module TupleType TupleType block
+              module Tuples
+                func GetFirst ((int, int):tuple) → int
+                  !
+                  return tuple.Item1
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -86,10 +89,11 @@ public class TupleTests
     public void Parse_TupleReturnExpression_ProducesTupleLiteralNode()
     {
         var calor = """
-            §M{TupleType}
-              §M{Tuples:pub}
-                §MT{MakeTuple:pub:stat} (i32:a, i32:b) -> (i32, i32)
-                  §R (a, b)
+            module TupleType TupleType block
+              module Tuples
+                func MakeTuple (int:a, int:b) → (int, int)
+                  !
+                  return (a, b)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -112,10 +116,11 @@ public class TupleTests
     public void Parse_TupleWithLiterals_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{TupleType}
-              §M{Tuples:pub}
-                §MT{GetPair:pub:stat} () -> (i32, i32)
-                  §R (10, 20)
+            module TupleType TupleType block
+              module Tuples
+                func GetPair () → (int, int)
+                  !
+                  return (10, 20)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -131,10 +136,11 @@ public class TupleTests
     public void Parse_TupleWithStringAndInt_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{TupleType}
-              §M{Tuples:pub}
-                §MT{GetPerson:pub:stat} () -> (str, i32)
-                  §R ("Alice", 30)
+            module TupleType TupleType block
+              module Tuples
+                func GetPerson () → (string, int)
+                  !
+                  return ("Alice", 30)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions

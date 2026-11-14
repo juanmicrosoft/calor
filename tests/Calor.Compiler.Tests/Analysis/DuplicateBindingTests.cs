@@ -35,7 +35,7 @@ public class DuplicateBindingTests
     public void DuplicateImmutableBindingInSameScope_IsRejected()
     {
         Assert.True(HasDuplicate(
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i32} 1\n    §B{x:i32} 2\n    §R x\n"));
+            "module S S block\n  func Do () → int\n    !\n    let int:x = 1\n    let int:x = 2\n    return x\n"));
     }
 
     [Fact]
@@ -43,9 +43,16 @@ public class DuplicateBindingTests
     {
         // Distinct scopes — each block's `x` is independent, no CS0128.
         Assert.False(HasDuplicate(
-            "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF (== a true)\n      §B{x:i32} 1\n      §R x\n" +
-            "    §IF (== b true)\n      §B{x:i32} 2\n      §R x\n    §R 0\n"));
+            "module S S block\n" +
+            "  func Do (bool:a, bool:b) → int\n" +
+            "    !\n" +
+            "    if (a == true)\n" +
+            "      let int:x = 1\n" +
+            "      return x\n" +
+            "    if (b == true)\n" +
+            "      let int:x = 2\n" +
+            "      return x\n" +
+            "    return 0\n"));
     }
 
     [Fact]
@@ -53,7 +60,7 @@ public class DuplicateBindingTests
     {
         // A mutable §B reusing a live name is a reassignment (`x = 2`), not a duplicate.
         Assert.False(HasDuplicate(
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x} 1\n    §B{~x} 2\n    §R x\n"));
+            "module S S block\n  func Do () → int\n    !\n    var x = 1\n    var x = 2\n    return x\n"));
     }
 
     [Fact]
@@ -61,8 +68,14 @@ public class DuplicateBindingTests
     {
         // Reusing an ENCLOSING-scope name is Calor0255 (CS0136), not Calor0258 (CS0128).
         Assert.False(HasDuplicate(
-            "§M{S}\n  §F{Do:pub} (bool:flag) -> i32\n    §B{~x:i32} 0\n" +
-            "    §IF (== flag true)\n      §B{x:str} \"hi\"\n      §R 0\n    §R x\n"));
+            "module S S block\n" +
+            "  func Do (bool:flag) → int\n" +
+            "    !\n" +
+            "    var int:x = 0\n" +
+            "    if (flag == true)\n" +
+            "      let string:x = \"hi\"\n" +
+            "      return 0\n" +
+            "    return x\n"));
     }
 
     [Fact]
@@ -71,7 +84,7 @@ public class DuplicateBindingTests
         // A body-top-level local reusing a parameter name is CS0136 shadowing (params live
         // in an enclosing scope), not a same-scope CS0128 duplicate.
         Assert.False(HasDuplicate(
-            "§M{S}\n  §F{Do:pub} (i32:x) -> i32\n    §B{x:i32} 9\n    §R x\n"));
+            "module S S block\n  func Do (int:x) → int\n    !\n    let int:x = 9\n    return x\n"));
     }
 
     // The converter side of #731: a `x = new …` reassignment must NOT round-trip to a

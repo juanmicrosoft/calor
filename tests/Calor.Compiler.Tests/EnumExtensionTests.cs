@@ -103,12 +103,11 @@ public class EnumExtensionTests
     public void Parser_ParsesBasicEnum()
     {
         var source = """
-            §M{Test}
-              §EN{Color}
-              Red
-              Green
-              Blue
-              §/EN
+            module Test Test block
+              enum Color
+                Red
+                Green
+                Blue
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -128,12 +127,11 @@ public class EnumExtensionTests
     public void Parser_ParsesEnumWithValues()
     {
         var source = """
-            §M{Test}
-              §EN{StatusCode}
-              Ok = 200
-              NotFound = 404
-              Error = 500
-              §/EN
+            module Test Test block
+              enum StatusCode
+                Ok = 200
+                NotFound = 404
+                Error = 500
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -150,12 +148,11 @@ public class EnumExtensionTests
     public void Parser_ParsesEnumWithUnderlyingType()
     {
         var source = """
-            §M{Test}
-              §EN{Flags:u8}
-              None = 0
-              Read = 1
-              Write = 2
-              §/EN
+            module Test Test block
+              enum Flags byte
+                None = 0
+                Read = 1
+                Write = 2
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -222,12 +219,11 @@ public class EnumExtensionTests
     public void Emit_Enum_GeneratesEnumDeclaration()
     {
         var source = """
-            §M{Test}
-              §EN{Color}
-              Red
-              Green
-              Blue
-              §/EN
+            module Test Test block
+              enum Color
+                Red
+                Green
+                Blue
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -245,11 +241,10 @@ public class EnumExtensionTests
     public void Emit_EnumWithValues_GeneratesEnumWithValues()
     {
         var source = """
-            §M{Test}
-              §EN{StatusCode}
-              Ok = 200
-              NotFound = 404
-              §/EN
+            module Test Test block
+              enum StatusCode
+                Ok = 200
+                NotFound = 404
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -292,11 +287,10 @@ public class EnumExtensionTests
     public void CalorEmitter_Enum_EmitsNewSyntax()
     {
         var source = """
-            §M{Test}
-              §EN{Color}
-              Red
-              Green
-              §/EN
+            module Test Test block
+              enum Color
+                Red
+                Green
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -458,9 +452,8 @@ public class EnumExtensionTests
     {
         // Empty extension is allowed (unusual but valid)
         var source = """
-            §M{Test}
-              §EEXT{Color}
-              §/EEXT
+            module Test Test block
+              module ColorExtensions
             """;
         var module = Parse(source, out var diagnostics);
 

@@ -27,11 +27,10 @@ public sealed class ObligationTests
     public void Generate_ProofObligation_CreatesObligation()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{positive} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"positive"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -53,12 +52,11 @@ public sealed class ObligationTests
     public void Generate_NestedProofObligation_CreatesObligation()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §IF (> x INT:0)
-                    §PROOF{positive} (> x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                if (x > 0)
+                  proof{"positive"} (x > 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -79,10 +77,10 @@ public sealed class ObligationTests
     public void Generate_InlineRefinement_CreatesRefinementEntryObligation()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:age | (# >= 0)) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -104,10 +102,9 @@ public sealed class ObligationTests
     public void Generate_PrivateFunctionInlineRefinement_IsBoundary()
     {
         var source = """
-            §M{Test}
-              §F{Helper:priv}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Helper private (int:age | (# >= 0)) → void
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -152,10 +149,10 @@ public sealed class ObligationTests
     public void Generate_NoRefinements_NoObligations()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -221,12 +218,10 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{Test}
-              §F{Add:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §Q (>= x INT:0)
-                  §PROOF{non-neg} (>= x INT:0)
+            module Test Test block
+              func Add private (int:x) → void
+                requires (x >= 0)
+                proof{"non-neg"} (x >= 0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -262,11 +257,9 @@ public sealed class ObligationTests
         // so the solver proves it too. The proof is still carried by the string theory (null
         // strings are unmodeled), so it must stay Assumed, never Discharged.
         var source = """
-            §M{Test}
-              §F{Check:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{bytelen} (== (len STR:"\u00e9") INT:1)
+            module Test Test block
+              func Check private (int:x) → void
+                proof{"bytelen"} (("é").Length == 1)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -292,11 +285,9 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{Test}
-              §F{Check:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{numeric} (== (+ INT:1 INT:1) INT:2)
+            module Test Test block
+              func Check private (int:x) → void
+                proof{"numeric"} ((1 + 1) == 2)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -315,11 +306,9 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{Test}
-              §F{Check:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{always-positive} (> x INT:0)
+            module Test Test block
+              func Check private (int:x) → void
+                proof{"always-positive"} (x > 0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -346,11 +335,10 @@ public sealed class ObligationTests
         // Private function with precondition that guarantees the inline refinement.
         // The # in (>= # INT:0) should resolve to 'age' via PushSelfVariable.
         var source = """
-            §M{Test}
-              §F{Validate:priv}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
-                  §Q (>= age INT:0)
+            module Test Test block
+              func Validate private (int:age | (# >= 0)) → void
+                requires (age >= 0)
+                return
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -373,10 +361,9 @@ public sealed class ObligationTests
 
         // A private declaration does not universally claim that every input is valid.
         var source = """
-            §M{Test}
-              §F{Validate:priv}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Validate private (int:age | (# >= 0)) → void
+                return
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -398,10 +385,10 @@ public sealed class ObligationTests
     public void Generate_SetsParameterNameOnRefinementEntry()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:myParam} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:myParam | (# >= 0)) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -419,11 +406,10 @@ public sealed class ObligationTests
     public void Generate_SetsSourceProofIdOnProofObligation()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -497,11 +483,10 @@ public sealed class ObligationTests
     public void CSharpEmit_DischargedProofObligation_EmitsProvenComment()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -534,11 +519,10 @@ public sealed class ObligationTests
     public void CSharpEmit_PolicyAlwaysGuard_OverridesProvenGuardElision()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -574,13 +558,13 @@ public sealed class ObligationTests
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{Test}
-              §F{Bad:pub}
-                  §O{void}
-                  §B{~x:i32} INT:1
-                  §IF (> x INT:0)
-                    §ASSIGN x INT:-1
-                    §PROOF{} (> x INT:0)
+            module Test Test block
+              func Bad () → void
+                !
+                var int:x = 1
+                if (x > 0)
+                  set x -1
+                  proof (x > 0)
             """;
         var options = new CompilationOptions
         {
@@ -632,11 +616,10 @@ public sealed class ObligationTests
     }
 
     private const string DischargedObligationSource = """
-        §M{Test}
-          §F{Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{check} (>= x INT:0)
+        module Test Test block
+          func Main (int:x) → void
+            !
+            proof{"check"} (x >= 0)
         """;
 
     private static ObligationTracker DischargedTracker(ModuleNode module)
@@ -693,11 +676,10 @@ public sealed class ObligationTests
     public void CSharpEmit_FailedProofObligation_EmitsRuntimeGuard()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -726,11 +708,10 @@ public sealed class ObligationTests
         // #879 ride-along: an obligation the solver cannot model keeps its runtime
         // check. Pre-fix, Unsupported fell through to the no-guard TODO comment.
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -761,11 +742,10 @@ public sealed class ObligationTests
         // Z3 unavailable attaches the tracker without solving) and must keep its guard.
         // The no-guard TODO now means exactly "no tracker ran".
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -787,11 +767,10 @@ public sealed class ObligationTests
     public void CSharpEmit_NoTracker_EmitsRuntimeGuard()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -824,10 +803,10 @@ public sealed class ObligationTests
     public void CSharpEmit_InlineRefinedParameter_EmitsEntryGuard()
     {
         var source = """
-            §M{Test}
-              §F{Use:pub}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Use (int:age | (# >= 0)) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -979,11 +958,10 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedParameterGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{Test}
-              §F{RequirePositive:pub}
-                  §I{i32:value} | (> # INT:0)
-                  §O{i32}
-                  §R value
+            module Test Test block
+              func RequirePositive (int:value | (# > 0)) → int
+                !
+                return value
             """);
 
         var exception = InvokeGenerated(csharp, "RequirePositive", -1);
@@ -1474,12 +1452,11 @@ public sealed class ObligationTests
     public void CSharpEmit_InlineRefinedParameterAssignment_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{Test}
-              §F{BadParameterWrite:pub}
-                  §I{i32:value} | (> # INT:0)
-                  §O{i32}
-                  §ASSIGN value INT:-1
-                  §R value
+            module Test Test block
+              func BadParameterWrite (int:value | (# > 0)) → int
+                !
+                set value -1
+                return value
             """);
 
         var exception = InvokeGenerated(csharp, "BadParameterWrite", 1);
@@ -1738,13 +1715,12 @@ public sealed class ObligationTests
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{Test}
-              §CL{Checker:pub}
-                §MT{Check:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §IF (> x INT:0)
-                    §PROOF{} (> x INT:0)
+            module Test Test block
+              class Checker
+                func Check (int:x) → void
+                  !
+                  if (x > 0)
+                    proof (x > 0)
             """;
         var options = new CompilationOptions
         {
@@ -1936,11 +1912,10 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedRefParameterMutation_CompilesAndThrows()
     {
         var csharp = Emit("""
-            §M{Test}
-              §F{Mutate:pub}
-                  §I{i32:value:ref} | (> # INT:0)
-                  §O{void}
-                  §ASSIGN value (- value INT:1)
+            module Test Test block
+              func Mutate (ref int:value | (# > 0)) → void
+                !
+                set value (value - 1)
             """);
 
         var exception = InvokeGenerated(csharp, "Mutate", 1);
@@ -1952,11 +1927,10 @@ public sealed class ObligationTests
     public void CSharpEmit_FailedRefinedWrites_DoNotCommitInvalidState()
     {
         var assignment = Emit("""
-            §M{Test}
-              §F{Mutate:pub}
-                  §I{i32:value:ref} | (> # INT:0)
-                  §O{void}
-                  §ASSIGN value INT:-1
+            module Test Test block
+              func Mutate (ref int:value | (# > 0)) → void
+                !
+                set value -1
             """);
         object?[] assignmentArguments = [1];
 
@@ -1969,11 +1943,10 @@ public sealed class ObligationTests
         Assert.Equal(1, assignmentArguments[0]);
 
         var decrement = Emit("""
-            §M{Test}
-              §F{Mutate:pub}
-                  §I{i32:value:ref} | (> # INT:0)
-                  §O{void}
-                  §ASSIGN value (- value INT:1)
+            module Test Test block
+              func Mutate (ref int:value | (# > 0)) → void
+                !
+                set value (value - 1)
             """);
         object?[] decrementArguments = [1];
 

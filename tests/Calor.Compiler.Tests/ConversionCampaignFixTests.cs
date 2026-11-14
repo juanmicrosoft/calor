@@ -94,15 +94,14 @@ public class ConversionCampaignFixTests
     public void Emit_WildcardMatchCase_EmitsDefault()
     {
         var source = @"
-§M{Test}
-  §F{MatchTest:pub}
-    §I{i32:x}
-    §O{str}
-    §W x
-    §K 1
-      §R ""one""
-    §K _
-      §R ""other""
+module Test Test block
+  func MatchTest (int:x) → string
+    !
+    match x
+      case 1
+        return ""one""
+      case _
+        return ""other""
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("default:", csharp);
@@ -113,17 +112,16 @@ public class ConversionCampaignFixTests
     public void Emit_MatchWithMultipleCasesAndWildcard_OnlyWildcardIsDefault()
     {
         var source = @"
-§M{Test}
-  §F{MatchTest:pub}
-    §I{i32:x}
-    §O{str}
-    §W x
-    §K 1
-      §R ""one""
-    §K 2
-      §R ""two""
-    §K _
-      §R ""other""
+module Test Test block
+  func MatchTest (int:x) → string
+    !
+    match x
+      case 1
+        return ""one""
+      case 2
+        return ""two""
+      case _
+        return ""other""
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("case 1:", csharp);
@@ -140,11 +138,10 @@ public class ConversionCampaignFixTests
     public void Emit_ReadOnlyAutoProperty_EmitsGetOnly()
     {
         var source = @"
-§M{Test}
-  §CL{Foo:pub}
-    §PROP{Name:str:pub}
-    §GET §/GET
-    §/PROP
+module Test Test block
+  class Foo
+    property string:Name
+      get
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("{ get; }", csharp);
@@ -155,12 +152,11 @@ public class ConversionCampaignFixTests
     public void Emit_ReadWriteAutoProperty_EmitsGetSet()
     {
         var source = @"
-§M{Test}
-  §CL{Foo:pub}
-    §PROP{Name:str:pub}
-    §GET §/GET
-    §SET §/SET
-    §/PROP
+module Test Test block
+  class Foo
+    property string:Name
+      get
+      set
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("get; set;", csharp);
@@ -174,12 +170,12 @@ public class ConversionCampaignFixTests
     public void Emit_ThisMemberAccess_NoAtPrefix()
     {
         var source = @"
-§M{Test}
-  §CL{Account:pub}
-    §FLD{str:_name:priv}
-    §MT{SetName:pub}
-      §I{str:name}
-      §ASSIGN this._name name
+module Test Test block
+  class Account
+    field string:_name private
+    func SetName (string:name)
+      !
+      set this._name name
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("this._name", csharp);
@@ -190,13 +186,11 @@ public class ConversionCampaignFixTests
     public void Emit_ThisInConstructor_NoAtPrefix()
     {
         var source = @"
-§M{Test}
-  §CL{Account:pub}
-    §FLD{str:_id:priv}
-    §CTOR{pub}
-    §I{str:id}
-    §ASSIGN this._id id
-    §/CTOR
+module Test Test block
+  class Account
+    field string:_id private
+    ctor (string:id)
+      set this._id id
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("this._id", csharp);
@@ -211,12 +205,11 @@ public class ConversionCampaignFixTests
     public void Emit_NewWithNamespacedType_PreservesDots()
     {
         var source = @"
-§M{Test}
-  §F{BuildReport:pub}
-    §O{str}
-    §E{cw}
-    §B{sb} §NEW{System.Text.StringBuilder} §/NEW
-    §R (str sb)
+module Test Test block
+  func BuildReport () → string
+    ! cw
+    let sb = new System.Text.StringBuilder()
+    return (sb).ToString()
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("new System.Text.StringBuilder()", csharp);
@@ -231,11 +224,10 @@ public class ConversionCampaignFixTests
     public void Emit_InterfaceWithProperty_EmitsPropertyNotMethod()
     {
         var source = @"
-§M{Test}
-  §IFACE{IOrder}
-    §PROP{Purchased:datetime:pub}
-    §GET §/GET
-    §/PROP
+module Test Test block
+  interface IOrder
+    property DateTime:Purchased
+      get
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("interface IOrder", csharp);
@@ -621,7 +613,7 @@ public class Example
     [Fact]
     public void Lexer_CharLiteral_DoesNotCrash()
     {
-        var source = "§M{Test}\n§F{hello}\n§O{str}\n§R 'x'\n\n";
+        var source = "module Test Test block\n  func hello private () → string\n    return 'x'\n";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var tokens = lexer.TokenizeAllForParser();
@@ -632,7 +624,7 @@ public class Example
     [Fact]
     public void Lexer_SlashNotFollowedBySlash_IsSlashToken()
     {
-        var source = "§M{Test}\n§F{div}\n§O{i32}\n§R (/ 10 2)\n\n";
+        var source = "module Test Test block\n  func div private () → int\n    return (10 / 2)\n";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var tokens = lexer.TokenizeAllForParser();
@@ -2274,12 +2266,11 @@ public class Demo
     public void Idx_InsideArithmetic_Compiles()
     {
         var calor = @"
-§M{IdxTest}
-    §F{AddFirst:pub}
-        §I{i32:val}
-        §O{i32}
-        §B{items} §LIST{i32} 10 20 30 §/LIST
-        §R (+ val §IDX items 0)
+module IdxTest IdxTest block
+  func AddFirst (int:val) → int
+    !
+    let items = new List<int>() { 10, 20, 30 }
+    return (val + items[0])
 ";
         var compiled = ParseAndEmit(calor);
         Assert.Contains("[0]", compiled);
@@ -2290,11 +2281,10 @@ public class Demo
     public void Cnt_InsideComparison_Compiles()
     {
         var calor = @"
-§M{CntTest}
-    §F{IsEmpty:pub}
-        §I{List<i32>:items}
-        §O{bool}
-        §R (== §CNT items 0)
+module CntTest CntTest block
+  func IsEmpty (List<int>:items) → bool
+    !
+    return (items . Count == 0)
 ";
         var compiled = ParseAndEmit(calor);
         Assert.Contains(".Count", compiled);
@@ -2305,11 +2295,10 @@ public class Demo
     public void Len_InsideComparison_Compiles()
     {
         var calor = @"
-§M{LenTest}
-    §F{IsLong:pub}
-        §I{List<str>:arr}
-        §O{bool}
-        §R (> §LEN arr 10)
+module LenTest LenTest block
+  func IsLong (List<string>:arr) → bool
+    !
+    return (arr.Length > 10)
 ";
         var compiled = ParseAndEmit(calor);
         Assert.Contains(".Length", compiled);
@@ -2414,19 +2403,18 @@ public class Demo
     {
         // Test that (not null), (or 1 2), (and (gt 0) (lt 100)) patterns round-trip
         var calor = @"
-§M{PatternTest}
-    §F{Classify:pub}
-        §I{i32:x}
-        §O{str}
-        §W x
-            §K (not null)
-              §R ""found""
-            §K (or 1 2)
-              §R ""one or two""
-            §K (and gt 0 lt 100)
-              §R ""in range""
-            §K _
-              §R ""other""
+module PatternTest PatternTest block
+  func Classify (int:x) → string
+    !
+    match x
+      case (not null)
+        return ""found""
+      case (or 1 2)
+        return ""one or two""
+      case (and > 0 < 100)
+        return ""in range""
+      case _
+        return ""other""
 ";
         var compiled = ParseAndEmit(calor);
         // Should emit proper C# switch with pattern combinators
@@ -2444,10 +2432,9 @@ public class Demo
     {
         // In permissive mode, unknown external calls should not produce Calor0411
         var source = @"
-§M{TestModule}
-  §F{doStuff}
-      §O{void}
-      §C{SomeUnknown.ExternalMethod} §/C";
+module TestModule TestModule block
+  func doStuff private () → void
+    SomeUnknown.ExternalMethod()";
 
         var ast = ParseCalor(source);
         var diag = new DiagnosticBag();
@@ -2476,10 +2463,9 @@ public class Demo
     {
         // A named effect is not waived by any flag.
         var source = @"
-§M{TestModule}
-  §F{greet}
-      §O{void}
-      §P ""hello""";
+module TestModule TestModule block
+  func greet private () → void
+    Console.WriteLine(""hello"")";
 
         var ast = ParseCalor(source);
         var diag = new DiagnosticBag();
@@ -2508,11 +2494,10 @@ public class Demo
     public void PermissiveMode_WaivesUnresolvedCall_ButNotNamedEffect()
     {
         var source = @"
-§M{TestModule}
-  §F{doIO}
-      §O{void}
-      §P ""writing to console""
-      §C{SomeExternal.DoNetworkCall} §/C";
+module TestModule TestModule block
+  func doIO private () → void
+    Console.WriteLine(""writing to console"")
+    SomeExternal.DoNetworkCall()";
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -2536,10 +2521,9 @@ public class Demo
     {
         // Verify that strict mode still produces errors (baseline comparison)
         var source = @"
-§M{TestModule}
-  §F{doStuff}
-      §O{void}
-      §C{SomeUnknown.ExternalMethod} §/C";
+module TestModule TestModule block
+  func doStuff private () → void
+    SomeUnknown.ExternalMethod()";
 
         var ast = ParseCalor(source);
         var diag = new DiagnosticBag();
@@ -2710,11 +2694,10 @@ public class Config { public string Name { get; set; } public int Value { get; s
     {
         // Fix 9.1: §A[@default] should parse — @ is skipped in named arg brackets
         var source = @"
-§M{Test}
-  §F{Foo:pub}
-    §I{str:name}
-    §O{str}
-    §R §C{Bar} §A[name] name §A[@default] null §/C";
+module Test Test block
+  func Foo (string:name) → string
+    !
+    return Bar(name: name, @default: null)";
         var compiled = Compile(source);
         Assert.NotNull(compiled);
     }
@@ -2741,10 +2724,11 @@ public class Foo {
     {
         // Fix 9.4: bool:trueTestPermits should NOT be parsed as BOOL:true literal
         var source = @"
-§M{Test}
-  §CL{Foo:pub}
-    §MT{Bar:pub} (bool:trueTest, bool:falseAlarm) -> bool
-        §R trueTest";
+module Test Test block
+  class Foo
+    func Bar (bool:trueTest, bool:falseAlarm) → bool
+      !
+      return trueTest";
         var compiled = Compile(source);
         Assert.NotNull(compiled);
     }
@@ -2854,16 +2838,13 @@ public class Foo {
         // When §PLIST §REST{_} is followed by { Prop: value }, ParseAttributes
         // must not greedily consume the property pattern as REST attributes.
         var source = @"
-§M{Test}
-  §F{Check:pub}
-    §I{i32:x}
-    §O{bool}
-    §B{result} §W x
-      §K §PLIST §REST{_} { Flag: true }
-        §R true
-      §K _
-        §R false
-    §R result
+module Test Test block
+  func Check (int:x) → bool
+    !
+    let result = match x
+      case [.., _] → true
+      case _ → false
+    return result
 ";
         var diag = ParseWithDiagnostics(source);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));

@@ -135,11 +135,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_StackAllocSized_EmitsStackallocExpression()
     {
         var calorSource = """
-            §M{StackAllocTest}
-                §F{Alloc:pub}
-                    §O{i32}
-                    §B{~sum:i32} INT:0
-                    §R sum
+            module StackAllocTest StackAllocTest block
+              func Alloc () → int
+                !
+                var int:sum = 0
+                return sum
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -165,10 +165,10 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_SizeOf_EmitsSizeofExpression()
     {
         var calorSource = """
-            §M{SizeOfTest}
-                §F{GetSize:pub}
-                    §O{i32}
-                    §R §SIZEOF{i32}
+            module SizeOfTest SizeOfTest block
+              func GetSize () → int
+                !
+                return sizeof(int)
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -215,13 +215,12 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_UnsafeBlock_EmitsUnsafeKeyword()
     {
         var calorSource = """
-            §M{UnsafeBlockTest}
-                §CL{Test:pub}
-                    §MT{DoUnsafe:pub}
-                        §O{void}
-                        §UNSAFE
-                          §B{~x:i32} INT:42
-                        §/UNSAFE
+            module UnsafeBlockTest UnsafeBlockTest block
+              class Test
+                func DoUnsafe () → void
+                  !
+                  unsafe
+                    var int:x = 42
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -255,11 +254,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArraySized_EmitsNewWithDimensions()
     {
         var calorSource = """
-            §M{ArrayTest}
-                §CL{Test:pub}
-                    §MT{Create:pub}
-                        §O{void}
-                        §B{grid:i32} §ARR2D{i32:3:4}
+            module ArrayTest ArrayTest block
+              class Test
+                func Create () → void
+                  !
+                  let int:grid = new int[3, 4]
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -270,14 +269,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArrayInitializer_EmitsNewWithInitializer()
     {
         var calorSource = """
-            §M{ArrayInitTest}
-                §CL{Test:pub}
-                    §MT{Create:pub}
-                        §O{void}
-                        §B{grid:i32} §ARR2D{i32}
-                          §ROW INT:1 INT:2
-                          §ROW INT:3 INT:4
-                        §/ARR2D
+            module ArrayInitTest ArrayInitTest block
+              class Test
+                func Create () → void
+                  !
+                  let int:grid = new int[,] { { 1, 2 }, { 3, 4 } }
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -290,12 +286,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArrayAccess_EmitsIndexing()
     {
         var calorSource = """
-            §M{IndexTest}
-                §CL{Test:pub}
-                    §MT{Get:pub}
-                        §I{grid:i32}
-                        §O{i32}
-                        §R §IDX2D grid INT:1 INT:2
+            module IndexTest IndexTest block
+              class Test
+                func Get (grid:i32) → int
+                  !
+                  return grid[1, 2]
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -536,10 +531,10 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_ExternMethodModifier_FromCalor()
     {
         var calorSource = """
-            §M{ExternMethodTest}
-                §CL{Test:pub}
-                    §MT{NativeCall:pub:stat,ext}
-                        §O{void}
+            module ExternMethodTest ExternMethodTest block
+              class Test
+                func NativeCall static extern () → void
+                  !
             """;
 
         var csharp = ParseAndEmit(calorSource);

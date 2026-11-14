@@ -70,9 +70,9 @@ public class AnalyzeDirectoryTests
         {
             // Write two simple .calr files
             File.WriteAllText(Path.Combine(tempDir, "file1.calr"),
-                "§M{Test1}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n");
+                "module Test1 Test1 block\n  func Add (int:a, int:b) → int\n    !\n    return (a + b)\n");
             File.WriteAllText(Path.Combine(tempDir, "file2.calr"),
-                "§M{Test2}\n§F{Sub:pub}\n§I{i32:x}\n§I{i32:y}\n§O{i32}\n§R (- x y)\n\n");
+                "module Test2 Test2 block\n  func Sub (int:x, int:y) → int\n    !\n    return (x - y)\n");
 
             var args = JsonDocument.Parse($$"""
                 {
@@ -111,9 +111,9 @@ public class AnalyzeDirectoryTests
         try
         {
             File.WriteAllText(Path.Combine(tempDir, "root.calr"),
-                "§M{Root}\n§F{Foo:pub}\n§O{i32}\n§R 42\n\n");
+                "module Root Root block\n  func Foo () → int\n    !\n    return 42\n");
             File.WriteAllText(Path.Combine(subDir, "nested.calr"),
-                "§M{Nested}\n§F{Bar:pub}\n§O{i32}\n§R 99\n\n");
+                "module Nested Nested block\n  func Bar () → int\n    !\n    return 99\n");
 
             var args = JsonDocument.Parse($$"""
                 {

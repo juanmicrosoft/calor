@@ -312,12 +312,10 @@ public class TaintAnalysisTests
     public void TaintAnalysis_SimpleFunction_NoVulnerabilities()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ x y)";
+module Test Test block
+  func Add (int:x, int:y) → int
+    !
+    return (x + y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -332,11 +330,10 @@ public class TaintAnalysisTests
     public void TaintAnalysis_ReportDiagnostics_AddsToCollection()
     {
         var source = @"
-§M{Test}
-  §F{Simple:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Simple (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -353,9 +350,10 @@ public class TaintAnalysisTests
     public void TaintAnalysis_EmptyFunction_NoVulnerabilities()
     {
         var source = @"
-§M{Test}
-  §F{Empty:pub}
-      §O{void}";
+module Test Test block
+  func Empty () → void
+    !
+    return";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -369,11 +367,10 @@ public class TaintAnalysisTests
     public void TaintAnalysis_FunctionWithCall_AnalyzesArguments()
     {
         var source = @"
-§M{Test}
-  §F{Process:pub}
-      §I{string:data}
-      §O{string}
-      §R (CALL process data)";
+module Test Test block
+  func Process (string:data) → string
+    !
+    return process(data)";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -388,11 +385,10 @@ public class TaintAnalysisTests
     public void TaintAnalysis_UserInputParameter_IsTainted()
     {
         var source = @"
-§M{Test}
-  §F{Process:pub}
-      §I{string:user_input}
-      §O{string}
-      §R user_input";
+module Test Test block
+  func Process (string:user_input) → string
+    !
+    return user_input";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -408,11 +404,10 @@ public class TaintAnalysisTests
     public void TaintAnalysis_DisabledTracking_NoTaint()
     {
         var source = @"
-§M{Test}
-  §F{Process:pub}
-      §I{string:user_input}
-      §O{string}
-      §R user_input";
+module Test Test block
+  func Process (string:user_input) → string
+    !
+    return user_input";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -446,13 +441,14 @@ public class TaintAnalysisTests
     public void TaintAnalysisRunner_AnalyzesModule()
     {
         var source = @"
-§M{Test}
-  §F{Foo:pub}
-      §O{i32}
-      §R INT:1
-  §F{Bar:pub}
-      §O{i32}
-      §R INT:2";
+module Test Test block
+  func Foo () → int
+    !
+    return 1
+
+  func Bar () → int
+    !
+    return 2";
 
         var bound = Bind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -469,11 +465,10 @@ public class TaintAnalysisTests
     public void TaintAnalysisRunner_AnalyzesFunction()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Test (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -493,11 +488,10 @@ public class TaintAnalysisTests
     public void TaintSource_ParameterNamedUserInput_IsTainted()
     {
         var source = @"
-§M{Test}
-  §F{Process:pub}
-      §I{string:user_input}
-      §O{string}
-      §R user_input";
+module Test Test block
+  func Process (string:user_input) → string
+    !
+    return user_input";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return; // Skip if string type not supported
@@ -513,11 +507,10 @@ public class TaintAnalysisTests
     public void TaintSource_ParameterNamedRequest_IsTainted()
     {
         var source = @"
-§M{Test}
-  §F{Handle:pub}
-      §I{string:request_data}
-      §O{string}
-      §R request_data";
+module Test Test block
+  func Handle (string:request_data) → string
+    !
+    return request_data";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -530,11 +523,10 @@ public class TaintAnalysisTests
     public void TaintSource_RegularParameter_NotTainted()
     {
         var source = @"
-§M{Test}
-  §F{Calculate:pub}
-      §I{i32:value}
-      §O{i32}
-      §R value";
+module Test Test block
+  func Calculate (int:value) → int
+    !
+    return value";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -553,12 +545,11 @@ public class TaintAnalysisTests
     public void TaintPropagation_ThroughBinding_Propagates()
     {
         var source = @"
-§M{Test}
-  §F{Propagate:pub}
-      §I{string:user_data}
-      §O{string}
-      §B{processed:string} user_data
-      §R processed";
+module Test Test block
+  func Propagate (string:user_data) → string
+    !
+    let string:processed = user_data
+    return processed";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -573,13 +564,11 @@ public class TaintAnalysisTests
     public void TaintPropagation_ThroughExpression_Propagates()
     {
         var source = @"
-§M{Test}
-  §F{Concat:pub}
-      §I{string:user_input}
-      §I{string:prefix}
-      §O{string}
-      §B{result:string} (+ prefix user_input)
-      §R result";
+module Test Test block
+  func Concat (string:user_input, string:prefix) → string
+    !
+    let string:result = (prefix + user_input)
+    return result";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -598,12 +587,10 @@ public class TaintAnalysisTests
     public void SafeCode_NoTaintSources_NoVulnerabilities()
     {
         var source = @"
-§M{Test}
-  §F{Safe:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ x y)";
+module Test Test block
+  func Safe (int:x, int:y) → int
+    !
+    return (x + y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -618,12 +605,12 @@ public class TaintAnalysisTests
     public void SafeCode_ConstantsOnly_NoVulnerabilities()
     {
         var source = @"
-§M{Test}
-  §F{Constants:pub}
-      §O{i32}
-      §B{a:i32} INT:1
-      §B{b:i32} INT:2
-      §R (+ a b)";
+module Test Test block
+  func Constants () → int
+    !
+    let int:a = 1
+    let int:b = 2
+    return (a + b)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -741,11 +728,10 @@ public class TaintAnalysisTests
     public void TaintAnalysis_ReportDiagnostics_NoVulnerabilities_NoDiagnostics()
     {
         var source = @"
-§M{Test}
-  §F{Safe:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Safe (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -767,15 +753,14 @@ public class TaintAnalysisTests
     public void TaintAnalysis_MultipleFunctions_AllAnalyzed()
     {
         var source = @"
-§M{Test}
-  §F{Func1:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x
-  §F{Func2:pub}
-      §I{i32:y}
-      §O{i32}
-      §R y";
+module Test Test block
+  func Func1 (int:x) → int
+    !
+    return x
+
+  func Func2 (int:y) → int
+    !
+    return y";
 
         var bound = Bind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);

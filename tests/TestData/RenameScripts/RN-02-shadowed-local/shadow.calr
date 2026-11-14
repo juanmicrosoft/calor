@@ -1,9 +1,10 @@
-§M{Shadow}
-  §F{Run:pub} () -> i32
-    §E{}
-    §B{value:i32} INT:10
-    §R (+ value §C{Helper} §/C)
-  §F{Helper:pub} () -> i32
-    §E{}
-    §B{value:i32} INT:1
-    §R value
+module Shadow Shadow block
+  func Run () → int
+    !
+    let int:value = 10
+    return (value + Helper())
+
+  func Helper () → int
+    !
+    let int:value = 1
+    return value

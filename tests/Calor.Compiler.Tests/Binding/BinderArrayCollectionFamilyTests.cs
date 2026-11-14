@@ -213,13 +213,11 @@ public class BinderArrayCollectionFamilyTests
         // The B2-review standard applied to B3: a /0 nested in a bound B3 node must
         // produce the actual Calor0920 through the full pipeline, not merely a subtree.
         const string source = @"
-§M{Test}
-  §F{Trap:pub} () -> void
-    §E{cw,alloc}
-    §LIST{xs:i32}
-      (/ 10 0)
-    §/LIST
-    §P §CNT{xs}";
+module Test Test block
+  func Trap () → void
+    ! cw, alloc
+    let List<int>:xs = new List<int>() { (10 / 0) }
+    Console.WriteLine(xs . Count)";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
         {

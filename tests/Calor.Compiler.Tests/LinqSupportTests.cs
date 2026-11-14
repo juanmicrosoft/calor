@@ -47,9 +47,10 @@ public class LinqSupportTests
     public void DecimalLiteral_TypedSyntax_EmitsCorrectly()
     {
         var source = @"
-§M{TestMod}
-  §F{Test:pub}
-      §B{~price:decimal} DECIMAL:18.0000
+module TestMod TestMod block
+  func Test ()
+    !
+    var decimal:price = 18.0000m
 ";
 
         var result = ParseAndEmit(source);
@@ -61,9 +62,10 @@ public class LinqSupportTests
     public void DecimalLiteral_InlineSuffix_EmitsCorrectly()
     {
         var source = @"
-§M{TestMod}
-  §F{Test:pub}
-      §B{~amount:decimal} 99.95M
+module TestMod TestMod block
+  func Test ()
+    !
+    var decimal:amount = 99.95m
 ";
 
         var result = ParseAndEmit(source);
@@ -75,9 +77,10 @@ public class LinqSupportTests
     public void DecimalLiteral_IntegerWithSuffix_EmitsCorrectly()
     {
         var source = @"
-§M{TestMod}
-  §F{Test:pub}
-      §B{~count:decimal} 42m
+module TestMod TestMod block
+  func Test ()
+    !
+    var decimal:count = 42m
 ";
 
         var result = ParseAndEmit(source);
@@ -109,9 +112,10 @@ public class LinqSupportTests
     public void ArrayInitializer_WithArgElements_EmitsCorrectly()
     {
         var source = @"
-§M{TestMod}
-  §F{Test:pub}
-      §B{[i32]:nums} §ARR{i32} §A 1 §A 2 §A 3 §/ARR
+module TestMod TestMod block
+  func Test ()
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
 
         var result = ParseAndEmit(source);
@@ -125,9 +129,10 @@ public class LinqSupportTests
     {
         // The binding carries the name; the value header carries only type and size.
         var source = @"
-§M{TestMod}
-  §F{Test:pub}
-      §B{nums:[i32]} §ARR{i32:3}
+module TestMod TestMod block
+  func Test ()
+    !
+    let int[]:nums = new int[3]
 ";
 
         var result = ParseAndEmit(source);
@@ -251,12 +256,10 @@ public class LinqSupportTests
     public void ObjectInitializer_BasicProperties_EmitsCorrectly()
     {
         var source = @"
-§M{TestMod}
-  §F{Test:pub}
-      §B{~p:Person} §NEW{Person}
-        Name = ""John""
-        Age = 30
-      §/NEW
+module TestMod TestMod block
+  func Test ()
+    !
+    var Person:p = new Person() { Name = ""John"", Age = 30 }
 ";
 
         var result = ParseAndEmit(source);
@@ -270,12 +273,10 @@ public class LinqSupportTests
     public void ObjectInitializer_EmitsInitializerBlock()
     {
         var source = @"
-§M{TestMod}
-  §F{Test:pub}
-      §B{~cfg:Config} §NEW{Config}
-        Timeout = 30
-        Enabled = true
-      §/NEW
+module TestMod TestMod block
+  func Test ()
+    !
+    var Config:cfg = new Config() { Timeout = 30, Enabled = true }
 ";
 
         var result = ParseAndEmit(source);

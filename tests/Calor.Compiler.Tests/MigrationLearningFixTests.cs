@@ -174,10 +174,11 @@ public class MigrationLearningFixTests
     {
         var result = Program.Compile(
             """
-            §M{Receivers}
-              §CL{Holder:pub}
-                §MT{Self:pub} () -> Holder
-                  §R this
+            module Receivers Receivers block
+              class Holder
+                func Self () → Holder
+                  !
+                  return this
             """);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));

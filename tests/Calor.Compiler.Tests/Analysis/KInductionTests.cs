@@ -413,11 +413,10 @@ public class KInductionTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{Test}
-  §F{NoLoop:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x INT:1)";
+module Test Test block
+  func NoLoop (int:x) → int
+    !
+    return (x + 1)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -436,16 +435,13 @@ public class KInductionTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{Test}
-  §F{Sum:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{sum:i32} INT:0
-      §L{i:0:10:1}
-          §C{Console.WriteLine}
-            §A i
-          §/C
-      §R sum";
+module Test Test block
+  func Sum (int:n) → int
+    !
+    let int:sum = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
+    return sum";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -465,16 +461,13 @@ public class KInductionTests
 
         // Use FOR loop which has built-in iteration
         var source = @"
-§M{Test}
-  §F{Count:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{count:i32} INT:0
-      §L{i:0:10:1}
-          §C{Console.WriteLine}
-            §A i
-          §/C
-      §R count";
+module Test Test block
+  func Count (int:n) → int
+    !
+    let int:count = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
+    return count";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -548,12 +541,12 @@ public class KInductionTests
         // unsigned bound became -1, both yielding Proven over a substituted transition.
         Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
         var source = @"
-§M{Test}
-  §F{Probe:pub}
-    §O{i32}
-    §L{i:0:10:1}
-      §B{t:i32} i
-    §R INT:0";
+module Test Test block
+  func Probe () → int
+    !
+    for i from 0 to 10 step 1
+      let int:t = i
+    return 0";
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join(Environment.NewLine, parseDiag.Select(d => d.Message)));
         var loop = Assert.Single(func.Body.OfType<BoundForStatement>());
@@ -577,17 +570,14 @@ public class KInductionTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{Test}
-  §F{Sum:pub}
-      §I{i32:n}
-      §O{i32}
-      §Q (>= n INT:0)
-      §B{sum:i32} INT:0
-      §L{i:0:10:1}
-          §C{Console.WriteLine}
-            §A i
-          §/C
-      §R sum";
+module Test Test block
+  func Sum (int:n) → int
+    !
+    requires (n >= 0)
+    let int:sum = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
+    return sum";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));

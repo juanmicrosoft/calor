@@ -50,11 +50,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_CastExpression_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{CastTest:pub}
-    §I{object:x}
-    §O{i32}
-    §R (cast i32 x)
+module Test Test block
+  func CastTest (object:x) → int
+    !
+    return ((int)x)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("cast", formatted);
@@ -65,11 +64,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_IsExpression_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{IsTest:pub}
-    §I{object:x}
-    §O{bool}
-    §R (is x str)
+module Test Test block
+  func IsTest (object:x) → bool
+    !
+    return (x is string)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("is", formatted);
@@ -80,11 +78,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_AsExpression_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{AsTest:pub}
-    §I{object:x}
-    §O{str}
-    §R (as x str)
+module Test Test block
+  func AsTest (object:x) → string
+    !
+    return (x as string)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("as", formatted);
@@ -95,11 +92,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedCast_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{NestedCast:pub}
-    §I{object:x}
-    §O{i32}
-    §R (cast i32 (cast f64 x))
+module Test Test block
+  func NestedCast (object:x) → int
+    !
+    return ((int)((double)x))
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("cast", formatted);
@@ -113,10 +109,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_AsyncFunction_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §AF{GetDataAsync:pub}
-    §O{str}
-    §R ""data""
+module Test Test block
+  func GetDataAsync async () → string
+    !
+    return ""data""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.NotEmpty(formatted);
@@ -131,17 +127,16 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_MatchStatement_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{MatchTest:pub}
-    §I{i32:x}
-    §O{str}
-    §W x
-    §K 1
-      §R ""one""
-    §K 2
-      §R ""two""
-    §K _
-      §R ""other""
+module Test Test block
+  func MatchTest (int:x) → string
+    !
+    match x
+      case 1
+        return ""one""
+      case 2
+        return ""two""
+      case _
+        return ""other""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§W ", formatted);
@@ -153,15 +148,14 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_MatchWithNullablePatterns_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{OptMatch:pub}
-    §I{i32:x}
-    §O{i32}
-    §W x
-    §K null
-      §R 1
-    §K _
-      §R 0
+module Test Test block
+  func OptMatch (int:x) → int
+    !
+    match x
+      case null
+        return 1
+      case _
+        return 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("null", formatted);
@@ -177,14 +171,12 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_PreconditionAndPostcondition_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (!= b 0)
-    §S (>= result 0)
-    §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => (result >= 0)
+    return (a / b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§Q", formatted);
@@ -200,12 +192,11 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ForLoop_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{LoopTest:pub}
-    §O{void}
-    §E{cw}
-    §L{i:0:10:1}
-      §C{Console.WriteLine} i
+module Test Test block
+  func LoopTest () → void
+    ! cw
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§L{", formatted);
@@ -216,13 +207,11 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_WhileLoop_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{WhileTest:pub}
-    §I{bool:running}
-    §O{void}
-    §E{cw}
-    §WH running
-      §P ""working""
+module Test Test block
+  func WhileTest (bool:running) → void
+    ! cw
+    while running
+      Console.WriteLine(""working"")
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§WH", formatted);
@@ -233,13 +222,12 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedLoops_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{NestedLoop:pub}
-    §O{void}
-    §E{cw}
-    §L{i:0:5:1}
-      §L{j:0:5:1}
-        §C{Console.WriteLine} (+ i j)
+module Test Test block
+  func NestedLoop () → void
+    ! cw
+    for i from 0 to 5 step 1
+      for j from 0 to 5 step 1
+        Console.WriteLine((i + j))
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Single(reparsed.Functions);
@@ -253,18 +241,13 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedIfElse_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{NestedIf:pub}
-    §I{bool:a}
-    §I{bool:b}
-    §O{i32}
-    §IF a
-      §IF b
-        §R 2
-      §EL
-        §R 1
-    §EL
-      §R 0
+module Test Test block
+  func NestedIf (bool:a, bool:b) → int
+    !
+    if a
+      return (b ? 2 : 1)
+    else
+      return 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§IF ", formatted);
@@ -279,12 +262,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_FunctionWithEffects_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{PrintAll:pub}
-    §I{str:msg}
-    §O{void}
-    §E{cw}
-    §C{Console.WriteLine} msg
+module Test Test block
+  func PrintAll (string:msg) → void
+    ! cw
+    Console.WriteLine(msg)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§E{", formatted);
@@ -299,13 +280,14 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NullableExpressions_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{SomeTest:pub}
-    §O{?i32}
-    §R 42
-  §F{NoneTest:pub}
-    §O{?i32}
-    §R null
+module Test Test block
+  func SomeTest () → int?
+    !
+    return 42
+
+  func NoneTest () → int?
+    !
+    return null
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("42", formatted);
@@ -317,13 +299,14 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ReturnAndThrow_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{OkTest:pub}
-    §O{i32}
-    §R 42
-  §F{ErrTest:pub}
-    §O{str}
-    §TH §NEW{Exception} §A ""error"" §/NEW
+module Test Test block
+  func OkTest () → int
+    !
+    return 42
+
+  func ErrTest () → string
+    !
+    throw new Exception(""error"")
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("42", formatted);
@@ -339,16 +322,18 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_LiteralInReturn_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{IntLiteral:pub}
-    §O{i32}
-    §R 42
-  §F{BoolLiteral:pub}
-    §O{bool}
-    §R true
-  §F{StringLiteral:pub}
-    §O{str}
-    §R ""hello""
+module Test Test block
+  func IntLiteral () → int
+    !
+    return 42
+
+  func BoolLiteral () → bool
+    !
+    return true
+
+  func StringLiteral () → string
+    !
+    return ""hello""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("42", formatted);
@@ -365,22 +350,17 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_MultipleFunctions_FormatsAndReparses()
     {
         var source = @"
-§M{MathLib}
-  §F{Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
-  §F{Subtract:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (- a b)
-  §F{Multiply:priv}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (* a b)
+module MathLib MathLib block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
+
+  func Subtract (int:a, int:b) → int
+    !
+    return (a - b)
+
+  func Multiply private (int:a, int:b) → int
+    return (a * b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("Add", formatted);
@@ -397,19 +377,17 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_FunctionWithContractsEffectsAndControlFlow_FormatsAndReparses()
     {
         var source = @"
-§M{ComplexTest}
-  §F{Process:pub}
-    §I{i32:input}
-    §O{i32}
-    §E{cw}
-    §Q (> input 0)
-    §S (>= result 0)
-    §IF (> input 10)
-      §C{Console.WriteLine} ""big""
-      §R (* input 2)
-    §EL
-      §C{Console.WriteLine} ""small""
-      §R input
+module ComplexTest ComplexTest block
+  func Process (int:input) → int
+    ! cw
+    requires (input > 0)
+    => (result >= 0)
+    if (input > 10)
+      Console.WriteLine(""big"")
+      return (input * 2)
+    else
+      Console.WriteLine(""small"")
+      return input
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§Q", formatted);
@@ -426,13 +404,11 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_BindStatements_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{BindTest:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §B{sum} (+ a b)
-    §R sum
+module Test Test block
+  func BindTest (int:a, int:b) → int
+    !
+    let sum = (a + b)
+    return sum
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§B{", formatted);
@@ -446,13 +422,12 @@ public class NewFeatureRoundTripTests
     {
         // Typed immutable: {type:name}, typed mutable: {~name:type}
         var source = @"
-§M{Test}
-  §F{TypedBindTest:pub}
-    §I{i32:x}
-    §O{i32}
-    §B{i32:count} 0
-    §B{~total:i32} 0
-    §R count
+module Test Test block
+  func TypedBindTest (int:x) → int
+    !
+    let int:count = 0
+    var int:total = 0
+    return count
 ";
         var (original, formatted, reparsed) = FormatAndReparse(source);
 
@@ -528,10 +503,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ArrayInitialized_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR
+module Test Test block
+  func Main () → void
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("§ARR", formatted);
@@ -542,10 +517,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ArraySized_FormatsAndReparses()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{[i32]:arr1} §ARR{arr1:10}
+module Test Test block
+  func Main () → void
+    !
+    let int[]:arr1 = new arr1[10]
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("§ARR", formatted);

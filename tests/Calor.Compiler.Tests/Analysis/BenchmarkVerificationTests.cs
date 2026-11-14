@@ -230,12 +230,11 @@ public class BenchmarkVerificationTests
     public void PathTraversal_VulnerableFileRead_DetectsTraversal()
     {
         var source = @"
-§M{Test}
-  §F{VulnerableRead:pub}
-      §I{string:user_path}
-      §O{string}
-      §B{content:string} (CALL file.read user_path)
-      §R content";
+module Test Test block
+  func VulnerableRead (string:user_path) → string
+    !
+    let string:content = file.read(user_path)
+    return content";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -250,12 +249,12 @@ public class BenchmarkVerificationTests
     public void PathTraversal_SafeConstantPath_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeConstant:pub}
-      §O{string}
-      §B{path:string} STR:""/etc/config.json""
-      §B{content:string} (CALL file.read path)
-      §R content";
+module Test Test block
+  func SafeConstant () → string
+    !
+    let string:path = ""/etc/config.json""
+    let string:content = file.read(path)
+    return content";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -274,12 +273,10 @@ public class BenchmarkVerificationTests
     public void DivByZero_VulnerableDivision_DetectsRisk()
     {
         var source = @"
-§M{Test}
-  §F{VulnerableDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (/ x y)";
+module Test Test block
+  func VulnerableDiv (int:x, int:y) → int
+    !
+    return (x / y)";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -294,15 +291,13 @@ public class BenchmarkVerificationTests
     public void DivByZero_SafeWithGuard_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF (!= y INT:0)
-        §R (/ x y)
-      §EL
-        §R INT:0";
+module Test Test block
+  func SafeDiv (int:x, int:y) → int
+    !
+    if (y != 0)
+      return (x / y)
+    else
+      return 0";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -317,11 +312,10 @@ public class BenchmarkVerificationTests
     public void DivByZero_DivisionByLiteral_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeLiteralDiv:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:2)";
+module Test Test block
+  func SafeLiteralDiv (int:x) → int
+    !
+    return (x / 2)";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -340,11 +334,11 @@ public class BenchmarkVerificationTests
     public void NullDeref_VulnerableAccess_DetectsRisk()
     {
         var source = @"
-§M{Test}
-  §F{VulnerableNull:pub}
-      §O{i32}
-      §B{maybeNull:i32[]} null
-      §R §LEN maybeNull";
+module Test Test block
+  func VulnerableNull () → int
+    !
+    let int[]:maybeNull = null
+    return maybeNull.Length";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -360,13 +354,12 @@ public class BenchmarkVerificationTests
     public void NullDeref_SafeNullCheck_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeNull:pub}
-      §I{i32[]?:maybeNull}
-      §O{i32}
-      §IF (== maybeNull null)
-        §R INT:0
-      §R §LEN maybeNull";
+module Test Test block
+  func SafeNull (int[]?:maybeNull) → int
+    !
+    if (maybeNull == null)
+      return 0
+    return maybeNull.Length";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -385,12 +378,10 @@ public class BenchmarkVerificationTests
     public void Bounds_VulnerableArrayAccess_DetectsRisk()
     {
         var source = @"
-§M{Test}
-  §F{VulnerableBounds:pub}
-      §I{i32[]:items}
-      §I{i32:index}
-      §O{i32}
-      §R §IDX items index";
+module Test Test block
+  func VulnerableBounds (int[]:items, int:index) → int
+    !
+    return items[index]";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -406,16 +397,14 @@ public class BenchmarkVerificationTests
     public void Bounds_SafeBoundsCheck_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeBounds:pub}
-      §I{i32[]:items}
-      §I{i32:index}
-      §O{i32}
-      §IF (< index INT:0)
-        §R INT:-1
-      §IF (>= index §LEN items)
-        §R INT:-1
-      §R §IDX items index";
+module Test Test block
+  func SafeBounds (int[]:items, int:index) → int
+    !
+    if (index < 0)
+      return -1
+    if (index >= items.Length)
+      return -1
+    return items[index]";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));

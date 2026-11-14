@@ -59,25 +59,28 @@ public class DiagnosticSurfaceSpellingTests
     {
         // Calor0254 — array bound to a concrete collection (echoes the collection + element type).
         new object[] { "array-to-list",
-            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
-            "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n    §R (len lines)\n" },
+            "module S S block\n" +
+            "  func Do (string:path) → int\n" +
+            "    ! fs:r\n" +
+            "    let List<string>:lines = File.ReadAllLines(path)\n" +
+            "    return lines.Length\n" },
         // Calor0256 — type-changing mutable rebind (echoes both types).
         new object[] { "rebind-mismatch",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n" },
+            "module S S block\n  func Do () → int\n    !\n    var int:x = 0\n    var string:x = \"hi\"\n    return 0\n" },
         // TypeChecker — IF condition not bool (echoes the got-type and formerly hardcoded
         // BOOL). The condition must PARSE as a valid expression but type as non-bool, so an
         // arithmetic expression (i32) is used rather than a comparison (which would be bool).
         new object[] { "if-cond-not-bool",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §IF (+ 1 2)\n      §R 1\n    §R 0\n" },
+            "module S S block\n  func Do () → int\n    !\n    if (1 + 2)\n      return 1\n    return 0\n" },
         // TypeChecker — WHILE condition not bool.
         new object[] { "while-cond-not-bool",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §WH (+ 1 2)\n      §R 1\n    §R 0\n" },
+            "module S S block\n  func Do () → int\n    !\n    while (1 + 2)\n      return 1\n    return 0\n" },
         // TypeChecker — assignment type mismatch (echoes both primitives: str -> i32).
         new object[] { "assign-mismatch",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i32} \"hi\"\n    §R 0\n" },
+            "module S S block\n  func Do () → int\n    !\n    let int:x = \"hi\"\n    return 0\n" },
         // TypeChecker — arithmetic on non-numeric (echoes operand types).
         new object[] { "arith-non-numeric",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{s:str} \"a\"\n    §B{r:i32} (+ s s)\n    §R r\n" },
+            "module S S block\n  func Do () → int\n    !\n    let string:s = \"a\"\n    let int:r = (s + s)\n    return r\n" },
         // Sized numeric types (#748 review finding 2): the token family most likely to leak
         // `INT`/`[bits=`. Each must surface as i64/f32/i16/u8.
         //
@@ -88,13 +91,13 @@ public class DiagnosticSurfaceSpellingTests
         // Each is now a genuine type error on a sized binding, which still forces the checker to
         // echo the width the user wrote.
         new object[] { "sized-int-i64",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i64} STR:\"a\"\n    §R INT:0\n" },
+            "module S S block\n  func Do () → int\n    !\n    let long:x = \"a\"\n    return 0\n" },
         new object[] { "sized-float-f32",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{y:f32} STR:\"a\"\n    §R INT:0\n" },
+            "module S S block\n  func Do () → int\n    !\n    let float:y = \"a\"\n    return 0\n" },
         new object[] { "sized-int-i16",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{z:i16} STR:\"a\"\n    §R INT:0\n" },
+            "module S S block\n  func Do () → int\n    !\n    let short:z = \"a\"\n    return 0\n" },
         new object[] { "sized-uint-u8",
-            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{b:u8} STR:\"a\"\n    §R INT:0\n" },
+            "module S S block\n  func Do () → int\n    !\n    let byte:b = \"a\"\n    return 0\n" },
     };
 
     [Theory]

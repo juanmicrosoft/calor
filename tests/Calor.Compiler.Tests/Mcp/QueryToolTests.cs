@@ -439,10 +439,10 @@ public sealed class QueryToolTests : IDisposable
         var foreign = Path.Combine(parent, "foreign");
         Directory.CreateDirectory(foreign);
         File.WriteAllText(Path.Combine(foreign, "other.calr"), """
-            §M{Other}
-              §F{OtherOnly:pub} () -> i32
-                §E{}
-                §R INT:7
+            module Other Other block
+              func OtherOnly () → int
+                !
+                return 7
             """);
         var foreignIndexDirectory = Path.Combine(foreign, "obj", "calor");
         BuildIndex(foreign, foreignIndexDirectory);
@@ -599,10 +599,10 @@ public sealed class QueryToolTests : IDisposable
     {
         var dir = TempDir();
         File.WriteAllText(Path.Combine(dir, "broken.calr"), """
-            §M{Broken}
-              §F{Uses:pub} () -> i32
-                §E{}
-                §R (+ undefinedName INT:1)
+            module Broken Broken block
+              func Uses () → int
+                !
+                return (undefinedName + 1)
             """);
         var text = await Call(Args(dir, "effects", "Uses", ", \"format\": \"text\""));
         Assert.True(text.IsError);

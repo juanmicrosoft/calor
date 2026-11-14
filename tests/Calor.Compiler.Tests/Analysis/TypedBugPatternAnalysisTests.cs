@@ -16,11 +16,12 @@ public class TypedBugPatternAnalysisTests
     public void Division_ReassignmentIsStrongUpdate()
     {
         var function = BindFunction("""
-            §M{Typed}
-              §F{Divide:pub} (i32:x) -> i32
-                §B{~divisor:i32} INT:2
-                §ASSIGN divisor INT:0
-                §R (/ x divisor)
+            module Typed Typed block
+              func Divide (int:x) → int
+                !
+                var int:divisor = 2
+                set divisor 0
+                return (x / divisor)
             """);
 
         var diagnostics = Run(function, division: true);
@@ -34,11 +35,12 @@ public class TypedBugPatternAnalysisTests
     public void Division_NegatedFallthroughPathIsSafe()
     {
         var function = BindFunction("""
-            §M{Typed}
-              §F{Divide:pub} (i32:x, i32:divisor) -> i32
-                §IF (== divisor INT:0)
-                  §R INT:0
-                §R (/ x divisor)
+            module Typed Typed block
+              func Divide (int:x, int:divisor) → int
+                !
+                if (divisor == 0)
+                  return 0
+                return (x / divisor)
             """);
 
         var diagnostics = Run(function, division: true);
@@ -51,11 +53,12 @@ public class TypedBugPatternAnalysisTests
     public void Division_ZeroBranchIsUnsafe()
     {
         var function = BindFunction("""
-            §M{Typed}
-              §F{Divide:pub} (i32:x, i32:divisor) -> i32
-                §IF (== divisor INT:0)
-                  §R (/ x divisor)
-                §R INT:0
+            module Typed Typed block
+              func Divide (int:x, int:divisor) → int
+                !
+                if (divisor == 0)
+                  return (x / divisor)
+                return 0
             """);
 
         var diagnostics = Run(function, division: true);
@@ -464,13 +467,14 @@ public class TypedBugPatternAnalysisTests
     public void Bounds_SequentialNegatedGuardsProveBothSides()
     {
         var function = BindFunction("""
-            §M{Typed}
-              §F{Read:pub} (i32[]:items, i32:index) -> i32
-                §IF (< index INT:0)
-                  §R INT:0
-                §IF (>= index §LEN items)
-                  §R INT:0
-                §R §IDX items index
+            module Typed Typed block
+              func Read (int[]:items, int:index) → int
+                !
+                if (index < 0)
+                  return 0
+                if (index >= items.Length)
+                  return 0
+                return items[index]
             """);
 
         var diagnostics = Run(function, bounds: true);
@@ -483,11 +487,12 @@ public class TypedBugPatternAnalysisTests
     public void Bounds_UnrelatedLengthDoesNotProtectAccess()
     {
         var function = BindFunction("""
-            §M{Typed}
-              §F{Read:pub} (i32[]:items, i32[]:other, i32:index) -> i32
-                §IF (&& (>= index INT:0) (< index §LEN other))
-                  §R §IDX items index
-                §R INT:0
+            module Typed Typed block
+              func Read (int[]:items, int[]:other, int:index) → int
+                !
+                if ((index >= 0) && (index < other.Length))
+                  return items[index]
+                return 0
             """);
 
         var diagnostics = Run(function, bounds: true);
@@ -500,12 +505,13 @@ public class TypedBugPatternAnalysisTests
     public void Bounds_IndexReassignmentInvalidatesPriorChecks()
     {
         var function = BindFunction("""
-            §M{Typed}
-              §F{Read:pub} (i32[]:items, i32:index) -> i32
-                §IF (&& (>= index INT:0) (< index §LEN items))
-                  §ASSIGN index §LEN items
-                  §R §IDX items index
-                §R INT:0
+            module Typed Typed block
+              func Read (int[]:items, int:index) → int
+                !
+                if ((index >= 0) && (index < items.Length))
+                  set index items.Length
+                  return items[index]
+                return 0
             """);
 
         var diagnostics = Run(function, bounds: true);
@@ -1162,13 +1168,14 @@ public class TypedBugPatternAnalysisTests
     public void ExternalOption_AliasCheckDoesNotAddLanguageVariantSemantics()
     {
         var function = BindFunction("""
-            §M{Typed}
-              §F{Read:pub} (Option<i32>:input) -> i32
-                §B{~original:Option<i32>} input
-                §B{alias:Option<i32>} original
-                §IF (== alias null)
-                  §R INT:0
-                §R §C{original.Unwrap} §/C
+            module Typed Typed block
+              func Read (Option<int>:input) → int
+                !
+                var Option<int>:original = input
+                let Option<int>:alias = original
+                if (alias == null)
+                  return 0
+                return original.Unwrap()
             """);
 
         var diagnostics = Run(function, nulls: true);
@@ -1182,14 +1189,15 @@ public class TypedBugPatternAnalysisTests
     public void ExternalOption_ReassignmentDoesNotProduceUnsafeUnwrap()
     {
         var function = BindFunction("""
-            §M{Typed}
-              §F{Read:pub} (Option<i32>:input) -> i32
-                §B{~original:Option<i32>} input
-                §B{alias:Option<i32>} original
-                §IF (!= alias null)
-                  §ASSIGN original null
-                  §R §C{original.Unwrap} §/C
-                §R INT:0
+            module Typed Typed block
+              func Read (Option<int>:input) → int
+                !
+                var Option<int>:original = input
+                let Option<int>:alias = original
+                if (alias != null)
+                  set original null
+                  return original.Unwrap()
+                return 0
             """);
 
         var diagnostics = Run(function, nulls: true);

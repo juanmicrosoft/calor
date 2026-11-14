@@ -1,5 +1,5 @@
-§M{Receipt}
-  §F{ReceiptTotal:pub} (i32:gross) -> i32
-    §B{t} §C{ComputeTaxWrapper} §A gross §/C
-    §R (- gross t)
-
+module Receipt Receipt block
+  func ReceiptTotal (int:gross) → int
+    !
+    let t = ComputeTaxWrapper(gross)
+    return (gross - t)

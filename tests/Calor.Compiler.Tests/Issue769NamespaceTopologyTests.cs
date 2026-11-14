@@ -49,15 +49,14 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{Topology}
-              §NS{Example}
-                §EN{Mode:pub}
-                  None = 0
-                  First = 1
-                  Second = 2
-                  All = First
-                    | Second
-                §CL{Survivor:pub}
+            module Topology Example block
+              enum Mode
+                None = 0
+                First = 1
+                Second = 2
+                All = First | Second
+
+              class Survivor
             """;
 
         var module = ParseCalor(source);
@@ -838,9 +837,8 @@ public class Issue769NamespaceTopologyTests
     {
         var module = ParseCalor(
             """
-            §M{Test}
-              §NS{Alpha}
-                §CL{Malformed:pub}
+            module Test Alpha block
+              class Malformed
             """);
         var type = Assert.Single(module.Classes);
         type.NamespaceScopeId = null;
@@ -938,29 +936,34 @@ public class Issue769NamespaceTopologyTests
             File.WriteAllText(
                 namespacedPath,
                 """
-                §M{StorageFile}
-                  §NS{Company.Storage}
-                    §F{Save:pub} () -> i32
-                      §R INT:41
+                module StorageFile Company.Storage block
+                  func Save () → int
+                    !
+                    return 41
                 """);
             File.WriteAllText(
                 globalPath,
                 """
-                §M{GlobalFile}
-                  §NS{_global:global}
-                    §F{Ping:pub} () -> i32
-                      §R INT:1
+                module GlobalFile
+                  func Ping () → int
+                    !
+                    return 1
                 """);
             File.WriteAllText(
                 callerPath,
                 """
-                §M{Consumer}
-                  §F{ReadNamespaced:pub} () -> i32
-                    §R §C{Save}
-                  §F{ReadGlobal:pub} () -> i32
-                    §R §C{Ping}
-                  §F{ReadExplicitNamespace:pub} () -> i32
-                    §R §C{Company.Storage.Save}
+                module Consumer Consumer block
+                  func ReadNamespaced () → int
+                    !
+                    return Save()
+
+                  func ReadGlobal () → int
+                    !
+                    return Ping()
+
+                  func ReadExplicitNamespace () → int
+                    !
+                    return Company.Storage.Save()
                 """);
 
             var files = new[]
@@ -1068,12 +1071,13 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{LocalModule}
-              §NS{Alpha}
-                §F{Pick:priv} () -> i32
-                  §R INT:7
-                §F{Run:pub} () -> i32
-                  §R §C{Pick}
+            module LocalModule Alpha block
+              func Pick private () → int
+                return 7
+
+              func Run () → int
+                !
+                return Pick()
             """;
 
         var result = Program.Compile(
@@ -1130,10 +1134,10 @@ public class Issue769NamespaceTopologyTests
             File.WriteAllText(
                 externalPath,
                 """
-                §M{ExternalModule}
-                  §NS{Gamma}
-                    §F{Pick:pub} (i32:value) -> i32
-                      §R INT:99
+                module ExternalModule Gamma block
+                  func Pick (int:value) → int
+                    !
+                    return 99
                 """);
 
             var files = new[]
@@ -1204,10 +1208,10 @@ public class Issue769NamespaceTopologyTests
             """;
         const string externalSource =
             """
-            §M{ExternalModule}
-              §NS{Gamma}
-                §F{Pick:pub} (i32:value) -> i32
-                  §R INT:99
+            module ExternalModule Gamma block
+              func Pick (int:value) → int
+                !
+                return 99
             """;
 
         var localModule = ParseCalor(localSource);
@@ -1287,10 +1291,10 @@ public class Issue769NamespaceTopologyTests
             """;
         const string externalSource =
             """
-            §M{ExternalModule}
-              §NS{Gamma}
-                §F{Pick:pub} () -> i32
-                  §R INT:99
+            module ExternalModule Gamma block
+              func Pick () → int
+                !
+                return 99
             """;
 
         var localModule = ParseCalor(localSource);
@@ -1476,25 +1480,38 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            §M{GenericArity}
-              §CL{Box:pub}<T>
-                §CTOR{pub} (i32:value)
-                  §B{copy1:i32} value
-                §MT{Pick:pub} () -> i32
-                  §R INT:1
-              §CL{Box:pub}<TFirst,TSecond>
-                §CTOR{pub} (str:value)
-                  §B{copy2:?str} value
-                §MT{Pick:pub} () -> i32
-                  §R INT:2
-              §F{UseOne:pub} (Box<i32>:box) -> i32
-                §R §C{box.Pick}
-              §F{UseTwo:pub} (Box<i32,str>:box) -> i32
-                §R §C{box.Pick}
-              §F{MakeOne:pub} () -> Box<i32>
-                §R §NEW{Box<i32>} §A INT:1 §/NEW
-              §F{MakeTwo:pub} () -> Box<i32,str>
-                §R §NEW{Box<i32,str>} §A STR:"two" §/NEW
+            module GenericArity GenericArity block
+              class Box<T>
+                ctor (int:value)
+                  let int:copy1 = value
+
+                func Pick () → int
+                  !
+                  return 1
+
+              class Box<TFirst,TSecond>
+                ctor (string:value)
+                  let string?:copy2 = value
+
+                func Pick () → int
+                  !
+                  return 2
+
+              func UseOne (Box<int>:box) → int
+                !
+                return box.Pick()
+
+              func UseTwo (Box<int, string>:box) → int
+                !
+                return box.Pick()
+
+              func MakeOne () → Box<int>
+                !
+                return new Box<int>(1)
+
+              func MakeTwo () → Box<int, string>
+                !
+                return new Box<int, string>("two")
             """;
 
         var module = ParseCalor(source);
@@ -1533,14 +1550,15 @@ public class Issue769NamespaceTopologyTests
     {
         const string effectSource =
             """
-            §M{GenericEffects}
-              §CL{Box:pub}<T>
-                §MT{Write:pub} (str:value) -> void
-                  §E{cw}
-                  §P value
-              §F{Use:pub} (Box<i32>:box, str:value) -> void
-                §E{}
-                §C{box.Write} §A value §/C
+            module GenericEffects GenericEffects block
+              class Box<T>
+                func Write (string:value) → void
+                  ! cw
+                  Console.WriteLine(value)
+
+              func Use (Box<int>:box, string:value) → void
+                !
+                box.Write(value)
             """;
         var effectResult = Program.Compile(effectSource);
 

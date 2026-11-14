@@ -21,16 +21,17 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{UsingCases}
-              §U{global:System.Threading}
-              §U{global:Tasks:System.Threading.Tasks}
-              §U{global:static:System.Math}
-              §U{System.Text}
-              §U{System.Text}
-              §U{Alias:System.Collections.Generic}
-              §U{static:System.Math}
-              §F{Value:pub} () -> i32
-                §R INT:1
+            module UsingCases UsingCases block
+              global using System.Threading
+              global using Tasks = System.Threading.Tasks
+              global using static System.Math
+              using System.Text
+              using System.Text
+              using Alias = System.Collections.Generic
+              using static System.Math
+              func Value () → int
+                !
+                return 1
             """);
 
         Assert.Collection(
@@ -288,25 +289,30 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{NestedElseTypes}
-              §PP{OUTER}
-                §CL{OuterSelected:pub}
-                  §MT{Value:pub:stat} () -> i32
-                    §R INT:1
-              §PPE
-                §CL{ElseDirect:pub}
-                  §FLD{i32:Value:pub}
-                §PP{INNER}
-                  §CL{InnerSelected:pub}
-                    §MT{Value:pub:stat} () -> i32
-                      §R INT:2
-                §PPE
-                  §CL{InnerFallback:pub}
-                    §MT{Value:pub:stat} () -> i32
-                      §R INT:3
-                §/PP{INNER}
-                §IFACE{IElseTail}
-              §/PP{OUTER}
+            module NestedElseTypes NestedElseTypes block
+              pp OUTER
+                class OuterSelected
+                  func Value static () → int
+                    !
+                    return 1
+
+              pp else
+                class ElseDirect
+                  field int:Value
+
+                pp INNER
+                  class InnerSelected
+                    func Value static () → int
+                      !
+                      return 2
+
+                pp else
+                  class InnerFallback
+                    func Value static () → int
+                      !
+                      return 3
+
+                interface IElseTail
             """,
             null,
             new CompilationOptions { DeferGeneratedOutputValidation = true });
@@ -868,12 +874,15 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{ConstructorResolution}
-              §CL{Pair:pub}
-                §CTOR{pub} (i32:Left, str:Right)
-                §CTOR{pub} (str:Left, i32:Right)
-              §F{Create:pub} () -> Pair
-                §R §NEW{Pair} §A[Right] "right" §A[Left] 1
+            module ConstructorResolution ConstructorResolution block
+              class Pair
+                ctor (int:Left, string:Right)
+
+                ctor (string:Left, int:Right)
+
+              func Create () → Pair
+                !
+                return new Pair(Right: "right", Left: 1)
             """);
         var diagnostics = new DiagnosticBag();
         var bound = new Binder(diagnostics).Bind(module);
@@ -939,9 +948,10 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{ConstructorSimplification}
-              §F{Create:pub} () -> Pair
-                §R §NEW{Pair} §A[Right] (+ 1 2) §A[Left] 4
+            module ConstructorSimplification ConstructorSimplification block
+              func Create () → Pair
+                !
+                return new Pair(Right: (1 + 2), Left: 4)
             """);
         var creation = Assert.IsType<NewExpressionNode>(
             Assert.IsType<ReturnStatementNode>(module.Functions[0].Body[0]).Expression);
@@ -1381,11 +1391,11 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{AliasBases}
-              §U{Alias:External}
-              §CL{Derived:pub}
-                §EXT{Alias.Base<i32>}
-                §IMPL{Alias.IFace<str>}
+            module AliasBases AliasBases block
+              using Alias = External
+              class Derived
+                extends Alias.Base<int>
+                implements Alias.IFace<string>
             """,
             null,
             new CompilationOptions { DeferGeneratedOutputValidation = true });
@@ -1462,9 +1472,10 @@ public class Issue766DeclarationModuleSemanticsTests
             """);
         var unrelatedModule = Parse(
             """
-            §M{Second}
-              §F{Echo:pub} (Leaky:value) -> Leaky
-                §R value
+            module Second Second block
+              func Echo (Leaky:value) → Leaky
+                !
+                return value
             """);
 
         var reused = new CSharpEmitter();
@@ -1482,11 +1493,14 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{Standalone}
-              §F{Echo:pub}<T> (List<T>:items) -> List<T>
-                §R items
-              §AF{EchoAsync:pub} (i32:value) -> i32
-                §R value
+            module Standalone Standalone block
+              func Echo<T> (List<T>:items) → List<T>
+                !
+                return items
+
+              func EchoAsync async (int:value) → int
+                !
+                return value
             """,
             null,
             new CompilationOptions { DeferGeneratedOutputValidation = true });

@@ -124,15 +124,12 @@ public class NegativeVerificationTests
     public void SafeCode_ConstantSqlQuery_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeQuery:pub}
-      §O{string}
-      §E{db:w}
-      §B{query:string} STR:""SELECT * FROM users WHERE id = 1""
-      §C{db.execute}
-        §A query
-      §/C
-      §R query";
+module Test Test block
+  func SafeQuery () → string
+    ! db:w
+    let string:query = ""SELECT * FROM users WHERE id = 1""
+    db.execute(query)
+    return query";
 
         AssertNoTaintVulnerabilities(source);
     }
@@ -141,17 +138,12 @@ public class NegativeVerificationTests
     public void SafeCode_ParameterizedQuery_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeParameterizedQuery:pub}
-      §I{string:user_input}
-      §O{string}
-      §E{db:w}
-      §B{query:string} STR:""SELECT * FROM users WHERE id = ?""
-      §C{db.execute_param}
-        §A query
-        §A user_input
-      §/C
-      §R query";
+module Test Test block
+  func SafeParameterizedQuery (string:user_input) → string
+    ! db:w
+    let string:query = ""SELECT * FROM users WHERE id = ?""
+    db.execute_param(query, user_input)
+    return query";
 
         // Parameterized queries are safe even with user input
         AssertNoTaintVulnerabilities(source);
@@ -167,17 +159,13 @@ public class NegativeVerificationTests
         // Major>=2 and the §R query trips Calor0273 — either would send
         // this test silently through Skip.If. Preserves the taint intent.
         var source = @"
-§M{Test}
-  §F{SafeSanitized:pub}
-      §I{string:user_input}
-      §O{?string}
-      §E{db:w}
-      §B{sanitized:?string} (CALL sql_escape user_input)
-      §B{query:?string} (+ STR:""SELECT * FROM users WHERE name = '"" sanitized)
-      §C{db.execute}
-        §A query
-      §/C
-      §R query";
+module Test Test block
+  func SafeSanitized (string:user_input) → string?
+    ! db:w
+    let string?:sanitized = sql_escape(user_input)
+    let string?:query = (""SELECT * FROM users WHERE name = '"" + sanitized)
+    db.execute(query)
+    return query";
 
         // Sanitized input should not trigger taint warnings
         AssertNoTaintVulnerabilities(source);
@@ -188,16 +176,12 @@ public class NegativeVerificationTests
     {
         // §B target + §O relaxed :string → :?string; see SafeCode_SanitizedInput.
         var source = @"
-§M{Test}
-  §F{SafeHtml:pub}
-      §I{string:user_input}
-      §O{?string}
-      §E{net:w}
-      §B{encoded:?string} (CALL html_escape user_input)
-      §C{response.write}
-        §A encoded
-      §/C
-      §R encoded";
+module Test Test block
+  func SafeHtml (string:user_input) → string?
+    ! net:w
+    let string?:encoded = html_escape(user_input)
+    response.write(encoded)
+    return encoded";
 
         AssertNoTaintVulnerabilities(source);
     }
@@ -206,11 +190,10 @@ public class NegativeVerificationTests
     public void SafeCode_NoUserInput_NoTaintWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeNoUserInput:pub}
-      §I{i32:count}
-      §O{i32}
-      §R count";
+module Test Test block
+  func SafeNoUserInput (int:count) → int
+    !
+    return count";
 
         // Integer parameter named 'count' should not be treated as user input
         AssertNoTaintVulnerabilities(source);
@@ -220,16 +203,13 @@ public class NegativeVerificationTests
     public void SafeCode_InternalDataOnly_NoTaintWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeInternalData:pub}
-      §O{string}
-      §E{db:w}
-      §B{name:string} STR:""admin""
-      §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" name)
-      §C{db.execute}
-        §A query
-      §/C
-      §R query";
+module Test Test block
+  func SafeInternalData () → string
+    ! db:w
+    let string:name = ""admin""
+    let string:query = (""SELECT * FROM users WHERE name = '"" + name)
+    db.execute(query)
+    return query";
 
         // Internal/constant data should not trigger taint warnings
         AssertNoTaintVulnerabilities(source);
@@ -243,15 +223,13 @@ public class NegativeVerificationTests
     public void SafeCode_DivisionWithGuard_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeDivWithGuard:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF (!= y INT:0)
-          §R (/ x y)
-      §EL
-          §R INT:0";
+module Test Test block
+  func SafeDivWithGuard (int:x, int:y) → int
+    !
+    if (y != 0)
+      return (x / y)
+    else
+      return 0";
 
         AssertNoDivisionByZeroWarnings(source);
     }
@@ -260,11 +238,10 @@ public class NegativeVerificationTests
     public void SafeCode_DivisionByLiteralNonZero_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeDivByLiteral:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:2)";
+module Test Test block
+  func SafeDivByLiteral (int:x) → int
+    !
+    return (x / 2)";
 
         // Division by a literal non-zero value is safe
         AssertNoDivisionByZeroWarnings(source);
@@ -277,12 +254,11 @@ public class NegativeVerificationTests
         // is always non-zero. The current analysis is conservative and warns about
         // any variable division without explicit guards.
         var source = @"
-§M{Test}
-  §F{SafeDivByConstant:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{divisor} INT:10
-      §R (/ x divisor)";
+module Test Test block
+  func SafeDivByConstant (int:x) → int
+    !
+    let divisor = 10
+    return (x / divisor)";
 
         // Division by a constant known to be non-zero
         AssertNoDivisionByZeroWarnings(source);
@@ -292,11 +268,10 @@ public class NegativeVerificationTests
     public void SafeCode_ModuloByLiteralNonZero_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeModulo:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (% x INT:7)";
+module Test Test block
+  func SafeModulo (int:x) → int
+    !
+    return (x % 7)";
 
         AssertNoDivisionByZeroWarnings(source);
     }
@@ -306,13 +281,13 @@ public class NegativeVerificationTests
     {
         // Note: Using constant bound (10) because parser doesn't support variable bounds
         var source = @"
-§M{Test}
-  §F{SafeDivInLoop:pub}
-      §O{i32}
-      §B{result} INT:0
-      §L{i:1:10:1}
-          §B{result:i32} (+ result (/ INT:100 i))
-      §R result";
+module Test Test block
+  func SafeDivInLoop () → int
+    !
+    let result = 0
+    for i from 1 to 10 step 1
+      let int:result = (result + (100 / i))
+    return result";
 
         // Loop starts from 1, so i is always >= 1 (non-zero)
         // But the analysis doesn't yet track loop bounds to know this
@@ -323,16 +298,14 @@ public class NegativeVerificationTests
     public void SafeCode_DivisionAfterAbsoluteValue_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeDivAfterAbs:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §B{absY:i32} (CALL math.abs y)
-      §IF (> absY INT:0)
-          §R (/ x absY)
-      §EL
-          §R INT:0";
+module Test Test block
+  func SafeDivAfterAbs (int:x, int:y) → int
+    !
+    let int:absY = math.abs(y)
+    if (absY > 0)
+      return (x / absY)
+    else
+      return 0";
 
         AssertNoDivisionByZeroWarnings(source);
     }
@@ -345,14 +318,13 @@ public class NegativeVerificationTests
     public void SafeCode_NullCheckBeforeUse_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeNullCheck:pub}
-      §I{string:maybeNull}
-      §O{i32}
-      §IF (!= maybeNull null)
-          §R (CALL string.length maybeNull)
-      §EL
-          §R INT:0";
+module Test Test block
+  func SafeNullCheck (string:maybeNull) → int
+    !
+    if (maybeNull != null)
+      return string.length(maybeNull)
+    else
+      return 0";
 
         AssertNoNullDereferenceWarnings(source);
     }
@@ -362,15 +334,14 @@ public class NegativeVerificationTests
     {
         // Note: This test verifies null checking doesn't produce warnings
         var source = @"
-§M{Test}
-  §F{SafeOptionMatch:pub}
-      §I{i32:value}
-      §O{i32}
-      §B{opt:i32} value
-      §IF (!= opt INT:0)
-          §R opt
-      §EL
-          §R INT:0";
+module Test Test block
+  func SafeOptionMatch (int:value) → int
+    !
+    let int:opt = value
+    if (opt != 0)
+      return opt
+    else
+      return 0";
 
         AssertNoNullDereferenceWarnings(source);
     }
@@ -379,11 +350,10 @@ public class NegativeVerificationTests
     public void SafeCode_NonNullableParameter_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeNonNullable:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x INT:1)";
+module Test Test block
+  func SafeNonNullable (int:x) → int
+    !
+    return (x + 1)";
 
         // Non-nullable types (i32) should not trigger null warnings
         AssertNoNullDereferenceWarnings(source);
@@ -394,12 +364,11 @@ public class NegativeVerificationTests
     {
         // §B target + §O relaxed :string → :?string; see SafeCode_SanitizedInput.
         var source = @"
-§M{Test}
-  §F{SafeDefaultValue:pub}
-      §I{string:input}
-      §O{?string}
-      §B{result:?string} (CALL coalesce input STR:""default"")
-      §R result";
+module Test Test block
+  func SafeDefaultValue (string:input) → string?
+    !
+    let string?:result = coalesce(input, ""default"")
+    return result";
 
         // Coalesce function provides a default, making result non-null
         AssertNoNullDereferenceWarnings(source);
@@ -414,13 +383,13 @@ public class NegativeVerificationTests
     {
         // Note: Using constant bound (10) because parser doesn't support variable bounds
         var source = @"
-§M{Test}
-  §F{SafeLoopBounds:pub}
-      §O{i32}
-      §B{sum} INT:0
-      §L{i:0:10:1}
-          §B{sum:i32} (+ sum i)
-      §R sum";
+module Test Test block
+  func SafeLoopBounds () → int
+    !
+    let sum = 0
+    for i from 0 to 10 step 1
+      let int:sum = (sum + i)
+    return sum";
 
         // Loop bounds are explicit and valid
         AssertNoBoundsWarnings(source);
@@ -430,15 +399,13 @@ public class NegativeVerificationTests
     public void SafeCode_BoundsCheckFirst_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeBoundsCheck:pub}
-      §I{i32:index}
-      §I{i32:len}
-      §O{i32}
-      §IF (&& (>= index INT:0) (< index len))
-          §R index
-      §EL
-          §R INT:-1";
+module Test Test block
+  func SafeBoundsCheck (int:index, int:len) → int
+    !
+    if ((index >= 0) && (index < len))
+      return index
+    else
+      return -1";
 
         // Bounds check before access
         AssertNoBoundsWarnings(source);
@@ -448,12 +415,11 @@ public class NegativeVerificationTests
     public void SafeCode_LiteralIndex_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeLiteralIndex:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{arr} INT:10
-      §R (+ arr x)";
+module Test Test block
+  func SafeLiteralIndex (int:x) → int
+    !
+    let arr = 10
+    return (arr + x)";
 
         // No actual array access in this simplified form
         AssertNoBoundsWarnings(source);
@@ -463,14 +429,12 @@ public class NegativeVerificationTests
     public void SafeCode_ClampedIndex_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeClampedIndex:pub}
-      §I{i32:index}
-      §I{i32:maxLen}
-      §O{i32}
-      §B{clamped:i32} (CALL math.min index (- maxLen INT:1))
-      §B{safeIndex:i32} (CALL math.max clamped INT:0)
-      §R safeIndex";
+module Test Test block
+  func SafeClampedIndex (int:index, int:maxLen) → int
+    !
+    let int:clamped = math.min(index, (maxLen - 1))
+    let int:safeIndex = math.max(clamped, 0)
+    return safeIndex";
 
         // Index is clamped to valid range
         AssertNoBoundsWarnings(source);
@@ -485,13 +449,12 @@ public class NegativeVerificationTests
     {
         // Test that code initializing variables before use parses and binds correctly
         var source = @"
-§M{Test}
-  §F{SafeInitialized:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{result} INT:0
-      §B{result:i32} (+ result x)
-      §R result";
+module Test Test block
+  func SafeInitialized (int:x) → int
+    !
+    let result = 0
+    let int:result = (result + x)
+    return result";
 
         var bound = Bind(source, out var parseDiag);
         // Skip test if syntax not supported (allows Calor syntax to evolve)
@@ -504,16 +467,15 @@ public class NegativeVerificationTests
     {
         // Test that code with all paths initializing variables parses correctly
         var source = @"
-§M{Test}
-  §F{SafeAllPathsInit:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{result} INT:0
-      §IF (> x INT:0)
-          §B{result} INT:1
-      §EL
-          §B{result} INT:-1
-      §R result";
+module Test Test block
+  func SafeAllPathsInit (int:x) → int
+    !
+    let result = 0
+    if (x > 0)
+      let result = 1
+    else
+      let result = -1
+    return result";
 
         var bound = Bind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -525,12 +487,10 @@ public class NegativeVerificationTests
     {
         // Test that parameters are always considered initialized
         var source = @"
-§M{Test}
-  §F{SafeParameterInit:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ x y)";
+module Test Test block
+  func SafeParameterInit (int:x, int:y) → int
+    !
+    return (x + y)";
 
         var bound = Bind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -541,14 +501,10 @@ public class NegativeVerificationTests
     public void Binding_NullExpression_ProducesBoundNullLiteral()
     {
         var source = @"
-§M{Test}
-  §F{TestNone:pub}
-      §I{string:maybeNull}
-      §O{i32}
-      §IF (!= maybeNull null)
-          §R INT:1
-      §EL
-          §R INT:0";
+module Test Test block
+  func TestNone (string:maybeNull) → int
+    !
+    return ((maybeNull != null) ? 1 : 0)";
 
         var bound = Bind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -591,12 +547,10 @@ public class NegativeVerificationTests
         // The call must appear directly as the divisor so Z3 can translate it
         // (the translator doesn't follow variable initializers)
         var source = @"
-§M{Test}
-  §F{ClampDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (/ x (CALL math.clamp y INT:1 INT:10))";
+module Test Test block
+  func ClampDiv (int:x, int:y) → int
+    !
+    return (x / math.clamp(y, 1, 10))";
 
         AssertNoDivisionByZeroWarnings(source);
     }
@@ -607,15 +561,13 @@ public class NegativeVerificationTests
         // math.sign(y) can be zero when y == 0, so a guard is needed
         // The call must appear directly as the divisor so Z3 can translate it
         var source = @"
-§M{Test}
-  §F{SignDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF (!= y INT:0)
-          §R (/ x (CALL math.sign y))
-      §EL
-          §R INT:0";
+module Test Test block
+  func SignDiv (int:x, int:y) → int
+    !
+    if (y != 0)
+      return (x / math.sign(y))
+    else
+      return 0";
 
         AssertNoDivisionByZeroWarnings(source);
     }
@@ -625,16 +577,14 @@ public class NegativeVerificationTests
     {
         // Constant declared inside an if block — requires deep constant propagation
         var source = @"
-§M{Test}
-  §F{DeepConst:pub}
-      §I{i32:x}
-      §I{i32:flag}
-      §O{i32}
-      §B{result} INT:0
-      §IF (> flag INT:0)
-          §B{divisor:i32} INT:5
-          §B{result:i32} (/ x divisor)
-      §R result";
+module Test Test block
+  func DeepConst (int:x, int:flag) → int
+    !
+    let result = 0
+    if (flag > 0)
+      let int:divisor = 5
+      let int:result = (x / divisor)
+    return result";
 
         AssertNoDivisionByZeroWarnings(source);
     }
@@ -644,15 +594,14 @@ public class NegativeVerificationTests
     {
         // Constant declared inside a for-loop body — requires recursive FindVariableInitializer
         var source = @"
-§M{Test}
-  §F{LoopConst:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{result} INT:0
-      §L{i:0:3:1}
-          §B{divisor:i32} INT:7
-          §B{result:i32} (+ result (/ x divisor))
-      §R result";
+module Test Test block
+  func LoopConst (int:x) → int
+    !
+    let result = 0
+    for i from 0 to 3 step 1
+      let int:divisor = 7
+      let int:result = (result + (x / divisor))
+    return result";
 
         AssertNoDivisionByZeroWarnings(source);
     }
@@ -704,14 +653,14 @@ public class NegativeVerificationTests
     {
         // Note: Using constant bounds because parser doesn't support variable bounds
         var source = @"
-§M{Test}
-  §F{SafeNestedLoops:pub}
-      §O{i32}
-      §B{sum} INT:0
-      §L{i:1:5:1}
-          §L{j:1:5:1}
-              §B{sum:i32} (+ sum (* i j))
-      §R sum";
+module Test Test block
+  func SafeNestedLoops () → int
+    !
+    let sum = 0
+    for i from 1 to 5 step 1
+      for j from 1 to 5 step 1
+        let int:sum = (sum + (i * j))
+    return sum";
 
         var bound = Bind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -732,15 +681,13 @@ public class NegativeVerificationTests
     public void SafeCode_MixedOperations_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SafeMixedOps:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §B{sum:i32} (+ a b)
-      §B{product:i32} (* a b)
-      §B{diff:i32} (- a b)
-      §R (+ (+ sum product) diff)";
+module Test Test block
+  func SafeMixedOps (int:a, int:b) → int
+    !
+    let int:sum = (a + b)
+    let int:product = (a * b)
+    let int:diff = (a - b)
+    return ((sum + product) + diff)";
 
         var bound = Bind(source, out var parseDiag);
         if (parseDiag.HasErrors || bound == null) return;
@@ -764,9 +711,10 @@ public class NegativeVerificationTests
     public void SafeCode_EmptyFunction_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{EmptyFunc:pub}
-      §O{void}";
+module Test Test block
+  func EmptyFunc () → void
+    !
+    return";
 
         var bound = Bind(source, out var parseDiag);
         if (parseDiag.HasErrors || bound == null) return;
@@ -782,11 +730,10 @@ public class NegativeVerificationTests
     public void SafeCode_SingleStatement_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{SingleStmt:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func SingleStmt (int:x) → int
+    !
+    return x";
 
         var bound = Bind(source, out var parseDiag);
         if (parseDiag.HasErrors || bound == null) return;
@@ -802,15 +749,14 @@ public class NegativeVerificationTests
     public void SafeCode_MultipleReturns_NoWarning()
     {
         var source = @"
-§M{Test}
-  §F{MultiReturn:pub}
-      §I{i32:x}
-      §O{i32}
-      §IF (< x INT:0)
-          §R INT:0
-      §IF (> x INT:100)
-          §R INT:100
-      §R x";
+module Test Test block
+  func MultiReturn (int:x) → int
+    !
+    if (x < 0)
+      return 0
+    if (x > 100)
+      return 100
+    return x";
 
         var bound = Bind(source, out var parseDiag);
         if (parseDiag.HasErrors || bound == null) return;

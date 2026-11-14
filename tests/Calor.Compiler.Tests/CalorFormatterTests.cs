@@ -23,7 +23,7 @@ public class CalorFormatterTests
     public void Format_MinimalModule_ProducesCorrectOutput()
     {
         var source = @"
-§M{Test}
+module Test Test block
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -40,9 +40,10 @@ public class CalorFormatterTests
     {
         // Simplified test without using directives which have complex parsing
         var source = @"
-§M{Test}
-  §F{Main:pub}
-    §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -62,12 +63,10 @@ public class CalorFormatterTests
     public void Format_FunctionWithParameters_IncludesTypeAndName()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -83,11 +82,10 @@ public class CalorFormatterTests
     public void Format_FunctionWithEffects_IncludesEffectsDeclaration()
     {
         var source = @"
-§M{Test}
-  §F{Print:pub}
-    §I{str:message}
-    §E{cw}
-    §C{Console.WriteLine} message
+module Test Test block
+  func Print (string:message)
+    ! cw
+    Console.WriteLine(message)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -104,14 +102,12 @@ public class CalorFormatterTests
     public void Format_FunctionWithContracts_IncludesPreconditionsAndPostconditions()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (!= b 0)
-    §S (>= result 0)
-    §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => (result >= 0)
+    return (a / b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -131,11 +127,11 @@ public class CalorFormatterTests
     public void Format_BindStatement_FormatsCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §O{i32}
-    §B{x} 42
-    §R x
+module Test Test block
+  func Test () → int
+    !
+    let x = 42
+    return x
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -150,14 +146,10 @@ public class CalorFormatterTests
     public void Format_IfStatement_FormatsWithIndentation()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §I{bool:cond}
-    §O{i32}
-    §IF cond
-      §R 1
-    §EL
-      §R 0
+module Test Test block
+  func Test (bool:cond) → int
+    !
+    return (cond ? 1 : 0)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -172,12 +164,11 @@ public class CalorFormatterTests
     public void Format_ForLoop_FormatsCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §O{void}
-    §E{cw}
-    §L{i:0:10:1}
-      §C{Console.WriteLine} i
+module Test Test block
+  func Test () → void
+    ! cw
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -193,13 +184,11 @@ public class CalorFormatterTests
     public void Format_WhileLoop_FormatsCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §I{bool:running}
-    §O{void}
-    §E{cw}
-    §WH running
-      §P ""working""
+module Test Test block
+  func Test (bool:running) → void
+    ! cw
+    while running
+      Console.WriteLine(""working"")
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -215,15 +204,14 @@ public class CalorFormatterTests
     public void Format_MatchStatement_FormatsWithCases()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §I{i32:x}
-    §O{i32}
-    §W x
-    §K null
-      §R 1
-    §K _
-      §R 0
+module Test Test block
+  func Test (int:x) → int
+    !
+    match x
+      case null
+        return 1
+      case _
+        return 0
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -243,13 +231,13 @@ public class CalorFormatterTests
     public void Format_Literals_FormatsCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §O{void}
-    §B{a} 42
-    §B{b} 3.14
-    §B{c} true
-    §B{d} ""hello""
+module Test Test block
+  func Test () → void
+    !
+    let a = 42
+    let b = 3.14
+    let c = true
+    let d = ""hello""
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -266,12 +254,10 @@ public class CalorFormatterTests
     public void Format_BinaryOperations_FormatsWithParentheses()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+module Test Test block
+  func Test (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -286,13 +272,14 @@ public class CalorFormatterTests
     public void Format_NullableExpressions_FormatsCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §O{?i32}
-    §R 42
-  §F{Test2:pub}
-    §O{?i32}
-    §R null
+module Test Test block
+  func Test () → int?
+    !
+    return 42
+
+  func Test2 () → int?
+    !
+    return null
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -308,13 +295,14 @@ public class CalorFormatterTests
     public void Format_ReturnAndThrow_FormatsCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §O{i32}
-    §R 42
-  §F{Test2:pub}
-    §O{str}
-    §TH §NEW{Exception} §A ""error"" §/NEW
+module Test Test block
+  func Test () → int
+    !
+    return 42
+
+  func Test2 () → string
+    !
+    throw new Exception(""error"")
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -334,18 +322,13 @@ public class CalorFormatterTests
     public void Format_NestedStatements_IndentsCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-    §I{bool:a}
-    §I{bool:b}
-    §O{i32}
-    §IF a
-      §IF b
-        §R 2
-      §EL
-        §R 1
-    §EL
-      §R 0
+module Test Test block
+  func Test (bool:a, bool:b) → int
+    !
+    if a
+      return (b ? 2 : 1)
+    else
+      return 0
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -368,12 +351,10 @@ public class CalorFormatterTests
     {
         // Test that basic formatting works and produces parseable output
         var source = @"
-§M{Test}
-  §F{Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -418,11 +399,11 @@ public class CalorFormatterTests
     public void Format_ForeachWithoutIndex_EmitsForeachBlockWithoutIndex()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACH{item:i32} items
-                      §P item
+            module Test Test block
+              func Main () → void
+                !
+                each int:item in items
+                  Console.WriteLine(item)
             """;
 
         var module = Parse(source, out var diagnostics);

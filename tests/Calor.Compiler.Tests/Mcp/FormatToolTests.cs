@@ -41,7 +41,7 @@ public class FormatToolTests
     [Fact]
     public async Task Format_ValidSource_Succeeds()
     {
-        var source = "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"hi\"\n";
+        var source = "module Test Test block\n  func Foo () → void\n    !\n    Console.WriteLine(\"hi\")\n";
         var result = await _tool.ExecuteAsync(CreateArgs(source));
 
         Assert.False(result.IsError);
@@ -53,7 +53,7 @@ public class FormatToolTests
     [Fact]
     public async Task Format_SemanticallyUnsupportedSource_ReportsConservativeFallback()
     {
-        var source = "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"missing effect\"\n";
+        var source = "module Test Test block\n  func Foo () → void\n    !\n    Console.WriteLine(\"missing effect\")\n";
 
         var result = await _tool.ExecuteAsync(CreateArgs(source));
 
@@ -70,9 +70,10 @@ public class FormatToolTests
     public async Task CheckLint_ReadOnlySemanticError_RemainsParseSuccessful()
     {
         var source =
-            "§M{Test}\n" +
-            "  §F{Foo:pub} () -> void\n" +
-            "    §P \"missing effect\"   \n";
+            "module Test Test block\n" +
+            "  func Foo () → void\n" +
+            "    !\n" +
+            "    Console.WriteLine(\"missing effect\")\n";
 
         var result = await _checkTool.ExecuteAsync(CreateLintArgs(source, fix: false));
 
@@ -89,9 +90,10 @@ public class FormatToolTests
     public async Task CheckLint_FixSemanticError_IsSuppressedWithoutParseFailure()
     {
         var source =
-            "§M{Test}\n" +
-            "  §F{Foo:pub} () -> void\n" +
-            "    §P \"missing effect\"   \n";
+            "module Test Test block\n" +
+            "  func Foo () → void\n" +
+            "    !\n" +
+            "    Console.WriteLine(\"missing effect\")\n";
 
         var result = await _checkTool.ExecuteAsync(CreateLintArgs(source, fix: true));
 
@@ -137,7 +139,7 @@ public class FormatToolTests
     [Fact]
     public async Task IdsCheck_InMemorySource_RequiresProjectSync()
     {
-        var source = "§M{Test}\n  §F{Foo:pub} () -> void\n";
+        var source = "module Test Test block\n  func Foo () → void\n    !\n    return\n";
         var result = await _tool.ExecuteAsync(CreateArgs(source, action: "ids", idsAction: "check"));
 
         Assert.True(result.IsError);
@@ -159,7 +161,7 @@ public class FormatToolTests
     [Fact]
     public async Task Format_IdFreeSource_DoesNotInventPersistedIds()
     {
-        var source = "§M{Test}\n  §F{Foo:pub} () -> void\n";
+        var source = "module Test Test block\n  func Foo () → void\n    !\n    return\n";
         var result = await _tool.ExecuteAsync(CreateArgs(source));
         Assert.False(result.IsError);
         var output = ParseOutput(result);

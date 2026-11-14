@@ -111,14 +111,13 @@ public class Service
     {
         // Verify that codegen emits `throw new InvalidOperationException(...)`
         var source = @"
-§M{Test}
-  §CL{Svc:pub}
-    §MT{Validate:pub}
-      §I{str:name}
-      §O{str}
-      §IF (== name null)
-        §TH §NEW{InvalidOperationException} §A ""name is null"" §/NEW
-      §R name
+module Test Test block
+  class Svc
+    func Validate (string:name) → string
+      !
+      if (name == null)
+        throw new InvalidOperationException(""name is null"")
+      return name
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("throw new InvalidOperationException", csharp);
@@ -154,10 +153,11 @@ public class Service
     {
         // Parse inline method syntax with default parameter
         var source = @"
-§M{Test}
-  §CL{Calculator:pub}
-    §MT{Add:pub} (i32:x, i32:y = 0) -> i32
-      §R (+ x y)
+module Test Test block
+  class Calculator
+    func Add (int:x, int:y = 0) → int
+      !
+      return (x + y)
 ";
         var module = ParseCalor(source);
         var cls = Assert.Single(module.Classes);
@@ -172,10 +172,11 @@ public class Service
     public void DefaultParam_Codegen_EmitsDefaultInParameter()
     {
         var source = @"
-§M{Test}
-  §CL{Calculator:pub}
-    §MT{Add:pub} (i32:x, i32:y = 0) -> i32
-      §R (+ x y)
+module Test Test block
+  class Calculator
+    func Add (int:x, int:y = 0) → int
+      !
+      return (x + y)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("int y = 0", csharp);
@@ -336,12 +337,10 @@ public class DataProcessor
     {
         // (+ a b) should generate `a + b` without unnecessary parentheses
         var source = @"
-§M{Test}
-  §F{Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("a + b", csharp);
@@ -352,13 +351,10 @@ public class DataProcessor
     {
         // Multiplication binds tighter than addition; each native arithmetic operation checks overflow.
         var source = @"
-§M{Test}
-  §F{Calc:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §I{i32:c}
-    §O{i32}
-    §R (+ (* a b) c)
+module Test Test block
+  func Calc (int:a, int:b, int:c) → int
+    !
+    return ((a * b) + c)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("checked(checked(a * b) + c)", csharp);
@@ -370,13 +366,10 @@ public class DataProcessor
     {
         // Preserve the sum as the complete multiplicand, with checked arithmetic.
         var source = @"
-§M{Test}
-  §F{Calc:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §I{i32:c}
-    §O{i32}
-    §R (* (+ a b) c)
+module Test Test block
+  func Calc (int:a, int:b, int:c) → int
+    !
+    return ((a + b) * c)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("checked((checked(a + b)) * c)", csharp);
@@ -391,11 +384,10 @@ public class DataProcessor
     {
         // A simple program without LINQ usage should NOT have `using System.Linq;`
         var source = @"
-§M{Test}
-  §F{Main:pub}
-    §O{void}
-    §E{cw}
-    §P ""Hello""
+module Test Test block
+  func Main () → void
+    ! cw
+    Console.WriteLine(""Hello"")
 ";
         var result = Program.Compile(source);
         Assert.False(result.HasErrors, FormatDiagnostics(result));
@@ -478,13 +470,12 @@ public class DataProcessor
     {
         // Parse §PP{DEBUG} ... §/PP{DEBUG} and verify codegen emits #if DEBUG ... #endif
         var source = @"
-§M{Test}
-  §CL{Logger:pub}
-    §MT{Log:pub}
-      §I{str:msg}
-      §PP{DEBUG}
-      §C{Console.WriteLine} msg
-      §/PP{DEBUG}
+module Test Test block
+  class Logger
+    func Log (string:msg)
+      !
+      pp DEBUG
+        Console.WriteLine(msg)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("#if DEBUG", csharp);
@@ -497,15 +488,14 @@ public class DataProcessor
     {
         // Test with else body: §PP{DEBUG} ... §PPE ... §/PP{DEBUG}
         var source = @"
-§M{Test}
-  §CL{Logger:pub}
-    §MT{GetLevel:pub}
-        §O{str}
-        §PP{DEBUG}
-        §R ""debug""
-        §PPE
-        §R ""release""
-        §/PP{DEBUG}
+module Test Test block
+  class Logger
+    func GetLevel () → string
+      !
+      pp DEBUG
+        return ""debug""
+      pp else
+        return ""release""
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("#if DEBUG", csharp);
@@ -519,15 +509,14 @@ public class DataProcessor
     public void Preprocessor_CustomCondition_EmitsCorrectly()
     {
         var source = @"
-§M{Test}
-  §CL{Config:pub}
-    §MT{GetEndpoint:pub}
-        §O{str}
-        §PP{RELEASE}
-        §R ""https://prod.example.com""
-        §PPE
-        §R ""https://dev.example.com""
-        §/PP{RELEASE}
+module Test Test block
+  class Config
+    func GetEndpoint () → string
+      !
+      pp RELEASE
+        return ""https://prod.example.com""
+      pp else
+        return ""https://dev.example.com""
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("#if RELEASE", csharp);
@@ -620,14 +609,13 @@ public class Test
     {
         // A throw statement inside a preprocessor-guarded block
         var source = @"
-§M{Test}
-  §CL{Guard:pub}
-    §MT{Check:pub}
-      §I{bool:flag}
-      §PP{DEBUG}
-      §IF (! flag)
-        §TH §NEW{InvalidOperationException} §A ""debug check failed"" §/NEW
-      §/PP{DEBUG}
+module Test Test block
+  class Guard
+    func Check (bool:flag)
+      !
+      pp DEBUG
+        if (!flag)
+          throw new InvalidOperationException(""debug check failed"")
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("#if DEBUG", csharp);

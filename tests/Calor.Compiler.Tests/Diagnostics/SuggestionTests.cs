@@ -199,7 +199,7 @@ public class SuggestionTests
     [Fact]
     public void Parser_NameofOperator_CompilesSuccessfully()
     {
-        var source = "§M{Test} §F{Fn} (i32:x) -> str §R (nameof x)";
+        var source = "module Test Test block\n  func Fn private (int:x) → string\n    return nameof(x)";
         var result = Program.Compile(source, "test.calr");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
@@ -644,7 +644,7 @@ public class SuggestionTests
     public void Parser_ExactMatchOperator_NoError()
     {
         // Exact match should not produce error
-        var source = "§M{Test} §F{Fn} §O{bool} §R (contains \"hello\" \"h\")";
+        var source = "module Test Test block\n  func Fn private () → bool\n    return (\"hello\").Contains(\"h\")";
         var result = Program.Compile(source, "test.calr");
 
         Assert.False(result.HasErrors);

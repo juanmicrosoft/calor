@@ -15,7 +15,7 @@ public class ApiStrictnessCheckerTests
     {
         var source = string.Join(newline,
             "/// Module documentation.",
-            "§M{Docs}",
+            "module Docs Docs block",
             "  /// Function documentation.",
             "  /// A second line.",
             "  §F{Run:pub} () -> void",
@@ -72,9 +72,10 @@ public class ApiStrictnessCheckerTests
     public void Check_DefaultMode_NoWarningsOnPublicFunction()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -90,9 +91,9 @@ public class ApiStrictnessCheckerTests
     public void Check_DefaultMode_NoWarningsOnPrivateFunction()
     {
         var source = @"
-§M{Test}
-  §F{Test:priv}
-      §O{void}
+module Test Test block
+  func Test private () → void
+    return
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -112,9 +113,10 @@ public class ApiStrictnessCheckerTests
     public void Check_RequireDocs_WarnsOnUndocumentedPublicFunction()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -131,9 +133,9 @@ public class ApiStrictnessCheckerTests
     public void Check_RequireDocs_NoWarningOnPrivateFunction()
     {
         var source = @"
-§M{Test}
-  §F{PrivateHelper:priv}
-      §O{void}
+module Test Test block
+  func PrivateHelper private () → void
+    return
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -153,7 +155,7 @@ public class ApiStrictnessCheckerTests
     public void Check_RequireDocs_WarnsOnUndocumentedModule()
     {
         var source = @"
-§M{Test}
+module Test Test block
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -176,9 +178,10 @@ public class ApiStrictnessCheckerTests
     public void Check_StrictApi_WarnsOnPublicFunctionWithoutContractsOrDocs()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -197,13 +200,11 @@ public class ApiStrictnessCheckerTests
     public void Check_StrictApi_NoWarningOnFunctionWithContracts()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -228,9 +229,10 @@ public class ApiStrictnessCheckerTests
     public void Check_RequireStabilityMarkers_InfoOnFunctionWithoutSince()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -253,9 +255,10 @@ public class ApiStrictnessCheckerTests
     public void Check_StrictPreset_ChecksAllRules()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -277,11 +280,10 @@ public class ApiStrictnessCheckerTests
     public void Compare_NoChanges_NoBrokenChanges()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x
+module Test Test block
+  func Test (int:x) → int
+    !
+    return x
 ";
         var oldModule = Parse(source, out var oldDiagnostics);
         var newModule = Parse(source, out var newDiagnostics);
@@ -300,18 +302,16 @@ public class ApiStrictnessCheckerTests
     public void Compare_ParameterTypeChange_ReportsBreakingChange()
     {
         var oldSource = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x
+module Test Test block
+  func Test (int:x) → int
+    !
+    return x
 ";
         var newSource = @"
-§M{Test}
-  §F{Test:pub}
-      §I{str:x}
-      §O{i32}
-      §R 0
+module Test Test block
+  func Test (string:x) → int
+    !
+    return 0
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);
@@ -330,19 +330,16 @@ public class ApiStrictnessCheckerTests
     public void Compare_ParameterCountChange_ReportsBreakingChange()
     {
         var oldSource = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x
+module Test Test block
+  func Test (int:x) → int
+    !
+    return x
 ";
         var newSource = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ x y)
+module Test Test block
+  func Test (int:x, int:y) → int
+    !
+    return (x + y)
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);
@@ -361,16 +358,20 @@ public class ApiStrictnessCheckerTests
     public void Compare_FunctionRemoved_ReportsBreakingChange()
     {
         var oldSource = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
-  §F{Helper:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
+
+  func Helper () → void
+    !
+    return
 ";
         var newSource = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);
@@ -389,16 +390,20 @@ public class ApiStrictnessCheckerTests
     public void Compare_FunctionAdded_NotBreakingChange()
     {
         var oldSource = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
 ";
         var newSource = @"
-§M{Test}
-  §F{Test:pub}
-      §O{void}
-  §F{NewFunction:pub}
-      §O{void}
+module Test Test block
+  func Test () → void
+    !
+    return
+
+  func NewFunction () → void
+    !
+    return
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);
@@ -417,16 +422,16 @@ public class ApiStrictnessCheckerTests
     public void Compare_ReturnTypeChange_ReportsBreakingChange()
     {
         var oldSource = @"
-§M{Test}
-  §F{Test:pub}
-      §O{i32}
-      §R 0
+module Test Test block
+  func Test () → int
+    !
+    return 0
 ";
         var newSource = @"
-§M{Test}
-  §F{Test:pub}
-      §O{str}
-      §R ""hello""
+module Test Test block
+  func Test () → string
+    !
+    return ""hello""
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);

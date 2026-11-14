@@ -1,10 +1,11 @@
-§M{Holder}
-  §CL{Box:pub}
-    §FLD{i32:count:pub}
-    §MT{Add:pub} (i32:count) -> i32
-      §E{}
-      §R (+ §THIS.count count)
-  §F{Run:pub} () -> i32
-    §E{alloc}
-    §B{box:Box} §NEW{Box} §/NEW
-    §R §C{box.Add} §A INT:5 §/C
+module Holder Holder block
+  class Box
+    field int:count
+    func Add (int:count) → int
+      !
+      return (this . count + count)
+
+  func Run () → int
+    ! alloc
+    let Box:box = new Box()
+    return box.Add(5)

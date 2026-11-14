@@ -1,35 +1,40 @@
-§M{ProvenContracts}
-  §F{Square:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §Q (<= x 46340)
-    §S (>= result 0)
-    §R (* x x)
+module ProvenContracts ProvenContracts block
+  func Square (int:x) → int
+    !
+    requires (x >= 0)
+    requires (x <= 46340)
+    => (result >= 0)
+    return (x * x)
 
-  §F{AbsoluteValue:pub} (i32:x) -> i32
-    §Q (>= x (- 0 2147483647))
-    §S (>= result 0)
-    §IF (< x 0)
-      §R (- 0 x)
-    §EL
-      §R x
+  func AbsoluteValue (int:x) → int
+    !
+    requires (x >= (0 - 2147483647))
+    => (result >= 0)
+    if (x < 0)
+      return (0 - x)
+    else
+      return x
 
-  §F{Max:pub} (i32:a, i32:b) -> i32
-    §S (>= result a)
-    §S (>= result b)
-    §IF (>= a b)
-      §R a
-    §EL
-      §R b
+  func Max (int:a, int:b) → int
+    !
+    => (result >= a)
+    => (result >= b)
+    if (a >= b)
+      return a
+    else
+      return b
 
-  §F{AddPositive:pub} (i32:a, i32:b) -> i32
-    §Q (> a 0)
-    §Q (> b 0)
-    §Q (<= a 1073741823)
-    §Q (<= b 1073741823)
-    §S (> result a)
-    §S (> result b)
-    §R (+ a b)
+  func AddPositive (int:a, int:b) → int
+    !
+    requires (a > 0)
+    requires (b > 0)
+    requires (a <= 1073741823)
+    requires (b <= 1073741823)
+    => (result > a)
+    => (result > b)
+    return (a + b)
 
-  §F{Identity:pub} (i32:x) -> i32
-    §S (== result x)
-    §R x
+  func Identity (int:x) → int
+    !
+    => (result == x)
+    return x

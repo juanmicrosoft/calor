@@ -1,4 +1,4 @@
-§M{Lib}
-  §F{Double:pub} (i32:n) -> i32
-    §E{}
-    §R (* n INT:2)
+module Lib Lib block
+  func Double (int:n) → int
+    !
+    return (n * 2)

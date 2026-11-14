@@ -22,21 +22,21 @@ namespace Calor.Compiler.Tests;
 public sealed class S2CacheLiteralWidthTests : IDisposable
 {
     private const string IntSource = """
-        §M{R1Case:overflow=unchecked}
-          §F{Probe:pub} (i32:x) -> i32
-            §E{}
-            §Q (== x INT:2147483647)
-            §S (> (+ x INT:1) INT:0)
-            §R INT:0
+        module R1Case R1Case block overflow unchecked
+          func Probe (int:x) → int
+            !
+            requires (x == 2147483647)
+            => ((x + 1) > 0)
+            return 0
         """;
 
     private const string LongSource = """
-        §M{R1Case:overflow=unchecked}
-          §F{Probe:pub} (i32:x) -> i32
-            §E{}
-            §Q (== x INT:2147483647)
-            §S (> (+ x LONG:1) INT:0)
-            §R INT:0
+        module R1Case R1Case block overflow unchecked
+          func Probe (int:x) → int
+            !
+            requires (x == 2147483647)
+            => ((x + 1L) > 0)
+            return 0
         """;
 
     private readonly string _root = Path.Combine(

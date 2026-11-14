@@ -1,4 +1,4 @@
-§M{App}
-  §F{Run:pub} () -> i32
-    §E{}
-    §R (+ §C{Double} §A INT:5 §/C §C{Double} §A INT:10 §/C)
+module App App block
+  func Run () → int
+    !
+    return (Double(5) + Double(10))

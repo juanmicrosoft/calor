@@ -69,11 +69,12 @@ public sealed class InlineRefinementContractTests
     public void ReassigningDependency_DoesNotLeaveAUsableStaleEntryFact(bool verify)
     {
         var assembly = Compile("""
-            §M{Refined}
-              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
-                §S (> result lo)
-                §ASSIGN lo hi
-                §R hi
+            module Refined Refined block
+              func Upper (int:lo, int:hi | (# > lo)) → int
+                !
+                => (result > lo)
+                set lo hi
+                return hi
             """, verify);
         var method = assembly.GetType("Refined.RefinedModule")!.GetMethod("Upper")!;
         var exception = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [1, 2]));
@@ -107,11 +108,14 @@ public sealed class InlineRefinementContractTests
     public void EffectfulCallArgument_IsExplicitlyUnsupported()
     {
         var tracker = Solve(Parse("""
-            §M{Refined}
-              §F{Positive:pub} (i32:x | (> # 0)) -> i32
-                §R x
-              §F{Caller:pub} (i32:x) -> i32
-                §R §C{Positive} §A §C{Get} §/C §/C
+            module Refined Refined block
+              func Positive (int:x | (# > 0)) → int
+                !
+                return x
+
+              func Caller (int:x) → int
+                !
+                return Positive(Get())
             """));
         var obligation = Assert.Single(tracker.Obligations.Where(o => o.Description.StartsWith("Call to")));
         Assert.Equal(ObligationStatus.Unsupported, obligation.Status);
@@ -122,11 +126,14 @@ public sealed class InlineRefinementContractTests
     public void CallRequiringNumericConversion_IsNotProvenInTheWrongWidth()
     {
         var tracker = Solve(Parse("""
-            §M{Refined}
-              §F{Positive:pub} (i64:x | (> # 2147483647)) -> i64
-                §R x
-              §F{Caller:pub} (i32:x) -> i64
-                §R §C{Positive} §A x §/C
+            module Refined Refined block
+              func Positive (long:x | (# > 2147483647)) → long
+                !
+                return x
+
+              func Caller (int:x) → long
+                !
+                return Positive(x)
             """));
         Assert.Equal(ObligationStatus.Unsupported,
             Assert.Single(tracker.Obligations.Where(o => o.Description.StartsWith("Call to"))).Status);
@@ -136,11 +143,14 @@ public sealed class InlineRefinementContractTests
     public void CapturedCallerRefinement_DoesNotManufactureAnInconsistentFact()
     {
         var module = Parse("""
-            §M{Refined}
-              §F{Positive:pub} (i32:value | (> # 0)) -> i32
-                §R value
-              §F{Caller:pub} (i32:x | (exists ((x i32)) (== # x))) -> i32
-                §R §C{Positive} §A -1 §/C
+            module Refined Refined block
+              func Positive (int:value | (# > 0)) → int
+                !
+                return value
+
+              func Caller (int:x | (exists int:x where true : (# == x))) → int
+                !
+                return Positive(-1)
             """);
         var collector = new FactCollector();
         collector.CollectFromFunction(module.Functions[1]);
@@ -187,10 +197,11 @@ public sealed class InlineRefinementContractTests
     public void NonProvenOutcome_KeepsEntryAndPostconditionGuards(string status)
     {
         var module = Parse("""
-            §M{Refined}
-              §F{Upper:pub} (i32:x | (> # 0)) -> i32
-                §S (< result 0)
-                §R x
+            module Refined Refined block
+              func Upper (int:x | (# > 0)) → int
+                !
+                => (result < 0)
+                return x
             """);
         var outcome = Calor.Compiler.Verification.Z3.ContractVerificationResult.FromOutcome(
             ProofOutcome.Rehydrate(status, null, "control: no proof established"));
@@ -215,11 +226,13 @@ public sealed class InlineRefinementContractTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
         };
         var result = Program.Compile("""
-            §M{Refined}
-              §F{Positive:priv} (i32:x | (> # 0)) -> i32
-                §R x
-              §F{Caller:pub} () -> i32
-                §R §C{Positive} §A 1 §/C
+            module Refined Refined block
+              func Positive private (int:x | (# > 0)) → int
+                return x
+
+              func Caller () → int
+                !
+                return Positive(1)
             """, "private.calr", options);
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
         Assert.Equal(ObligationStatus.Discharged,

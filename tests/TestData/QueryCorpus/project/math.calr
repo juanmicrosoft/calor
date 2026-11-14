@@ -1,7 +1,8 @@
-§M{MathLib}
-  §F{Scale:pub} (i32:n) -> i32
-    §E{}
-    §R (* n INT:2)
-  §F{ScaleTwice:pub} (i32:n) -> i32
-    §E{}
-    §R §C{Scale} §A §C{Scale} §A n §/C §/C
+module MathLib MathLib block
+  func Scale (int:n) → int
+    !
+    return (n * 2)
+
+  func ScaleTwice (int:n) → int
+    !
+    return Scale(Scale(n))

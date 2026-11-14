@@ -43,11 +43,11 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Identity} INT:1   ← NEW: no §/C
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §O{i32}
-      §B{x} §C{Identity} INT:1
-      §R x
+module Test Test block
+  func Foo () → int
+    !
+    let x = Identity(1)
+    return x
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -64,11 +64,11 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Identity} INT:1 §/C   ← LEGACY: still accepted
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §O{i32}
-      §B{x} §C{Identity} INT:1 §/C
-      §R x
+module Test Test block
+  func Foo () → int
+    !
+    let x = Identity(1)
+    return x
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -84,9 +84,10 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Vec.empty}   ← NEW: zero-arg, no §/C
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x} §C{Vec.empty}
+module Test Test block
+  func Foo ()
+    !
+    let x = Vec.empty()
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -102,9 +103,10 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Vec.empty} §/C   ← LEGACY zero-arg with closer
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x} §C{Vec.empty} §/C
+module Test Test block
+  func Foo ()
+    !
+    let x = Vec.empty()
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -123,10 +125,11 @@ public class CallExpressionImplicitCloseTests
         // Note: the lexer treats `obj.Length` (with bare dot) as a single dotted
         // identifier, so we use `?.` to force a parser-level disambiguation.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{obj:string} STR:"hi"
-      §B{n} §C{Identity} obj?.Length
+module Test Test block
+  func Foo ()
+    !
+    let string:obj = "hi"
+    let n = Identity(obj?.Length)
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -153,9 +156,10 @@ public class CallExpressionImplicitCloseTests
         // The ?.Length should attach to the (zero-arg) call result, not be
         // parsed as a malformed inline argument.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{n} §C{Maybe}?.Length
+module Test Test block
+  func Foo ()
+    !
+    let n = (Maybe())?.Length
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -172,9 +176,10 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{n} §C{Maybe}.Length — dot member after zero-arg implicit close.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{n} §C{Maybe}.Length
+module Test Test block
+  func Foo ()
+    !
+    let n = Maybe() . Length
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -191,10 +196,11 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{x} §C{Foo.bar} §C{Baz.qux} y   ← RFC §3.2 case C
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{y:i32} INT:1
-      §B{x} §C{Foo.bar} §C{Baz.qux} y
+module Test Test block
+  func Foo ()
+    !
+    let int:y = 1
+    let x = Foo.bar(Baz.qux(y))
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -217,9 +223,10 @@ public class CallExpressionImplicitCloseTests
     {
         // §C{outer} §A §C{inner} INT:1 §/C   ← one §/C goes to outer; inner elided
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x} §C{outer} §A §C{inner} INT:1 §/C
+module Test Test block
+  func Foo ()
+    !
+    let x = outer(inner(1))
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -240,9 +247,10 @@ public class CallExpressionImplicitCloseTests
     {
         // §C{outer} §A §C{inner} INT:1 §/C §/C   ← LEGACY both explicit
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x} §C{outer} §A §C{inner} INT:1 §/C §/C
+module Test Test block
+  func Foo ()
+    !
+    let x = outer(inner(1))
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -263,10 +271,11 @@ public class CallExpressionImplicitCloseTests
     {
         // §C{o1} §A §C{o2} §A §C{i} x §/C §/C §/C   ← all three explicit
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x:i32} INT:1
-      §B{r} §C{o1} §A §C{o2} §A §C{i} x §/C §/C §/C
+module Test Test block
+  func Foo ()
+    !
+    let int:x = 1
+    let r = o1(o2(i(x)))
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -287,10 +296,11 @@ public class CallExpressionImplicitCloseTests
     {
         // §C{o1} §A §C{o2} §A §C{i} x §/C §/C   ← exactly two §/C, i elided
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x:i32} INT:1
-      §B{r} §C{o1} §A §C{o2} §A §C{i} x §/C §/C
+module Test Test block
+  func Foo ()
+    !
+    let int:x = 1
+    let r = o1(o2(i(x)))
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -343,14 +353,15 @@ public class CallExpressionImplicitCloseTests
         // §C{pred}. Mirrors the conversion-scorecard test 093 (Delegates):
         // `§B{_pre} §C{pred} §IDX{numbers} i / §IF _pre ...`.
         var source = """
-§M{Test}
-  §F{Filter:pub} (i32[]:numbers, F:pred) -> i32
-      §B{~count:i32} 0
-      §L{i:0:(- (len numbers) 1):1}
-          §B{_pre} §C{pred} §IDX{numbers} i
-          §IF _pre
-              §ASSIGN count (+ count 1)
-      §R count
+module Test Test block
+  func Filter (int[]:numbers, F:pred) → int
+    !
+    var int:count = 0
+    for i from 0 to (numbers.Length - 1) step 1
+      let _pre = pred(numbers[i])
+      if _pre
+        set count (count + 1)
+    return count
 """;
         Parse(source, out var diags);
         Assert.DoesNotContain(diags.Errors,
@@ -362,9 +373,10 @@ public class CallExpressionImplicitCloseTests
     {
         // §B{xs} §C{Array.Empty<i32>}   ← generic target, zero-arg, no §/C
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{xs} §C{Array.Empty<i32>}
+module Test Test block
+  func Foo ()
+    !
+    let xs = Array.Empty<int>()
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -383,9 +395,10 @@ public class CallExpressionImplicitCloseTests
         // Regression check: the existing statement-context implicit close
         // at Parser.cs:1376 is unaffected by the expression-context change.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Console.WriteLine} STR:"hello"
+module Test Test block
+  func Foo ()
+    !
+    Console.WriteLine("hello")
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -404,10 +417,11 @@ public class CallExpressionImplicitCloseTests
         // Per rubber-duck review: requires _inOuterCallArgDepth to be bumped
         // in ParseCallStatement's §A loop, not just ParseCallExpression's.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x:i32} INT:1
-      §C{outer} §A §C{inner} x §/C
+module Test Test block
+  func Foo ()
+    !
+    let int:x = 1
+    outer(inner(x))
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -444,11 +458,11 @@ public class CallExpressionImplicitCloseTests
         // Inside Lisp expressions, the canonical §A + §/C form must still
         // parse cleanly. The closer-elision change must not regress this.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §O{i32}
-      §B{x} (+ §C{f} §A INT:1 §/C §C{g} §A INT:2 §/C)
-      §R x
+module Test Test block
+  func Foo () → int
+    !
+    let x = (f(1) + g(2))
+    return x
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -526,12 +540,15 @@ public class CallExpressionImplicitCloseTests
         // Dedent thinking it was an indent-only end-of-block. The enclosing
         // method body terminator vanished, and the next sibling member
         // would fail to parse. RFC v0.6 §3.2 / v0.6.1.
-        var source = @"§M{Demo}
-  §CL{C:pub}
-    §MT{M1:pub}
-      §C{Foo}
-    §MT{M2:pub}
-      §C{Bar}
+        var source = @"module Demo Demo block
+  class C
+    func M1 ()
+      !
+      Foo()
+
+    func M2 ()
+      !
+      Bar()
 ";
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -882,11 +899,10 @@ public class CallExpressionImplicitCloseTests
         // Parse a small module with a §DICT containing call key/values, then
         // re-emit with flag=true and verify §C{...} §/C survives.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §DICT{d:str:i32}
-        §KV §C{K} §/C §C{V} §/C
-      §/DICT
+module Test Test block
+  func Foo ()
+    !
+    let Dictionary<string, int>:d = new Dictionary<string, int>() { { K(), V() } }
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -1127,11 +1143,11 @@ public class CallExpressionImplicitCloseTests
         // previously used raw node.Operand.Accept(this). Re-emit could
         // produce (is §C{Foo} str) which re-parses with str as inline arg.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §O{bool}
-      §B{x} (is §C{Foo} §/C str)
-      §R x
+module Test Test block
+  func Foo () → bool
+    !
+    let x = (Foo() is string)
+    return x
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -1234,11 +1250,11 @@ public class CallExpressionImplicitCloseTests
         // string literals are in IsExpressionStart and the call's inline-arg
         // branch absorbs the member name.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §O{i32}
-      §B{x} (?. §C{Get} §/C "Length")
-      §R x.unwrap
+module Test Test block
+  func Foo () → int
+    !
+    let x = (Get())?.Length
+    return x.unwrap
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,

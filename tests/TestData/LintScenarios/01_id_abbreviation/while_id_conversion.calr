@@ -1,8 +1,7 @@
-§M{WhileTest}
-  §F{CountDown:pub} (i32:n) -> void
-    §E{cw}
-    §B{~x} n
-    §WH (> x 0)
-      §P x
-      §B{~x} (- x 1)
-
+module WhileTest WhileTest block
+  func CountDown (int:n) → void
+    ! cw
+    var x = n
+    while (x > 0)
+      Console.WriteLine(x)
+      var x = (x - 1)

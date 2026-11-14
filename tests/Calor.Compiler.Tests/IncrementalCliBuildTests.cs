@@ -73,16 +73,16 @@ public class IncrementalCliBuildTests : IDisposable
     private (string APath, string BPath) WriteIndependentPair()
     {
         var a = WriteSource("a.calr", """
-            §M{Alpha}
-              §F{Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
         var b = WriteSource("b.calr", """
-            §M{Beta}
-              §F{Wave:pub} () -> void
-                §E{cw}
-                §P "wave"
+            module Beta Beta block
+              func Wave () → void
+                ! cw
+                Console.WriteLine("wave")
             """);
         return (a, b);
     }
@@ -152,10 +152,10 @@ public class IncrementalCliBuildTests : IDisposable
         Run([a, b]);
 
         File.WriteAllText(a, """
-            §M{Alpha}
-              §F{Greet:pub} () -> void
-                §E{cw}
-                §P "changed"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("changed")
             """);
 
         var warm = Run([a, b]);
@@ -173,10 +173,10 @@ public class IncrementalCliBuildTests : IDisposable
         // run would skip and the edited content would never be compiled.
         var (a, b) = WriteIndependentPair();
         var edited = """
-            §M{Alpha}
-              §F{Greet:pub} () -> void
-                §E{cw}
-                §P "edited mid-compile"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("edited mid-compile")
             """;
 
         var cold = Run([a, b], afterCompile: file =>
@@ -311,15 +311,16 @@ public class IncrementalCliBuildTests : IDisposable
     public void CrossModuleViolation_IsNeverPublishedOrCached()
     {
         var callee = WriteSource("callee.calr", """
-            §M{OrderService}
-              §F{SaveOrder:pub} () -> void
-                §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """);
         var caller = WriteSource("caller.calr", """
-            §M{App}
-              §F{Main:pub} () -> void
-                §E{}
-                §C{OrderService.SaveOrder} §/C
+            module App App block
+              func Main () → void
+                !
+                OrderService.SaveOrder()
             """);
 
         var cold = Run([callee, caller]);
@@ -343,15 +344,16 @@ public class IncrementalCliBuildTests : IDisposable
         // the module from cross-module enforcement and Calor0410 would silently
         // disappear on warm builds. Rule: no summary, no hit.
         var callee = WriteSource("callee2.calr", """
-            §M{OrderService}
-              §F{SaveOrder:pub} () -> void
-                §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """);
         var caller = WriteSource("caller2.calr", """
-            §M{App}
-              §F{Main:pub} () -> void
-                §E{}
-                §C{OrderService.SaveOrder} §/C
+            module App App block
+              func Main () → void
+                !
+                OrderService.SaveOrder()
             """);
 
         var cold = Run([callee, caller]);
@@ -449,16 +451,16 @@ public class IncrementalCliEndToEndTests : IDisposable
         var a = Path.Combine(_tempDir, "a.calr");
         var b = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(a, """
-            §M{Alpha}
-              §F{Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
         File.WriteAllText(b, """
-            §M{Beta}
-              §F{Wave:pub} () -> void
-                §E{cw}
-                §P "wave"
+            module Beta Beta block
+              func Wave () → void
+                ! cw
+                Console.WriteLine("wave")
             """);
 
         var cold = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b, "--cache");
@@ -484,10 +486,10 @@ public class IncrementalCliEndToEndTests : IDisposable
         // --cache no state file is written and repeat runs always recompile.
         var a = Path.Combine(_tempDir, "a.calr");
         File.WriteAllText(a, """
-            §M{Alpha}
-              §F{Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
 
         for (var run = 0; run < 2; run++)
@@ -508,10 +510,10 @@ public class IncrementalCliEndToEndTests : IDisposable
         var source = Path.Combine(_tempDir, "explicit-output.calr");
         var output = Path.Combine(_tempDir, "explicit-output.cs");
         File.WriteAllText(source, """
-            §M{ExplicitOutput}
-              §F{Main:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module ExplicitOutput ExplicitOutput block
+              func Main () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
 
         for (var run = 0; run < 2; run++)
@@ -589,11 +591,11 @@ public class IncrementalCliEndToEndTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "nullable-assignment.calr");
         File.WriteAllText(path, """
-            §M{N0}
-              §F{Probe:pub} () -> void
-                §E{}
-                §B{x:?str} null
-                §B{y:str} x
+            module N0 N0 block
+              func Probe () → void
+                !
+                let string?:x = null
+                let string:y = x
             """);
         return path;
     }
@@ -667,17 +669,17 @@ public class IncrementalCliEndToEndTests : IDisposable
     {
         var a = Path.Combine(_tempDir, "a.calr");
         File.WriteAllText(a, """
-            §M{Alpha}
-              §F{Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
         var b = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(b, """
-            §M{Beta}
-              §F{Wave:pub} () -> void
-                §E{cw}
-                §P "wave"
+            module Beta Beta block
+              func Wave () → void
+                ! cw
+                Console.WriteLine("wave")
             """);
         return (a, b);
     }
@@ -699,10 +701,10 @@ public class IncrementalCliEndToEndTests : IDisposable
         var (a, b) = WritePair();
         var c = Path.Combine(_tempDir, "c.calr");
         File.WriteAllText(c, """
-            §M{Gamma}
-              §F{Call:pub} () -> void
-                §E{cw}
-                §C{Greet} §/C
+            module Gamma Gamma block
+              func Call () → void
+                ! cw
+                Greet()
             """);
         Assert.Empty(Directory.EnumerateFiles(_tempDir, ".calor-index.json", SearchOption.AllDirectories));
         Assert.False(Directory.Exists(Path.Combine(_tempDir, "obj")));
@@ -793,14 +795,15 @@ public class IncrementalCliEndToEndTests : IDisposable
         var diagnostics = new DiagnosticBag();
         var parser = new Parsing.Parser(
             new Parsing.Lexer("""
-                §M{Overloads}
-                  §CL{Box:pub}
-                    §MT{Run:pub} (i32:x) -> void
-                      §E{cw}
-                      §C{System.Console.WriteLine} §A x §/C
-                    §MT{Run:pub} (str:s) -> void
-                      §E{cw}
-                      §C{System.Console.WriteLine} §A s §/C
+                module Overloads Overloads block
+                  class Box
+                    func Run (int:x) → void
+                      ! cw
+                      System.Console.WriteLine(x)
+
+                    func Run (string:s) → void
+                      ! cw
+                      System.Console.WriteLine(s)
                 """, diagnostics).TokenizeAllForParser(), diagnostics);
         var module = parser.Parse();
         Assert.NotNull(module);

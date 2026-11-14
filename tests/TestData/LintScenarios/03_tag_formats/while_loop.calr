@@ -1,8 +1,7 @@
-§M{WhileTest}
-  §F{CountUp:pub} (i32:max) -> void
-    §E{cw}
-    §B{~i} 0
-    §WH (< i max)
-      §P i
-      §B{~i} (+ i 1)
-
+module WhileTest WhileTest block
+  func CountUp (int:max) → void
+    ! cw
+    var i = 0
+    while (i < max)
+      Console.WriteLine(i)
+      var i = (i + 1)
