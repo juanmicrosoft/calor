@@ -1,112 +1,92 @@
-'use client';
-
-import { useState } from 'react';
-import { Check, Copy } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { trackInstallCommandCopy } from '@/lib/analytics';
 import Link from 'next/link';
 
-const commands = [
-  {
-    label: 'Install Calor',
-    command: 'dotnet tool install -g calor',
-    description: 'One command. Works on Windows, Mac, and Linux. Requires .NET 10+.',
-  },
-  {
-    label: 'Enable Calor in your project',
-    command: 'calor init',
-    description: 'Adds MSBuild integration. Connecting an AI agent is optional.',
-  },
-  {
-    label: 'Build and check',
-    command: 'dotnet build',
-    description: 'Compiles the Calor sources in this project to C# and builds the application.',
-  },
+const agents = [
+  { name: 'Claude Code', command: 'calor init --ai claude' },
+  { name: 'Codex', command: 'calor init --ai codex' },
+  { name: 'Gemini CLI', command: 'calor init --ai gemini' },
+  { name: 'GitHub Copilot', command: 'calor init --ai github' },
 ];
 
 export function QuickStart() {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-
-  const copyToClipboard = async (text: string, index: number) => {
-    await navigator.clipboard.writeText(text.replace(/\\\n/g, ''));
-    trackInstallCommandCopy(commands[index].label);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
   return (
-    <section className="py-16">
+    <section className="py-16" aria-labelledby="quick-start-title">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-3xl">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Use an existing .NET project
+          <h2 id="quick-start-title" className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Get started with your coding agent
           </h2>
           <p className="mt-3 text-muted-foreground font-body">
-            Requires the .NET 10 SDK. Run these commands in a directory containing
-            your <code>.csproj</code> and Calor source files; keep your existing entry point.
-            {' '}Starting from scratch?{' '}
-            <Link className="text-primary underline" href="/docs/getting-started/hello-world/">
-              Run the complete Hello World example
-            </Link>{' '}without an AI subscription.
+            Start a new .NET project or open one you already have. Set up Calor,
+            then describe what you want your coding agent to build. The agent
+            writes the code; you review the result.
           </p>
+          <div className="mt-6 rounded-lg border p-5" role="region" aria-labelledby="try-calor-title">
+            <h3 id="try-calor-title" className="text-xl font-semibold">Set up once, then ask your agent</h3>
+            <p className="mt-3 text-sm text-muted-foreground">
+              1. Install Microsoft's .NET 10 developer tools (the SDK) and your
+              chosen coding agent. Then install Calor in a terminal:
+            </p>
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-calor-navy p-4 text-sm text-white"><code>dotnet tool install -g calor</code></pre>
+            <p className="mt-4 text-sm text-muted-foreground">
+              2. Open a terminal in your existing project folder. Starting fresh?
+              Create a project first with these commands, using a new folder name:
+            </p>
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-calor-navy p-4 text-sm text-white"><code>{`dotnet new console -o MyApp
+cd MyApp`}</code></pre>
+            <p className="mt-4 text-sm text-muted-foreground">
+              3. Run <code>calor init</code> for your agent in that project folder.
+              Choose one command below. It sets up Calor's build support and
+              gives the agent project instructions and tools.
+            </p>
+            <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
+              {agents.map(agent => (
+                <div key={agent.name} className="min-w-0">
+                  <p className="mb-1 text-sm font-medium">{agent.name}</p>
+                  <pre className="overflow-x-auto rounded-lg bg-calor-navy p-4 text-sm text-white"><code>{agent.command}</code></pre>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">
+              4. Open your coding agent in the same folder and follow its setup
+              and trust prompts. Then ask it for a small change, for example:
+            </p>
+            <blockquote className="mt-3 border-l-2 border-primary pl-4 text-sm">
+              Use Calor to add a function that calculates an order total from
+              item prices and quantities. Reject negative prices and quantities.
+              Add tests and run the project's build and tests. Leave unrelated
+              code unchanged.
+            </blockquote>
+            <p className="mt-4 text-sm text-muted-foreground">
+              You do not need to type Calor code yourself. Review what the
+              agent changed, the rules it wrote, and the build and test results.
+              Setup guides the agent; it does not guarantee correct code.
+            </p>
+            <Link className="mt-4 inline-block text-primary underline" href="/docs/getting-started/">
+              Follow the complete agent setup
+            </Link>
+          </div>
         </div>
 
-        <div className="mt-6 mx-auto max-w-3xl">
-          <div className="rounded-lg overflow-hidden border">
-            <div className="bg-calor-navy" role="region" aria-label="Existing-project commands">
-              {/* Terminal header */}
-              <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-                <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-calor-pink" />
-                  <div className="w-3 h-3 rounded-full bg-calor-salmon" />
-                  <div className="w-3 h-3 rounded-full bg-calor-cyan" />
-                </div>
-                <div className="flex items-center gap-2 ml-4 text-calor-cyan text-sm font-terminal">
-                  <span>calor-terminal</span>
-                </div>
-              </div>
-
-              {/* Commands */}
-              <div className="relative divide-y divide-white/5">
-                {commands.map((cmd, index) => (
-                  <div key={index} className="relative group">
-                    <div className="flex items-start justify-between p-4 sm:p-5">
-                      <div className="space-y-2">
-                        <span className="text-xs text-calor-cyan uppercase tracking-widest font-terminal">
-                          {cmd.label}
-                        </span>
-                        <pre className="text-sm sm:text-base text-white font-terminal whitespace-pre-wrap leading-relaxed">
-                          <span className="text-calor-cyan">$</span> {cmd.command}
-                        </pre>
-                        <p className="text-xs text-white/80 font-body">{cmd.description}</p>
-                      </div>
-                      <button
-                        onClick={() => copyToClipboard(cmd.command, index)}
-                        className={cn(
-                          'shrink-0 flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors font-body',
-                          copiedIndex === index
-                            ? 'text-calor-cyan'
-                            : 'text-white/80 hover:text-white hover:bg-white/5'
-                        )}
-                      >
-                        {copiedIndex === index ? (
-                          <>
-                            <Check className="h-3.5 w-3.5" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3.5 w-3.5" />
-                            Copy
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-              </div>
-            </div>
+        <div className="mt-6 mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border p-5">
+            <h3 className="font-semibold">Just getting to know Calor?</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Learn how setup prepares your coding agent and what to review
+              after it makes a change.
+            </p>
+            <Link className="mt-4 inline-block text-primary underline" href="/docs/getting-started/how-it-works/">
+              See how the workflow works
+            </Link>
+          </div>
+          <div className="rounded-lg border p-5">
+            <h3 className="font-semibold">Already have a C# project?</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Keep your project running while you convert to Calor in phases.
+              Start with one file; there is no need to convert everything at once.
+            </p>
+            <Link className="mt-4 inline-block text-primary underline" href="/docs/guides/adding-calor-to-existing-projects/">
+              Follow the phased conversion guide
+            </Link>
           </div>
         </div>
       </div>

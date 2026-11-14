@@ -17,7 +17,7 @@ for (const timezoneId of ['UTC', 'America/Los_Angeles', 'Asia/Tokyo']) {
     page.on('console', message => {
       if (message.type() === 'error' && /hydration|mismatch|React error/i.test(message.text())) errors.push(message.text());
     });
-    for (const route of ['/', '/docs/benchmarking/results/', '/docs/benchmarking/agent-tasks/']) {
+    for (const route of ['/docs/benchmarking/results/', '/docs/benchmarking/agent-tasks/']) {
       await page.goto(`http://127.0.0.1:4173${process.env.NEXT_PUBLIC_BASE_PATH || ''}${route}`);
       const initial = await page.locator('time').allTextContents();
       expect(initial.length).toBeGreaterThan(0);

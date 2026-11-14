@@ -1,15 +1,14 @@
 ---
-title: "Formal Semantics"
+title: "Technical Specification"
 section: "semantics"
 order: 0
 hasChildren: true
+description: "Exact technical rules for how Calor programs are interpreted and turned into .NET code."
 ---
 
-
-> **Audience:** Tooling developers, language contributors, and agents generating
-> Calor. Review these rules together with the compiler's support boundaries,
-> generated C#, and runtime tests; contracts and proof results are not a complete
-> correctness guarantee.
+This section defines the exact technical rules for how Calor programs behave
+and how they are turned into .NET code. It is reference material for people
+building tools or needing precise implementation details.
 
 **An agent-friendly language needs a spec that is tighter than "it emits C#."**
 

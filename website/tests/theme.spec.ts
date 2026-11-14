@@ -20,7 +20,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
     await page.reload();
     await expect(button).toHaveAttribute('aria-pressed', String(chosenDark));
     expect(await page.evaluate(() => localStorage.getItem('calor-theme'))).toBe(chosenDark ? 'dark' : 'light');
-    await page.locator('header').getByRole('link', { name: 'Docs', exact: true }).click();
+    await page.locator('header').getByRole('link', { name: 'Documentation', exact: true }).click();
     await expect(page).toHaveURL(/\/docs\/$/);
     await expect(button).toHaveAttribute('aria-pressed', String(chosenDark));
     await page.emulateMedia({ colorScheme });

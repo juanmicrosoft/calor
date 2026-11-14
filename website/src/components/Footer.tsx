@@ -7,12 +7,13 @@ import { trackAskCalorClick } from '@/lib/analytics';
 const footerLinks = {
   documentation: [
     { name: 'Getting Started', href: '/docs/getting-started/' },
-    { name: 'Syntax Reference', href: '/docs/syntax-reference/' },
-    { name: 'CLI Reference', href: '/docs/cli/' },
+    { name: 'Guides and Resources', href: '/docs/' },
+    { name: 'Language Reference', href: '/docs/syntax-reference/' },
+    { name: 'Command Reference', href: '/docs/cli/' },
   ],
   resources: [
-    { name: 'Benchmarking', href: '/docs/benchmarking/' },
-    { name: 'Philosophy', href: '/docs/philosophy/' },
+    { name: 'Research and Results', href: '/docs/benchmarking/' },
+    { name: 'Why Calor?', href: '/docs/philosophy/' },
     { name: 'Contributing', href: '/docs/contributing/' },
   ],
   community: [
@@ -36,7 +37,7 @@ export function Footer() {
               Calor
             </Link>
             <p className="mt-4 text-sm text-white/50 font-body leading-relaxed">
-              Coding Agent Language for Optimized Reasoning. A language designed for AI coding agents.
+              An experimental way to make AI-written .NET code easier to check and review.
             </p>
           </div>
 

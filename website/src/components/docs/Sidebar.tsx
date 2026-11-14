@@ -17,8 +17,8 @@ export function Sidebar({ sections }: SidebarProps) {
   const pathname = usePathname();
   const currentSection = currentDocSection(pathname);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
-    // Expand the current section by default
-    return new Set(currentSection ? [currentSection] : sections.map((s) => s.slug));
+    // On the overview page, lead with the beginner path instead of opening every reference section.
+    return new Set([currentSection || 'getting-started']);
   });
   useEffect(() => {
     if (currentSection) setExpandedSections(previous => new Set([...previous, currentSection]));

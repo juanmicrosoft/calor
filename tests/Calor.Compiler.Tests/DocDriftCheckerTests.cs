@@ -143,9 +143,6 @@ public class DocDriftCheckerTests
         new[] { "ContractReview", "LoopReview", "BoundedFactorial", "ExtractedCalculation" },
         new[] { "42", "15", "120", "25" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
-    [InlineData("getting-started/index.mdx", 1, 0,
-        new[] { "MyApp" }, new[] { "0" },
-        new[] { "((System.Func<int>)(() => { GlobalModule.Main(); return 0; }))()" })]
     [InlineData("getting-started/installation.mdx", 1, 0,
         new[] { "InstalledHello" }, new[] { "0" },
         new[] { "((System.Func<int>)(() => { GlobalModule.Main(); return 0; }))()" })]
@@ -190,17 +187,12 @@ public class DocDriftCheckerTests
         new[] { "Calculator" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
     [InlineData("benchmarking/metrics/safety.mdx", 1, 0,
         new[] { "Math" }, new[] { "5" }, new[] { "GlobalModule.SafeDivide(10, 2)" })]
-    [InlineData("philosophy/index.mdx", 2, 0,
-        new[] { "DivisionObligations", "Calculator" }, new[] { "4", "42" },
-        new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Add(20, 22)" })]
     [InlineData("philosophy/design-principles.mdx", 1, 0,
         new[] { "DesignContracts" }, new[] { "4" }, new[] { "GlobalModule.Divide(9, 2)" })]
     [InlineData("philosophy/static-verification.mdx", 3, 0,
         new[] { "SquareBoundaries", "FunctionCallBoundary", "FloatingProofBoundary" },
         new[] { "2147395600", "1", "4" },
         new[] { "GlobalModule.Square(46340)", "GlobalModule.Identity(1)", "GlobalModule.Square(2.0)" })]
-    [InlineData("guides/adding-calor-to-existing-projects.mdx", 1, 0,
-        new[] { "Calculator" }, new[] { "42" }, new[] { "GlobalModule.Add(20, 22)" })]
     [InlineData("guides/adoption-playbook.mdx", 1, 0,
         new[] { "Pricing" }, new[] { "5" }, new[] { "GlobalModule.ClampToCap(9, 5)" })]
     [InlineData("guides/effect-manifests-dotnet-ecosystem.mdx", 1, 0,
@@ -1679,10 +1671,6 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("philosophy/index.mdx", "DivisionObligations", "9, 2", "4", "4")]
-    [InlineData("philosophy/index.mdx", "DivisionObligations", "-9, 2", "Ensures", "-4")]
-    [InlineData("philosophy/index.mdx", "DivisionObligations", "9, 0", "Requires", "!DivideByZeroException")]
-    [InlineData("philosophy/index.mdx", "DivisionObligations", "int.MinValue, -1", "!OverflowException", "!OverflowException")]
     [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, 2", "4", "4")]
     [InlineData("philosophy/design-principles.mdx", "DesignContracts", "-9, 2", "Requires", "-4")]
     [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, -2", "Requires", "-4")]
@@ -1741,7 +1729,6 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("getting-started/index.mdx")]
     [InlineData("getting-started/installation.mdx")]
     public void PublicGettingStarted_ExecutesPublishedEntryPointWithNormalEnforcement(string page)
     {

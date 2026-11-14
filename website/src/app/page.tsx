@@ -13,10 +13,10 @@ export default function HomePage() {
       <ScrollDepthTracker />
       <Hero />
       <FirstProgram />
+      <QuickStart />
       <CodeComparison />
       <CatchBugs />
       <BenchmarkChart />
-      <QuickStart />
       <AskCalor />
     </div>
   );

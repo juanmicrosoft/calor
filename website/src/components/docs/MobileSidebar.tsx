@@ -19,7 +19,7 @@ export function MobileSidebar({ sections }: MobileSidebarProps) {
   const currentSection = currentDocSection(pathname);
   const [isOpen, setIsOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
-    return new Set(currentSection ? [currentSection] : sections.map((s) => s.slug));
+    return new Set([currentSection || 'getting-started']);
   });
   useEffect(() => {
     if (currentSection) setExpandedSections(previous => new Set([...previous, currentSection]));
