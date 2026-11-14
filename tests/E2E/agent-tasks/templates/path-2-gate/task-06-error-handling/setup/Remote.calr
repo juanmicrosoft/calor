@@ -1,9 +1,8 @@
-§M{Remote}
-  §F{FetchRemote:pub} (str:url) -> str
-    §E{net}
-    §R "payload"
+module Remote Remote block
+  func FetchRemote (string:url) → string
+    ! net
+    return "payload"
 
-  §F{WriteRecord:pub} (str:data) -> i32
-    §E{db}
-    §R 0
-
+  func WriteRecord (string:data) → int
+    ! db
+    return 0

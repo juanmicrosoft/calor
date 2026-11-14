@@ -1,15 +1,16 @@
-§M{GridOps}
-  §F{SumGrid:pub} (i32:size) -> i32
-    §B{~total} 0
-    §L{x:0:size:1}
-      §B{plane} §C{SumPlane} §A x §A size §/C
-      §B{~total} (+ total plane)
-    §R total
+module GridOps GridOps block
+  func SumGrid (int:size) → int
+    !
+    var total = 0
+    for x from 0 to size step 1
+      let plane = SumPlane(x, size)
+      var total = (total + plane)
+    return total
 
-  §F{SumPlane:pub} (i32:x, i32:size) -> i32
-    §B{~sum} 0
-    §L{y:0:size:1}
-      §L{z:0:size:1}
-        §B{~sum} (+ sum (+ x (+ y z)))
-    §R sum
-
+  func SumPlane (int:x, int:size) → int
+    !
+    var sum = 0
+    for y from 0 to size step 1
+      for z from 0 to size step 1
+        var sum = (sum + (x + (y + z)))
+    return sum

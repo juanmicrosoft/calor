@@ -1,8 +1,7 @@
-§M{Escaped}
-  §F{Escapes:pub} () -> void
-    §E{cw}
-    §P "line1\nline2"
-    §P "tab\there"
-    §P "quote\"inside"
-    §P "backslash\\"
-
+module Escaped Escaped block
+  func Escapes () → void
+    ! cw
+    Console.WriteLine("line1\nline2")
+    Console.WriteLine("tab\there")
+    Console.WriteLine("quote\"inside")
+    Console.WriteLine("backslash\\")

@@ -1,14 +1,8 @@
-§M{Collections}
-
-  §F{SumList:pub}
-    §O{i32}
-    §E{alloc}
-    §LIST{numbers:i32}
-      10
-      20
-      30
-    §/LIST
-    §B{~sum} 0
-    §EACH{n} numbers
-      §B{~sum} (+ sum n)
-    §R sum
+module Collections Collections block
+  func SumList () → int
+    ! alloc
+    let List<int>:numbers = new List<int>() { 10, 20, 30 }
+    var sum = 0
+    each n in numbers
+      var sum = (sum + n)
+    return sum

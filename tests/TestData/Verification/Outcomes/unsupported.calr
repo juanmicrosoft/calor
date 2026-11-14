@@ -1,5 +1,6 @@
-§M{OutcomeUnsupported}
-  §F{Half:pub} (f64:x) -> f64
-    §Q (> x 0.0)
-    §S (> result 0.0)
-    §R x
+module OutcomeUnsupported OutcomeUnsupported block
+  func Half (double:x) → double
+    !
+    requires (x > 0.0)
+    => (result > 0.0)
+    return x

@@ -1,7 +1,8 @@
-§M{OutcomeRefutedBinding}
-  §F{QuoteWithSurchargeDefective:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
-    §S (<= result cap)
-    §B{total:i32} (+ baseAmount surcharge)
-    §IF (> total (+ cap 10))
-      §R cap
-    §R total
+module OutcomeRefutedBinding OutcomeRefutedBinding block
+  func QuoteWithSurchargeDefective (int:baseAmount, int:surcharge, int:cap) → int
+    !
+    => (result <= cap)
+    let int:total = (baseAmount + surcharge)
+    if (total > (cap + 10))
+      return cap
+    return total

@@ -1,10 +1,12 @@
-§M{ReturnVal}
-  §F{GetNumber:pub} () -> i32
-    §R 42
+module ReturnVal ReturnVal block
+  func GetNumber () → int
+    !
+    return 42
 
-  §F{GetSum:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+  func GetSum (int:a, int:b) → int
+    !
+    return (a + b)
 
-  §F{GetString:pub} () -> str
-    §R "result"
-
+  func GetString () → string
+    !
+    return "result"

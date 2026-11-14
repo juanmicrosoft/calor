@@ -1,8 +1,9 @@
-§M{OutcomeUnsupportedBody}
-  §F{SumTo:pub} (i32:n) -> i32
-    §Q (> n 0)
-    §S (>= result 0)
-    §B{~total:i32} 0
-    §L{i:1:n:1}
-      §B{~total:i32} (+ total i)
-    §R total
+module OutcomeUnsupportedBody OutcomeUnsupportedBody block
+  func SumTo (int:n) → int
+    !
+    requires (n > 0)
+    => (result >= 0)
+    var int:total = 0
+    for i from 1 to n step 1
+      var int:total = (total + i)
+    return total

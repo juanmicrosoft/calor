@@ -1,10 +1,12 @@
-§M{Binary}
-  §F{Add:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+module Binary Binary block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 
-  §F{Subtract:pub} (i32:a, i32:b) -> i32
-    §R (- a b)
+  func Subtract (int:a, int:b) → int
+    !
+    return (a - b)
 
-  §F{Multiply:pub} (i32:a, i32:b) -> i32
-    §R (* a b)
-
+  func Multiply (int:a, int:b) → int
+    !
+    return (a * b)

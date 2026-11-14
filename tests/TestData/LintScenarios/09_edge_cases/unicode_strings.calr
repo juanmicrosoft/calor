@@ -1,8 +1,7 @@
-§M{Unicode}
-  §F{Greet:pub} () -> void
-    §E{cw}
-    §P "Hello World"
-    §P "Bonjour le monde"
-    §P "Hola mundo"
-    §P "Ciao mondo"
-
+module Unicode Unicode block
+  func Greet () → void
+    ! cw
+    Console.WriteLine("Hello World")
+    Console.WriteLine("Bonjour le monde")
+    Console.WriteLine("Hola mundo")
+    Console.WriteLine("Ciao mondo")

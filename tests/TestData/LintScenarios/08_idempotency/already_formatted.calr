@@ -1,5 +1,4 @@
-§M{Formatted}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "Hello"
-
+module Formatted Formatted block
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello")

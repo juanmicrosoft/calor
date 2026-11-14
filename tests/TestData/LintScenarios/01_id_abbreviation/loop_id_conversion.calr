@@ -1,8 +1,7 @@
-§M{LoopTest}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §L{i:1:10:1}
-      §P i
-      §L{j:1:5:1}
-        §P j
-
+module LoopTest LoopTest block
+  func Main () → void
+    ! cw
+    for i from 1 to 10 step 1
+      Console.WriteLine(i)
+      for j from 1 to 5 step 1
+        Console.WriteLine(j)

@@ -1,4 +1,4 @@
-§M{Split}
-  §F{Two:pub} () -> i32
-    §E{}
-    §R INT:2
+module Split Split block
+  func Two () → int
+    !
+    return 2

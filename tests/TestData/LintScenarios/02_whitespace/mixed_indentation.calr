@@ -1,6 +1,5 @@
-§M{Test}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "deep"
-    §R
-
+module Test Test block
+  func Main () → void
+    ! cw
+    Console.WriteLine("deep")
+    return

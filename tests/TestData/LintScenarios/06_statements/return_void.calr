@@ -1,10 +1,10 @@
-§M{ReturnVoid}
-  §F{DoNothing:pub} () -> void
-    §R
+module ReturnVoid ReturnVoid block
+  func DoNothing () → void
+    !
+    return
 
-  §F{EarlyExit:pub} (bool:condition) -> void
-    §E{cw}
-    §IF condition
-      §R
-    §P "continuing"
-
+  func EarlyExit (bool:condition) → void
+    ! cw
+    if condition
+      return
+    Console.WriteLine("continuing")

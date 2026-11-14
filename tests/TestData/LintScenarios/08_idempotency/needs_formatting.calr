@@ -1,5 +1,4 @@
-§M{Unformatted}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "Hello"
-
+module Unformatted Unformatted block
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello")

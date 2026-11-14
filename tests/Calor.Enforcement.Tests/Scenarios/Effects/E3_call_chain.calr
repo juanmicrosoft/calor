@@ -1,8 +1,8 @@
-§M{Test}
-  §F{Caller:pub} () -> void
-    §C{Callee} §/C
+module Test Test block
+  func Caller () → void
+    !
+    Callee()
 
-  §F{Callee:pub} () -> void
-    §E{cw}
-    §P "Hello from Callee"
-
+  func Callee () → void
+    ! cw
+    Console.WriteLine("Hello from Callee")

@@ -1,7 +1,4 @@
-§M{IfTest}
-  §F{Check:pub} (i32:x) -> str
-    §IF (> x 0)
-      §R "positive"
-    §EL
-      §R "non-positive"
-
+module IfTest IfTest block
+  func Check (int:x) → string
+    !
+    return ((x > 0) ? "positive" : "non-positive")

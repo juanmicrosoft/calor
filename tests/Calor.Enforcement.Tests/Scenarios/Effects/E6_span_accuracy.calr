@@ -1,6 +1,6 @@
-§M{Test}
-  §F{SpanTest:pub} (i32:x) -> i32
-    §B{i32:result} (* x 2)
-    §P "The result is: "
-    §R result
-
+module Test Test block
+  func SpanTest (int:x) → int
+    !
+    let int:result = (x * 2)
+    Console.WriteLine("The result is: ")
+    return result

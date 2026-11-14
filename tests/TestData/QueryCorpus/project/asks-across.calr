@@ -1,7 +1,8 @@
-§M{Across}
-  §F{AsksAmbiguous:pub} () -> i32
-    §E{}
-    §R §C{Shared} §/C
-  §F{AsksMissing:pub} () -> i32
-    §E{}
-    §R §C{NoSuchFunction} §/C
+module Across Across block
+  func AsksAmbiguous () → int
+    !
+    return Shared()
+
+  func AsksMissing () → int
+    !
+    return NoSuchFunction()

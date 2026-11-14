@@ -1,22 +1,23 @@
-§M{NestedTry}
-  §F{OuterHandler:pub} (i32:x) -> i32
-    §TR
-      §TR
-        §R (/ 100 x)
-      §CA{DivideByZeroException:inner}
-        §R -1
-    §CA{Exception:outer}
-      §R -2
+module NestedTry NestedTry block
+  func OuterHandler (int:x) → int
+    !
+    try
+      try
+        return (100 / x)
+      catch DivideByZeroException:inner
+        return -1
+    catch Exception:outer
+      return -2
 
-  §F{DeepNesting:pub} (i32:a, i32:b) -> i32
-    §TR
-      §TR
-        §TR
-          §R (/ (/ a b) b)
-        §CA{DivideByZeroException:e3}
-          §R -3
-      §CA{ArithmeticException:e2}
-        §R -2
-    §CA{Exception:e1}
-      §R -1
-
+  func DeepNesting (int:a, int:b) → int
+    !
+    try
+      try
+        try
+          return ((a / b) / b)
+        catch DivideByZeroException:e3
+          return -3
+      catch ArithmeticException:e2
+        return -2
+    catch Exception:e1
+      return -1

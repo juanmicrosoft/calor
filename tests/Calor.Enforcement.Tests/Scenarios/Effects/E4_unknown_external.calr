@@ -1,4 +1,4 @@
-§M{Test}
-  §F{CallUnknown:pub} () -> void
-    §C{MyCustomLib.DoSomething} §/C
-
+module Test Test block
+  func CallUnknown () → void
+    !
+    MyCustomLib.DoSomething()

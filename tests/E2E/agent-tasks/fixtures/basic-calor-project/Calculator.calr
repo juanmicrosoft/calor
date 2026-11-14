@@ -1,7 +1,8 @@
-§M{Calculator}
-  §F{Add:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+module Calculator Calculator block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 
-  §F{Subtract:pub} (i32:a, i32:b) -> i32
-    §R (- a b)
-
+  func Subtract (int:a, int:b) → int
+    !
+    return (a - b)

@@ -1,8 +1,8 @@
-§M{TaxCalc}
-  §F{ComputeTax:priv} (i32:amount) -> i32
-    §R (/ amount 10)
+module TaxCalc TaxCalc block
+  func ComputeTax private (int:amount) → int
+    return (amount / 10)
 
-  §F{ComputeTaxWrapper:pub} (i32:amount) -> i32
-    §B{t} §C{ComputeTax} §A amount §/C
-    §R t
-
+  func ComputeTaxWrapper (int:amount) → int
+    !
+    let t = ComputeTax(amount)
+    return t

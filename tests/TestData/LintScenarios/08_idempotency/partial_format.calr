@@ -1,5 +1,4 @@
-§M{Partial}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "Hello"
-
+module Partial Partial block
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello")

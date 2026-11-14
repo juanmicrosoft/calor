@@ -1,5 +1,4 @@
-§M{Hello}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "Hello from Calor!"
-
+module Hello Hello block
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello from Calor!")

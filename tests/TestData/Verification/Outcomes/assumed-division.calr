@@ -1,5 +1,6 @@
-§M{OutcomeAssumed}
-  §F{Ratio:pub} (i32:a, i32:b) -> i32
-    §Q (>= a 0)
-    §S (>= result (- 0 a))
-    §R (/ a b)
+module OutcomeAssumed OutcomeAssumed block
+  func Ratio (int:a, int:b) → int
+    !
+    requires (a >= 0)
+    => (result >= (0 - a))
+    return (a / b)

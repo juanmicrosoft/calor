@@ -1,4 +1,4 @@
-§M{TaxCalc}
-  §F{ComputeTax:pub} (i32:amount) -> i32
-    §R (/ amount 10)
-
+module TaxCalc TaxCalc block
+  func ComputeTax (int:amount) → int
+    !
+    return (amount / 10)

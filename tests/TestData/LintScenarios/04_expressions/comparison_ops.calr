@@ -1,19 +1,24 @@
-§M{Compare}
-  §F{IsEqual:pub} (i32:a, i32:b) -> bool
-    §R (== a b)
+module Compare Compare block
+  func IsEqual (int:a, int:b) → bool
+    !
+    return (a == b)
 
-  §F{IsNotEqual:pub} (i32:a, i32:b) -> bool
-    §R (!= a b)
+  func IsNotEqual (int:a, int:b) → bool
+    !
+    return (a != b)
 
-  §F{IsLess:pub} (i32:a, i32:b) -> bool
-    §R (< a b)
+  func IsLess (int:a, int:b) → bool
+    !
+    return (a < b)
 
-  §F{IsGreater:pub} (i32:a, i32:b) -> bool
-    §R (> a b)
+  func IsGreater (int:a, int:b) → bool
+    !
+    return (a > b)
 
-  §F{IsLessEqual:pub} (i32:a, i32:b) -> bool
-    §R (<= a b)
+  func IsLessEqual (int:a, int:b) → bool
+    !
+    return (a <= b)
 
-  §F{IsGreaterEqual:pub} (i32:a, i32:b) -> bool
-    §R (>= a b)
-
+  func IsGreaterEqual (int:a, int:b) → bool
+    !
+    return (a >= b)

@@ -1,5 +1,5 @@
-§M{Web}
-  §F{RenderHome:pub} (i32:userId) -> str
-    §B{board} §C{PrepareDashboard} §A userId §/C
-    §R board
-
+module Web Web block
+  func RenderHome (int:userId) → string
+    !
+    let board = PrepareDashboard(userId)
+    return board

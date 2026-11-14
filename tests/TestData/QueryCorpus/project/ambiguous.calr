@@ -1,4 +1,4 @@
-§M{Alt}
-  §F{Shared:pub} () -> i32
-    §E{}
-    §R INT:1
+module Alt Alt block
+  func Shared () → int
+    !
+    return 1

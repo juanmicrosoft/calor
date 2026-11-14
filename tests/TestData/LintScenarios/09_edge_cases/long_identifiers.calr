@@ -1,5 +1,5 @@
-§M{LongIds}
-  §F{ProcessValue:pub} (i32:inputValue) -> i32
-    §B{localVariable} inputValue
-    §R localVariable
-
+module LongIds LongIds block
+  func ProcessValue (int:inputValue) → int
+    !
+    let localVariable = inputValue
+    return localVariable

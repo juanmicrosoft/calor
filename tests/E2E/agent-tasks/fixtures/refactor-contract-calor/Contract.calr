@@ -1,14 +1,16 @@
-§M{ContractExamples}
-  §F{Sqrt:pub} (i32:x) -> i32
-    §R x
+module ContractExamples ContractExamples block
+  func Sqrt (int:x) → int
+    !
+    return x
 
-  §F{Abs:pub} (i32:x) -> i32
-    §R (? (< x 0) (- 0 x) x)
+  func Abs (int:x) → int
+    !
+    return ((x < 0) ? (0 - x) : x)
 
-  §F{GetElement:pub} (i32:index, i32:length) -> i32
-    §R (? (&& (>= index 0) (< index length)) index (- 0 1))
+  func GetElement (int:index, int:length) → int
+    !
+    return (((index >= 0) && (index < length)) ? index : (0 - 1))
 
-  §F{PrintValue:pub} (i32:x) -> void
-    §E{cw}
-    §C{Console.WriteLine} §A x §/C
-
+  func PrintValue (int:x) → void
+    ! cw
+    Console.WriteLine(x)

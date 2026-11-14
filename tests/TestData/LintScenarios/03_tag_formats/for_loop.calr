@@ -1,6 +1,5 @@
-§M{ForTest}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §L{i:1:10:1}
-      §P i
-
+module ForTest ForTest block
+  func Main () → void
+    ! cw
+    for i from 1 to 10 step 1
+      Console.WriteLine(i)

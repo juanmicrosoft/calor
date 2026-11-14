@@ -1,19 +1,22 @@
-§M{MathOps}
-  §F{Calculate:pub} (i32:val, i32:prior) -> i32
-    §Q (>= val 0)
-    §S (>= result prior)
-    §B{validated} §C{ValidateInput} §A val §/C
-    §B{scaled} §C{ScaleInput} §A validated §/C
-    §B{total} §C{RunningTotal} §A scaled §A prior §/C
-    §R total
+module MathOps MathOps block
+  func Calculate (int:val, int:prior) → int
+    !
+    requires (val >= 0)
+    => (result >= prior)
+    let validated = ValidateInput(val)
+    let scaled = ScaleInput(validated)
+    let total = RunningTotal(scaled, prior)
+    return total
 
-  §F{ValidateInput:pub} (i32:val) -> i32
-    §Q (>= val 0)
-    §R val
+  func ValidateInput (int:val) → int
+    !
+    requires (val >= 0)
+    return val
 
-  §F{ScaleInput:pub} (i32:val) -> i32
-    §R (* val 2)
+  func ScaleInput (int:val) → int
+    !
+    return (val * 2)
 
-  §F{RunningTotal:pub} (i32:scaled, i32:prior) -> i32
-    §R (+ scaled prior)
-
+  func RunningTotal (int:scaled, int:prior) → int
+    !
+    return (scaled + prior)

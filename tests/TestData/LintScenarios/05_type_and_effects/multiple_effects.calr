@@ -1,9 +1,8 @@
-§M{MultiEffect}
-  §F{ProcessFile:pub} (str:path) -> void
-    §E{fr,fw,cw}
-    §P path
+module MultiEffect MultiEffect block
+  func ProcessFile (string:path) → void
+    ! fr, fw, cw
+    Console.WriteLine(path)
 
-  §F{NetworkOp:pub} () -> void
-    §E{net,cw}
-    §P "network"
-
+  func NetworkOp () → void
+    ! net, cw
+    Console.WriteLine("network")

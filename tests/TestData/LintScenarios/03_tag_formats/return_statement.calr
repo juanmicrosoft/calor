@@ -1,7 +1,8 @@
-§M{Returns}
-  §F{GetValue:pub} () -> i32
-    §R 42
+module Returns Returns block
+  func GetValue () → int
+    !
+    return 42
 
-  §F{GetDouble:pub} (i32:x) -> i32
-    §R (* x 2)
-
+  func GetDouble (int:x) → int
+    !
+    return (x * 2)

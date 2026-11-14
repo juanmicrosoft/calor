@@ -1,9 +1,8 @@
-§M{Print}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "Hello World"
-    §P 42
-    §P true
-    §B{x} 100
-    §P x
-
+module Print Print block
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello World")
+    Console.WriteLine(42)
+    Console.WriteLine(true)
+    let x = 100
+    Console.WriteLine(x)

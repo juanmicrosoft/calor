@@ -1,12 +1,15 @@
-§M{Overload}
-  §CL{Picker:pub}
-    §MT{Pick:pub} (i32:n) -> i32
-      §E{}
-      §R (+ n INT:1)
-    §MT{Pick:pub} (str:s) -> i32
-      §E{}
-      §R INT:99
-  §F{Run:pub} () -> i32
-    §E{alloc}
-    §B{p:Picker} §NEW{Picker} §/NEW
-    §R §C{p.Pick} §A INT:5 §/C
+module Overload Overload block
+  class Picker
+    func Pick (int:n) → int
+      !
+      return (n + 1)
+
+    func Pick (string:s) → int
+      !
+      return 99
+
+
+  func Run () → int
+    ! alloc
+    let Picker:p = new Picker()
+    return p.Pick(5)

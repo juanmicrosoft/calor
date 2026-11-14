@@ -1,9 +1,9 @@
-§M{IfTest}
-  §F{Classify:pub} (i32:x) -> str
-    §IF (< x 0)
-      §R "negative"
-    §EI (== x 0)
-      §R "zero"
-    §EL
-      §R "positive"
-
+module IfTest IfTest block
+  func Classify (int:x) → string
+    !
+    if (x < 0)
+      return "negative"
+    else if (x == 0)
+      return "zero"
+    else
+      return "positive"
