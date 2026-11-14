@@ -1,0 +1,10 @@
+module Fixture overflow unchecked
+  module UncheckedFixture
+    func Run () → int
+      !
+      let int:max = 2147483647
+      let int:big = 300
+      let int:wrapped = checked(((unchecked((max + 1)) == -2147483648) ? 1 : 0))
+      let int:truncated = checked((unchecked(((byte)big)) + 0))
+      let int:outer = ((unchecked((max + 2)) == (-2147483648 + 1)) ? 3 : 0)
+      return (((wrapped * 1000) + (truncated * 10)) + outer)

@@ -1,0 +1,24 @@
+module RecordTest RecordTest overflow unchecked
+  record Point (int:X, int:Y)
+
+    func Sum () → int
+      !
+      return (X + Y)
+
+
+  module RecordFixture
+    func Run () → int
+      ! unknown
+      => result == 3107
+      let a = new Point(3, 4)
+      let b = new Point(3, 4)
+      let c = (a with { Y = 10 })
+      let _preCondition006 = (((!(a == b)) || (!a.Equals(b))) || (a.GetHashCode() != b.GetHashCode()))
+      if _preCondition006
+        return (-1)
+      if (((a == c) || (c . X != 3)) || (c . Y != 10))
+        return (-2)
+      let _preToString009 = a.ToString()
+      if (_preToString009 != "Point { X = 3, Y = 4 }")
+        return (-3)
+      return (((c . X * 1000) + (c . Y * 10)) + a.Sum())

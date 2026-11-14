@@ -683,6 +683,9 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             ? "InterpolationHoleTest.InterpolationHoleTestModule" : "InterpolationHole",
         "string-interpolation-to-string" => valueFixture
             ? "InterpolationToStringTest.InterpolationToStringTestModule" : "InterpolationToString",
+        "record" => valueFixture ? "RecordTest.RecordFixture" : "RecordFixture",
+        "checked-expression" => valueFixture ? "CheckedExpressionTest.CheckedFixture" : "CheckedFixture",
+        "unchecked-expression" => valueFixture ? "UncheckedExpressionTest.UncheckedFixture" : "UncheckedFixture",
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unregistered fixture owner.")
     };
 
