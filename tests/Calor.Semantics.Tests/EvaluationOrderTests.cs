@@ -22,8 +22,10 @@ public class EvaluationOrderTests
         var source = @"
 module Test Test
   func target (int:a, int:b, int:c) → int
+    !
     return (a + b) + c
   func test () → int
+    !
     let int:x = 1
     let int:y = 2
     let int:z = 3
@@ -56,6 +58,7 @@ module Test Test
         var source = @"
 module Test Test
   func compute (int:a, int:b, int:c) → int
+    !
     return (a + b) + c
 ";
 
@@ -80,6 +83,7 @@ module Test Test
         var source = @"
 module Test Test
   func testAnd (bool:a, bool:b) → bool
+    !
     return a && b
 ";
 
@@ -106,6 +110,7 @@ module Test Test
         var source = @"
 module Test Test
   func testOr (bool:a, bool:b) → bool
+    !
     return a || b
 ";
 
@@ -130,6 +135,7 @@ module Test Test
         var source = @"
 module Test Test
   func simple (int:x) → int
+    !
     return x * 2
 ";
 

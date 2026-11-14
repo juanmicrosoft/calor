@@ -789,6 +789,9 @@
     "tests/TestData/InteropScope/W1/transcripts/W1-F6-project.json",
     "tests/TestData/InteropScope/W1/transcripts/W1-F6-rescue.json"
   ],
+  "identitySidecarPaths": [
+    "samples/SdkSample/.calor/ids.json"
+  ],
   "executables": [
     {
       "originalPath": "docs/design/spikes/effect-rows/experiments/run.py",

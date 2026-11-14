@@ -1,6 +1,7 @@
 module ModuloContracts ModuloContracts
   module ModuloContractsModule
     func ModBounded public (int:a, int:b) → int
+      !
       requires b > 0
       requires a >= 0
       => result >= 0
@@ -8,6 +9,7 @@ module ModuloContracts ModuloContracts
       return a % b
 
     func ModEvenOdd public (int:n) → int
+      !
       => result >= 0
       => result <= 1
       let r = n % 2
@@ -17,6 +19,7 @@ module ModuloContracts ModuloContracts
         return r
 
     func WrapAround public (int:index, int:size) → int
+      !
       requires size > 0
       requires index >= 0
       => result >= 0

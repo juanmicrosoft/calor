@@ -211,6 +211,7 @@ public class EffectResolverTests
             module StringContracts overflow unchecked nullable oblivious
               module Target
                 func Apply (string:value) → char[]
+                  !
                   return value.ToCharArray()
             """);
     }
@@ -242,6 +243,7 @@ public class EffectResolverTests
             module StringContracts overflow unchecked nullable oblivious
               module Target
                 func Apply ({{parameter}}:value) → {{returnType}}
+                  !
                   return {{expression}}
             """;
         var emissions = StringEmissions(native);
@@ -494,6 +496,7 @@ public class EffectResolverTests
             module StringContracts overflow unchecked nullable oblivious
               module Target
                 func Apply (string:value, System.Globalization.CultureInfo:culture) → string
+                  !
                   return {{expression}}
             """);
     }
@@ -525,6 +528,7 @@ public class EffectResolverTests
             module StringContracts overflow unchecked
               module Target
                 func Apply (string:value, string:other, System.Globalization.CultureInfo:culture) → int
+                  !
                   return {{expression}}
             """, expectedInterop: 0);
     }
@@ -548,6 +552,7 @@ public class EffectResolverTests
 
               class Transform
                 func GetNames (List<string>:items) → List<string>
+                  !
                   return (items.Where((string:s) => (s.Length > 0))).Select((string:s) => (s).ToUpper()).OrderBy((string:s) => s).ToList()
             """);
     }
@@ -845,6 +850,7 @@ public class EffectResolverTests
                 module NumericContracts overflow unchecked nullable oblivious
                   module Target
                     func Apply (System.IFormatProvider:provider) → {{returnType}}
+                      !
                       return {{expression}}
                 """);
         }
@@ -863,6 +869,7 @@ public class EffectResolverTests
             module NumericContracts overflow unchecked
               module Target
                 func Apply (System.IFormatProvider:provider) → {{type}}
+                  !
                   return {{type}}.Parse("1234", System.Globalization.CultureInfo.InvariantCulture)
             """);
 
@@ -912,6 +919,7 @@ public class EffectResolverTests
             module NumericContracts overflow unchecked
               module Target
                 func Apply (System.IFormatProvider:provider) → bool
+                  !
                   return bool.Parse("invalid")
             """);
     }
@@ -2325,7 +2333,7 @@ public class EffectResolverTests
             module LinqContracts overflow unchecked nullable oblivious
               using System.Linq
               module Target
-                func Apply public (System.Collections.Generic.IEnumerable<int>:source, System.Func<int,int>:selector, System.Collections.Generic.IComparer<int>:comparer) → int
+                func Apply public (System.Collections.Generic.IEnumerable<int>:source, System.Func<int,int>:selector ! unknown, System.Collections.Generic.IComparer<int>:comparer) → int
                   !
                   return {{expression.Replace("value => value", "(int:value) => value", StringComparison.Ordinal)}}
             """);

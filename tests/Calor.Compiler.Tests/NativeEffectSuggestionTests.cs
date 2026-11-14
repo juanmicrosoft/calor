@@ -13,7 +13,7 @@ public sealed class NativeEffectSuggestionTests
     [InlineData("    ! alloc // retained code\n")]
     public void MultipleMissingCodes_KeepNativeSeparatorsAndRowComments(string row)
     {
-        var source = "module Native\n  func Echo () → void\n" + row
+        var source = "module Native\n  func Echo () → void\n    !\n" + row
             + "    System.Console.ReadLine()\n    System.Console.Write(\"effect\")\n";
         var compiled = Program.Compile(source, "native.calr");
         var diagnostic = Assert.Single(compiled.Diagnostics.DiagnosticsWithFixes,
@@ -36,7 +36,7 @@ public sealed class NativeEffectSuggestionTests
     public async Task KnownEffects_OfferApplicableNativeEditsWithoutAutomaticPolicyChanges(
         bool existingRow, bool crlf)
     {
-        var source = "module Native\n  func Echo (int:value) → int\n"
+        var source = "module Native\n  func Echo (int:value) → int\n    !\n"
             + (existingRow ? "    ! alloc // keep this row comment\n" : "")
             + "    // keep the contract comment\n"
             + "    requires value >= 0\n"
@@ -115,7 +115,7 @@ public sealed class NativeEffectSuggestionTests
     [InlineData(true)]
     public async Task UnknownConstructorEffects_RemainErrorsWithoutAnInventedDeclaration(bool existingRow)
     {
-        var source = "module Native\n  func Make () → object\n"
+        var source = "module Native\n  func Make () → object\n    !\n"
             + (existingRow ? "    ! alloc\n" : "")
             + "    return new object()\n";
         var compiled = Program.Compile(source);

@@ -14,7 +14,7 @@ public sealed class AgentDiagnosticTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"calor-agent-diag-{Guid.NewGuid():N}");
     private const string Broken = "§M{Calc}\n  §F{Add:i32:pub}\n    §R (+ 1 2)\n  §/F\n§/M";
     private const string NativeLayout = "module Calc Calc   \n\tmodule CalcModule  \n"
-        + "\t\tfunc Add public () → int  \n\t\t\treturn 1 + 2  ";
+        + "\t\tfunc Add public () → int  \n\t\t\t!\n\t\t\treturn 1 + 2  ";
 
     public AgentDiagnosticTests() => Directory.CreateDirectory(_directory);
     public void Dispose() => Directory.Delete(_directory, recursive: true);
@@ -30,9 +30,11 @@ public sealed class AgentDiagnosticTests : IDisposable
     {
         var source = "module White   " + newline
             + "  func Value public () → string" + newline
+            + "    !" + newline
             + "    return \"tail  \" \t";
         var expected = "module White" + newline
             + "  func Value public () → string" + newline
+            + "    !" + newline
             + "    return \"tail  \"";
         var original = Program.Compile(source);
         Assert.False(original.HasErrors, string.Join("\n", original.Diagnostics.Errors));
@@ -295,7 +297,7 @@ public sealed class AgentDiagnosticTests : IDisposable
     {
         const string retired = "§M{Test}\n  §F{Contains:pub} () -> bool\n    §R (cotains \"hello\" \"h\")";
         AssertRetiredSourceRejected(retired);
-        const string source = "module Test\n  func Contains public (string:value) → string\n    return vlaue";
+        const string source = "module Test\n  func Contains public (string:value) → string\n    !\n    return vlaue";
         AssertNativeFrontend(source);
         var original = Program.Compile(source);
         Assert.Contains(original.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
@@ -382,7 +384,7 @@ public sealed class AgentDiagnosticTests : IDisposable
     [InlineData("∃")]
     public void CliApply_RetiredSyntaxRemainsAnErrorAndPreservesEncodedBytes(string retired)
     {
-        const string canonical = "module Test\r\n  func Value () → int\r\n    return 1\r\n";
+        const string canonical = "module Test\r\n  func Value () → int\r\n    !\n    return 1\r\n";
         Assert.False(Program.Compile(canonical).HasErrors);
         var path = Path.Combine(_directory, "retired.calr");
         File.WriteAllText(path, canonical + retired + "\r\n", new UnicodeEncoding(false, true));
@@ -466,7 +468,7 @@ public sealed class AgentDiagnosticTests : IDisposable
     [Fact]
     public void CliPreview_IsReadOnlyAndKeepsErrorExitAndFixPayload()
     {
-        const string source = "module Calc\n\tfunc Add public () → int\n\t\treturn missing";
+        const string source = "module Calc\n\tfunc Add public () → int\n\t\t!\n\t\treturn missing";
         AssertNativeFrontend(source);
         var original = Program.Compile(source);
         Assert.Contains(original.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
@@ -488,7 +490,7 @@ public sealed class AgentDiagnosticTests : IDisposable
         var path = Path.Combine(_directory, "broken.calr");
         const string retired = "§M{Test}\n  §F{Broken:pub} () -> i32\n    §R missing";
         AssertRetiredSourceRejected(retired);
-        const string source = "module Test\n  func Broken public () → int\n    return missing";
+        const string source = "module Test\n  func Broken public () → int\n    !\n    return missing";
         AssertNativeFrontend(source);
         Assert.Contains(Program.Compile(source).Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
@@ -754,7 +756,7 @@ public sealed class AgentDiagnosticTests : IDisposable
     [InlineData("short")]
     public void CanonicalLiteralReturn_DoesNotIntroduceAnIntConditionalIntoANarrowReturn(string type)
     {
-        var source = $"module Choices\n  func Pick public (bool:condition) → {type}\n"
+        var source = $"module Choices\n  func Pick public (bool:condition) → {type}\n    !\n"
             + "    !\n    if condition\n      return 1\n    else\n      return 2";
         var original = CompileNative(source);
         Assert.Empty(LosslessSourceDocument.DiagnoseCanonicalUsage(source, "choice.calr", original.Ast!));
@@ -766,7 +768,7 @@ public sealed class AgentDiagnosticTests : IDisposable
     [Fact]
     public void CanonicalLiteralReturn_PreservesLaterStatementSourceMappings()
     {
-        const string source = "module Choices\n  func Pick public (bool:condition) → int\n"
+        const string source = "module Choices\n  func Pick public (bool:condition) → int\n    !\n"
             + "    !\n    if condition\n      return 1\n    else\n      return 2\n"
             + "  func Other public () → int\n    !\n    return 3";
         var original = Program.Compile(source, "choice.calr");

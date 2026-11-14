@@ -32,6 +32,8 @@ Two terms used throughout:
 
 Preserved C# is a migration boundary, not a failure. It is also work that is still to do.
 Every preserved piece is counted in the report.
+In the tested cases, the report distinguishes native output from preservation.
+Neither label establishes whole-program safety.
 
 The converter preserves complete C# members containing `__makeref`, `__refvalue`,
 or `__reftype` as `typed-reference`, and `__arglist` signatures or expressions as
@@ -137,17 +139,20 @@ module Inventory overflow unchecked
 
   module Inventory
     func ParseOr (string:text, int:fallback) → int
+      !
       var int:n = default(int)
       if int.TryParse(text, out n)
         return n
       return fallback
 
     func CountOf (Dictionary<string, int>:stock, string:item) → int
+      !
       var int:count = default(int)
       stock.TryGetValue(item, out count)
       return count
 
     func IsNumber (string:text) → bool
+      !
       return int.TryParse(text, out _)
 
     func Bump (ref int:x)
@@ -155,6 +160,7 @@ module Inventory overflow unchecked
       set x (x + 1)
 
     func Twice (in int:x) → int
+      !
       return (x * 2)
 
     func Run () → int
@@ -349,6 +355,7 @@ public static class Shapes
 module Shapes overflow unchecked
   module Shapes
     func Area (int:w, int:h) → int
+      !
       let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)
       return (Clamp(w) * Clamp(h))
 
@@ -425,6 +432,7 @@ module Grid overflow unchecked
       return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })
 
     func Sum (int[]:xs, int:start) → int
+      !
       var int:s = start
       each x in xs
         set s (s + x)
@@ -435,6 +443,7 @@ module Grid overflow unchecked
       return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])
 
     func Mixed () → int
+      !
       raw member:array-element-block:Other:Statement%20preserved%20as%20raw%20C%23%3A%20object%5B%5D%20items%20%3D%20%7B%20new%20List%3Cint%3E%20%7B%201%20%7D%2C%202%20%7D%3B 53
         object[] items = { new List<int> { 1 }, 2 };
 
@@ -475,6 +484,7 @@ module Countdown overflow unchecked
     field int:Start = 3
 
     func First () → int
+      !
       each s in Steps
         return s
       return 0

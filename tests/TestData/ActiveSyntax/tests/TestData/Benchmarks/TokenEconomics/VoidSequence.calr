@@ -1,15 +1,19 @@
 module VoidSequence VoidSequence
   module VoidSequenceModule
     func Initialize public () → void
+      !
       return
 
     func Process public () → void
+      !
       return
 
     func Shutdown public () → void
+      !
       return
 
     func Execute public () → void
+      !
       Initialize()
       Process()
       Shutdown()

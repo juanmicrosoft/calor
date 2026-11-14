@@ -3,11 +3,13 @@
 
 module BoundsViolationBenchmark BoundsViolationBenchmark
   func VulnerableArrayAccess public (int:index, int[]:items) → int
+    !
     // BUG: Array access with unchecked index
     // EXPECTED: Calor0921 Index Out of Bounds
     return items[index]
 
   func SafeBoundsCheck public (int:index, int[]:items) → int
+    !
     // SAFE: Bounds check before access
     // EXPECTED: No warnings
     let int:len = items.Length
@@ -17,6 +19,7 @@ module BoundsViolationBenchmark BoundsViolationBenchmark
       return -1
 
   func VulnerableLoopBeyondLength public (int:n, int[]:items) → int
+    !
     // BUG: Loop can exceed array bounds
     // EXPECTED: Calor0921 Index Out of Bounds
     var int:sum = 0
@@ -26,6 +29,7 @@ module BoundsViolationBenchmark BoundsViolationBenchmark
     return sum
 
   func SafeLoopWithinBounds public (int[]:items) → int
+    !
     // SAFE: Loop bounded by array length
     // EXPECTED: No warnings
     let int:len = items.Length
@@ -37,12 +41,14 @@ module BoundsViolationBenchmark BoundsViolationBenchmark
     return sum
 
   func VulnerableNegativeIndex public (int:offset, int:startIndex, int[]:items) → int
+    !
     // BUG: Index can be negative
     // EXPECTED: Calor0921 Index Out of Bounds
     let int:index = startIndex - offset
     return items[index]
 
   func SafeClampedIndex public (int:index, int[]:items) → int
+    !
     // SAFE: Index clamped to valid range
     // EXPECTED: No warnings
     requires items.Length > 0
@@ -52,6 +58,7 @@ module BoundsViolationBenchmark BoundsViolationBenchmark
     return items[safeIdx]
 
   func VulnerableOffByOne public (int[]:items) → int
+    !
     // BUG: Classic off-by-one error
     // EXPECTED: Calor0921 Index Out of Bounds
     let int:len = items.Length
@@ -63,6 +70,7 @@ module BoundsViolationBenchmark BoundsViolationBenchmark
     return sum
 
   func SafeWithPrecondition public (int:index, int[]:items) → int
+    !
     // SAFE: Precondition guarantees valid index
     // EXPECTED: No warnings
     requires index >= 0

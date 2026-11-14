@@ -1,7 +1,9 @@
 module Contains Contains
   module ContainsModule
     func Matches public (int:value, int:target) → bool
+      !
       return value == target
 
     func IsInRange public (int:index, int:length) → bool
+      !
       return index >= 0 && index < length

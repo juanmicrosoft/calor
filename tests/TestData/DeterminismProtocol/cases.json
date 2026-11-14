@@ -12784,7 +12784,7 @@
   {
    "name": "translator-fixture-v3",
    "source": "tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs",
-   "expected": "f58ee927a0ae8fa8fe5bf2af5dbf0ea78b989ca4264fc055bc027f583b51628a|z3-executable-semantics-v3",
+   "expected": "52c2c3d5a5742aae5c3fe57a665b93996bcd1a1ef8cbf7123491e68ed003187e|z3-executable-semantics-v4",
    "profiles": [
     "verification-full"
    ]

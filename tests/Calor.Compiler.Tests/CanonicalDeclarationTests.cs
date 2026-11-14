@@ -18,7 +18,7 @@ public sealed class CanonicalDeclarationTests
     [InlineData("event System.Action:Changed")]
     public void EmptyMembersDoNotConsumeTheFollowingNativeFunction(string member)
     {
-        var module = Parse($"module Demo\n  class Value\n    {member}\n    func Next () → int\n      return 42");
+        var module = Parse($"module Demo\n  class Value\n    {member}\n    func Next () → int\n      !\n      return 42");
         var type = Assert.Single(module.Classes);
         Assert.Equal("Next", Assert.Single(type.Methods).Name);
         Assert.Single(type.Methods[0].Body);
@@ -67,6 +67,7 @@ public sealed class CanonicalDeclarationTests
                 return
               class Box
                 func Echo (int:value) → int
+                  !
                   return value
             """);
         Assert.Equal("Demo", module.Name);
@@ -94,7 +95,7 @@ public sealed class CanonicalDeclarationTests
     [InlineData("(int X, string? Y)[]")]
     public void CanonicalTypesRoundTripWithoutLoss(string type)
     {
-        var module = Parse($"module Types\n  func Copy ({type}:value) → {type}\n    return value");
+        var module = Parse($"module Types\n  func Copy ({type}:value) → {type}\n    !\n    return value");
         var emitted = new CalorEmitter().Emit(module);
         Assert.DoesNotContain('§', emitted);
         var reparsed = Parse(emitted);
@@ -230,7 +231,7 @@ public sealed class CanonicalDeclarationTests
     public void HeaderClausesCannotFollowMethodStatements(string clause)
     {
         var diagnostics = new DiagnosticBag();
-        _ = new Parser(new Lexer($"module Bad\n  class C\n    func F () → int\n      return 1\n      {clause}", diagnostics)
+        _ = new Parser(new Lexer($"module Bad\n  class C\n    func F () → int\n      !\n      return 1\n      {clause}", diagnostics)
             .TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);
     }
@@ -265,12 +266,14 @@ public sealed class CanonicalDeclarationTests
         var module = Parse("""
             module Api
               func Pick (int:value) → int
+                !
                 let int:copy = value
                 return copy
               func Hidden private () → void
                 return
               class Box
                 func Echo (int:value) → int
+                  !
                   return value
             """);
         var generated = new CSharpEmitter().Emit(module);
@@ -296,7 +299,7 @@ public sealed class CanonicalDeclarationTests
     public void RetiredTypeAliasesAndPrefixFormsAreExplicitErrors(string type)
     {
         var diagnostics = new DiagnosticBag();
-        _ = new Parser(new Lexer($"module Bad\n  func F ({type}:value) → int\n    return 1", diagnostics)
+        _ = new Parser(new Lexer($"module Bad\n  func F ({type}:value) → int\n    !\n    return 1", diagnostics)
             .TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);
     }

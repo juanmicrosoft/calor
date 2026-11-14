@@ -103,10 +103,13 @@ public class FixToolTests
         const string source = """
             module Names
               func Echo (int:value) → int
+                !
                 return value
               func Echo (string:value) → string
+                !
                 return value
               func Use () → int
+                !
                 let int:first = Echo(1)
                 return Echo(first)
             """;

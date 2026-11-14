@@ -1,10 +1,13 @@
 module MethodOverriding MethodOverriding
   module MethodOverridingModule
     func BaseSpeak public () → int
+      !
       return 0
 
     func DogSpeak public () → int
+      !
       return 1
 
     func CatSpeak public () → int
+      !
       return 2

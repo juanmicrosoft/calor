@@ -1,5 +1,6 @@
 module AggregateStats AggregateStats
   module AggregateStatsModule
     func Mean3 public (int:a, int:b, int:c) → int
+      !
       let sum = (a + b) + c
       return sum / 3

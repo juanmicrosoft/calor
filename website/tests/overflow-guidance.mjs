@@ -44,10 +44,12 @@ foreach (var value in new[] { 46340, 46341 })
   for (const page of ['philosophy/static-verification', 'benchmarking/metrics/contract-verification']) {
     const doc = (await readFile(`content/${page}.mdx`, 'utf8')).replace(/\r/g, '');
     const example = [...doc.matchAll(/```calor\n([\s\S]*?)```/g)]
-      .map(match => match[1]).find(source => /^func Square\s/.test(source));
+      .map(match => match[1]).find(source => /^\s*func Square\s/m.test(source));
     assert.ok(example, `Missing published Square example in ${page}`);
-    await writeFile(path.join(workspace, 'Snippet.calr'),
-      `module DocsSquare\n${example.trimEnd().split('\n').map(line => `  ${line}`).join('\n')}\n`);
+    const source = example.startsWith('module ')
+      ? example
+      : `module DocsSquare\n${example.trimEnd().split('\n').map(line => `  ${line}`).join('\n')}\n`;
+    await writeFile(path.join(workspace, 'Snippet.calr'), source);
     for (const mode of ['debug', 'off']) {
       for (const verify of [false, true]) {
         run([compiler, '--input', 'Snippet.calr', '--output', 'Snippet.g.cs',

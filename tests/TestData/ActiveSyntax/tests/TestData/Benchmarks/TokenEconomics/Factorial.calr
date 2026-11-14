@@ -1,6 +1,7 @@
 module Factorial Factorial
   module FactorialModule
     func Calculate public (int:n) → int
+      !
       var result = 1
       var i = 2
       while i <= n

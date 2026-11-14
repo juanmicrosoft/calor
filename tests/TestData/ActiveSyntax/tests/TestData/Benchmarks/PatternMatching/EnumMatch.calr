@@ -1,6 +1,7 @@
 module EnumMatch EnumMatch
   module EnumMatchModule
     func HttpStatus public (int:code) → int
+      !
       if code == 200
         return 0
       else if code == 404

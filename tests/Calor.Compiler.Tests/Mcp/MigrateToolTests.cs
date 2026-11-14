@@ -197,8 +197,10 @@ public class MigrateToolTests
         const string source = """
             module Echo
               func Echo public () → int
+                !
                 return 1
               func Use public () → int
+                !
                 let int:first = Echo()
                 return Echo()
             """;
@@ -517,7 +519,7 @@ public class MigrateToolTests
         try
         {
             File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
-                "module Test\n  func Foo public () → void\n    let int:x = 1\n    let int:x = 2\n");
+                "module Test\n  func Foo public () → void\n    !\n    let int:x = 1\n    let int:x = 2\n");
 
             var args = JsonDocument.Parse($$"""{"projectPath": {{JsonSerializer.Serialize(tempDir)}}, "phase": "compile"}""").RootElement;
             var result = await _tool.ExecuteAsync(args);

@@ -40,6 +40,7 @@ public sealed class StructuralNullabilityJoinTests
               func Take public ({{targetType}}:value) → void
                 !
               func Probe public ({{sourceType}}:value, {{targetType}}:fallback, bool:flag) → {{targetType}}
+                !
                 let joined = {{expression}}
                 {{statement}}
                 throw null
@@ -102,6 +103,7 @@ public sealed class StructuralNullabilityJoinTests
         var diagnostics = Bind($$"""
             module MixedAnnotationJoin
               func Probe public ({{NativeType(sourceType)}}:value, {{NativeType(targetType)}}:fallback, bool:flag) → {{NativeType(targetType)}}
+                !
                 let joined = {{expression}}
                 return joined
             """);
@@ -128,6 +130,7 @@ public sealed class StructuralNullabilityJoinTests
               func Take public ({{nativeTarget}}:value) → void
                 !
               func Probe public ({{NativeType(sourceType)}}:value, bool:flag) → {{nativeTarget}}
+                !
                 {{(local ? $"let joined = {nativeExpression}" : "")}}
                 {{statement}}
                 throw null
@@ -160,6 +163,7 @@ public sealed class StructuralNullabilityJoinTests
         var diagnostics = Bind($$"""
             module ContainerJoins
               func Probe public (string[]?:value, string[]:fallback, bool:flag) → string[]
+                !
                 return {{NativeExpression(expression)}}
             """);
         Assert.Equal(unsafeValue, diagnostics.Any(d =>
@@ -176,6 +180,7 @@ public sealed class StructuralNullabilityJoinTests
         var diagnostics = Bind($$"""
             module ElementJoins
               func Probe public (string?[]?:value, string[]:fallback, bool:flag) → string[]
+                !
                 return {{NativeExpression(expression)}}
             """);
         Assert.Equal(unsafeValue, diagnostics.Any(d =>

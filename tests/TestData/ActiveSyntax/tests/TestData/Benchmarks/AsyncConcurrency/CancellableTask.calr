@@ -1,7 +1,9 @@
 module CancellableTask CancellableTask
   module CancellableTaskModule
     func IsCancelled public (bool:token) → bool
+      !
       return token
 
     func ShouldContinue public (bool:cancelled, int:iteration, int:maxIterations) → bool
+      !
       return !cancelled && iteration < maxIterations

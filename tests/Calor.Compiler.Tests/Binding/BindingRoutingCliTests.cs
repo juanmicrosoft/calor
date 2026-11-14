@@ -243,8 +243,10 @@ public class BindingRoutingCliTests : IDisposable
     private const string NativeDuplicate = """
         module Routing Routing block
           func Probe public () → int
+            !
             return 1
           func Probe public () → int
+            !
             return 2
         """;
 
@@ -306,8 +308,10 @@ public class BindingRoutingCliTests : IDisposable
                 "§R §C{System.Int32.Parse} §A §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_ROUTING_UNSET\" §/C §/C", "i32") => """
                 module Routing Routing block
                   func Take public (string:value) → int
+                    !
                     return 1
                   func Probe public (string?:value) → int
+                    !
                     return Take(value)
                 """,
             _ => throw new ArgumentOutOfRangeException(nameof(body))

@@ -8539,7 +8539,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Handle invocation expressions (method calls)
         if (expr is InvocationExpressionSyntax invocation)
         {
-            if (HasComputedCallTarget(invocation))
+            if (HasComputedCallTarget(invocation) || NeedsObliviousInstanceCallReceiver(invocation))
                 return new ExpressionStatementNode(GetTextSpan(node), ConvertInvocationExpression(invocation));
             // #1677: where the statement's own conversion starts; the fallback below converts the
             // invocation again and must not keep the first conversion's hoists.
@@ -13548,11 +13548,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
     {
-        if (HasComputedCallTarget(invocation))
+        var guardReceiver = NeedsObliviousInstanceCallReceiver(invocation);
+        if (HasComputedCallTarget(invocation) || guardReceiver)
         {
+            var callReceiver = invocation.Expression is MemberAccessExpressionSyntax access
+                ? ConvertInPlace(access.Expression, always: true) : null;
+            if (guardReceiver && invocation.Expression is MemberAccessExpressionSyntax guardedAccess)
+                callReceiver = GuardNullReceiver(callReceiver!, GetTextSpan(guardedAccess.Expression));
             var targetExpression = invocation.Expression is MemberAccessExpressionSyntax member
                 ? new FieldAccessNode(GetTextSpan(member),
-                    ConvertInPlace(member.Expression, always: true), member.Name.Identifier.ValueText,
+                    callReceiver!, member.Name.Identifier.ValueText,
                     GetTextSpan(member.Name))
                 : ConvertInPlace(invocation.Expression, always: true);
             var arguments = ConvertOrderedExpressions(
@@ -13834,6 +13839,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers, typeArguments);
     }
 
+    private bool NeedsObliviousInstanceCallReceiver(InvocationExpressionSyntax invocation)
+        => invocation.ArgumentList.Arguments.Count == 0
+            && invocation.Expression is MemberAccessExpressionSyntax member
+            && NeedsObliviousReceiverGuard(member.Expression)
+            && _semanticModel!.GetSymbolInfo(invocation).Symbol is IMethodSymbol
+                { IsStatic: false, ReducedFrom: null, Parameters.Length: 0 };
+
+    private bool NeedsObliviousReceiverGuard(ExpressionSyntax receiver)
+        => PreserveObliviousDeclarations
+            && _context.Fidelity == ConversionFidelity.Lossy
+            && _context.Mode == ConversionMode.Interop
+            && _semanticModel is { } model
+            && receiver.SyntaxTree == model.SyntaxTree
+            && model.GetTypeInfo(receiver) is
+                { Type.IsReferenceType: true, Nullability.FlowState: not NullableFlowState.NotNull };
+
+    private static ExpressionNode GuardNullReceiver(ExpressionNode receiver, TextSpan span)
+        => new NullCoalesceNode(span, receiver,
+            new ThrowExpressionNode(span, new ReferenceNode(span, "null")));
+
     private bool HasComputedCallTarget(InvocationExpressionSyntax invocation)
     {
         if (invocation.Ancestors().Any(node => node is AssignmentExpressionSyntax
@@ -14035,6 +14060,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Use ValueText to strip @ prefix from verbatim identifiers (e.g., @decimal → decimal)
         var memberName = memberAccess.Name.Identifier.ValueText;
         var span = GetTextSpan(memberAccess);
+
+        if (NeedsObliviousReceiverGuard(memberAccess.Expression)
+            && _semanticModel!.GetSymbolInfo(memberAccess).Symbol is IPropertySymbol
+                { IsStatic: false, IsIndexer: false })
+        {
+            // Keep the CLR null-receiver exception without inventing a non-null source contract.
+            // Property receivers have no arguments whose evaluation would precede that exception.
+            target = GuardNullReceiver(target, span);
+        }
 
         // Convert string.Empty and System.String.Empty to empty string literal ""
         if (memberName == "Empty")

@@ -19,7 +19,7 @@ public class WritePathRobustnessTests
     [Fact]
     public void CanonicalHealing_AlignsWordClausesAndReportsAmbiguity()
     {
-        const string source = "module M\n    func F () → int\n        if true\n            return 1\n            else\n            return 2";
+        const string source = "module M\n    func F () → int\n      !\n        if true\n            return 1\n            else\n            return 2";
         var healer = new SourceHealer();
         var healed = healer.Heal(source);
         Assert.Equal("module M\n  func F () → int\n    if true\n      return 1\n    else\n      return 2", healed);
@@ -57,7 +57,7 @@ public class WritePathRobustnessTests
     public void CanonicalHealing_MultilineStringsRemainByteExact()
     {
         const string literal = "\"\"\"first\r\n       else\r\n§/M ${n}\r\nlast\"\"\"";
-        var source = "module M\n    func F (int:n) → string\n        return " + literal;
+        var source = "module M\n    func F (int:n) → string\n      !\n        return " + literal;
         var healed = new SourceHealer().Heal(source);
         Assert.Equal("module M\n  func F (int:n) → string\n    return " + literal, healed);
         Assert.Equal(healed, new SourceHealer().Heal(healed));
@@ -131,7 +131,7 @@ public class WritePathRobustnessTests
     [Fact]
     public void TabIndentation_ReportsSingleWarning_WithEditsForEveryTabLine()
     {
-        var source = "module T\n\tfunc Main () → void\n\t\tSystem.Console.WriteLine(\"x\")";
+        var source = "module T\n\tfunc Main () → void\n\t  !\n\t\tSystem.Console.WriteLine(\"x\")";
 
         var diagnostics = ParseSource(source);
 
@@ -172,7 +172,7 @@ public class WritePathRobustnessTests
     [Fact]
     public void NonStandardIndentWidth_FourSpaceFile_FixNormalizesInOnePass()
     {
-        var source = "module T\n    func Main () → void\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
+        var source = "module T\n    func Main () → void\n      !\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
 
         var diagnostics = ParseSource(source);
 
@@ -214,7 +214,7 @@ public class WritePathRobustnessTests
         // if-chain closed before the clause was seen.
         var source = string.Join('\n',
             "module T",
-            "  func Main () → void",
+            "  func Main () → void\n    !",
             "    for i from 1 to 10 step 1",
             "      if i == 1",
             "        System.Console.WriteLine(\"a\")",
@@ -243,10 +243,10 @@ public class WritePathRobustnessTests
         // error, forever (a probe-confirmed infinite agent loop).
         var source = string.Join('\n',
             "module T",
-            "  func A () → void",
+            "  func A () → void\n    !",
             "    if 1 == 1",
             "      System.Console.WriteLine(\"a\")",
-            "  func B () → void",
+            "  func B () → void\n    !",
             "    else if 1 == 2",
             "      System.Console.WriteLine(\"b\")");
 
@@ -268,7 +268,7 @@ public class WritePathRobustnessTests
         // column would not change the file, so no fix may be emitted.
         var source = string.Join('\n',
             "module T",
-            "  func A () → void",
+            "  func A () → void\n    !",
             "    if 1 == 1",
             "      System.Console.WriteLine(\"a\")",
             "    System.Console.WriteLine(\"x\")",
@@ -294,7 +294,7 @@ public class WritePathRobustnessTests
     [Fact]
     public void Heal_TabIndentation_NormalizesToTwoSpaces()
     {
-        var source = "module T\n\tfunc Main () → void\n\t\tSystem.Console.WriteLine(\"x\")";
+        var source = "module T\n\tfunc Main () → void\n\t  !\n\t\tSystem.Console.WriteLine(\"x\")";
 
         var healed = new SourceHealer().Heal(source);
 
@@ -305,7 +305,7 @@ public class WritePathRobustnessTests
     [Fact]
     public void Heal_FourSpaceIndentation_NormalizesToTwoSpaces()
     {
-        var source = "module T\n    func Main () → void\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
+        var source = "module T\n    func Main () → void\n      !\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
 
         var healed = new SourceHealer().Heal(source);
 
@@ -317,7 +317,7 @@ public class WritePathRobustnessTests
     {
         var source = string.Join('\n',
             "module T",
-            "  func Main () → void",
+            "  func Main () → void\n    !",
             "    System.Console.WriteLine(\"x\")",
             "  §/F",
             "§/M");
@@ -333,7 +333,7 @@ public class WritePathRobustnessTests
     {
         var source = string.Join('\n',
             "module T",
-            "  func Main () → void",
+            "  func Main () → void\n    !",
             "    if 1 == 1",
             "      System.Console.WriteLine(\"a\")",
             "      else if 1 == 2", // written at body level
@@ -357,7 +357,7 @@ public class WritePathRobustnessTests
     {
         var source = string.Join('\n',
             "module T",
-            "  func Main () → void",
+            "  func Main () → void\n    !",
             "    if 1 == 1",
             "      System.Console.WriteLine(\"a\")",
             "else if 1 == 2", // dedented to module level
@@ -384,7 +384,7 @@ public class WritePathRobustnessTests
         // GUESS that must be surfaced, not silently applied.
         var source = string.Join('\n',
             "module T",
-            "  func Main () → void",
+            "  func Main () → void\n    !",
             "    if 1 == 1",
             "      System.Console.WriteLine(\"a\")",
             "      else if 1 == 2", // written at body level
@@ -465,7 +465,7 @@ public class WritePathRobustnessTests
     [Fact]
     public void Heal_TrailingWhitespaceAndCrlf_Normalized()
     {
-        var source = "module T\r\n  func Main () → void   \r\n    System.Console.WriteLine(\"x\")\t\r\n";
+        var source = "module T\r\n  func Main () → void   \r\n    !\n    System.Console.WriteLine(\"x\")\t\r\n";
 
         var healed = new SourceHealer().Heal(source);
 
@@ -488,10 +488,10 @@ public class WritePathRobustnessTests
     }
 
     [Theory]
-    [InlineData("module T\n\tfunc Main () → void\n\t\tSystem.Console.WriteLine(\"x\")")]
-    [InlineData("module T\n    func Main () → void\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")")]
+    [InlineData("module T\n\tfunc Main () → void\n\t  !\n\t\tSystem.Console.WriteLine(\"x\")")]
+    [InlineData("module T\n    func Main () → void\n      !\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")")]
     [InlineData("module T\n  func Main () → void\n    System.Console.WriteLine(\"x\")\n  §/F\n§/M")]
-    [InlineData("module T\n  func Main () → void\n    if 1 == 1\n      System.Console.WriteLine(\"a\")\n      else if 1 == 2\n        System.Console.WriteLine(\"b\")")]
+    [InlineData("module T\n  func Main () → void\n    !\n    if 1 == 1\n      System.Console.WriteLine(\"a\")\n      else if 1 == 2\n        System.Console.WriteLine(\"b\")")]
     [InlineData("module T\n  func Main () → void\n    if 1 == 1\n      System.Console.WriteLine(\"a\")\nelse if 1 == 2\n      System.Console.WriteLine(\"b\")")]
     public void Heal_IsIdempotent(string source)
     {
@@ -507,7 +507,7 @@ public class WritePathRobustnessTests
         // Four-space indentation and a body-level else-if with an ambiguous following statement.
         var mangled = string.Join('\n',
             "module FizzBuzz",
-            "    func Main () → void",
+            "    func Main () → void\n      !",
             "        ! cw",
             "        for i from 1 to 100 step 1",
             "            if i % 15 == 0",
@@ -536,11 +536,11 @@ public class WritePathRobustnessTests
         // the suggestion, but reserve the heuristic repair for explicit heal.
         var source = string.Join('\n',
             "module T",
-            "  func A () → void",
+            "  func A () → void\n    !",
             "    ! cw",
             "    System.Console.WriteLine(\"a\")",
             "   System.Console.WriteLine(\"b\")",
-            "  func B () → void",
+            "  func B () → void\n    !",
             "    ! cw",
             "    System.Console.WriteLine(\"c\")",
             "   System.Console.WriteLine(\"d\")");

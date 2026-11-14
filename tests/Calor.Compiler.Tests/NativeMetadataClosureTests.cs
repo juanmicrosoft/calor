@@ -311,8 +311,10 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module NamedConstants
               func Pick (byte:small, ushort:big) → int
+                !
                 return small + big
               func Run public () → int
+                !
                 return Pick({{arguments}})
             """;
         var compiled = Compile(source);
@@ -407,8 +409,10 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module ConstantRange
               func Pick ({{type}}:value) → int
+                !
                 return 1
               func Run public () → int
+                !
                 return Pick({{argument}})
             """;
         var compiled = Compile(source);
@@ -426,7 +430,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("in")]
     public void NativeIntegerLiteralArguments_DoNotAuthorizeByReferenceConversions(string modifier)
     {
-        var body = modifier == "out" ? "! mut\n    set value 0" : "return";
+        var body = modifier == "out" ? "! mut\n    set value 0" : "!\n    return";
         var source = $$"""
             module RefConstants
               func Pick ({{modifier}} byte:value) → void
@@ -451,10 +455,13 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module AmbiguousConstants
               func Pick ({{firstA}}:first, {{secondA}}:second) → int
+                !
                 return 1
               func Pick ({{firstB}}:first, {{secondB}}:second) → int
+                !
                 return 2
               func Run () → int
+                !
                 return Pick(1, 1)
             """;
         var compiled = Compile(source);
@@ -478,10 +485,13 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module MixedConstants
               func Pick (string?:text, {{stringValueType}}:value) → string
+                !
                 return "string"
               func Pick (object?:text, {{objectValueType}}:value) → string
+                !
                 return "object"
               func Run public () → string
+                !
                 return Pick(null, 1)
             """;
         var compiled = Compile(source);
@@ -513,8 +523,10 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module GenericConstants
               func Pick<T> (T:value) → T
+                !
                 return value
               func Run public () → int
+                !
                 return Pick<byte>({{argument}})
             """;
         var compiled = Compile(source);
@@ -625,6 +637,7 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module PrimitiveStaticReceiver
               func Probe public () → object
+                !
                 return {{expression}}
             """;
         var reemitted = new CalorEmitter().Emit(Parse(source));
@@ -664,6 +677,7 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module VerbatimPrimitiveReceiver
               func Probe public (string:@{{alias}}) → int
+                !
                 return @{{alias}}.Length
             """;
         var reemitted = new CalorEmitter().Emit(Parse(source));
@@ -711,6 +725,7 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module PrimitiveConstant
               func Probe public () → object
+                !
                 return {{expression}}
             """;
         var diagnostics = new DiagnosticBag();
@@ -758,6 +773,7 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module PrimitiveContract
               func Probe public () → object
+                !
                 return {{expression}}
             """;
         var diagnostics = new DiagnosticBag();
@@ -788,6 +804,7 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module ReadonlyField
               func Probe public () → {{type}}
+                !
                 return {{expression}}
             """;
         var module = Parse(source);
@@ -844,10 +861,13 @@ public sealed class NativeMetadataClosureTests
               class Char
                 field int:Value public
               func Pick (@Char:value) → string
+                !
                 return "nominal"
               func Pick (char:value) → string
+                !
                 return "char"
               func Probe public () → string
+                !
                 return Pick('x')
             """;
         var diagnostics = new DiagnosticBag();
@@ -882,6 +902,7 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module OrdinaryTypeLikeReceiver
               func Probe public (string:{{name}}) → int
+                !
                 return {{name}}.Length
             """;
         var reemitted = new CalorEmitter().Emit(Parse(source));
@@ -1034,12 +1055,12 @@ public sealed class NativeMetadataClosureTests
         if (expression.Contains('!') || expression.Contains('~'))
         {
             var diagnostics = new DiagnosticBag();
-            var source = $"module CastSyntax\n  func Probe () → object\n    return {expression}";
+            var source = $"module CastSyntax\n  func Probe () → object\n    !\n    return {expression}";
             new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
             Assert.True(diagnostics.HasErrors);
             return;
         }
-        var module = Parse($"module CastSyntax\n  func Probe () → object\n    return {expression}");
+        var module = Parse($"module CastSyntax\n  func Probe () → object\n    !\n    return {expression}");
         var actual = Assert.IsType<ReturnStatementNode>(
             Assert.Single(Assert.Single(module.Functions).Body)).Expression;
         Assert.True(isCast == (actual is TypeOperationNode { Operation: TypeOp.Cast }),
@@ -1052,7 +1073,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("(f)((x) => x)", false)]
     public void NativeGroupedCallees_RetainTheirOriginalCallNodesAndSpans(string expression, bool computed)
     {
-        var source = $"module GroupedCalls\n  func Probe () → object\n    return {expression}";
+        var source = $"module GroupedCalls\n  func Probe () → object\n    !\n    return {expression}";
         var value = Assert.IsType<ReturnStatementNode>(Assert.Single(Parse(source).Functions).Body[0]).Expression;
         if (computed)
         {
@@ -1096,7 +1117,8 @@ public sealed class NativeMetadataClosureTests
     {
         const string source = """
             module GroupedDelegate
-              func Probe (Func<int,int>:f) → int
+              func Probe (Func<int,int>:f ! unknown) → int
+                !
                 return (f)(3)
             """;
         Assert.IsType<CallExpressionNode>(Assert.IsType<ReturnStatementNode>(
@@ -1114,6 +1136,7 @@ public sealed class NativeMetadataClosureTests
             module ShadowedDelegate
               class Func<T>
               func Probe () → object
+                !
                 return ((Func<int>)(() => 9))()
             """;
         var bound = new Binder(new DiagnosticBag()).Bind(Parse(source));
@@ -1129,7 +1152,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("\"abc\".Length", "3")]
     public void NativeNameofAndLiteralLength_RetainStringMetadataAndPureInterpolation(string expression, string expected)
     {
-        var authored = "module Native Native\n  func Probe (int:n) → string\n    return \"${" + expression + "}\"";
+        var authored = "module Native Native\n  func Probe (int:n) → string\n    !\n    return \"${" + expression + "}\"";
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
         {
             var diagnostics = new DiagnosticBag();
@@ -1156,6 +1179,7 @@ public sealed class NativeMetadataClosureTests
         var result = Compile("""
             module UnknownNameofMember
               func Probe (int:n) → int
+                !
                 return nameof(n).Missing
             """);
         Assert.True(result.HasErrors);
@@ -1168,6 +1192,7 @@ public sealed class NativeMetadataClosureTests
         const string authored = """
             module Native Native
               func Probe () → string
+                !
                 return "${((Func<int>)(() => 9))()}"
             """;
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
@@ -1203,10 +1228,13 @@ public sealed class NativeMetadataClosureTests
         var authored = $$"""
             module DelegateReturnIdentity
               func Pick (int:value) → string
+                !
                 return "int"
               func Pick (object:value) → string
+                !
                 return "object"
               func Probe () → string
+                !
                 return Pick((({{type}})(() => 9))())
             """;
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
@@ -1231,8 +1259,10 @@ public sealed class NativeMetadataClosureTests
         var authored = $$"""
             module NullableDelegateReturn
               func Pick (object:value) → int
+                !
                 return 1
               func Probe () → int
+                !
                 return Pick((({{type}})(() => {{value}}))())
             """;
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
@@ -1253,6 +1283,7 @@ public sealed class NativeMetadataClosureTests
         var authored = $$"""
             module NonNullDelegateResult
               func Pick (object:value) → int
+                !
                 return 7
               func Probe () → int
                 ! alloc
@@ -1279,8 +1310,10 @@ public sealed class NativeMetadataClosureTests
         var authored = $$"""
             module PossiblyNullDelegateResult
               func Pick (object:value) → int
+                !
                 return 7
               func Probe ({{type}}:input) → int
+                !
                 return Pick(((Func<object>)(() => input))())
             """;
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
@@ -1300,8 +1333,10 @@ public sealed class NativeMetadataClosureTests
         var result = Compile("""
             module UnknownObjectConstructor
               func Pick (object:value) → int
+                !
                 return 7
               func Probe () → int
+                !
                 return Pick(((Func<object>)(() => new object()))())
             """);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0411");
@@ -1322,6 +1357,7 @@ public sealed class NativeMetadataClosureTests
                 System.Console.WriteLine("next")
                 return 9
               func Probe () → int
+                !
                 return {{expression}}
             """;
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
@@ -1337,17 +1373,18 @@ public sealed class NativeMetadataClosureTests
     {
         var result = Compile("""
             module UnknownDelegate
-              func Probe (Func<int>:value) → int
+              func Probe (Func<int>:value ! unknown) → int
+                !
                 return ((Func<int>)value)()
             """);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0419");
     }
 
     [Theory]
-    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.List<int> {1, 2}")]
-    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.Dictionary<string,int> {{\"a\", 1}}")]
-    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.HashSet<string> {\"a\"}")]
-    [InlineData("module Demo\n  func Run () → void\n    let System.Collections.Generic.List<int>:items = new System.Collections.Generic.List<int> {1, 2}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let items = new System.Collections.Generic.List<int> {1, 2}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let items = new System.Collections.Generic.Dictionary<string,int> {{\"a\", 1}}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let items = new System.Collections.Generic.HashSet<string> {\"a\"}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let System.Collections.Generic.List<int>:items = new System.Collections.Generic.List<int> {1, 2}")]
     public void OriginalIdentityFreeCollectionInitializers_RetainTheirNativeTypes(string source)
     {
         var module = Parse(source);
@@ -1536,17 +1573,21 @@ public sealed class NativeMetadataClosureTests
               using System.Collections.Generic
               interface IWidget
                 func Marker () → void
+                  !
               class WidgetException
                 extends System.Exception
                 implements IWidget
                 func Create static () → WidgetException
+                  !
                   return new WidgetException()
                 func Marker () → void
+                  !
                   System.Console.WriteLine("marker")
               class DerivedException
                 extends WidgetException
                 field int:Code
               func Use (object:value) → WidgetException
+                !
                 let WidgetException[]:items = new WidgetException[1]
                 let List<WidgetException>:values = new List<WidgetException> {new WidgetException()}
                 try
@@ -1605,6 +1646,7 @@ public sealed class NativeMetadataClosureTests
             module NonEnumerable
               class {{declaration}}
                 func Add (int:value) → void
+                  !
                   return
               func Make () → {{constructed}}
                 ! alloc, mut
@@ -1680,6 +1722,7 @@ public sealed class NativeMetadataClosureTests
                 ! alloc, mut
                 return "${new List<int> {1, 2}.Count}"
               func After () → int
+                !
                 return 9
             """;
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
@@ -1724,7 +1767,6 @@ public sealed class NativeMetadataClosureTests
             module Native Native
               using System.Collections.Generic
               func Echo private (int:value) → int
-                !
                 return value
               func Probe () → object
                 ! alloc
@@ -1941,7 +1983,6 @@ public sealed class NativeMetadataClosureTests
               class Parent
                 field int:Value public {{(staticInitializer ? "static" : "")}} = Initialize()
                 func Initialize private static () → int
-                  ! cw
                   System.Console.WriteLine("base initialization")
                   return 7
                 {{(declaredConstructor ? "ctor ()" : "")}}
@@ -2032,10 +2073,10 @@ public sealed class NativeMetadataClosureTests
               class Seed
                 field int:Value public static = Initialize()
                 func Initialize private static () → int
-                  ! cw
                   System.Console.WriteLine("static initialization")
                   return 7
                 func Read public static () → int
+                  !
                   return 42
               class Holder
                 field int:Value public = Seed.Read()
@@ -2096,6 +2137,7 @@ public sealed class NativeMetadataClosureTests
               class Service partial
                 ctor ()
                 func Read () → int
+                  !
                   return 42
               func Make () → Service
                 ! alloc
@@ -2173,7 +2215,7 @@ public sealed class NativeMetadataClosureTests
     public void NativeCollectionInitializer_RejectsMalformedOrMixedEntries(string expression)
     {
         var diagnostics = new DiagnosticBag();
-        new Parser(new Lexer($"module Invalid\n  func Make () → void\n    let value = {expression}",
+        new Parser(new Lexer($"module Invalid\n  func Make () → void\n    !\n    let value = {expression}",
             diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);
     }
@@ -2184,8 +2226,10 @@ public sealed class NativeMetadataClosureTests
         const string authored = """
             module CodecArithmetic
               func Scalar (string:text, int:i, int:scalar) → int
+                !
                 return ((65536 + ((scalar - 55296) * 1024)) + ((int)(text[i]) - 56320))
               func Previous (byte[]:values, int:i) → int
+                !
                 return (values[i]) - 1
             """;
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
@@ -2207,7 +2251,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("int[][]")]
     public void ArrayCasts_RetainActualClrArrayIdentity(string type)
     {
-        var authored = $"module ArrayCasts\n  func Preserve (object:value) → {type}\n    return ({type})value\n";
+        var authored = $"module ArrayCasts\n  func Preserve (object:value) → {type}\n    !\n    return ({type})value\n";
         object input = type switch
         {
             "int[]" => new[] { 42 },
@@ -2243,6 +2287,7 @@ public sealed class NativeMetadataClosureTests
         var authored = $$"""
             module Numbers
               func Divide ({{alias}}:left, {{alias}}:right) → {{output}}
+                !
                 let quotient = left / right
                 return quotient
             """;
@@ -2268,7 +2313,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("System.String")]
     public void ClrNonNumericAliases_DoNotAcquireArithmeticOperations(string alias)
     {
-        var source = $"module Numbers\n  func Divide ({alias}:left, {alias}:right) → int\n    let quotient = left / right\n    return quotient";
+        var source = $"module Numbers\n  func Divide ({alias}:left, {alias}:right) → int\n    !\n    let quotient = left / right\n    return quotient";
         var diagnostics = new DiagnosticBag();
         new TypeChecking.TypeChecker(diagnostics).Check(Parse(source));
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -2325,7 +2370,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("int", "Length")]
     public void NativeLength_DoesNotPermitUnmodeledMembersOrReceivers(string type, string member)
     {
-        var source = $"module Lengths\n  func Count ({type}:values) → int\n    while (values).{member} > 0\n      return 1\n    return 0";
+        var source = $"module Lengths\n  func Count ({type}:values) → int\n    !\n    while (values).{member} > 0\n      return 1\n    return 0";
         var diagnostics = new DiagnosticBag();
         var module = Parse(source);
         Assert.Contains(Assert.Single(module.Functions).Body, statement => statement is WhileStatementNode);
@@ -2339,7 +2384,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("string")]
     public void NativeLength_DoesNotBecomeABooleanOrAnUnknownType(string type)
     {
-        var source = $"module Lengths\n  func Count ({type}:values) → int\n    while (values).Length\n      return 1\n    return 0";
+        var source = $"module Lengths\n  func Count ({type}:values) → int\n    !\n    while (values).Length\n      return 1\n    return 0";
         var diagnostics = new DiagnosticBag();
         var module = Parse(source);
         Assert.Contains(Assert.Single(module.Functions).Body, statement => statement is WhileStatementNode);
@@ -2355,12 +2400,15 @@ public sealed class NativeMetadataClosureTests
             module ScopedAliases
               class Left
                 func Make () → object
+                  !
                   return new Builder()
               class Right
                 func Make () → object
+                  !
                   return new Builder()
               class Outside
                 func Make () → object
+                  !
                   return new Builder()
             """);
         var scopes = new[]
@@ -2406,6 +2454,7 @@ public sealed class NativeMetadataClosureTests
             module InvalidAlias
               {{imports}}
               func Make () → object
+                !
                 return new StringBuilder()
             """);
         var bound = new Binder(new DiagnosticBag()).Bind(module);
@@ -2509,6 +2558,7 @@ public sealed class NativeMetadataClosureTests
         const string authored = """
             module DefaultIdentifier
               func Run (int:@default) → int
+                !
                 let int:value = @default
                 return value
             """;
@@ -2565,16 +2615,22 @@ public sealed class NativeMetadataClosureTests
         const string authored = """
             module Defaults
               func Pick (object:value) → int
+                !
                 return 1
               func Pick (string?:value) → int
+                !
                 return 2
               func ObjectChoice () → int
+                !
                 return Pick(default(object))
               func StringChoice () → int
+                !
                 return Pick(default(string))
               func ObjectText () → string?
+                !
                 return System.Convert.ToString(default(object))
               func StringText () → string?
+                !
                 return System.Convert.ToString(default(string))
             """;
         var module = Parse(authored);
@@ -2630,6 +2686,7 @@ public sealed class NativeMetadataClosureTests
         var binding = Compile("""
             module DefaultNull
               func Run () → string
+                !
                 let string:value = default(string)
                 return value
             """);
@@ -2637,6 +2694,7 @@ public sealed class NativeMetadataClosureTests
         var returning = Compile("""
             module DefaultNull
               func Run () → string
+                !
                 return default(string)
             """);
         Assert.Contains(returning.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
@@ -2651,17 +2709,20 @@ public sealed class NativeMetadataClosureTests
 
               module Inventory
                 func ParseOr (string:text, int:fallback) → int
+                  !
                   var int:n = default(int)
                   if int.TryParse(text, out n)
                     return n
                   return fallback
 
                 func CountOf (Dictionary<string,int>:stock, string:item) → int
+                  !
                   var int:count = default(int)
                   stock.TryGetValue(item, out count)
                   return count
 
                 func IsNumber (string:text) → bool
+                  !
                   return int.TryParse(text, out _)
 
                 func Bump (ref int:x) → void
@@ -2669,6 +2730,7 @@ public sealed class NativeMetadataClosureTests
                   set x (x + 1)
 
                 func Twice (in int:x) → int
+                  !
                   return x * 2
 
                 func Run () → int
@@ -2832,7 +2894,7 @@ public sealed class NativeMetadataClosureTests
     [InlineData("int")]
     public void MissingEscapedPrimitiveReceiver_DoesNotBecomeAStaticMetadataType(string name)
     {
-        var source = $"module M\n  func Test () → string\n    return @{name}.ToString()";
+        var source = $"module M\n  func Test () → string\n    !\n    return @{name}.ToString()";
         var diagnostics = new DiagnosticBag();
         var bound = new Binder(diagnostics).Bind(Parse(source));
         var call = Assert.IsType<BoundCallExpression>(
@@ -2848,6 +2910,7 @@ public sealed class NativeMetadataClosureTests
         const string source = """
             module M
               func Test (char:@char) → string
+                !
                 return @char.ToString()
             """;
         var diagnostics = new DiagnosticBag();
@@ -3014,6 +3077,7 @@ public sealed class NativeMetadataClosureTests
         var source = $$"""
             module NativeOut
               func ParseNumber (string:text) → int
+                !
                 var int:n = 0
                 if int.TryParse(text, out {{(discard ? "_" : "n")}})
                   return {{(discard ? "1" : "n")}}
@@ -3036,6 +3100,7 @@ public sealed class NativeMetadataClosureTests
                 ! mut
                 set x x + 1
               func Read (in int:x) → int
+                !
                 return x
               func Run () → int
                 ! mut
@@ -3058,6 +3123,7 @@ public sealed class NativeMetadataClosureTests
         const string source = """
             module NativeDiscard
               func ParseNumber (string:text) → bool
+                !
                 return int.TryParse(text, out _)
             """;
         var escaped = Compile(source.Replace("out _", "out @_", StringComparison.Ordinal));
@@ -3166,7 +3232,6 @@ public sealed class NativeMetadataClosureTests
               class Probe public
                 field int:Calls public static = 0
                 func Receiver private static (object:value) → object
-                  ! mut
                   set Calls Calls + 1
                   return value
                 func Read public static (object:value) → System.Type
@@ -3200,6 +3265,7 @@ public sealed class NativeMetadataClosureTests
               class Shadow public
                 field int:Count
                 func GetType public () → int
+                  !
                   {{(effect.Length == 0 ? "" : "! " + effect)}}
                   {{body}}
                   return 7
@@ -3298,8 +3364,10 @@ public sealed class NativeMetadataClosureTests
             module Nonvirtual nullable oblivious
               class Shadow public
                 func GetType public (string:value) → int
+                  !
                   return 1
                 func GetType public (System.Version:value) → int
+                  !
                   return 2
               func Read (Shadow:value) → int
                 !
@@ -3549,6 +3617,7 @@ public sealed class NativeMetadataClosureTests
         const string source = """
             module MissingFieldType
               func Read public () → object
+                !
                 return Missing . EventArgs . Empty
             """;
         var result = Program.Compile(source, "missing-field-type.calr", new CompilationOptions
@@ -3701,6 +3770,7 @@ public sealed class NativeMetadataClosureTests
         const string source = """
             module LengthFlowBoundary
               func Length (string:value) → int
+                !
                 return value.Length
               func Local (string:value) → string
                 !

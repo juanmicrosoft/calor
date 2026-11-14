@@ -18,6 +18,7 @@ public class NumericTests
         var source = @"
 module Test Test
   func overflow () → int
+    !
     let max = 2147483647
     return max + 1
 ";
@@ -44,6 +45,7 @@ module Test Test
         var source = @"
 module Test Test
   func convert (int:i) → double
+    !
     return i
 ";
 
@@ -63,6 +65,7 @@ module Test Test
         var source = @"
 module Test Test
   func divZero (int:a, int:b) → int
+    !
     return a / b
 ";
 
@@ -84,8 +87,10 @@ module Test Test
         var source = @"
 module Test Test
   func add (int:a, int:b) → int
+    !
     return a + b
   func mul (int:a, int:b) → int
+    !
     return a * b
 ";
 
@@ -107,8 +112,10 @@ module Test Test
         var source = @"
 module Test Test
   func lessThan (int:a, int:b) → bool
+    !
     return a < b
   func equals (int:a, int:b) → bool
+    !
     return a == b
 ";
 
@@ -130,6 +137,7 @@ module Test Test
         var source = @"
 module Test Test
   func mod (int:a, int:b) → int
+    !
     return a % b
 ";
 

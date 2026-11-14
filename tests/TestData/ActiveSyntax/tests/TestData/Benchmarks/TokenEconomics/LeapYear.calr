@@ -1,6 +1,7 @@
 module DateUtils DateUtils
   module DateUtilsModule
     func IsLeapYear public (int:year) → bool
+      !
       if year % 400 == 0
         return true
       else if year % 100 == 0

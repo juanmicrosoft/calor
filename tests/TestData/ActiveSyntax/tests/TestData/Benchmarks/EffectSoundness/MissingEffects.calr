@@ -10,4 +10,5 @@ module UnsafeService UnsafeService
       System.Console.WriteLine(content)
 
     func HiddenNetwork public (string:url) → string
+      !
       return url

@@ -1,48 +1,50 @@
-§M{Billing}
-  §F{NormalizeUsage:priv} (i32:units) -> i32
-    §E{}
-    §S (>= result 0)
-    §S (<= result 100000)
-    §IF (< units 0)
-      §R 0
-    §IF (> units 100000)
-      §R 100000
-    §R units
+module Billing Billing block
+  module BillingModule partial
+    func NormalizeUsage private (int:units) → int
+      => (result >= 0)
+      => (result <= 100000)
+      if (units < 0)
+        return 0
+      if (units > 100000)
+        return 100000
+      return units
 
-  §F{BillBasic:pub} (i32:units) -> i32
-    §E{}
-    §S (>= result 500)
-    §S (<= result 70500)
-    §B{u:i32} §C{NormalizeUsage} §A units §/C
-    §R (+ (/ (* u 7) 10) 500)
+    func BillBasic (int:units) → int
+      !
+      => (result >= 500)
+      => (result <= 70500)
+      let int:u = NormalizeUsage(units)
+      return (((u * 7) / 10) + 500)
 
-  §F{BillPro:pub} (i32:units) -> i32
-    §E{}
-    §S (>= result 300)
-    §S (<= result 80400)
-    §B{u:i32} §C{NormalizeUsage} §A units §/C
-    §IF (<= u 1000)
-      §R (+ (/ (* u 9) 10) 300)
-    §B{tier1:i32} (/ (* 1000 9) 10)
-    §B{tier2:i32} (/ (* (- u 1000) 8) 10)
-    §R (+ (+ tier1 tier2) 300)
+    func BillPro (int:units) → int
+      !
+      => (result >= 300)
+      => (result <= 80400)
+      let int:u = NormalizeUsage(units)
+      if (u <= 1000)
+        return (((u * 9) / 10) + 300)
+      let int:tier1 = ((1000 * 9) / 10)
+      let int:tier2 = (((u - 1000) * 8) / 10)
+      return ((tier1 + tier2) + 300)
 
-  §F{BillCapped:pub} (i32:units, i32:cap) -> i32
-    §E{}
-    §Q (>= cap 0)
-    §S (>= result 0)
-    §S (<= result cap)
-    §B{price:i32} §C{BillPro} §A units §/C
-    §IF (> price cap)
-      §R cap
-    §R price
+    func BillCapped (int:units, int:cap) → int
+      !
+      requires (cap >= 0)
+      => (result >= 0)
+      => (result <= cap)
+      let int:price = BillPro(units)
+      if (price > cap)
+        return cap
+      return price
 
-  §F{CheaperPlan:pub} (i32:units) -> i32
-    §E{}
-    §S (>= result 0)
-    §S (<= result 1)
-    §B{basic:i32} §C{BillBasic} §A units §/C
-    §B{pro:i32} §C{BillPro} §A units §/C
-    §IF (<= basic pro)
-      §R 0
-    §R 1
+    func CheaperPlan (int:units) → int
+      !
+      => (result >= 0)
+      => (result <= 1)
+      let int:basic = BillBasic(units)
+      let int:pro = BillPro(units)
+      if (basic <= pro)
+        return 0
+      return 1
+
+

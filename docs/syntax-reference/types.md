@@ -304,6 +304,7 @@ types still produce `Calor0202`:
 ```calor expect=Calor0202
 module IncompatibleType
   func Main () → void
+    !
     let int:value = "not an integer"
 ```
 

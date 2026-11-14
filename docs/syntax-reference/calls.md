@@ -108,6 +108,8 @@ For effects, a matching manifest name alone cannot authorize an unselected
 computed member call. Strict checking still requires a resolved callee and its
 effect contract; raw C# and CLR conversions do not provide that contract.
 
+<a id="by-reference-arguments-ref-out-in"></a>
+
 ## By-reference arguments
 
 Declare parameters as `ref T:name`, `out T:name`, or `in T:name`. Mark the
@@ -125,6 +127,7 @@ module RefOutDemo
     set x x + 1
 
   func Twice (in int:x) → int
+    !
     return x * 2
 
   func TryPositive (int:value, out int:result) → bool

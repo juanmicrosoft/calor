@@ -231,6 +231,7 @@ module Counter overflow unchecked
         set count value
 
     func Next () → int
+      !
       set Count (Count + 1)
       return Count
 
@@ -353,9 +354,11 @@ converts to:
 module Probe overflow unchecked
   module Probe
     func Add (int:x) → int
+      !
       return (x + 1000)
 
     func UseShadow () → int
+      !
       let System.Func<int, int>:Add = static (int:x) => (x + 1)
       return Add(2)
 
@@ -419,7 +422,6 @@ module Countdown
         return CountDown()
 
     func CountDown private () → IEnumerable<int>
-      !
       for i from Start to 1 step -1
         yield i
 ```

@@ -1,6 +1,7 @@
 module ExhaustiveMatch ExhaustiveMatch
   module ExhaustiveMatchModule
     func CardSuit public (int:suit) → int
+      !
       if suit == 0
         return 0
       else if suit == 1
@@ -13,4 +14,5 @@ module ExhaustiveMatch ExhaustiveMatch
         return 0 - 1
 
     func IsRed public (int:suit) → bool
+      !
       return suit == 1 || suit == 2

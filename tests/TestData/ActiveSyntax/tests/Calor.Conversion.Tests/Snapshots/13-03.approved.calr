@@ -7,5 +7,6 @@ module Test_13_03 Test_13_03 overflow unchecked
       ! alloc
       return new KeyValuePair<string,object?>[] {new KeyValuePair<string,object?>("key", null), new KeyValuePair<string,object?>("key2", "value")}
 
-    func GetComparer public () → Func<object?,object?,bool>
+    func GetComparer public () → Func<object?,object?,bool> ! unknown
+      !
       return (object?:a, object?:b) => Equals(a, b)

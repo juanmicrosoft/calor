@@ -58,6 +58,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Identity<T> public (T:value) → T
+                !
                 return value
             """;
 
@@ -77,7 +78,8 @@ public class GenericSyntaxTests
     {
         var source = """
             module Test
-              func Map<T, U> public (T:input, Func<T, U>:mapper) → U
+              func Map<T, U> public (T:input, Func<T, U>:mapper ! unknown) → U
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -121,6 +123,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func GetItems public (List<int>:items) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -137,6 +140,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func GetLookup<T> public (Dictionary<string, List<T>>:lookup) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -153,6 +157,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Sort<T> public (List<T>:items) → void
+                !
                 where T : class, IComparable<T>
             """;
 
@@ -175,6 +180,7 @@ public class GenericSyntaxTests
               interface IRepository<T>
                 where T : class
                 func Get (int:id) → T
+                  !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -195,6 +201,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Identity<T> public (T:value) → T
+                !
                 where T : class
             """;
 
@@ -218,6 +225,7 @@ public class GenericSyntaxTests
         var calor = """
             module Test
               func Identity<T> public (T:value) → T
+                !
                 return value
             """;
 
@@ -264,7 +272,9 @@ public class GenericSyntaxTests
               interface IRepository<T>
                 where T : class
                 func GetById (int:id) → T
+                  !
                 func Save (T:entity) → void
+                  !
             """;
 
         var csharp = CompileToCS(calor);
@@ -281,6 +291,7 @@ public class GenericSyntaxTests
         var calor = """
             module Test
               func GetLookup<T> public (Dictionary<string, List<T>>:lookup) → Dictionary<string, List<T>>
+                !
                 return lookup
             """;
 
@@ -298,7 +309,8 @@ public class GenericSyntaxTests
         var calor = """
             module Test
               class Container public
-                func Convert<T, U> public (T:input, Func<T, U>:converter) → U
+                func Convert<T, U> public (T:input, Func<T, U>:converter ! unknown) → U
+                  !
                   return converter(input)
             """;
 
@@ -324,6 +336,7 @@ public class GenericSyntaxTests
         var calor = """
             module Test
               func GetDefault<T> public () → T
+                !
                 where T : struct
                 return default
             """;
@@ -379,6 +392,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Transform<T, U> public (T:input) → U
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -397,6 +411,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Sort<T> public (List<T>:items) → void
+                !
                 where T : class, IComparable<T>
             """;
 
@@ -438,6 +453,7 @@ public class GenericSyntaxTests
               interface IFactory<T>
                 where T : new()
                 func Create () → T
+                  !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -458,6 +474,7 @@ public class GenericSyntaxTests
             module Test
               class Mapper public
                 func Map<TSource, TDest> public (TSource:source) → TDest
+                  !
                   where TDest : new()
             """;
 
@@ -481,6 +498,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Identity<T> public (T:value) → T
+                !
                 return value
             """;
 
@@ -527,6 +545,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Sort<T> public (List<T>:items) → void
+                !
                 where T : class, IComparable<T>
             """;
 
@@ -669,6 +688,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Identity<T> public (T:value) → T
+                !
                 return value
             """;
 
@@ -688,6 +708,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Process<T> public (List<T>:items) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -706,6 +727,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func GetData<T> public (Dictionary<string, List<T>>:data) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -724,6 +746,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Combine<T, U> public (T:first, U:second) → T
+                !
                 return first
             """;
 
@@ -747,6 +770,7 @@ public class GenericSyntaxTests
         var source = """
             module Test
               func Combine<T, U> public (T:a, U:b) → void
+                !
                 where T : class
                 where U : struct
             """;
@@ -786,6 +810,7 @@ public class GenericSyntaxTests
             module Test
               interface IMapper
                 func Map<TSource, TDest> (TSource:source) → TDest
+                  !
             """;
 
         var csharp = CompileToCS(calor);
@@ -801,6 +826,7 @@ public class GenericSyntaxTests
               interface IConverter<T>
                 where T : class
                 func Convert<U> (T:input) → U
+                  !
             """;
 
         var csharp = CompileToCS(calor);

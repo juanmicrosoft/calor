@@ -3,6 +3,7 @@ module Fixture Fixture overflow unchecked
     using Number = System.Int32
     module ConditionalValue
       func Get () → Number
+        !
         return 41
 
 
@@ -10,4 +11,5 @@ module Fixture Fixture overflow unchecked
     using Number = System.Int32
     module ConditionalValue
       func Get () → Number
+        !
         return 42

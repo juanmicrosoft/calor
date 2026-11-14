@@ -1,6 +1,7 @@
 module Fixture Fixture overflow unchecked
   module ConditionalExpressionFixture
     func Run () → int
+      !
       => result == 329
       var int:i = 0
       var bool:gate = false

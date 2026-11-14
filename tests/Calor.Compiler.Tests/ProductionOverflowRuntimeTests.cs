@@ -188,7 +188,7 @@ public class ProductionOverflowRuntimeTests
                   using System.Collections.Generic
                   module Migrated
                     func Record private (List<int>:trace, int:value) → int
-                      ! mut
+                       mut
                       trace.Add(value)
                       return value
                     func Probe (List<int>:trace) → int
@@ -239,10 +239,8 @@ public class ProductionOverflowRuntimeTests
             module OverflowIdentifiers overflow unchecked
               module Migrated
                 func @unchecked private (int:value) → int
-                  !
                   return value
                 func @checked private (int:value) → int
-                  !
                   return @unchecked(value)
                 func Probe (int:value) → int
                   !
@@ -264,7 +262,7 @@ public class ProductionOverflowRuntimeTests
         string Source(string expression) => $$"""
             module OverflowAnalysis
               func Effectful private () → int
-                ! cw
+                 cw
                 Console.WriteLine("effect")
                 return 1
               func Probe (int:value) → int

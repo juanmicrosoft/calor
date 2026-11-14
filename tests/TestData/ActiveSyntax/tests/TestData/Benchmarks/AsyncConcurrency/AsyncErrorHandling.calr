@@ -5,4 +5,5 @@ module AsyncErrorHandling AsyncErrorHandling
       return url
 
     func IsError public (bool:succeeded) → bool
+      !
       return !succeeded

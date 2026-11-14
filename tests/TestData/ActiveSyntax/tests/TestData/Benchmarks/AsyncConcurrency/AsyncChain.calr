@@ -1,10 +1,13 @@
 module AsyncChain AsyncChain
   module AsyncChainModule
     func Step1 public async (int:input) → int
+      !
       return input + 1
 
     func Step2 public async (int:input) → int
+      !
       return input * 2
 
     func SyncPipeline public (int:input) → int
+      !
       return (input + 1) * 2

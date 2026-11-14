@@ -505,7 +505,7 @@ public class EffectInferenceTests
     }
 
     [Fact]
-    public void InferredRow_ExplicitPrivateContractStillConstrainsItsBody()
+    public void InferredRow_ExplicitPrivateContractIsRejected()
     {
         const string source = """
             module InferredRows
@@ -518,8 +518,8 @@ public class EffectInferenceTests
             """;
         var result = Program.Compile(source, "inferred.calr");
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
-            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
-            && diagnostic.Message.Contains("'Write'") && diagnostic.Message.Contains("'cw'"));
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.NonPublicEffectRow
+            && diagnostic.Message.Contains("'Write'"));
     }
 
 }

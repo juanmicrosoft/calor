@@ -1,12 +1,15 @@
-§M{WindowStats}
-  §F{WindowSum:pub} ([i32]:values, i32:start, i32:count) -> i32
-    §E{}
-    §Q (>= start 0)
-    §Q (> count 0)
-    §Q (<= (+ start count) §LEN values)
-    §B{~total:i32} 0
-    §B{~i:i32} start
-    §WH (< i (+ start count))
-      §ASSIGN total (+ total §IDX values i)
-      §ASSIGN i (+ i 1)
-    §R total
+module WindowStats WindowStats block
+  module WindowStatsModule partial
+    func WindowSum (int[]:values, int:start, int:count) → int
+      !
+      requires (start >= 0)
+      requires (count > 0)
+      requires ((start + count) <= values.Length)
+      var int:total = 0
+      var int:i = start
+      while (i < (start + count))
+        set total (total + values[i])
+        set i (i + 1)
+      return total
+
+

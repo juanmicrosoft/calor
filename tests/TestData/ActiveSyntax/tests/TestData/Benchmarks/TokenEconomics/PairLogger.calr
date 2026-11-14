@@ -1,8 +1,10 @@
 module PairLogger PairLogger
   module PairLoggerModule
     func LogPair public (string:key, int:value) → void
+      !
       return
 
     func RunReport public (string:k1, int:v1, string:k2, int:v2) → void
+      !
       LogPair(k1, v1)
       LogPair(k2, v2)

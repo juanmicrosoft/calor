@@ -1,12 +1,15 @@
 module DisjointSet DisjointSet
   module DisjointSetModule
     func IsRoot public (int:node, int:parent) → bool
+      !
       return node == parent
 
     func ShouldMerge public (int:rootA, int:rootB) → bool
+      !
       return rootA != rootB
 
     func PickRoot public (int:rankA, int:rankB, int:rootA, int:rootB) → int
+      !
       if rankA >= rankB
         return rootA
       else

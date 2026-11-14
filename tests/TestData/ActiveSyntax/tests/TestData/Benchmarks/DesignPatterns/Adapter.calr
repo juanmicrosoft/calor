@@ -1,12 +1,15 @@
 module Adapter Adapter
   module AdapterModule
     func MilesToKm public (float:miles) → float
+      !
       requires miles >= 0
       return miles * 1.60934
 
     func KmToMiles public (float:km) → float
+      !
       requires km >= 0
       return km * 0.621371
 
     func FahrenheitToCelsius public (float:f) → float
+      !
       return ((f - 32) * 5) / 9

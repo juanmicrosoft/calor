@@ -1,6 +1,7 @@
 module Test_09_03 Test_09_03 overflow unchecked
   class ListPatternDemo public
     func Classify public (int[]:list) → string
+      !
       return match list
         case [] → "empty"
         case [var single] → "one: ${single}"
@@ -8,6 +9,7 @@ module Test_09_03 Test_09_03 overflow unchecked
         case [1, 2, ..] → "starts with 1,2"
 
     func IsFirstAndLast public (int[]:list) → bool
+      !
       return match list
         case [var first, .., var last] → true
         case _ → false

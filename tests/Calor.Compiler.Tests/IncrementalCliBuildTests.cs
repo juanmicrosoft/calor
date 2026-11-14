@@ -1075,6 +1075,7 @@ public sealed class NativeProjectCacheTests : IDisposable
         Write("caller", """
             module Caller Client
               func Main public () → void
+                !
                 Store.Write()
             """);
         var cold = Run(enforceEffects: false);
@@ -1099,6 +1100,7 @@ public sealed class NativeProjectCacheTests : IDisposable
         Write("caller", """
             module Caller Client
               func Main public () → void
+                !
                 Store.Write()
             """);
         var cold = Run(enforceEffects: false);

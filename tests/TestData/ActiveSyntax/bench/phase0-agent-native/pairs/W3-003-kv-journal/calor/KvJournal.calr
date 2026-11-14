@@ -1,4 +1,7 @@
-§M{KvJournal}
-  §F{Set:pub} (str:path, str:key, str:value) -> void
-    §E{fs:w}
-    §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
+module KvJournal KvJournal block
+  module KvJournalModule partial
+    func Set (string:path, string:key, string:value) → void
+      ! fs:w
+      File.AppendAllText(path, (key + ("=" + (value + "\n"))))
+
+

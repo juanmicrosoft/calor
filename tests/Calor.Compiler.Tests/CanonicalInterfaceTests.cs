@@ -23,6 +23,7 @@ public sealed class CanonicalInterfaceTests
                   !
                   => true && true
                 func Close ()
+                  !
               class Sibling
             """);
         var definition = Assert.Single(module.Interfaces);

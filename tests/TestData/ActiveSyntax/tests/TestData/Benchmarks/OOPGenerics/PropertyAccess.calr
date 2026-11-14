@@ -1,17 +1,22 @@
 module PropertyAccess PropertyAccess
   module PropertyAccessModule
     func GetX public (int:x) → int
+      !
       return x
 
     func GetY public (int:y) → int
+      !
       return y
 
     func GetName public (string:name) → string
+      !
       return name
 
     func GetAge public (int:age) → int
+      !
       requires age >= 0
       return age
 
     func GetEmail public (string:email) → string
+      !
       return email

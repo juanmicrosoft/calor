@@ -683,6 +683,7 @@ public class VerificationCacheTests : IDisposable
         var source = @"
 module Test
   func Square (int:x) → int
+    !
     requires x >= 0
     => result >= 0
     return x * x
@@ -719,6 +720,7 @@ module Test
         var source = @"
 module Test
   func Square (int:x) → int
+    !
     requires x >= 0
     => result >= 0
     return x * x
@@ -771,6 +773,7 @@ module Test
         var source = @"
 module Test
   func Square (int:x) → int
+    !
     requires x >= 0
     return x * x
 ";
@@ -806,6 +809,7 @@ module Test
         var source = @"
 module Test
   func Square (int:x) → int
+    !
     requires x >= 0
     return x * x
 ";
@@ -860,10 +864,12 @@ module Test
         var source = @"
 module Test
   func Square (int:x) → int
+    !
     requires x >= 0
     => result >= 0
     return x * x
   func BadDecrement (int:x) → int
+    !
     => result >= 0
     return x - 1
 ";

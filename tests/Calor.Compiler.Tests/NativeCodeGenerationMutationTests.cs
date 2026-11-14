@@ -32,7 +32,6 @@ public class NativeCodeGenerationMutationTests
         const string source = """
             module OperandOrder
               func Record private (System.Collections.Generic.List<int>:trace, int:value) → int
-                ! mut
                 trace.Add(value)
                 return value
               func Calculate public (System.Collections.Generic.List<int>:trace) → int
@@ -59,7 +58,6 @@ public class NativeCodeGenerationMutationTests
         const string source = """
             module ConditionalOrder
               func Record private (System.Collections.Generic.List<int>:trace, int:value) → int
-                ! mut
                 trace.Add(value)
                 return value
               func Choose public (System.Collections.Generic.List<int>:trace, bool:first) → int

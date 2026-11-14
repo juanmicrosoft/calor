@@ -3,6 +3,7 @@ module Test_13_08 Test_13_08 overflow unchecked
 
   class CollectionHoistDemo public
     func GetValues public () → Dictionary<string,int>
+      !
       return new Dictionary<string,int> {{"a", Compute(1)}, {"b", Compute(2)}}
 
     func GetNames public () → HashSet<string>

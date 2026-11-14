@@ -1143,6 +1143,56 @@ public sealed class Binder
 
     public BoundModule Bind(ModuleNode module) => Bind(module, null);
 
+    internal void ValidateCallableEffectRows(DiagnosticBag diagnostics)
+    {
+        foreach (var position in UnannotatedCallablePositions())
+            diagnostics.ReportError(position.Span, DiagnosticCode.MissingCallableEffectRow,
+                "A callback parameter or return type requires an explicit effect row. "
+                + "Use '! unknown' when no invocation contract is known; this does not authorize calling it.");
+    }
+
+    internal void MaterializeUnknownCallableRows()
+    {
+        foreach (var position in UnannotatedCallablePositions())
+        {
+            var row = new EffectsNode(position.Span, new Dictionary<string, string> { ["unknown"] = "*" });
+            if (position is ParameterNode parameter)
+                parameter.Row = row;
+            else if (position is OutputNode output)
+                output.Row = row;
+        }
+    }
+
+    private IEnumerable<AstNode> UnannotatedCallablePositions()
+    {
+        foreach (var (declaration, symbol) in _functionSymbols)
+        {
+            var (parameters, output) = declaration switch
+            {
+                FunctionNode function => (function.Parameters, function.Output),
+                MethodNode method => (method.Parameters, method.Output),
+                MethodSignatureNode method => (method.Parameters, method.Output),
+                OperatorOverloadNode op => (op.Parameters, op.Output),
+                ConstructorNode constructor => (constructor.Parameters, (OutputNode?)null),
+                _ => (Array.Empty<ParameterNode>(), (OutputNode?)null)
+            };
+            for (var index = 0; index < parameters.Count; index++)
+                if (parameters[index].Row == null && symbol.Parameters[index].FunctionType != null)
+                    yield return parameters[index];
+            if (output is { Row: null } && symbol.ReturnFunctionType != null)
+                yield return output;
+        }
+        foreach (var (name, declaration) in _delegateDefinitions)
+        {
+            foreach (var parameter in declaration.Parameters)
+                if (parameter.Row == null && TryBuildParameterFunctionType(parameter, [], name) != null)
+                    yield return parameter;
+            if (declaration.Output is { Row: null } output
+                && TryBuildReturnFunctionType(output, [], name) != null)
+                yield return output;
+        }
+    }
+
     internal BoundModule Bind(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance,
         bool declarationsOnly = false)
     {
@@ -1896,8 +1946,8 @@ public sealed class Binder
         {
             // v0.15 E2 slice b — position 6's row (§3.3).
             BodyReturnType = returnShape.BodyType,
-            ReturnFunctionType = isAsync ? null : TryBuildFunctionType(
-                output?.TypeName, output?.Row, effectParameters,
+            ReturnFunctionType = isAsync ? null : TryBuildReturnFunctionType(
+                output, effectParameters,
                 containingTypeName ?? lexicalTypeContext),
         };
         TrackSymbol(symbol);
@@ -2594,7 +2644,8 @@ public sealed class Binder
             using var scope = PushScope(_scope.CreateChild());
             if (!ReturnShape.IsVoidType(returnType))
                 _scope.TryDeclare(CreateLocalVariable("result", returnType, isMutable: false,
-                    isParameter: true, ParameterModifier.None, Parsing.TextSpan.Empty, "contract-result"));
+                    isParameter: true, ParameterModifier.None, Parsing.TextSpan.Empty, "contract-result",
+                    nullableAnnotation: TryReadDeclaredStringAnnotation(returnType)));
             conditions.AddRange(postconditions.Select(postcondition => BindExpression(postcondition.Condition)));
             return conditions;
         }
@@ -2719,9 +2770,9 @@ public sealed class Binder
             SyncBlockNode sync => BindSyncBlock(sync),
             PrintStatementNode print => new BoundExpressionStatement(print.Span,
                 BindExpression(print.Expression)),
-            // Passthrough nodes — no executable semantics
+            // Comments have no executable semantics; preserved C# remains opaque.
             FallbackCommentNode => null,
-            RawCSharpNode => null,
+            RawCSharpNode => BindUnsupportedStatement(stmt),
             // 0.25 F3 (#847): bound as its own callable (BindLocalFunctions).
             LocalFunctionStatementNode => null,
             PreprocessorDirectiveNode preprocessor => BindPreprocessorDirective(preprocessor),
@@ -9895,6 +9946,19 @@ public sealed class Binder
             // kind (calls of any form, construction, element/field/property reads) may.
             BoundIntLiteral or BoundStringLiteral or BoundBoolLiteral or BoundFloatLiteral or BoundDecimalLiteral
                 or BoundNullLiteral or BoundLambdaExpression => false,
+            BoundThrowExpression { Exception: BoundNullLiteral } => false,
+            BoundStructuralExpression
+                { NodeTypeName: nameof(NullCoalesceNode), Children: [var receiver, BoundThrowExpression { Exception: BoundNullLiteral }] } =>
+                MayChangeHeap(receiver),
+            BoundFieldAccessExpression
+                {
+                    ResolvedMetadataMember: Microsoft.CodeAnalysis.IPropertySymbol
+                    {
+                        Name: "Length", IsStatic: false, Parameters.Length: 0,
+                        ContainingType.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String
+                    },
+                    Target: var receiver
+                } => MayChangeHeap(receiver),
             // An operator on a user type may be an overloaded operator method.
             BoundBinaryExpression binary => !IsBuiltInOperand(binary.Left) || !IsBuiltInOperand(binary.Right),
             // A built-in string or character operation (`len`, `upper`) over built-in operands runs no user code.
@@ -11589,6 +11653,27 @@ public sealed class Binder
                     : null;
         }
         return TryBuildFunctionType(parameter.TypeName, parameter.Row, binders, lexicalTypeContext);
+    }
+
+    private BoundTypes.FunctionBoundType? TryBuildReturnFunctionType(
+        OutputNode? output, IReadOnlyList<EffectParameterInfo>? binders, string? lexicalTypeContext)
+    {
+        if (output == null)
+            return null;
+        if (ResolveSourceCallConversions && _asyncTypeModule is not null)
+        {
+            SourceCallBindings();
+            if (_sourceCallConversions.OutputTypes.TryGetValue(output, out var type))
+                return type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
+                    ? new BoundTypes.FunctionBoundType(
+                        System.Collections.Immutable.ImmutableArray.CreateRange(
+                            invoke.Parameters.Select(item => Metadata.MetadataBinderResult.ToBoundType(item.Type))),
+                        Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+                        displayOverride: output.TypeName,
+                        row: BindRow(output.Row, binders))
+                    : null;
+        }
+        return TryBuildFunctionType(output.TypeName, output.Row, binders, lexicalTypeContext);
     }
 
     /// <summary>

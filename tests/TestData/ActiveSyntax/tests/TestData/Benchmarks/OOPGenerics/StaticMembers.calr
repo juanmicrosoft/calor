@@ -1,7 +1,9 @@
 module StaticMembers StaticMembers
   module StaticMembersModule
     func NextId public (int:current) → int
+      !
       return current + 1
 
     func InstanceCount public (int:count) → int
+      !
       return count

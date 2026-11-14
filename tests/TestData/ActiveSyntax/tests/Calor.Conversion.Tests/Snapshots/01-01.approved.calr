@@ -1,7 +1,9 @@
 module Test_01_01 Test_01_01 overflow unchecked
   class Calculator public
     func Add public (int:a, int:b) → int
+      !
       return a + b
 
     func Subtract public (int:a, int:b) → int
+      !
       return a - b

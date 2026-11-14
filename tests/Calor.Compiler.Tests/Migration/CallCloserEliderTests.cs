@@ -46,6 +46,7 @@ public class CallCloserEliderTests
         const string source = """
             module Native
               func Abs (int:value) → int
+                !
                 return System.Math.Abs(value)
             """;
         Assert.False(Program.Compile(source).HasErrors);

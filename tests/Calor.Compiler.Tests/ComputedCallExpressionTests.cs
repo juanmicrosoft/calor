@@ -598,6 +598,7 @@ public sealed class ComputedCallExpressionTests
             module NativeSourceEffects
               module Extensions
                 func Count (this string?:value) → int
+                  !
                   {{body}}
               func Use (string?:value) → int
                 !
@@ -867,7 +868,7 @@ public sealed class ComputedCallExpressionTests
             module SelectedCallbackRows
               using System.Linq
               using System.Collections.Generic
-              func Use (IEnumerable<int>:values, Func<int,int>:selector{{callbackRow}}) → IEnumerable<int>
+              func Use (IEnumerable<int>:values, Func<int,int>:selector{{(callbackRow.Length == 0 ? " ! unknown" : callbackRow)}}) → IEnumerable<int>
                 ! {{callerEffects}}
                 return {{(staticCall ? "Enumerable.Select(selector: selector, source: values)" : "values.Select(selector: selector)")}}
             """;
@@ -1041,6 +1042,7 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, _) = Bind("""
             module GenericCharIndex
               func Test<@String> (@String:text) → string
+                !
                 return text[0].ToString()
             """);
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
@@ -1076,6 +1078,7 @@ public sealed class ComputedCallExpressionTests
               class Chain public
                 field List<string>:_memberNames private readonly = new List<string>(2)
                 func Run public () → string
+                  !
                   _memberNames.Add("root")
                   let string:last = _memberNames[0]
                   return _memberNames[0]
@@ -1123,6 +1126,7 @@ public sealed class ComputedCallExpressionTests
               class Chain public
                 field List<{{element}}>:_memberNames private readonly = new List<{{element}}>(2)
                 func Last public () → string
+                  !
                   let string:last = {{receiver}}[0]
                   return {{receiver}}[0]
             """);
@@ -1152,11 +1156,13 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, diagnostics) = Bind($$"""
             module Test
               func Use public (List<{{element}}>:items) → string
+                !
                 let source = {{initializer}}
                 let value = source[0]
                 let string:copy = value
                 return value
               func Make public () → List<{{element}}>
+                !
                 return new List<{{element}}>()
             """);
         Assert.Equal(nullable, diagnostics.Errors.Any(diagnostic =>
@@ -1178,6 +1184,7 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, diagnostics) = Bind($$"""
             module Test
               func Use public (List<{{(nullable ? "Widget?" : "Widget")}}>:items) → Widget
+                !
                 let value = items[0]
                 let Widget:copy = value
                 return value
@@ -1477,6 +1484,7 @@ public sealed class ComputedCallExpressionTests
             module Probe Probe
               class Runner public
                 func Run public static () → int
+                  !
                   let validator = new Witness()
                   return Pick(validator)
                 func Pick private static (Witness:validator) → int
@@ -1736,10 +1744,12 @@ public sealed class ComputedCallExpressionTests
             module Test
               class Holder<@String>
                 func Use (@String:text) → string
+                  !
                   return text[0].ToString()
             """ : """
             module Test
               func Use<@String> (@String:text) → string
+                !
                 return text[0].ToString()
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -1767,10 +1777,12 @@ public sealed class ComputedCallExpressionTests
             var (_, bound, diagnostics) = Bind($$"""
                 module Test
                   func Use ({{type}}:source) → int
+                    !
                     match source
                       case {{pattern}}
                         return Pick(captured)
                   func Pick ({{type.TrimEnd('?')}}:item) → int
+                    !
                     return 2
                   class Widget
                 """);
@@ -1796,8 +1808,10 @@ public sealed class ComputedCallExpressionTests
             var (_, bound, diagnostics) = Bind($$"""
                 module Test
                   func Use ({{type}}:value) → int
+                    !
                     return Pick(value)
                   func Pick ({{parameter}}:value) → int
+                    !
                     return 2
                 """);
             var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
@@ -1869,11 +1883,13 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, diagnostics) = Bind($$"""
             module Test
               func Use public ({{type}}:source) → int
+                !
                 match source
                   case {{pattern}}
                     captured.ToString()
                     return Pick(captured)
               func Pick public ({{type}}:item) → int
+                !
                 return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -1897,10 +1913,12 @@ public sealed class ComputedCallExpressionTests
         var (ast, bound, diagnostics) = Bind($$"""
             module Test
               func Use public (object:input, External:External) → int
+                !
                 let source = {{(known ? "input" : "External.Make()")}}
                 return match source
                   case var captured → Pick(captured)
               func Pick public (object:item) → int
+                !
                 return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -1928,12 +1946,14 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, diagnostics) = Bind($$"""
             module Test
               func Use public (object:input, External:External) → int
+                !
                 let source = {{(known ? "input" : "External.Make()")}}
                 let projected = match source
                   case var captured → {{(returnCapture ? "captured" : "input")}}
                 let alias = projected
                 return Pick(alias)
               func Pick public (object:item) → int
+                !
                 return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -1995,12 +2015,15 @@ public sealed class ComputedCallExpressionTests
             var (_, bound, diagnostics) = Bind($$"""
                 module Test
                   func Use public (Func<object>:make, External:External) → int
+                    !
                     {{binding}}
                     let alias = value
                     return Pick(alias)
                   func Make public () → object
+                    !
                     return new object()
                   func Pick public ({{parameter}}:value) → int
+                    !
                     return 2
                 """);
             var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
@@ -2036,11 +2059,13 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, diagnostics) = Bind($$"""
             module Test
               func Use public (bool:gate, External:External) → int
+                !
                 var value = {{initializer}}
                 {{(branch ? "if gate\n      set value " : "var value = ")}}{{replacement}}
                 let alias = value
                 return Pick(alias)
               func Pick public (object:value) → int
+                !
                 return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -2066,9 +2091,11 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, diagnostics) = Bind($$"""
             module Test
               func Use public (bool:gate, External:External) → int
+                !
                 {{binding.Replace("\n", "\n    ", StringComparison.Ordinal)}}
                 return Pick(value)
               func Pick public (object:item) → int
+                !
                 return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -2252,6 +2279,7 @@ public sealed class ComputedCallExpressionTests
               using System.Collections.Generic
               class Orderer public
                 func Run public static (Handler[]:handlers) → int
+                  !
                   let handlerObjectsDetails = handlers.Select((Handler:s) => new ObjectDetails(s)).ToList()
                   let uniqueHandlers = RemoveOverridden(handlerObjectsDetails).ToArray()
                   return uniqueHandlers.Length
@@ -2291,13 +2319,17 @@ public sealed class ComputedCallExpressionTests
         var (ast, bound, diagnostics) = Bind("""
             module Test
               func Use public (Holder:h) → int
+                !
                 return Get(h).Pick(3)
               func Get public (Holder:h) → Holder
+                !
                 return h
               class Holder public
                 func Pick public (int:value) → int
+                  !
                   return value
                 func Pick public (string:value) → string
+                  !
                   return value
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -2321,11 +2353,14 @@ public sealed class ComputedCallExpressionTests
         var (_, _, diagnostics) = Bind("""
             module Test
               func Use public (Holder:h) → int
+                !
                 return Get(h).Pick(true)
               func Get public (Holder:h) → Holder
+                !
                 return h
               class Holder public
                 func Pick public (int:value) → int
+                  !
                   return value
             """);
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
@@ -2337,6 +2372,7 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, diagnostics) = Bind("""
             module Test
               func Use public () → string[]
+                !
                 return new System.Globalization.CultureInfo("en-US").DateTimeFormat.GetAllDateTimePatterns()
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -2393,6 +2429,7 @@ public sealed class ComputedCallExpressionTests
         var (ast, bound, diagnostics) = Bind("""
             module Test
               func Use public () → bool
+                !
                 return new object().Equals(3)
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -2410,8 +2447,10 @@ public sealed class ComputedCallExpressionTests
         var (_, bound, diagnostics) = Bind("""
             module Test
               func Use<Random> public (Random:value) → int
+                !
                 return Get<Random>(value).Next()
               func Get<T> public (T:value) → T
+                !
                 return value
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -2427,6 +2466,7 @@ public sealed class ComputedCallExpressionTests
         var result = Program.Compile("""
             module Test
               func Use public () → object
+                !
                 return new object().Equals(1 ?? 2)
             """, "computed.calr", new CompilationOptions { EnableTypeChecking = true, EnforceEffects = false, StatusWriter = TextWriter.Null });
         Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Message.Contains("Null-coalescing requires", StringComparison.Ordinal));
@@ -2440,6 +2480,7 @@ public sealed class ComputedCallExpressionTests
         var result = Program.Compile($$"""
             module Test
               func Use public () → void
+                !
                 {{effects}}
                 new Holder().Loud()
               class Holder public
@@ -2462,6 +2503,7 @@ public sealed class ComputedCallExpressionTests
             var (_, _, diagnostics) = Bind($$"""
                 module Test
                   func Use public (string?:input, bool:gate) → int
+                    !
                     var string?:value = input
                     let Action:later = () =>
                       set value null

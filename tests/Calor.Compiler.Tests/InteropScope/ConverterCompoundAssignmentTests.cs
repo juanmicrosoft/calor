@@ -8,8 +8,9 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// #1633, #1632, #1634: compound assignments evaluate their target before the right-hand side,
 /// hoisted statements land inside the body they belong to, and compound assignments on small
 /// integral types keep C#'s implicit narrowing cast. Every row is converted on the library, CLI
-/// and MCP surfaces, compiled, run, and compared with the original C#; a row also states whether
-/// it must convert natively or be kept as C#.
+/// and MCP surfaces, run, and compared with the original C#. Native default output must compile
+/// strictly; marked preservation is not a certificate. The separate noncertifying lowering
+/// comparison retains each row's native-or-preserved shape requirement.
 /// </summary>
 public class ConverterCompoundAssignmentTests
 {
@@ -169,7 +170,7 @@ public class ConverterCompoundAssignmentTests
     {
         var (_, source, allowed) = Rows().Single(row => row.Id == id);
         var original = RefOutImplementationTests.Run(source);
-        var (calor, losses) = await RefOutImplementationTests.ConvertAsync(source, surface);
+        var (calor, losses) = await RefOutImplementationTests.ConvertForValueComparisonAsync(source, surface, original);
         var interop = calor.Contains("§CSHARP{", StringComparison.Ordinal) || calor.Contains("§CS{", StringComparison.Ordinal)
             || calor.Contains("§RAW", StringComparison.Ordinal) || losses.Count > 0;
         var strict = Program.Compile(calor, id + ".calr", new CompilationOptions { StatusWriter = TextWriter.Null });

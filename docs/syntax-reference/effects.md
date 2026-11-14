@@ -58,15 +58,20 @@ func Name (Type:parameter) → ReturnType
 
 ## Inferred Non-public Effects
 
-Private and internal functions and methods can omit their own effect row.
+Private and internal function and method bodies must omit their own effect row.
 The compiler infers it from their bodies, including recursive calls. Callers
 still need to cover those effects at public boundaries. An unknown inferred row
 still fails strict checking; inference does not turn it into Pure.
 
 A non-public virtual method's inferred body is not a contract for every possible
 override. Open dispatch and method groups without a declared slot contract remain
-Unknown. Existing explicit non-public annotations are still checked against the
-body; removing that annotation form is a separate, unfinished language change.
+Unknown. Writing an own row on a private/internal body reports `Calor0125`.
+This does not remove rows from callback types in its signature.
+
+Public/protected functions and methods, public operators, interface and abstract methods, extern
+methods, and delegate declarations require an explicit own row. A missing row
+reports `Calor0124`; write `!` for Pure. Constructors, accessors and initializers
+retain their implicit contracts.
 
 The C# converter omits synthesized own rows on private/internal bodies. Callback
 parameter and return rows stay explicit, as do existing abstract/extern contracts.
@@ -76,6 +81,10 @@ Public callers still declare every reachable effect.
 
 When a function accepts another function — a callback, handler, predicate, or
 transform — an effect row says what that callback is allowed to do.
+Callback parameter and return types require an explicit row (`Calor0407` when
+missing), including on inferred private/internal bodies. Write `! unknown` when
+no invocation contract is known. A declared callback may remain unused, but its
+Unknown row cannot authorize a strict invocation.
 
 **The line matters.** An `!` row on its **own line** is the containing
 function's effect declaration. An `!` row on the **same line** as a function
@@ -106,8 +115,8 @@ Rows are part of the type. `Func<int,int> !` and
 `Func<int,int> ! cw` have the same inputs and output, but different effect
 permissions.
 
-For callback parameters, returned callbacks and delegate declarations, an
-**omitted row means Unknown**. Write `! unknown` to state Unknown explicitly,
+For callback parameters, returned callbacks and delegate declarations, a row
+is required. Write `! unknown` to state Unknown explicitly,
 or an empty `!` to promise Pure. Unknown is not a wildcard permission:
 invoking an Unknown callback fails strict effect checking, even if the caller
 declares every known effect. Merely accepting an unused Unknown callback does
@@ -118,8 +127,8 @@ The marker is case-sensitive and stands alone. It is not an effect code, so
 do not combine it with `cw` or use it as a function's own declaration, a binding
 row, a field row, a property row or a lambda row. An existing effect placeholder
 named `unknown` keeps its normal binding identity; it is not the marker.
-These callback defaults do not change callable declaration contracts or the
-intrinsic mutation/allocation contracts of constructors and rowless operators.
+These callback contracts do not change intrinsic constructor or accessor
+mutation/allocation contracts.
 An omitted binding or lambda row can retain a known row inferred from its
 initializer or body; it does not automatically mean Pure.
 

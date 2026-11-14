@@ -179,6 +179,34 @@ public sealed class Issue1401NullableContextConversionTests
         Assert.Equal(DeclaredMetadata(original), DeclaredMetadata(result.GeneratedCode));
     }
 
+    [Theory]
+    [InlineData("public string M(string value) { T Identity<T>(T item) => item; return Identity(value); }", "method")]
+    [InlineData("public string Value { get { T Identity<T>(T item) => item; return Identity(\"kept\"); } }", "property")]
+    [InlineData("public static C operator +(C left, C right) { T Identity<T>(T item) => item; return Identity(left); }", "operator")]
+    public void ObliviousConversion_DirectMemberPreservationRetainsStrictMetadata(
+        string member, string feature)
+    {
+        var original = $"public class C {{ public int Native(int value) => value; {member} }}";
+        var conversion = new CSharpToCalorConverter().Convert(original, "Hybrid.cs");
+
+        Assert.True(conversion.Success, FormatIssues(conversion));
+        var preservation = Assert.Single(conversion.Losses);
+        Assert.Equal(ConversionLossKind.InteropPreserved, preservation.Kind);
+        Assert.Equal(ConversionPath.Interop, preservation.Path);
+        Assert.Equal(feature, preservation.Feature);
+        Assert.Equal(1, conversion.InteropPreservationCount);
+        Assert.Contains("nullable oblivious", conversion.CalorSource);
+        Assert.Contains("func Native", conversion.CalorSource);
+        var compiled = Program.Compile(conversion.CalorSource!, "hybrid.calr", new CompilationOptions
+        {
+            StrictEffects = true,
+            UnknownCallPolicy = Effects.UnknownCallPolicy.Strict
+        });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(ConversionRoundTrip.Verified, conversion.Context.RoundTrip);
+        Assert.Equal(DeclaredMetadata(original), DeclaredMetadata(compiled.GeneratedCode));
+    }
+
     [Fact]
     public void NativeObliviousConversion_DoesNotFlattenMixedContexts()
     {
@@ -1386,5 +1414,120 @@ public sealed class Issue1401NullableContextConversionTests
             Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
             Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
         }
+    }
+
+    [Theory]
+    [InlineData("ToUpperInvariant", "string")]
+    [InlineData("ToLowerInvariant", "string")]
+    public void ObliviousZeroArgumentReceiver_RetainsNullExceptionEvaluationAndMetadata(
+        string method, string returnType)
+    {
+        var source = $$"""
+            public static class Fixture
+            {
+                private static string Receiver(ref int calls, string value)
+                {
+                    calls++;
+                    return value;
+                }
+                public static {{returnType}} Probe(ref int calls, string value)
+                    => Receiver(ref calls, value).{{method}}();
+            }
+            """;
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy, Mode = ConversionMode.Interop
+        }).Convert(source, "Receiver.cs");
+        Assert.True(converted.Success, FormatIssues(converted));
+        Assert.True(converted.Losses.Count == 0, FormatIssues(converted));
+        var compiled = Program.Compile(converted.CalorSource!, "receiver.calr", new CompilationOptions
+        {
+            StrictEffects = true, UnknownCallPolicy = Effects.UnknownCallPolicy.Strict,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+        var original = EmitInMemory(source, "", NullableContextOptions.Disable)
+            .GetType("Fixture")!.GetMethod("Probe")!;
+        var generated = EmitInMemory(compiled.GeneratedCode, "", NullableContextOptions.Disable)
+            .GetType("Fixture")!.GetMethod("Probe")!;
+        object?[] originalArguments = [0, " AbC "];
+        object?[] generatedArguments = [0, " AbC "];
+        Assert.Equal(original.Invoke(null, originalArguments), generated.Invoke(null, generatedArguments));
+        Assert.Equal(1, originalArguments[0]);
+        Assert.Equal(1, generatedArguments[0]);
+        originalArguments = [0, null];
+        generatedArguments = [0, null];
+        var originalFailure = Assert.Throws<TargetInvocationException>(() => original.Invoke(null, originalArguments));
+        Assert.IsType<NullReferenceException>(originalFailure.InnerException);
+        var failure = Assert.Throws<TargetInvocationException>(() => generated.Invoke(null, generatedArguments));
+        Assert.IsType<NullReferenceException>(failure.InnerException);
+    }
+
+    [Fact]
+    public void ObliviousZeroArgumentExtension_DoesNotAcquireAnInstanceNullGuard()
+    {
+        const string source = """
+            public static class Fixture
+            {
+                public static string Read(this string value) => value ?? "none";
+                public static string Probe(string value) => value.Read();
+            }
+            """;
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy, Mode = ConversionMode.Interop
+        }).Convert(source, "Extension.cs");
+        Assert.True(converted.Success, FormatIssues(converted));
+        Assert.Empty(converted.Losses);
+        var compiled = Program.Compile(converted.CalorSource!, "extension.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var generated = EmitInMemory(compiled.GeneratedCode, "", NullableContextOptions.Disable);
+        Assert.Equal("none", generated.GetType("Fixture")!.GetMethod("Probe")!.Invoke(null, [null]));
+        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+    }
+
+    [Fact]
+    public void ObliviousCallWithArguments_RetainsTheReceivingRefusal()
+    {
+        const string source = """
+            public static class Fixture
+            {
+                public static string Probe(string value, int width) => value.PadLeft(width);
+            }
+            """;
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy, Mode = ConversionMode.Interop
+        }).Convert(source, "Arguments.cs");
+        Assert.True(converted.Success, FormatIssues(converted));
+        var compiled = Program.Compile(converted.CalorSource!, "arguments.calr");
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+                && diagnostic.Message.StartsWith("Instance receiver", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ObliviousZeroArgumentReceiver_DoesNotGrantOpenObjectDispatchEffects()
+    {
+        const string source = """
+            public static class Fixture
+            {
+                public static int Probe(object value) => value.GetHashCode();
+            }
+            """;
+        var converted = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy, Mode = ConversionMode.Interop
+        }).Convert(source, "Object.cs");
+        Assert.True(converted.Success, FormatIssues(converted));
+        var compiled = Program.Compile(converted.CalorSource!, "object.calr", new CompilationOptions
+        {
+            StrictEffects = true, UnknownCallPolicy = Effects.UnknownCallPolicy.Strict,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
     }
 }

@@ -1,217 +1,210 @@
-// Interval booking scheduler over parallel arrays.
-// Booking i = [starts[i], ends[i]) with priority prios[i]; active[i] is 1
-// while the booking holds its slot and 0 once cancelled. count is the number
-// of booking records (including cancelled ones); capacity beyond count is
-// scratch space. Invariant: no two active bookings overlap.
-// Callers keep every time value in 0 .. 999999 so 32-bit arithmetic never wraps.
-§M{Scheduler}
-  §F{IsValidInterval:pub} (i32:s, i32:e) -> bool
-    §E{}
-    §R (&& (>= s 0) (< s e))
+module Scheduler Scheduler block
+  module SchedulerModule partial
+    func IsValidInterval (int:s, int:e) → bool
+      !
+      return ((s >= 0) && (s < e))
 
-  §F{Overlaps:pub} (i32:s1, i32:e1, i32:s2, i32:e2) -> bool
-    §E{}
-    §R (&& (< s1 e2) (< s2 e1))
+    func Overlaps (int:s1, int:e1, int:s2, int:e2) → bool
+      !
+      return ((s1 < e2) && (s2 < e1))
 
-  §F{ConflictIndex:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:s, i32:e) -> i32
-    §E{}
-    §Q (>= count 0)
-    §Q (<= count §LEN starts)
-    §Q (<= count §LEN ends)
-    §Q (<= count §LEN active)
-    §S (>= result -1)
-    §B{~i:i32} 0
-    §WH (< i count)
-      §IF (== §IDX active i 1)
-        §B{bs:i32} §IDX starts i
-        §B{be:i32} §IDX ends i
-        §B{ov:bool} §C{Overlaps} §A bs §A be §A s §A e §/C
-        §IF ov
-          §R i
-      §ASSIGN i (+ i 1)
-    §R -1
+    func ConflictIndex (int[]:starts, int[]:ends, int[]:active, int:count, int:s, int:e) → int
+      !
+      requires (count >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      => (result >= -1)
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:bs = starts[i]
+          let int:be = ends[i]
+          let bool:ov = Overlaps(bs, be, s, e)
+          if ov
+            return i
+        set i (i + 1)
+      return -1
 
-  §F{HasConflict:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:s, i32:e) -> bool
-    §E{}
-    §Q (>= count 0)
-    §Q (<= count §LEN starts)
-    §Q (<= count §LEN ends)
-    §Q (<= count §LEN active)
-    §B{idx:i32} §C{ConflictIndex} §A starts §A ends §A active §A count §A s §A e §/C
-    §R (>= idx 0)
+    func HasConflict (int[]:starts, int[]:ends, int[]:active, int:count, int:s, int:e) → bool
+      !
+      requires (count >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      let int:idx = ConflictIndex(starts, ends, active, count, s, e)
+      return (idx >= 0)
 
-  §F{AddBooking:pub} ([i32]:starts, [i32]:ends, [i32]:prios, [i32]:active, i32:count, i32:s, i32:e, i32:prio) -> i32
-    §E{mut}
-    §Q (>= count 0)
-    §Q (< count §LEN starts)
-    §Q (< count §LEN ends)
-    §Q (< count §LEN prios)
-    §Q (< count §LEN active)
-    §S (>= result -1)
-    §B{valid:bool} §C{IsValidInterval} §A s §A e §/C
-    §IF (! valid)
-      §R -1
-    §B{conflict:bool} §C{HasConflict} §A starts §A ends §A active §A count §A s §A e §/C
-    §IF conflict
-      §R -1
-    §SETIDX{starts} count s
-    §SETIDX{ends} count e
-    §SETIDX{prios} count prio
-    §SETIDX{active} count 1
-    §R (+ count 1)
+    func AddBooking (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:s, int:e, int:prio) → int
+      ! mut
+      requires (count >= 0)
+      requires (count < starts.Length)
+      requires (count < ends.Length)
+      requires (count < prios.Length)
+      requires (count < active.Length)
+      => (result >= -1)
+      let bool:valid = IsValidInterval(s, e)
+      if (!valid)
+        return -1
+      let bool:conflict = HasConflict(starts, ends, active, count, s, e)
+      if conflict
+        return -1
+      set starts[count] s
+      set ends[count] e
+      set prios[count] prio
+      set active[count] 1
+      return (count + 1)
 
-  §F{Cancel:pub} ([i32]:active, i32:count, i32:index) -> bool
-    §E{mut}
-    §Q (>= count 0)
-    §Q (>= index 0)
-    §Q (< index count)
-    §Q (<= count §LEN active)
-    §IF (== §IDX active index 1)
-      §SETIDX{active} index 0
-      §R BOOL:true
-    §R BOOL:false
+    func Cancel (int[]:active, int:count, int:index) → bool
+      ! mut
+      requires (count >= 0)
+      requires (index >= 0)
+      requires (index < count)
+      requires (count <= active.Length)
+      if (active[index] == 1)
+        set active[index] 0
+        return true
+      return false
 
-  §F{NextFreeStart:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:duration, i32:earliest, i32:horizon) -> i32
-    §E{}
-    §Q (>= count 0)
-    §Q (>= earliest 0)
-    §Q (<= count §LEN starts)
-    §Q (<= count §LEN ends)
-    §Q (<= count §LEN active)
-    §S (>= result -1)
-    §B{~t:i32} earliest
-    §WH (<= (+ t duration) horizon)
-      §B{te:i32} (+ t duration)
-      §B{idx:i32} §C{ConflictIndex} §A starts §A ends §A active §A count §A t §A te §/C
-      §IF (< idx 0)
-        §R t
-      §ASSIGN t §IDX ends idx
-    §R -1
+    func NextFreeStart (int[]:starts, int[]:ends, int[]:active, int:count, int:duration, int:earliest, int:horizon) → int
+      !
+      requires (count >= 0)
+      requires (earliest >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      => (result >= -1)
+      var int:t = earliest
+      while ((t + duration) <= horizon)
+        let int:te = (t + duration)
+        let int:idx = ConflictIndex(starts, ends, active, count, t, te)
+        if (idx < 0)
+          return t
+        set t ends[idx]
+      return -1
 
-  §F{ActiveCount:pub} ([i32]:active, i32:count) -> i32
-    §E{}
-    §Q (>= count 0)
-    §Q (<= count §LEN active)
-    §S (>= result 0)
-    §B{~n:i32} 0
-    §B{~i:i32} 0
-    §WH (< i count)
-      §IF (== §IDX active i 1)
-        §ASSIGN n (+ n 1)
-      §ASSIGN i (+ i 1)
-    §R n
+    func ActiveCount (int[]:active, int:count) → int
+      !
+      requires (count >= 0)
+      requires (count <= active.Length)
+      => (result >= 0)
+      var int:n = 0
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          set n (n + 1)
+        set i (i + 1)
+      return n
 
-  §F{OverlapLength:pub} (i32:s, i32:e, i32:winFrom, i32:winTo) -> i32
-    §E{}
-    §S (>= result 0)
-    §B{~lo:i32} s
-    §IF (> winFrom lo)
-      §ASSIGN lo winFrom
-    §B{~hi:i32} e
-    §IF (< winTo hi)
-      §ASSIGN hi winTo
-    §IF (<= hi lo)
-      §R 0
-    §R (- hi lo)
+    func OverlapLength (int:s, int:e, int:winFrom, int:winTo) → int
+      !
+      => (result >= 0)
+      var int:lo = s
+      if (winFrom > lo)
+        set lo winFrom
+      var int:hi = e
+      if (winTo < hi)
+        set hi winTo
+      if (hi <= lo)
+        return 0
+      return (hi - lo)
 
-  §F{BusyTime:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:winFrom, i32:winTo) -> i32
-    §E{}
-    §Q (>= count 0)
-    §Q (<= count §LEN starts)
-    §Q (<= count §LEN ends)
-    §Q (<= count §LEN active)
-    §B{~total:i32} 0
-    §B{~i:i32} 0
-    §WH (< i count)
-      §IF (== §IDX active i 1)
-        §B{bs:i32} §IDX starts i
-        §B{be:i32} §IDX ends i
-        §B{part:i32} §C{OverlapLength} §A bs §A be §A winFrom §A winTo §/C
-        §ASSIGN total (+ total part)
-      §ASSIGN i (+ i 1)
-    §R total
+    func BusyTime (int[]:starts, int[]:ends, int[]:active, int:count, int:winFrom, int:winTo) → int
+      !
+      requires (count >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      var int:total = 0
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:bs = starts[i]
+          let int:be = ends[i]
+          let int:part = OverlapLength(bs, be, winFrom, winTo)
+          set total (total + part)
+        set i (i + 1)
+      return total
 
-  §F{UtilizationPercent:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:winFrom, i32:winTo) -> i32
-    §E{}
-    §Q (>= count 0)
-    §Q (>= winFrom 0)
-    §Q (< winFrom winTo)
-    §Q (<= count §LEN starts)
-    §Q (<= count §LEN ends)
-    §Q (<= count §LEN active)
-    §B{busy:i32} §C{BusyTime} §A starts §A ends §A active §A count §A winFrom §A winTo §/C
-    §R (/ (* busy 100) (- winTo winFrom))
+    func UtilizationPercent (int[]:starts, int[]:ends, int[]:active, int:count, int:winFrom, int:winTo) → int
+      !
+      requires (count >= 0)
+      requires (winFrom >= 0)
+      requires (winFrom < winTo)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      let int:busy = BusyTime(starts, ends, active, count, winFrom, winTo)
+      return ((busy * 100) / (winTo - winFrom))
 
-  §F{PriorityAt:pub} ([i32]:starts, [i32]:ends, [i32]:prios, [i32]:active, i32:count, i32:t) -> i32
-    §E{}
-    §Q (>= count 0)
-    §Q (<= count §LEN starts)
-    §Q (<= count §LEN ends)
-    §Q (<= count §LEN prios)
-    §Q (<= count §LEN active)
-    §B{~i:i32} 0
-    §WH (< i count)
-      §IF (== §IDX active i 1)
-        §B{bs:i32} §IDX starts i
-        §B{be:i32} §IDX ends i
-        §IF (&& (<= bs t) (< t be))
-          §R §IDX prios i
-      §ASSIGN i (+ i 1)
-    §R -1
+    func PriorityAt (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:t) → int
+      !
+      requires (count >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= prios.Length)
+      requires (count <= active.Length)
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:bs = starts[i]
+          let int:be = ends[i]
+          if ((bs <= t) && (t < be))
+            return prios[i]
+        set i (i + 1)
+      return -1
 
-  §F{AddWithPreemption:pub} ([i32]:starts, [i32]:ends, [i32]:prios, [i32]:active, i32:count, i32:s, i32:e, i32:prio, i32:horizon) -> i32
-    §E{mut}
-    §Q (>= count 0)
-    §Q (< count §LEN starts)
-    §Q (< count §LEN ends)
-    §Q (< count §LEN prios)
-    §Q (< count §LEN active)
-    §S (>= result -1)
-    §B{valid:bool} §C{IsValidInterval} §A s §A e §/C
-    §IF (! valid)
-      §R -1
-    // Reject when any conflicting active booking has priority >= prio.
-    §B{~blocked:bool} BOOL:false
-    §B{~i:i32} 0
-    §WH (< i count)
-      §IF (== §IDX active i 1)
-        §B{bs:i32} §IDX starts i
-        §B{be:i32} §IDX ends i
-        §B{ov:bool} §C{Overlaps} §A bs §A be §A s §A e §/C
-        §IF ov
-          §IF (>= §IDX prios i prio)
-            §ASSIGN blocked BOOL:true
-      §ASSIGN i (+ i 1)
-    §IF blocked
-      §R -1
-    // Remove every conflicting booking from the timetable (mark pending = 2).
-    §ASSIGN i 0
-    §WH (< i count)
-      §IF (== §IDX active i 1)
-        §B{cs:i32} §IDX starts i
-        §B{ce:i32} §IDX ends i
-        §B{ov2:bool} §C{Overlaps} §A cs §A ce §A s §A e §/C
-        §IF ov2
-          §SETIDX{active} i 2
-      §ASSIGN i (+ i 1)
-    // Place the new booking.
-    §SETIDX{starts} count s
-    §SETIDX{ends} count e
-    §SETIDX{prios} count prio
-    §SETIDX{active} count 1
-    §B{newCount:i32} (+ count 1)
-    // Re-place displaced bookings in increasing index order.
-    §ASSIGN i 0
-    §WH (< i count)
-      §IF (== §IDX active i 2)
-        §B{ds:i32} §IDX starts i
-        §B{de:i32} §IDX ends i
-        §B{dur:i32} (- de ds)
-        §SETIDX{active} i 0
-        §B{slot:i32} §C{NextFreeStart} §A starts §A ends §A active §A newCount §A dur §A e §A horizon §/C
-        §IF (>= slot 0)
-          §SETIDX{starts} i slot
-          §SETIDX{ends} i (+ slot dur)
-          §SETIDX{active} i 1
-      §ASSIGN i (+ i 1)
-    §R newCount
+    func AddWithPreemption (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:s, int:e, int:prio, int:horizon) → int
+      ! mut
+      requires (count >= 0)
+      requires (count < starts.Length)
+      requires (count < ends.Length)
+      requires (count < prios.Length)
+      requires (count < active.Length)
+      => (result >= -1)
+      let bool:valid = IsValidInterval(s, e)
+      if (!valid)
+        return -1
+      var bool:blocked = false
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:bs = starts[i]
+          let int:be = ends[i]
+          let bool:ov = Overlaps(bs, be, s, e)
+          if ov
+            if (prios[i] >= prio)
+              set blocked true
+        set i (i + 1)
+      if blocked
+        return -1
+      set i 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:cs = starts[i]
+          let int:ce = ends[i]
+          let bool:ov2 = Overlaps(cs, ce, s, e)
+          if ov2
+            set active[i] 2
+        set i (i + 1)
+      set starts[count] s
+      set ends[count] e
+      set prios[count] prio
+      set active[count] 1
+      let int:newCount = (count + 1)
+      set i 0
+      while (i < count)
+        if (active[i] == 2)
+          let int:ds = starts[i]
+          let int:de = ends[i]
+          let int:dur = (de - ds)
+          set active[i] 0
+          let int:slot = NextFreeStart(starts, ends, active, newCount, dur, e, horizon)
+          if (slot >= 0)
+            set starts[i] slot
+            set ends[i] (slot + dur)
+            set active[i] 1
+        set i (i + 1)
+      return newCount
+
+

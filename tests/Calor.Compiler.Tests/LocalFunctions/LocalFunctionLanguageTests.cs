@@ -74,9 +74,11 @@ public class LocalFunctionLanguageTests
         var source = """
             module TypeShadow
               func Add public (string:x) → string
+                !
                 return x + "!"
 
               func Use public () → int
+                !
                 let Func<int,int>:Add = static (int:x) =>
                   return x + 1
                 let y = Add(2)
@@ -142,7 +144,7 @@ public class LocalFunctionLanguageTests
     [InlineData("func L (int:x) → System.Collections.Generic.IEnumerable<int>\n      yield x\n    return 0", "iterator", 1)]
     public void RetiredLocal_OutsideTheShape_IsRejectedWithLambdaGuidance(string body, string message, int expectedCount)
     {
-        var source = "module Bad\n  func Outer public (int:n) → int\n    " + body + "\n";
+        var source = "module Bad\n  func Outer public (int:n) → int\n    !\n    " + body + "\n";
         var compilation = Program.Compile(source, "bad.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(compilation.HasErrors, message);
@@ -160,6 +162,7 @@ public class LocalFunctionLanguageTests
                 field int:n private = 5
 
                 func Get public (int:n) → int
+                  !
                   let Func<int,int>:AddN = static (int:x) =>
                     return x + n
                   return AddN(1)
@@ -179,12 +182,14 @@ public class LocalFunctionLanguageTests
             module Ver
               module Probe
                 func Five public () → int
+                  !
                   => result == 5
                   let Func<int>:Value = static () =>
                     return {{returned}}
                   return Value()
 
                 func Run public () → string
+                  !
                   return "" + Five()
             """;
         var compilation = CompileNative(source, "ver.calr", new CompilationOptions
@@ -236,6 +241,7 @@ public class LocalFunctionLanguageTests
         var source = """
             module Cap
               func Add public (int:x) → int
+                !
                 return x + 1000
               module Probe
                 func Get public (Func<int,int>:Add !) → int
@@ -293,8 +299,10 @@ public class LocalFunctionLanguageTests
             module Binder
               module Probe
                 func Add public (string:x) → string
+                  !
                   return x
                 func M public () → int
+                  !
                   let Func<int,int>:Add = static (int:x) =>
                     return x + 1
                   let Func<Func<int,int>,int>:Other = static (Func<int,int>:Add) =>
@@ -365,9 +373,11 @@ public class LocalFunctionLanguageTests
         var source = """
             module Cap
               func Add public (int:x) → int
+                !
                 return x + 1000
               module Probe
                 func Get public (object:o) → int
+                  !
                   if o is Func<int,int> Add
                     return 1
                   let Func<int>:L = static () =>
@@ -431,7 +441,7 @@ public class LocalFunctionLanguageTests
             + "    field Func<int,int>:Saved public !\n"
             + "    func Take public (Func<int,int>:g !) → int\n      !\n      return g(1)\n"
             + "    func Get public (Func<int,int>:f) → Func<int,int> !\n      ! cw,mut\n      "
-            + body + "\n      func Help (int:x) → int\n        System.Console.WriteLine(\"hidden\")\n        return x\n";
+            + body + "\n      func Help (int:x) → int\n        !\n        System.Console.WriteLine(\"hidden\")\n        return x\n";
         var compilation = Program.Compile(source, "r3.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         AssertRetiredLocal(compilation);
@@ -449,6 +459,7 @@ public class LocalFunctionLanguageTests
                 ! alloc
                 return new int[0]
               func Use public (List<int>:xs) → List<int>
+                !
                 let Func<List<int>,List<int>>:Add = static (List<int>:xs) =>
                   return xs
                 let List<int>:y = {{target}}(xs)
@@ -469,6 +480,7 @@ public class LocalFunctionLanguageTests
             module ArgumentShadow
               using System.Collections.Generic
               func Pick public (List<int>:xs) → int
+                !
                 return 0
               func Use public () → int
                 ! alloc
@@ -543,7 +555,7 @@ public class LocalFunctionLanguageTests
                 !{{(moduleWrites ? " cw" : "")}}
                 {{(moduleWrites ? "System.Console.WriteLine(\"wrong\")" : "")}}
                 return value + 1000
-              func Use public ({{type}}:Add{{row}}, int:value) → int
+              func Use public ({{type}}:Add{{(row.Length == 0 ? " ! unknown" : row)}}, int:value) → int
                 !
                 return Add.Invoke(value)
             """;

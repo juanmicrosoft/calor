@@ -171,7 +171,7 @@ public sealed class ImplicitSystemContextTests(ITestOutputHelper output)
     [Fact]
     public void NativeSource_UsesSystemContextWithoutChangingEmission()
     {
-        const string source = "module Demo\n  func Identity (Exception:value) \u2192 Exception\n    return value\n";
+        const string source = "module Demo\n  func Identity (Exception:value) → Exception\n    !\n    return value\n";
         var standalone = Program.Compile(source);
         var project = Program.Compile(source, null, new CompilationOptions
         {

@@ -1,11 +1,14 @@
 module BubbleSort BubbleSort
   module BubbleSortModule
     func NeedsSwap public (int:a, int:b) → bool
+      !
       return a > b
 
     func PassEnd public (int:length, int:pass) → int
+      !
       requires length > 0
       return length - (pass + 1)
 
     func TotalPasses public (int:length) → int
+      !
       return length - 1

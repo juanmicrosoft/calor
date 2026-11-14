@@ -40,6 +40,32 @@ public class NullabilityIntegrationTests
         => Assert.IsType<BoundCallExpression>(
             Assert.IsType<BoundExpressionStatement>(statement).Expression);
 
+    [Theory]
+    [InlineData("string", "result.Length > 0", "\"safe\"", false, false)]
+    [InlineData("string?", "result.Length > 0", "null", true, false)]
+    [InlineData("string?", "result == null || result.Length > 0", "null", false, false)]
+    [InlineData("string", "result.Length > 0", "null", false, true)]
+    public void PostconditionResult_PreservesDeclaredStringNullability(
+        string returnType, string condition, string value, bool nullableReceiver, bool nullableReturn)
+    {
+        var source = $$"""
+            module ContractResult
+              func Get public () → {{returnType}}
+                !
+                => {{condition}}
+                return {{value}}
+            """;
+
+        var result = Calor.Compiler.Program.Compile(source, "contract-result.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+
+        Assert.Equal(nullableReceiver, result.Diagnostics.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(nullableReturn, result.Diagnostics.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.Equal(nullableReceiver || nullableReturn, result.HasErrors);
+    }
+
     [Fact]
     public void LiteralNull_TriggersAllScalarReceivingDiagnostics()
     {
@@ -48,6 +74,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public () → string
+                !
                 let string:required = null
                 Take(null)
                 return null
@@ -72,6 +99,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (bool:flag) → string
+                !
                 let string:required = flag ? null : "safe"
                 Take(flag ? "safe" : null)
                 return flag ? null : "safe"
@@ -92,6 +120,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module UnrelatedConditionalNull
               func Probe public (bool:flag) → void
+                !
                 let string:required = flag ? null : 1
             """;
 
@@ -116,6 +145,7 @@ public class NullabilityIntegrationTests
                 func Take public static ({{parameterType}}:value) → void
                   !
                 func Probe public static () → void
+                  !
                   Foo.Take(null)
             """;
 
@@ -138,10 +168,13 @@ public class NullabilityIntegrationTests
             module NullOverloadIdentity
               class Foo public
                 func Take public static (string:value) → int
+                  !
                   return 1
                 func Take public static (Foo:value) → int
+                  !
                   return 2
                 func Probe public static () → int
+                  !
                   return Foo.Take(null)
             """;
 
@@ -159,10 +192,13 @@ public class NullabilityIntegrationTests
         const string source = """
             module NullOverloadSpecificity
               func Take public (string:value) → int
+                !
                 return 1
               func Take public (object:value) → int
+                !
                 return 2
               func Probe public () → int
+                !
                 return Take(null)
             """;
 
@@ -188,10 +224,13 @@ public class NullabilityIntegrationTests
               class Child public
                 extends Parent
                 func Take public static (Parent:value) → int
+                  !
                   return 1
                 func Take public static (Child:value) → int
+                  !
                   return 2
                 func Probe public static () → int
+                  !
                   return Child.Take(null)
             """;
 
@@ -220,6 +259,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value) → void
+                !
                 if value is string
                   Mutate({{modifier}} value)
                   Take(value)
@@ -242,6 +282,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value, string:replacement) → void
+                !
                 if value is string
                   System.Threading.Interlocked.Exchange(ref value, replacement)
                   Take(value)
@@ -262,6 +303,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value, string?:replacement, bool:flag) → void
+                !
                 var candidate = value
                 if string.IsNullOrEmpty(candidate)
                   return
@@ -296,6 +338,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value) → string
+                !
                 if {{target}}(value)
                   return "fallback"
                 let string:copy = value
@@ -327,10 +370,12 @@ public class NullabilityIntegrationTests
               using Text = System.String
               class Pretender public
                 func {{method}} public {{(alias ? "" : "static ")}}(string?:value) → bool
+                  !
                   return false
               func Take public (string:value) → void
                 !
               func Probe public (string?:value) → string
+                !
                 {{(alias ? "let Text = new Pretender()" : "")}}
                 if {{target}}.{{method}}(value)
                   return "fallback"
@@ -370,6 +415,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value) → void
+                !
                 if string.IsNullOrEmpty(value)
                   Take(value)
                 else
@@ -401,9 +447,11 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Mutate public (ref string?:value) → bool
+                !
                 set value null
                 return false
               func Probe public (string?:value, bool:flag) → void
+                !
                 if string.IsNullOrEmpty(value)
                   return
                 else if {{condition}}
@@ -428,7 +476,8 @@ public class NullabilityIntegrationTests
             module DirectDelegate
               class Envelope<T> public
               class Foo public
-                func Probe public static (Action<string>:takeString, Action<string[]>:takeArray, Action<Envelope<string>>:takeEnvelope, Action<Foo>:takeFoo, string?:value) → void
+                func Probe public static (Action<string>:takeString ! unknown, Action<string[]>:takeArray ! unknown, Action<Envelope<string>>:takeEnvelope ! unknown, Action<Foo>:takeFoo ! unknown, string?:value) → void
+                  !
                   takeString(value)
                   takeString(null)
                   takeArray(null)
@@ -461,6 +510,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value, string?:replacement) → string
+                !
                 var candidate = value
                 if string.IsNullOrEmpty(candidate)
                   return "fallback"
@@ -489,6 +539,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value, string?:replacement, bool:flag) → string
+                !
                 var candidate = value
                 if candidate is string
                   if flag
@@ -518,6 +569,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value, string?:replacement) → string
+                !
                 var candidate = value
                 if candidate is string
                   {{mutation}}
@@ -547,6 +599,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value, string?:replacement) → string
+                !
                 var candidate = value
                 if candidate is string
                   if candidate is string
@@ -575,6 +628,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value) → string
+                !
                 if string.IsNullOrEmpty(value)
                   yield "fallback"
                 let string:required = value
@@ -605,6 +659,7 @@ public class NullabilityIntegrationTests
               func Take public ({{type}}:value) → void
                 !
               func Probe public ({{type}}?:value, {{type}}?:other) → {{type}}
+                !
                 if {{condition}}
                   return {{(type == "string" ? "\"fallback\"" : "new Item()")}}
                 let {{type}}:copy = value
@@ -631,6 +686,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value, bool:flag) → void
+                !
                 if {{condition}}
                   {{(terminates ? "return" : "let bool:observed = true")}}
                 Take(value)
@@ -659,6 +715,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value, bool:flag) → void
+                !
                 if value == null
                   {{body.Replace("\n", "\n      ", StringComparison.Ordinal)}}
                 Take(value)
@@ -677,6 +734,7 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Probe public (string?:value) → void
+                !
                 if value == null
                   goto after
                   return
@@ -708,6 +766,7 @@ public class NullabilityIntegrationTests
               func Take public (Item:value) → void
                 !
               func Probe public (Item?:value) → void
+                !
                 if value == null
                   return
                 Take(value)
@@ -731,12 +790,15 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Mutate public (ref string?:value) → bool
+                !
                 set value null
                 return false
               func MutateOut public (out string?:value) → bool
+                !
                 set value null
                 return false
               func Probe public (string?:value, string?:replacement) → void
+                !
                 var candidate = value
                 let Func<bool>:change = () => Mutate(ref candidate)
                 if candidate == null
@@ -768,12 +830,15 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Mutate public (ref string?:value) → bool
+                !
                 set value null
                 return false
               func MutateOut public (out string?:value) → bool
+                !
                 set value null
                 return false
               func Probe public (string?:value, string?:other) → void
+                !
                 var candidate = value
                 let Func<bool>:change = () => Mutate(ref candidate)
                 if (candidate == null) || {{right}}
@@ -801,6 +866,7 @@ public class NullabilityIntegrationTests
                 func Take public (string:value) → void
                   !
                 func Probe public () → void
+                  !
                   if Value == null
                     return
                   Take(Value)
@@ -824,6 +890,7 @@ public class NullabilityIntegrationTests
                 func Take public (string:value) → void
                   !
                 func Probe public () → void
+                  !
                   if Value == null
                     return
                   Take(Value)
@@ -851,6 +918,7 @@ public class NullabilityIntegrationTests
                 func Take public (string:value) → void
                   !
                 func Probe public (Holder:other) → string
+                  !
                   if {{value}} == null
                     return "fallback"
                   let string:copy = {{value}}
@@ -874,6 +942,7 @@ public class NullabilityIntegrationTests
                 func Take public (string:value) → void
                   !
                 func Probe public (Holder:left, Holder:right, Holder:uncheckedReceiver) → void
+                  !
                   if (Value == null) || ((left . Value == null) || (right . Value == null))
                     return
                   Take(Value)
@@ -905,12 +974,15 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Mutate public (ref Holder:target, Holder:replacement) → bool
+                !
                 set target replacement
                 return false
               func MutateOut public (out Holder:target, Holder:replacement) → bool
+                !
                 set target replacement
                 return false
               func Probe public (Holder:value, Holder:replacement, Holder:other, bool:flag) → void
+                !
                 var candidate = value
                 let Func<bool>:change = () => Mutate(ref candidate, replacement)
                 if (candidate . Value == null) || (other . Value == null)
@@ -943,9 +1015,11 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Mutate public (ref Holder:target, Holder:replacement) → bool
+                !
                 set target replacement
                 return false
               func Probe public (Holder:value, Holder:replacement, Holder:other) → void
+                !
                 var candidate = value
                 if (candidate . Value == null) || {{right}}
                   return
@@ -974,6 +1048,7 @@ public class NullabilityIntegrationTests
                 func Take public (string:value) → void
                   !
                 func Probe public () → void
+                  !
                   if Value == null
                     return
                   Take(Value)
@@ -999,6 +1074,7 @@ public class NullabilityIntegrationTests
                 func Take public (string:value) → void
                   !
                 func Probe public () → void
+                  !
                   if Value == null
                     {{(terminates ? "return" : "let bool:observed = true")}}
                   Take(Value)
@@ -1030,6 +1106,7 @@ public class NullabilityIntegrationTests
                   set Value null
                   Take(Value)
                 func Probe public () → void
+                  !
                   if (Child . Value == null)
                     return
                   Take(Child . Value)
@@ -1052,8 +1129,10 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Mutate public (ref Holder:target, Holder:replacement) → void
+                !
                 set target replacement
               func Probe public (ref Holder:first, ref Holder:second, Holder:replacement) → void
+                !
                 if (first . Value == null)
                   return
                 Mutate(ref second, replacement)
@@ -1079,6 +1158,7 @@ public class NullabilityIntegrationTests
                 func Take public (string:value) → void
                   !
                 func Probe public () → void
+                  !
                   pp FEATURE
                     {{(missingWhenDefined ? "Missing()" : "let bool:observed = true")}}
                   pp else
@@ -1107,8 +1187,10 @@ public class NullabilityIntegrationTests
               func Take public (string:value) → void
                 !
               func Mutate public (ref Holder:target, Holder:replacement) → void
+                !
                 set target replacement
               func Probe public (Holder:value, Holder:replacement, bool:flag) → void
+                !
                 var candidate = value
                 if (candidate . Value == null)
                   return
@@ -1134,6 +1216,7 @@ public class NullabilityIntegrationTests
                 func Take public (string:value) → void
                   !
                 func Probe public (bool:flag) → void
+                  !
                   if flag
                     goto after
                   if Value == null
@@ -1155,15 +1238,21 @@ public class NullabilityIntegrationTests
             module NestedDelegates
               class NullableOwner public
                 delegate Handler public () → string?
-                func Probe public (Handler:handler) → string
+                  ! unknown
+                func Probe public (Handler:handler ! unknown) → string
+                  !
                   return handler()
               class NonNullOwner public
                 delegate Handler public () → string
-                func Probe public (Handler:handler) → string
+                  ! unknown
+                func Probe public (Handler:handler ! unknown) → string
+                  !
                   return handler()
               class UniqueOwner public
                 delegate NullableReader public () → string?
-                func Probe public (UniqueOwner.NullableReader:reader) → string
+                  ! unknown
+                func Probe public (UniqueOwner.NullableReader:reader ! unknown) → string
+                  !
                   return reader()
             """;
 
@@ -1210,7 +1299,8 @@ public class NullabilityIntegrationTests
     {
         const string source = """
             module DelegateInvoke
-              func Probe public (Func<string?>:read) → string
+              func Probe public (Func<string?>:read ! unknown) → string
+                !
                 return read.Invoke()
             """;
 
@@ -1234,6 +1324,7 @@ public class NullabilityIntegrationTests
                 !
                 return 2
               func Probe public (string?:value) → int
+                !
                 if value is string
                   return Mutate(ref value)
                 return 0
@@ -1286,8 +1377,10 @@ public class NullabilityIntegrationTests
             module NativeMapping
               class Bar public
                 func Take public (Bar:required, Bar?:optional) → int
+                  !
                   return 1
                 func Caller public (Bar?:maybe, Bar:sure) → int
+                  !
                   {{(expression ? "return " : "")}}{{call}}
                   {{(expression ? "" : "return 0")}}
             """;
@@ -1328,6 +1421,7 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module BclMapping
               func Caller public (string?:maybe) → string
+                !
                 {{(expression ? "return " : "")}}{{call}}
                 {{(expression ? "" : "return \"done\"")}}
             """;
@@ -1363,6 +1457,7 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module BclParams
               func Caller public (string?:maybe) → string
+                !
                 {{(expression ? "return " : "")}}System.IO.Path.Combine({{args}})
                 {{(expression ? "" : "return \"done\"")}}
             """;
@@ -1461,10 +1556,13 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module RejectedMappings
               func Pick public (float:required) → int
+                !
                 return 1
               func Pick public (decimal:required) → int
+                !
                 return 2
               func Caller public () → int
+                !
                 {{(expression ? "return " : "")}}Pick(required: {{(ambiguous ? "1" : "true")}})
                 {{(expression ? "" : "return 0")}}
             """;
@@ -1580,6 +1678,7 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module NominalMapping
               func Probe public () → void
+                !
                 {{(expression ? "let permissions = " : "")}}{{call}}
             """;
         var (bound, diagnostics) = BindSource(source);
@@ -1608,14 +1707,17 @@ public class NullabilityIntegrationTests
             module LexicalMapping A
               class Foo public
                 func Get public static () → Foo?
+                  !
                   return new Foo()
                 func Take public static (Foo:required, Foo?:optional) → int
+                  !
                   return 1
             """;
         var consumer = $$"""
             module LexicalMapping B
               class Foo public
                 func Probe public static () → int
+                  !
                   {{(expression ? "return " : "")}}A.Foo.Take(optional: A.Foo.Get(), required: A.Foo.Get())
                   {{(expression ? "" : "return 0")}}
             """;
@@ -1673,8 +1775,10 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module LocalMapping
               func Take public (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) → int
+                !
                 return 1
               func Probe public () → void
+                !
                 let first = System.IO.Directory.{{producer}}("/")
                 let second = first
                 let safe = System.IO.Directory.CreateDirectory("/")
@@ -1781,6 +1885,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module LocalLiteral
               func Ok public () → void
+                !
                 let string:greeting = "hello"
             """;
 
@@ -1801,6 +1906,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module Interp
               func Ok public () → void
+                !
                 let string:name = "world"
                 let string:greeting = "hello, ${name}"
             """;
@@ -1824,6 +1930,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module Concat
               func Ok public () → void
+                !
                 let string:a = "hello"
                 let string:b = "world"
                 let string:joined = a + b
@@ -1846,6 +1953,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module NameOf
               func Ok public () → void
+                !
                 let string:a = "hello"
                 let string:name = nameof(a)
             """;
@@ -1939,6 +2047,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module Trim
               func Ok public () → void
+                !
                 let string:a = "  hello  "
                 let string:trimmed = a.Trim()
             """;
@@ -1955,6 +2064,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module Substr
               func Ok public () → void
+                !
                 let string:a = "hello"
                 let string:sub = a.Substring(0, 3)
             """;
@@ -1983,6 +2093,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module ToStr
               func Bad public (object:n) → void
+                !
                 let string:s = n.ToString()
             """;
 
@@ -2009,6 +2120,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module ToStr
               func Ok public (string:value) → void
+                !
                 let string:s = value.ToString()
             """;
 
@@ -2033,6 +2145,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module Tern
               func Ok public () → void
+                !
                 let string:picked = true ? "yes" : "no"
             """;
 
@@ -2235,6 +2348,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module VarFlow
               func Ok public () → void
+                !
                 let string:a = "x"
                 let string:b = a
             """;
@@ -2258,6 +2372,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module NullableVar
               func Bad public () → void
+                !
                 let string?:a = "x"
                 let string:b = a
             """;
@@ -2284,6 +2399,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module TernVar
               func Ok public () → void
+                !
                 let string:a = "x"
                 let string:r = true ? a : "safe"
             """;
@@ -2436,6 +2552,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module S4Literal
               func Hi public () → string
+                !
                 return "hello"
             """;
 
@@ -2457,6 +2574,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module S4Int
               func Answer public () → int
+                !
                 return 42
             """;
 
@@ -2545,6 +2663,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module InferredOk
               func Ok public () → void
+                !
                 let a = "hi"
                 let string:b = a
             """;
@@ -2609,6 +2728,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module S4Repro
               func Bad public () → void
+                !
                 let string:contents = System.IO.File.ReadAllText(System.Environment.GetEnvironmentVariable("PATH"))
             """;
 
@@ -2673,6 +2793,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module S4IntParam
               func Ok public () → void
+                !
                 let int:v = System.Math.Abs(-3)
             """;
 
@@ -2693,6 +2814,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module S4Message
               func Bad public () → void
+                !
                 let string:contents = System.IO.File.ReadAllText(System.Environment.GetEnvironmentVariable("PATH"))
             """;
 
@@ -2761,6 +2883,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module ParamOk
               func Ok public (string:name) → void
+                !
                 let string:copy = name
             """;
 
@@ -2782,6 +2905,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module ParamBad
               func Bad public (string?:name) → void
+                !
                 let string:copy = name
             """;
 
@@ -2881,6 +3005,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module LamOk
               func Use public () → void
+                !
                 let f = (string:name) => name
             """;
 
@@ -2899,6 +3024,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module LamNullable
               func Use public () → void
+                !
                 let f = (string?:name) => name
             """;
 
@@ -2966,6 +3092,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module ForeachStr
               func Use public (string[]:items) → void
+                !
                 each string:s in items
                   System.Console.WriteLine(s)
             """;
@@ -2985,6 +3112,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module ForeachNullStr
               func Use public (string?[]:items) → void
+                !
                 each string?:s in items
                   System.Console.WriteLine(s)
             """;
@@ -3002,6 +3130,7 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module NullableLoop
               func Probe public ({{typeName}}[]:items) → void
+                !
                 each {{typeName}}:item in items
                   let {{typeName}}:copy = item
             """;
@@ -3034,6 +3163,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module IntParam
               func Ok public (int:n) → void
+                !
                 var x = n
             """;
 
@@ -3212,6 +3342,7 @@ public class NullabilityIntegrationTests
         const string source = """
             module S5Call
               func Bad public () → void
+                !
                 let string:contents = System.IO.File.ReadAllText(System.Environment.GetEnvironmentVariable("PATH"))
             """;
 
@@ -3248,6 +3379,7 @@ public class NullabilityIntegrationTests
         const string callSource = """
             module S5Call
               func Bad public () → void
+                !
                 let string:contents = System.IO.File.ReadAllText(System.Environment.GetEnvironmentVariable("PATH"))
             """;
 
@@ -3589,6 +3721,7 @@ public class NullabilityIntegrationTests
             module S8Bind
               class Foo public
                 func Use public (Foo?:a) → void
+                  !
                   let Foo:b = a
             """;
 
@@ -3612,6 +3745,7 @@ public class NullabilityIntegrationTests
             module S8Roundtrip
               class Foo public
                 func Use public (Foo:a) → void
+                  !
                   let Foo:b = a
             """;
 
@@ -3634,6 +3768,7 @@ public class NullabilityIntegrationTests
             module S8Return
               class Foo public
                 func Get public (Foo?:a) → Foo
+                  !
                   return a
             """;
 
@@ -3801,8 +3936,10 @@ public class NullabilityIntegrationTests
             module F3AUserRefOk
               class Bar public
                 func Take public (Bar:a) → Bar
+                  !
                   return a
                 func Caller public (Bar:x) → Bar
+                  !
                   return this.Take(x)
             """;
 
@@ -3828,8 +3965,10 @@ public class NullabilityIntegrationTests
             module F3AUserRefNullableParam
               class Bar public
                 func Take public (Bar?:a) → Bar
+                  !
                   return a
                 func Caller public (Bar?:x) → Bar
+                  !
                   return this.Take(x)
             """;
 
@@ -3863,8 +4002,10 @@ public class NullabilityIntegrationTests
             module F3AUserRef
               class Bar public
                 func Take public (Bar:a) → Bar
+                  !
                   return a
                 func Caller public (Bar?:x) → Bar
+                  !
                   return this.Take(x)
             """;
 
@@ -3900,8 +4041,10 @@ public class NullabilityIntegrationTests
         const string source = """
             module F3BNullableStringReturn
               func GetFoo public () → string?
+                !
                 return "hi"
               func Use public () → void
+                !
                 let string?:tmp = GetFoo()
             """;
 
@@ -3932,8 +4075,10 @@ public class NullabilityIntegrationTests
         const string source = """
             module F3BNonNullStringReturn
               func GetFoo public () → string
+                !
                 return "hi"
               func Use public () → void
+                !
                 let string:tmp = GetFoo()
             """;
 
@@ -3968,8 +4113,10 @@ public class NullabilityIntegrationTests
             module F3BNullableUserClassReturn
               class Foo public
                 func GetFoo public static (Foo?:x) → Foo?
+                  !
                   return x
                 func Use public static (Foo?:y) → void
+                  !
                   let Foo?:tmp = Foo.GetFoo(y)
             """;
 
@@ -4002,8 +4149,10 @@ public class NullabilityIntegrationTests
             module F3BNonNullUserClassReturn
               class Foo public
                 func GetFoo public static (Foo:x) → Foo
+                  !
                   return x
                 func Use public static (Foo:y) → void
+                  !
                   let Foo:tmp = Foo.GetFoo(y)
             """;
 
@@ -4046,6 +4195,7 @@ public class NullabilityIntegrationTests
             module NewNoArgs
               class Foo public
                 func Make public static () → Foo
+                  !
                   return new Foo()
             """;
 
@@ -4071,6 +4221,7 @@ public class NullabilityIntegrationTests
               class Foo public
                 ctor public (int:x)
                 func Make public static () → Foo
+                  !
                   return new Foo(1)
             """;
 
@@ -4096,6 +4247,7 @@ public class NullabilityIntegrationTests
             module NewIntoNonNull
               class Foo public
                 func Make public static () → void
+                  !
                   let Foo:b = new Foo()
             """;
 
@@ -4106,13 +4258,13 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("let string[]:copy = value", "func Probe public (string[]?:value) → void",
+    [InlineData("let string[]:copy = value", "func Probe public (string[]?:value) → void\n  !",
         DiagnosticCode.NullableToNonNullableBinding)]
-    [InlineData("return value", "func Probe public (string[]?:value) → string[]",
+    [InlineData("return value", "func Probe public (string[]?:value) → string[]\n  !",
         DiagnosticCode.NullableReturnFromNonNullable)]
-    [InlineData("let string[]:copy = value", "func Probe public (string?[]:value) → void",
+    [InlineData("let string[]:copy = value", "func Probe public (string?[]:value) → void\n  !",
         DiagnosticCode.NullableToNonNullableBinding)]
-    [InlineData("return value", "func Probe public (string?[]:value) → string[]",
+    [InlineData("return value", "func Probe public (string?[]:value) → string[]\n  !",
         DiagnosticCode.NullableReturnFromNonNullable)]
     public void StageB_ArrayVariablesAreCheckedOutsideMethodArguments(
         string statement, string signature, string expectedCode)
@@ -4127,16 +4279,16 @@ public class NullabilityIntegrationTests
     }
 
     [Theory]
-    [InlineData("return value", "func Probe public (IEnumerable<string?>:value) → IEnumerable<string>",
+    [InlineData("return value", "func Probe public (IEnumerable<string?>:value) → IEnumerable<string>\n  !",
         DiagnosticCode.NullableReturnFromNonNullable)]
     [InlineData("return Take(value)",
-        "func Probe public (IEnumerable<string?>:value) → IEnumerable<string>",
+        "func Probe public (IEnumerable<string?>:value) → IEnumerable<string>\n  !",
         DiagnosticCode.NullableArgumentToNonNullableParameter)]
     public void StageB_GenericVariablePayloadNullabilitySurvivesReferences(
         string statement, string signature, string expectedCode)
     {
         var helper = expectedCode == DiagnosticCode.NullableArgumentToNonNullableParameter
-            ? "func Take public (IEnumerable<string>:value) → IEnumerable<string>\n    return value"
+            ? "func Take public (IEnumerable<string>:value) → IEnumerable<string>\n  !\n    return value"
             : "";
         var source = $$"""
             module GenericBoundary
@@ -4175,10 +4327,12 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module GenericCallResult
               func Give public () → IEnumerable<string?>
+                !
                 throw null
               func Take public (IEnumerable<string>:value) → void
                 !
               func Probe public () → IEnumerable<string>
+                !
                 {{statement}}
                 throw null
             """;
@@ -4222,6 +4376,7 @@ public class NullabilityIntegrationTests
               func Take public (List<List<string>>:value) → void
                 !
               func Probe public (List<List<string?>>:value) → void
+                !
                 Take(value)
             """;
 
@@ -4242,6 +4397,7 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module NullableGenericContainer
               func Probe public ({{sourceType}}:value) → List<string>
+                !
                 if value != null
                   return value
                 throw null
@@ -4261,8 +4417,10 @@ public class NullabilityIntegrationTests
         var source = $$"""
             module NullableGenericCall
               func Give public () → {{returnType}}
+                !
                 throw null
               func Probe public () → List<string>
+                !
                 return Give()
             """;
 
@@ -4283,6 +4441,7 @@ public class NullabilityIntegrationTests
               func Take public ({{targetType}}:value) → void
                 !
               func Probe public ({{sourceType}}:value) → void
+                !
                 Take(value)
             """;
 

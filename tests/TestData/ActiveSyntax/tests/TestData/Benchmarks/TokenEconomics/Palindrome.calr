@@ -1,12 +1,14 @@
 module StringCheck StringCheck
   module StringCheckModule
     func IsPalindrome3 public (string:a, string:b, string:c) → bool
+      !
       if a == c
         return true
       else
         return false
 
     func AreEqual public (string:a, string:b) → bool
+      !
       if a == b
         return true
       else

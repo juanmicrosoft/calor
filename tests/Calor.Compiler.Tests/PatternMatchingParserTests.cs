@@ -40,6 +40,7 @@ public class PatternMatchingParserTests
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x
       case 1 → ""one""
       case 2 → ""two""
@@ -63,6 +64,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x
       case 1
         return ""one""
@@ -84,6 +86,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x
       case 1 → ""one""
       case 2
@@ -117,6 +120,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x
       case var n → ""captured""";
 
@@ -136,6 +140,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x
       case var n when n > 0 → ""positive""
       case _ → ""non-positive""";
@@ -161,6 +166,7 @@ module Test
         var source = @"
 module Test
   func Grade public (int:score) → string
+    !
     return match score
       case >= 90 → ""A""
       case >= 80 → ""B""
@@ -182,6 +188,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x
       case >= 100 → ""gte100""
       case > 50 → ""gt50""
@@ -242,6 +249,7 @@ module Test
         var source = @"
 module Test
   func GetDay public (int:day) → string
+    !
     return match day
       case 1 → ""Monday""
       case 2 → ""Tuesday""
@@ -261,6 +269,7 @@ module Test
         var source = @"
 module Test
   func Grade public (int:score) → string
+    !
     return match score
       case >= 90 → ""A""
       case < 60 → ""F""
@@ -278,6 +287,7 @@ module Test
         var source = @"
 module Test
   func Sign public (int:x) → string
+    !
     return match x
       case var n when n > 0 → ""positive""
       case var n when n < 0 → ""negative""
@@ -298,6 +308,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x
       case 1 → ""one""
       case _ → ""other""";
@@ -319,6 +330,7 @@ module Test
         var source = @"
 module Test
   func Test public (bool:flag) → string
+    !
     return match flag
       case true → ""yes""
       case false → ""no""";
@@ -343,6 +355,7 @@ module Test
         var source = @"
 module Test
   func Test public (int?:opt) → int
+    !
     match opt
       case true
         return 0";
@@ -367,6 +380,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → int
+    !
     match x
       case _
         return 0
@@ -394,6 +408,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x
       case 1 → ""one""
       case _ → ""other""";
@@ -436,6 +451,7 @@ module Test
         var source = @"
 module Test
   func Test public (int:x) → string
+    !
     return match x";
 
         var module = Parse(source, out var diagnostics);

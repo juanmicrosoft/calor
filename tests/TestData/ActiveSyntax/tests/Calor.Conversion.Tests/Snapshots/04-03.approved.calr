@@ -3,6 +3,7 @@ module Test_04_03 Test_04_03 overflow unchecked
 
   class Shape public
     func Area public virtual () → double
+      !
       return 0
 
   class Circle public
@@ -15,4 +16,5 @@ module Test_04_03 Test_04_03 overflow unchecked
       set Radius radius
 
     func Area public override () → double
+      !
       return (Math.PI * Radius) * Radius

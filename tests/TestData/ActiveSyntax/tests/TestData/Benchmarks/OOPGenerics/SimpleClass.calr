@@ -1,12 +1,15 @@
 module SimpleClass SimpleClass
   module SimpleClassModule
     func CreateAge public (int:birthYear, int:currentYear) → int
+      !
       requires currentYear > birthYear
       => result > 0
       return currentYear - birthYear
 
     func IsAdult public (int:age) → bool
+      !
       return age >= 18
 
     func FullName public (string:first, string:last) → string
+      !
       return first

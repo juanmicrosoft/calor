@@ -3,7 +3,6 @@ module Fixture Fixture overflow unchecked
     field int:ArgumentCalls private static
 
     func Argument private () → int
-      ! mut
       set ArgumentCalls (ArgumentCalls + 1)
       return 7
 
@@ -29,5 +28,6 @@ module Fixture Fixture overflow unchecked
           return 0
 
       func M (int:value) → int
+        !
         set Calls (Calls + 1)
         return value

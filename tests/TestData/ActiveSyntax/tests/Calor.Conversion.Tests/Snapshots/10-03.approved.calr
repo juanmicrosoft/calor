@@ -1,4 +1,5 @@
 module Test_10_03 Test_10_03 overflow unchecked
   class TupleMapper public
     func GetTriple public () → (int,string,bool)
+      !
       return (1, "hello", true)

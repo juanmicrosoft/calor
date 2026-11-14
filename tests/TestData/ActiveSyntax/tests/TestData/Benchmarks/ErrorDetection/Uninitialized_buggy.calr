@@ -1,6 +1,7 @@
 module UninitExample UninitExample
   module UninitExampleModule
     func Process public (int:n) → int
+      !
       if n > 0
         return n
       return 0 - n

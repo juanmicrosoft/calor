@@ -78,6 +78,13 @@ the registered diagnostic positions, including padding before its delegate
 invocation; its expected diagnostics are unchanged. These checks are current
 regressions, not historical remeasurements.
 
+The active fixture registry lists mirror-only identity sidecars separately in
+`identitySidecarPaths`. They are project metadata, not additional historical
+subjects. Registry checks validate their schema and registered source files
+without synchronizing or rewriting identities. Only each validated sidecar's
+own `ids.lock` is excluded from fixture enumeration; unrelated metadata and
+locks remain visible, and incomplete identity transactions fail the check.
+
 The in-process edit-script harness synchronizes its explicit workspace inputs
 before calling the compilation driver, as the CLI does. It checks persisted
 declaration IDs across each sequence, unchanged sidecar bytes on resynchronization,

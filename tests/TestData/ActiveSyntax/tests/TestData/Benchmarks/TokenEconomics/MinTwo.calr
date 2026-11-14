@@ -1,6 +1,7 @@
 module MinTwo MinTwo
   module MinTwoModule
     func Min public (int:a, int:b) → int
+      !
       => result <= a
       => result <= b
       if a < b

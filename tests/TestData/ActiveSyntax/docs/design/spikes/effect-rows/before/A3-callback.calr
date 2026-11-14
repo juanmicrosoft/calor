@@ -1,6 +1,8 @@
-§M{CallbackAfter}
-  §CL{Counter:pub}
-    §FLD{Action<i32>:onChange:priv}
-    §MT{Bump:pub} (i32:n) -> void
-      §E{cw}
-      §C{onChange} §A n §/C
+module CallbackAfter CallbackAfter block
+  class Counter
+    field Action<int>:onChange private
+    func Bump (int:n) → void
+      ! cw
+      onChange(n)
+
+

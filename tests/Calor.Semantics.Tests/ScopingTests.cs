@@ -19,6 +19,7 @@ public class ScopingTests
         var source = @"
 module Test Test
   func testAccess (bool:cond) → int
+    !
     let x = 42
     if cond
       return x + 1
@@ -47,6 +48,7 @@ module Test Test
         var source = @"
 module Test Test
   func testReturn (bool:condition) → int
+    !
     if condition
       return 42
     return 0
@@ -73,6 +75,7 @@ module Test Test
         var source = @"
 module Test Test
   func testLookup (bool:a, bool:b) → int
+    !
     let outer = 100
     if a
       if b
@@ -106,6 +109,7 @@ module Test Test
         var source = @"
 module Test Test
   func useParams (int:a, int:b) → int
+    !
     let sum = a + b
     return sum
 ";
@@ -124,6 +128,7 @@ module Test Test
         var source = @"
 module Test Test
   func test () → int
+    !
     let x = 5
     let y = x * 2
     return y
@@ -148,6 +153,7 @@ module Test Test
         var source = @"
 module Test Test
   func test () → int
+    !
     let a = 1
     let b = 2
     let c = 3

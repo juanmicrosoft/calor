@@ -1,6 +1,7 @@
 module TypeMatch TypeMatch
   module TypeMatchModule
     func Describe public (int:typeCode) → int
+      !
       if typeCode == 0
         return 0
       else if typeCode == 1

@@ -1,6 +1,7 @@
 module AreaOfCircle AreaOfCircle
   module AreaOfCircleModule
     func Area public (float:radius) → float
+      !
       requires radius > 0
       => result > 0
       return 3.14159265 * (radius * radius)

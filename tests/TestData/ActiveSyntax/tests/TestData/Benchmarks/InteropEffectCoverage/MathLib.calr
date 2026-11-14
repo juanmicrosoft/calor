@@ -1,17 +1,21 @@
 module MathLib MathLib
   module MathLibModule
     func Square public (float:x) → float
+      !
       => result >= 0
       return x * x
 
     func Cube public (float:x) → float
+      !
       return x * (x * x)
 
     func MaxOf public (float:a, float:b) → float
+      !
       if a > b
         return a
       else
         return b
 
     func Floor public (float:x) → int
+      !
       return (int)x

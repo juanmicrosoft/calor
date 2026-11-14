@@ -106,11 +106,9 @@ public class NativeExpressionGroupingRuntimeTests
             module Grouping Grouping
               module GroupingModule
                 func RecordText private (List<string>:trace, string:value) → string
-                  ! mut
                   trace.Add(value)
                   return value
                 func RecordNumber private (List<int>:trace, int:value) → int
-                  ! mut
                   trace.Add(value)
                   return value
                 func Text (List<string>:trace) → string
@@ -140,6 +138,7 @@ public class NativeExpressionGroupingRuntimeTests
             module Grouping Grouping
               module GroupingModule
                 func Probe async (Task<int>:first, Task<int>:second) → Task<int>
+                  !
                   return await (first ?? second){{configuration}}
             """);
         foreach (var first in new[] { Task.FromResult(5), null })

@@ -57,7 +57,7 @@ public class PrimerMistakesRejectedTests
     {
         var module = topLevel
             ? $"module Probe\n  {fragment}\n    return 0\n"
-            : $"module Probe\n  func Probe (int:x) → int\n    {fragment}\n    return x\n";
+            : $"module Probe\n  func Probe (int:x) → int\n    !\n    {fragment}\n    return x\n";
 
         var result = Compile(module, "primer-mistake.calr");
 
@@ -80,9 +80,9 @@ public class PrimerMistakesRejectedTests
     }
 
     [Theory]
-    [InlineData("module Probe\n  func Add (int:a, int:b) → int\n    return a + b\n")]
-    [InlineData("module Probe\n  func Probe (int:x) → int\n    return x\n")]
-    [InlineData("module Probe\n  func Probe () → int\n    return 0\n")]
+    [InlineData("module Probe\n  func Add (int:a, int:b) → int\n    !\n    return a + b\n")]
+    [InlineData("module Probe\n  func Probe (int:x) → int\n    !\n    return x\n")]
+    [InlineData("module Probe\n  func Probe () → int\n    !\n    return 0\n")]
     public void CorrectModule_CompilesAtBothLayers(string correct)
     {
         // Sanity for the two-layer check itself: a correct module must pass BOTH layers, so a

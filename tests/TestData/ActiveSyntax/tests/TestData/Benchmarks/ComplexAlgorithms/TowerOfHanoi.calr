@@ -1,6 +1,7 @@
 module TowerOfHanoi TowerOfHanoi
   module TowerOfHanoiModule
     func MovesForDisks public (int:disks) → int
+      !
       requires disks > 0
       => result > 0
       if disks == 1
@@ -15,8 +16,10 @@ module TowerOfHanoi TowerOfHanoi
         return ((2 * disks) * disks) - 1
 
     func IsBaseCase public (int:disks) → bool
+      !
       return disks == 1
 
     func SubProblemSize public (int:disks) → int
+      !
       requires disks > 1
       return disks - 1

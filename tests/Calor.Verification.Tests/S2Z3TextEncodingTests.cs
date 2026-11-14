@@ -44,11 +44,11 @@ public sealed class S2Z3TextEncodingTests
         // R1-STR-NULL-NONASCII-001 and -004 (the same source).
         Assert.Equal(1, "\u00e9".Length);
         const string source = """
-            §M{R1Case}
-              §F{Probe:pub} (bool:c) -> str
-                §E{}
-                §S (<= (len result) INT:1)
-                §R (? c STR:"\u00e9" STR:"")
+            module R1Case
+              func Probe public (bool:c) → string
+                !
+                => result.Length <= 1
+                return c ? "\u00e9" : ""
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         Assert.Equal(ProofStatus.Assumed, outcome.Status);
@@ -60,11 +60,11 @@ public sealed class S2Z3TextEncodingTests
     {
         Assert.Equal(4, "\ud83d\ude00ab".Length);
         const string source = """
-            §M{M}
-              §F{Probe:pub} (bool:c) -> i32
-                §E{}
-                §S (== result INT:4)
-                §R (len (? c STR:"\ud83d\ude00ab" STR:"abcd"))
+            module M
+              func Probe public (bool:c) → int
+                !
+                => result == 4
+                return (c ? "\ud83d\ude00ab" : "abcd").Length
             """;
         Assert.Equal(ProofStatus.Assumed, VerifySinglePostcondition(source).EffectiveOutcome.Status);
     }
@@ -75,11 +75,11 @@ public sealed class S2Z3TextEncodingTests
         // The Calor literal is the six characters \u{41}; Z3 must not read it as "A".
         Assert.Equal(6, "\\u{41}".Length);
         const string source = """
-            §M{M}
-              §F{Probe:pub} () -> i32
-                §E{}
-                §S (== result INT:6)
-                §R (len STR:"\\u{41}")
+            module M
+              func Probe public () → int
+                !
+                => result == 6
+                return "\\u{41}".Length
             """;
         Assert.Equal(ProofStatus.Assumed, VerifySinglePostcondition(source).EffectiveOutcome.Status);
         Assert.Equal(@"\u{5c}u{41}", ContractTranslator.ToZ3StringLiteral("\\u{41}"));
@@ -149,12 +149,12 @@ public sealed class S2Z3TextEncodingTests
         string? s = null;
         Assert.True(string.IsNullOrEmpty(s) && s != "");
         const string source = """
-            §M{M}
-              §F{Probe:pub} (str:s) -> i32
-                §E{}
-                §Q (|| (!= (len STR:"\u00e9") INT:1) (&& (isempty s) (!= s STR:"")))
-                §S (== result INT:1)
-                §R INT:0
+            module M
+              func Probe public (string:s) → int
+                !
+                requires "\u00e9".Length != 1 || (string.IsNullOrEmpty(s) && s != "")
+                => result == 1
+                return 0
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         Assert.False(outcome.Status == ProofStatus.Proven && outcome.IsVacuous);
@@ -169,17 +169,19 @@ public sealed class S2Z3TextEncodingTests
         Assert.True(translator.DeclareVariable("a", "i32[]"));
         var diagnostics = new DiagnosticBag();
         var module = new Calor.Compiler.Parsing.Parser(new Calor.Compiler.Parsing.Lexer("""
-            §M{M}
-              §F{P:pub} () -> i32
-                §E{}
-                §S (forall ((q i32)) (>= q INT:0))
-                §R INT:0
+            module M
+              func P public () → int
+                !
+                => forall int:q where true : q >= 0
+                return 0
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var forall = (Calor.Compiler.Ast.ForallExpressionNode)module.Functions[0].Postconditions[0].Condition;
         // Control: the quantifier as written translates.
         Assert.NotNull(translator.TranslateBoolExpr(forall));
         // Witness: binder and body both renamed to the array's synthetic length symbol.
-        var body = (Calor.Compiler.Ast.BinaryOperationNode)forall.Body;
+        var body = Assert.IsType<Calor.Compiler.Ast.BinaryOperationNode>(
+            Assert.IsType<Calor.Compiler.Ast.ImplicationExpressionNode>(forall.Body).Consequent);
         var renamed = new Calor.Compiler.Ast.ForallExpressionNode(
             forall.Span,
             [new Calor.Compiler.Ast.QuantifierVariableNode(forall.Span, "a$length", "u32")],
@@ -259,12 +261,12 @@ public sealed class S2Z3TextEncodingTests
         // Review round 3 witness: every string operand is a non-null literal, so the
         // precondition is unsatisfiable at runtime too.
         const string source = """
-            §M{M}
-              §F{Probe:pub} (bool:c) -> i32
-                §E{}
-                §Q (== (? c STR:"a" STR:"b") STR:"c")
-                §S (== result INT:1)
-                §R INT:0
+            module M
+              func Probe public (bool:c) → int
+                !
+                requires (c ? "a" : "b") == "c"
+                => result == 1
+                return 0
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         Assert.NotEqual(ProofStatus.Unsupported, outcome.Status);
@@ -331,12 +333,12 @@ public sealed class S2Z3TextEncodingTests
         // #1493: if the two names collapsed into one Z3 constant (Windows, ANSI code page),
         // the precondition on ж would "prove" the postcondition on щ.
         const string source = """
-            §M{M}
-              §F{Probe:pub} (i32:ж, i32:щ) -> i32
-                §E{}
-                §Q (== ж INT:0)
-                §S (== щ INT:0)
-                §R INT:0
+            module M
+              func Probe public (int:ж, int:щ) → int
+                !
+                requires ж == 0
+                => щ == 0
+                return 0
             """;
         Assert.Equal(ProofStatus.Refuted, VerifySinglePostcondition(source).EffectiveOutcome.Status);
     }

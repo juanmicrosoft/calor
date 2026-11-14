@@ -329,11 +329,11 @@ public class EmptyClauseBodyTests
     {
         AssertRetiredClauseRejected(name, clause);
         var source = "module T\n"
-            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n"
+            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n    !\n"
             + "    !\n"
             + "    " + NativeClause(name) + "\n"
             + "    return 7\n"
-            + "  func B public () → int\n"
+            + "  func B public () → int\n    !\n"
             + "    !\n"
             + "    return 8\n";
         var module = Parse(source);
@@ -354,7 +354,7 @@ public class EmptyClauseBodyTests
         // The empty clause is the last statement of a loop body; the
         // statement after it is at the loop's column, so it follows the loop.
         var source = "module T\n"
-            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n"
+            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n    !\n"
             + "    !\n"
             + "    for j from 0 to 1 step 1\n"
             + "      " + NativeClause(name).Replace("\n    ", "\n      ") + "\n"
@@ -560,8 +560,12 @@ public class EmptyClauseBodyTests
     public void MultilineFunctionHeader_BodyOnHeaderLastLine_StaysInBody()
     {
         AssertRetiredSourceRejected("§M{T}\n  §F{A:pub} (\n    bool:x\n  ) -> i32 §R 1\n");
-        var module = Parse("module T\n  func A public (\n    bool:x\n  ) → int return 1\n");
+        const string source = "module T\n  func A public (\n    bool:x\n  ) → int return 1\n";
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
 
+        // Ownership survives recovery; the public header still lacks its required budget.
+        Assert.Equal(DiagnosticCode.MissingBoundaryEffectRow, Assert.Single(diagnostics.Errors).Code);
         Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
     }
 
@@ -861,6 +865,7 @@ public class EmptyClauseBodyTests
         var module = Parse("""
             module T
               func A public () → void
+                !
               func B public () → int
                 !
                 return 2
@@ -1005,6 +1010,7 @@ public class EmptyClauseBodyTests
         var body = Assert.Single(ParseInternal("""
             module Test
               func SafeDivide public (int:a, int:b) → int
+                !
                 try
                 return a / b
                 catch DivideByZeroException:ex
@@ -1020,6 +1026,7 @@ public class EmptyClauseBodyTests
         var native = ParseSingleFunctionBody("""
             module Test
               func SafeDivide public (int:a, int:b) → int
+                !
                 try
                   return a / b
                 catch DivideByZeroException:ex
@@ -1038,7 +1045,7 @@ public class EmptyClauseBodyTests
         AssertRetiredSourceRejected("§M{Test}\n§F{A:pub}\n§O{i32}\n§R 1\n§F{B:pub}\n§O{i32}\n§R 2\n");
         // Internal module-column ownership control, not recommended/native indented source.
         var module = ParseInternal(
-            "module Test\nfunc A public () → int\n__return__ 1\nfunc B public () → int\n__return__ 2\n",
+            "module Test\nfunc A public () → int\n!\n__return__ 1\nfunc B public () → int\n!\n__return__ 2\n",
             ("__return__", TokenKind.Return));
 
         Assert.Equal(2, module.Functions.Count);
@@ -1047,8 +1054,10 @@ public class EmptyClauseBodyTests
         var native = Parse("""
             module Test
               func A public () → int
+                !
                 return 1
               func B public () → int
+                !
                 return 2
             """);
         Assert.Equal(2, native.Functions.Count);
@@ -1204,7 +1213,7 @@ public class EmptyClauseBodyTests
     {
         Assert.Equal(clause, Assert.Single(EmptyClauseCases(), row => (string)row[0] == name)[1]);
         AssertRetiredSourceRejected("module T\n"
-            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n"
+            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n    !\n"
             + "    !\n    " + clause + "\n    return 7\n");
     }
 

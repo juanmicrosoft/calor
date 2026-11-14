@@ -20,6 +20,7 @@ public sealed class NativeGenericMemberTypingTests
     private const string ListCount = """
         module GenericMembers
           func GetCount<T> public (List<T>:items) → int
+            !
             return items . Count
         """;
 
@@ -61,7 +62,7 @@ public sealed class NativeGenericMemberTypingTests
     public void ScalarMetadataSelection_RetainsExactTypeAndSeparateGetterIdentity(
         string receiver, string name, string output, SpecialType resultType, SymbolKind kind)
     {
-        var authored = $"module SelectedMembers\n  func Read<T> ({receiver}:value) → {output}\n    return (value).{name}";
+        var authored = $"module SelectedMembers\n  func Read<T> ({receiver}:value) → {output}\n    !\n    return (value).{name}";
         var oracleTree = CSharpSyntaxTree.ParseText(
             $"using System.Collections.Generic; class Oracle {{ {output} Read<T>({receiver} value) => value.{name}; }}");
         var oracle = CSharpCompilation.Create("MemberOracle", [oracleTree], GeneratedCSharpCompiler.References,
@@ -121,7 +122,7 @@ public sealed class NativeGenericMemberTypingTests
     public void MissingInaccessibleInvalidOrNonscalarMembers_DoNotAcquireMetadataTyping(
         string receiver, string name)
     {
-        var authored = $"module RejectedMembers\n  func Read<T> ({receiver}:value) → int\n    return (value).{name}";
+        var authored = $"module RejectedMembers\n  func Read<T> ({receiver}:value) → int\n    !\n    return (value).{name}";
         foreach (var source in NativeInputs(authored))
         {
             var module = Parse(source);
@@ -140,7 +141,7 @@ public sealed class NativeGenericMemberTypingTests
     [InlineData("if (items).Count\n      return 1\n    return 0", "int")]
     public void SelectedIntegerMember_DoesNotBecomeAnUnknownOrBoolean(string body, string output)
     {
-        var authored = $"module WrongMemberContext\n  func Read<T> (List<T>:items) → {output}\n    {body}";
+        var authored = $"module WrongMemberContext\n  func Read<T> (List<T>:items) → {output}\n    !\n    {body}";
         foreach (var source in NativeInputs(authored))
         {
             var diagnostics = new DiagnosticBag();
@@ -155,7 +156,7 @@ public sealed class NativeGenericMemberTypingTests
     [InlineData("missing ?? items")]
     public void ReceiverDiagnostics_AreNotSkippedByMemberProjection(string receiver)
     {
-        var authored = $"module InvalidReceiver\n  func Read<T> (List<T>:items) → int\n    return ({receiver}).Count";
+        var authored = $"module InvalidReceiver\n  func Read<T> (List<T>:items) → int\n    !\n    return ({receiver}).Count";
         foreach (var source in NativeInputs(authored))
         {
             var module = Parse(source);
@@ -180,6 +181,7 @@ public sealed class NativeGenericMemberTypingTests
               class List<T>
                 {{declaration}}
               func Read<T> (List<T>:items) → {{output}}
+                !
                 let {{output}}:result = (items).Count
                 return result
             """;
@@ -233,7 +235,7 @@ public sealed class NativeGenericMemberTypingTests
             ? File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root,
                 Path.Combine(root, "samples", "Generics", "generics.calr")))
             : ListCount;
-        if (explicitPure)
+        if (explicitPure && !authored.Contains("    !\n    return items . Count", StringComparison.Ordinal))
             authored = authored.Replace("    return items . Count", "    !\n    return items . Count", StringComparison.Ordinal);
         foreach (var source in NativeInputs(authored))
         {
@@ -276,9 +278,11 @@ public sealed class NativeGenericMemberTypingTests
               class Host
                 pp FEATURE
                   func Read<T> public static (List<T>:items) → int
+                    !
                     return (items).Count
                 pp else
                   func Read<T> public static (IReadOnlyCollection<T>:items) → int
+                    !
                     return (items).Count
             """;
         foreach (var source in NativeInputs(authored))
@@ -308,6 +312,7 @@ public sealed class NativeGenericMemberTypingTests
                 pp else
                   field {{other}}:items public
                 func Read public () → int
+                  !
                   return (items).Count
             """;
         foreach (var source in NativeInputs(authored))
@@ -326,6 +331,7 @@ public sealed class NativeGenericMemberTypingTests
               using Items = System.Collections.Generic.List<int>
               using Items = System.Collections.Generic.IReadOnlyCollection<int>
               func Read (Items:items) → int
+                !
                 return (items).Count
             """;
         foreach (var source in NativeInputs(authored))

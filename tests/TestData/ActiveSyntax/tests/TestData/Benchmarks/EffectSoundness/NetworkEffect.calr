@@ -9,4 +9,5 @@ module NetService NetService
       return 200
 
     func BuildUrl public (string:@base, string:path) → string
+      !
       return @base

@@ -17,10 +17,12 @@ public sealed class NativeBindingContinuationTests
         var module = Parse("""
             module Continuation
               func First () → int
+                !
                 let int:value =
                   1 + 2
                 return value
               func Next () → int
+                !
                 return 4
             """);
         Assert.Equal(2, module.Functions.Count);
@@ -50,6 +52,7 @@ public sealed class NativeBindingContinuationTests
         var module = Parse("""
             module Lambdas
               func Run (int:x) → int
+                !
                 let Func<int,int>:f =
                   (int:y) =>
                     let int:z = y + 1

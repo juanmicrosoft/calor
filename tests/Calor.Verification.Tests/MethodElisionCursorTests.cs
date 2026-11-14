@@ -24,15 +24,14 @@ public class MethodElisionCursorTests
         // Same contract shape the §F form has always elided (VerifierTests square
         // pattern); pre-fix the §MT form emitted a runtime guard with id "unknown".
         const string source = @"
-§M{Test}
-  §CL{Calc:pub}
-    §MT{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §Q (<= x 46340)
-      §S (>= result 0)
-      §R (* x x)";
+module Test Test
+  class Calc public
+    func Square public (int:x) → int
+      !
+      requires x >= 0
+      requires x <= 46340
+      => result >= 0
+      return x * x";
 
         var result = Program.Compile(source, "test.calr", NoCache());
 
@@ -49,13 +48,12 @@ public class MethodElisionCursorTests
         // No Z3 needed: with no verification result the guard is always kept, and its
         // reported function id comes straight from the cursor — pre-fix, "unknown".
         const string source = @"
-§M{Test}
-  §CL{Calc:pub}
-    §MT{Half:pub}
-      §I{i32:x}
-      §O{i32}
-      §S (> result 10)
-      §R (/ x 2)";
+module Test Test
+  class Calc public
+    func Half public (int:x) → int
+      !
+      => result > 10
+      return x / 2";
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions());
 
@@ -76,23 +74,20 @@ public class MethodElisionCursorTests
         // postcondition index at 0 — without the operator's own cursor reset, the
         // operator's FALSE §S elides on Pick's proof. It must keep its guard.
         const string source = @"
-§M{Test}
-  §CL{Calc:pub}
-    §MT{Pick:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §S (>= result 0)
-      §IF (>= x 5)
-        §R x
-      §EL
-        §R INT:0
-    §OP{+:pub}
-      §I{i32:left}
-      §I{i32:right}
-      §O{i32}
-      §S (>= result 100)
-      §R INT:0";
+module Test Test
+  class Calc public
+    func Pick public (int:x) → int
+      !
+      requires x >= 0
+      => result >= 0
+      if x >= 5
+        return x
+      else
+        return 0
+    op + (int:left, int:right) → int
+      !
+      => result >= 100
+      return 0";
 
         var result = Program.Compile(source, "test.calr", NoCache(unsafeTranspileOnly: true));
 
@@ -118,18 +113,16 @@ public class MethodElisionCursorTests
         // Second's constructor guard (pre-#879 it was "unknown"; the first fix upgraded
         // it to a confidently WRONG id). The constructor's own id is the honest key.
         const string source = @"
-§M{Test}
-  §CL{First:pub}
-    §MT{Inc:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §S (>= result 1)
-      §R (+ x 1)
-  §CL{Second:pub}
-    §CTOR{pub}
-      §I{i32:size}
-      §Q (> size 0)";
+module Test Test
+  class First public
+    func Inc public (int:x) → int
+      !
+      requires x >= 0
+      => result >= 1
+      return x + 1
+  class Second public
+    ctor (int:size)
+      requires size > 0";
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions());
 
@@ -151,13 +144,12 @@ public class MethodElisionCursorTests
         // REFUSED at translation (Calor0718 — `(len x)` models string length, not array
         // length), which keeps the guard: the new surface must not over-elide it.
         const string source = @"
-§M{Test}
-  §CL{Calc:pub}
-    §MT{Count:pub}
-      §I{i32[]:arr}
-      §O{i32}
-      §S (>= result 0)
-      §R (len arr)";
+module Test Test
+  class Calc public
+    func Count public (int[]:arr) → int
+      !
+      => result >= 0
+      return arr.Length";
 
         var result = Program.Compile(source, "test.calr", NoCache());
 
@@ -179,14 +171,13 @@ public class MethodElisionCursorTests
         // Assumed on the §MT form too — the cursor fix must not turn a demoted proof
         // into an elision on class methods.
         const string source = @"
-§M{Test}
-  §CL{Fmt:pub}
-    §MT{Chk:pub}
-      §I{str:s}
-      §O{str}
-      §Q (== s STR:""abc"")
-      §S (! (starts result STR:""zzz"" :ordinal))
-      §R s";
+module Test Test
+  class Fmt public
+    func Chk public (string:s) → string
+      !
+      requires s == ""abc""
+      => !result.StartsWith(""zzz"", System.StringComparison.Ordinal)
+      return s";
 
         var result = Program.Compile(source, "test.calr", NoCache());
 
@@ -200,15 +191,14 @@ public class MethodElisionCursorTests
     // Same Proven source for both default/opt-out pins below: a genuine ∀-proof
     // (x in [0, 46340] ⇒ x*x >= 0), not vacuous.
     private const string ProvenSquareSource = @"
-§M{Test}
-  §CL{Calc:pub}
-    §MT{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §Q (<= x 46340)
-      §S (>= result 0)
-      §R (* x x)";
+module Test Test
+  class Calc public
+    func Square public (int:x) → int
+      !
+      requires x >= 0
+      requires x <= 46340
+      => result >= 0
+      return x * x";
 
     [SkippableFact]
     public void ProvenPostcondition_Default_ElidesGuard()

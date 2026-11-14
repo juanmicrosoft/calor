@@ -1,15 +1,18 @@
 module BankAccount BankAccount
   module BankAccountModule
     func Deposit public (float:balance, float:amount) → float
+      !
       requires amount > 0
       => result > balance
       return balance + amount
 
     func Withdraw public (float:balance, float:amount) → float
+      !
       requires amount > 0
       requires balance >= amount
       => result < balance
       return balance - amount
 
     func CanWithdraw public (float:balance, float:amount) → bool
+      !
       return amount > 0 && balance >= amount

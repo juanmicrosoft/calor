@@ -497,6 +497,7 @@ public class KInductionTests
         var function = GetFunction("""
             module NativeProofs
               func Probe public () → int
+                !
                 for i from 0 to 10 step 1
                   let int:copy = i
                 for j = 0; j <= 10; j = j + 1

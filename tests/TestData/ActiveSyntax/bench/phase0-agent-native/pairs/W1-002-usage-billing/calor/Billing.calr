@@ -1,11 +1,14 @@
-§M{Billing}
-  §F{BillBasic:pub} (i32:units) -> i32
-    §E{}
-    §S (>= result 500)
-    §S (<= result 70500)
-    §B{~u:i32} units
-    §IF (< u 0)
-      §ASSIGN u 0
-    §IF (> u 100000)
-      §ASSIGN u 100000
-    §R (+ (/ (* u 7) 10) 500)
+module Billing Billing block
+  module BillingModule partial
+    func BillBasic (int:units) → int
+      !
+      => (result >= 500)
+      => (result <= 70500)
+      var int:u = units
+      if (u < 0)
+        set u 0
+      if (u > 100000)
+        set u 100000
+      return (((u * 7) / 10) + 500)
+
+

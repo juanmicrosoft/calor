@@ -1,13 +1,16 @@
 module MixedSyntax MixedSyntax
   module MixedSyntaxModule
     func Compact public (int:x) → int
+      !
       return x * 2
 
     func Verbose public (int:x) → int
+      !
       requires x > 0
       => result > x
       return x * 3
 
     func CompactWithContract public (int:a, int:b) → int
+      !
       requires b != 0
       return a / b

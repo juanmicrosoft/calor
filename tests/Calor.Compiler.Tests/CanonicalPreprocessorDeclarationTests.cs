@@ -17,14 +17,18 @@ public sealed class CanonicalPreprocessorDeclarationTests
           class Logger
             pp DEBUG && (!TRACE || true)
               func Read static () → int
+                !
                 return 1
             pp elif TRACE
               func Read static () → int
+                !
                 return 2
             pp else
               func Read static () → int
+                !
                 return 3
             func Sibling static () → int
+              !
               return 4
         """;
 
@@ -65,14 +69,17 @@ public sealed class CanonicalPreprocessorDeclarationTests
                 class Logger
                   pp true
                     func Read static () → int
+                      !
                       return 1
               pp elif TRACE
                 class Logger
                   func Read static () → int
+                    !
                     return 2
               pp else
                 class Logger
                   func Read static () → int
+                    !
                     return 3
               class Sibling
             """;
@@ -92,8 +99,10 @@ public sealed class CanonicalPreprocessorDeclarationTests
               interface IBag
                 pp DEBUG
                   func Read () → int
+                    !
                 pp else
                   func Read () → int
+                    !
             """);
         var block = Assert.Single(module.Interfaces.Single().PreprocessorBlocks);
         Assert.IsType<MethodSignatureNode>(Assert.Single(block.Items));

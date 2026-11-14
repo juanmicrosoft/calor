@@ -1,13 +1,17 @@
 module StringUtils StringUtils
   module StringUtilsModule
     func GetLength public (string:s) → int
+      !
       return s.Length
 
     func ToUpper public (string:s) → string
+      !
       return s.ToUpper()
 
     func ToLower public (string:s) → string
+      !
       return s.ToLower()
 
     func Concat public (string:a, string:b) → string
+      !
       return string.Concat(a, b)

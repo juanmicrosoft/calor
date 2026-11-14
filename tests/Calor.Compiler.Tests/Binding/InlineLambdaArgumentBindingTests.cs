@@ -411,7 +411,7 @@ public sealed class InlineLambdaArgumentBindingTests
     {
         var source = $$"""
             module CallbackEffects
-              func Invoke public (System.Action:callback{{callbackRow}}) → void
+              func Invoke public (System.Action:callback{{(callbackRow.Length == 0 ? " ! unknown" : callbackRow)}}) → void
                 ! {{callerRow}}
                 callback()
               func Run public () → void
@@ -475,7 +475,7 @@ public sealed class InlineLambdaArgumentBindingTests
               using Callback = System.Action
               delegate NativeCallback () → void
                 !
-              func Invoke public ({{callbackType}}:callback{{callbackRow}}) → void
+              func Invoke public ({{callbackType}}:callback{{(callbackRow.Length == 0 ? " ! unknown" : callbackRow)}}) → void
                 !
                 callback()
               {{UnrelatedLambda(unrelatedLambda)}}
@@ -656,7 +656,7 @@ public sealed class InlineLambdaArgumentBindingTests
                 Ignore(callback)
             """ : """
             module UnknownCallback
-              func Run (System.Action:callback) → void
+              func Run (System.Action:callback ! unknown) → void
                 !
                 callback()
             """;
@@ -671,7 +671,6 @@ public sealed class InlineLambdaArgumentBindingTests
 
     private static string UnrelatedLambda(bool include) => include ? """
         func Unrelated private () → void
-            !
             let Func<int>:unused ! = () ! => 1
         """ : "";
 

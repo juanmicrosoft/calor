@@ -20,6 +20,7 @@ public sealed class NativeIdentifierSemanticsTests
         var module = Parse($"""
             module ProofIdentity
               func Identity (int:{name}) → int
+                !
                 => result == {name}
                 return {name}
             """);
@@ -70,6 +71,7 @@ public sealed class NativeIdentifierSemanticsTests
         var source = $"""
             module NullNarrowing
               func Run (string?:@null, string?:other) → string
+                !
                 if {comparison}
                   return other
                 return "fallback"
@@ -91,6 +93,7 @@ public sealed class NativeIdentifierSemanticsTests
         var result = Compile("""
             module NullReturn
               func Run (string:@null) → string
+                !
                 return null
             """);
         Assert.Contains(result.Diagnostics,

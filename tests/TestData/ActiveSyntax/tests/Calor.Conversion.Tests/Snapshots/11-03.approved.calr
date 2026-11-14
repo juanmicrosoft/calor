@@ -1,6 +1,7 @@
 module Test_11_03 Test_11_03 overflow unchecked
   class Container public
     func GetStatus public () → Status
+      !
       return Status.Active
 
     class Inner private

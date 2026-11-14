@@ -1,7 +1,9 @@
 module ParallelTasks ParallelTasks
   module ParallelTasksModule
     func CombineResults public (int:a, int:b) → int
+      !
       return a + b
 
     func AllSucceeded public (bool:a, bool:b) → bool
+      !
       return a && b

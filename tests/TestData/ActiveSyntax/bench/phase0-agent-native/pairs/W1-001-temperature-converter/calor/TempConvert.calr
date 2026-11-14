@@ -1,30 +1,33 @@
-§M{TempConvert}
-  §F{CelsiusToFahrenheit:pub} (i32:celsius) -> i32
-    §E{}
-    §Q (>= celsius -273)
-    §S (>= result -459)
-    §S (<= result 9032)
-    §B{~c:i32} celsius
-    §IF (> c 5000)
-      §ASSIGN c 5000
-    §R (+ (/ (* c 9) 5) 32)
+module TempConvert TempConvert block
+  module TempConvertModule partial
+    func CelsiusToFahrenheit (int:celsius) → int
+      !
+      requires (celsius >= -273)
+      => (result >= -459)
+      => (result <= 9032)
+      var int:c = celsius
+      if (c > 5000)
+        set c 5000
+      return (((c * 9) / 5) + 32)
 
-  §F{CelsiusToKelvin:pub} (i32:celsius) -> i32
-    §E{}
-    §Q (>= celsius -273)
-    §S (>= result 0)
-    §S (<= result 5273)
-    §B{~c:i32} celsius
-    §IF (> c 5000)
-      §ASSIGN c 5000
-    §R (+ c 273)
+    func CelsiusToKelvin (int:celsius) → int
+      !
+      requires (celsius >= -273)
+      => (result >= 0)
+      => (result <= 5273)
+      var int:c = celsius
+      if (c > 5000)
+        set c 5000
+      return (c + 273)
 
-  §F{FahrenheitToCelsius:pub} (i32:fahrenheit) -> i32
-    §E{}
-    §Q (>= fahrenheit -459)
-    §S (>= result -273)
-    §S (<= result 5000)
-    §B{~f:i32} fahrenheit
-    §IF (> f 9032)
-      §ASSIGN f 9032
-    §R (/ (* (- f 32) 5) 9)
+    func FahrenheitToCelsius (int:fahrenheit) → int
+      !
+      requires (fahrenheit >= -459)
+      => (result >= -273)
+      => (result <= 5000)
+      var int:f = fahrenheit
+      if (f > 9032)
+        set f 9032
+      return (((f - 32) * 5) / 9)
+
+

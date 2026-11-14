@@ -1,5 +1,6 @@
 module SurrogateValueTest SurrogateValueTest
   func Verify () → int
+    !
     => result == 167935
     let char:high = '\ud800'
     let char:low = '\udfff'

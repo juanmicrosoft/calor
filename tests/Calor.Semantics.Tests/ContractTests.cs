@@ -20,6 +20,7 @@ public class ContractTests
         var source = @"
 module Test Test
   func getNone () → int
+    !
     return 0
 ";
 
@@ -40,6 +41,7 @@ module Test Test
         var source = @"
 module Test Test
   func positiveOnly (int:x) → int
+    !
     requires x > 0
     return x
 ";
@@ -72,6 +74,7 @@ module Test Test
         var source = @"
 module Test Test
   func positiveOnly (int:x) → int
+    !
     requires x > 0
     return x * 2
 ";
@@ -92,6 +95,7 @@ module Test Test
         var source = @"
 module Test Test
   func bounded (int:x) → int
+    !
     requires x > 0
     requires x < 100
     return x
@@ -124,6 +128,7 @@ module Test Test
         var source = @"
 module Test Test
   func withMessage (int:x) → int
+    !
     requires x > 0
     return x
 ";

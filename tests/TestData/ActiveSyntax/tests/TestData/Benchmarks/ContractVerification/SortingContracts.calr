@@ -1,12 +1,15 @@
 module SortingContracts SortingContracts
   module SortingContractsModule
     func IsSorted public (int:a, int:b) → bool
+      !
       return a <= b
 
     func IsPartitioned public (int:left, int:pivot, int:right) → bool
+      !
       return left <= pivot && right >= pivot
 
     func MergePreserves public (int:lenA, int:lenB) → int
+      !
       requires lenA >= 0
       requires lenB >= 0
       => result == lenA + lenB

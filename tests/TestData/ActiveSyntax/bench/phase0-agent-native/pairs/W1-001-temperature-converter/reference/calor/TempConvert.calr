@@ -1,39 +1,41 @@
-§M{TempConvert}
-  §F{ClampToCeiling:priv} (i32:value, i32:ceiling) -> i32
-    §E{}
-    §S (<= result ceiling)
-    §IF (> value ceiling)
-      §R ceiling
-    §R value
+module TempConvert TempConvert block
+  module TempConvertModule partial
+    func ClampToCeiling private (int:value, int:ceiling) → int
+      => (result <= ceiling)
+      if (value > ceiling)
+        return ceiling
+      return value
 
-  §F{CelsiusToFahrenheit:pub} (i32:celsius) -> i32
-    §E{}
-    §Q (>= celsius -273)
-    §S (>= result -459)
-    §S (<= result 9032)
-    §B{c:i32} §C{ClampToCeiling} §A celsius §A 5000 §/C
-    §R (+ (/ (* c 9) 5) 32)
+    func CelsiusToFahrenheit (int:celsius) → int
+      !
+      requires (celsius >= -273)
+      => (result >= -459)
+      => (result <= 9032)
+      let int:c = ClampToCeiling(celsius, 5000)
+      return (((c * 9) / 5) + 32)
 
-  §F{CelsiusToKelvin:pub} (i32:celsius) -> i32
-    §E{}
-    §Q (>= celsius -273)
-    §S (>= result 0)
-    §S (<= result 5273)
-    §B{c:i32} §C{ClampToCeiling} §A celsius §A 5000 §/C
-    §R (+ c 273)
+    func CelsiusToKelvin (int:celsius) → int
+      !
+      requires (celsius >= -273)
+      => (result >= 0)
+      => (result <= 5273)
+      let int:c = ClampToCeiling(celsius, 5000)
+      return (c + 273)
 
-  §F{FahrenheitToCelsius:pub} (i32:fahrenheit) -> i32
-    §E{}
-    §Q (>= fahrenheit -459)
-    §S (>= result -273)
-    §S (<= result 5000)
-    §B{f:i32} §C{ClampToCeiling} §A fahrenheit §A 9032 §/C
-    §R (/ (* (- f 32) 5) 9)
+    func FahrenheitToCelsius (int:fahrenheit) → int
+      !
+      requires (fahrenheit >= -459)
+      => (result >= -273)
+      => (result <= 5000)
+      let int:f = ClampToCeiling(fahrenheit, 9032)
+      return (((f - 32) * 5) / 9)
 
-  §F{KelvinToCelsius:pub} (i32:kelvin) -> i32
-    §E{}
-    §Q (>= kelvin 0)
-    §S (>= result -273)
-    §S (<= result 5000)
-    §B{k:i32} §C{ClampToCeiling} §A kelvin §A 5273 §/C
-    §R (- k 273)
+    func KelvinToCelsius (int:kelvin) → int
+      !
+      requires (kelvin >= 0)
+      => (result >= -273)
+      => (result <= 5000)
+      let int:k = ClampToCeiling(kelvin, 5273)
+      return (k - 273)
+
+

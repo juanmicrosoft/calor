@@ -18,7 +18,7 @@ public sealed class CanonicalDocumentationMetadataTests
     [InlineData("/// deprecated 1.4.0", null)]
     public void CountedDeprecationFormsPreserveVersionAndOptionalReplacement(string comment, string? replacement)
     {
-        var source = $"module Api\n  {comment}\n  func Old () → void\n    return";
+        var source = $"module Api\n  {comment}\n  func Old () → void\n    !\n    return";
         var module = Parse(source);
         var deprecated = module.Functions.Single().Deprecated!;
         Assert.Equal("1.4.0", deprecated.SinceVersion);
@@ -44,6 +44,7 @@ public sealed class CanonicalDocumentationMetadataTests
               /// breaking 2.0.0 "Requires x > 0 & y < 5"
               /// breaking 3.0.0 "Requires options"
               func Old () → void
+                !
                 return
             """;
         var module = Parse(source);
@@ -66,7 +67,7 @@ public sealed class CanonicalDocumentationMetadataTests
     [Fact]
     public void BreakingDescriptionsDecodeAndReencodeCSharpEscapes()
     {
-        var module = Parse("module Api\n  /// breaking 2.0.0 \"Use \\\"options\\\"\\nNext line\"\n  func Old ()\n    return");
+        var module = Parse("module Api\n  /// breaking 2.0.0 \"Use \\\"options\\\"\\nNext line\"\n  func Old ()\n    !\n    return");
         Assert.Equal("Use \"options\"\nNext line", module.Functions.Single().BreakingChanges.Single().Description);
         var emitted = new CalorEmitter().Emit(module);
         Assert.Equal(module.Functions.Single().BreakingChanges.Single().Description,
@@ -85,7 +86,7 @@ public sealed class CanonicalDocumentationMetadataTests
     public void MalformedOrDuplicateMetadataIsDiagnosed(string comment)
     {
         var diagnostics = new DiagnosticBag();
-        _ = new Parser(new Lexer($"module Bad\n  /// {comment}\n  func Old ()\n    return", diagnostics)
+        _ = new Parser(new Lexer($"module Bad\n  /// {comment}\n  func Old ()\n    !\n    return", diagnostics)
             .TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);
     }

@@ -1,10 +1,13 @@
 module Test_11_01 Test_11_01 overflow unchecked
   class Validator public
     func IsInRange public (int:x) → bool
+      !
       return x > 0 && x < 100
 
     func IsOutOfRange public (int:x) → bool
+      !
       return x < 0 || x > 100
 
     func IsNotNegative public (int:x) → bool
+      !
       return !(x < 0)

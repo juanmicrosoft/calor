@@ -63,6 +63,7 @@ public class EjectStoryTests
     private const string ContractsCurrentNativeModule = """
         module Pricing Pricing
           func ClampToCap public (int:amount, int:cap) → int
+            !
             requires cap >= 0
             => result <= cap
             return Math.Min(amount, cap)
@@ -71,6 +72,7 @@ public class EjectStoryTests
     private const string EarlyReturnContractsCurrentNativeModule = """
         module Pricing Pricing
           func ClampToCap public (int:amount, int:cap) → int
+            !
             requires cap >= 0
             => result <= cap
             if amount > cap
@@ -88,6 +90,7 @@ public class EjectStoryTests
     private const string NullableCurrentNativeModule = """
         module Ejected Ejected
           func PickOrDefault public (int:x, bool:take) → int
+            !
             if take
               let int?:value = x
               return value ?? 0

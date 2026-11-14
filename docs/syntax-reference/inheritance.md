@@ -32,14 +32,17 @@ The following complete program returns `59`.
 module ClassModifiers
   class FinalService sealed
     func Process () → int
+      !
       return 42
 
   class Service partial
     func Read () → int
+      !
       return 1
 
   module MathUtils
     func Square (int:x) → int
+      !
       return x * x
 
   func Main () → int
@@ -59,11 +62,13 @@ derived implementation. This program returns `"Woof!"`, not `"..."`.
 module VirtualDispatch
   class Animal
     func Speak virtual () → string
+      !
       return "..."
 
   class Dog
     extends Animal
     func Speak override () → string
+      !
       return "Woof!"
 
   func Main () → string
@@ -106,6 +111,7 @@ module InterfaceInheritance
 
   class Animal
     func Speak virtual () → string
+      !
       return "..."
 
   class Dog
@@ -113,8 +119,10 @@ module InterfaceInheritance
     implements IPet
     implements ITrainable
     func Name () → string
+      !
       return "Rex"
     func Train () → int
+      !
       return 7
 
   func Main () → (string, string, int)
@@ -177,16 +185,19 @@ and `Main` returns `42`.
 module SealedOverride
   class Base
     func Compute virtual () → int
+      !
       return 1
 
   class Derived
     extends Base
     func Compute sealed override () → int
+      !
       return 42
 
   class Final
     extends Derived
     func Label () → string
+      !
       return "final"
 
   func Main () → int
@@ -209,11 +220,13 @@ This override adds `5` to the base result, so the program returns `15`.
 module BaseMethods
   class Base
     func GetValue virtual () → int
+      !
       return 10
 
   class Derived
     extends Base
     func GetValue override () → int
+      !
       return base.GetValue() + 5
 
   func Main () → int
@@ -239,6 +252,7 @@ module BaseConstructors
     ctor protected (string:name)
       set this._name name
     func GetName () → string
+      !
       return this._name
 
   class Dog
@@ -248,6 +262,7 @@ module BaseConstructors
       base(name)
       set this._breed breed
     func Describe () → string
+      !
       return "${this.GetName()}:${this._breed}"
 
   func Main () → string
@@ -286,6 +301,7 @@ module ShapeHierarchy
     func Area abstract () → double
       !
     func Describe virtual () → (string, double)
+      !
       return (this._name, this.Area())
 
   class Circle
@@ -295,6 +311,7 @@ module ShapeHierarchy
       base("Circle")
       set this._radius radius
     func Area override () → double
+      !
       return 3.14159 * (this._radius * this._radius)
 
   func Demo () → (string, double)

@@ -1,6 +1,7 @@
 module PrimeCheck PrimeCheck
   module PrimeCheckModule
     func IsPrime public (int:n) → bool
+      !
       requires n > 0
       if n <= 1
         return false

@@ -1,6 +1,7 @@
 module MathUtils MathUtils
   module MathUtilsModule
     func GCD public (int:a, int:b) → int
+      !
       var x = a
       var y = b
       while y != 0

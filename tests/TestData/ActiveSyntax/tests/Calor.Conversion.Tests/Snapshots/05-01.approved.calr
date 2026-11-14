@@ -3,5 +3,6 @@ module Test_05_01 Test_05_01 overflow unchecked
 
   class DataService public
     func FetchDataAsync public async () → string
+      !
       let _ = await Task.Delay(100)
       return "data"

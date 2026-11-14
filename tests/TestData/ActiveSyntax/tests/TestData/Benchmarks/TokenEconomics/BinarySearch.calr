@@ -1,6 +1,7 @@
 module Search Search
   module SearchModule
     func Find public (int:target, int:val1, int:val2, int:val3) → int
+      !
       if val1 == target
         return 0
       else if val2 == target

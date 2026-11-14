@@ -1,6 +1,7 @@
 module TaxCalculator TaxCalculator
   module TaxCalculatorModule
     func TaxRate public (float:income) → float
+      !
       requires income >= 0
       if income <= 10000
         return 0.1
@@ -12,12 +13,14 @@ module TaxCalculator TaxCalculator
         return 0.37
 
     func SimpleTax public (float:income, float:rate) → float
+      !
       requires income >= 0
       requires rate >= 0
       requires rate <= 1
       return income * rate
 
     func AfterTax public (float:income, float:tax) → float
+      !
       requires income >= 0
       requires tax >= 0
       => result >= 0

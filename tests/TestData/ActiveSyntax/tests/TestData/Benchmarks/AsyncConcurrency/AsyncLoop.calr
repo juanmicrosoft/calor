@@ -1,7 +1,9 @@
 module AsyncLoop AsyncLoop
   module AsyncLoopModule
     func ProcessItem public async (int:item) → int
+      !
       return item * 2
 
     func HasMore public (int:index, int:count) → bool
+      !
       return index < count

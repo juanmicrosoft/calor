@@ -15,6 +15,7 @@ module SqlInjectionBenchmark SqlInjectionBenchmark
   class SqlEscaping public
     // Double SQL literal delimiters; the regression harness models this exact symbol.
     func Escape public static (string:value) → string
+      !
       return value.Replace("'", "''")
 
   func VulnerableQuery public (string:user_input, db:connection) → string

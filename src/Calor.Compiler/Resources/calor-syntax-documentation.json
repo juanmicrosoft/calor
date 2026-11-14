@@ -23,7 +23,7 @@
       "examples": [
         {
           "csharp": "var user = new User(\"John\", 25);\nvar list = new List<int>();\nreturn new Widget(value);",
-          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    return person?.Name"
+          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    !\n    return person?.Name"
         }
       ]
     },
@@ -81,7 +81,7 @@
       "examples": [
         {
           "csharp": "public void Process(int value) { ... }\npublic virtual string GetName() { return _name; }\npublic override int Calculate(int x) { ... }",
-          "calor": "module AgentReference28\n  class Calculator\n    func Add (int:a, int:b) → int\n      return (a + b)"
+          "calor": "module AgentReference28\n  class Calculator\n    func Add (int:a, int:b) → int\n      !\n      return (a + b)"
         }
       ]
     },
@@ -107,7 +107,7 @@
       "examples": [
         {
           "csharp": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }",
-          "calor": "module Contracts\n  func Square (int:x) → int\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    requires b != 0\n    return a / b"
+          "calor": "module Contracts\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    !\n    requires b != 0\n    return a / b"
         }
       ]
     },
@@ -135,7 +135,7 @@
       "examples": [
         {
           "csharp": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)",
-          "calor": "module AgentReference25\n  func ApplyComplex (int:x) → int\n    let Func<int,int>:process = (int:n) =>\n      return n > 0 ? n * 2 : 0\n    return process(x)"
+          "calor": "module AgentReference25\n  func ApplyComplex (int:x) → int\n    !\n    let Func<int,int>:process = (int:n) =>\n      return n > 0 ? n * 2 : 0\n    return process(x)"
         },
         {
           "csharp": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)",
@@ -225,7 +225,7 @@
         },
         {
           "csharp": "var items = Data.Products;\nvar items = Data.GetProducts();",
-          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    return person?.Name"
+          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    !\n    return person?.Name"
         }
       ]
     },
@@ -344,7 +344,7 @@
       "examples": [
         {
           "csharp": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }",
-          "calor": "module Branching\n  func Sign (int:x) → int\n    if (x > 0)\n      return 1\n    else if (x < 0)\n      return (-1)\n    else\n      return 0"
+          "calor": "module Branching\n  func Sign (int:x) → int\n    !\n    if (x > 0)\n      return 1\n    else if (x < 0)\n      return (-1)\n    else\n      return 0"
         }
       ]
     },
@@ -368,7 +368,7 @@
       "examples": [
         {
           "csharp": "var x = condition ? a : b;\nreturn count > 0 ? \"items\" : \"none\";\nvar label = isActive ? GetLabel() : \"default\";",
-          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
+          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    !\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
         }
       ]
     },
@@ -392,7 +392,7 @@
       "examples": [
         {
           "csharp": "return 42;\nreturn user.Name;\nreturn;",
-          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
+          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    !\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
         }
       ]
     },
@@ -420,11 +420,11 @@
       "examples": [
         {
           "csharp": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }",
-          "calor": "module Classes\n  class Greeter\n    func Greet () → string\n      return \"hello\""
+          "calor": "module Classes\n  class Greeter\n    func Greet () → string\n      !\n      return \"hello\""
         },
         {
           "csharp": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }",
-          "calor": "module PointModule\n  class Point\n    field int:_x private\n    field int:_y private\n\n    ctor (int:x, int:y)\n      set this._x x\n      set this._y y\n\n    func Equals (Point:other) → bool\n      if (other == null)\n        return false\n      else\n        return true\n\n    op == (Point:left, Point:right) → bool\n      if (left == null)\n        return (right == null)\n      else\n        return left.Equals(right)\n\n    op != (Point:left, Point:right) → bool\n      return (!(left == right))"
+          "calor": "module PointModule\n  class Point\n    field int:_x private\n    field int:_y private\n\n    ctor (int:x, int:y)\n      set this._x x\n      set this._y y\n\n    func Equals (Point:other) → bool\n      !\n      if (other == null)\n        return false\n      else\n        return true\n\n    op == (Point:left, Point:right) → bool\n      !\n      if (left == null)\n        return (right == null)\n      else\n        return left.Equals(right)\n\n    op != (Point:left, Point:right) → bool\n      !\n      return (!(left == right))"
         }
       ]
     },
@@ -450,7 +450,7 @@
       "examples": [
         {
           "csharp": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }",
-          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
+          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      !\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
         }
       ]
     },
@@ -474,7 +474,7 @@
       "examples": [
         {
           "csharp": "var result = await FetchAsync();\nawait Task.Delay(1000);",
-          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
+          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      !\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
         }
       ]
     },
@@ -500,7 +500,7 @@
       "examples": [
         {
           "csharp": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }",
-          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
+          "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      !\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
         }
       ]
     },
@@ -544,7 +544,7 @@
         "!"
       ],
       "calorSyntax": "! effect1,effect2,...",
-      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Empty ! is a declared pure row. Private and internal callables without a declaration use their inferred body rows; public callers must still cover those effects. A body row does not certify open virtual dispatch. An omitted callback parameter, returned-callback or delegate contract is Unknown, as is explicit ! unknown in those positions. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. Transporting Unknown can report Calor0425 when a row fit cannot be proved; permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with <! e> and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
+      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Public/protected and declaration-only boundaries require an explicit own row; empty ! declares Pure. Private/internal bodies infer their rows and reject own annotations. Public callers must still cover every reachable effect. A body row does not certify open virtual dispatch. Callback parameter, returned-callback and delegate contracts require explicit rows, including ! unknown when no invocation contract is known. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. An unused declared Unknown callback is allowed; transporting it can report Calor0425 when a row fit cannot be proved. Permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with <! e> and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
       "programs": [
         "primer_effects"
       ],
@@ -579,7 +579,7 @@
       "examples": [
         {
           "csharp": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)",
-          "calor": "module Contracts\n  func Square (int:x) → int\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    requires b != 0\n    return a / b"
+          "calor": "module Contracts\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    !\n    requires b != 0\n    return a / b"
         }
       ]
     },
@@ -605,7 +605,7 @@
       "examples": [
         {
           "csharp": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result",
-          "calor": "module Contracts\n  func Square (int:x) → int\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    requires b != 0\n    return a / b"
+          "calor": "module Contracts\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    !\n    requires b != 0\n    return a / b"
         }
       ]
     },
@@ -629,7 +629,7 @@
       "examples": [
         {
           "csharp": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }",
-          "calor": "module Invariants\n  invariant (1 > 0)\n  func Read () → int\n    return 1"
+          "calor": "module Invariants\n  invariant (1 > 0)\n  func Read () → int\n    !\n    return 1"
         }
       ]
     },
@@ -682,7 +682,7 @@
       "examples": [
         {
           "csharp": "private string _name;\nprivate readonly int _id;",
-          "calor": "module AgentReference33\n  class Person\n    field string:_name private\n    field int:_age private\n    ctor (string:name, int:age)\n      set _name name\n      set _age age\n    func GetName () → string\n      return _name"
+          "calor": "module AgentReference33\n  class Person\n    field string:_name private\n    field int:_age private\n    ctor (string:name, int:age)\n      set _name name\n      set _age age\n    func GetName () → string\n      !\n      return _name"
         }
       ]
     },
@@ -705,7 +705,7 @@
       "examples": [
         {
           "csharp": "public interface IRepository { void Save(Entity e); }",
-          "calor": "module Interfaces\n  interface ICounter\n    func Count () → int\n  class Counter\n    implements ICounter\n    func Count () → int\n      return 1"
+          "calor": "module Interfaces\n  interface ICounter\n    func Count () → int\n      !\n  class Counter\n    implements ICounter\n    func Count () → int\n      !\n      return 1"
         }
       ]
     },
@@ -728,7 +728,7 @@
       "examples": [
         {
           "csharp": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }",
-          "calor": "module ConvertedModule\n  enum Status\n    Pending\n    Active\n    Suspended\n    Closed\n\n  class StatusHelper\n    func GetLabel static (Status:s) → string\n      return match s\n        case Status.Pending → \"Pending Review\"\n        case Status.Active → \"Active\"\n        case Status.Suspended → \"Temporarily Suspended\"\n        case Status.Closed → \"Closed\"\n        case _ → \"Unknown\""
+          "calor": "module ConvertedModule\n  enum Status\n    Pending\n    Active\n    Suspended\n    Closed\n\n  class StatusHelper\n    func GetLabel static (Status:s) → string\n      !\n      return match s\n        case Status.Pending → \"Pending Review\"\n        case Status.Active → \"Active\"\n        case Status.Suspended → \"Temporarily Suspended\"\n        case Status.Closed → \"Closed\"\n        case _ → \"Unknown\""
         }
       ]
     },
@@ -752,7 +752,7 @@
       "examples": [
         {
           "csharp": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }",
-          "calor": "module AgentReference33\n  class Person\n    field string:_name private\n    field int:_age private\n    ctor (string:name, int:age)\n      set _name name\n      set _age age\n    func GetName () → string\n      return _name"
+          "calor": "module AgentReference33\n  class Person\n    field string:_name private\n    field int:_age private\n    ctor (string:name, int:age)\n      set _name name\n      set _age age\n    func GetName () → string\n      !\n      return _name"
         }
       ]
     },
@@ -776,7 +776,7 @@
       "examples": [
         {
           "csharp": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }",
-          "calor": "module ConvertedModule\n  enum Status\n    Pending\n    Active\n    Suspended\n    Closed\n\n  class StatusHelper\n    func GetLabel static (Status:s) → string\n      return match s\n        case Status.Pending → \"Pending Review\"\n        case Status.Active → \"Active\"\n        case Status.Suspended → \"Temporarily Suspended\"\n        case Status.Closed → \"Closed\"\n        case _ → \"Unknown\""
+          "calor": "module ConvertedModule\n  enum Status\n    Pending\n    Active\n    Suspended\n    Closed\n\n  class StatusHelper\n    func GetLabel static (Status:s) → string\n      !\n      return match s\n        case Status.Pending → \"Pending Review\"\n        case Status.Active → \"Active\"\n        case Status.Suspended → \"Temporarily Suspended\"\n        case Status.Closed → \"Closed\"\n        case _ → \"Unknown\""
         }
       ]
     },
@@ -838,11 +838,11 @@
         },
         {
           "csharp": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);",
-          "calor": "module NamespaceFile Contoso.Tools\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+          "calor": "module NamespaceFile Contoso.Tools\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      !\n      return 7"
         },
         {
           "csharp": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);",
-          "calor": "module BlockFile Contoso.Tools block\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+          "calor": "module BlockFile Contoso.Tools block\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      !\n      return 7"
         }
       ]
     },
@@ -867,7 +867,7 @@
       "examples": [
         {
           "csharp": "public class Repository<T> where T : class { }\npublic T Get<T>(int id) where T : new() { }",
-          "calor": "module AgentReference29\n  class Container<T>\n    field T:_value private\n    func Get () → T\n      return _value\n    func HashSet (T:value) → void\n      ! mut\n      set _value value"
+          "calor": "module AgentReference29\n  class Container<T>\n    field T:_value private\n    func Get () → T\n      !\n      return _value\n    func HashSet (T:value) → void\n      ! mut\n      set _value value"
         }
       ]
     },
@@ -916,7 +916,7 @@
       "examples": [
         {
           "csharp": "$\"Hello, {name}!\"\n$\"Total: {price:C2}\"\n$\"{firstName} {lastName}\"\n$\"Result: {Calculate(x, y)} units\"",
-          "calor": "module Interpolation\n  func Greet (string:name) → string\n    return \"Hello ${name}\""
+          "calor": "module Interpolation\n  func Greet (string:name) → string\n    !\n    return \"Hello ${name}\""
         }
       ]
     },
@@ -1013,7 +1013,7 @@
       "examples": [
         {
           "csharp": "public static class StringHelper { }",
-          "calor": "module StaticTypes\n  module Counter\n    func Read () → int\n      return 7\n  func Run () → int\n    return Counter.Read()"
+          "calor": "module StaticTypes\n  module Counter\n    func Read () → int\n      !\n      return 7\n  func Run () → int\n    !\n    return Counter.Read()"
         }
       ]
     },
@@ -1037,7 +1037,7 @@
       "examples": [
         {
           "csharp": "public virtual string GetName() { return _name; }\nprotected virtual void OnChanged() { }",
-          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n      !\n    func Label virtual () → string\n      !\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      !\n      return 7\n    func Label override () → string\n      !\n      return \"derived\""
         }
       ]
     },
@@ -1061,7 +1061,7 @@
       "examples": [
         {
           "csharp": "public override string ToString() { return _name; }\npublic override int GetHashCode() { return _id; }",
-          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n      !\n    func Label virtual () → string\n      !\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      !\n      return 7\n    func Label override () → string\n      !\n      return \"derived\""
         }
       ]
     },
@@ -1084,7 +1084,7 @@
       "examples": [
         {
           "csharp": "public abstract class Shape { }",
-          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n      !\n    func Label virtual () → string\n      !\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      !\n      return 7\n    func Label override () → string\n      !\n      return \"derived\""
         }
       ]
     },
@@ -1107,7 +1107,7 @@
       "examples": [
         {
           "csharp": "public abstract double GetArea();",
-          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n      !\n    func Label virtual () → string\n      !\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      !\n      return 7\n    func Label override () → string\n      !\n      return \"derived\""
         }
       ]
     },
@@ -1130,7 +1130,7 @@
       "examples": [
         {
           "csharp": "public sealed class FinalClass { }",
-          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
+          "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n      !\n    func Label virtual () → string\n      !\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      !\n      return 7\n    func Label override () → string\n      !\n      return \"derived\""
         }
       ]
     },
@@ -1155,7 +1155,7 @@
       "examples": [
         {
           "csharp": "lock (_sync) { _count++; }",
-          "calor": "module Synchronization\n  func Read (object:gate) → int\n    lock (gate)\n      return 7"
+          "calor": "module Synchronization\n  func Read (object:gate) → int\n    !\n    lock (gate)\n      return 7"
         }
       ]
     },
@@ -1179,7 +1179,7 @@
       "examples": [
         {
           "csharp": "// TODO: Implement caching\n// FIXME: This breaks with null input\n// HACK: Temporary workaround for API bug",
-          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    !\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -1203,7 +1203,7 @@
       "examples": [
         {
           "csharp": "[Obsolete(\"Use NewMethod instead\")]",
-          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    !\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -1228,7 +1228,7 @@
       "examples": [
         {
           "csharp": "// Complexity: O(n log n)\n// Complexity: O(1) - constant time",
-          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    !\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -1254,7 +1254,7 @@
       "examples": [
         {
           "csharp": "public void Method() { }\nprivate int _field;\nprotected virtual void OnChange() { }",
-          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    !\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -1304,7 +1304,7 @@
         "op"
       ],
       "calorSyntax": "op + (type:left, type:right) → resultType; op implicit (type:value) → resultType",
-      "description": "Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. An optional standalone ! effect row precedes contracts and body statements, as for functions. An explicit row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. Without a row, only intrinsic mutation and allocation are allowed; I/O, throwing and unknown calls remain rejected. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.",
+      "description": "Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. Public operators require a standalone ! effect row before contracts and body statements; an empty ! declares Pure. The row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. A missing row is a parse error, even when optional effect checking is disabled. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.",
       "programs": [
         "complex_class"
       ],
@@ -1312,7 +1312,7 @@
       "examples": [
         {
           "csharp": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }",
-          "calor": "module PointModule\n  class Point\n    field int:_x private\n    field int:_y private\n\n    ctor (int:x, int:y)\n      set this._x x\n      set this._y y\n\n    func Equals (Point:other) → bool\n      if (other == null)\n        return false\n      else\n        return true\n\n    op == (Point:left, Point:right) → bool\n      if (left == null)\n        return (right == null)\n      else\n        return left.Equals(right)\n\n    op != (Point:left, Point:right) → bool\n      return (!(left == right))"
+          "calor": "module PointModule\n  class Point\n    field int:_x private\n    field int:_y private\n\n    ctor (int:x, int:y)\n      set this._x x\n      set this._y y\n\n    func Equals (Point:other) → bool\n      !\n      if (other == null)\n        return false\n      else\n        return true\n\n    op == (Point:left, Point:right) → bool\n      !\n      if (left == null)\n        return (right == null)\n      else\n        return left.Equals(right)\n\n    op != (Point:left, Point:right) → bool\n      !\n      return (!(left == right))"
         }
       ]
     },
@@ -1337,7 +1337,7 @@
       "examples": [
         {
           "csharp": "decimal price = 18.0000m;\ndecimal total = 100m;",
-          "calor": "module Decimals\n  func Price () → decimal\n    return 18.00m"
+          "calor": "module Decimals\n  func Price () → decimal\n    !\n    return 18.00m"
         }
       ]
     },
@@ -1385,7 +1385,7 @@
       "examples": [
         {
           "csharp": "yield return item;\nyield break;\npublic IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }",
-          "calor": "module ConvertedModule\n  using System.Collections.Generic\n\n  class NumberGen\n    func GetEvens (int:max) → IEnumerable<int>\n      for i from 0 to max step 2\n        yield i"
+          "calor": "module ConvertedModule\n  using System.Collections.Generic\n\n  class NumberGen\n    func GetEvens (int:max) → IEnumerable<int>\n      !\n      for i from 0 to max step 2\n        yield i"
         }
       ]
     },
@@ -1412,7 +1412,7 @@
       "examples": [
         {
           "csharp": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }",
-          "calor": "module AgentReference26\n  delegate MathOperation (int:x, int:y) → int"
+          "calor": "module AgentReference26\n  delegate MathOperation (int:x, int:y) → int\n    ! unknown"
         }
       ]
     },
@@ -1440,7 +1440,7 @@
       "examples": [
         {
           "csharp": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif",
-          "calor": "module Preprocessor\n  func Mode () → string\n    pp DEBUG\n      return \"debug\"\n    pp else\n      return \"release\""
+          "calor": "module Preprocessor\n  func Mode () → string\n    !\n    pp DEBUG\n      return \"debug\"\n    pp else\n      return \"release\""
         }
       ]
     },
@@ -1537,7 +1537,7 @@
       "examples": [
         {
           "csharp": "public partial class UserService { public void Save() { } }",
-          "calor": "module PartialTypes\n  class Counter partial\n    func Read () → int\n      return 1"
+          "calor": "module PartialTypes\n  class Counter partial\n    func Read () → int\n      !\n      return 1"
         }
       ]
     },
@@ -1584,7 +1584,7 @@
       "examples": [
         {
           "csharp": "x ??= GetDefault();\n_cache ??= new Dictionary<string, int>();",
-          "calor": "module NullableValues\n  func DefaultName (string?:name) → string\n    var string?:value = name\n    if (value == null)\n      set value \"unknown\"\n    return (value ?? \"unknown\")"
+          "calor": "module NullableValues\n  func DefaultName (string?:name) → string\n    !\n    var string?:value = name\n    if (value == null)\n      set value \"unknown\"\n    return (value ?? \"unknown\")"
         }
       ]
     },
@@ -1637,7 +1637,7 @@
       "examples": [
         {
           "csharp": "if (x is > 0 and < 100)\nreturn x is < 0 or > 100;\nif (x is not < 0)",
-          "calor": "module Patterns\n  func InRange (int:value) → bool\n    return ((value > 0) && (value < 100))"
+          "calor": "module Patterns\n  func InRange (int:value) → bool\n    !\n    return ((value > 0) && (value < 100))"
         }
       ]
     },
@@ -1665,7 +1665,7 @@
       "examples": [
         {
           "csharp": "var slice = array[0..5];\nvar last = items[^1];\nvar tail = data[2..];",
-          "calor": "module ArrayRanges\n  func FirstTwo (int[]:values) → int[]\n    return values[0..2]"
+          "calor": "module ArrayRanges\n  func FirstTwo (int[]:values) → int[]\n    !\n    return values[0..2]"
         }
       ]
     },
@@ -1691,7 +1691,7 @@
       "examples": [
         {
           "csharp": "(hour, minute) switch { (0, 0) => \"midnight\" }\nobj switch { { Length: > 0 } => true }",
-          "calor": "module Patterns\n  func InRange (int:value) → bool\n    return ((value > 0) && (value < 100))"
+          "calor": "module Patterns\n  func InRange (int:value) → bool\n    !\n    return ((value > 0) && (value < 100))"
         }
       ]
     },
@@ -1736,7 +1736,7 @@
       "examples": [
         {
           "csharp": "(int, string) pair = (1, \"hello\");\n(int X, int Y) point = (10, 20);\nreturn (a + b, a - b);",
-          "calor": "module Tuples\n  func Pair (int:value) → (int, string)\n    return (value, \"value\")"
+          "calor": "module Tuples\n  func Pair (int:value) → (int, string)\n    !\n    return (value, \"value\")"
         }
       ]
     },
@@ -1761,7 +1761,7 @@
       "examples": [
         {
           "csharp": "var result = value ?? \"default\";\nreturn name ?? \"Anonymous\";",
-          "calor": "module NullableValues\n  func DefaultName (string?:name) → string\n    var string?:value = name\n    if (value == null)\n      set value \"unknown\"\n    return (value ?? \"unknown\")"
+          "calor": "module NullableValues\n  func DefaultName (string?:name) → string\n    !\n    var string?:value = name\n    if (value == null)\n      set value \"unknown\"\n    return (value ?? \"unknown\")"
         }
       ]
     },
@@ -1786,7 +1786,7 @@
       "examples": [
         {
           "csharp": "var name = user?.Name;\nvar len = text?.Length;",
-          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    return person?.Name"
+          "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    !\n    return person?.Name"
         }
       ]
     },
@@ -1810,7 +1810,7 @@
       "examples": [
         {
           "csharp": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;",
-          "calor": "module Jumps\n  func Normalize (int:value) → int\n    match value\n      case 0\n        goto case 1\n      case 1\n        return 1\n      case _\n        return 0"
+          "calor": "module Jumps\n  func Normalize (int:value) → int\n    !\n    match value\n      case 0\n        goto case 1\n      case 1\n        return 1\n      case _\n        return 0"
         }
       ]
     },
@@ -1930,7 +1930,7 @@
       "examples": [
         {
           "csharp": "name = expression;",
-          "calor": "module AgentReference27\n  func Accumulate (int:n) → int\n    var int:acc = 0          // Bind mutable variable acc = 0\n    set acc (acc + n)   // Assign acc = acc + n\n    set acc (acc + n)   // Assign again\n    set acc (acc + n)   // And again\n    return acc"
+          "calor": "module AgentReference27\n  func Accumulate (int:n) → int\n    !\n    var int:acc = 0          // Bind mutable variable acc = 0\n    set acc (acc + n)   // Assign acc = acc + n\n    set acc (acc + n)   // Assign again\n    set acc (acc + n)   // And again\n    return acc"
         }
       ]
     },
@@ -2002,11 +2002,11 @@
       "examples": [
         {
           "csharp": "a + b; a == b; p && q; !p; condition ? thenValue : elseValue",
-          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
+          "calor": "module AgentReference4\n  func Abs (int:x) → int\n    !\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
         },
         {
           "csharp": "a + b; a == b; p && q; !p; condition ? thenValue : elseValue",
-          "calor": "module AgentReference10\n  func Max (int:a, int:b) → int\n    if (a >= b)\n      return a\n    else\n      return b"
+          "calor": "module AgentReference10\n  func Max (int:a, int:b) → int\n    !\n    if (a >= b)\n      return a\n    else\n      return b"
         },
         {
           "csharp": "a + b; a == b; p && q; !p; condition ? thenValue : elseValue",
@@ -2038,11 +2038,11 @@
       "examples": [
         {
           "csharp": "// Universal/existential contracts with bounded ranges.",
-          "calor": "module AgentReference39\n  func AllPositive (int[]:arr, int:n) → bool\n    requires n == arr.Length\n    => !result || !(exists int:i in 0..n : arr[i] <= 0)\n    var bool:allPos = true\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] <= 0\n        set allPos false\n    return allPos"
+          "calor": "module AgentReference39\n  func AllPositive (int[]:arr, int:n) → bool\n    !\n    requires n == arr.Length\n    => !result || !(exists int:i in 0..n : arr[i] <= 0)\n    var bool:allPos = true\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] <= 0\n        set allPos false\n    return allPos"
         },
         {
           "csharp": "// Universal/existential contracts with bounded ranges.",
-          "calor": "module AgentReference40\n  func HasNegative (int[]:arr, int:n) → bool\n    requires n == arr.Length\n    => result == (exists int:i in 0..n : arr[i] < 0)\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] < 0\n        return true\n    return false"
+          "calor": "module AgentReference40\n  func HasNegative (int[]:arr, int:n) → bool\n    !\n    requires n == arr.Length\n    => result == (exists int:i in 0..n : arr[i] < 0)\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] < 0\n        return true\n    return false"
         }
       ]
     },
@@ -2127,15 +2127,15 @@
       "examples": [
         {
           "csharp": "namespace Contoso.Tools;",
-          "calor": "module NamespaceFile Contoso.Tools\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+          "calor": "module NamespaceFile Contoso.Tools\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      !\n      return 7"
         },
         {
           "csharp": "namespace Contoso.Tools;",
-          "calor": "module BlockFile Contoso.Tools block\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+          "calor": "module BlockFile Contoso.Tools block\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      !\n      return 7"
         },
         {
           "csharp": "namespace Contoso.Tools;",
-          "calor": "module StaticTypes\n  module Counter\n    func Read () → int\n      return 7\n  func Run () → int\n    return Counter.Read()"
+          "calor": "module StaticTypes\n  module Counter\n    func Read () → int\n      !\n      return 7\n  func Run () → int\n    !\n    return Counter.Read()"
         }
       ]
     },
@@ -2177,7 +2177,7 @@
       "examples": [
         {
           "csharp": "// Available since version 1.0.0",
-          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    !\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     },
@@ -2198,7 +2198,7 @@
       "examples": [
         {
           "csharp": "// Breaking change in version 2.0.0: Description of the change",
-          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+          "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    !\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
         }
       ]
     }
@@ -2378,7 +2378,7 @@
     "!": {
       "name": "Effects",
       "syntax": "! effect1,effect2,...",
-      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Empty ! is a declared pure row. Private and internal callables without a declaration use their inferred body rows; public callers must still cover those effects. A body row does not certify open virtual dispatch. An omitted callback parameter, returned-callback or delegate contract is Unknown, as is explicit ! unknown in those positions. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. Transporting Unknown can report Calor0425 when a row fit cannot be proved; permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with <! e> and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
+      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Public/protected and declaration-only boundaries require an explicit own row; empty ! declares Pure. Private/internal bodies infer their rows and reject own annotations. Public callers must still cover every reachable effect. A body row does not certify open virtual dispatch. Callback parameter, returned-callback and delegate contracts require explicit rows, including ! unknown when no invocation contract is known. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. An unused declared Unknown callback is allowed; transporting it can report Calor0425 when a row fit cannot be proved. Permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with <! e> and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
       "csharpEquivalent": "// Method that writes to console\n// Method that reads file and writes console\n// Pure function (no effects)"
     },
     "=>": {
@@ -2515,7 +2515,7 @@
     "op": {
       "name": "Operator Overload",
       "syntax": "op + (type:left, type:right) → resultType; op implicit (type:value) → resultType",
-      "description": "Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. An optional standalone ! effect row precedes contracts and body statements, as for functions. An explicit row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. Without a row, only intrinsic mutation and allocation are allowed; I/O, throwing and unknown calls remain rejected. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.",
+      "description": "Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. Public operators require a standalone ! effect row before contracts and body statements; an empty ! declares Pure. The row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. A missing row is a parse error, even when optional effect checking is disabled. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.",
       "csharpEquivalent": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }"
     },
     "pp": {

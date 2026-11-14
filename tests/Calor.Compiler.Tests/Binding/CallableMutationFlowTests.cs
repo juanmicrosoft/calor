@@ -230,6 +230,7 @@ public sealed class CallableMutationFlowTests
                 ! mut
                 set value null
               func NoopBool public () → bool
+                !
                 return true
               func MutateBool public ({{modifier}} {{nullableType}}:value) → bool
                 ! mut
@@ -299,12 +300,14 @@ public sealed class CallableMutationFlowTests
         var source = $$"""
             module CallableShadow
               func Mutate public ({{modifier}} {{nativeNullableType}}:value) → void
+                ! mut
                 set value null
               func Take public ({{nativeNonNullableType}}:value) → void
                 !
               class Holder
                 field {{nativeNullableType}}:value public
                 func Probe public () → void
+                  ! mut
                   if value != null
                     let Action<{{nativeNullableType}}>:later = ({{nativeNullableType}}:value) =>
                       Mutate({{modifier}} value)
@@ -385,10 +388,12 @@ public sealed class CallableMutationFlowTests
               func Noop public () → void
                 !
               func Mutate public ({{modifier}} {{nullableType}}:value) → void
+                ! mut
                 set value null
               func Take public ({{nonNullableType}}:value) → void
                 !
               func Probe public ({{nullableType}}:value, bool:flag) → void
+                ! mut
                 if value != null
                   let Action:noopAction = () => Noop()
                   let Action:mutator = () => Mutate({{modifier}} value)
@@ -517,7 +522,7 @@ public sealed class CallableMutationFlowTests
         };
         var source = $$"""
             module BranchFallthrough
-            {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      return 0" : "")}}
+            {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      !\n      return 0" : "")}}
               func Noop public () → void
                 !
               func Mutate public ({{modifier}} {{nullableType}}:value) → void
@@ -582,6 +587,7 @@ public sealed class CallableMutationFlowTests
         var source = $$"""
             module LoopDiagnostics
               func Probe public () → void
+                !
             {{Indent(body, 4)}}
             """;
         var result = CompileInMode(source, mode);
@@ -621,6 +627,7 @@ public sealed class CallableMutationFlowTests
         var source = $$"""
             module LoopIncompleteAnalysis
               func Probe public () → void
+                !
             {{(previouslyReported ? "    let int:before = 1" : "")}}
             {{Indent(body, 4)}}
                 let int:after = 3
@@ -855,7 +862,7 @@ public sealed class CallableMutationFlowTests
             };
             var source = $$"""
                 module ExceptionalCallableFlow
-                {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      return 0" : "")}}
+                {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      !\n      return 0" : "")}}
                   func Noop public () → void
                     !
                   func MayThrow public (bool:flag) → void
@@ -938,7 +945,7 @@ public sealed class CallableMutationFlowTests
     {
         var source = $$"""
             module DelegateInvoke
-              func Probe (Action:callback {{valueRow}}) → void
+              func Probe (Action:callback {{(valueRow.Length == 0 ? "! unknown" : valueRow)}}) → void
                 {{callerRow}}
                 callback.Invoke()
             """;
@@ -976,6 +983,7 @@ public sealed class CallableMutationFlowTests
                   func Take (string:value) → void
                     !
                   func Probe (string?:value) → void
+                    ! mut
                     if value != null
                       let Action:callback = () =>
                         set value null
@@ -1080,7 +1088,7 @@ public sealed class CallableMutationFlowTests
         };
         var source = $$"""
             module ShadowedCapture
-            {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      return 0" : "")}}
+            {{(shape == "nominal" ? "  class Foo\n    func Marker () → int\n      !\n      return 0" : "")}}
               class Holder
                 field {{type}}?:value public
                 field {{type}}?:otherValue public

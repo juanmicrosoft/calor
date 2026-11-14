@@ -1,7 +1,10 @@
-§M{Inventory}
-  §F{AddItem:pub} (Dictionary<str, i32>:items, str:name, i32:qty) -> void
-    §E{mut}
-    §IF §HAS{items} §KEY name
-      §PUT{items} name (+ §IDX items name qty)
-    §EL
-      §PUT{items} name qty
+module Inventory Inventory block
+  module InventoryModule partial
+    func AddItem (Dictionary<string, int>:items, string:name, int:qty) → void
+      ! mut
+      if items.ContainsKey(name)
+        set items[name] (items[name] + qty)
+      else
+        set items[name] qty
+
+

@@ -1,7 +1,9 @@
 module AbstractClass AbstractClass
   module AbstractClassModule
     func BaseProcess public (int:input, int:factor) → int
+      !
       return input * factor
 
     func Validate public (int:value, int:min, int:max) → bool
+      !
       return value >= min && value <= max

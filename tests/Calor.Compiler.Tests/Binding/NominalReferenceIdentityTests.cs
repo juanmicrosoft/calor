@@ -101,8 +101,10 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         var source = $$"""
             module CatchNullability
               func Take public (Exception:value) → Exception
+                !
                 return value
               func Probe public () → Exception
+                !
                 try
                   System.Console.WriteLine("try")
                 catch Exception:ex
@@ -124,8 +126,10 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         var source = $$"""
             module UsingNullability
               func TakeStream public (System.IO.MemoryStream:value) → System.IO.MemoryStream
+                !
                 return value
               func Probe public () → System.IO.MemoryStream
+                !
                 using stream = new System.IO.MemoryStream()
                   {{statement}}
             """;
@@ -145,6 +149,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             module ThisNullability
               class Foo public
                 func Probe public (Foo?:other, bool:flag) → Foo
+                  !
                   return {{expression}}
             """;
         var (_, diagnostics) = Bind(source);
@@ -167,6 +172,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         const string source = """
             module NullableUsing
               func Probe public (System.IO.MemoryStream?:input) → void
+                !
                 using System.IO.MemoryStream?:stream = input
                   let System.IO.MemoryStream:copy = stream
             """;
@@ -186,6 +192,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             module NullableResourceHeader
               class Resource public
               func Probe public ({{typeName}}:input) → void
+                !
                 using {{typeName}}:stream = input
                   let copy = stream
             """;
@@ -209,6 +216,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         var source = $$"""
             module ResourceExpressions
               func Probe public (bool:flag, System.IDisposable:first, System.IDisposable:second) → void
+                !
                 using {{expression}}
                   let copy = first
             """;
@@ -226,6 +234,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         const string source = """
             module NullableUsingInitializer
               func Probe public (System.IO.MemoryStream?:input) → void
+                !
                 using System.IO.MemoryStream:stream = input
                   let System.IO.MemoryStream?:copy = stream
             """;
@@ -241,8 +250,10 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         const string source = """
             module InferredNullableUsing
               func Take public (System.IO.MemoryStream:value) → System.IO.MemoryStream
+                !
                 return value
               func Probe public (System.IO.MemoryStream?:input) → System.IO.MemoryStream
+                !
                 using stream = input
                   return Take(stream)
             """;
@@ -306,12 +317,14 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             module Namespaces A
               class Foo public
                 func Get public static () → Foo?
+                  !
                   return new Foo()
             """;
         var sourceB = $$"""
             module Namespaces B
               class {{callerClassName}} public
                 func Probe public static () → void
+                  !
                   let {{receivingType}}:value = A.Foo.Get()
             """;
         var diagnostics = new DiagnosticBag();
@@ -430,6 +443,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         const string source = """
             module Unknown
               func Probe public () → void
+                !
                 let value = Missing()
                 let copy = value
             """;
@@ -452,6 +466,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             module UnsupportedReceiver
               using System.IO
               func Probe public (System.IO.DirectoryInfo:directory) → void
+                !
                 let System.IO.DirectoryInfo:value = {{target}}("/")
             """;
         var (module, diagnostics) = Bind(source);
@@ -475,6 +490,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             module SupportedReceiver
               using System.IO
               func Probe public (System.IO.DirectoryInfo:directory) → void
+                !
                 let System.IO.DirectoryInfo:value = {{target}}("/")
             """;
         var (module, diagnostics) = Bind(source);
@@ -526,6 +542,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         var source = $$"""
             module NominalMetadata
               func Probe public () → {{(boundary == "binding" ? "void" : "System.IO.DirectoryInfo")}}
+                !
                 {{body}}
             """;
         var (module, diagnostics) = Bind(source, out var binder);
@@ -566,6 +583,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         const string source = """
             module NominalBclArgument
               func Probe public () → void
+                !
                 let System.Security.AccessControl.DirectorySecurity:permissions = System.IO.FileSystemAclExtensions.GetAccessControl(System.IO.Directory.GetParent("/"))
             """;
         var (module, diagnostics) = Bind(source);
@@ -624,10 +642,13 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             module ExpandedNative
               class Foo public
                 func Get public static () → Foo?
+                  !
                   return new Foo()
                 func Consume public static (Foo:value) → int
+                  !
                   return 0
                 func Probe public static () → {{(boundary == "binding" ? "void" : boundary == "return" ? "Foo" : "int")}}
+                  !
                   {{body}}
             """;
         var module = Parse(source, new DiagnosticBag());

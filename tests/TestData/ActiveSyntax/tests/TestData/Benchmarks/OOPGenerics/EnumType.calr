@@ -1,6 +1,7 @@
 module EnumType EnumType
   module EnumTypeModule
     func DaysInSeason public (int:season) → int
+      !
       if season == 0
         return 92
       else if season == 1
@@ -11,4 +12,5 @@ module EnumType EnumType
         return 90
 
     func IsWarm public (int:season) → bool
+      !
       return season == 1 || season == 0

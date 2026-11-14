@@ -216,6 +216,8 @@ hole.
 
 <a id="c-migration"></a>
 
+<a id="converting-c-interpolated-strings"></a>
+
 ## Converting C# interpolation
 
 The C# target type can change overload selection. The converter uses its
@@ -233,7 +235,7 @@ preservation. Converter-owned C# payloads are not native Calor expressions and
 do not establish native effect or verification acceptance. With fallback
 disabled, an unsupported conversion fails instead of producing that payload.
 
-`calor feature-check string-interpolation` reports
-**Partial**. Inspect the conversion
+`calor feature-check string-interpolation` reports **Partial**.
+Inspect the conversion
 report and supply the original references and parse context; a missing target
 type is not evidence that the original overload choice was recovered.

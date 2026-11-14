@@ -1,12 +1,15 @@
 module Strategy Strategy
   module StrategyModule
     func CompareAsc public (int:a, int:b) → bool
+      !
       return a < b
 
     func CompareDesc public (int:a, int:b) → bool
+      !
       return a > b
 
     func ShouldSwap public (int:a, int:b, bool:ascending) → bool
+      !
       if ascending
         return a > b
       else

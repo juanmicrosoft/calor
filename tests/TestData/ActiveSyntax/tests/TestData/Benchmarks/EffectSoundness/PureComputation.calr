@@ -1,14 +1,18 @@
 module PureComputation PureComputation
   module PureComputationModule
     func Add public (int:a, int:b) → int
+      !
       return a + b
 
     func Multiply public (int:a, int:b) → int
+      !
       return a * b
 
     func Negate public (int:x) → int
+      !
       return 0 - x
 
     func Square public (int:x) → int
+      !
       => result >= 0
       return x * x

@@ -3,4 +3,5 @@ module Test_07_02 Test_07_02 overflow unchecked
 
   class LambdaDemo public
     func Test public ()
+      !
       let Func<int,int>:doubler = (int:x) => x * 2

@@ -1,13 +1,16 @@
 module Flyweight Flyweight
   module FlyweightModule
     func PoolSize public (int:uniqueCount) → int
+      !
       => result >= 0
       return uniqueCount
 
     func MemorySaved public (int:totalObjects, int:uniqueObjects, int:objectSize) → int
+      !
       requires totalObjects >= uniqueObjects
       => result >= 0
       return (totalObjects - uniqueObjects) * objectSize
 
     func IsPooled public (int:objectId, int:poolSize) → bool
+      !
       return objectId < poolSize

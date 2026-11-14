@@ -260,6 +260,7 @@ public class InitializerConversionTests
                 {{block}}
                 field int:After = 2
                 func Get () → int
+                  !
                   return After
               class Other
                 field int:Y = 3
@@ -1020,6 +1021,7 @@ public class InitializerConversionTests
                 field int:After = 2
               module Probe
                 func Run () → string
+                  !
                   let h = new Holder()
                   return h.Xs.Count + ":" + string.Join(",", h.Xs) + "|" + h.Sb.Capacity + "|" + h.After
             """;

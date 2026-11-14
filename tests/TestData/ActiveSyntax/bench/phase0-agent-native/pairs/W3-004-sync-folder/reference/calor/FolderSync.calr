@@ -1,202 +1,200 @@
-§M{FolderSync}
-  §F{EntryName:priv} (str:line) -> str
-    §E{}
-    §B{sep:i32} (indexof line "|" :ordinal)
-    §IF (< sep 0)
-      §R line
-    §R (substr line 0 sep)
+module FolderSync FolderSync block
+  module FolderSyncModule partial
+    func EntryName private (string:line) → string
+      let int:sep = (line).IndexOf("|", StringComparison.Ordinal)
+      if (sep < 0)
+        return line
+      return (line).Substring(0, sep)
 
-  §F{EntryStamp:priv} (str:line) -> i32
-    §E{}
-    §B{sep:i32} (indexof line "|" :ordinal)
-    §IF (< sep 0)
-      §R -1
-    §B{digits:str} (substr line (+ sep 1) (- (len line) (+ sep 1)))
-    §R §C{Int32.Parse} §A digits §/C
+    func EntryStamp private (string:line) → int
+      let int:sep = (line).IndexOf("|", StringComparison.Ordinal)
+      if (sep < 0)
+        return -1
+      let string:digits = (line).Substring((sep + 1), (line.Length - (sep + 1)))
+      return Int32.Parse(digits)
 
-  §F{FormatEntry:priv} (str:name, i32:stamp) -> str
-    §E{}
-    §R (+ name (+ "|" §C{stamp.ToString} §/C))
+    func FormatEntry private (string:name, int:stamp) → string
+      return (name + ("|" + stamp.ToString()))
 
-  §F{IndexHas:pub} (str:path, str:name) -> bool
-    §E{fs:r}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R false
-    §B{prefix:str} (+ name "|")
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §EACH{line} lines
-      §B{matches:bool} (starts line prefix :ordinal)
-      §IF matches
-        §R true
-    §R false
+    func IndexHas (string:path, string:name) → bool
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return false
+      let string:prefix = (name + "|")
+      let string[]:lines = File.ReadAllLines(path)
+      each line in lines
+        let bool:matches = (line).StartsWith(prefix, StringComparison.Ordinal)
+        if matches
+          return true
+      return false
 
-  §F{IndexStamp:pub} (str:path, str:name) -> i32
-    §E{fs:r}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R -1
-    §B{prefix:str} (+ name "|")
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §EACH{line} lines
-      §B{matches:bool} (starts line prefix :ordinal)
-      §IF matches
-        §R §C{EntryStamp} §A line §/C
-    §R -1
+    func IndexStamp (string:path, string:name) → int
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return -1
+      let string:prefix = (name + "|")
+      let string[]:lines = File.ReadAllLines(path)
+      each line in lines
+        let bool:matches = (line).StartsWith(prefix, StringComparison.Ordinal)
+        if matches
+          return EntryStamp(line)
+      return -1
 
-  §F{WriteIndexEntry:pub} (str:path, str:name, i32:stamp) -> void
-    §E{fs:rw}
-    §B{entry:str} §C{FormatEntry} §A name §A stamp §/C
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §C{File.AppendAllText} §A path §A (+ entry "\n") §/C
-      §R
-    §B{prefix:str} (+ name "|")
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §B{~content:str} ""
-    §B{~found:bool} false
-    §EACH{line} lines
-      §B{matches:bool} (starts line prefix :ordinal)
-      §IF (&& (! found) matches)
-        §ASSIGN content (+ content (+ entry "\n"))
-        §ASSIGN found true
-      §EL
-        §ASSIGN content (+ content (+ line "\n"))
-    §IF (! found)
-      §ASSIGN content (+ content (+ entry "\n"))
-    §C{File.WriteAllText} §A path §A content §/C
+    func WriteIndexEntry (string:path, string:name, int:stamp) → void
+      ! fs:rw
+      let string:entry = FormatEntry(name, stamp)
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        File.AppendAllText(path, (entry + "\n"))
+        return
+      let string:prefix = (name + "|")
+      let string[]:lines = File.ReadAllLines(path)
+      var string:content = ""
+      var bool:found = false
+      each line in lines
+        let bool:matches = (line).StartsWith(prefix, StringComparison.Ordinal)
+        if ((!found) && matches)
+          set content (content + (entry + "\n"))
+          set found true
+        else
+          set content (content + (line + "\n"))
+      if (!found)
+        set content (content + (entry + "\n"))
+      File.WriteAllText(path, content)
 
-  §F{RemoveIndexEntry:pub} (str:path, str:name) -> void
-    §E{fs:rw}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R
-    §B{prefix:str} (+ name "|")
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §B{~content:str} ""
-    §EACH{line} lines
-      §B{matches:bool} (starts line prefix :ordinal)
-      §IF (! matches)
-        §ASSIGN content (+ content (+ line "\n"))
-    §C{File.WriteAllText} §A path §A content §/C
+    func RemoveIndexEntry (string:path, string:name) → void
+      ! fs:rw
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return
+      let string:prefix = (name + "|")
+      let string[]:lines = File.ReadAllLines(path)
+      var string:content = ""
+      each line in lines
+        let bool:matches = (line).StartsWith(prefix, StringComparison.Ordinal)
+        if (!matches)
+          set content (content + (line + "\n"))
+      File.WriteAllText(path, content)
 
-  §F{CopyNewer:pub} (str:sourcePath, str:targetPath) -> i32
-    §E{fs:rw}
-    §B{exists:bool} §C{File.Exists} §A sourcePath §/C
-    §IF (! exists)
-      §R 0
-    §B{lines:[str]} §C{File.ReadAllLines} §A sourcePath §/C
-    §B{~count:i32} 0
-    §EACH{line} lines
-      §B{name:str} §C{EntryName} §A line §/C
-      §B{s:i32} §C{EntryStamp} §A line §/C
-      §B{t:i32} §C{IndexStamp} §A targetPath §A name §/C
-      §IF (> s t)
-        §C{WriteIndexEntry} §A targetPath §A name §A s §/C
-        §ASSIGN count (+ count 1)
-    §R count
+    func CopyNewer (string:sourcePath, string:targetPath) → int
+      ! fs:rw
+      let bool:exists = File.Exists(sourcePath)
+      if (!exists)
+        return 0
+      let string[]:lines = File.ReadAllLines(sourcePath)
+      var int:count = 0
+      each line in lines
+        let string:name = EntryName(line)
+        let int:s = EntryStamp(line)
+        let int:t = IndexStamp(targetPath, name)
+        if (s > t)
+          WriteIndexEntry(targetPath, name, s)
+          set count (count + 1)
+      return count
 
-  §F{PruneOrphans:pub} (str:sourcePath, str:targetPath) -> i32
-    §E{fs:rw}
-    §B{exists:bool} §C{File.Exists} §A targetPath §/C
-    §IF (! exists)
-      §R 0
-    §B{lines:[str]} §C{File.ReadAllLines} §A targetPath §/C
-    §B{~count:i32} 0
-    §EACH{line} lines
-      §B{name:str} §C{EntryName} §A line §/C
-      §B{present:bool} §C{IndexHas} §A sourcePath §A name §/C
-      §IF (! present)
-        §C{RemoveIndexEntry} §A targetPath §A name §/C
-        §ASSIGN count (+ count 1)
-    §R count
+    func PruneOrphans (string:sourcePath, string:targetPath) → int
+      ! fs:rw
+      let bool:exists = File.Exists(targetPath)
+      if (!exists)
+        return 0
+      let string[]:lines = File.ReadAllLines(targetPath)
+      var int:count = 0
+      each line in lines
+        let string:name = EntryName(line)
+        let bool:present = IndexHas(sourcePath, name)
+        if (!present)
+          RemoveIndexEntry(targetPath, name)
+          set count (count + 1)
+      return count
 
-  §F{DryRunReport:pub} (str:sourcePath, str:targetPath) -> str
-    §E{fs:r}
-    §B{~report:str} ""
-    §B{srcExists:bool} §C{File.Exists} §A sourcePath §/C
-    §IF srcExists
-      §B{srcLines:[str]} §C{File.ReadAllLines} §A sourcePath §/C
-      §EACH{line} srcLines
-        §B{name:str} §C{EntryName} §A line §/C
-        §B{s:i32} §C{EntryStamp} §A line §/C
-        §B{t:i32} §C{IndexStamp} §A targetPath §A name §/C
-        §IF (> s t)
-          §ASSIGN report (+ report (+ "copy " (+ name "\n")))
-    §B{tgtExists:bool} §C{File.Exists} §A targetPath §/C
-    §IF tgtExists
-      §B{tgtLines:[str]} §C{File.ReadAllLines} §A targetPath §/C
-      §EACH{line2} tgtLines
-        §B{name2:str} §C{EntryName} §A line2 §/C
-        §B{present:bool} §C{IndexHas} §A sourcePath §A name2 §/C
-        §IF (! present)
-          §ASSIGN report (+ report (+ "prune " (+ name2 "\n")))
-    §R report
+    func DryRunReport (string:sourcePath, string:targetPath) → string
+      ! fs:r
+      var string:report = ""
+      let bool:srcExists = File.Exists(sourcePath)
+      if srcExists
+        let string[]:srcLines = File.ReadAllLines(sourcePath)
+        each line in srcLines
+          let string:name = EntryName(line)
+          let int:s = EntryStamp(line)
+          let int:t = IndexStamp(targetPath, name)
+          if (s > t)
+            set report (report + ("copy " + (name + "\n")))
+      let bool:tgtExists = File.Exists(targetPath)
+      if tgtExists
+        let string[]:tgtLines = File.ReadAllLines(targetPath)
+        each line2 in tgtLines
+          let string:name2 = EntryName(line2)
+          let bool:present = IndexHas(sourcePath, name2)
+          if (!present)
+            set report (report + ("prune " + (name2 + "\n")))
+      return report
 
-  §F{Sync:pub} (str:sourcePath, str:targetPath) -> i32
-    §E{fs:rw}
-    §B{copied:i32} §C{CopyNewer} §A sourcePath §A targetPath §/C
-    §B{pruned:i32} §C{PruneOrphans} §A sourcePath §A targetPath §/C
-    §R (+ copied pruned)
+    func Sync (string:sourcePath, string:targetPath) → int
+      ! fs:rw
+      let int:copied = CopyNewer(sourcePath, targetPath)
+      let int:pruned = PruneOrphans(sourcePath, targetPath)
+      return (copied + pruned)
 
-  §F{RecordDelete:pub} (str:tombstonePath, str:name, i32:stamp) -> void
-    §E{fs:rw}
-    §B{existing:i32} §C{IndexStamp} §A tombstonePath §A name §/C
-    §IF (>= existing stamp)
-      §R
-    §C{WriteIndexEntry} §A tombstonePath §A name §A stamp §/C
+    func RecordDelete (string:tombstonePath, string:name, int:stamp) → void
+      ! fs:rw
+      let int:existing = IndexStamp(tombstonePath, name)
+      if (existing >= stamp)
+        return
+      WriteIndexEntry(tombstonePath, name, stamp)
 
-  §F{SyncTwoWay:pub} (str:sourcePath, str:targetPath, str:tombstonePath) -> i32
-    §E{fs:rw,mut,alloc}
-    §B{~actions:i32} 0
-    §LIST{srcNames:str}
-    §/LIST
-    §LIST{tgtSnapshot:str}
-    §/LIST
-    §B{tgtExists:bool} §C{File.Exists} §A targetPath §/C
-    §IF tgtExists
-      §B{tgtLines:[str]} §C{File.ReadAllLines} §A targetPath §/C
-      §EACH{tline} tgtLines
-        §PUSH{tgtSnapshot} tline
-    §B{srcExists:bool} §C{File.Exists} §A sourcePath §/C
-    §IF srcExists
-      §B{srcLines:[str]} §C{File.ReadAllLines} §A sourcePath §/C
-      §EACH{line} srcLines
-        §B{name:str} §C{EntryName} §A line §/C
-        §PUSH{srcNames} name
-        §B{s:i32} §C{EntryStamp} §A line §/C
-        §B{t:i32} §C{IndexStamp} §A targetPath §A name §/C
-        §B{d:i32} §C{IndexStamp} §A tombstonePath §A name §/C
-        §B{~m:i32} s
-        §IF (> t m)
-          §ASSIGN m t
-        §IF (>= d m)
-          §C{RemoveIndexEntry} §A sourcePath §A name §/C
-          §ASSIGN actions (+ actions 1)
-          §IF (>= t 0)
-            §C{RemoveIndexEntry} §A targetPath §A name §/C
-            §ASSIGN actions (+ actions 1)
-        §EI (> s t)
-          §C{WriteIndexEntry} §A targetPath §A name §A s §/C
-          §ASSIGN actions (+ actions 1)
-        §EI (> t s)
-          §C{WriteIndexEntry} §A sourcePath §A name §A t §/C
-          §ASSIGN actions (+ actions 1)
-    §EACH{tline2} tgtSnapshot
-      §B{name2:str} §C{EntryName} §A tline2 §/C
-      §IF (! §HAS{srcNames} name2)
-        §B{t2:i32} §C{EntryStamp} §A tline2 §/C
-        §B{d2:i32} §C{IndexStamp} §A tombstonePath §A name2 §/C
-        §IF (>= d2 t2)
-          §C{RemoveIndexEntry} §A targetPath §A name2 §/C
-          §ASSIGN actions (+ actions 1)
-        §EL
-          §C{WriteIndexEntry} §A sourcePath §A name2 §A t2 §/C
-          §ASSIGN actions (+ actions 1)
-    §R actions
+    func SyncTwoWay (string:sourcePath, string:targetPath, string:tombstonePath) → int
+      ! fs:rw, mut, alloc
+      var int:actions = 0
+      let List<string>:srcNames = new System.Collections.Generic.List<string>()
+      let List<string>:tgtSnapshot = new System.Collections.Generic.List<string>()
+      let bool:tgtExists = File.Exists(targetPath)
+      if tgtExists
+        let string[]:tgtLines = File.ReadAllLines(targetPath)
+        each tline in tgtLines
+          tgtSnapshot.Add(tline)
+      let bool:srcExists = File.Exists(sourcePath)
+      if srcExists
+        let string[]:srcLines = File.ReadAllLines(sourcePath)
+        each line in srcLines
+          let string:name = EntryName(line)
+          srcNames.Add(name)
+          let int:s = EntryStamp(line)
+          let int:t = IndexStamp(targetPath, name)
+          let int:d = IndexStamp(tombstonePath, name)
+          var int:m = s
+          if (t > m)
+            set m t
+          if (d >= m)
+            RemoveIndexEntry(sourcePath, name)
+            set actions (actions + 1)
+            if (t >= 0)
+              RemoveIndexEntry(targetPath, name)
+              set actions (actions + 1)
+          else if (s > t)
+            WriteIndexEntry(targetPath, name, s)
+            set actions (actions + 1)
+          else if (t > s)
+            WriteIndexEntry(sourcePath, name, t)
+            set actions (actions + 1)
+      each tline2 in tgtSnapshot
+        let string:name2 = EntryName(tline2)
+        if (!srcNames.Contains(name2))
+          let int:t2 = EntryStamp(tline2)
+          let int:d2 = IndexStamp(tombstonePath, name2)
+          if (d2 >= t2)
+            RemoveIndexEntry(targetPath, name2)
+            set actions (actions + 1)
+          else
+            WriteIndexEntry(sourcePath, name2, t2)
+            set actions (actions + 1)
+      return actions
 
-  §F{SyncWithPolicy:pub} (str:sourcePath, str:targetPath, str:tombstonePath, bool:twoWay) -> i32
-    §E{fs:rw,mut,alloc}
-    §IF twoWay
-      §R §C{SyncTwoWay} §A sourcePath §A targetPath §A tombstonePath §/C
-    §R §C{Sync} §A sourcePath §A targetPath §/C
+    func SyncWithPolicy (string:sourcePath, string:targetPath, string:tombstonePath, bool:twoWay) → int
+      ! fs:rw, mut, alloc
+      if twoWay
+        return SyncTwoWay(sourcePath, targetPath, tombstonePath)
+      return Sync(sourcePath, targetPath)
+
+

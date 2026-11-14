@@ -1,11 +1,14 @@
-§M{MiddlewareBroadening}
-  §IFACE{IPipelineBehavior}
-    §MT{Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
-      §E{e}
+module MiddlewareBroadening MiddlewareBroadening block
+  interface IPipelineBehavior
+    func Handle <! e> (int:request, Func<int>:next ! e) → int
+      ! e
 
-  §CL{LoggingBehavior:pub}
-    §IMPL{IPipelineBehavior}
-    §MT{Handle:pub}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
-      §E{e, cw}
-      §P "before"
-      §R §C{next} §/C
+  class LoggingBehavior
+    implements IPipelineBehavior
+
+    func Handle <! e> (int:request, Func<int>:next ! e) → int
+      ! cw, e
+      System.Console.WriteLine("before")
+      return next()
+
+

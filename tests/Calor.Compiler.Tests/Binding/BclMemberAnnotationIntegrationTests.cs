@@ -38,6 +38,7 @@ public partial class BclMemberAnnotationTests
         var source = $$"""
             module JointLocals
               func Probe public ({{parameters}}) → {{(boundary == "return" ? TypeMapper.ToSurfaceType(receivingType) : "void")}}
+                !
                 let first = {{expression}}
                 {{(depth == 2 ? "let second = first" : "")}}
                 {{(boundary == "return" ? "return" : $"let {TypeMapper.ToSurfaceType(receivingType)}:result =")}} {{value}}
@@ -83,8 +84,10 @@ public partial class BclMemberAnnotationTests
         var source = $$"""
             module JointNativeMap
               func Take public (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) → int
+                !
                 return 1
               func Probe public (System.IO.DirectoryInfo:directory) → void
+                !
                 let first = directory.{{(nullable ? "Parent" : "Root")}}
                 let second = first
                 {{(expression ? "let result = " : "")}}Take(safe: directory, required: second)
@@ -122,6 +125,7 @@ public partial class BclMemberAnnotationTests
         var source = $$"""
             module JointBclMap
               func Probe public () → void
+                !
                 let first = {{(nullable ? "System.Environment.ProcessPath" : "System.String.Empty")}}
                 let second = first
                 {{(expression ? "let result = " : "")}}System.IO.Path.Combine({{arguments}})
@@ -168,6 +172,7 @@ public partial class BclMemberAnnotationTests
         var source = $$"""
             module JointContext
               func Probe public (N5Fixture.Derived:value) → void
+                !
                 let first = value.{{(nullable ? "Nullable" : "NonNull")}}DirectoryField
                 let second = first
                 {{(expression ? "let result = " : "")}}System.N5MemberSink.Take(optional: first, required: second)
@@ -202,6 +207,7 @@ public partial class BclMemberAnnotationTests
         var source = $$"""
             module JointTaint
               func Probe public (string:user_input) → void
+                !
                 let first = System.Text.Encoding.UTF8
                 let second = first
                 {{(expression ? "let result = " : "")}}System.IO.File.ReadAllText(encoding: second, path: {{(taintedPath ? "user_input" : "\"safe.txt\"")}})

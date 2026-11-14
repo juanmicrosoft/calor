@@ -1,10 +1,13 @@
-§M{MiddlewareAlpha}
-  §IFACE{IPipelineBehavior}
-    §MT{Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
-      §E{e}
+module MiddlewareAlpha MiddlewareAlpha block
+  interface IPipelineBehavior
+    func Handle <! e> (int:request, Func<int>:next ! e) → int
+      ! e
 
-  §CL{PassThroughBehavior:pub}
-    §IMPL{IPipelineBehavior}
-    §MT{Handle:pub}<eff f> (i32:request, Func<i32>:next §E{f}) -> i32
-      §E{f}
-      §R §C{next} §/C
+  class PassThroughBehavior
+    implements IPipelineBehavior
+
+    func Handle <! f> (int:request, Func<int>:next ! f) → int
+      ! f
+      return next()
+
+

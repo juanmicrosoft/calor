@@ -164,6 +164,7 @@ public class ConstructorOverloadingTests
               class Base public
                 field int:Value public
                 func Bump () → void
+                  !
                   set this.Value this.Value + 1
               class Derived public
                 extends Base

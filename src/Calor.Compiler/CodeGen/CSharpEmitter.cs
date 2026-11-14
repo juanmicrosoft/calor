@@ -7676,6 +7676,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(DelegateDefinitionNode node)
     {
+        if (CallableOrigin is { } origin)
+            AppendLine(origin(node));
         var name = SanitizeIdentifier(node.Name);
         var returnType = node.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
@@ -8416,16 +8418,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         }
     }
 
-    private void RegisterOpaqueCSharpDependencies()
-    {
-        RequireNamespace("System.Collections.Generic");
-        RequireNamespace("System.IO");
-        RequireNamespace("System.Linq");
-        RequireNamespace("System.Net.Http");
-        RequireNamespace("System.Threading");
-        RequireNamespace("System.Threading.Tasks");
-    }
-
     private string MapTypeName(string calorType)
     {
         // Check indexed type erasure: SizedList → List, NonEmptyArr → int[], etc.
@@ -9126,7 +9118,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     public string Visit(FallbackExpressionNode node)
     {
         // Emit the original C# code with a TODO comment
-        RegisterOpaqueCSharpDependencies();
         return $"/* TODO: {node.FeatureName} */ {node.OriginalCSharp}";
     }
 
@@ -9225,7 +9216,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(RawCSharpNode node)
     {
-        RegisterOpaqueCSharpDependencies();
         AppendRawCSharp(node.CSharpCode, node);
         return "";
     }
@@ -9238,7 +9228,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(RawCSharpExpressionNode node)
     {
-        RegisterOpaqueCSharpDependencies();
         return node.CSharpCode;
     }
 
@@ -9517,7 +9506,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     public string Visit(CSharpInteropBlockNode node)
     {
-        RegisterOpaqueCSharpDependencies();
         AppendRawCSharp(node.CSharpCode, node);
         return "";
     }

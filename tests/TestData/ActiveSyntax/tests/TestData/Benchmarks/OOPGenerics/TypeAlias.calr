@@ -1,11 +1,14 @@
 module TypeAlias TypeAlias
   module TypeAliasModule
     func UserId public (int:id) → int
+      !
       requires id > 0
       return id
 
     func IsValidId public (int:id) → bool
+      !
       return id > 0
 
     func NextId public (int:id) → int
+      !
       return id + 1

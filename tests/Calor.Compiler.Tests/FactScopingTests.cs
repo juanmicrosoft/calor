@@ -21,6 +21,7 @@ public sealed class FactScopingTests
         var module = Parse("""
             module Test
               func Probe (int:n) → void
+                !
                 do
                   proof n == 0
                 while n > 0
@@ -47,6 +48,7 @@ public sealed class FactScopingTests
         var module = Parse($$"""
             module Test
               func Probe (int:start, int:end) → void
+                !
                 for i from start to end step {{step}}
                   proof i == i
                 proof start == start
@@ -72,6 +74,7 @@ public sealed class FactScopingTests
         var module = Parse("""
             module Test
               func Probe (int:start, int:end) → void
+                !
                 for i = start; i < end; i = i + 2
                   proof i < end
                 proof start == start
@@ -96,6 +99,7 @@ public sealed class FactScopingTests
         var module = Parse("""
             module Test
               func Probe (int:end) → void
+                !
                 for i = 0; i < end; i = i + 1
                   set i end
                   proof i < end
@@ -257,6 +261,7 @@ public sealed class FactScopingTests
             module Test
               class Checker
                 func Check (int:x) → void
+                  !
                   if x > 0
                     proof x > 0
             """;

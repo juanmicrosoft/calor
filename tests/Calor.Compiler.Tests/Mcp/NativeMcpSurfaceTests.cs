@@ -23,7 +23,7 @@ public sealed class NativeMcpSurfaceTests : IDisposable
             let Box:first = Make()
             return Make()
         """;
-    private const string Wide = "module Calc\n    func Add (int:x, int:y) → int\n        return x + y\n";
+    private const string Wide = "module Calc\n    func Add (int:x, int:y) → int\n      !\n        return x + y\n";
 
     public NativeMcpSurfaceTests() => Directory.CreateDirectory(_directory);
     public void Dispose() => Directory.Delete(_directory, recursive: true);
@@ -146,7 +146,7 @@ public sealed class NativeMcpSurfaceTests : IDisposable
     [Fact]
     public async Task Fix_DoesNotGuessTypesOrApplyFuzzyNameSuggestions()
     {
-        const string source = "module Guess\n  func Use (int:value) → int\n    return vlaue\n";
+        const string source = "module Guess\n  func Use (int:value) → int\n    !\n    return vlaue\n";
         var result = await Call("calor_fix", new { source });
         Assert.True(result.IsError);
         var output = Output(result);

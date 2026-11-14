@@ -1,52 +1,55 @@
-§M{Spans}
-  §F{TotalCovered:pub} ([i32]:starts, [i32]:ends) -> i32
-    §E{}
-    §Q (== §LEN starts §LEN ends)
-    §S (>= result 0)
-    §B{~total:i32} 0
-    §B{~i:i32} 0
-    §WH (< i §LEN starts)
-      §ASSIGN total (+ total (- §IDX ends i §IDX starts i))
-      §ASSIGN i (+ i 1)
-    §R total
+module Spans Spans block
+  module SpansModule partial
+    func TotalCovered (int[]:starts, int[]:ends) → int
+      !
+      requires (starts.Length == ends.Length)
+      => (result >= 0)
+      var int:total = 0
+      var int:i = 0
+      while (i < starts.Length)
+        set total (total + (ends[i] - starts[i]))
+        set i (i + 1)
+      return total
 
-  §F{ContainsPoint:pub} ([i32]:starts, [i32]:ends, i32:x) -> bool
-    §E{}
-    §Q (== §LEN starts §LEN ends)
-    §B{~i:i32} 0
-    §WH (< i §LEN starts)
-      §IF (&& (>= x §IDX starts i) (< x §IDX ends i))
-        §R true
-      §ASSIGN i (+ i 1)
-    §R false
+    func ContainsPoint (int[]:starts, int[]:ends, int:x) → bool
+      !
+      requires (starts.Length == ends.Length)
+      var int:i = 0
+      while (i < starts.Length)
+        if ((x >= starts[i]) && (x < ends[i]))
+          return true
+        set i (i + 1)
+      return false
 
-  §F{ClipCovered:pub} ([i32]:starts, [i32]:ends, i32:lo, i32:hi) -> i32
-    §E{}
-    §Q (== §LEN starts §LEN ends)
-    §Q (<= lo hi)
-    §S (>= result 0)
-    §B{~total:i32} 0
-    §B{~i:i32} 0
-    §WH (< i §LEN starts)
-      §B{~s:i32} §IDX starts i
-      §B{~e:i32} §IDX ends i
-      §IF (< s lo)
-        §ASSIGN s lo
-      §IF (> e hi)
-        §ASSIGN e hi
-      §IF (> e s)
-        §ASSIGN total (+ total (- e s))
-      §ASSIGN i (+ i 1)
-    §R total
+    func ClipCovered (int[]:starts, int[]:ends, int:lo, int:hi) → int
+      !
+      requires (starts.Length == ends.Length)
+      requires (lo <= hi)
+      => (result >= 0)
+      var int:total = 0
+      var int:i = 0
+      while (i < starts.Length)
+        var int:s = starts[i]
+        var int:e = ends[i]
+        if (s < lo)
+          set s lo
+        if (e > hi)
+          set e hi
+        if (e > s)
+          set total (total + (e - s))
+        set i (i + 1)
+      return total
 
-  §F{GapCount:pub} ([i32]:starts, [i32]:ends) -> i32
-    §E{}
-    §Q (== §LEN starts §LEN ends)
-    §S (>= result 0)
-    §B{~n:i32} 0
-    §B{~i:i32} 1
-    §WH (< i §LEN starts)
-      §IF (> §IDX starts i §IDX ends (- i 1))
-        §ASSIGN n (+ n 1)
-      §ASSIGN i (+ i 1)
-    §R n
+    func GapCount (int[]:starts, int[]:ends) → int
+      !
+      requires (starts.Length == ends.Length)
+      => (result >= 0)
+      var int:n = 0
+      var int:i = 1
+      while (i < starts.Length)
+        if (starts[i] > ends[(i - 1)])
+          set n (n + 1)
+        set i (i + 1)
+      return n
+
+

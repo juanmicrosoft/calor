@@ -1,63 +1,62 @@
-§M{KvJournal}
-  §F{Set:pub} (str:path, str:key, str:value) -> void
-    §E{fs:w}
-    §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
+module KvJournal KvJournal block
+  module KvJournalModule partial
+    func Set (string:path, string:key, string:value) → void
+      ! fs:w
+      File.AppendAllText(path, (key + ("=" + (value + "\n"))))
 
-  §F{KeyOf:priv} (str:line) -> str
-    §E{}
-    §B{eq:i32} (indexof line "=" :ordinal)
-    §IF (< eq 0)
-      §R line
-    §R (substr line 0 eq)
+    func KeyOf private (string:line) → string
+      let int:eq = (line).IndexOf("=", StringComparison.Ordinal)
+      if (eq < 0)
+        return line
+      return (line).Substring(0, eq)
 
-  §F{ValueOf:priv} (str:line) -> str
-    §E{}
-    §B{eq:i32} (indexof line "=" :ordinal)
-    §IF (< eq 0)
-      §R ""
-    §R (substr line (+ eq 1) (- (len line) (+ eq 1)))
+    func ValueOf private (string:line) → string
+      let int:eq = (line).IndexOf("=", StringComparison.Ordinal)
+      if (eq < 0)
+        return ""
+      return (line).Substring((eq + 1), (line.Length - (eq + 1)))
 
-  §F{Get:pub} (str:path, str:key) -> str
-    §E{fs:r}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R ""
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §B{~found:str} ""
-    §EACH{ln} lines
-      §B{k:str} §C{KeyOf} §A ln §/C
-      §IF (== k key)
-        §ASSIGN found §C{ValueOf} §A ln §/C
-    §R found
+    func Get (string:path, string:key) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      let string[]:lines = File.ReadAllLines(path)
+      var string:found = ""
+      each ln in lines
+        let string:k = KeyOf(ln)
+        if (k == key)
+          set found ValueOf(ln)
+      return found
 
-  §F{CountKeys:pub} (str:path) -> i32
-    §E{fs:r,mut,alloc}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R 0
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §LIST{seen:str}
-    §/LIST
-    §EACH{ln} lines
-      §B{k:str} §C{KeyOf} §A ln §/C
-      §IF (! §HAS{seen} k)
-        §PUSH{seen} k
-    §R §CNT{seen}
+    func CountKeys (string:path) → int
+      ! fs:r, mut, alloc
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return 0
+      let string[]:lines = File.ReadAllLines(path)
+      let List<string>:seen = new System.Collections.Generic.List<string>()
+      each ln in lines
+        let string:k = KeyOf(ln)
+        if (!seen.Contains(k))
+          seen.Add(k)
+      return seen . Count
 
-  §F{Compact:pub} (str:path) -> void
-    §E{fs:rw,mut,alloc}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §LIST{order:str}
-    §/LIST
-    §EACH{ln} lines
-      §B{k:str} §C{KeyOf} §A ln §/C
-      §IF (! §HAS{order} k)
-        §PUSH{order} k
-    §B{~text:str} ""
-    §EACH{k2} order
-      §B{v:str} §C{Get} §A path §A k2 §/C
-      §ASSIGN text (+ text (+ k2 (+ "=" (+ v "\n"))))
-    §C{File.WriteAllText} §A path §A text §/C
+    func Compact (string:path) → void
+      ! fs:rw, mut, alloc
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return
+      let string[]:lines = File.ReadAllLines(path)
+      let List<string>:order = new System.Collections.Generic.List<string>()
+      each ln in lines
+        let string:k = KeyOf(ln)
+        if (!order.Contains(k))
+          order.Add(k)
+      var string:text = ""
+      each k2 in order
+        let string:v = Get(path, k2)
+        set text (text + (k2 + ("=" + (v + "\n"))))
+      File.WriteAllText(path, text)
+
+

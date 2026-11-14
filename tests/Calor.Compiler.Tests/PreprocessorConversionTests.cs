@@ -125,6 +125,7 @@ public class Test
 module Test Test
   class Test
     func M () → void
+      !
       pp DEBUG
         let x = 1
 ";
@@ -261,6 +262,7 @@ public class Test
 module Test Test
   class Test
     func M () → int
+      !
       pp NET8_0_OR_GREATER
         return 1
       pp else
@@ -376,6 +378,7 @@ module Test Test
   class Test
     pp DEBUG
       func DebugMethod () → void
+        !
 ";
         var csharp = CompileCalorToCSharp(calor);
         Assert.Contains("#if DEBUG", csharp);
@@ -2789,6 +2792,7 @@ public class Test
                 ctor ()
                 field int:Value public
                 func Get () → int
+                  !
                   return Value
             """;
 

@@ -1,9 +1,11 @@
 module LogPipeline LogPipeline
   module LogPipelineModule
     func Log public (string:msg) → void
+      !
       return
 
     func RunBatch public (string:a, string:b, string:c) → void
+      !
       Log(a)
       Log(b)
       Log(c)

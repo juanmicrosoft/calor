@@ -7,9 +7,11 @@ module FixtureTest FixtureTest
   module ConditionalValue
     pp FEATURE
       func Get () → Number
+        !
         => result == 41
         return 41
     pp else
       func Get () → Number
+        !
         => result == 42
         return 42

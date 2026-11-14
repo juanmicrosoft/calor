@@ -1,11 +1,13 @@
 // Current nullable/exception semantics, not a replay of the frozen benchmark.
 module NullDerefBenchmark NullDerefBenchmark
   func VulnerableNullDeref public (string?:maybeNull) → int
+    !
     // BUG: Potential null dereference without check
     // EXPECTED: Calor0922 Null Dereference
     return maybeNull.Length
 
   func SafeNullCheck public (string?:maybeNull) → int
+    !
     // SAFE: Null check before use
     // EXPECTED: No warnings
     if maybeNull != null
@@ -14,6 +16,7 @@ module NullDerefBenchmark NullDerefBenchmark
       return 0
 
   func VulnerableChainedAccess public (BenchmarkNode?:obj) → string?
+    !
     // BUG: Chained access without null checks
     // EXPECTED: Calor0922 Null Dereference
     let BenchmarkNode?:inner = obj . Inner
@@ -21,6 +24,7 @@ module NullDerefBenchmark NullDerefBenchmark
     return value
 
   func SafeCoalesce public (string?:maybeNull) → string
+    !
     // SAFE: Coalesce provides default
     // EXPECTED: No warnings
     let string:safe = maybeNull ?? "default"
@@ -33,6 +37,7 @@ module NullDerefBenchmark NullDerefBenchmark
     return maybeValue ?? throw new InvalidOperationException("Missing value")
 
   func SafeNullableCheck public (int?:maybeValue) → int
+    !
     // SAFE: Guarded nullable value with a fallback
     // EXPECTED: No warnings
     if maybeValue != null
@@ -41,12 +46,14 @@ module NullDerefBenchmark NullDerefBenchmark
       return 0
 
   func VulnerableFunctionReturn public (int:key, System.Collections.Generic.Dictionary<int,string?>:dict) → int
+    !
     // BUG: Function return may be null
     // EXPECTED: Calor0922 Null Dereference
     let string?:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key)
     return result.GetHashCode()
 
   func SafeOrDefault public (int:key, System.Collections.Generic.Dictionary<int,string?>:dict) → int
+    !
     // SAFE: Using get_or_default
     // EXPECTED: No warnings
     let string:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key) ?? ""

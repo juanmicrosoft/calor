@@ -19,6 +19,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func PrintHello public () → void
+                !
                 System.Console.WriteLine("Hello, World!")
             """, DiagnosticCode.ForbiddenEffect, "Function 'PrintHello' uses effect 'cw'"));
 
@@ -53,6 +54,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func Caller public () → void
+                !
                 Callee()
               func Callee public () → void
                 ! cw
@@ -73,6 +75,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func CallUnknown public () → void
+                !
                 MyCustomLib.DoSomething()
             """, DiagnosticCode.UnknownExternalCall, "Unknown external call to 'MyCustomLib.DoSomething'"));
 
@@ -90,6 +93,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func RecursivePrint public (int:n) → void
+                !
                 if n > 0
                   System.Console.WriteLine(n)
                   RecursivePrint(n - 1)
@@ -108,6 +112,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func SpanTest public (int:x) → int
+                !
                 let int:result = x * 2
                 System.Console.WriteLine("The result is: ")
                 return result
@@ -133,6 +138,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func PrintHello public () → void
+                !
                 System.Console.WriteLine("Hello, World!")
             """), options);
 
@@ -153,6 +159,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func PrintAndRead public () → string
+                !
                 System.Console.WriteLine("Enter your name: ")
                 let string:name = "placeholder"
                 return name
@@ -176,6 +183,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func Add public (int:a, int:b) → int
+                !
                 return a + b
             """));
 
@@ -194,6 +202,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func TestPrint public () → void
+                !
                 System.Console.WriteLine("test")
             """));
 
@@ -295,6 +304,7 @@ public class EffectEnforcementTests
             module Test Test
               class MyService
                 func PrintHello public () → void
+                  !
                   System.Console.WriteLine("Hello from method")
             """));
 
@@ -368,6 +378,7 @@ public class EffectEnforcementTests
             module Test Test
               class Logger
                 func Log public () → void
+                  !
                   Console.WriteLine("log message")
             """));
 
@@ -394,6 +405,7 @@ public class EffectEnforcementTests
             module Test Test
               class Calculator
                 func Add public (int:a, int:b) → int
+                  !
                   return a + b
             """));
 
@@ -447,6 +459,7 @@ public class EffectEnforcementTests
             module Test Test
               class Mapper
                 func Apply public (int:value) → int
+                  !
                   return transform(value)
             """));
 
@@ -476,6 +489,7 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func UseDelegate public () → void
+                !
                 callback()
             """), options);
 
@@ -508,11 +522,13 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func Work public (int:value) → int
+                !
                 return value
               func Work public (string:value) → void
                 ! cw
                 System.Console.WriteLine(value)
               func Caller public () → int
+                !
                 return Work(1)
             """));
 
@@ -544,11 +560,13 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func Work public (int:value) → int
+                !
                 return value
               func Work public (string:value) → void
                 ! cw
                 System.Console.WriteLine(value)
               func Caller public () → void
+                !
                 Work(true)
             """));
 
@@ -602,8 +620,10 @@ public class EffectEnforcementTests
             module Test Test
               class Calculator
                 func Add public (int:a, int:b) → int
+                  !
                   return a + b
               func UseCalculator public (Calculator:_calc) → int
+                !
                 return _calc.Add(1, 2)
             """));
 
@@ -638,6 +658,7 @@ public class EffectEnforcementTests
                   ! cw
                   System.Console.WriteLine(message)
               func DoWork public (Logger:_logger) → void
+                !
                 _logger.Log("hello")
             """));
 
@@ -750,6 +771,7 @@ public class EffectEnforcementTests
               class App
                 field Printer:_printer private
                 func Run public () → void
+                  !
                   _printer.PrintMessage("hello")
             """));
 
@@ -840,6 +862,7 @@ public class EffectEnforcementTests
             module Test Test
               class PureService
                 func Process public (string:data) → string
+                  !
                   return data
               class EffectfulService
                 func Process public (string:data) → void
@@ -886,11 +909,14 @@ public class EffectEnforcementTests
             module Test Test
               class Calculator
                 func Compute public (int:x) → int
+                  !
                   return x + 1
               class OtherService
                 func Format public (string:s) → string
+                  !
                   return s
               func UseCalc public (Calculator:_calc) → int
+                !
                 return _calc.Compute(5)
             """));
 
@@ -1428,7 +1454,7 @@ public class EffectEnforcementTests
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module BareTargetProbe BareTargetProbe
-              func Go public (Func<int>:make) → int
+              func Go public (Func<int>:make ! unknown) → int
                 !
                 return make()
             """));

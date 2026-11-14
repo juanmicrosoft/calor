@@ -1,6 +1,7 @@
 module SafeMath SafeMath
   module SafeMathModule
     func Divide public (int:a, int:b) → int
+      !
       requires{"divisor must not be zero"} b != 0
       => result == a / b
       return a / b

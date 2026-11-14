@@ -1,5 +1,8 @@
-§M{TextUtils}
-  §F{Slugify:pub} (str:s) -> str
-    §E{}
-    §B{lower:str} §C{s.ToLowerInvariant} §/C
-    §R §C{lower.Replace} §A " " §A "-" §/C
+module TextUtils TextUtils block
+  module TextUtilsModule partial
+    func Slugify (string:s) → string
+      !
+      let string:lower = s.ToLowerInvariant()
+      return lower.Replace(" ", "-")
+
+

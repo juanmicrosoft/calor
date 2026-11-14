@@ -6,4 +6,5 @@ module DelayedResult DelayedResult
       return value
 
     func ImmediateValue public (int:value) → int
+      !
       return value

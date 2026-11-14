@@ -4,6 +4,7 @@ module Test_07_04 Test_07_04 overflow unchecked
 
   module BlockLambdaDemo public
     func Run public ()
+      !
       let _lam005 = () =>
         let _chainRange004 = Enumerable.Range(1, 5)
         let nums = _chainRange004.ToArray()
@@ -11,5 +12,6 @@ module Test_07_04 Test_07_04 overflow unchecked
         return total
       Handle("/x", _lam005)
 
-    func Handle public (string:route, Func<int>:handler)
+    func Handle public (string:route, Func<int>:handler ! unknown)
+      !
       return

@@ -78,6 +78,7 @@ public sealed class SymbolAndOverloadBindingTests
               func Pick private (string:value) → string
                 return value
               func Use public () → int
+                !
                 return Pick(null ?? 0)
             """;
 
@@ -97,17 +98,22 @@ public sealed class SymbolAndOverloadBindingTests
         const string source = """
             module Test
               func UseQualified public (Converter:c) → int
+                !
                 return c.Convert(1)
 
               class Converter
                 field int:_value private
                 func Convert public (int:x) → int
+                  !
                   return x
                 func Convert public (string:x) → string
+                  !
                   return x
                 func Convert public (int:x, int:y) → bool
+                  !
                   return true
                 func Use public () → void
+                  !
                   Convert(1)
                   Convert("x")
                   Convert(1, 2)
@@ -220,6 +226,7 @@ public sealed class SymbolAndOverloadBindingTests
               func Pick private (int:value) → int
                 return value
               func Use public () → int
+                !
                 return Pick("wrong")
             """;
 
@@ -241,6 +248,7 @@ public sealed class SymbolAndOverloadBindingTests
               func Pick<T> private (int:value, T:other) → T
                 return other
               func Use public () → int
+                !
                 return Pick(1, 2)
             """;
 
@@ -258,6 +266,7 @@ public sealed class SymbolAndOverloadBindingTests
         const string source = """
             module Test
               func Use public () → void
+                !
                 Console.WriteLine("ok")
             """;
 
@@ -279,6 +288,7 @@ public sealed class SymbolAndOverloadBindingTests
         const string source = """
             module Test
               func Create public () → object
+                !
                 return new Box<List<Widget>>()
               class Widget
               class List<T>
@@ -440,6 +450,7 @@ public sealed class SymbolAndOverloadBindingTests
               func Select<T,U> private (T:value) → T
                 return value
               func Use public () → void
+                !
                 Select<int>(1)
                 Select<int,string>(1)
             """;
@@ -544,14 +555,17 @@ public sealed class SymbolAndOverloadBindingTests
         const string original = """
             module Test
               func Keep public (int:value) → int
+                !
                 let int:local = value
                 return local
             """;
         const string inserted = """
             module Test
               func Before public () → int
+                !
                 return 0
               func Keep public (int:value) → int
+                !
                 let int:local = value
                 return local
             """;
@@ -584,6 +598,7 @@ public sealed class SymbolAndOverloadBindingTests
         const string source = """
             module Test
               func Update public () → int
+                !
                 var int:value = 1
                 var value = 2
                 return value
@@ -610,6 +625,7 @@ public sealed class SymbolAndOverloadBindingTests
         const string source = """
             module Test
               func Update public () → int
+                !
                 let int:@fixed = 1
                 var @fixed = 2
                 var int:value = 1
@@ -1171,12 +1187,14 @@ public sealed class SymbolAndOverloadBindingTests
                 ctor public (int:x)
                   set value x
                 func Pick public (int:x) → int
+                  !
                   return x
               class Derived
                 extends Base
                 ctor public (int:x)
                   base(x)
                 func Use public () → int
+                  !
                   return base.Pick(1)
             """;
 
@@ -1206,8 +1224,10 @@ public sealed class SymbolAndOverloadBindingTests
               class Worker
                 pp FEATURE
                   func Do public () → int
+                    !
                     return 1
                 func Run public () → int
+                  !
                   return Do()
             """;
 
@@ -1526,6 +1546,7 @@ public sealed class SymbolAndOverloadBindingTests
               class Derived
                 extends Base
                 func Use public () → int
+                  !
                   let int:first = Pick(1)
                   let int:second = this.Pick(2)
                   Hidden()
@@ -1613,6 +1634,7 @@ public sealed class SymbolAndOverloadBindingTests
               func Echo private (string:value) → string
                 return value
               func Use public (string[]:values) → void
+                !
                 each item in values
                   let string:copy = Echo(item)
             """;
@@ -1664,6 +1686,7 @@ public sealed class SymbolAndOverloadBindingTests
         const string source = """
             module Test
               func Use public () → object
+                !
                 return new object().GetType()
             """;
 

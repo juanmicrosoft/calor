@@ -39,9 +39,9 @@ public class ContractTranslatorSemanticsVersionGuardTests
     //   2. If it IS intentional, bump ContractTranslator.SemanticsVersion (so old
     //      on-disk cache entries are invalidated) AND replace the two constants
     //      below with the reported new values, in the SAME commit.
-    private const string ExpectedSemanticsVersion = "z3-executable-semantics-v3";
+    private const string ExpectedSemanticsVersion = "z3-executable-semantics-v4";
     private const string ExpectedFixtureHash =
-        "f58ee927a0ae8fa8fe5bf2af5dbf0ea78b989ca4264fc055bc027f583b51628a";
+        "52c2c3d5a5742aae5c3fe57a665b93996bcd1a1ef8cbf7123491e68ed003187e";
     private const string HistoricalSemanticsVersion = "z3-executable-semantics-v2";
     private const string HistoricalFixtureHash =
         "95e8039c7ea350581bc5c32b530d75576ae296c26850eec2056235d6847f0d86";

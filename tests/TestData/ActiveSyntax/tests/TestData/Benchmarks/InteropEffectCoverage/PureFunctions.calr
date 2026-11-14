@@ -1,24 +1,29 @@
 module PureMath PureMath
   module PureMathModule
     func Add public (int:a, int:b) → int
+      !
       return a + b
 
     func Multiply public (int:a, int:b) → int
+      !
       return a * b
 
     func Abs public (int:x) → int
+      !
       if x < 0
         return 0 - x
       else
         return x
 
     func Max public (int:a, int:b) → int
+      !
       if a > b
         return a
       else
         return b
 
     func Power public (int:@base, int:exp) → int
+      !
       requires exp >= 0
       var result = 1
       var i = 0
@@ -28,4 +33,5 @@ module PureMath PureMath
       return result
 
     func StringConcat public (string:a, string:b) → string
+      !
       return string.Concat(a, b)

@@ -1,12 +1,15 @@
-§M{ParityEncoder}
-  §F{Encode:pub} ([i32]:values) -> i32
-    §E{}
-    §B{~odd:i32} 0
-    §B{~i:i32} 0
-    §WH (< i (len values))
-      §B{v:i32} §IDX values i
-      §IF (!= (% v 2) 0)
-        §ASSIGN odd (+ odd 1)
-      §ASSIGN i (+ i 1)
-    §B{n:i32} §LEN values
-    §R (+ (* odd 65536) n)
+module ParityEncoder ParityEncoder block
+  module ParityEncoderModule partial
+    func Encode (int[]:values) → int
+      !
+      var int:odd = 0
+      var int:i = 0
+      while (i < values.Length)
+        let int:v = values[i]
+        if ((v % 2) != 0)
+          set odd (odd + 1)
+        set i (i + 1)
+      let int:n = values.Length
+      return ((odd * 65536) + n)
+
+

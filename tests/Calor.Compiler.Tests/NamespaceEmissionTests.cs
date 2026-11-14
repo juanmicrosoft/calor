@@ -17,6 +17,7 @@ public class NamespaceEmissionTests
             module Tests Calor.Runtime.Tests block
               module TestsModule public
                 func Test public () → void
+                  !
             """;
 
         // Act
@@ -38,6 +39,7 @@ public class NamespaceEmissionTests
             module Tests Calor.Runtime.Tests block
               module TestsModule public
                 func TestFunc public () → void
+                  !
             """;
 
         // Act
@@ -72,6 +74,7 @@ public class NamespaceEmissionTests
             module MyNamespace MyNamespace block
               module MyNamespaceModule public
                 func Test public () → void
+                  !
             """;
 
         // Act
@@ -92,6 +95,7 @@ public class NamespaceEmissionTests
             module Tests Company.Product.Feature.SubFeature.Tests block
               module TestsModule public
                 func Test public () → void
+                  !
             """;
 
         // Act

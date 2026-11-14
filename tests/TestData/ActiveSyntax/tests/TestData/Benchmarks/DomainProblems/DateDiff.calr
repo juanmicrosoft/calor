@@ -1,6 +1,7 @@
 module DateDiff DateDiff
   module DateDiffModule
     func DaysBetween public (int:dayA, int:dayB) → int
+      !
       => result >= 0
       let diff = dayB - dayA
       if diff < 0
@@ -9,9 +10,11 @@ module DateDiff DateDiff
         return diff
 
     func WeeksBetween public (int:days) → int
+      !
       requires days >= 0
       return days / 7
 
     func RemainingDays public (int:days) → int
+      !
       requires days >= 0
       return days % 7

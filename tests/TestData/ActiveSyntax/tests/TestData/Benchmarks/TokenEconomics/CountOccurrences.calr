@@ -1,11 +1,13 @@
 module CountOccurrences CountOccurrences
   module CountOccurrencesModule
     func CountOccurrences public (int:length, int:matchCount) → int
+      !
       => result >= 0
       => result <= length
       return matchCount
 
     func IncrementIf public (int:count, bool:matches) → int
+      !
       if matches
         return count + 1
       else

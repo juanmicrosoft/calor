@@ -16,6 +16,9 @@ public class DocumentStateTests
     [InlineData("module _global\n  ", "unit:feature:Other:%20", "public class Kept { }", "Calor1012")]
     [InlineData("module _global\n  ", "unit:feature:Other:%ZZ", "public class Kept { }", "Calor0013")]
     [InlineData("module _global\n  ", "unit:feature:Other:%FF", "public class Kept { }", "Calor0013")]
+    [InlineData("module Gate\n  func Run () \u2192 void\n    !\n    ", "member:unresolved-feature:Other:reason", "return;", "Calor1012")]
+    [InlineData("module Gate\n  class Host\n    ", "member:unresolved-feature:Other:reason", "public int Value => 7;", "Calor1012")]
+    [InlineData("module _global\n  ", "unit:unresolved-feature:Other:reason", "public class Kept { }", "Calor1012")]
     public void InteropReasonGate_EditorMatchesSharedCompilation(
         string prefix, string marker, string payload, string code)
     {
@@ -40,7 +43,7 @@ public class DocumentStateTests
         const string payload = "#nullable enable";
         var source = "module Directives\n  raw directive:nullable-directive "
             + System.Text.Encoding.UTF8.GetByteCount(payload) + "\n" + payload
-            + "\n  func Value () \u2192 int\n    return 7\n";
+            + "\n  func Value () \u2192 int\n    !\n    return 7\n";
         var state = LspTestHarness.CreateDocument(source);
         Assert.False(state.Diagnostics.HasErrors, string.Join("\n", state.Diagnostics));
         var result = Compiler.Program.Compile(source);
@@ -55,10 +58,11 @@ public class DocumentStateTests
     public void N3_NamedCall_EditorRetainsActualArgumentSpanAndActiveRoute(bool expression)
     {
         var source = $$"""
-            §M{EditorMapping}
-              §F{Caller:pub} (?string:maybe) -> string
-                {{(expression ? "§R " : "")}}§C{System.IO.Path.Combine} §A[path2] STR:"safe" §A[path1] maybe §/C
-                {{(expression ? "" : "§R STR:\"done\"")}}
+            module EditorMapping EditorMapping
+              func Caller public (string?:maybe) → string
+                !
+                {{(expression ? "return " : "")}}System.IO.Path.Combine(path2: "safe", path1: maybe)
+                {{(expression ? "" : "return \"done\"")}}
             """;
         var state = LspTestHarness.CreateDocument(source);
         var diagnostic = Assert.Single(state.Diagnostics.Where(d =>
@@ -98,9 +102,10 @@ public class DocumentStateTests
     public void Reanalyze_ValidSource_ParsesAst()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub} () -> i32
-                §R 0
+            module TestModule TestModule
+              func Test public () → int
+                !
+                return 0
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -121,7 +126,7 @@ public class DocumentStateTests
     }
 
     /// <summary>
-    /// The §SEMVER compatibility check runs at parse time, so the language server
+    /// The semver compatibility check runs at parse time, so the language server
     /// surfaces the fail-closed refusal of a retired-major file as Calor0701 with the
     /// migration pointer (#1084 item 1 / #1087) — not only `calor build`.
     /// </summary>
@@ -129,10 +134,11 @@ public class DocumentStateTests
     public void Reanalyze_LegacySemver_ReportsCalor0701()
     {
         var source = """
-            §M{Legacy}
-              §SEMVER{1.0.0}
-              §F{Test:pub} () -> i32
-                §R 0
+            module Legacy Legacy
+              semver "1.0.0"
+              func Test public () → int
+                !
+                return 0
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -151,10 +157,11 @@ public class DocumentStateTests
     public void Reanalyze_CurrentSemver_NoVersionDiagnostics()
     {
         var source = $$"""
-            §M{Modern}
-              §SEMVER{{{Compiler.SemanticsVersion.VersionString}}}
-              §F{Test:pub} () -> i32
-                §R 0
+            module Modern Modern
+              semver "{{Compiler.SemanticsVersion.VersionString}}"
+              func Test public () → int
+                !
+                return 0
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -172,9 +179,10 @@ public class DocumentStateTests
         string expression)
     {
         var source = $$"""
-            §M{TestModule}
-              §F{Make:pub} () -> object
-                §R {{expression}}
+            module TestModule TestModule
+              func Make public () → object
+                !
+                return {{expression}}
             """;
 
         DocumentState? state = null;
@@ -186,20 +194,59 @@ public class DocumentStateTests
         var diagnostic = Assert.Single(
             state.Diagnostics,
             item => item.Code
-                    == Compiler.Diagnostics.DiagnosticCode.ExpectedTypeName);
+                    == Compiler.Diagnostics.DiagnosticCode.UnknownSectionMarker);
         Assert.Equal(
-            "§NEW requires a non-empty type name.",
+            "Legacy section marker '§NEW' is removed. Use canonical lowercase words and ordinary C# expression punctuation.",
             diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("new ()", "(")]
+    [InlineData("new <int>()", "<")]
+    public void Reanalyze_MalformedNativeNewType_PublishesDiagnosticWithoutThrowing(
+        string expression, string unexpectedToken)
+    {
+        var source = $$"""
+            module MalformedCreation
+              func Make public () → object
+                !
+                return {{expression}}
+            """;
+        DocumentState? state = null;
+        var exception = Record.Exception(() => state = LspTestHarness.CreateDocument(source));
+
+        Assert.Null(exception);
+        Assert.NotNull(state);
+        const string message = "Use a C# type spelling with suffix arrays and nullability, such as 'int[]' or 'string?'.";
+        var diagnostic = Assert.Single(state.Diagnostics.Where(item =>
+            item.Code == Compiler.Diagnostics.DiagnosticCode.UnexpectedToken
+            && item.Message == message));
+        Assert.Equal(Compiler.Diagnostics.DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(4, diagnostic.Span.Line);
+        Assert.Equal(source.IndexOf(expression, StringComparison.Ordinal)
+            + expression.IndexOf(unexpectedToken, StringComparison.Ordinal), diagnostic.Span.Start);
+        Assert.DoesNotContain(state.Diagnostics, item =>
+            item.Code == Compiler.Diagnostics.DiagnosticCode.UnknownSectionMarker
+            || item.Code == "Calor9999");
     }
 
     [Fact]
     public void Reanalyze_InteropConstruct_PublishesInfoSeverityUnsupported_NotError()
     {
-        var source = """
-            §M{TestModule}
-              §F{Pick:pub} () -> object
-                §R §CS{DateTime.Now}
-            """;
+        var conversion = new Compiler.Migration.CSharpToCalorConverter(
+            new Compiler.Migration.ConversionOptions
+            {
+                ValidateRoundTripCSharp = false
+            }).Convert("""
+                public class MarkerCases {
+                    int value;
+                    int[] values = new int[2];
+                    public void Run() { checked { int n = 1; } }
+                }
+                """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.True(conversion.InteropPreservationCount > 0);
+        var source = Assert.IsType<string>(conversion.CalorSource);
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -215,14 +262,16 @@ public class DocumentStateTests
     public void Update_ChangesSource()
     {
         var source1 = """
-            §M{TestModule}
-              §F{Test}
-                §R 0
+            module TestModule TestModule
+              func Test () → int
+                !
+                return 0
             """;
         var source2 = """
-            §M{TestModule}
-              §F{Test2}
-                §R 1
+            module TestModule TestModule
+              func Test2 () → int
+                !
+                return 1
             """;
 
         var state = LspTestHarness.CreateDocument(source1);
@@ -239,7 +288,7 @@ public class DocumentStateTests
     {
         var badSource = "§M{Test} §UNKNOWN_TOKEN_XYZ"; // Invalid
         var goodSource = """
-            §M{TestModule}
+            module TestModule TestModule
             """;
 
         var state = LspTestHarness.CreateDocument(badSource);
@@ -254,7 +303,7 @@ public class DocumentStateTests
     public void GetTokenAtPosition_ReturnsToken()
     {
         var source = """
-            §M{TestModule}
+            module TestModule TestModule
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -267,7 +316,7 @@ public class DocumentStateTests
     public void GetTokenAtPosition_InvalidPosition_ReturnsNull()
     {
         var source = """
-            §M{TestModule}
+            module TestModule TestModule
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -280,7 +329,7 @@ public class DocumentStateTests
     public void GetTokenAtOffset_ReturnsToken()
     {
         var source = """
-            §M{TestModule}
+            module TestModule TestModule
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -293,7 +342,7 @@ public class DocumentStateTests
     public void Reanalyze_SetsFilePath()
     {
         var source = """
-            §M{TestModule}
+            module TestModule TestModule
             """;
 
         var state = LspTestHarness.CreateDocument(source, "file:///path/to/test.calr");
@@ -307,9 +356,10 @@ public class DocumentStateTests
     public void Reanalyze_WithBindingErrors_StillHasAst()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §R undefined_variable
+            module TestModule TestModule
+              func Test () → int
+                !
+                return undefined_variable
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -324,11 +374,10 @@ public class DocumentStateTests
     {
         // Uses "valeu" instead of "value" - a typo that should be suggested
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §I{i32:value}
-                §O{i32}
-                §R valeu
+            module TestModule TestModule
+              func Test (int:value) → int
+                !
+                return valeu
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -349,11 +398,10 @@ public class DocumentStateTests
     {
         // Uses "valeu" instead of "value" - should have a quick fix
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §I{i32:value}
-                §O{i32}
-                §R valeu
+            module TestModule TestModule
+              func Test (int:value) → int
+                !
+                return valeu
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -663,12 +711,12 @@ public class DocumentStateTests
         var workspace = new WorkspaceState();
         var aUri = DocumentUri.From("file:///publication-a.calr");
         var bUri = DocumentUri.From("file:///publication-b.calr");
-        workspace.GetOrCreate(aUri, "§M{A}\n", version: 1);
-        workspace.GetOrCreate(bUri, "§M{B}\n", version: 1);
+        workspace.GetOrCreate(aUri, "module A\n", version: 1);
+        workspace.GetOrCreate(bUri, "module B\n", version: 1);
         var older = workspace.CaptureSnapshot();
         var olderB = older.GetDocument(bUri)!;
 
-        workspace.Update(aUri, "§M{A2}\n", version: 2);
+        workspace.Update(aUri, "module A2\n", version: 2);
         var newer = workspace.CaptureSnapshot();
         var newerB = newer.GetDocument(bUri)!;
         Assert.Same(olderB.Analysis, newerB.Analysis);
@@ -758,9 +806,10 @@ public class DocumentStateTests
     }
 
     private static string VersionedSource(int version) => $$"""
-        §M{Versioned}
-          §F{Version{{version}}:pub} () -> i32
-            §R MissingVersion{{version}}
+        module Versioned Versioned
+          func Version{{version}} public () → int
+            !
+            return MissingVersion{{version}}
         """;
 
     private static void AssertCoherent(DocumentSnapshot snapshot)
@@ -825,10 +874,11 @@ public class DocumentStateTests
     public void Calor0270_InferredLocalReceiver_IsOneInformationDiagnostic()
     {
         var source = """
-            §M{Test}
-              §F{DoWork:pub} () -> void
-                §B{x} §C{Unknown.Make} §/C
-                §C{x.Run} §/C
+            module Test Test
+              func DoWork public () → void
+                !
+                let x = Unknown.Make()
+                x.Run()
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -850,10 +900,11 @@ public class DocumentStateTests
     public void Calor0270_MemberChainReceiver_IsSilentInTheEditor()
     {
         var source = """
-            §M{Test}
-              §F{DoWork:pub} () -> void
-                §B{a} §NEW{Random} §/NEW
-                §C{a.b.Chain} §/C
+            module Test Test
+              func DoWork public () → void
+                !
+                let a = new System.Random()
+                a.b.Chain()
             """;
 
         var state = LspTestHarness.CreateDocument(source);

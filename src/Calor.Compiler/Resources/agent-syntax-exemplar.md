@@ -92,11 +92,13 @@ an effect charge. Arrays and lists differ: File.ReadAllLines returns string[], n
 ```calor
 module Contracts
   func Square (int:x) → int
+    !
     requires x >= 0
     => result >= 0
     return x * x
 
   func Divide (int:a, int:b) → int
+    !
     requires b != 0
     return a / b
 ```
@@ -104,6 +106,7 @@ module Contracts
 ```calor
 module Branching
   func Sign (int:x) → int
+    !
     if (x > 0)
       return 1
     else if (x < 0)
@@ -183,6 +186,7 @@ module Bindings
 module Classes
   class Greeter
     func Greet () → string
+      !
       return "hello"
 ```
 

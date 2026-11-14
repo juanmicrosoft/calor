@@ -190,11 +190,12 @@ public sealed class CanonicalControlFlowTests
               module Holder
                 field int:Value static = 7
               func Probe public () → int
+                !
                 return Holder . Value
             """);
         binder.Bind(module);
         Assert.Single(binder.BoundSourceStaticFieldReads);
-        binder.Bind(Parse("module Empty\n  func Probe public () → int\n    return 0"));
+        binder.Bind(Parse("module Empty\n  func Probe public () → int\n    !\n    return 0"));
         Assert.Empty(binder.BoundSourceStaticFieldReads);
     }
 
@@ -204,6 +205,7 @@ public sealed class CanonicalControlFlowTests
         const string source = """
             module Pairs
               func Probe public (System.Collections.Generic.Dictionary<string,int>:pairs) → int
+                !
                 var int:total = 0
                 each key, value in pairs
                   let int:count = value
@@ -468,7 +470,6 @@ public sealed class CanonicalControlFlowTests
             }
             """, declarations: NativeDisposable(), effectCodes: "mut,alloc", nativeMethods: """
               func Acquire private () → Resource
-                ! mut,alloc
                 set Instrumentation.Trace Instrumentation.Trace + "A"
                 return new Resource()
 
@@ -859,7 +860,7 @@ public sealed class CanonicalControlFlowTests
                   return
                 func Source private () → Hub
                   return this
-                func MakeHandler private () → System.Action
+                func MakeHandler private () → System.Action ! unknown
                   return Handle
                 func Probe () → int
                   ! mut
@@ -953,6 +954,7 @@ public sealed class CanonicalControlFlowTests
         const string source = """
             module Conditions
               func Probe () → int
+                !
                 var int:n = 0
                 pp FIRST
                   set n 1
@@ -981,6 +983,7 @@ public sealed class CanonicalControlFlowTests
         const string source = """
             module Conditions
               func Probe () → int
+                !
                 var int:n = 0
                 pp OUTER
                   pp INNER
@@ -1010,6 +1013,7 @@ public sealed class CanonicalControlFlowTests
         const string source = """
             module Conditions
               func Probe () → int
+                !
                 pp FIRST
                   let int:value = 1
                 pp elif SECOND
@@ -1036,7 +1040,7 @@ public sealed class CanonicalControlFlowTests
     [InlineData("pp FLAG\n  return 1\npp else\n  return 2\npp elif OTHER", "preceding branch")]
     public void StatementPreprocessor_RejectsMalformedAndOrphanContinuations(string body, string message)
     {
-        var source = "module Conditions\n  func Probe () → int\n" +
+        var source = "module Conditions\n  func Probe () → int\n    !\n" +
             string.Join("\n", body.Split('\n').Select(line => "    " + line)) + "\n      return 3";
         var diagnostics = new DiagnosticBag();
         _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -1224,6 +1228,7 @@ public sealed class CanonicalControlFlowTests
                 field bool:Active
                 field T?:Value
               func Probe (object:value) → int
+                !
                 return match value
                   case {{pattern}} → {{binding}}.Value
                   case _ → -1
@@ -1272,6 +1277,7 @@ public sealed class CanonicalControlFlowTests
                 field bool:Active
                 field T?:Value
               func Probe (Calculator.Box<int>:value) → int
+                !
                 return match value
                   case { Active: true, Value: 7 } → 1
                   case _ → 0
@@ -1310,6 +1316,7 @@ public sealed class CanonicalControlFlowTests
                 field bool:IsSome public
                 field T?:Value public
               func Probe ({{inputType}}:value) → int
+                !
                 return match value
                   case {{pattern}} → v
                   case _ → -1
@@ -1367,6 +1374,7 @@ public sealed class CanonicalControlFlowTests
               class Envelope<T>
                 field T?:Inner public
               func Probe (object:value) → int
+                !
                 return match value
                   case Calculator.Envelope<Calculator.Option<int>> { Inner: { IsSome: true, Value: var v } } → v
                   case _ → -1
@@ -1409,6 +1417,7 @@ public sealed class CanonicalControlFlowTests
               class Option<T>
                 field T?:Value public
               func Probe (Calculator.Option<{{argument}}>:value) → {{result}}
+                !
                 return match value
                   case { Value: var v } → v
                   case _ → null
@@ -1442,6 +1451,7 @@ public sealed class CanonicalControlFlowTests
                 field bool:IsSome public
                 field T?:Value public
               func Probe (object:value) → int
+                !
                 return match value
                   case Calculator.Option<object> { IsSome: true, Value: int v } → v
                   case _ → -1
@@ -1475,6 +1485,7 @@ public sealed class CanonicalControlFlowTests
               class Option<T>
                 field T?:Value public
               func Probe (Calculator.Option<{{argument}}>:value) → {{result}}
+                !
                 return match value
                   case { {{memberPattern}} } → {{body}}
                   case _ → 0
@@ -1497,6 +1508,7 @@ public sealed class CanonicalControlFlowTests
               class Option<T>
                 field T?:Value public
               func Probe (object:value) → int
+                !
                 return match value
                   case Other.Option<int> { Value: var v } → v
                   case _ → 0
@@ -1534,6 +1546,7 @@ public sealed class CanonicalControlFlowTests
               class Box<T>
                 field T?:Value
               func Probe (object:value) → int
+                !
                 return match value
                   case Calculator.Box<int> _ → 1
                   case _ → 0
@@ -1567,7 +1580,7 @@ public sealed class CanonicalControlFlowTests
     [InlineData("§PPROP §PMATCH{Value} §VAR{v}")]
     public void NativeCarrierPatterns_RejectMalformedPropertiesAndRetiredTypeAliases(string pattern)
     {
-        var source = $"module Bad\n  func Probe (object:value) → int\n    return match value\n" +
+        var source = $"module Bad\n  func Probe (object:value) → int\n    !\n    return match value\n" +
             $"      case {pattern} → 1\n      case _ → 0";
         var diagnostics = new DiagnosticBag();
         _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -1596,6 +1609,7 @@ public sealed class CanonicalControlFlowTests
         var source = """
             module Labels
               func Probe () → void
+                !
                 done:
             """;
         foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
@@ -1613,6 +1627,7 @@ public sealed class CanonicalControlFlowTests
         var source = """
             module Iterators
               func Probe (int:limit) → int
+                !
                 for i from 0 to 3
                   if i == limit
                     yield break
@@ -1673,7 +1688,7 @@ public sealed class CanonicalControlFlowTests
     public void ElseOnlyIf_FixPreservesCommentRawPayloadAndFollowingSibling()
     {
         var payload = "/* raw\r\n  untouched bytes\r\n*/";
-        var source = "module Decisions\n  func Probe (int:n) → int\n    var int:result = 0\n" +
+        var source = "module Decisions\n  func Probe (int:n) → int\n    !\n    var int:result = 0\n" +
             "    if n == 0\n      set result 1\n    else // keep explanation\n" +
             "      // keep inner comment\n      if n == 1\n" +
             $"        raw statement {Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
@@ -1728,6 +1743,7 @@ public sealed class CanonicalControlFlowTests
         const string source = """
             module Migrated
               func Assign (out int:result) → void
+                !
                 var int:i = 0
                 do
                   set result i
@@ -1785,11 +1801,9 @@ public sealed class CanonicalControlFlowTests
             }
             """, nativeMethods: """
               func Pairs private () → System.Collections.Generic.IEnumerable<(int, int)>
-                ! mut
                 set Instrumentation.Trace Instrumentation.Trace + "E"
                 return Enumerate()
               func Enumerate private () → (int, int)
-                ! mut
                 set Instrumentation.Trace Instrumentation.Trace + "A"
                 try
                   set Instrumentation.Trace Instrumentation.Trace + "B"
@@ -1856,11 +1870,9 @@ public sealed class CanonicalControlFlowTests
 
             """, nativeMethods: """
               func Pairs private () → System.Collections.Generic.IEnumerable<Pair>
-                ! mut,alloc
                 set Instrumentation.Trace Instrumentation.Trace + "E"
                 return Enumerate()
               func Enumerate private () → Pair
-                ! mut,alloc
                 set Instrumentation.Trace Instrumentation.Trace + "A"
                 try
                   set Instrumentation.Trace Instrumentation.Trace + "B"
@@ -1898,15 +1910,12 @@ public sealed class CanonicalControlFlowTests
             }
             """, effectCodes: "mut,throw", nativeMethods: """
               func Fail private () → void
-                ! mut,throw,alloc
                 set Instrumentation.Trace Instrumentation.Trace + "X"
                 throw new System.InvalidOperationException()
               func Pairs private () → System.Collections.Generic.IEnumerable<(int, int)>
-                ! mut
                 set Instrumentation.Trace Instrumentation.Trace + "E"
                 return Enumerate()
               func Enumerate private () → (int, int)
-                ! mut
                 set Instrumentation.Trace Instrumentation.Trace + "A"
                 try
                   set Instrumentation.Trace Instrumentation.Trace + "B"
@@ -1922,6 +1931,7 @@ public sealed class CanonicalControlFlowTests
         var source = """
             module Loops
               func Run (int:n) → void
+                !
                 for i from 0 to n step 1
                   continue
                 for j = 0; j < n; j = j + 1
@@ -1945,6 +1955,7 @@ public sealed class CanonicalControlFlowTests
         var source = """
             module Stores
               func Probe () → int
+                !
                 var int:n = 0
                 set n n + 3
                 return n
@@ -1966,7 +1977,7 @@ public sealed class CanonicalControlFlowTests
     public void RemovedLoopForms_AreErrorsNotCompatibility(string header)
     {
         var diagnostics = new DiagnosticBag();
-        _ = new Parser(new Lexer($"module Bad\n  func Run (int[]:xs) → void\n    {header}\n      break",
+        _ = new Parser(new Lexer($"module Bad\n  func Run (int[]:xs) → void\n    !\n    {header}\n      break",
             diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);
     }
@@ -2054,7 +2065,7 @@ public sealed class CanonicalControlFlowTests
         effectCodes ??= members.Length == 0 ? null : "mut";
         // Native instrumentation exposes effects that its old raw bodies hid.
         var requiredEffects = (effectCodes?.Split(',') ?? []).Concat(helperEffects).Distinct().ToArray();
-        var effects = requiredEffects.Length == 0 ? "" : $"    ! {string.Join(",", requiredEffects)}\n";
+        var effects = requiredEffects.Length == 0 ? "    !\n" : $"    ! {string.Join(",", requiredEffects)}\n";
         var source = $"module Migrated overflow {overflow}\n{support}{declarations}  func Probe () → int\n{effects}" +
             string.Join("\n", body.Split('\n').Select(line => "    " + line));
         AssertObservationSource(source, expected, originalMethods, types);

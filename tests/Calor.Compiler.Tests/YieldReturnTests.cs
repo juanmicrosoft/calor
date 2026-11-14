@@ -64,6 +64,7 @@ public class YieldReturnTests
         var source = """
             module TestModule
               func GetNumbers public () → int
+                !
                 yield 42
             """;
 
@@ -83,6 +84,7 @@ public class YieldReturnTests
         var source = """
             module TestModule
               func GetNumbers public () → int
+                !
                 yield break
             """;
 
@@ -99,6 +101,7 @@ public class YieldReturnTests
         var source = """
             module TestModule
               func GetItems public (int:x) → int
+                !
                 yield x
             """;
 
@@ -159,6 +162,7 @@ public class YieldReturnTests
         var source = """
             module TestModule
               func GetNumbers public () → int
+                !
                 yield 1
                 yield 2
                 yield 3
@@ -445,6 +449,7 @@ public class YieldReturnTests
         var calorSource = """
             module TestModule
               func GetNumbers public () → int
+                !
                 yield 1
                 yield 2
                 yield 3
@@ -464,6 +469,7 @@ public class YieldReturnTests
         var calorSource = """
             module TestModule
               func GetNumbers public () → int
+                !
                 yield 1
                 yield break
             """;
@@ -487,6 +493,7 @@ public class YieldReturnTests
             module TestModule
               class NumberGenerator
                 func GetNumbers public () → int
+                  !
                   yield 1
                   yield 2
                   yield 3
@@ -507,6 +514,7 @@ public class YieldReturnTests
             module TestModule
               class Service
                 func GetItems public () → string
+                  !
                   yield "hello"
                   yield break
             """;
@@ -727,6 +735,7 @@ public class YieldReturnTests
         var source = """
             module TestModule
               func Process public (ref int:value) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -743,6 +752,7 @@ public class YieldReturnTests
         var source = """
             module TestModule
               func Process public (out int:value) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -759,6 +769,7 @@ public class YieldReturnTests
         var source = """
             module TestModule
               func Process public (params string:values) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);

@@ -31,14 +31,15 @@ module OrderService OrderService
 
 **`Handler.calr`**
 
-```calor group=orders expect=Calor0410,Calor0417
+```calor group=orders expect=Calor0410
 module Handler
 
   func HandleRequest () → void
+    !
     SaveOrder()
 ```
 
-`HandleRequest` calls `SaveOrder` — a function defined in another module — but declares no effects. `SaveOrder` has effect `db:w`, so `HandleRequest` must also declare `db:w`.
+`HandleRequest` calls `SaveOrder` — a function defined in another module — but declares Pure. `SaveOrder` has effect `db:w`, so `HandleRequest` must also declare `db:w`.
 
 The per-file effect pass cannot see another file's declarations for the bare-name call `SaveOrder()`. The cross-module pass supplies that boundary check; a single-file result is not proof of the complete project's effect safety.
 
@@ -49,15 +50,11 @@ Starting in v0.4.9, Calor runs a **cross-module effect enforcement pass** after 
 For the example above, `calor --input OrderService.calr --input Handler.calr` reports:
 
 ```text output
-warning Calor0417: Public function 'HandleRequest' in module 'Handler' has no effect
-declaration. Cross-module callers cannot verify effect safety. Add an indented ! row to
-declare effects.
 error Calor0410: Function 'HandleRequest' uses effect 'db:w' via cross-module call
 to 'SaveOrder' (in module 'OrderService') but does not declare it.
 ```
 
-The `Calor0410` error is the cross-module check. The `Calor0417` warning is explained
-under "Undeclared public functions" below.
+The `Calor0410` error is the cross-module check.
 
 Fix by adding the effect to the caller. This is a **function fragment** to use
 inside `Handler.calr`, not a complete file:
@@ -115,17 +112,18 @@ OrderRepo.Save()                // class-qualified
 
 ---
 
-## Undeclared public functions: Calor0417
+## Missing public rows: Calor0124
 
-If a public or internal function lacks an `!` row entirely, cross-module callers have nothing to verify against. Rather than silently assuming the function is pure, the compiler emits a **warning**:
+Public functions require an explicit `!` row. Omitting it is a parse error:
 
 ```text illustrative
-Calor0417: Public function 'SaveOrder' in module 'OrderService' has no effect
-declaration. Cross-module callers cannot verify effect safety. Add an indented ! row to
-declare effects.
+Calor0124: Boundary 'SaveOrder' requires an explicit effect row.
+Write '!' for Pure or '! effects' before its body.
 ```
 
-The function is excluded from the cross-module registry, so callers get no cross-module check for it. Add an `!` row (even bare `!` for a provably pure function) to enable the check.
+Add the declared budget before compiling, even bare `!` for Pure. The compiler
+then checks whether the body satisfies it. Internal bodies infer their effects;
+they do not acquire a public cross-module contract.
 
 ---
 

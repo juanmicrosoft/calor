@@ -14,7 +14,7 @@ public class ControlFlowTests
     [InlineData("§IF true\n      §R 1\n    §EL → §R 2")]
     public void Parse_ArrowConditionalStatements_AreRejected(string statement)
     {
-        var source = "module Test\n  func Probe public () → int\n    " + CurrentStatement(statement);
+        var source = "module Test\n  func Probe public () → int\n    !\n    " + CurrentStatement(statement);
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
@@ -28,7 +28,7 @@ public class ControlFlowTests
     [InlineData("§R §W value\n      §K _ → 1", false)]
     public void Parse_StatementMatchArmsRequireBlocks(string statement, bool hasErrors)
     {
-        var source = "module Test\n  func Probe public (int:value) → int\n    " + CurrentStatement(statement);
+        var source = "module Test\n  func Probe public (int:value) → int\n    !\n    " + CurrentStatement(statement);
         var module = Parse(source, out var diagnostics);
         Assert.Equal(hasErrors, diagnostics.HasErrors);
         if (hasErrors)
@@ -67,6 +67,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Probe public (int:value) → int
+                !
                 return match value
                   case _ → 1
             """;
@@ -122,6 +123,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Main public () → void
+                !
                 for i from 0 to 10 step 1
                   Console.WriteLine(i)
             """;
@@ -163,6 +165,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Main public () → void
+                !
                 if x == 0
                   Console.WriteLine("Zero")
             """;
@@ -186,6 +189,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Main public () → void
+                !
                 if true
                   Console.WriteLine("Then")
                 else
@@ -208,6 +212,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Main public () → void
+                !
                 if x == 1
                   Console.WriteLine("One")
                 else if x == 2
@@ -232,6 +237,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Main public () → void
+                !
                 while x < 10
                   Console.WriteLine(x)
             """;
@@ -250,6 +256,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Main public () → void
+                !
                 let int:x = 42
             """;
 
@@ -269,6 +276,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Add public (int:a, int:b) → int
+                !
                 return a + b
             """;
 
@@ -350,6 +358,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Add public (int:a, int:b) → int
+                !
                 return a + b
             """;
 
@@ -365,6 +374,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func IsEven public (int:n) → bool
+                !
                 return n % 2 == 0
             """;
 
@@ -380,6 +390,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func Main public () → void
+                !
                 do
                   Console.WriteLine(x)
                 while x < 10
@@ -442,6 +453,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func SumRange public (int:n) → int
+                !
                 var int:sum = 0
                 for i from 1 to n step 1
                   set sum sum + i
@@ -551,6 +563,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func LogicalTest public (int:a, int:b) → bool
+                !
                 return a > 0 && b < 100
             """;
 
@@ -568,6 +581,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func NestedIfTest public (int:x) → int
+                !
                 var int:result = 0
                 if x > 0
                   set result 1
@@ -595,8 +609,10 @@ public class ControlFlowTests
             module Test
               class TestClass public
                 func MethodA public () → void
+                  !
                   let int:x = 1
                 func MethodB public () → void
+                  !
                   let int:x = 2
             """;
 
@@ -645,6 +661,7 @@ public class ControlFlowTests
         var source = """
             module Test
               func testShadow public (bool:cond) → int
+                !
                 let int:x = 10
                 if cond
                   let int:x = 20

@@ -1,8 +1,10 @@
 module ParseAndDouble ParseAndDouble
   module ParseAndDoubleModule
     func Parse public (string:s) → int
+      !
       return 42
 
     func Compute public (string:input) → int
+      !
       let n = Parse(input)
       return n * 2

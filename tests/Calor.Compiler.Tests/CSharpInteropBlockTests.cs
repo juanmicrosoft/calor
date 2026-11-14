@@ -103,18 +103,49 @@ public class CSharpInteropBlockTests
     [Fact]
     public void InteropReasonGate_ShapeIsNotOriginOrReasonApplicabilityAuthority()
     {
-        // Phase B1 checks shape only; this deliberately unknown feature needs the B2 authority design.
-        var source = InteropReasonGateSource("unit", "unit:unresolved-feature:Other:not%20origin%20proof");
+        // A registered producer key still does not establish its original context or applicability.
+        var source = InteropReasonGateSource("unit", "unit:whole-file-preservation:Other:not%20origin%20proof");
         var result = Program.Compile(source);
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         Assert.Equal("public class Kept { }", result.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData("statement", false, "unresolved-feature")]
+    [InlineData("statement", true, "unresolved-feature")]
+    [InlineData("member", false, "unresolved-feature")]
+    [InlineData("member", true, "unresolved-feature")]
+    [InlineData("unit", false, "unresolved-feature")]
+    [InlineData("unit", true, "unresolved-feature")]
+    [InlineData("unit", false, "Whole-file-preservation")]
+    [InlineData("unit", false, "anonymous-method")]
+    public void InteropReasonGate_RejectsFabricatedProducerKeysBeforeOptionalChecks(
+        string channel, bool optionsOff, string feature)
+    {
+        var prefix = channel == "unit" ? "unit" : "member";
+        var source = InteropReasonGateSource(channel,
+            $"{prefix}:{feature}:Other:not%20origin%20proof");
+        var result = Program.Compile(source, "unknown-preservation.calr", optionsOff
+            ? new CompilationOptions
+            {
+                EnforceEffects = false, EnableTypeChecking = false, UnsafeTranspileOnly = true,
+                DeferGeneratedOutputValidation = true
+            } : new CompilationOptions());
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        var diagnostic = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.InvalidCSharpInteropReason, diagnostic.Code);
+        Assert.Contains(feature, diagnostic.Message);
+        Assert.Contains("native Calor", diagnostic.Message);
+        Assert.Contains("calor convert", diagnostic.Message);
+        Assert.Equal(source.IndexOf("raw ", StringComparison.Ordinal), diagnostic.Span.Start);
     }
 
     private static string InteropReasonGateSource(string channel, string marker)
     {
         var (prefix, indent, payload) = channel switch
         {
-            "statement" => ("module Gate\n  func Run () \u2192 void\n", "    ", "return;"),
+            "statement" => ("module Gate\n  func Run () → void\n    !\n", "    ", "return;"),
             "member" => ("module Gate\n  class Host\n", "    ", "public int Value => 7;"),
             _ => ("module _global\n", "  ", "public class Kept { }")
         };
@@ -495,7 +526,7 @@ public class CSharpInteropBlockTests
     public void RawFraming_StatementAndSourceToolsDoNotRewritePayload()
     {
         var payload = "  // §/M\r\n// §/NEW{x}\r\n// commas ,,, \u03c0 \r\n";
-        var source = $"module RawTest\n  func Run public () → void\n    raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+        var source = $"module RawTest\n  func Run public () → void\n    !\n    raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
         var module = ParseRawModule(source);
         Assert.Equal(payload, Assert.IsType<RawCSharpNode>(Assert.Single(module.Functions[0].Body)).CSharpCode);
         var emitted = new CalorEmitter().Emit(module);
@@ -539,7 +570,7 @@ public class CSharpInteropBlockTests
     public void RawFraming_LambdaCaptureAndHoistingPreservePayload()
     {
         const string payload = "// \u03c0\r\n  // §/LAM\r\n";
-        var source = $"module RawTest\n  func Run public () → void\n" +
+        var source = $"module RawTest\n  func Run public () → void\n    !\n" +
             "    let Action:action = () =>\n" +
             $"      raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
         var module = ParseRawModule(source);
@@ -559,7 +590,7 @@ public class CSharpInteropBlockTests
     public void RawFraming_StatementReasonIsPreservedInItsActualScope(string reason)
     {
         const string payload = "// exact\r\n";
-        var source = $"module RawTest\n  class C\n    func Run public () → void\n" +
+        var source = $"module RawTest\n  class C\n    func Run public () → void\n      !\n" +
             $"      raw {reason} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
         var original = ParseRawModule(source);
         var raw = Assert.IsType<RawCSharpNode>(Assert.Single(original.Classes[0].Methods[0].Body));
@@ -606,7 +637,7 @@ public class CSharpInteropBlockTests
     public void RawFraming_HealerDiagnosticsRetainOriginalLineNumbers()
     {
         const string payload = "// one\r\n// two\r\n";
-        var source = "module T\n  func Main public () → void\n" +
+        var source = "module T\n  func Main public () → void\n    !\n" +
             $"    raw statement {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n" +
             "    if 1 == 1\n      Console.WriteLine(\"a\")\n      else if 1 == 2\n      Console.WriteLine(\"b\")";
         var healer = new Calor.Compiler.Formatting.SourceHealer();

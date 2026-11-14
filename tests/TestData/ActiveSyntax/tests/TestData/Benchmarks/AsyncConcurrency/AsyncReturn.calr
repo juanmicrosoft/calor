@@ -1,7 +1,9 @@
 module AsyncReturn AsyncReturn
   module AsyncReturnModule
     func ComputeAsync public async (int:x) → int
+      !
       return x * x
 
     func ComputeSync public (int:x) → int
+      !
       return x * x

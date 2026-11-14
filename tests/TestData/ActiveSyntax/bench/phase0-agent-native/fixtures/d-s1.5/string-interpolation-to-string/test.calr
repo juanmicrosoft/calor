@@ -1,8 +1,10 @@
 module InterpolationToStringTest InterpolationToStringTest
   func Describe (int:count, string:name) → string
+    !
     return "${name}:${count,4}|${count:D3}"
 
   func Verify () → int
+    !
     => result == 1013
     let string:s = Describe(7, "ab")
     let string:wrapped = "<${s}>"

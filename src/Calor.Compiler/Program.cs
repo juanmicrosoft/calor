@@ -846,8 +846,20 @@ public class Program
             ProjectionContractMode = options.ContractMode
         };
         binder.Bind(ast);
+        binder.ValidateCallableEffectRows(diagnostics);
+        if (diagnostics.HasErrors)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
+        }
         phaseSw.Stop();
         var semanticBindingMilliseconds = phaseSw.ElapsedMilliseconds;
+
+        bool CanVerifyRejectedRuntimeQuantifier() =>
+            (options.VerifyContracts || options.VerifyRefinements)
+            && diagnostics.HasErrors
+            && diagnostics.Errors.All(diagnostic =>
+                diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
 
         // Type checking (optional)
         if (options.EnableTypeChecking && !options.UnsafeTranspileOnly)
@@ -873,7 +885,7 @@ public class Program
                 status.WriteLine("Type checking completed");
             }
 
-            if (diagnostics.HasErrors)
+            if (diagnostics.HasErrors && !CanVerifyRejectedRuntimeQuantifier())
             {
                 // Suggestions do not activate binder-only errors or make their edits safe.
                 diagnostics.ImportMatchingFixes(bindingDiagnostics.DiagnosticsWithFixes
@@ -906,7 +918,7 @@ public class Program
         phaseSw.Stop();
         telemetry?.TrackPhase("ReturnValidation", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
-        if (diagnostics.HasErrors)
+        if (diagnostics.HasErrors && !CanVerifyRejectedRuntimeQuantifier())
         {
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
@@ -925,7 +937,7 @@ public class Program
             status.WriteLine("Semantic binding completed");
         }
 
-        if (diagnostics.HasErrors)
+        if (diagnostics.HasErrors && !CanVerifyRejectedRuntimeQuantifier())
         {
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
@@ -966,7 +978,7 @@ public class Program
             status.WriteLine("Contract inheritance checking completed");
         }
 
-        if (diagnostics.HasErrors)
+        if (diagnostics.HasErrors && !CanVerifyRejectedRuntimeQuantifier())
         {
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
@@ -1003,7 +1015,10 @@ public class Program
                 status.WriteLine(EffectEnforcementCompletedStatus);
         }
 
-        if (diagnostics.HasErrors)
+        // A runtime-lowering refusal must not hide an explicitly requested static refusal.
+        // It remains a compilation error, and this path never reaches code generation.
+        var verifyRejectedRuntimeQuantifier = CanVerifyRejectedRuntimeQuantifier();
+        if (diagnostics.HasErrors && !verifyRejectedRuntimeQuantifier)
         {
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
@@ -1031,6 +1046,12 @@ public class Program
         if (options.Verbose)
         {
             status.WriteLine("Contract simplification completed");
+        }
+
+        if (verifyRejectedRuntimeQuantifier && !CanVerifyRejectedRuntimeQuantifier())
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
         }
 
         // Refinement type obligation generation and verification (optional)
@@ -1116,9 +1137,11 @@ public class Program
             var verificationOptions = new VerificationOptions
             {
                 Verbose = options.Verbose,
-                ElideProvenGuards = options.ElideProvenGuards,
+                ElideProvenGuards = options.ElideProvenGuards && !verifyRejectedRuntimeQuantifier,
                 TimeoutMs = options.VerificationTimeoutMs,
-                CacheOptions = options.VerificationCacheOptions ?? VerificationCacheOptions.Default,
+                CacheOptions = verifyRejectedRuntimeQuantifier
+                    ? new VerificationCacheOptions { Enabled = false }
+                    : options.VerificationCacheOptions ?? VerificationCacheOptions.Default,
                 CancellationToken = options.CancellationToken
             };
             var verificationPass = new ContractVerificationPass(diagnostics, verificationOptions);
@@ -1155,6 +1178,12 @@ public class Program
                     $"{options.VerificationAnalysisResult.BugPatternsFound} bug patterns, " +
                     $"{options.VerificationAnalysisResult.TaintVulnerabilities} taint issues");
             }
+        }
+
+        if (verifyRejectedRuntimeQuantifier)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
         }
 
         // Code generation

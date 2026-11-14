@@ -1,27 +1,30 @@
-§M{MatchAfter}
-  §F{MatchOption:pub}<eff e> (bool:hasValue, i32:value, Func<i32,i32>:onSome §E{e}, Func<i32>:onNone §E{e}) -> i32
-    §E{e}
-    §IF hasValue
-      §R §C{onSome} §A value §/C
-    §R §C{onNone} §/C
+module MatchAfter MatchAfter block
+  module MatchAfterModule partial
+    func MatchOption <! e> (bool:hasValue, int:value, Func<int, int>:onSome ! e, Func<int>:onNone ! e) → int
+      ! e
+      if hasValue
+        return onSome(value)
+      return onNone()
 
-  §F{Identity:pub} (i32:x) -> i32
-    §E{}
-    §R x
+    func Identity (int:x) → int
+      !
+      return x
 
-  §F{Zero:pub} () -> i32
-    §E{}
-    §R INT:0
+    func Zero () → int
+      !
+      return 0
 
-  §F{Shout:pub} (i32:x) -> i32
-    §E{cw}
-    §P x
-    §R x
+    func Shout (int:x) → int
+      ! cw
+      System.Console.WriteLine(x)
+      return x
 
-  §F{BothPure:pub} (bool:h, i32:v) -> i32
-    §E{}
-    §R §C{MatchOption} §A h §A v §A Identity §A Zero §/C
+    func BothPure (bool:h, int:v) → int
+      !
+      return MatchOption(h, v, Identity, Zero)
 
-  §F{OneImpure:pub} (bool:h, i32:v) -> i32
-    §E{cw}
-    §R §C{MatchOption} §A h §A v §A Shout §A Zero §/C
+    func OneImpure (bool:h, int:v) → int
+      ! cw
+      return MatchOption(h, v, Shout, Zero)
+
+

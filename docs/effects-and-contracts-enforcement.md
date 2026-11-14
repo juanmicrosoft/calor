@@ -51,16 +51,29 @@ For the motivation behind this design, see [Effects & Contracts Enforcement](/ca
 - Writes to objects allocated within the same function scope
 - Contract instrumentation
 
+Direct bound calls to an unannotated private/internal function can instantiate
+bare `ref`/`out` stores against proved caller-owned local storage. The callee's
+inferred row and callable-value row remain unchanged. Heap/global writes,
+public declared rows, unresolved calls and caller by-reference storage still
+charge their full effects. Nested calls, recursive calls, initializer bodies
+and escaping callables do not acquire this local-storage proof.
+
 ## Contract Effect Semantics
 
 **Contract checks do NOT require a `throw` effect declaration.**
 - Contracts are a verification mechanism, not a business effect
-- A function with `§Q` and `§S` but no `§E` is valid and compiles
-- The `throw` effect applies only to intentional `§TH` statements
+- Preconditions and postconditions do not add operational effects.
+- The `throw` effect applies only to intentional `throw` statements.
+
+Postconditions bind `result` with the declared return type, including `string`
+versus `string?`. Nullable results still need a non-null guard before member
+access. A nullable return from a nonnullable function remains an error.
 
 **Missing declarations depend on the callable boundary.**
 - Private and internal functions and methods infer their rows from their bodies.
-- Public and protected callable declarations retain their existing pure default.
+- Public/protected functions/methods, public operators, interface/abstract/extern methods, and
+  delegates require an explicit own row (`Calor0124`); `!` declares Pure.
+- An own annotation on a private/internal body is a parse error (`Calor0125`).
 - Contract-generated exceptions are not "operational effects"
 - Public callers still declare every reachable operational effect.
 
@@ -69,16 +82,19 @@ charges before variance checks. Unknown bodies remain errors in strict mode;
 declaration-only inputs cannot stand in for analyzed bodies. Inferred body rows
 do not grant contracts to open virtual slots or method-group values that can
 dispatch to another implementation. Constructor, accessor and initializer
-contracts are unchanged. Existing explicit non-public annotations remain
-authoritative; parser-level rejection and mandatory boundary annotations are
-not implemented by this inference-engine unit.
+contracts are unchanged. Callback parameter and return types require explicit
+rows regardless of optional type checking or effect-enforcement settings
+(`Calor0407`). Detection uses selected bound callable types, not a blanket
+`Func`/`Action` name match. An explicit Unknown row preserves the prior unknown
+contract and does not authorize invocation.
 
 The C# converter omits synthesized own rows on private/internal functions and
 concrete methods. Recompilation infers those bodies rather than trusting a
 printed permission. Callback parameter/return rows and their effect binders
-remain explicit; abstract and extern declarations retain their existing rows.
-Public callers must still cover every reachable effect. This does not implement
-mandatory boundary syntax or removal of authored non-public annotations.
+remain explicit; abstract and extern declarations retain boundary rows.
+Unproved callback positions are emitted as `! unknown`, never Pure. Probe
+boundary rows are restrictive budgets, not evidence that a body satisfies them.
+Public callers must still cover every reachable effect.
 
 ## Unknown External Call Policy
 

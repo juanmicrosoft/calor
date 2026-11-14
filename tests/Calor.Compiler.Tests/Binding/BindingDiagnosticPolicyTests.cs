@@ -98,8 +98,8 @@ public class BindingDiagnosticPolicyTests
     public void SharedApiContext_DoesNotReuseSuccessOrTurnEarlyTypingIntoBinderOwnership()
     {
         using var context = new CompilationContext { SharedEffectResolver = new Effects.EffectResolver() };
-        const string safe = "module Routing\n  func Probe () → string\n    return \"safe\"\n";
-        var duplicate = safe + "  func Probe () → string\n    return \"safe\"\n";
+        const string safe = "module Routing\n  func Probe () → string\n    !\n    return \"safe\"\n";
+        var duplicate = safe + "  func Probe () → string\n    !\n    return \"safe\"\n";
         foreach (var source in new[] { safe, duplicate, safe })
         {
             var ordinary = Program.Compile(source, "routing.calr");
@@ -110,7 +110,7 @@ public class BindingDiagnosticPolicyTests
         }
         // Scalar nullable-to-nonnullable assignment is owned by the binder
         // even when the optional type checker is enabled.
-        const string early = "module Routing\n  func Probe () → void\n    let string?:x = null\n    let string:y = x\n";
+        const string early = "module Routing\n  func Probe () → void\n    !\n    let string?:x = null\n    let string:y = x\n";
         var rejected = Program.Compile(early, "routing.calr", new CompilationOptions { Context = context });
         var active = Assert.Single(rejected.Diagnostics);
         Assert.Equal(DiagnosticCode.NullableToNonNullableBinding, active.Code);
@@ -131,14 +131,14 @@ public class BindingDiagnosticPolicyTests
         var bag = new DiagnosticBag();
         var span = new TextSpan(0, 1, 1, 1);
         bag.ReportError(span, DiagnosticCode.UndefinedReference, "before binding");
-        Bind("module Routing\n  func Probe () → int\n    return absent\n", bag);
+        Bind("module Routing\n  func Probe () → int\n    !\n    return absent\n", bag);
         bag.ReportError(span, DiagnosticCode.UndefinedReference, "after binding");
         Assert.Null(bag.First().BindingContext);
         Assert.Null(bag.Last().BindingContext);
         Assert.NotNull(bag.ElementAt(1).BindingContext);
         Assert.True(bag.HasErrors);
 
-        var duplicates = Bind("module Routing\n  func Probe (int:x,int:x) → int\n    return x\n");
+        var duplicates = Bind("module Routing\n  func Probe (int:x,int:x) → int\n    !\n    return x\n");
         Assert.Contains(duplicates.DiagnosticsWithFixes, d => d.BindingContext is not null);
         Assert.All(duplicates.Errors, d => Assert.True(BindingDiagnosticPolicy.IsCompilationError(d)));
     }
@@ -146,7 +146,7 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void ActiveErrors_PropagateOnce_WithoutChangingTheirSpanSeverityOrMessage()
     {
-        var bag = Bind("module Routing\n  func Probe () → int\n    return 1\n  func Probe () → int\n    return 2\n");
+        var bag = Bind("module Routing\n  func Probe () → int\n    !\n    return 1\n  func Probe () → int\n    !\n    return 2\n");
         var original = Assert.Single(bag.Errors);
         Assert.Equal(DiagnosticCode.DuplicateFunctionSignature, original.Code);
         foreach (var rule in BindingDiagnosticPolicy.Catalog.Values.Where(rule =>
@@ -162,7 +162,7 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void NativeReferenceSuggestions_SurviveRoutingWithoutBecomingSafeFixes()
     {
-        const string source = "module Routing\n  func Probe (string:value) → string\n    return vlaue\n";
+        const string source = "module Routing\n  func Probe (string:value) → string\n    !\n    return vlaue\n";
         var binding = Bind(source);
         var original = Assert.Single(binding.Errors);
         var originalFix = Assert.Single(binding.DiagnosticsWithFixes);
@@ -175,7 +175,7 @@ public class BindingDiagnosticPolicyTests
         Assert.Empty(destination);
         Assert.Empty(destination.DiagnosticsWithFixes);
 
-        var duplicate = Bind("module Routing\n  func Probe (int:x,int:x) → int\n    return x\n");
+        var duplicate = Bind("module Routing\n  func Probe (int:x,int:x) → int\n    !\n    return x\n");
         BindingDiagnosticPolicy.PropagateCompilationErrors(duplicate, destination);
         BindingDiagnosticPolicy.PropagateCompilationErrors(duplicate, destination);
         Assert.Equal(duplicate.Where(BindingDiagnosticPolicy.IsCompilationError), destination);

@@ -2,7 +2,9 @@ module Generics Generics
   interface IRepository<T>
     where T : class
     func Add (T:item) → void
+      !
     func GetAll () → IReadOnlyList<T>
+      !
 
   class Pair<T,U> public
     field T:First public
@@ -20,14 +22,18 @@ module Generics Generics
       ! mut
       _items.Add(item)
     func GetAll public () → IReadOnlyList<T>
+      !
       return _items
     func Count public () → int
+      !
       return _items . Count
 
   func Identity<T> public (T:value) → T
+    !
     return value
 
   func GetCount<T> public (List<T>:items) → int
+    !
     return items . Count
 
   func Main public () → void

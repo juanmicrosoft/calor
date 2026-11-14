@@ -1,12 +1,15 @@
 module LCS LCS
   module LCSModule
     func CharsMatch public (int:charA, int:charB) → bool
+      !
       return charA == charB
 
     func ExtendMatch public (int:prevLen) → int
+      !
       return prevLen + 1
 
     func BestOfTwo public (int:a, int:b) → int
+      !
       if a > b
         return a
       else

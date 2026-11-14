@@ -1,10 +1,13 @@
 module Map Map
   module MapModule
     func Double public (int:x) → int
+      !
       return x * 2
 
     func Square public (int:x) → int
+      !
       return x * x
 
     func Negate public (int:x) → int
+      !
       return 0 - x

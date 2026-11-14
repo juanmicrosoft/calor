@@ -66,7 +66,7 @@ public class ExplainErrorToolTests
         var example = match.GetProperty("correctExample").GetString()!;
         Assert.Contains("set k k + 1", example);
         Assert.DoesNotContain("§", example);
-        var source = "module Redeclaration\n  func Increment (int:rng, int:n) → int\n"
+        var source = "module Redeclaration\n  func Increment (int:rng, int:n) → int\n    !\n"
             + string.Join("\n", example.Split('\n').Select(line => "    " + line))
             + "\n    return k\n";
         var compiled = Program.Compile(source);

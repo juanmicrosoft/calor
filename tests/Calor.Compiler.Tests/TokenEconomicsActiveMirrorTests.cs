@@ -422,6 +422,7 @@ public sealed class TokenEconomicsActiveMirrorTests
             var source = $$"""
                 module CountedLoopProjection
                   func Probe () → void
+                    !
                     for {{variable.Identifier.ValueText}} from {{variable.Initializer!.Value}} to {{condition.Right}} step {{step}}
                       OriginalLoopBody()
                 """;

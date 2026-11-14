@@ -109,6 +109,8 @@ public sealed class ConversionOptions
     /// <summary>
     /// Fidelity contract for conversion. Lossless is the safe default; lossy
     /// substitutions and drops require explicit caller opt-in.
+    /// Lossy interop lowering retains a uniform annotation-disabled source context,
+    /// but does not certify effects or flatten lexical nullable directives.
     /// </summary>
     public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
 
@@ -721,14 +723,18 @@ public sealed class CSharpToCalorConverter
         var candidate = ConvertCore(source, sourceFile, cancellationToken, capturePreservationContext,
             originalSemanticModel: model, allowScopedNamespaceImports: allowScopedNamespaceImports,
             obliviousModule: true);
-        if (!candidate.Success || candidate.InteropPreservationCount != 0 || candidate.Losses.Count != 0
-            || candidate.CalorSource is not { } native)
+        var entirelyNative = candidate.InteropPreservationCount == 0 && candidate.Losses.Count == 0;
+        var directPreservation = candidate.InteropPreservationCount > 0 && candidate.Losses.Count > 0
+            && candidate.Losses.All(loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Path == ConversionPath.Interop);
+        if (!candidate.Success || !(entirelyNative || directPreservation)
+            || candidate.CalorSource is not { } calorSource)
             return PreserveUncertifiedModule(
-                "The oblivious module candidate did not produce successful, entirely native Calor; "
-                + "the native replacement could not be certified.", candidate);
+                "The oblivious module candidate did not produce successful, entirely native Calor "
+                + "or direct, lossless member preservation; the replacement could not be certified.", candidate);
         // Reparse the actual deliverable and enforce the normal binder/effect
         // checks. No deferred or unchecked output can authorize this recovery.
-        var compiled = Program.Compile(native, sourceFile, new CompilationOptions
+        var compiled = Program.Compile(calorSource, sourceFile, new CompilationOptions
         {
             IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
             ProjectDirectory = _options.ProjectDirectory,
@@ -1171,6 +1177,18 @@ public sealed class CSharpToCalorConverter
                 obliviousModule = !semanticModel!.GetNullableContext(root.SpanStart)
                     .HasFlag(NullableContext.AnnotationsEnabled);
             }
+
+            // Noncertifying lowering still preserves the source's annotation context.
+            if (_options.Fidelity == ConversionFidelity.Lossy
+                && _options.Mode == ConversionMode.Interop
+                && semanticModel != null
+                && !semanticModel.GetNullableContext(root.SpanStart)
+                    .HasFlag(NullableContext.AnnotationsEnabled)
+                && !root.DescendantTrivia(descendIntoTrivia: true)
+                    .Any(trivia => trivia.GetStructure() is NullableDirectiveTriviaSyntax)
+                && !semanticModel.Compilation.GetDiagnostics(cancellationToken)
+                    .Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+                obliviousModule = true;
 
             // Visit C# AST and build Calor AST
             ModuleNode? calorAst;
@@ -1704,6 +1722,9 @@ public sealed class CSharpToCalorConverter
 
             var converged = EffectEnforcementPass.SynthesizeConvertedRows(reparsed, resolver);
             CopyEffectRows(reparsed, module, declarationOffsets);
+            var binding = new Binding.Binder(new Diagnostics.DiagnosticBag());
+            binding.Bind(module, null, declarationsOnly: true);
+            binding.MaterializeUnknownCallableRows();
 
             if (!converged)
             {

@@ -894,7 +894,45 @@ public sealed class Parser
     {
         var module = ParseModule();
         ValidateDefaultConstraintOwners(module);
+        ValidateEffectBoundaries(module);
         return module;
+    }
+
+    private void ValidateEffectBoundaries(ModuleNode module)
+    {
+        if (_diagnostics.HasErrors)
+            return;
+        foreach (var function in module.Functions)
+            ValidateOwnEffectRow(function.Name, function.Span, function.Effects,
+                function.Visibility is not (Visibility.Private or Visibility.Internal));
+        foreach (var extension in module.EnumExtensions)
+            foreach (var function in extension.Methods)
+                ValidateOwnEffectRow(function.Name, function.Span, function.Effects,
+                    function.Visibility is not (Visibility.Private or Visibility.Internal));
+        foreach (var owner in Analysis.CallGraphAnalysis.EnumerateClasses(module))
+        {
+            foreach (var method in Analysis.CallGraphAnalysis.EnumerateMethods(owner))
+                ValidateOwnEffectRow(method.Name, method.Span, method.Effects,
+                    method.IsAbstract || method.IsExtern
+                    || method.Visibility is not (Visibility.Private or Visibility.Internal));
+            foreach (var op in Analysis.CallGraphAnalysis.EnumerateOperators(owner))
+                ValidateOwnEffectRow($"operator {op.OperatorToken}", op.Span, op.Effects, required: true);
+        }
+        foreach (var iface in Analysis.CallGraphAnalysis.EnumerateInterfaces(module))
+            foreach (var method in iface.Methods)
+                ValidateOwnEffectRow(method.Name, method.Span, method.Effects, required: true);
+        foreach (var declaration in Analysis.CallGraphAnalysis.EnumerateDelegates(module))
+            ValidateOwnEffectRow(declaration.Name, declaration.Span, declaration.Effects, required: true);
+    }
+
+    private void ValidateOwnEffectRow(string name, TextSpan span, EffectsNode? row, bool required)
+    {
+        if (required && row == null)
+            _diagnostics.ReportError(span, DiagnosticCode.MissingBoundaryEffectRow,
+                $"Boundary '{name}' requires an explicit effect row. Write '!' for Pure or '! effects' before its body.");
+        else if (!required && row != null)
+            _diagnostics.ReportError(row.Span, DiagnosticCode.NonPublicEffectRow,
+                $"Private/internal body '{name}' infers its effects. Remove its own effect row; callback type rows remain explicit.");
     }
 
     private void ValidateDefaultConstraintOwners(ModuleNode module)

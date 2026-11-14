@@ -1,6 +1,7 @@
 module DesignPatterns
   class DataProcessor internal abstract
     func Process public () → string
+      !
       let string:data = this.ReadData()
       if data == ""
         return "Validation failed"
@@ -8,10 +9,13 @@ module DesignPatterns
       return this.SaveResults(processed)
 
     func ReadData private abstract () → string
+      !
 
     func ProcessData private abstract (string:data) → string
+      !
 
     func SaveResults private abstract (string:data) → string
+      !
 
     func ValidateData private virtual (string:data) → bool
       return data != ""
@@ -64,10 +68,12 @@ module DesignPatterns
 
   module TemplateMethodDemo internal
     func ProcessCsv public (string:input, string:output) → string
+      !
       let CsvProcessor:processor = new CsvProcessor(input, output)
       return processor.Process()
 
     func ProcessJson public (string:endpoint, string:output) → string
+      !
       let JsonProcessor:processor = new JsonProcessor(endpoint, output)
       return processor.Process()
 

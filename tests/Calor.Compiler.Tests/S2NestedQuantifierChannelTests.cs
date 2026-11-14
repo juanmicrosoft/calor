@@ -22,12 +22,11 @@ public sealed class S2NestedQuantifierChannelTests
         // The nested precondition entails n > 0 over non-empty bounds; it must not be used.
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         const string source = """
-            §M{M}
-              §F{Probe:priv} (i32:n) -> i32
-                §E{}
-                §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:1)) (forall ((j i32)) (-> (&& (>= j INT:0) (< j INT:1)) (> n INT:0)))))
-                §PROOF{claim} (> n INT:0)
-                §R n
+            module M
+              func Probe private (int:n) → int
+                requires forall int:i in 0..1 : (forall int:j in 0..1 : n > 0)
+                proof{"claim"} n > 0
+                return n
             """;
         var options = new CompilationOptions
         {
@@ -46,13 +45,12 @@ public sealed class S2NestedQuantifierChannelTests
         // so it must not make the earlier obligation Unsupported.
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         const string source = """
-            §M{M}
-              §F{Probe:priv} (i32:n) -> i32
-                §E{}
-                §PROOF{claim} (>= (* n INT:0) INT:0)
-                §IF (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:1)) (cast bool (forall ((j i32)) (-> (&& (>= j INT:0) (< j INT:1)) (< j INT:2))))))
-                  §R INT:1
-                §R INT:0
+            module M
+              func Probe private (int:n) → int
+                proof{"claim"} n * 0 >= 0
+                if forall int:i in 0..1 : (bool)(forall int:j in 0..1 : j < 2)
+                  return 1
+                return 0
             """;
         var options = new CompilationOptions
         {
@@ -70,12 +68,12 @@ public sealed class S2NestedQuantifierChannelTests
         // Proving only "i >= 0" must not report the whole invariant, nested part included.
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         const string source = """
-            §M{Test}
-              §F{Loop:pub}
-                  §O{i32}
-                  §L{i:0:3:1}
-                      §P i
-                  §R INT:0
+            module Test
+              func Loop public () → int
+                ! cw
+                for i from 0 to 3 step 1
+                  System.Console.WriteLine(i)
+                return 0
             """;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -85,5 +83,172 @@ public sealed class S2NestedQuantifierChannelTests
         using var prover = new KInductionProver(new KInductionOptions());
         var result = prover.ProveInvariant(loop, "i >= 0 && (forall ((j i32)) (forall ((k i32)) false))", function);
         Assert.NotEqual(KInductionStatus.Proven, result.Status);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    public void RuntimeQuantifierRefusal_RetainsRequestedStaticRefusalWithoutCode(
+        bool proofObligation, bool enableTypeChecking)
+    {
+        Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
+        using var status = new StringWriter();
+        var source = $$"""
+            module NativeRefusal
+              func Probe public (sbyte:n) → int
+                !
+                requires n > 0 && n < 12
+                {{(proofObligation ? "proof{\"claim\"}" : "=>")}} forall int:i in 0..n : (forall int:j in 0..n : i - j < 29)
+                return 0
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyContracts = !proofObligation,
+            VerifyRefinements = proofObligation,
+            EnableTypeChecking = enableTypeChecking,
+            Verbose = true,
+            StatusWriter = status,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+        };
+
+        var result = Program.Compile(source, "case.calr", options);
+
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Single(result.Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+        Assert.True(proofObligation ? options.ObligationResults is not null : options.VerificationResults is not null,
+            "Requested verification was not reached:\n" + status);
+        if (proofObligation)
+        {
+            Assert.NotNull(options.ObligationResults);
+            var proof = Assert.Single(options.ObligationResults.Obligations,
+                obligation => obligation.Kind == ObligationKind.ProofObligation);
+            Assert.Equal(ObligationStatus.Unsupported, proof.Status);
+        }
+        else
+        {
+            Assert.NotNull(options.VerificationResults);
+            var function = Assert.Single(options.VerificationResults.Functions);
+            var postcondition = Assert.Single(function.PostconditionResults);
+            Assert.Equal(Verification.ProofStatus.Unsupported, postcondition.EffectiveOutcome.Status);
+            Assert.Contains("nested quantifiers are not verified", postcondition.EffectiveOutcome.Reason);
+        }
+    }
+
+    [Theory]
+    [InlineData("return missing")]
+    [InlineData("System.Console.WriteLine(n)\n    return 0")]
+    public void OrdinaryTypingAndEffectErrors_StillStopBeforeStaticVerification(string body)
+    {
+        var source = $$"""
+            module InvalidNative
+              func Probe public (int:n) → int
+                !
+                => result == n
+                {{body}}
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyContracts = true,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+        };
+
+        var result = Program.Compile(source, "case.calr", options);
+
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.IsError
+            && diagnostic.Code != DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+        Assert.Null(options.VerificationResults);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RuntimeQuantifierRefusal_WithoutVerification_StillStopsWithoutCode(bool enableTypeChecking)
+    {
+        const string source = """
+            module NativeRefusal
+              func Probe public (sbyte:n) → int
+                !
+                requires n > 0 && n < 12
+                => forall int:i in 0..n : (forall int:j in 0..n : i - j < 29)
+                return 0
+            """;
+        var options = new CompilationOptions { EnableTypeChecking = enableTypeChecking };
+
+        var result = Program.Compile(source, "case.calr", options);
+
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Single(result.Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+        Assert.Null(options.VerificationResults);
+        Assert.Null(options.ObligationResults);
+    }
+
+    [Fact]
+    public void RuntimeQuantifierRefusal_DoesNotCachePartialVerification()
+    {
+        const string source = """
+            module NativeRefusal
+              func Probe public (sbyte:n) → int
+                !
+                requires n > 0 && n < 12
+                => forall int:i in 0..n : (forall int:j in 0..n : i - j < 29)
+                return 0
+            """;
+        var cacheDirectory = Path.Combine(Path.GetTempPath(), "calor-refused-quantifier", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var options = new CompilationOptions
+            {
+                VerifyContracts = true,
+                ElideProvenGuards = true,
+                VerificationCacheOptions = new VerificationCacheOptions
+                {
+                    Enabled = true,
+                    CacheDirectory = cacheDirectory
+                }
+            };
+
+            var result = Program.Compile(source, "case.calr", options);
+
+            Assert.True(result.HasErrors);
+            Assert.Empty(result.GeneratedCode);
+            Assert.NotNull(options.VerificationResults);
+            Assert.Empty(Directory.Exists(cacheDirectory)
+                ? Directory.GetFiles(cacheDirectory, "*", SearchOption.AllDirectories)
+                : []);
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDirectory))
+                Directory.Delete(cacheDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RuntimeQuantifierRefusal_WithTypingError_StillStopsBeforeVerification()
+    {
+        const string source = """
+            module InvalidNative
+              func Probe public (sbyte:n) → int
+                !
+                requires n > 0 && n < 12
+                => forall int:i in 0..n : (forall int:j in 0..n : i - j < 29)
+                return missing
+            """;
+        var options = new CompilationOptions { VerifyContracts = true };
+
+        var result = Program.Compile(source, "case.calr", options);
+
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+        Assert.Null(options.VerificationResults);
     }
 }

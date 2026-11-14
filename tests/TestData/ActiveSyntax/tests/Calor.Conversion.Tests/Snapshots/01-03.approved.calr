@@ -8,4 +8,5 @@ module Test_01_03 Test_01_03 overflow unchecked
       set _balance initialBalance
 
     func GetBalance public () → decimal
+      !
       return _balance

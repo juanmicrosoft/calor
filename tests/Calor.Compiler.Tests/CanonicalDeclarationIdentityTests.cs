@@ -23,6 +23,7 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
     private const string Source = """
         module ContractExamples
           func Sqrt (int:x) → int
+            !
             return x
         """;
 
@@ -46,6 +47,7 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
               enum Mode byte
                 @event = 7
               delegate Handler (int:value) → void
+                ! unknown
               class Source
                 event Handler:Changed
             """;
@@ -79,9 +81,11 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
                     return i
                 pp DEBUG
                   func Probe () → int
+                    !
                     return 1
                 pp else
                   func Probe () → int
+                    !
                     return 2
             """;
         var file = Write("src/Counter.calr", source);
@@ -156,7 +160,7 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
     [Fact]
     public void NativeAmbiguousTextRenamesDoNotRewriteTheSidecar()
     {
-        var source = Source + "\n  func Other (int:x) → int\n    return x";
+        var source = Source + "\n  func Other (int:x) → int\n    !\n    return x";
         var file = Write("tests/Contract.calr", source);
         var initial = Store.Sync([file]);
         Persist(initial with
@@ -178,7 +182,7 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
     [Fact]
     public async Task NativeMcpRenamePreservesSeededIdentityAndReferenceNavigation()
     {
-        var source = Source + "\n  func Use () → int\n    return Sqrt(1)";
+        var source = Source + "\n  func Use () → int\n    !\n    return Sqrt(1)";
         var file = Write("tests/Contract.calr", source);
         var initial = Store.Sync([file]);
         Persist(initial with

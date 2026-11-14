@@ -1,18 +1,21 @@
 module ShoppingCart ShoppingCart
   module ShoppingCartModule
     func ItemTotal public (float:price, int:quantity) → float
+      !
       requires price > 0
       requires quantity > 0
       => result >= 0
       return price * quantity
 
     func CartSubtotal public (float:itemTotal1, float:itemTotal2) → float
+      !
       requires itemTotal1 >= 0
       requires itemTotal2 >= 0
       => result >= 0
       return itemTotal1 + itemTotal2
 
     func TotalWithTax public (float:subtotal, float:taxRate) → float
+      !
       requires subtotal >= 0
       requires taxRate >= 0
       requires taxRate <= 1
@@ -20,6 +23,7 @@ module ShoppingCart ShoppingCart
       return subtotal + (subtotal * taxRate)
 
     func NewQuantity public (int:oldQuantity, int:change) → int
+      !
       let result = oldQuantity + change
       if result < 0
         return 0

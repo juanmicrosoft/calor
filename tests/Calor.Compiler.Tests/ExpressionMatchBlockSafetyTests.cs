@@ -41,7 +41,8 @@ public class ExpressionMatchBlockSafetyTests
     {
         const string source = """
             module MatchSafety
-              func Factory public () → Func<int>
+              func Factory public () → Func<int> ! unknown
+                !
                 return () =>
                   return match 1
                     case 1

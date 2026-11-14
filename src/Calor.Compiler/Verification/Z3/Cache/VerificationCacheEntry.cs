@@ -97,7 +97,9 @@ public sealed class VerificationCacheEntry
     // (1.21 is taken by the S2 text-encoding repair, #1497.)
     // 1.23: escaped null/true/false names retain symbol identity throughout binding and proof
     // translation. Their REF keys can match older entries produced with literal-name semantics.
-    public const string CurrentFormatVersion = "1.23";
+    // 1.24: non-scalar type names retain case. Recheck verdicts produced with merged
+    // user-type field registries and solver sorts.
+    public const string CurrentFormatVersion = "1.24";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even

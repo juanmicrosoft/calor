@@ -63,7 +63,6 @@ callee. Its pure caller is rejected with `Calor0410`:
 ```calor expect=Calor0410
 module TransitiveLogging
   func LogMessage private (string:message) → void
-    ! cw
     Console.WriteLine(message)
 
   func Process () → int
@@ -76,18 +75,15 @@ If logging is intended, the caller must admit `cw`. Otherwise remove or replace
 the operation. Changing the declaration is an API policy decision, not proof
 that the original program already met its row.
 
-The following dependencies, in contrast, are **synthetic stubs**. Their
-declarations admit database and network effects, but their bodies only return
-constants:
+The following dependencies, in contrast, are **synthetic stubs**. Their private
+bodies infer Pure because they only return constants:
 
 ```calor
 module OrderEffects
   func SaveOrder private () → bool
-    ! db:rw
     return true
 
   func SendConfirmation private () → bool
-    ! net:w
     return true
 
   func ProcessOrder () → bool
@@ -99,8 +95,8 @@ module OrderEffects
 
 `ProcessOrder()` returns `true` and compiles. The available computed effects of
 these source bodies are empty. This is **not** a negative network-effect
-example: merely naming a function `SendConfirmation` and writing a broad row
-does not make it perform network I/O.
+example: merely naming a function `SendConfirmation` does not make it perform
+network I/O.
 
 ## What It Catches
 
@@ -112,7 +108,6 @@ This synthetic dependency does not exercise a real HTTP client:
 ```calor
 module HiddenNetwork
   func FetchExchangeRate private () → int
-    ! net:r
     return 2
 
   func Calculate () → int
@@ -125,17 +120,15 @@ constant. It must not be counted as detection of an undeclared network call.
 
 ### Undeclared Database Writes
 
-Likewise, these synthetic dependencies declare different permissions but
-perform no database operations:
+Likewise, these synthetic dependencies perform no database operations. Their
+caller's database permission does not prove that they access a database:
 
 ```calor
 module DatabasePermissions
   func GetById private (int:id) → int
-    ! db:r
     return id
 
   func WriteAudit private (int:id) → bool
-    ! db:w
     return true
 
   func GetUser (int:id) → int
@@ -171,7 +164,6 @@ Pure calls can compose without adding permissions:
 ```calor
 module PureComposition
   func Increment private (int:value) → int
-    !
     return value + 1
 
   func Calculate () → int
@@ -238,22 +230,20 @@ however, Calor's checked source effect rows.
 
 ### Calor Example
 
-This **separate synthetic pipeline** demonstrates row propagation. It is not a
-conversion or runtime-equivalent implementation of the C# fragment. None of
-these stub bodies performs database, console or network I/O:
+This **separate synthetic pipeline** has a conservative public budget and
+inferred private bodies. It is not a conversion or runtime-equivalent
+implementation of the C# fragment. None of these stubs performs database,
+console or network I/O:
 
 ```calor
 module DeclaredPipeline
   func ReadUser private (int:id) → int
-    ! db:r
     return id
 
   func LogUser private (int:user) → void
-    ! cw
     return
 
   func CacheUser private (int:user) → int
-    ! net:rw
     return user
 
   func GetUser (int:id) → int

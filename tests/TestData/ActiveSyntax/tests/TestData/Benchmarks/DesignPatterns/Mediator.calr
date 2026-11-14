@@ -1,10 +1,13 @@
 module Mediator Mediator
   module MediatorModule
     func ShouldDeliver public (int:senderId, int:recipientId) → bool
+      !
       return senderId != recipientId
 
     func MessageCount public (int:current) → int
+      !
       return current + 1
 
     func UserCount public (int:count) → int
+      !
       return count

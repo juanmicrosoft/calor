@@ -1,25 +1,28 @@
-§M{MapAfter}
-  §F{Map:pub}<eff e> ([i32]:xs, Func<i32,i32>:f §E{e}) -> [i32]
-    §E{e, alloc, mut}
-    §B{n:i32} (len xs)
-    §B{~out:[i32]} §ARR{i32} n
-    §L{i:0:n:1}
-      §SETIDX{out} i §C{f} §A §IDX xs i §/C
-    §R out
+module MapAfter MapAfter block
+  module MapAfterModule partial
+    func Map <! e> (int[]:xs, Func<int, int>:f ! e) → int[]
+      ! alloc, mut, e
+      let int:n = xs.Length
+      var int[]:@out = new int[n]
+      for i from 0 to n step 1
+        set @out[i] f(xs[i])
+      return @out
 
-  §F{Double:pub} (i32:x) -> i32
-    §E{}
-    §R (* x INT:2)
+    func Double (int:x) → int
+      !
+      return (x * 2)
 
-  §F{Announce:pub} (i32:x) -> i32
-    §E{cw}
-    §P x
-    §R x
+    func Announce (int:x) → int
+      ! cw
+      System.Console.WriteLine(x)
+      return x
 
-  §F{UsePure:pub} ([i32]:xs) -> [i32]
-    §E{alloc, mut}
-    §R §C{Map} §A xs §A Double §/C
+    func UsePure (int[]:xs) → int[]
+      ! alloc, mut
+      return Map(xs, Double)
 
-  §F{UseImpure:pub} ([i32]:xs) -> [i32]
-    §E{alloc, mut, cw}
-    §R §C{Map} §A xs §A Announce §/C
+    func UseImpure (int[]:xs) → int[]
+      ! alloc, mut, cw
+      return Map(xs, Announce)
+
+

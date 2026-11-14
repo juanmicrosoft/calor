@@ -50,6 +50,7 @@ public class IterationVariableRebindTests
         "    §EACHKV{k:v} d\n      §B{~k:str} \"z\"\n    §R 0\n" => """
             module S S
               func Do public () → int
+                !
                 let Dictionary<string,int>:d = new Dictionary<string,int>()
                 each k, v in d
                   var string:k = "z"
@@ -60,6 +61,7 @@ public class IterationVariableRebindTests
         "    §EACHKV{k:v} d\n      §B{~v:i32} 9\n    §R 0\n" => """
             module S S
               func Do public () → int
+                !
                 let Dictionary<string,int>:d = new Dictionary<string,int>()
                 each k, v in d
                   var int:v = 9
@@ -80,6 +82,7 @@ public class IterationVariableRebindTests
         "    §L{i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n" => """
             module S S
               func Do public () → int
+                !
                 var s = 0
                 for i from 0 to 3 step 1
                   var int:i = 9
@@ -140,6 +143,7 @@ public class IterationVariableRebindTests
         "    §EACHKV{k:v} d\n      §B{x:i32} 9\n      §R x\n    §R x\n" => """
             module S S
               func Do public (int:x) → int
+                !
                 let Dictionary<string,int>:d = new Dictionary<string,int>()
                 each k, v in d
                   let int:x = 9

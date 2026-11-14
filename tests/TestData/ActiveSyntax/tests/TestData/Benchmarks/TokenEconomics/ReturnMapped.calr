@@ -1,7 +1,9 @@
 module ReturnMapped ReturnMapped
   module ReturnMappedModule
     func Double public (int:x) → int
+      !
       return x * 2
 
     func Process public (int:n) → int
+      !
       return Double(n)

@@ -55,10 +55,13 @@ public class LocalReferenceAnnotationTests
             module LocalReferences
               class Foo public
                 func Get public static ({{(nullable ? "Foo?" : "Foo")}}:input) → {{(nullable ? "Foo?" : "Foo")}}
+                  !
                   return input
                 func Consume public static ({{receivingType}}:value) → int
+                  !
                   return 0
                 func Probe public static ({{(nullable ? "Foo?" : "Foo")}}:input) → {{output}}
+                  !
                   {{body}}
             """;
         var (module, diagnostics) = Bind(source);
@@ -120,6 +123,7 @@ public class LocalReferenceAnnotationTests
               class Child public
                 extends Parent
                 func Probe public () → void
+                  !
                   let {{receivingType}}:bare = Value
                   let {{receivingType}}:viaThis = this.Value
                   let {{receivingType}}:viaBase = base.Value
@@ -156,12 +160,14 @@ public class LocalReferenceAnnotationTests
             module Namespaces A
               class Foo public
                 func Get public static () → {{(nullable ? "Foo?" : "Foo")}}
+                  !
                   return new Foo()
             """;
         var sourceB = $$"""
             module Namespaces B
               class Foo public
                 func Probe public static () → void
+                  !
                   let first = A.Foo.Get()
                   let second = first
                   let {{receivingType}}:result = second
@@ -210,6 +216,7 @@ public class LocalReferenceAnnotationTests
             module DeclaredReferences
               class Foo public
                 func Probe public static () → void
+                  !
                   let {{declaredType}}:first = new Foo()
                   let second = first
                   let third = second
@@ -232,6 +239,7 @@ public class LocalReferenceAnnotationTests
             module ConditionalLimit
               class Foo public
                 func Probe public static (bool:choose, Foo:left, {{rightType}}:right) → void
+                  !
                   let first = choose ? left : right
                   let second = first
             """;
@@ -257,6 +265,7 @@ public class LocalReferenceAnnotationTests
             module ExcludedSources
               class Holder public
                 func Probe public static () → void
+                  !
                   let first = {{expression}}
                   let second = first
             """;
@@ -280,6 +289,7 @@ public class LocalReferenceAnnotationTests
             module StringLocalRegression
               class Holder public
                 func Probe public static () → string
+                  !
                   let first = {{call}}
                   let second = first
                   return second
@@ -313,6 +323,7 @@ public class LocalReferenceAnnotationTests
               class Holder public
                 field {{(nullable ? "ILogEventEnricher?" : "ILogEventEnricher")}}:{{memberName}} private
                 func Probe public () → ILogEventEnricher
+                  !
                   let first = this.{{memberName}}
                   let second = first
                   return second
@@ -403,6 +414,7 @@ public class LocalReferenceAnnotationTests
               class Child public
                 extends Parent
                 func Probe public () → void
+                  !
                   let bareFirst = Value
                   let bareSecond = bareFirst
                   let string:bareResult = bareSecond
@@ -444,8 +456,10 @@ public class LocalReferenceAnnotationTests
               using Text = System.String
               class Holder public
                 func Get public static ({{typeName}}:input) → {{typeName}}
+                  !
                   return input
                 func Probe public static ({{typeName}}:input) → void
+                  !
                   let first = {{(returned ? "Holder.Get(input)" : "input")}}
                   let second = first
                   let string:result = second
@@ -473,6 +487,7 @@ public class LocalReferenceAnnotationTests
             module OptionInference
               class Holder public
                 func Probe public static () → void
+                  !
                   let string?:first = null
                   let second = first
                   let string:result = second

@@ -1,17 +1,21 @@
 module Timer Timer
   module TimerModule
     func SecondsToMinutes public (int:seconds) → int
+      !
       requires seconds >= 0
       return seconds / 60
 
     func RemainingSeconds public (int:seconds) → int
+      !
       requires seconds >= 0
       return seconds % 60
 
     func IsExpired public (int:remaining) → bool
+      !
       return remaining <= 0
 
     func Tick public (int:remaining) → int
+      !
       requires remaining > 0
       => result < remaining
       return remaining - 1

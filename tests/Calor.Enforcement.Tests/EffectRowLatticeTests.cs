@@ -49,6 +49,7 @@ public class EffectRowLatticeTests
             """, """
             module M M
               func Pure public () → int
+                !
                 return 1
             """));
 
@@ -69,7 +70,7 @@ public class EffectRowLatticeTests
                 §R value
             """, """
             module M M
-              func Apply public (Func<int,int>:transform, int:value) → int
+              func Apply public (Func<int,int>:transform ! unknown, int:value) → int
                 !
                 return value
             """));
@@ -865,7 +866,7 @@ public class EffectRowLatticeTests
               func Apply public (Func<int,int>:transform !, int:value) → int
                 !
                 return value
-              func Main public (Func<int,int>:opaque) → int
+              func Main public (Func<int,int>:opaque ! unknown) → int
                 !
                 return Apply(opaque, 1)
             """));
@@ -975,7 +976,7 @@ public class EffectRowLatticeTests
               func Apply public (Func<int,int>:transform ! cw, int:value) → int
                 ! cw
                 return value
-              func Pick public (Func<int,int>:a) → Func<int,int> ! cw
+              func Pick public (Func<int,int>:a ! unknown) → Func<int,int> ! cw
                 ! cw
                 let int:used = Apply(a, 1)
                 return a
@@ -1004,6 +1005,7 @@ public class EffectRowLatticeTests
         """ => NativeSource(original, """
             module Z9 Z9
               func Log public (int:x) → void ! cw
+                !
                 System.Console.WriteLine(x)
             """),
         """
@@ -1015,6 +1017,7 @@ public class EffectRowLatticeTests
         """ => NativeSource(original, """
             module Z9 Z9
               func Log public (int:x ! cw) → void
+                !
                 System.Console.WriteLine(x)
             """),
         """
@@ -1025,6 +1028,7 @@ public class EffectRowLatticeTests
         """ => NativeSource(original, """
             module Z9 Z9
               func Get public () → int ! cw
+                !
                 return 1
             """),
         """

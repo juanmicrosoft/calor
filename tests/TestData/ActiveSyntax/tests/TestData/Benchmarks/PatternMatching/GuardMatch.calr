@@ -1,6 +1,7 @@
 module GuardMatch GuardMatch
   module GuardMatchModule
     func Classify public (int:x, int:y) → int
+      !
       if x == 0 && y == 0
         return 0
       else if x == y

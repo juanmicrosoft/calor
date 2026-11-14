@@ -1,10 +1,13 @@
 module BreadthFirstSearch BreadthFirstSearch
   module BreadthFirstSearchModule
     func IsGoal public (int:current, int:target) → bool
+      !
       return current == target
 
     func QueueEmpty public (int:queueSize) → bool
+      !
       return queueSize == 0
 
     func Distance public (int:parentDist) → int
+      !
       return parentDist + 1

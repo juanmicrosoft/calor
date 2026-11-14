@@ -1,9 +1,11 @@
 module NullCheck NullCheck
   module NullCheckModule
     func IsNull public (bool:isNull) → bool
+      !
       return isNull
 
     func CoalesceInt public (int:value, int:fallback, bool:hasValue) → int
+      !
       if hasValue
         return value
       else

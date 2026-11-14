@@ -1,4 +1,5 @@
 module Test_09_01 Test_09_01 overflow unchecked
   class RangeDemo public
     func Slice public (int[]:array) → int[]
+      !
       return array[0..5]

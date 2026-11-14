@@ -47,7 +47,7 @@ public sealed class UnknownCallbackContractTests
         var ast = Parse($$"""
             module Contracts
               delegate Factory (Action:callback{{suffix}}) → Func<Func<int>>{{suffix}}
-                {{(suffix.Length == 0 ? "" : suffix.TrimStart())}}
+                {{ExplicitContract(suffix).TrimStart()}}
               class Holder
                 func Keep (Func<Action,Func<int>>:callback{{suffix}}) → Func<Action,Func<int>>{{suffix}}
                   !
@@ -61,8 +61,8 @@ public sealed class UnknownCallbackContractTests
         Assert.Equal(ast.Delegates.Single().Parameters.Single().TypeName,
             definition.Parameters.Single().TypeName);
         Assert.Equal(ast.Delegates.Single().Output!.TypeName, definition.Output!.TypeName);
-        Assert.Equal(suffix.Length == 0, definition.Effects == null);
-        Assert.Equal(suffix.Contains("unknown"), definition.Effects?.IsUnknown == true);
+        Assert.NotNull(definition.Effects);
+        Assert.Equal(suffix.Length == 0 || suffix.Contains("unknown"), definition.Effects.IsUnknown);
         Assert.Equal(suffix.Length == 0, method.Parameters.Single().Row == null);
         Assert.Equal(suffix.Contains("unknown"), method.Output!.Row?.IsUnknown == true);
         Assert.Empty(method.Effects!.Effects);
@@ -101,7 +101,8 @@ public sealed class UnknownCallbackContractTests
             module Contracts
               using Callback = System.Func<int>
               delegate Factory () → int
-              func Run ({{type}}:callback{{suffix}}) → int
+                ! unknown
+              func Run ({{type}}:callback{{ExplicitContract(suffix)}}) → int
                 !
                 let {{type}}:alias = callback
                 return alias.Invoke()
@@ -127,8 +128,8 @@ public sealed class UnknownCallbackContractTests
         var result = Compile($$"""
             module Contracts
               delegate Factory () → int
-                {{contract}}
-              func Run (Factory:callback) → int
+                {{(contract.Length == 0 ? "! unknown" : contract)}}
+              func Run (Factory:callback ! unknown) → int
                 !
                 return callback()
             """);
@@ -142,7 +143,6 @@ public sealed class UnknownCallbackContractTests
         var source = """
             module Contracts
               func Loud private () → int
-                ! cw
                 Console.WriteLine("loud")
                 return 1
               func Run () → int
@@ -167,7 +167,8 @@ public sealed class UnknownCallbackContractTests
     {
         var result = Compile("""
             module Contracts
-              func Run (Func<int>:callback) → int
+              func Run (Func<int>:callback ! unknown) → int
+                !
                 return callback()
             """);
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
@@ -175,6 +176,7 @@ public sealed class UnknownCallbackContractTests
         var known = Compile("""
             module Contracts
               func Run () → void
+                !
                 Console.WriteLine("still undeclared")
             """, UnknownCallPolicy.Permissive);
         Assert.Contains(known.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
@@ -207,7 +209,7 @@ public sealed class UnknownCallbackContractTests
     {
         var result = Compile($$"""
             module Contracts
-              func Ignore (Func<int>:callback{{suffix}}) → int
+              func Ignore (Func<int>:callback{{ExplicitContract(suffix)}}) → int
                 !
                 return 1
             """);
@@ -223,7 +225,7 @@ public sealed class UnknownCallbackContractTests
     {
         var result = Compile($$"""
             module Contracts
-              func Run (Func<int>:callback{{suffix}}) → int
+              func Run (Func<int>:callback{{ExplicitContract(suffix)}}) → int
                 !
                 return callback()
             """);
@@ -245,7 +247,7 @@ public sealed class UnknownCallbackContractTests
     {
         var result = Compile($$"""
             module Contracts
-              func Run (Func<int>:callback{{suffix}}) → int
+              func Run (Func<int>:callback{{ExplicitContract(suffix)}}) → int
                 ! cw,cr,fs:rw,net:rw,db:rw,env:rw,mut,alloc,throw
                 return callback()
             """);
@@ -261,12 +263,12 @@ public sealed class UnknownCallbackContractTests
     {
         var source = $$"""
             module Contracts
-              func Run (Func<int>:callback{{suffix}}) → int
+              func Run (Func<int>:callback{{ExplicitContract(suffix)}}) → int
                 !
                 return callback()
             """;
         Assert.False(Compile(source, UnknownCallPolicy.Permissive).HasErrors);
-        var known = source.Replace(suffix + ") →", " ! cw) →", StringComparison.Ordinal);
+        var known = source.Replace(ExplicitContract(suffix) + ") →", " ! cw) →", StringComparison.Ordinal);
         Assert.Contains(Compile(known, UnknownCallPolicy.Permissive).Diagnostics.Errors,
             d => d.Code == DiagnosticCode.ForbiddenEffect);
     }
@@ -278,7 +280,7 @@ public sealed class UnknownCallbackContractTests
     {
         var source = $$"""
             module Contracts
-              func Keep (Func<int>:callback{{suffix}}) → Func<int>{{suffix}}
+              func Keep (Func<int>:callback{{ExplicitContract(suffix)}}) → Func<int>{{ExplicitContract(suffix)}}
                 !
                 return callback
             """;
@@ -298,7 +300,7 @@ public sealed class UnknownCallbackContractTests
         var source = $$"""
             module Contracts
               using Callback = System.Func<int>
-              func Keep (Callback:callback{{suffix}}) → Callback{{suffix}}
+              func Keep (Callback:callback{{ExplicitContract(suffix)}}) → Callback{{ExplicitContract(suffix)}}
                 !
                 return callback
             """;
@@ -318,10 +320,10 @@ public sealed class UnknownCallbackContractTests
     {
         var result = Compile($$"""
             module Contracts
-              func Keep (Func<int>:callback{{suffix}}) → Func<int>{{suffix}}
+              func Keep (Func<int>:callback{{ExplicitContract(suffix)}}) → Func<int>{{ExplicitContract(suffix)}}
                 !
                 return callback
-              func Run (Func<int>:callback{{suffix}}) → int
+              func Run (Func<int>:callback{{ExplicitContract(suffix)}}) → int
                 !
                 let Func<int>:alias = Keep(callback)
                 let Func<int>:second = alias
@@ -345,7 +347,8 @@ public sealed class UnknownCallbackContractTests
             module Contracts
               using Callback = System.Func<int>
               delegate Factory () → int
-              func Run ({{type}}:callback{{suffix}}) → int
+                ! unknown
+              func Run ({{type}}:callback{{ExplicitContract(suffix)}}) → int
                 ! cw
                 let {{type}}:first = callback
                 let {{type}}:second = first
@@ -373,7 +376,7 @@ public sealed class UnknownCallbackContractTests
                 ! cw
                 Console.WriteLine("loud")
                 return 1
-              func Ignore (Func<int>:callback{{suffix}}) → void
+              func Ignore (Func<int>:callback{{ExplicitContract(suffix)}}) → void
                 !
                 return
               func Run () → void
@@ -391,14 +394,12 @@ public sealed class UnknownCallbackContractTests
     {
         var result = Compile($$"""
             module Contracts
-              func First private (Func<int>:callback{{suffix}}) → int
-                !
+              func First private (Func<int>:callback{{ExplicitContract(suffix)}}) → int
                 return Second(callback)
-              func Second private (Func<int>:callback{{suffix}}) → int
-                !
+              func Second private (Func<int>:callback{{ExplicitContract(suffix)}}) → int
                 let int:ignored = First(callback)
                 return callback()
-              func Run (Func<int>:callback{{suffix}}) → int
+              func Run (Func<int>:callback{{ExplicitContract(suffix)}}) → int
                 !
                 return First(callback)
             """);
@@ -448,17 +449,23 @@ public sealed class UnknownCallbackContractTests
         Assert.True(conversion.Success);
         Assert.Equal(0, conversion.InteropPreservationCount);
         var ast = Parse(conversion.CalorSource!);
-        Assert.Null(Assert.Single(ast.Delegates).Effects);
+        Assert.True(Assert.Single(ast.Delegates).Effects!.IsUnknown);
         var methods = Assert.Single(ast.Classes).Methods;
         Assert.Equal(2, methods.Count);
-        Assert.All(methods, method => Assert.Null(Assert.Single(method.Parameters).Row));
-        Assert.Null(methods.Single(method => method.Name == "Keep").Output!.Row);
+        Assert.All(methods, method =>
+        {
+            var row = Assert.Single(method.Parameters).Row!;
+            Assert.True(row.IsUnknown || row.EffectVariables.Count > 0);
+        });
+        Assert.True(methods.Single(method => method.Name == "Keep").Output!.Row!.IsUnknown);
         var source = suffix.Length == 0 ? conversion.CalorSource! :
             conversion.CalorSource!.Replace(":callback)", ":callback ! unknown)", StringComparison.Ordinal);
         var result = Compile(source);
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.EffectRowUnknown);
     }
+
+    private static string ExplicitContract(string suffix) => suffix.Length == 0 ? " ! unknown" : suffix;
 
     private static CompilationResult Compile(string source, UnknownCallPolicy policy = UnknownCallPolicy.Strict) =>
         Program.Compile(source, "contracts.calr", new CompilationOptions

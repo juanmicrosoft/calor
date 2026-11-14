@@ -27,6 +27,7 @@ public class BinderDispatchCompletenessTests
         AssertExpressionCount($$"""
             module LambdaAccounting
               func Probe () → void
+                !
                 {{statement}}
             """, expectedCount);
     }
@@ -38,7 +39,8 @@ public class BinderDispatchCompletenessTests
     {
         AssertExpressionCount($$"""
             module LambdaReturnAccounting
-              func Probe () → Func<{{carrier}}<int>>
+              func Probe () → Func<{{carrier}}<int>> ! unknown
+                !
                 return async () => 42
             """, expectedCount);
     }
@@ -51,6 +53,7 @@ public class BinderDispatchCompletenessTests
         AssertExpressionCount($$"""
             module OverflowAccounting
               func Probe () → void
+                !
                 let int:value = {{keyword}}(1 + 2)
             """, 4);
     }
@@ -61,10 +64,13 @@ public class BinderDispatchCompletenessTests
         AssertExpressionCount("""
             module CandidateAccounting
               func Choose async (int:value) → Task<int>
+                !
                 return value
               func Choose async (string:value) → Task<int>
+                !
                 return 0
               func Consume async () → Task<int>
+                !
                 let Func<Task<int>>:factory = async () => 42
                 return await Choose(42)
             """, 7);
@@ -76,8 +82,10 @@ public class BinderDispatchCompletenessTests
         AssertExpressionCount("""
             module MethodGroupAccounting
               func Identity<T> async (T:value) → Task<T>
+                !
                 return value
               func Consume async () → Task<int>
+                !
                 let Func<ValueTask<int>>:local = async () => 42
                 let Func<int, Task<int>>:factory = Identity
                 let Task<int>:pending = factory(42)

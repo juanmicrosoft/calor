@@ -1,6 +1,7 @@
 module BasicTryCatch BasicTryCatch
   module BasicTryCatchModule
     func SafeDivide public (int:a, int:b) → int
+      !
       if b == 0
         return 0
       else

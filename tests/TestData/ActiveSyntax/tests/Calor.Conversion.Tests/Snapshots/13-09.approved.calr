@@ -1,7 +1,9 @@
 module Test_13_09 Test_13_09 overflow unchecked
   class AnonDemo public
     func GetHtmlAttributes public () → object
+      !
       return new { @class = "container", id = "main" }
 
     func GetConfig public (string:name) → object
+      !
       return new { name = name, value = 42 }

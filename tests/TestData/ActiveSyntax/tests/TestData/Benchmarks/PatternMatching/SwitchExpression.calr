@@ -1,6 +1,7 @@
 module SwitchExpression SwitchExpression
   module SwitchExpressionModule
     func Season public (int:month) → int
+      !
       requires month >= 1
       requires month <= 12
       if month == 12
@@ -17,6 +18,7 @@ module SwitchExpression SwitchExpression
         return 0
 
     func DayType public (int:day) → int
+      !
       if day == 0
         return 0
       else if day == 6
@@ -25,6 +27,7 @@ module SwitchExpression SwitchExpression
         return 1
 
     func HttpCategory public (int:status) → int
+      !
       if status < 200
         return 1
       else if status < 300

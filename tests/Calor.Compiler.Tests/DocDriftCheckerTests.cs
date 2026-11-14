@@ -16,7 +16,7 @@ namespace Calor.Compiler.Tests;
 [Collection("ProductionPipelineConsole")]
 public class DocDriftCheckerTests
 {
-    private const string ValidTeachingProgram = "module Good\n  func Value () → int\n    return 1\n";
+    private const string ValidTeachingProgram = "module Good\n  func Value () → int\n    !\n    return 1\n";
 
     [Fact]
     public void PublicWebsite_HasNoDocumentationDriftUnderProductionChecks()
@@ -1946,7 +1946,7 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("module Good\n  func Value () → int\n    return 1\n", false)]
+    [InlineData("module Good\n  func Value () → int\n    !\n    return 1\n", false)]
     [InlineData("// Header\nmodule Good\n  func Value () → int\n    return 1\n", false)]
     [InlineData("// Header\nfunc Value () → int\n  return 1\n", true)]
     public void NativeReferenceExtraction_PreservesCommentsContextAndDocumentLine(string source, bool wrapped)
@@ -1964,8 +1964,8 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("module Bad\n  func Value () → int\n    return (\n")]
-    [InlineData("module Bad\n  func Value () → int\n    return \"not an int\"\n")]
-    [InlineData("func Value () → int\n  return 1\n")]
+    [InlineData("module Bad\n  func Value () → int\n    !\n    return \"not an int\"\n")]
+    [InlineData("func Value () → int\n  !\n  return 1\n")]
     [InlineData("This is not a complete module.")]
     [InlineData("module Injected\n  func Value () → int\n    return 1\n```\nThis is not Calor\n```calor\nmodule Hidden\n  func Value () → int\n    return 1\n")]
     public void TeachingRegeneration_RejectsInvalidProgramsBeforeWritingAnyMirror(string invalid)
@@ -2063,7 +2063,7 @@ public class DocDriftCheckerTests
             {
                 new
                 {
-                    id = "function", csharpConstruct = "Function", calorSyntax = "func Value () → int",
+                    id = "function", csharpConstruct = "Function", calorSyntax = "func Value () → int\n  !",
                     description = "Return a value.", csharpEquivalent = "int Value() => 1;",
                     keywords = new[] { "func" }, programs = ids
                 }
@@ -2084,7 +2084,7 @@ public class DocDriftCheckerTests
     [InlineData("\n// Header\n\n")]
     public void NativeModuleAfterLeadingComments_IsChecked(string prefix)
     {
-        var source = prefix + "module Good\n  func Value () → int\n    return 1\n";
+        var source = prefix + "module Good\n  func Value () → int\n    !\n    return 1\n";
         var doc = new DocFile("docs/example.md", $"```calor\n{source}```\n");
         Assert.Empty(DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc])));
 
@@ -2663,7 +2663,7 @@ public class DocDriftCheckerTests
 
     private const string FizzBuzzExample =
         "module FizzBuzz\n" +
-        "  func Main () → void\n" +
+        "  func Main () → void\n    !\n" +
         "    ! cw\n" +
         "    for i from 1 to 100 step 1\n" +
         "      if i % 15 == 0\n" +

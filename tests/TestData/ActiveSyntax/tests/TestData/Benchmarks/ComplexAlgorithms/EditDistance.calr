@@ -1,6 +1,7 @@
 module EditDistance EditDistance
   module EditDistanceModule
     func MinOfThree public (int:a, int:b, int:c) → int
+      !
       let minAB = a
       if b < minAB
         set minAB b
@@ -10,6 +11,7 @@ module EditDistance EditDistance
         return minAB
 
     func SubstitutionCost public (int:charA, int:charB) → int
+      !
       if charA == charB
         return 0
       else

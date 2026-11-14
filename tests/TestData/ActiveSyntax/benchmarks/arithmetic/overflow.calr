@@ -3,11 +3,13 @@
 
 module OverflowBenchmark OverflowBenchmark
   func VulnerableAddition public (int:a, int:b) → int
+    !
     // BUG: Unchecked addition may overflow
     // EXPECTED: Calor0923 Integer Overflow
     return a + b
 
   func SafeCheckedAddition public (int:a, int:b) → int
+    !
     // SAFE: Addition with overflow check
     // EXPECTED: No warnings
     var int:result = 0
@@ -17,11 +19,13 @@ module OverflowBenchmark OverflowBenchmark
     return result
 
   func VulnerableMultiplication public (int:x, int:y) → int
+    !
     // BUG: Unchecked multiplication may overflow
     // EXPECTED: Calor0923 Integer Overflow
     return x * y
 
   func SafeSmallValues public (int:x) → int
+    !
     // SAFE: Values known to be small
     // EXPECTED: No warnings
     requires x < 1000
@@ -29,11 +33,13 @@ module OverflowBenchmark OverflowBenchmark
     return x * 100
 
   func VulnerableLeftShift public (int:x, int:n) → int
+    !
     // BUG: Left shift may overflow
     // EXPECTED: Calor0923 Integer Overflow
     return x << n
 
   func SafeBoundedShift public (int:x) → int
+    !
     // SAFE: Both the operand and shift amount are bounded
     // EXPECTED: No warnings
     requires x >= -536870912
@@ -41,6 +47,7 @@ module OverflowBenchmark OverflowBenchmark
     return x << 2
 
   func VulnerableAccumulator public (int:n) → int
+    !
     // BUG: Accumulator in loop may overflow
     // EXPECTED: Calor0923 Integer Overflow
     var int:sum = 0
@@ -49,6 +56,7 @@ module OverflowBenchmark OverflowBenchmark
     return sum
 
   func SafeBoundedAccumulator public () → int
+    !
     // SAFE: Loop bound prevents overflow
     // EXPECTED: No warnings
     var int:sum = 0

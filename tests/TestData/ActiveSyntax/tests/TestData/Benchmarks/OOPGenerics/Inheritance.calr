@@ -1,6 +1,7 @@
 module Inheritance Inheritance
   module InheritanceModule
     func AnimalSound public (int:animalType) → int
+      !
       if animalType == 0
         return 0
       else if animalType == 1
@@ -9,9 +10,11 @@ module Inheritance Inheritance
         return 2
 
     func CanFly public (int:animalType) → bool
+      !
       return animalType == 2
 
     func Legs public (int:animalType) → int
+      !
       if animalType == 0
         return 4
       else if animalType == 1

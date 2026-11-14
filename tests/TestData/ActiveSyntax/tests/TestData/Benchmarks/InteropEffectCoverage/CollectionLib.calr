@@ -1,12 +1,15 @@
 module CollectionLib CollectionLib
   module CollectionLibModule
     func ListLength public (int:count) → int
+      !
       => result >= 0
       return count
 
     func IsInBounds public (int:index, int:count) → bool
+      !
       return index >= 0 && index < count
 
     func AfterAdd public (int:count) → int
+      !
       => result > count
       return count + 1

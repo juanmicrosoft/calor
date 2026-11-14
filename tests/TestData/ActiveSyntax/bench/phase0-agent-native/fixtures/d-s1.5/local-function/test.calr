@@ -3,6 +3,7 @@ module Fixture Fixture block overflow unchecked
   using Calor.Runtime
   module LocalFunctionFixture
     func Add (int:x) → int
+      !
       return unchecked((x + 1000))
 
     raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Run%28%29%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20int%20__calorPostconditionResult0... 1752

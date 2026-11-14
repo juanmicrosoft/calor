@@ -8,4 +8,5 @@ module Test_13_02 Test_13_02 overflow unchecked
       set this.@class @class
 
     func Process public (string:@namespace, int:@event)
+      !
       let result = @namespace + @event.ToString()

@@ -1,11 +1,13 @@
 module ProvenContracts ProvenContracts
   func Square public (int:x) → int
+    !
     requires x >= 0
     requires x <= 46340
     => result >= 0
     return x * x
 
   func AbsoluteValue public (int:x) → int
+    !
     requires x >= 0 - 2147483647
     => result >= 0
     if x < 0
@@ -14,6 +16,7 @@ module ProvenContracts ProvenContracts
       return x
 
   func Max public (int:a, int:b) → int
+    !
     => result >= a
     => result >= b
     if a >= b
@@ -22,6 +25,7 @@ module ProvenContracts ProvenContracts
       return b
 
   func AddPositive public (int:a, int:b) → int
+    !
     requires a > 0
     requires b > 0
     requires a <= 1073741823
@@ -31,5 +35,6 @@ module ProvenContracts ProvenContracts
     return a + b
 
   func Identity public (int:x) → int
+    !
     => result == x
     return x

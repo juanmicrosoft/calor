@@ -1,9 +1,11 @@
 module DigitCount DigitCount
   module DigitCountModule
     func IsZero public (int:n) → bool
+      !
       return n == 0
 
     func Abs public (int:n) → int
+      !
       => result >= 0
       if n < 0
         return 0 - n
@@ -11,6 +13,7 @@ module DigitCount DigitCount
         return n
 
     func DigitCountPositive public (int:n) → int
+      !
       requires n >= 0
       => result > 0
       if n < 10
@@ -19,6 +22,7 @@ module DigitCount DigitCount
       return 1 + rest
 
     func DigitCount public (int:n) → int
+      !
       => result > 0
       if n == 0
         return 1

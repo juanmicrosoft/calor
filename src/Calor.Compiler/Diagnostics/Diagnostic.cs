@@ -121,6 +121,9 @@ public static class DiagnosticCode
     /// </summary>
     public const string TypeFirstBindingHeader = "Calor0123";
 
+    public const string MissingBoundaryEffectRow = "Calor0124";
+    public const string NonPublicEffectRow = "Calor0125";
+
     // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
 
     /// <summary>
@@ -468,6 +471,8 @@ public static class DiagnosticCode
     /// See docs/design/effect-rows-in-the-type-system.md §3.1.
     /// </summary>
     public const string EffectRowMisplaced = "Calor0405";
+
+    public const string MissingCallableEffectRow = "Calor0407";
 
     /// <summary>
     /// Error: effect inference stopped at an iteration cap before the computed

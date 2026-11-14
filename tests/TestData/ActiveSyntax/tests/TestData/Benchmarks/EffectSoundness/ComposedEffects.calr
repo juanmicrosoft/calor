@@ -10,4 +10,5 @@ module ComposedService ComposedService
       System.Console.WriteLine(path)
 
     func PureHelper public (string:data) → int
+      !
       return 0

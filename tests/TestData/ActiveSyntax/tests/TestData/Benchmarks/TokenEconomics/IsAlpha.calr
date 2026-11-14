@@ -1,10 +1,13 @@
 module IsAlpha IsAlpha
   module IsAlphaModule
     func IsUpper public (int:charCode) → bool
+      !
       return charCode >= 65 && charCode <= 90
 
     func IsLower public (int:charCode) → bool
+      !
       return charCode >= 97 && charCode <= 122
 
     func IsAlpha public (int:charCode) → bool
+      !
       return (charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122)

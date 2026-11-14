@@ -6,10 +6,12 @@ module CompactClass CompactClass
       return name
 
     func Square public (int:x) → int
+      !
       => result >= 0
       return x * x
 
     func Max public (int:a, int:b) → int
+      !
       => result >= a
       => result >= b
       if a > b

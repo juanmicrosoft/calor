@@ -401,6 +401,7 @@ public class BclContractTests
         var module = new Parser(new Lexer($$"""
             module DirectNativeBcl
               func Probe (string:s, int:x) → int
+                !
                 requires {{predicate}}
                 return 0
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -550,6 +551,7 @@ public class BclContractTests
             var module = new Parser(new Lexer($$"""
                 module NativeBclProof
                   func Probe (string:s) → bool
+                    !
                     return {{receiver}}.IsNullOrEmpty(s)
                 """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
             Assert.False(diagnostics.HasErrors);
@@ -575,6 +577,7 @@ public class BclContractTests
         var module = new Parser(new Lexer($$"""
             module NativeBclProof
               func Probe (string:s) → string
+                !
                 return {{expression}}
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors);

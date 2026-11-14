@@ -22,13 +22,13 @@ for (const width of [1366, 390]) {
     const root = `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/docs/`;
     await page.goto(root);
     const input = page.getByRole('searchbox', { name: 'Search documentation' });
-    for (const query of ['Calor0410', '--verify', '§F']) {
+    for (const query of ['Calor0410', '--verify', 'func']) {
       await input.fill(query);
       const results = page.getByRole('list', { name: 'Search results' });
       await expect(results.getByRole('link').first()).toBeVisible();
       expect(indexRequests.every(url => new URL(url).hostname === '127.0.0.1')).toBe(true);
       expect(indexRequests.every(url => !url.includes(query))).toBe(true);
-      const targetLink = query === '§F'
+      const targetLink = query === 'func'
         ? results.getByRole('link').filter({ has: page.getByText('Structure Tags', { exact: true }) })
         : results.getByRole('link').first();
       const target = await targetLink.getAttribute('href');
@@ -41,7 +41,7 @@ for (const width of [1366, 390]) {
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(`http://127.0.0.1:4173${target}`);
       await expect(page.locator('article')).toContainText(query);
-      if (query === '§F') await expect(page.locator('article > h1')).toHaveText('Structure Tags');
+      if (query === 'func') await expect(page.locator('article > h1')).toHaveText('Structure Tags');
       await expect(input).toBeVisible();
     }
 

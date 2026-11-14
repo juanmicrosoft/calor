@@ -1,12 +1,14 @@
 module DistanceCalculator DistanceCalculator
   module DistanceCalculatorModule
     func DistanceSquared public (float:x1, float:y1, float:x2, float:y2) → float
+      !
       => result >= 0
       let dx = x2 - x1
       let dy = y2 - y1
       return (dx * dx) + (dy * dy)
 
     func ManhattanDist public (float:x1, float:y1, float:x2, float:y2) → float
+      !
       => result >= 0
       let dx = x2 - x1
       let dy = y2 - y1

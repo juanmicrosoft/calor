@@ -423,6 +423,7 @@ public sealed class NativePostfixTests
                 func Dispose () → void
                   !
               func Probe (System.IDisposable:value) → void
+                !
                 value.Dispose()
             """;
         var (_, bound, diagnostics) = Bind(source);
@@ -738,7 +739,6 @@ public sealed class NativePostfixTests
         var source = $$"""
             module Native Native
               func Echo private (int:value) → int
-                !
                 return value
               func Probe () → object
                 ! alloc
@@ -901,6 +901,7 @@ public sealed class NativePostfixTests
         var type = Compile("""
             module Native Native
               func Probe (int[]:items) → int
+                !
                 return (items).Length + (1 + 2)
             """);
         Assert.Equal(5, Invoke(type, "Probe", new[] { 10, 20 }));
@@ -915,7 +916,7 @@ public sealed class NativePostfixTests
     [InlineData("x?.Factory().M()")]
     public void NativeConditionalInvocation_PreservesThePostfixChain(string expression)
     {
-        var source = $"module Native Native\n  func Probe () → object\n    return {expression}\n";
+        var source = $"module Native Native\n  func Probe () → object\n    !\n    return {expression}\n";
         var diagnostics = new DiagnosticBag();
         var ast = Parse(source, diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -938,7 +939,7 @@ public sealed class NativePostfixTests
     public void NativeUnsupportedConditionalForms_RemainGated(string expression)
     {
         var diagnostics = new DiagnosticBag();
-        Parse($"module Native Native\n  func Probe () → object\n    return {expression}\n", diagnostics);
+        Parse($"module Native Native\n  func Probe () → object\n    !\n    return {expression}\n", diagnostics);
         Assert.True(diagnostics.HasErrors, expression);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Message.Contains("not yet supported"));
     }
@@ -953,6 +954,7 @@ public sealed class NativePostfixTests
                 System.Console.WriteLine(1)
                 return 0
               func Probe (string?:x) → string?
+                !
                 return x?.Substring(Step())
             """;
         var (ast, bound, diagnostics) = Bind(source);
@@ -982,6 +984,7 @@ public sealed class NativePostfixTests
                 System.Console.WriteLine(1)
                 return null
               func Probe (string?:x) → string?
+                !
                 return {{expression}}
             """;
         var result = Program.Compile(source);
@@ -1033,13 +1036,17 @@ public sealed class NativePostfixTests
         var (ast, bound, diagnostics) = Bind("""
             module Native Native
               func Use (Holder:h) → int
+                !
                 return Get(h).Pick(value: 3)
               func Get (Holder:h) → Holder
+                !
                 return h
               class Holder
                 func Pick (int:value) → int
+                  !
                   return value
                 func Pick (string:value) → string
+                  !
                   return value
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -1056,10 +1063,13 @@ public sealed class NativePostfixTests
         (_, bound, diagnostics) = Bind("""
             module Native Native
               func Array (System.Globalization.CultureInfo:culture) → string[]
+                !
                 return culture.DateTimeFormat.GetAllDateTimePatterns()
               func Generic (System.Collections.ArrayList:items) → IEnumerable<int>
+                !
                 return items.Cast<int>()
               func Static (int:x) → int
+                !
                 return Math.Abs(x)
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -1081,9 +1091,11 @@ public sealed class NativePostfixTests
         var (_, _, diagnostics) = Bind($$"""
             module Native Native
               func Use (Holder:h) → int
+                !
                 return {{expression}}
               class Holder
                 func Pick (int:value) → int
+                  !
                   return value
             """);
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
@@ -1095,9 +1107,11 @@ public sealed class NativePostfixTests
         var source = """
             module Native Native
               func Probe () → int
+                !
                 return Random.Echo<int>(value: 7)
               class Random
                 func Echo<T> static (T:value) → T
+                  !
                   return value
             """;
         var (_, bound, diagnostics) = Bind(source);
@@ -1112,9 +1126,9 @@ public sealed class NativePostfixTests
     }
 
     [Theory]
-    [InlineData("  func Use<T> () → int\n    return T.Pick()")]
-    [InlineData("  class Container<T>\n    func Use static () → int\n      return T.Pick()")]
-    [InlineData("  class Container\n    func Use<T> static () → int\n      return T.Pick()")]
+    [InlineData("  func Use<T> () → int\n    !\n    return T.Pick()")]
+    [InlineData("  class Container<T>\n    func Use static () → int\n      !\n      return T.Pick()")]
+    [InlineData("  class Container\n    func Use<T> static () → int\n      !\n      return T.Pick()")]
     public void TypeParameterReceivers_DoNotBindAnUnrelatedSourceClass(string declaration)
     {
         var source = $$"""
@@ -1122,6 +1136,7 @@ public sealed class NativePostfixTests
             {{declaration}}
               class T
                 func Pick static () → int
+                  !
                   return 1
             """;
         var (_, bound, diagnostics) = Bind(source);
@@ -1146,14 +1161,17 @@ public sealed class NativePostfixTests
               class Owner
                 {{ownerMember}}
                 func Use static () → int
+                  !
                   return T.Pick()
               class Parent
                 field Holder:T public static
               class T
                 func Pick static () → int
+                  !
                   return 1
               class Holder
                 func Pick () → int
+                  !
                   return 2
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -1169,6 +1187,7 @@ public sealed class NativePostfixTests
         var source = """
             module Native Native
               func Use<Math> () → int
+                !
                 return Math.Abs(-3)
             """;
         var (_, bound, diagnostics) = Bind(source);
@@ -1189,12 +1208,15 @@ public sealed class NativePostfixTests
             module Native Native
               class Owner
                 func Use static () → int
+                  !
                   return T.Pick()
                 class T
                   func Pick static () → int
+                    !
                     return 2
               class T
                 func Pick static () → int
+                  !
                   return 1
             """);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -1237,6 +1259,7 @@ public sealed class NativePostfixTests
         var (_, _, diagnostics) = Bind("""
             module Native Native
               func Use (string?:input, bool:gate) → int
+                !
                 var string?:value = input
                 let Action:later = () =>
                   set value null
@@ -1425,6 +1448,7 @@ public sealed class NativePostfixTests
         var source = $$"""
             module Native Native
               func Probe (int:n) → string
+                !
                 return "${{{hole}}}"
             """;
         foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
@@ -1475,6 +1499,7 @@ public sealed class NativePostfixTests
         var source = $$"""
             module Native Native
               func Probe (int:x) → string
+                !
                 return "${{{hole}}}"
             """;
         foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
@@ -1529,6 +1554,7 @@ public sealed class NativePostfixTests
         const string source = """
             module Native Native
               func Probe (int:n) → string
+                !
                 return "v=${Math.Max(val1: n, val2: 3)}"
             """;
         var (_, bound, diagnostics) = Bind(source);
@@ -1549,15 +1575,12 @@ public sealed class NativePostfixTests
             ! mut
         {{string.Join("\n", body.Split('\n').Select(line => "    " + line))}}
           func GetLists private (List<int>:trace, List<int>[]:items) → List<int>[]
-            ! mut
             trace.Add(1)
             return items
           func Index private (List<int>:trace) → int
-            ! mut
             trace.Add(2)
             return 0
           func Number private (List<int>:trace, int:value) → int
-            ! mut
             trace.Add(value)
             return value
         """;
@@ -1565,6 +1588,7 @@ public sealed class NativePostfixTests
     private static string Source(string expression, bool statement = false, string type = "int") => $$"""
         module Native Native
           func Probe () → {{type}}
+            !
             {{(statement ? "" : "return ")}}{{expression}}
         """;
 

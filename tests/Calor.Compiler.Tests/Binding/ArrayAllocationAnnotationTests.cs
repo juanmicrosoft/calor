@@ -60,7 +60,6 @@ public sealed class ArrayAllocationAnnotationTests
                 !
                 return Get(values)[0].Contains(0)
               func Get private (System.Collections.Generic.List<int>[]:values) → List<int>[]
-                !
                 return values
             """;
         var result = Program.Compile(source, "metadata-array-declaration-context.calr");

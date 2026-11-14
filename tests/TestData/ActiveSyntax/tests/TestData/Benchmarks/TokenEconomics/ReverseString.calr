@@ -1,7 +1,9 @@
 module StringOps StringOps
   module StringOpsModule
     func Swap public (string:a, string:b) → string
+      !
       return b + a
 
     func Identity public (string:s) → string
+      !
       return s

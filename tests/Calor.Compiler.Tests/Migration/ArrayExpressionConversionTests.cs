@@ -2164,7 +2164,7 @@ public class ArrayExpressionConversionTests
     public void AnonymousObjects_RejectInvalidProjectionAndDuplicateNames(string expression)
     {
         var diagnostics = new DiagnosticBag();
-        var source = $"module InvalidAnonymous\n  func Make () → object\n    return {expression}\n";
+        var source = $"module InvalidAnonymous\n  func Make () → object\n    !\n    return {expression}\n";
         new Parsing.Parser(new Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);
     }
@@ -2419,6 +2419,7 @@ public class ArrayExpressionConversionTests
                 field int:V public
               module G
                 func Get public (Cell[,]:g, Cell[]:xs) → int
+                  !
                   return g[0, 1].V + xs[0].V
             """;
         var compilation = Program.Compile(calor, "group.calr", new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });

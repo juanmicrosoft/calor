@@ -45,10 +45,13 @@ public sealed class GenericStaticSourceCallTests
             module GenericStatic
               module Cache<T>
                 func Use (T:value) → T
+                  !
                   return value
                 func Use (object:value) → int
+                  !
                   return -1
               func Run () → int
+                !
                 return Cache<int>.Use(7)
             """;
         var module = Parse(source);
@@ -78,9 +81,11 @@ public sealed class GenericStaticSourceCallTests
               using Selected = global::Cases.Cache<int>
               module Cache<T>
                 func Use (T:value) → T
+                  !
                   return value
               module Probe
                 func Run () → int
+                  !
                   return {{receiver}}.Use(7)
             """;
         foreach (var source in new[] { authored, new CalorEmitter().Emit(Parse(authored)) })
@@ -105,7 +110,6 @@ public sealed class GenericStaticSourceCallTests
             "field" => """
                     field int:seed static = Initialize()
                     func Initialize private () → int
-                      ! mut
                       set Probe . log "I"
                       return 1
                 """ + "\n",
@@ -157,6 +161,7 @@ public sealed class GenericStaticSourceCallTests
               class Right
               module Cache<T>
                 func Use (int:value) → int
+                  !
                   return value
               module Probe
                 func Run () → int
@@ -173,10 +178,11 @@ public sealed class GenericStaticSourceCallTests
                 .Replace("Cache<int>.Use", "Selected.Use", StringComparison.Ordinal),
             "arity" => baseline.Replace("Cache<int>.Use", "Cache<int,int>.Use", StringComparison.Ordinal),
             "constraint" => baseline.Replace("module Cache<T>", "module Cache<T>\n    where T : class", StringComparison.Ordinal),
-            "private" => baseline.Replace("func Use (", "func Use private (", StringComparison.Ordinal),
+            "private" => baseline.Replace("func Use (int:value) → int\n      !",
+                "func Use private (int:value) → int", StringComparison.Ordinal),
             "ambiguous" => baseline.Replace("int:value", "Left:value", StringComparison.Ordinal)
                 .Replace("  module Probe",
-                    "    func Use (Right:value) → int\n      return 2\n  module Probe", StringComparison.Ordinal)
+                    "    func Use (Right:value) → int\n      !\n      return 2\n  module Probe", StringComparison.Ordinal)
                 .Replace("Cache<int>.Use(7)", "Cache<int>.Use(null)", StringComparison.Ordinal)
                 .Replace("return value", "return 1", StringComparison.Ordinal),
             _ => throw new ArgumentOutOfRangeException(nameof(competitor))
@@ -202,8 +208,10 @@ public sealed class GenericStaticSourceCallTests
             module GenericStatic
               module Cache<T>
                 func Use (T:value) → T
+                  !
                   return value
               func Run () → string
+                !
                 return Cache<{{argument}}>.Use(null)
             """;
         foreach (var typed in new[] { false, true })
@@ -221,6 +229,7 @@ public sealed class GenericStaticSourceCallTests
               module Cache<T>
                 field int:seed static = System.Environment.TickCount
                 func Use (int:value) → int
+                  !
                   return value
               func Run () → int
                 !

@@ -1,43 +1,46 @@
-§M{ParityEncoder}
-  §F{Encode:pub} ([i32]:values) -> i32
-    §E{}
-    §B{~odd:i32} 0
-    §B{~i:i32} 0
-    §WH (< i (len values))
-      §B{v:i32} §IDX values i
-      §IF (!= (% v 2) 0)
-        §ASSIGN odd (+ odd 1)
-      §ASSIGN i (+ i 1)
-    §B{n:i32} §LEN values
-    §R (+ (* odd 65536) n)
+module ParityEncoder ParityEncoder block
+  module ParityEncoderModule partial
+    func Encode (int[]:values) → int
+      !
+      var int:odd = 0
+      var int:i = 0
+      while (i < values.Length)
+        let int:v = values[i]
+        if ((v % 2) != 0)
+          set odd (odd + 1)
+        set i (i + 1)
+      let int:n = values.Length
+      return ((odd * 65536) + n)
 
-  §F{IsValidLength:pub} ([i32]:values, i32:expectedLength) -> bool
-    §E{}
-    §Q (>= expectedLength 0)
-    §B{n:i32} §LEN values
-    §R (== n expectedLength)
+    func IsValidLength (int[]:values, int:expectedLength) → bool
+      !
+      requires (expectedLength >= 0)
+      let int:n = values.Length
+      return (n == expectedLength)
 
-  §F{CountEven:pub} ([i32]:values) -> i32
-    §E{}
-    §S (>= result 0)
-    §S (<= result §LEN values)
-    §B{~count:i32} 0
-    §B{~i:i32} 0
-    §WH (< i (len values))
-      §B{v:i32} §IDX values i
-      §IF (== (% v 2) 0)
-        §ASSIGN count (+ count 1)
-      §ASSIGN i (+ i 1)
-    §R count
+    func CountEven (int[]:values) → int
+      !
+      => (result >= 0)
+      => (result <= values.Length)
+      var int:count = 0
+      var int:i = 0
+      while (i < values.Length)
+        let int:v = values[i]
+        if ((v % 2) == 0)
+          set count (count + 1)
+        set i (i + 1)
+      return count
 
-  §F{IndexOfFirstOdd:pub} ([i32]:values) -> i32
-    §E{}
-    §S (>= result -1)
-    §S (< result §LEN values)
-    §B{~i:i32} 0
-    §WH (< i (len values))
-      §B{v:i32} §IDX values i
-      §IF (!= (% v 2) 0)
-        §R i
-      §ASSIGN i (+ i 1)
-    §R -1
+    func IndexOfFirstOdd (int[]:values) → int
+      !
+      => (result >= -1)
+      => (result < values.Length)
+      var int:i = 0
+      while (i < values.Length)
+        let int:v = values[i]
+        if ((v % 2) != 0)
+          return i
+        set i (i + 1)
+      return -1
+
+

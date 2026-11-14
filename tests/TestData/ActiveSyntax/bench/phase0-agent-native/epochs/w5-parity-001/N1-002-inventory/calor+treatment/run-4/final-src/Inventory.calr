@@ -16,6 +16,7 @@ module Inventory Inventory block
           set items[name] (items[name] - qty)
 
     func TotalCount (Dictionary<string, int>:items) → int
+      !
       let total = 0
       each k, v in items
         set total (total + v)

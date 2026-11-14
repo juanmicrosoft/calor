@@ -48,6 +48,7 @@ public sealed class NestedContractInheritanceRuntimeTests
               class Outer public
                 interface IPositive
                   func Get (int:x) → int
+                    !
                     requires x > 0
                     => result > 0
                 interface IChild
@@ -76,6 +77,7 @@ public sealed class NestedContractInheritanceRuntimeTests
             class Positive public
               interface IValue
                 func Get (int:x) → int
+                  !
                   requires x > 0
                   => result > 0
               class Inner public
@@ -121,12 +123,14 @@ public sealed class NestedContractInheritanceRuntimeTests
             module NestedContracts NestedContracts block
               interface IValue
                 func Get (int:x) → int
+                  !
                   requires x > 0
               class Outer public
                 class Inner public
                   implements IValue
                   interface IValue
                     func Get (int:x) → int
+                      !
                       requires x < 0
                   func Get public (int:value) → int
                     !
@@ -148,6 +152,7 @@ public sealed class NestedContractInheritanceRuntimeTests
               class Base public
                 interface IPositive
                   func Get (int:x) → int
+                    !
                     requires x > 0
                     => result > 0
               class Outer public
@@ -174,10 +179,12 @@ public sealed class NestedContractInheritanceRuntimeTests
               class Outer<T> public
                 interface IPositive
                   func Get (int:x) → int
+                    !
                     requires x > 0
                     => result > 0
                 interface IValue
                   func Check (object:x) → object
+                    !
                     requires x is T
                     => result is T
               class Inner public
@@ -210,6 +217,7 @@ public sealed class NestedContractInheritanceRuntimeTests
             class Outer public
               interface IValue
                 func Get (int:x) → int
+                  !
                   requires x > 0
                   => result > 0
               class Inner public
@@ -241,6 +249,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                   class Outer<{{outerParameter}}> public
                     interface IValue<U>
                       func Check (object:x) → object
+                        !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
                   class Impl<T> public
                     implements Outer<int>.IValue<T>
@@ -276,6 +285,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                         return 1
                     interface IValue
                       func Check (object:x) → object
+                        !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
                   class Marker public
                     func Tag public () → int
@@ -329,6 +339,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                         return 2
                     interface IValue
                       func Check (object:x) → object
+                        !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
                   class Marker public
                     func Tag public () → int
@@ -376,6 +387,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                         return 1
                     interface IValue
                       func Check<{{parameter}}> (object:x) → object
+                        !
                 {{Indent(Indent(Indent(Indent(contracts.Replace("Box<T>", $"Box<{parameter}>")))))}}
                   class Impl public
                     implements Outer<int>.IValue
@@ -426,6 +438,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                 declarations += "\n" + """
                     interface IValue<T>
                       func Check (T:x) → T
+                        !
                     """ + "\n" + Indent(Indent(contracts));
             }
             if (path != "interface")
@@ -461,6 +474,7 @@ public sealed class NestedContractInheritanceRuntimeTests
             module NestedContracts NestedContracts block
               interface IValue<U>
                 func Check<T> (U:x) → U
+                  !
                   requires x != null
                   => result != null
               class Impl<T> public
@@ -499,7 +513,7 @@ public sealed class NestedContractInheritanceRuntimeTests
             var declarations = "";
             if (path != "base")
             {
-                declarations = $"interface IValue\n  func Check<T> ({surfaceShape}:x) → {surfaceShape}\n    where T : class\n"
+                declarations = $"interface IValue\n  func Check<T> ({surfaceShape}:x) → {surfaceShape}\n    !\n    where T : class\n"
                     + Indent(Indent(contracts));
             }
             if (path != "interface")
@@ -562,6 +576,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                   class Outer public
                     interface IValue
                       func Check (object:x) → object
+                        !
                         requires x != null
                         => result != null
                     class Impl public
@@ -579,12 +594,14 @@ public sealed class NestedContractInheritanceRuntimeTests
               class Outer public
                 interface IValue
                   func Get (int:x) → int
+                    !
                     requires x > 0
               class Container public
                 class Scope public
                   class Outer public
                     interface IValue
                       func Get (int:x) → int
+                        !
                         requires x < 0
                 class Relative public
                   implements Scope.Outer.IValue
@@ -617,6 +634,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                   class Outer public
                     interface IValue
                       func Get (int:x) → int
+                        !
                         {{contract}}
                     class Impl public
                       implements {{reference}}
@@ -656,6 +674,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                       field int:Min public static = 0
                     interface IValue
                       func Get (int:x) → int
+                        !
                         {{contract}}
                   class Limits public
                     field int:Min public static = -10
@@ -673,6 +692,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                       field int:Min public static = -10
                     interface IValue
                       func Check (Payload:Limits) → int
+                        !
                         requires Limits.Min > 0
                   class Payload public
                     field int:Min public = 0
@@ -716,6 +736,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                       field int:Min public static = 10
                     interface IValue
                       func Check (object:x) → object
+                        !
                         {{contract}}
                   class Payload public
                     field int:Min public = 0
@@ -922,6 +943,7 @@ public sealed class NestedContractInheritanceRuntimeTests
               class Outer public
                 interface IValue
                   func Get (int:x) → int
+                    !
                     requires x > 0
                     => result > 0
                 class Impl public
@@ -990,6 +1012,7 @@ public sealed class NestedContractInheritanceRuntimeTests
     private const string NativePositiveInterface = """
         interface IPositive
           func Get (int:x) → int
+            !
             requires x > 0
             => result > 0
         """;

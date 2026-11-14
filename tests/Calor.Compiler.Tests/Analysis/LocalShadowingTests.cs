@@ -41,6 +41,7 @@ public class LocalShadowingTests
         "    §R x\n" => """
             module S S
               func Do public (bool:flag) → int
+                !
                 var int:x = 0
                 if flag == true
                   let string:x = "hi"
@@ -57,6 +58,7 @@ public class LocalShadowingTests
         "    §R result\n" => """
             module S S
               func Fact public (int:n) → int
+                !
                 var result = 1
                 var i = 2
                 while i <= n
@@ -75,6 +77,7 @@ public class LocalShadowingTests
         "    §R 0\n" => """
             module S S
               func Do public (bool:a, bool:b) → int
+                !
                 if a == true
                   let int:x = 1
                   Console.WriteLine(x)
@@ -93,6 +96,7 @@ public class LocalShadowingTests
               class Box public
                 field int:x private
                 func Do public () → int
+                  !
                   let int:x = 5
                   return x
             """,
@@ -104,6 +108,7 @@ public class LocalShadowingTests
         "    §R 0\n" => """
             module S S
               func Do public () → int
+                !
                 for i from 0 to 3 step 1
                   let int:i = 9
                   Console.WriteLine(i)
@@ -117,6 +122,7 @@ public class LocalShadowingTests
         "    §R x\n" => """
             module S S
               func Do public (int:x) → int
+                !
                 if x > 0
                   let int:x = 9
                   Console.WriteLine(x)
@@ -130,6 +136,7 @@ public class LocalShadowingTests
         "    §R x\n" => """
             module S S
               func Do public () → int
+                !
                 var x = 0
                 for x from 0 to 3 step 1
                   set x x + 1
@@ -160,6 +167,7 @@ public class LocalShadowingTests
         "    §R s\n" => """
             module S S
               func Do public () → int
+                !
                 var s = 0
                 for i from 0 to 3 step 1
                   set s s + i

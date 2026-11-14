@@ -1,11 +1,14 @@
 module MergeSort MergeSort
   module MergeSortModule
     func MidPoint public (int:low, int:high) → int
+      !
       requires low <= high
       return low + ((high - low) / 2)
 
     func ShouldTakeLeft public (int:leftVal, int:rightVal) → bool
+      !
       return leftVal <= rightVal
 
     func IsBaseCase public (int:low, int:high) → bool
+      !
       return low >= high

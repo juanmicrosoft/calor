@@ -24,26 +24,26 @@ public class ReviewPacketTests : IDisposable
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
     private const string MixedModule = @"
-§M{Pricing}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §Q (<= x 46340)
-      §S (>= result 0)
-      §R (* x x)
+module Pricing
+  func Square public (int:x) → int
 
-  §F{BrokenCap:pub}
-      §I{i32:amount}
-      §I{i32:cap}
-      §O{i32}
-      §S (<= result cap)
-      §R amount
+    !
+    requires x >= 0
+    requires x <= 46340
+    => result >= 0
+    return x * x
 
-  §F{Caller:pub}
-      §I{i32:y}
-      §O{i32}
-      §R §C{Square} §A y §/C
+  func BrokenCap public (int:amount, int:cap) → int
+
+    !
+
+    => result <= cap
+    return amount
+
+  func Caller public (int:y) → int
+    !
+
+    return Square(y)
 ";
 
     private ReviewPacketBuilder.Result Build(
@@ -184,7 +184,7 @@ public class ReviewPacketTests : IDisposable
     public void Packet_AlwaysCarriesRefinementHonestyNote()
     {
         // No Z3 needed: the honesty note is unconditional.
-        var result = Build("§M{Empty}\n  §F{Id:pub} (i32:x) -> i32\n    §R x\n");
+        var result = Build("module Empty\n  func Id public (int:x) → int\n    !\n    return x\n");
         Assert.Contains(ReviewPacketBuilder.RefinementHonestyNote, result.Packet.HonestyNotes);
 
         var markdown = ReviewPacketBuilder.RenderMarkdown(result.Packet);
@@ -247,18 +247,16 @@ public class ReviewPacketTests : IDisposable
         // M2 pin (PR #841 review): a caller in one file of a declaration
         // changed in another file of the SAME invocation must be found.
         const string lib = @"
-§M{Lib}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (* x x)
+module Lib
+  func Square public (int:x) → int
+    !
+    return x * x
 ";
         const string app = @"
-§M{App}
-  §F{UseSquare:pub}
-      §I{i32:y}
-      §O{i32}
-      §R §C{Square} §A y §/C
+module App
+  func UseSquare public (int:y) → int
+    !
+    return Square(y)
 ";
         var libFile = Path.Combine(_root, "lib.calr");
         var appFile = Path.Combine(_root, "app.calr");
@@ -298,14 +296,13 @@ public class ReviewPacketTests : IDisposable
         // m2 pin: a vacuously-proven contract (unsatisfiable §Q set) must not
         // let summary.proven read clean — proven counts non-vacuous only.
         const string vacuous = @"
-§M{Vac}
-  §F{Weird:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 1)
-      §Q (<= x 0)
-      §S (== result 5)
-      §R 7
+module Vac
+  func Weird public (int:x) → int
+    !
+    requires x >= 1
+    requires x <= 0
+    => result == 5
+    return 7
 ";
         var result = Build(vacuous);
         var summary = result.Packet.Summary;
@@ -330,7 +327,7 @@ public class ReviewPacketTests : IDisposable
         // A parse-level error: unterminated call argument list.
         var result = ReviewPacketBuilder.Build(
             [new ReviewPacketBuilder.InputFile(Path.Combine(_root, "broken.calr"),
-                "§M{Broken}\n  §F{Bad:pub} (i32:x) -> i32\n    §R (+ x\n")],
+                "module Broken\n  func Bad public (int:x) → int\n    !\n    return Add(x\n")],
             new ReviewPacketBuilder.Options());
         Assert.True(result.HasCompileErrors);
         Assert.NotEmpty(result.CompileDiagnostics);

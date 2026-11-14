@@ -66,7 +66,7 @@ public sealed class ContractTranslator
     /// Z3 verification cache but forgot the version bump (the failure mode
     /// #961 landed by hand in 0.13.2).
     /// </remarks>
-    public const string SemanticsVersion = "z3-executable-semantics-v3";
+    public const string SemanticsVersion = "z3-executable-semantics-v4";
 
     private readonly Context _ctx;
     private readonly Dictionary<string, (Expr Expr, string Type)> _variables = new();
@@ -1633,7 +1633,8 @@ public sealed class ContractTranslator
             "boolean" or "system.boolean" => "bool",
             "single" or "system.single" => "f32",
             "double" or "system.double" => "f64",
-            var t => t
+            // User-defined types must retain their case-sensitive identity.
+            _ => typeName
         };
     }
 
@@ -2462,7 +2463,7 @@ public sealed class ContractTranslator
         var applied = accessor.Apply(target);
 
         // If the field is an integer, track its width so subsequent operations work.
-        if (applied is BitVecExpr bv && fieldType is "i32" or "int" or "i64" or "long" or "u32" or "uint" or "u64" or "ulong" or "i8" or "i16" or "u8" or "u16" or "byte" or "short" or "ushort")
+        if (applied is BitVecExpr bv)
         {
             var (w, signed) = GetTypeWidthAndSignedness(fieldType);
             if (w > 0) TrackBitVec(bv, w, signed);
@@ -2478,12 +2479,11 @@ public sealed class ContractTranslator
     {
         var t = NormalizeTypeName(typeName);
         if (t.EndsWith("?")) t = t[..^1];
+        var (width, _) = GetTypeWidthAndSignedness(t);
+        if (width > 0)
+            return _ctx.MkBitVecSort(width);
         return t switch
         {
-            "i8" or "u8" => _ctx.MkBitVecSort(8),
-            "i16" or "u16" => _ctx.MkBitVecSort(16),
-            "i32" or "u32" or "int" or "uint" => _ctx.MkBitVecSort(32),
-            "i64" or "u64" or "long" or "ulong" => _ctx.MkBitVecSort(64),
             "bool" => _ctx.BoolSort,
             // Like every other string-sort site (D3/D12), this arm mints a field accessor's
             // result sort and accessor.Apply(target) does not pass through TrackString.

@@ -30,6 +30,7 @@ public sealed class CanonicalEnumDelegateEventTests
             module SourceNullReceivers{{(oblivious ? " block overflow unchecked nullable oblivious" : "")}}
               module StringExtensions
                 func IsNullOrEmpty (this {{type}}:s) → bool
+                  !
                   return ((s == null) || (s.Length == 0))
               func Use ({{type}}:s) → int
                 !
@@ -376,7 +377,7 @@ public sealed class CanonicalEnumDelegateEventTests
                 Red
               module Extensions
                 func Pick {{visibility}} (this Color:value) → int
-                  !
+                  {{(visibility == "private" ? "" : "!")}}
                   return 7
             {{extra}}  func Main () → int
                 !
@@ -1459,6 +1460,7 @@ public sealed class CanonicalEnumDelegateEventTests
             None = 0
             @event = 7
           delegate Handler (int:value) → void
+            ! unknown
           class Source
             field int:Count public = 0
             event Handler:Changed
@@ -1776,6 +1778,7 @@ public sealed class CanonicalEnumDelegateEventTests
                 event System.Action:Changed
               class Source partial
                 func Read (Source:other) → void
+                  !
                   let copy = {{expression}}
             """;
         var diagnostics = new DiagnosticBag();
@@ -1794,15 +1797,15 @@ public sealed class CanonicalEnumDelegateEventTests
     }
 
     [Theory]
-    [InlineData("class Source\n    event System.Action:Changed\n      add\n        return\n      remove\n        return\n    func Read () → void\n      let copy = Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n      add\n        return\n      remove\n        return\n    func Read () → void\n      !\n      let copy = Changed")]
     [InlineData("class Source\n    event System.Action:Changed\n  class Derived\n    extends Source\n    func Read () → void\n      let copy = Changed")]
     [InlineData("class Source\n    event System.Action:Changed\n  func Read (Source:value) → void\n    let copy = value.Changed")]
-    [InlineData("class Source\n    event System.Action:Changed\n    func Read static () → void\n      let copy = Changed")]
-    [InlineData("class Source\n    event System.Action:Changed static\n    func Read (Source:value) → void\n      let copy = value.Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n    func Read static () → void\n      !\n      let copy = Changed")]
+    [InlineData("class Source\n    event System.Action:Changed static\n    func Read (Source:value) → void\n      !\n      let copy = value.Changed")]
     [InlineData("class Source\n    event System.Action:Changed static\n  func Read () → void\n    let copy = Source.Changed")]
     [InlineData("class Source\n    event System.Action:Changed private\n  func Read (Source:value) → void\n    let copy = value.Changed")]
     [InlineData("class Source\n    event System.Action:Changed\n    func Read () → void\n      let copy = Changed\n  class Source")]
-    [InlineData("func Read (System.ComponentModel.INotifyPropertyChanged:value) → void\n    let copy = value.PropertyChanged")]
+    [InlineData("func Read (System.ComponentModel.INotifyPropertyChanged:value) → void\n  !\n    let copy = value.PropertyChanged")]
     public void EventReadsOutsideLegalFieldLikeStorageDoNotAcquireCallableTypes(string declaration)
     {
         var diagnostics = new DiagnosticBag();
@@ -1995,6 +1998,7 @@ public sealed class CanonicalEnumDelegateEventTests
                 pp else
                   event System.Action<string>:Changed
                 func Read () → void
+                  !
                   let copy = Changed
             """;
         var diagnostics = new DiagnosticBag();
@@ -2015,6 +2019,7 @@ public sealed class CanonicalEnumDelegateEventTests
               class Source
                 event EventHandler:Changed
                 func Read () → void
+                  !
                   let copy = Changed
             """;
         var diagnostics = new DiagnosticBag();

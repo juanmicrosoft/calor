@@ -63,6 +63,7 @@ public class ParserTests
         var source = $"""
             module Modifiers
               func Run async (System.Threading.Tasks.Task<int>:task) → System.Threading.Tasks.Task<int>
+                !
                 return await task.ConfigureAwait({value})
             """;
         var module = ParseNative(source);
@@ -101,6 +102,7 @@ public class ParserTests
             var declaredSource = $"""
                 module Modifiers
                   func Run async (System.Threading.Tasks.Task<int>:task, bool:{value}) → System.Threading.Tasks.Task<int>
+                    !
                     return await task.ConfigureAwait({value})
                 """;
             var declared = Program.Compile(declaredSource);
@@ -120,7 +122,7 @@ public class ParserTests
     [InlineData("CLASS", TypeConstraintKind.TypeName)]
     public void ConstraintKeywords_AreNotCaseFolded(string constraint, TypeConstraintKind expected)
     {
-        var source = $"module Modifiers\n  func Run<T> () → void\n    where T : {constraint}";
+        var source = $"module Modifiers\n  func Run<T> () → void\n    !\n    where T : {constraint}";
         foreach (var module in new[] { ParseNative(source), ParseNative(new CalorEmitter().Emit(ParseNative(source))) })
         {
             var parsed = Assert.Single(Assert.Single(Assert.Single(module.Functions).TypeParameters).Constraints);
@@ -145,7 +147,7 @@ public class ParserTests
                 ? "Expected a type:name parameter."
                 : "Parameter modifiers precede the type"));
 
-        var module = ParseNative("module Modifiers\n  func Run (ref int:x) → void\n    return");
+        var module = ParseNative("module Modifiers\n  func Run (ref int:x) → void\n    !\n    return");
         var parameter = Assert.Single(Assert.Single(module.Functions).Parameters);
         Assert.Equal(ParameterModifier.Ref, parameter.Modifier);
         Assert.Equal("int", parameter.TypeName);
@@ -160,8 +162,8 @@ public class ParserTests
         AssertRetiredMarker($"§M{{Modifiers}}\n  §CL{{Widget:pub}}\n    §{marker}{{Run:pub}} () -> void",
             $"§{marker}");
         var source = marker == "AMT"
-            ? "module Modifiers\n  class Widget\n    func Run async () → System.Threading.Tasks.Task\n      return"
-            : "module Modifiers\n  class Widget\n    func Run () → void\n      return";
+            ? "module Modifiers\n  class Widget\n    func Run async () → System.Threading.Tasks.Task\n      !\n      return"
+            : "module Modifiers\n  class Widget\n    func Run () → void\n      !\n      return";
         foreach (var module in new[] { ParseNative(source), ParseNative(new CalorEmitter().Emit(ParseNative(source))) })
         {
             var method = Assert.Single(Assert.Single(module.Classes).Methods);
@@ -198,9 +200,9 @@ public class ParserTests
             "readonly" => "field int:Value readonly = 1",
             "required" => "property string:Value required\n      get\n      set",
             "vol" => "field int:Value volatile",
-            "stat" => "func Run static () → void",
-            "ov" => "func Run override () → void",
-            _ => $"func Run {canonical} () → void"
+            "stat" => "func Run static () → void\n      !",
+            "ov" => "func Run override () → void\n      !",
+            _ => $"func Run {canonical} () → void\n      !"
         };
         var type = Assert.Single(ParseNative($"module Modifiers\n  class Widget\n    {nativeMember}").Classes);
         var expected = canonical switch
@@ -293,7 +295,7 @@ public class ParserTests
             _ => $"1 {symbol} 2"
         };
         var native = Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(
-            ParseNative($"module Test\n  func Test () → object\n    return {expression}").Functions).Body)).Expression;
+            ParseNative($"module Test\n  func Test () → object\n    !\n    return {expression}").Functions).Body)).Expression;
         if (symbol == "**")
         {
             var call = Assert.IsType<ExpressionCallNode>(native);
@@ -429,6 +431,7 @@ public class ParserTests
         var source = """
             module Test
               func MyFunc public () → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -449,6 +452,7 @@ public class ParserTests
         var source = """
             module Test
               func Add public (int:a, int:b) → int
+                !
                 return a + b
             """;
 
@@ -669,6 +673,7 @@ public class ParserTests
         var source = """
             module Test
               func GetValue public () → int
+                !
                 return 42
             """;
 

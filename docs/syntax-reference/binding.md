@@ -120,6 +120,7 @@ binding with `while` instead of assigning the counted-loop variable.
 ```calor expect=Calor0213
 module ReadOnlyBinding
   func Main () → int
+    !
     let value = 1
     set value 2
     return value
@@ -133,6 +134,7 @@ inferred bare `null`; supply an appropriate nullable type instead.
 ```calor expect=Calor0251
 module InferredNull
   func Main () → void
+    !
     let value = null
 ```
 
@@ -143,6 +145,7 @@ clear.
 ```calor expect=Calor0253
 module MixedNumericInference
   func Main () → void
+    !
     let value = 0 + 0.0
 ```
 
@@ -162,6 +165,7 @@ receiving boundary:
 ```calor expect=Calor0272
 module NullableBinding
   func Main () → void
+    !
     let string?:input = null
     let string:value = input
 ```
@@ -188,6 +192,7 @@ Writing it reports `Calor0213`, even when the mutable branch is selected.
 ```calor expect=Calor0213
 module ConditionalBinding
   func Main () → int
+    !
     pp DEBUG
       let value = 1
     pp else
@@ -237,6 +242,7 @@ hide a field.
 ```calor expect=Calor0255
 module ShadowedBinding
   func Main (int:value) → int
+    !
     if value > 0
       let int:value = 1
     return value

@@ -1,10 +1,13 @@
 module TempConvert TempConvert
   module TempConvertModule
     func CelsiusToFahrenheit public (float:c) → float
+      !
       return c * 1.8 + 32
 
     func FahrenheitToCelsius public (float:f) → float
+      !
       return (f - 32) / 1.8
 
     func CelsiusToKelvin public (float:c) → float
+      !
       return c + 273.15

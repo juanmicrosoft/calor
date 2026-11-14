@@ -33,13 +33,21 @@ public sealed class S2NestedQuantifierTests : IDisposable
         }
     }
 
+    private static string NativeComparisonInput(string comparison) => comparison switch
+    {
+        "(< (- i j) INT:29)" => "i - j < 29",
+        "(!= (- i j) INT:101)" => "i - j != 101",
+        "(<= (- i j) INT:94)" => "i - j <= 94",
+        _ => throw new ArgumentException("No native spelling registered for this comparison input.", nameof(comparison))
+    };
+
     private static string Nested(string comparison) => $$"""
-        §M{R1Case}
-          §F{Probe:pub} (i8:n) -> i32
-            §E{}
-            §Q (&& (> n INT:0) (< n INT:12))
-            §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (forall ((j i32)) (-> (&& (>= j INT:0) (< j n)) {{comparison}}))))
-            §R INT:0
+        module R1Case
+          func Probe public (sbyte:n) → int
+            !
+            requires n > 0 && n < 12
+            => forall int:i in 0..n : (forall int:j in 0..n : {{NativeComparisonInput(comparison)}})
+            return 0
         """;
 
     private (ProofOutcome Outcome, CompilationResult Result) Verify(string source, bool cache = false)
@@ -71,12 +79,12 @@ public sealed class S2NestedQuantifierTests : IDisposable
     public void Control_SingleBoundedForall_StillProven()
     {
         const string source = """
-            §M{M}
-              §F{Probe:pub} (i8:n) -> i32
-                §E{}
-                §Q (&& (> n INT:0) (< n INT:12))
-                §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (< i INT:29)))
-                §R INT:0
+            module M
+              func Probe public (sbyte:n) → int
+                !
+                requires n > 0 && n < 12
+                => forall int:i in 0..n : i < 29
+                return 0
             """;
         Assert.Equal(ProofStatus.Proven, Verify(source).Outcome.Status);
     }
@@ -121,11 +129,10 @@ public sealed class S2NestedQuantifierTests : IDisposable
     public void NestedQuantifierProofObligation_IsUnsupported()
     {
         const string source = """
-            §M{M}
-              §F{Probe:priv} (i32:n) -> i32
-                §E{}
-                §PROOF{claim} (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:3)) (forall ((j i32)) (-> (&& (>= j INT:0) (< j INT:3)) (< (- i j) INT:5)))))
-                §R INT:0
+            module M
+              func Probe private (int:n) → int
+                proof{"claim"} forall int:i in 0..3 : (forall int:j in 0..3 : i - j < 5)
+                return 0
             """;
         var options = new CompilationOptions
         {

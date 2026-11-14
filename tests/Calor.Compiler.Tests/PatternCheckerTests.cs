@@ -14,6 +14,7 @@ public class PatternCheckerTests
         var source = """
             module Test
               func Test public (bool:x) → int
+                !
                 match x
             """ + "\n" + cases;
         var diagnostics = new DiagnosticBag();
@@ -76,6 +77,7 @@ public class PatternCheckerTests
         var source = $$"""
             module RemovedPatterns
               func Probe public (object:value) → int
+                !
                 return match value
                   case {{pattern}} → 1
                   case _ → 0

@@ -27,7 +27,17 @@ public sealed class CanonicalParameterAttributeTests
     [InlineData("class Box\n    op + (Box:left ATTR, Box:right) → Box\n      return left")]
     public void EveryInlineCallablePreservesParameterAttributes(string declaration)
     {
-        var source = "module Attributes\n  " + declaration.Replace(
+        var lines = new List<string>();
+        foreach (var line in declaration.Split('\n'))
+        {
+            lines.Add(line);
+            var header = line.TrimStart();
+            if (header.StartsWith("func ", StringComparison.Ordinal)
+                || header.StartsWith("delegate ", StringComparison.Ordinal))
+                lines.Add(new string(' ', line.Length - header.Length + (lines.Count == 1 ? 4 : 2))
+                    + (header.StartsWith("delegate ", StringComparison.Ordinal) ? "! unknown" : "!"));
+        }
+        var source = "module Attributes\n  " + string.Join("\n", lines).Replace(
             "ATTR", "[@System.ComponentModel.Description(\"native\")]", StringComparison.Ordinal);
         foreach (var input in new[] { source, new CalorEmitter().Emit(Parse(source)) })
         {
@@ -61,6 +71,7 @@ public sealed class CanonicalParameterAttributeTests
             module Attributes
               using System
               func Apply (Func<int>:action [@System.ComponentModel.Description("callback")] ! cw, int:value [@System.ComponentModel.Description("default")] = 2) → int
+                !
                 return value
             """);
         var emitted = new CalorEmitter().Emit(module);
@@ -78,6 +89,7 @@ public sealed class CanonicalParameterAttributeTests
         var source = """
             module Attributes
               func Read (int:@event [@System.ComponentModel.Description("quote \" slash \\ newline \n \${value}")][@System.Runtime.CompilerServices.CallerLineNumber] = 2) → int
+                !
                 return @event
             """;
         foreach (var input in new[] { source, new CalorEmitter().Emit(Parse(source)) })
@@ -100,7 +112,7 @@ public sealed class CanonicalParameterAttributeTests
     [InlineData("\"value\"u8")]
     public void NonconstantAttributeStringArgumentsAreRejectedExplicitly(string argument)
     {
-        var source = $"module Attributes\n  func Read (int:value [@System.ComponentModel.Description({argument})]) → int\n    return value";
+        var source = $"module Attributes\n  func Read (int:value [@System.ComponentModel.Description({argument})]) → int\n    !\n    return value";
         var diagnostics = new DiagnosticBag();
         _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         var error = Assert.Single(diagnostics.Errors);

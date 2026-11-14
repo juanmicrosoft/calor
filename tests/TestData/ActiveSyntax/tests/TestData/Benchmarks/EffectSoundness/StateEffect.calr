@@ -9,4 +9,5 @@ module StateService StateService
       return 0
 
     func ReadCounter public (int:counter) → int
+      !
       return counter

@@ -1,6 +1,7 @@
 module CompoundInterest CompoundInterest
   module CompoundInterestModule
     func SimpleInterest public (float:principal, float:rate, int:years) → float
+      !
       requires principal > 0
       requires rate >= 0
       requires years > 0
@@ -8,6 +9,7 @@ module CompoundInterest CompoundInterest
       return principal * (1 + rate * (double)years)
 
     func YearlyGrowth public (float:amount, float:rate) → float
+      !
       requires amount > 0
       requires rate >= 0
       return amount * (1 + rate)

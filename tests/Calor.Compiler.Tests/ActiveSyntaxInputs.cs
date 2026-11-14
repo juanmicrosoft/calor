@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Text.Json;
+using Calor.Compiler.Ids;
 
 namespace Calor.Compiler.Tests;
 
@@ -78,13 +79,62 @@ internal static class ActiveSyntaxInputs
         return registered;
     });
 
+    private static readonly Lazy<FrozenSet<string>> IdentitySidecars = new(() =>
+    {
+        var root = FindRepoRoot();
+        using var document = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, RelativeRoot, "inputs.json")));
+        var paths = document.RootElement.GetProperty("identitySidecarPaths").EnumerateArray()
+            .Select(entry => entry.GetString()
+                ?? throw new InvalidDataException("Null active identity sidecar path.")).ToArray();
+        var registered = paths.ToFrozenSet(StringComparer.Ordinal);
+        if (registered.Count != paths.Length)
+            throw new InvalidDataException("Duplicate active identity sidecar.");
+        foreach (var path in paths)
+        {
+            ValidateExecutablePath(root, path, ".json");
+            if (!path.EndsWith("/" + DeclarationIdentityStore.RelativePath, StringComparison.Ordinal)
+                || OriginalPaths.Contains(path) || TypedRegistrations.ContainsKey(path)
+                || ExecutableRegistrations.Values.Any(entry =>
+                    entry.OriginalPath == path || entry.TranscriptPath == path))
+                throw new InvalidDataException($"Invalid or overlapping active identity sidecar: {path}.");
+        }
+        return registered;
+    });
+
     internal static IReadOnlySet<string> OriginalPaths => Registry.Value;
+    internal static IReadOnlySet<string> IdentitySidecarPaths => IdentitySidecars.Value;
 
     internal static IReadOnlyDictionary<string, ExecutableRegistration> ExecutableRegistrations
         => Executables.Value;
 
     internal static IReadOnlyDictionary<string, InputKind> TypedRegistrations => TypedRegistry.Value;
     internal static string RepositoryRoot => FindRepoRoot();
+
+    internal static IReadOnlyList<string> EnumerateMirrorPaths(string repoRoot)
+    {
+        var activeRoot = Path.Combine(repoRoot, RelativeRoot);
+        var locks = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var relative in IdentitySidecarPaths)
+        {
+            var sidecar = RequiredMirror(repoRoot, relative);
+            var project = Path.GetDirectoryName(Path.GetDirectoryName(sidecar))!;
+            var journal = Path.Combine(project, ".calor", "ids.transaction.json");
+            if (File.Exists(journal))
+                throw new InvalidDataException($"Active identity fixture has an incomplete transaction: {journal}.");
+            foreach (var input in new DeclarationIdentityStore(project).ReadRegisteredInputs())
+            {
+                var original = Path.GetRelativePath(activeRoot, input).Replace('\\', '/');
+                if (!OriginalPaths.Contains(original) || !File.Exists(input))
+                    throw new InvalidDataException($"Active identity sidecar registers a missing or unregistered input: {input}.");
+            }
+            locks.Add(Path.ChangeExtension(relative, ".lock"));
+        }
+        return Directory.EnumerateFiles(activeRoot, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(activeRoot, path).Replace('\\', '/'))
+            .Where(path => path != "inputs.json" && !locks.Contains(path))
+            .Order(StringComparer.Ordinal).ToArray();
+    }
 
     internal static string ForCurrentTypedInput(string repoRoot, string originalPath, InputKind kind)
     {

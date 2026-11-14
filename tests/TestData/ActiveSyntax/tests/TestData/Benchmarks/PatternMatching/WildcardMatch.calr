@@ -1,6 +1,7 @@
 module WildcardMatch WildcardMatch
   module WildcardMatchModule
     func DefaultValue public (int:typeCode) → int
+      !
       if typeCode == 0
         return 0
       else if typeCode == 1
@@ -9,4 +10,5 @@ module WildcardMatch WildcardMatch
         return 0 - 1
 
     func IsKnown public (int:typeCode) → bool
+      !
       return typeCode >= 0 && typeCode <= 1

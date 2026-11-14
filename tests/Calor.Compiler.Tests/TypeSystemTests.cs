@@ -130,6 +130,7 @@ public class TypeSystemTests
         var source = """
             module Test
               func GetValue public () → int?
+                !
                 return 42
             """;
 
@@ -152,6 +153,7 @@ public class TypeSystemTests
         var source = """
             module Test
               func GetNothing public () → int?
+                !
                 return null
             """;
 
@@ -336,6 +338,7 @@ public class TypeSystemTests
         var source = """
             module Test
               func FindValue public (int:id) → int?
+                !
                 return 42
             """;
 
@@ -355,6 +358,7 @@ public class TypeSystemTests
         var source = """
             module Test
               func FindName public () → string?
+                !
                 return "hello"
             """;
 
@@ -374,6 +378,7 @@ public class TypeSystemTests
         var source = """
             module Test
               func Process public (int?:value) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -414,6 +419,7 @@ public class TypeSystemTests
         var source = """
             module Test
               func GetLong public () → long
+                !
                 return 100
             """;
 
@@ -433,6 +439,7 @@ public class TypeSystemTests
         var source = """
             module Test
               func GetFloat public () → float
+                !
                 return 1.5f
             """;
 

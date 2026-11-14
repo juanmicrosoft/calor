@@ -272,6 +272,7 @@ public sealed class FinalExpressionGrammarTests
         const string source = """
             module Ranges
               func Run () → int
+                !
                 let range = 1..
                 return 42
             """;
@@ -451,7 +452,8 @@ public sealed class FinalExpressionGrammarTests
     {
         const string authored = """
             module NativeAwait
-              func Run async (Func<Task<int>>:next) → Task<int>
+              func Run async (Func<Task<int>>:next ! unknown) → Task<int>
+                !
                 return await next() + await next()
             """;
         var diagnostics = new DiagnosticBag();
@@ -494,7 +496,7 @@ public sealed class FinalExpressionGrammarTests
         Assert.True(reference.IsVerbatim);
         Assert.False(reference.IsNullLiteral);
         Assert.Equal(name[1..], reference.Name);
-        var authored = $"module NativeIdentity\n  func Run (string:{name}) → string\n    return {name}";
+        var authored = $"module NativeIdentity\n  func Run (string:{name}) → string\n    !\n    return {name}";
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(authored, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
@@ -715,7 +717,7 @@ public sealed class FinalExpressionGrammarTests
     [InlineData("((result >= 0))")]
     public void GroupedPostconditions_DoNotCaptureFollowingClauseAsLambda(string condition)
     {
-        var source = $"module P\n  func F (int:x) → int\n    => {condition}\n    => result == x\n    => result <= 100\n    return x";
+        var source = $"module P\n  func F (int:x) → int\n    !\n    => {condition}\n    => result == x\n    => result <= 100\n    return x";
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
@@ -822,7 +824,7 @@ public sealed class FinalExpressionGrammarTests
     [InlineData("forall int:i in 0..n,")]
     public void QuantifierRecovery_DoesNotConsumeTheFollowingReturn(string expression)
     {
-        var source = $"module Q\n  func Run (int:n) → bool\n    requires {expression}\n    return true";
+        var source = $"module Q\n  func Run (int:n) → bool\n    !\n    requires {expression}\n    return true";
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);
@@ -835,16 +837,22 @@ public sealed class FinalExpressionGrammarTests
         const string authored = """
             module NativeQuantifiers
               func All (int:lo, int:hi) → bool
+                !
                 return forall int:i in lo..hi : i != 2
               func Any (int:lo, int:hi) → bool
+                !
                 return exists int:i in lo..hi : i == 2
               func Dependent (int:n) → bool
+                !
                 return forall int:i in 0..n, int:j in i..n : i <= j
               func Array (int[]:xs) → bool
+                !
                 return forall int:i in 0..xs.Length : xs[i] >= 0
               func Lazy (int:lo, int:hi) → bool
+                !
                 return forall int:i in lo..hi : 10 / i > 0
               func Scoped (int:i) → bool
+                !
                 return (exists int:i in 0..3 : i == 2) && i == 42
             """;
         var diagnostics = new DiagnosticBag();
@@ -911,7 +919,7 @@ public sealed class FinalExpressionGrammarTests
     {
         const string authored = """
             module NativeEffectfulLambda
-              func Build (Action<int>:log ! cw) → Action<int>
+              func Build (Action<int>:log ! cw) → Action<int> ! unknown
                 ! cw
                 return (int:x) ! cw =>
                   log(x)
@@ -979,7 +987,8 @@ public sealed class FinalExpressionGrammarTests
     {
         const string authored = """
             module NativeAssignment
-              func Run (Func<Func<int>[]>:factory, Func<int>:index, Func<int>:next) → int
+              func Run (Func<Func<int>[]>:factory ! unknown, Func<int>:index ! unknown, Func<int>:next ! unknown) → int
+                !
                 set factory()[index()] () =>
                   return next()
                 return 0
@@ -1117,6 +1126,7 @@ public sealed class FinalExpressionGrammarTests
         const string source = """
             module NativeLambda
               func Run (int:x) → int
+                !
                 let Func<int,int>:f =
                   (int:y) =>
                     let int:z = y + 1

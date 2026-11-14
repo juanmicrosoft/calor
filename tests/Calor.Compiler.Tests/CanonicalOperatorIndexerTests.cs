@@ -32,13 +32,13 @@ public sealed class CanonicalOperatorIndexerTests
                   System.Console.WriteLine("operator")
                   return 1
             """;
-        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        foreach (var candidate in OperatorCandidates(source, row.Length == 0))
         {
             var compiled = Program.Compile(candidate);
             Assert.Equal(invalid, compiled.HasErrors);
             if (invalid)
                 Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == (row.Length == 0
-                    ? DiagnosticCode.AccessorEffectContractUnavailable : DiagnosticCode.ForbiddenEffect));
+                    ? DiagnosticCode.MissingBoundaryEffectRow : DiagnosticCode.ForbiddenEffect));
             else
             {
                 var module = Parse(candidate);
@@ -72,13 +72,13 @@ public sealed class CanonicalOperatorIndexerTests
                   {{row}}
                   throw new System.InvalidOperationException("original")
             """;
-        foreach (var candidate in new[] { source, new CalorEmitter().Emit(Parse(source)) })
+        foreach (var candidate in OperatorCandidates(source, row.Length == 0))
         {
             var compiled = Program.Compile(candidate);
             Assert.Equal(invalid, compiled.HasErrors);
             if (invalid)
                 Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == (row.Length == 0
-                    ? DiagnosticCode.AccessorEffectContractUnavailable : DiagnosticCode.ForbiddenEffect));
+                    ? DiagnosticCode.MissingBoundaryEffectRow : DiagnosticCode.ForbiddenEffect));
             else
                 Assert.Equal(42, Execute(compiled.GeneratedCode, assembly =>
                 {
@@ -966,14 +966,16 @@ public sealed class CanonicalOperatorIndexerTests
             module MissingOperatorHeader
               class Box
                 op implicit (Box:value) → int
+                  ! cw
                   System.Console.WriteLine("operator")
                   return 1
             """);
+        module.Classes.Single().OperatorOverloads.Single().Effects = null;
         Assert.True(EffectEnforcementPass.SynthesizeDeclaredRows(module));
         Assert.Null(Assert.Single(module.Classes.Single().OperatorOverloads).Effects);
         var diagnostics = new DiagnosticBag();
         new EffectEnforcementPass(diagnostics).Enforce(module);
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AccessorEffectContractUnavailable);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
     }
 
     [Theory]
@@ -1021,8 +1023,10 @@ public sealed class CanonicalOperatorIndexerTests
             ctor (long:cents)
               set Cents cents
             op + (Money:a, Money:b) → Money
+              ! alloc, mut
               return new Money(a.Cents + b.Cents)
             op implicit (long:cents) → Money
+              ! alloc, mut
               return new Money(cents)
         """;
 
@@ -1467,6 +1471,17 @@ public sealed class CanonicalOperatorIndexerTests
         var context = new AssemblyLoadContext("RetainedCapabilities", isCollectible: true);
         try { return observe(context.LoadFromStream(stream)); }
         finally { context.Unload(); }
+    }
+
+    private static string[] OperatorCandidates(string source, bool missingRow)
+    {
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        if (missingRow)
+            Assert.Equal(DiagnosticCode.MissingBoundaryEffectRow, Assert.Single(diagnostics.Errors).Code);
+        else
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return [source, new CalorEmitter().Emit(module)];
     }
 
     private static ModuleNode Parse(string source)

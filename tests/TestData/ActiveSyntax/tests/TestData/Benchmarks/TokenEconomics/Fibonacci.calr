@@ -1,6 +1,7 @@
 module Fibonacci Fibonacci
   module FibonacciModule
     func Calculate public (int:n) → int
+      !
       if n <= 1
         return n
       else

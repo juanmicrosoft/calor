@@ -402,7 +402,7 @@
         "!"
       ],
       "calorSyntax": "! effect1,effect2,...",
-      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Empty ! is a declared pure row. Private and internal callables without a declaration use their inferred body rows; public callers must still cover those effects. A body row does not certify open virtual dispatch. An omitted callback parameter, returned-callback or delegate contract is Unknown, as is explicit ! unknown in those positions. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. Transporting Unknown can report Calor0425 when a row fit cannot be proved; permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with <! e> and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
+      "description": "Declares authoritative effects in the function header-clause region before the first body statement. Public/protected and declaration-only boundaries require an explicit own row; empty ! declares Pure. Private/internal bodies infer their rows and reject own annotations. Public callers must still cover every reachable effect. A body row does not certify open virtual dispatch. Callback parameter, returned-callback and delegate contracts require explicit rows, including ! unknown when no invocation contract is known. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. An unused declared Unknown callback is allowed; transporting it can report Calor0425 when a row fit cannot be proved. Permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with <! e> and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.",
       "programs": [
         "primer_effects"
       ],
@@ -970,7 +970,7 @@
         "op"
       ],
       "calorSyntax": "op + (type:left, type:right) → resultType; op implicit (type:value) → resultType",
-      "description": "Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. An optional standalone ! effect row precedes contracts and body statements, as for functions. An explicit row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. Without a row, only intrinsic mutation and allocation are allowed; I/O, throwing and unknown calls remain rejected. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.",
+      "description": "Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. Public operators require a standalone ! effect row before contracts and body statements; an empty ! declares Pure. The row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. A missing row is a parse error, even when optional effect checking is disabled. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.",
       "programs": [
         "complex_class"
       ],
@@ -2029,12 +2029,12 @@
     {
       "id": "task_3",
       "title": "SquareRoot",
-      "calor": "module AgentReference3\n  func SquareRoot (int:x) → int\n    requires (x >= 0)\n    return x"
+      "calor": "module AgentReference3\n  func SquareRoot (int:x) → int\n    !\n    requires (x >= 0)\n    return x"
     },
     {
       "id": "task_4",
       "title": "Abs",
-      "calor": "module AgentReference4\n  func Abs (int:x) → int\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
+      "calor": "module AgentReference4\n  func Abs (int:x) → int\n    !\n    => (result >= 0)\n    return ((x < 0) ? (0 - x) : x)"
     },
     {
       "id": "task_5",
@@ -2059,17 +2059,17 @@
     {
       "id": "task_9",
       "title": "Classify",
-      "calor": "module AgentReference9\n  func Classify (int:n) → string\n    if (n < 0)\n      return \"negative\"\n    else if (n == 0)\n      return \"zero\"\n    else\n      return \"positive\""
+      "calor": "module AgentReference9\n  func Classify (int:n) → string\n    !\n    if (n < 0)\n      return \"negative\"\n    else if (n == 0)\n      return \"zero\"\n    else\n      return \"positive\""
     },
     {
       "id": "task_10",
       "title": "Max",
-      "calor": "module AgentReference10\n  func Max (int:a, int:b) → int\n    if (a >= b)\n      return a\n    else\n      return b"
+      "calor": "module AgentReference10\n  func Max (int:a, int:b) → int\n    !\n    if (a >= b)\n      return a\n    else\n      return b"
     },
     {
       "id": "task_11",
       "title": "GetGrade",
-      "calor": "module AgentReference11\n  func GetGrade (int:score) → string\n    var string:grade = \"F\"\n    if (score >= 90)\n      set grade \"A\"\n    else if (score >= 80)\n      set grade \"B\"\n    else if (score >= 70)\n      set grade \"C\"\n    else\n      set grade \"F\"\n    return grade"
+      "calor": "module AgentReference11\n  func GetGrade (int:score) → string\n    !\n    var string:grade = \"F\"\n    if (score >= 90)\n      set grade \"A\"\n    else if (score >= 80)\n      set grade \"B\"\n    else if (score >= 70)\n      set grade \"C\"\n    else\n      set grade \"F\"\n    return grade"
     },
     {
       "id": "task_12",
@@ -2099,32 +2099,32 @@
     {
       "id": "task_17",
       "title": "GetDataAsync",
-      "calor": "module AgentReference17\n  func GetDataAsync async () → Task<int>\n    return 42"
+      "calor": "module AgentReference17\n  func GetDataAsync async () → Task<int>\n    !\n    return 42"
     },
     {
       "id": "task_18",
       "title": "GetStatus",
-      "calor": "module AgentReference18\n  func GetStatus (int:code) → string\n    return match code\n      case 200 → \"OK\"\n      case 404 → \"Not Found\"\n      case 500 → \"Server Error\"\n      case _ → \"Unknown\""
+      "calor": "module AgentReference18\n  func GetStatus (int:code) → string\n    !\n    return match code\n      case 200 → \"OK\"\n      case 404 → \"Not Found\"\n      case 500 → \"Server Error\"\n      case _ → \"Unknown\""
     },
     {
       "id": "task_19",
       "title": "DayName",
-      "calor": "module AgentReference19\n  func DayName (int:day) → int\n    return match day\n      case 1 → 100\n      case 2 → 100\n      case 3 → 100\n      case 4 → 100\n      case 5 → 100\n      case 6 → 200\n      case 7 → 200\n      case _ → 0"
+      "calor": "module AgentReference19\n  func DayName (int:day) → int\n    !\n    return match day\n      case 1 → 100\n      case 2 → 100\n      case 3 → 100\n      case 4 → 100\n      case 5 → 100\n      case 6 → 200\n      case 7 → 200\n      case _ → 0"
     },
     {
       "id": "task_20",
       "title": "GetGrade",
-      "calor": "module AgentReference20\n  func GetGrade (int:score) → string\n    return match score\n      case >= 90 → \"A\"\n      case >= 80 → \"B\"\n      case >= 70 → \"C\"\n      case _ → \"F\""
+      "calor": "module AgentReference20\n  func GetGrade (int:score) → string\n    !\n    return match score\n      case >= 90 → \"A\"\n      case >= 80 → \"B\"\n      case >= 70 → \"C\"\n      case _ → \"F\""
     },
     {
       "id": "task_21",
       "title": "Describe",
-      "calor": "module AgentReference21\n  func Describe (int:x) → string\n    return match x\n      case var n when (n > 100) → \"large\"\n      case var n when (n < 0) → \"negative\"\n      case 0 → \"zero\"\n      case _ → \"normal\""
+      "calor": "module AgentReference21\n  func Describe (int:x) → string\n    !\n    return match x\n      case var n when (n > 100) → \"large\"\n      case var n when (n < 0) → \"negative\"\n      case 0 → \"zero\"\n      case _ → \"normal\""
     },
     {
       "id": "task_22",
       "title": "IsSingleDigit",
-      "calor": "module AgentReference22\n  func IsSingleDigit (int:n) → bool\n    return match n\n      case 0 → true\n      case 1 → true\n      case 2 → true\n      case 3 → true\n      case 4 → true\n      case 5 → true\n      case 6 → true\n      case 7 → true\n      case 8 → true\n      case 9 → true\n      case _ → false"
+      "calor": "module AgentReference22\n  func IsSingleDigit (int:n) → bool\n    !\n    return match n\n      case 0 → true\n      case 1 → true\n      case 2 → true\n      case 3 → true\n      case 4 → true\n      case 5 → true\n      case 6 → true\n      case 7 → true\n      case 8 → true\n      case 9 → true\n      case _ → false"
     },
     {
       "id": "task_23",
@@ -2134,32 +2134,32 @@
     {
       "id": "task_24",
       "title": "ApplyDouble",
-      "calor": "module AgentReference24\n  func ApplyDouble (int:x) → int\n    let Func<int,int>:doubler = (int:n) => (n * 2)\n    return doubler(x)"
+      "calor": "module AgentReference24\n  func ApplyDouble (int:x) → int\n    !\n    let Func<int,int>:doubler = (int:n) => (n * 2)\n    return doubler(x)"
     },
     {
       "id": "task_25",
       "title": "ApplyComplex",
-      "calor": "module AgentReference25\n  func ApplyComplex (int:x) → int\n    let Func<int,int>:process = (int:n) =>\n      return n > 0 ? n * 2 : 0\n    return process(x)"
+      "calor": "module AgentReference25\n  func ApplyComplex (int:x) → int\n    !\n    let Func<int,int>:process = (int:n) =>\n      return n > 0 ? n * 2 : 0\n    return process(x)"
     },
     {
       "id": "task_26",
       "title": "MathOperation",
-      "calor": "module AgentReference26\n  delegate MathOperation (int:x, int:y) → int"
+      "calor": "module AgentReference26\n  delegate MathOperation (int:x, int:y) → int\n    ! unknown"
     },
     {
       "id": "task_27",
       "title": "Accumulate",
-      "calor": "module AgentReference27\n  func Accumulate (int:n) → int\n    var int:acc = 0          // Bind mutable variable acc = 0\n    set acc (acc + n)   // Assign acc = acc + n\n    set acc (acc + n)   // Assign again\n    set acc (acc + n)   // And again\n    return acc"
+      "calor": "module AgentReference27\n  func Accumulate (int:n) → int\n    !\n    var int:acc = 0          // Bind mutable variable acc = 0\n    set acc (acc + n)   // Assign acc = acc + n\n    set acc (acc + n)   // Assign again\n    set acc (acc + n)   // And again\n    return acc"
     },
     {
       "id": "task_28",
       "title": "Calculator",
-      "calor": "module AgentReference28\n  class Calculator\n    func Add (int:a, int:b) → int\n      return (a + b)"
+      "calor": "module AgentReference28\n  class Calculator\n    func Add (int:a, int:b) → int\n      !\n      return (a + b)"
     },
     {
       "id": "task_29",
       "title": "Container",
-      "calor": "module AgentReference29\n  class Container<T>\n    field T:_value private\n    func Get () → T\n      return _value\n    func HashSet (T:value) → void\n      ! mut\n      set _value value"
+      "calor": "module AgentReference29\n  class Container<T>\n    field T:_value private\n    func Get () → T\n      !\n      return _value\n    func HashSet (T:value) → void\n      ! mut\n      set _value value"
     },
     {
       "id": "task_30",
@@ -2179,12 +2179,12 @@
     {
       "id": "task_33",
       "title": "Person",
-      "calor": "module AgentReference33\n  class Person\n    field string:_name private\n    field int:_age private\n    ctor (string:name, int:age)\n      set _name name\n      set _age age\n    func GetName () → string\n      return _name"
+      "calor": "module AgentReference33\n  class Person\n    field string:_name private\n    field int:_age private\n    ctor (string:name, int:age)\n      set _name name\n      set _age age\n    func GetName () → string\n      !\n      return _name"
     },
     {
       "id": "task_34",
       "title": "AbsoluteValue",
-      "calor": "module AgentReference34\n  func AbsoluteValue (int:x) → int\n    => (result >= 0)\n    => (!((x >= 0)) || (result == x))\n    => (!((x < 0)) || (result == (0 - x)))\n    return ((x < 0) ? (0 - x) : x)"
+      "calor": "module AgentReference34\n  func AbsoluteValue (int:x) → int\n    !\n    => (result >= 0)\n    => (!((x >= 0)) || (result == x))\n    => (!((x < 0)) || (result == (0 - x)))\n    return ((x < 0) ? (0 - x) : x)"
     },
     {
       "id": "task_35",
@@ -2209,12 +2209,12 @@
     {
       "id": "task_39",
       "title": "AllPositive",
-      "calor": "module AgentReference39\n  func AllPositive (int[]:arr, int:n) → bool\n    requires n == arr.Length\n    => !result || !(exists int:i in 0..n : arr[i] <= 0)\n    var bool:allPos = true\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] <= 0\n        set allPos false\n    return allPos"
+      "calor": "module AgentReference39\n  func AllPositive (int[]:arr, int:n) → bool\n    !\n    requires n == arr.Length\n    => !result || !(exists int:i in 0..n : arr[i] <= 0)\n    var bool:allPos = true\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] <= 0\n        set allPos false\n    return allPos"
     },
     {
       "id": "task_40",
       "title": "HasNegative",
-      "calor": "module AgentReference40\n  func HasNegative (int[]:arr, int:n) → bool\n    requires n == arr.Length\n    => result == (exists int:i in 0..n : arr[i] < 0)\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] < 0\n        return true\n    return false"
+      "calor": "module AgentReference40\n  func HasNegative (int[]:arr, int:n) → bool\n    !\n    requires n == arr.Length\n    => result == (exists int:i in 0..n : arr[i] < 0)\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] < 0\n        return true\n    return false"
     },
     {
       "id": "task_41",
@@ -2229,12 +2229,12 @@
     {
       "id": "primer_contracts",
       "title": "Contracts",
-      "calor": "module Contracts\n  func Square (int:x) → int\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    requires b != 0\n    return a / b"
+      "calor": "module Contracts\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    !\n    requires b != 0\n    return a / b"
     },
     {
       "id": "primer_branching",
       "title": "Branching",
-      "calor": "module Branching\n  func Sign (int:x) → int\n    if (x > 0)\n      return 1\n    else if (x < 0)\n      return (-1)\n    else\n      return 0"
+      "calor": "module Branching\n  func Sign (int:x) → int\n    !\n    if (x > 0)\n      return 1\n    else if (x < 0)\n      return (-1)\n    else\n      return 0"
     },
     {
       "id": "primer_files",
@@ -2269,7 +2269,7 @@
     {
       "id": "primer_classes",
       "title": "Classes",
-      "calor": "module Classes\n  class Greeter\n    func Greet () → string\n      return \"hello\""
+      "calor": "module Classes\n  class Greeter\n    func Greet () → string\n      !\n      return \"hello\""
     },
     {
       "id": "nested_arrays",
@@ -2279,27 +2279,27 @@
     {
       "id": "complex_class",
       "title": "Class with Fields, Constructor + Operators",
-      "calor": "module PointModule\n  class Point\n    field int:_x private\n    field int:_y private\n\n    ctor (int:x, int:y)\n      set this._x x\n      set this._y y\n\n    func Equals (Point:other) → bool\n      if (other == null)\n        return false\n      else\n        return true\n\n    op == (Point:left, Point:right) → bool\n      if (left == null)\n        return (right == null)\n      else\n        return left.Equals(right)\n\n    op != (Point:left, Point:right) → bool\n      return (!(left == right))"
+      "calor": "module PointModule\n  class Point\n    field int:_x private\n    field int:_y private\n\n    ctor (int:x, int:y)\n      set this._x x\n      set this._y y\n\n    func Equals (Point:other) → bool\n      !\n      if (other == null)\n        return false\n      else\n        return true\n\n    op == (Point:left, Point:right) → bool\n      !\n      if (left == null)\n        return (right == null)\n      else\n        return left.Equals(right)\n\n    op != (Point:left, Point:right) → bool\n      !\n      return (!(left == right))"
     },
     {
       "id": "complex_async",
       "title": "Async Method with Try/Catch",
-      "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
+      "calor": "module ConvertedModule\n  using System\n  using System.Threading.Tasks\n  class DataService\n    func FetchAsync async (string:url) → string\n      !\n      try\n        await Task.Delay(100)\n        return \"data from \" + url\n      catch Exception:ex\n        return \"error: \" + ex.Message"
     },
     {
       "id": "complex_enum",
       "title": "Enum with Switch/Match",
-      "calor": "module ConvertedModule\n  enum Status\n    Pending\n    Active\n    Suspended\n    Closed\n\n  class StatusHelper\n    func GetLabel static (Status:s) → string\n      return match s\n        case Status.Pending → \"Pending Review\"\n        case Status.Active → \"Active\"\n        case Status.Suspended → \"Temporarily Suspended\"\n        case Status.Closed → \"Closed\"\n        case _ → \"Unknown\""
+      "calor": "module ConvertedModule\n  enum Status\n    Pending\n    Active\n    Suspended\n    Closed\n\n  class StatusHelper\n    func GetLabel static (Status:s) → string\n      !\n      return match s\n        case Status.Pending → \"Pending Review\"\n        case Status.Active → \"Active\"\n        case Status.Suspended → \"Temporarily Suspended\"\n        case Status.Closed → \"Closed\"\n        case _ → \"Unknown\""
     },
     {
       "id": "complex_yield",
       "title": "Yield Iterator",
-      "calor": "module ConvertedModule\n  using System.Collections.Generic\n\n  class NumberGen\n    func GetEvens (int:max) → IEnumerable<int>\n      for i from 0 to max step 2\n        yield i"
+      "calor": "module ConvertedModule\n  using System.Collections.Generic\n\n  class NumberGen\n    func GetEvens (int:max) → IEnumerable<int>\n      !\n      for i from 0 to max step 2\n        yield i"
     },
     {
       "id": "complete_objects",
       "title": "objects",
-      "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    return person?.Name"
+      "calor": "module Objects\n  class Person\n    property string:Name\n      get\n      set\n  func Create () → Person\n    ! alloc\n    return new Person()\n  func ReadName (Person:person) → string?\n    !\n    return person?.Name"
     },
     {
       "id": "complete_indexer",
@@ -2309,12 +2309,12 @@
     {
       "id": "complete_invariant",
       "title": "invariant",
-      "calor": "module Invariants\n  invariant (1 > 0)\n  func Read () → int\n    return 1"
+      "calor": "module Invariants\n  invariant (1 > 0)\n  func Read () → int\n    !\n    return 1"
     },
     {
       "id": "complete_interface",
       "title": "interface",
-      "calor": "module Interfaces\n  interface ICounter\n    func Count () → int\n  class Counter\n    implements ICounter\n    func Count () → int\n      return 1"
+      "calor": "module Interfaces\n  interface ICounter\n    func Count () → int\n      !\n  class Counter\n    implements ICounter\n    func Count () → int\n      !\n      return 1"
     },
     {
       "id": "complete_using",
@@ -2329,7 +2329,7 @@
     {
       "id": "complete_interpolation",
       "title": "interpolation",
-      "calor": "module Interpolation\n  func Greet (string:name) → string\n    return \"Hello ${name}\""
+      "calor": "module Interpolation\n  func Greet (string:name) → string\n    !\n    return \"Hello ${name}\""
     },
     {
       "id": "complete_break_continue",
@@ -2339,27 +2339,27 @@
     {
       "id": "complete_inheritance",
       "title": "inheritance",
-      "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n    func Label virtual () → string\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      return 7\n    func Label override () → string\n      return \"derived\""
+      "calor": "module Inheritance\n  class Base abstract\n    func Read abstract () → int\n      !\n    func Label virtual () → string\n      !\n      return \"base\"\n  class Derived sealed\n    extends Base\n    func Read override () → int\n      !\n      return 7\n    func Label override () → string\n      !\n      return \"derived\""
     },
     {
       "id": "complete_sync",
       "title": "sync",
-      "calor": "module Synchronization\n  func Read (object:gate) → int\n    lock (gate)\n      return 7"
+      "calor": "module Synchronization\n  func Read (object:gate) → int\n    !\n    lock (gate)\n      return 7"
     },
     {
       "id": "complete_documentation",
       "title": "documentation",
-      "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
+      "calor": "module Documentation\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  /// deprecated 1.0.0 ReadCurrent\n  func Read () → int\n    !\n    return 7\n  /// since 1.0.0\n  /// breaking 2.0.0 \"Returns the current value instead of the cached value.\"\n  func ReadCurrent private () → int\n    return 8"
     },
     {
       "id": "complete_decimal",
       "title": "decimal",
-      "calor": "module Decimals\n  func Price () → decimal\n    return 18.00m"
+      "calor": "module Decimals\n  func Price () → decimal\n    !\n    return 18.00m"
     },
     {
       "id": "complete_preprocessor",
       "title": "preprocessor",
-      "calor": "module Preprocessor\n  func Mode () → string\n    pp DEBUG\n      return \"debug\"\n    pp else\n      return \"release\""
+      "calor": "module Preprocessor\n  func Mode () → string\n    !\n    pp DEBUG\n      return \"debug\"\n    pp else\n      return \"release\""
     },
     {
       "id": "complete_struct",
@@ -2369,7 +2369,7 @@
     {
       "id": "complete_partial",
       "title": "partial",
-      "calor": "module PartialTypes\n  class Counter partial\n    func Read () → int\n      return 1"
+      "calor": "module PartialTypes\n  class Counter partial\n    func Read () → int\n      !\n      return 1"
     },
     {
       "id": "complete_unsafe",
@@ -2379,27 +2379,27 @@
     {
       "id": "complete_nullable",
       "title": "nullable",
-      "calor": "module NullableValues\n  func DefaultName (string?:name) → string\n    var string?:value = name\n    if (value == null)\n      set value \"unknown\"\n    return (value ?? \"unknown\")"
+      "calor": "module NullableValues\n  func DefaultName (string?:name) → string\n    !\n    var string?:value = name\n    if (value == null)\n      set value \"unknown\"\n    return (value ?? \"unknown\")"
     },
     {
       "id": "complete_patterns",
       "title": "patterns",
-      "calor": "module Patterns\n  func InRange (int:value) → bool\n    return ((value > 0) && (value < 100))"
+      "calor": "module Patterns\n  func InRange (int:value) → bool\n    !\n    return ((value > 0) && (value < 100))"
     },
     {
       "id": "complete_tuples",
       "title": "tuples",
-      "calor": "module Tuples\n  func Pair (int:value) → (int, string)\n    return (value, \"value\")"
+      "calor": "module Tuples\n  func Pair (int:value) → (int, string)\n    !\n    return (value, \"value\")"
     },
     {
       "id": "complete_goto",
       "title": "goto",
-      "calor": "module Jumps\n  func Normalize (int:value) → int\n    match value\n      case 0\n        goto case 1\n      case 1\n        return 1\n      case _\n        return 0"
+      "calor": "module Jumps\n  func Normalize (int:value) → int\n    !\n    match value\n      case 0\n        goto case 1\n      case 1\n        return 1\n      case _\n        return 0"
     },
     {
       "id": "complete_ranges",
       "title": "array ranges",
-      "calor": "module ArrayRanges\n  func FirstTwo (int[]:values) → int[]\n    return values[0..2]"
+      "calor": "module ArrayRanges\n  func FirstTwo (int[]:values) → int[]\n    !\n    return values[0..2]"
     },
     {
       "id": "complete_postfix",
@@ -2414,17 +2414,17 @@
     {
       "id": "complete_static_class",
       "title": "Named static module with implicit static function",
-      "calor": "module StaticTypes\n  module Counter\n    func Read () → int\n      return 7\n  func Run () → int\n    return Counter.Read()"
+      "calor": "module StaticTypes\n  module Counter\n    func Read () → int\n      !\n      return 7\n  func Run () → int\n    !\n    return Counter.Read()"
     },
     {
       "id": "complete_namespace",
       "title": "Explicit file-scoped namespace, independent of the file label",
-      "calor": "module NamespaceFile Contoso.Tools\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+      "calor": "module NamespaceFile Contoso.Tools\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      !\n      return 7"
     },
     {
       "id": "complete_block_namespace",
       "title": "Explicit block namespace with the same CLR type identity",
-      "calor": "module BlockFile Contoso.Tools block\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      return 7"
+      "calor": "module BlockFile Contoso.Tools block\n  using Text = System.Text\n  class Box\n    field Text.StringBuilder?:Builder\n    func Read () → int\n      !\n      return 7"
     },
     {
       "id": "complete_enum_extensions",

@@ -87,14 +87,13 @@ public class IntegrationTests
         // (The unbounded form is genuinely refutable — x*x wraps negative —
         // and lives in the outcome corpus as refuted-overflow.calr.)
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §Q (<= x 46340)
-      §S (>= result 0)
-      §R (* x x)";
+module Test
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    requires x <= 46340
+    => result >= 0
+    return x * x";
 
         var options = new CompilationOptions
         {
@@ -225,11 +224,11 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         const string source = @"
-§M{Test}
-  §F{ByteLen:pub} () -> i32
-    §E{}
-    §S (== result INT:1)
-    §R (len STR:""\u00e9"")";
+module Test
+  func ByteLen public () → int
+    !
+    => result == 1
+    return ""\u00e9"".Length";
 
         var result = Program.Compile(source, "test.calr", NoCache());
 
@@ -245,11 +244,11 @@ public class IntegrationTests
         // Control: the same shape with no string in the body at all is still genuinely proved and
         // elided, so this pins the trigger rather than a verifier that stopped proving.
         var numeric = Program.Compile(@"
-§M{Test}
-  §F{Two:pub} () -> i32
-    §E{}
-    §S (== result INT:2)
-    §R INT:2", "test.calr", NoCache());
+module Test
+  func Two public () → int
+    !
+    => result == 2
+    return 2", "test.calr", NoCache());
 
         Assert.False(numeric.HasErrors);
         Assert.Contains("// PROVEN: Postcondition", numeric.GeneratedCode);
@@ -272,12 +271,11 @@ public class IntegrationTests
         // "Proven" is a satisfiability result (∃), not validity (∀) — a caller
         // can still violate it, so the emitted C# must always carry the guard.
         var source = @"
-§M{Test}
-  §F{Half:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (> x 0)
-      §R (/ x 2)";
+module Test
+  func Half public (int:x) → int
+    !
+    requires x > 0
+    return x / 2";
 
         var options = new CompilationOptions
         {
@@ -300,14 +298,13 @@ public class IntegrationTests
         // D-G1.3 elision-soundness pin: Proven(vacuous) — unsatisfiable §Q set —
         // must not elide the postcondition check and must warn loudly.
         var source = @"
-§M{Test}
-  §F{Impossible:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (> x 10)
-      §Q (< x 5)
-      §S (== result x)
-      §R x";
+module Test
+  func Impossible public (int:x) → int
+    !
+    requires x > 10
+    requires x < 5
+    => result == x
+    return x";
 
         var options = new CompilationOptions
         {
@@ -329,12 +326,11 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{Test}
-  §F{Bad:pub}
-      §I{i32:x}
-      §O{i32}
-      §S (> result x)
-      §R x";
+module Test
+  func Bad public (int:x) → int
+    !
+    => result > x
+    return x";
 
         var options = new CompilationOptions
         {
@@ -356,13 +352,12 @@ public class IntegrationTests
     public void WithoutVerifyFlag_BehaviorIdentical()
     {
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §S (>= result 0)
-      §R (* x x)";
+module Test
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x";
 
         var withoutVerify = Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -383,13 +378,12 @@ public class IntegrationTests
         // If Z3 is unavailable, it should still compile successfully
 
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §S (>= result 0)
-      §R (* x x)";
+module Test
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x";
 
         var options = new CompilationOptions
         {
@@ -415,12 +409,10 @@ public class IntegrationTests
     {
         // Basic contract compilation without --verify should work as before
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)";
+module Test
+  func Add public (int:a, int:b) → int
+    !
+    return a + b";
 
         var result = Program.Compile(source, "test.calr");
 
@@ -432,13 +424,12 @@ public class IntegrationTests
     public void ContractModeOff_NoChecks()
     {
         var source = @"
-§M{Test}
-  §F{Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §S (>= result 0)
-      §R (* x x)";
+module Test
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x";
 
         var options = new CompilationOptions
         {
@@ -466,14 +457,13 @@ public class IntegrationTests
 
         // LONG:/UINT: literals appear in the pre/postconditions and the body.
         var source = @"
-§M{Test}
-  §F{Clamp:pub}
-      §I{i64:x}
-      §O{i64}
-      §Q (>= x LONG:0)
-      §Q (<= x LONG:1000000000000)
-      §S (>= result LONG:0)
-      §R x";
+module Test
+  func Clamp public (long:x) → long
+    !
+    requires x >= 0L
+    requires x <= 1000000000000L
+    => result >= 0L
+    return x";
 
         var options = new CompilationOptions { VerifyContracts = true, ElideProvenGuards = true };
         var result = Program.Compile(source, "test.calr", options);
@@ -488,13 +478,13 @@ public class IntegrationTests
     {
         // End-to-end Calor-source → C#: the typed literals emit the right suffix.
         var source = @"
-§M{Test}
-  §F{Widths:pub}
-      §O{i64}
-      §B{a:i64} LONG:5
-      §B{b:u32} UINT:7
-      §B{c:f32} SINGLE:3.14
-      §R a";
+module Test
+  func Widths public () → long
+    !
+    let long:a = 5L
+    let uint:b = 7U
+    let float:c = 3.14f
+    return a";
 
         var result = Program.Compile(source, "test.calr");
 

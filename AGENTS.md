@@ -287,6 +287,10 @@ invariant expression                  Invariant
 The file label is not a CLR namespace or static container. Omit the namespace for
 the global namespace; use a nested `module Name` for a named static container.
 Effect rows and contract headers precede the first body statement.
+Public/protected callable boundaries require an own row (`!` for Pure).
+Private/internal bodies infer theirs and reject own annotations. Callback
+parameter and return types retain explicit rows; `! unknown` is not permission
+to invoke them.
 
 Example (complete fenced `calor` programs starting with `module` are parse-checked
 by `calor self-check docs`):

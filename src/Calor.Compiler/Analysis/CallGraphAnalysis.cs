@@ -96,6 +96,7 @@ public sealed class CallGraphAnalysis
         internal HashSet<TextSpan> ForeignSourceCallSites { get; } = [];
         internal HashSet<TextSpan> AmbiguousCalls { get; } = [];
         internal Dictionary<ParameterNode, ITypeSymbol> ParameterTypes { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<OutputNode, ITypeSymbol> OutputTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<EventDefinitionNode, INamedTypeSymbol> EventTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<AstNode, EventStorageSelection> EventStorageUses { get; } = new(ReferenceEqualityComparer.Instance);
         internal Dictionary<LambdaExpressionNode, INamedTypeSymbol> LambdaTargets { get; } = new(ReferenceEqualityComparer.Instance);
@@ -119,10 +120,13 @@ public sealed class CallGraphAnalysis
         internal Dictionary<ReferenceNode, ClassDefinitionNode?> StaticFieldInitializations { get; } = new(ReferenceEqualityComparer.Instance);
         internal HashSet<ConstructorNode> RecordCopyConstructors { get; } = new(ReferenceEqualityComparer.Instance);
         internal List<Diagnostics.Diagnostic> SourceConstructionErrors { get; } = [];
+        internal List<Diagnostics.Diagnostic> RuntimeQuantifierRejections { get; } = [];
     }
 
     private OperatorBindings _operatorBindings = new();
     internal IReadOnlyList<string> OperatorBindingFailures => _operatorBindings.Failures;
+    internal IReadOnlyList<Diagnostics.Diagnostic> RuntimeQuantifierRejections =>
+        _operatorBindings.RuntimeQuantifierRejections;
     internal IReadOnlyCollection<string> OperatorCalls(AstNode expression) =>
         _operatorBindings.SourceCalls.TryGetValue(expression, out var calls) ? calls : Array.Empty<string>();
     internal IReadOnlyCollection<EffectResolverKey> ExternalOperatorCalls(AstNode node) =>
@@ -303,6 +307,7 @@ public sealed class CallGraphAnalysis
             .ToHashSet(ReferenceEqualityComparer.Instance);
         var conflictingTypes = new HashSet<ExpressionNode>(ReferenceEqualityComparer.Instance);
         var conflictingParameters = new HashSet<ParameterNode>(ReferenceEqualityComparer.Instance);
+        var conflictingOutputs = new HashSet<OutputNode>(ReferenceEqualityComparer.Instance);
         var conflictingEvents = new HashSet<EventDefinitionNode>(ReferenceEqualityComparer.Instance);
         var conflictingEventUses = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
         var conflictingLambdas = new HashSet<LambdaExpressionNode>(ReferenceEqualityComparer.Instance);
@@ -367,7 +372,8 @@ public sealed class CallGraphAnalysis
         var additions = visited.Where(IsAddition).ToArray();
         if (!bindExpressions && !bindNullableUnwrapping && !bindNullGuards && !bindMemberTypes && !bindInitialization
             && !bindInterpolation && additions.Length == 0
-            && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any())
+            && initializerCreations.Count == 0 && !visited.OfType<ParameterNode>().Any()
+            && !visited.OfType<OutputNode>().Any())
             return bindings;
 
         void RegisterArgument(AstNode argument, (TextSpan Call, int Index) owner)
@@ -434,6 +440,9 @@ public sealed class CallGraphAnalysis
             diagnostics?.Add(diagnostic);
         if (emissionDiagnostics.HasErrors)
         {
+            if (emissionDiagnostics.Errors.All(diagnostic =>
+                diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported))
+                bindings.RuntimeQuantifierRejections.AddRange(emissionDiagnostics.Errors);
             bindingFailures.AddRange(emissionDiagnostics.Errors.Select(diagnostic =>
                 $"{diagnostic.Code}: {diagnostic.Message}"));
             return bindings;
@@ -524,15 +533,21 @@ public sealed class CallGraphAnalysis
                 }
             }
             foreach (var declaration in root.DescendantNodes().Where(node =>
-                         node is BaseMethodDeclarationSyntax or LocalFunctionStatementSyntax))
+                         node is BaseMethodDeclarationSyntax or LocalFunctionStatementSyntax or DelegateDeclarationSyntax))
             {
                 foreach (var trivia in declaration.GetLeadingTrivia())
                 {
                     if (TryReadMarker(trivia, callablePrefix, out var index)
-                        && model.GetDeclaredSymbol(declaration) is IMethodSymbol method)
+                        && (model.GetDeclaredSymbol(declaration) switch
+                        {
+                            IMethodSymbol declared => declared,
+                            INamedTypeSymbol { DelegateInvokeMethod: { } invoke } => invoke,
+                            _ => null
+                        }) is { } method)
                     {
                         var origin = emittedCallables[index];
-                        methods[method] = origin;
+                        if (origin is not DelegateDefinitionNode)
+                            methods[method] = origin;
                         if (initializationIds.TryGetValue(origin, out var functionId))
                         {
                             bindings.InitializationFunctions[method.OriginalDefinition] = functionId;
@@ -575,10 +590,32 @@ public sealed class CallGraphAnalysis
                         {
                             FunctionNode function => function.Parameters,
                             MethodNode member => member.Parameters,
+                            MethodSignatureNode signature => signature.Parameters,
+                            DelegateDefinitionNode definition => definition.Parameters,
                             ConstructorNode constructor => constructor.Parameters,
                             OperatorOverloadNode op => op.Parameters,
                             _ => []
                         };
+                        var output = origin switch
+                        {
+                            FunctionNode function => function.Output,
+                            MethodNode member => member.Output,
+                            MethodSignatureNode signature => signature.Output,
+                            DelegateDefinitionNode definition => definition.Output,
+                            OperatorOverloadNode op => op.Output,
+                            _ => null
+                        };
+                        if (output != null)
+                        {
+                            if (bindings.OutputTypes.TryGetValue(output, out var previous)
+                                && !SameType(previous, method.ReturnType))
+                            {
+                                conflictingOutputs.Add(output);
+                                bindings.OutputTypes.Remove(output);
+                            }
+                            else if (!conflictingOutputs.Contains(output))
+                                bindings.OutputTypes[output] = method.ReturnType;
+                        }
                         if (parameters.Count != method.Parameters.Length)
                             continue;
                         for (var i = 0; i < parameters.Count; i++)

@@ -29,6 +29,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     private const string Original = """
         module Demo
           func Add (int:x) → int
+            !
             return x
         """;
 
@@ -252,7 +253,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void TextClassRenamePreservesSelfTypedMemberIdentity()
     {
-        var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      return value\n";
+        var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      !\n      return value\n";
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
         var after = source.Replace("class A", "class B").Replace("(A:value)", "(B:value)").Replace("→ A", "→ B");
@@ -325,8 +326,8 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public async Task McpClassRenameReportsExistingTypeIndexLimitationWithoutEdits()
     {
-        var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      return value\n"
-            + "    func Echo (int:value) → int\n      return value\n";
+        var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      !\n      return value\n"
+            + "    func Echo (int:value) → int\n      !\n      return value\n";
         var file = Write("active.calr", source);
         Store.Sync([file]);
         var sidecar = File.ReadAllText(Store.SidecarPath);
@@ -351,8 +352,10 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             module Demo
               class A
                 func Echo (A:value) → A
+                  !
                   return value
                 func Echo (int:value) → int
+                  !
                   return value
             """;
         var file = Write("active.calr", source);
@@ -374,8 +377,10 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             module Demo
               class A
                 func Echo (A:value) → A
+                  !
                   return value
                 func Echo (A:value, int:count) → A
+                  !
                   return value
             """;
         var file = Write("active.calr", source);
@@ -460,6 +465,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             module Records
               record P (int:X, int:Y)
                 func Sum () → int
+                  !
                   return X + Y
             """;
         var file = Write("before.calr", source);
@@ -484,7 +490,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void AmbiguousTextRenamesWriteNothing()
     {
-        var before = Original + "\n  func Other (int:x) → int\n    return x";
+        var before = Original + "\n  func Other (int:x) → int\n    !\n    return x";
         var file = Write("active.calr", before);
         Store.Sync([file]);
         var bytes = File.ReadAllBytes(Store.SidecarPath);
@@ -497,7 +503,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void ExplicitRelocationsDisambiguateTwoRenamesAtomically()
     {
-        var before = Original + "\n  func Other (int:x) → int\n    return x";
+        var before = Original + "\n  func Other (int:x) → int\n    !\n    return x";
         var file = Write("active.calr", before);
         var state = Store.Sync([file]);
         var after = before.Replace("Add", "Sum").Replace("Other", "Again");
@@ -560,9 +566,11 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             module Demo
               class Parts partial
                 func First () → int
+                  !
                   return 1
               class Parts partial
                 func Second () → int
+                  !
                   return 2
             """;
         var file = Write("active.calr", source);
@@ -586,6 +594,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
                 field int:count public
                 event EventHandler:Changed
               func Main () → int
+                !
                 proof{"positive"} 1 > 0
                 return 1
             """;
@@ -647,7 +656,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public void OverloadsUseTypesAndRefModifiersRatherThanParameterNames()
     {
-        var before = Original + "\n  func Add (string:value) → string\n    return value";
+        var before = Original + "\n  func Add (string:value) → string\n    !\n    return value";
         var file = Write("active.calr", before);
         var initial = Store.Sync([file]);
         File.WriteAllText(file, before.Replace("Add", "Sum").Replace("int:x", "int:input").Replace("return x", "return input"));
@@ -666,6 +675,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             module Demo
               class A
                 func Work (int:x) → int
+                  !
                   return x
               class B
             """;
@@ -674,6 +684,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
               class A
               class B
                 func Work (int:x) → int
+                  !
                   return x
             """;
         var file = Write("before.calr", before);
@@ -726,9 +737,11 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             module Demo
               module Tools
                 func Work () → int
+                  !
                   return 1
                 module Nested
                   func Inner () → int
+                    !
                     return 2
             """;
         var file = Write("active.calr", source);
@@ -985,7 +998,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Fact]
     public async Task McpRenameUsesPositionsAndKeepsNavigationIdentity()
     {
-        var source = Original + "\n  func Use () → int\n    return Add(1)";
+        var source = Original + "\n  func Use () → int\n    !\n    return Add(1)";
         var file = Write("active.calr", source);
         var initial = Store.Sync([file]);
         var sessions = new ProjectSessionManager();
@@ -1010,6 +1023,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             module Demo
               class A
                 func Work (int:x) → int
+                  !
                   return x
               class B
             """;
@@ -1018,6 +1032,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
               class A
               class B
                 func Work (int:x) → int
+                  !
                   return x
             """;
         var file = Write("before.calr", before);
@@ -1070,7 +1085,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.Equal(before.Declarations.Single(d => d.Name == "Add").Id,
             after.Declarations.Single(d => d.Name == "Add").Id);
         Store.Apply([new(file, Original.Replace("(int:x)", "(long:x)"), Original)]);
-        var overloaded = Original + "\n  func Add (string:x) → string\n    return x";
+        var overloaded = Original + "\n  func Add (string:x) → string\n    !\n    return x";
         File.WriteAllText(file, overloaded);
         Store.Sync();
         var sidecar = File.ReadAllBytes(Store.SidecarPath);
@@ -1086,8 +1101,10 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             module Demo
               class A
                 func One () → int
+                  !
                   return 1
                 func Two () → int
+                  !
                   return 2
             """;
         var file = Write("active.calr", source);
@@ -1119,7 +1136,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var file = Write("active.calr", Original);
         if (registered) Store.Sync([file]);
         var before = File.Exists(Store.SidecarPath) ? File.ReadAllText(Store.SidecarPath) : null;
-        var duplicate = Original + "\n  func Add (int:x) → int\n    return x\n";
+        var duplicate = Original + "\n  func Add (int:x) → int\n    !\n    return x\n";
         File.WriteAllText(file, duplicate);
         var failure = Assert.Throws<DeclarationIdentityParseException>(() => Store.Sync([file]));
         var diagnostic = Assert.Single(failure.Diagnostics.Errors);
@@ -1138,9 +1155,11 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
               class A
                 pp DEBUG
                   func Work () → int
+                    !
                     return 1
                 pp else
                   func Work () → int
+                    !
                     return 2
             """;
         var file = Write("active.calr", source);
@@ -1177,10 +1196,12 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         const string source = """
             module Demo
               delegate Transform (int:value) → int
+                ! unknown
               class A
                 event EventHandler:Changed
                 field int:value public
               func Main () → int
+                !
                 let System.Func<int>:Local = () =>
                   if true
                     proof{"positive"} 1 > 0

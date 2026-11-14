@@ -52,7 +52,7 @@ public sealed class CanonicalMultiFileFunctionTests
     [Fact]
     public void MissingCrossModuleEffectRowsSuggestOnlyTheNativeSyntax()
     {
-        var result = Program.Compile("module Orders\n  func SaveOrder () → int\n    return 41");
+        var result = Program.Compile("module Orders\n  func SaveOrder () → int\n    !\n    return 41");
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         var registry = CrossModuleEffectRegistry.Build([(result.Ast!, "Orders.calr")]);
         var diagnostic = Assert.Single(registry.BuildDiagnostics,

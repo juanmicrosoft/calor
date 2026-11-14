@@ -40,9 +40,11 @@ public sealed class StageBDelegateReturnTests
             module DelegateReturns
               using System.Collections.Generic
               delegate Reader () → {{sourceType}}
+                ! unknown
               func Take public ({{targetType}}:value) → void
                 !
-              func Probe public (Reader:reader) → {{(boundary == "return" ? targetType : "void")}}
+              func Probe public (Reader:reader ! unknown) → {{(boundary == "return" ? targetType : "void")}}
+                !
             {{(inferred ? $"    let produced = {call}" : "")}}
                 {{Sink(boundary, targetType, value)}}
             """;
@@ -58,12 +60,19 @@ public sealed class StageBDelegateReturnTests
               class Lookalikes
                 class String
               delegate Reader () → List<string?>
+                ! unknown
               delegate NestedReader () → List<List<string?>>
+                ! unknown
               delegate ElementReader () → string?[]
+                ! unknown
               delegate ContainerReader () → string[]?
+                ! unknown
               delegate SafeReader () → List<string>
+                ! unknown
               delegate NominalReader () → List<Lookalikes.String?>
-              func Probe public (Reader:reader, NestedReader:nested, ElementReader:elements, ContainerReader:container, SafeReader:safe, NominalReader:lookalike, Lookalikes.String:ordinary) → void
+                ! unknown
+              func Probe public (Reader:reader ! unknown, NestedReader:nested ! unknown, ElementReader:elements ! unknown, ContainerReader:container ! unknown, SafeReader:safe ! unknown, NominalReader:lookalike ! unknown, Lookalikes.String:ordinary) → void
+                !
                 let List<string>:required = reader()
                 let nestedValue = nested()
                 let elementValue = elements()
@@ -144,6 +153,7 @@ public sealed class StageBDelegateReturnTests
               func Take public (List<string>:value) → void
                 !
               func Probe public (List<{{(nullable ? "string?" : "string")}}>:value, List<string>:fallback, bool:flag) → {{(boundary == "return" ? "List<string>" : "void")}}
+                !
                 let joined = {{expression}}
                 if joined != null
                   {{Sink(boundary, "List<string>", "joined")}}

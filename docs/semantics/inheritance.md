@@ -46,6 +46,7 @@ public abstract class Shape
 module SealedClasses
   class FinalClass sealed
     func Read () → int
+      !
       return 42
   func Main () → int
     ! alloc
@@ -72,9 +73,11 @@ declare individual static methods.
 module StaticUtilities
   module Utilities
     func Helper () → int
+      !
       return 21
   class Service
     func Helper static () → int
+      !
       return 21
   func Main () → int
     !
@@ -103,6 +106,7 @@ requires the ordinary C# rules and compatible compilation context.
 module PartialService
   class DataService partial
     func Read () → int
+      !
       return 42
   func Main () → int
     ! alloc
@@ -168,14 +172,17 @@ module CombinedInheritance
       !
   class Animal
     func Speak virtual () → string
+      !
       return "..."
   class Dog
     extends Animal
     implements IPet
     implements ITrainable
     func Name () → string
+      !
       return "Rex"
     func Train () → int
+      !
       return 7
   func Main () → string
     ! alloc
@@ -221,10 +228,12 @@ public virtual string Speak()
 module MethodDispatch
   class Animal
     func Speak virtual () → string
+      !
       return "..."
   class Dog
     extends Animal
     func Speak override () → string
+      !
       return "Woof!"
   func Main () → string
     ! alloc
@@ -269,10 +278,12 @@ public abstract double Area();
 module SealedOverrides
   class Base
     func Compute virtual () → int
+      !
       return 1
   class Derived
     extends Base
     func Compute sealed override () → int
+      !
       return 42
   class Final
     extends Derived
@@ -320,10 +331,12 @@ To call a base class method, use `base.MethodName` as the call target:
 module BaseMethods
   class Base
     func GetValue virtual () → int
+      !
       return 10
   class Derived
     extends Base
     func GetValue override () → int
+      !
       return base.GetValue() + 5
   func Main () → int
     ! alloc
@@ -356,6 +369,7 @@ module BaseConstructors
     ctor protected (string:name)
       set this._name name
     func GetName () → string
+      !
       return this._name
   class Dog
     extends Animal
@@ -364,6 +378,7 @@ module BaseConstructors
       base(name)
       set this._breed breed
     func Describe () → string
+      !
       return "${this.GetName()}:${this._breed}"
   func Main () → string
     ! alloc, mut
@@ -502,10 +517,12 @@ Return types support covariance:
 module CovariantReturns
   class Animal
     func Clone virtual () → Animal
+      !
       return this
   class Dog
     extends Animal
     func Clone override () → Dog
+      !
       return this
   func Main () → bool
     ! alloc

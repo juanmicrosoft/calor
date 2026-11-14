@@ -19,7 +19,9 @@ public class InheritanceTests
 module Test
   class Shape public abstract
     func Area public abstract () → double
+      !
     func Name public abstract () → string
+      !
 ";
 
         var result = ParseAndEmit(source);
@@ -36,10 +38,12 @@ module Test
 module Test
   class Shape public abstract
     func Area public abstract () → double
+      !
   class Circle public
     extends Shape
     field double:radius private
     func Area public override () → double
+      !
       return 3.14159 * (radius * radius)
 ";
 
@@ -57,6 +61,7 @@ module Test
 module Test
   class Animal public
     func Speak public virtual () → string
+      !
       return ""...""
 ";
 
@@ -73,10 +78,12 @@ module Test
 module Test
   class Base public
     func Compute public virtual () → int
+      !
       return 0
   class Derived public
     extends Base
     func Compute public sealed override () → int
+      !
       return 42
 ";
 
@@ -93,10 +100,12 @@ module Test
 module Test
   class Base public
     func GetValue public virtual () → int
+      !
       return 10
   class Derived public
     extends Base
     func GetValue public override () → int
+      !
       return base.GetValue() + 5
 ";
 
@@ -138,13 +147,17 @@ module Test
 module Test
   interface IMovable
     func Move () → void
+      !
   interface IDrawable
     func Draw () → void
+      !
   class GameObject public
     implements IMovable
     implements IDrawable
     func Move public () → void
+      !
     func Draw public () → void
+      !
 ";
 
         var result = ParseAndEmit(source);
@@ -160,6 +173,7 @@ module Test
 module Test
   class MathUtils public
     func Square public static (int:x) → int
+      !
       return x * x
 ";
 
@@ -176,6 +190,7 @@ module Test
 module Test
   class DataService public partial
     func GetData public () → string
+      !
       return ""data""
 ";
 
@@ -191,6 +206,7 @@ module Test
 module Test
   class FinalClass public sealed
     func DoWork public () → void
+      !
 ";
 
         var result = ParseAndEmit(source);
@@ -295,6 +311,7 @@ module Test
 module Test
   class AbstractBase abstract
     func Method public abstract () → void
+      !
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -347,6 +364,7 @@ module Test
 module Test
   class Base public
     func VirtualMethod public virtual () → void
+      !
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -366,6 +384,7 @@ module Test
 module Test
   class Derived public
     func Method public override () → void
+      !
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -385,6 +404,7 @@ module Test
 module Test
   class Abstract abstract
     func Method public abstract () → void
+      !
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -405,6 +425,7 @@ module Test
 module Test
   class Base abstract sealed
     func Method public static virtual () → void
+      !
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -432,6 +453,7 @@ module Test
 module Test
   class NonAbstract public
     func AbstractMethod public abstract () → void
+      !
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -484,7 +506,9 @@ module Test
 module Test
   class Shape abstract
     func Area public abstract () → double
+      !
     func Perimeter public abstract () → double
+      !
 ";
 
         // Parse original
@@ -516,10 +540,12 @@ module Test
 module Test
   class Animal public
     func Speak public virtual () → string
+      !
       return ""...""
   class Dog public
     extends Animal
     func Speak public override () → string
+      !
       return ""Woof!""
 ";
 
@@ -594,10 +620,12 @@ module Test
 module Test
   class Base public
     func GetValue public virtual () → int
+      !
       return 10
   class Derived public
     extends Base
     func GetValue public override () → int
+      !
       return base.GetValue() + 5
 ";
 
@@ -618,6 +646,7 @@ module Test
     func Helper private () → string
       return ""done""
     func Process public () → string
+      !
       return this.Helper()
 ";
 
@@ -636,10 +665,12 @@ module Test
 module Test
   class Base public
     func Compute public virtual () → int
+      !
       return 0
   class Final public
     extends Base
     func Compute public sealed override () → int
+      !
       return 42
 ";
 
@@ -658,6 +689,7 @@ module Test
 module Test
   class MyAbstract abstract
     func DoWork public abstract () → void
+      !
   class MySealed sealed
 ";
 
@@ -681,7 +713,9 @@ module Test
 module Test
   class Test public
     func VirtualMethod public virtual () → void
+      !
     func StaticMethod public static () → void
+      !
     func PrivateMethod private () → void
 ";
 
@@ -703,6 +737,7 @@ module Test
     ctor (int:val)
   class Factory public
     func Create public static () → Item
+      !
       return new Item(42)
 ";
 

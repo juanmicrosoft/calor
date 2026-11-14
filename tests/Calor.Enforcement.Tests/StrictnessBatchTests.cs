@@ -38,7 +38,8 @@ public class StrictnessBatchTests
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
-              func Apply (Func<int,int>:transform, int:value) → int
+              func Apply (Func<int,int>:transform ! unknown, int:value) → int
+                !
                 return transform(value)
             """));
         // v0.15 E4 (§13.1): row-less ⇒ Unknown ⇒ Calor0425 at the invocation, and the
@@ -61,6 +62,7 @@ public class StrictnessBatchTests
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func UseLambda () → int
+                !
                 let f = (int:x) => x + 1
                 return f(1)
             """));
@@ -82,7 +84,8 @@ public class StrictnessBatchTests
 ";
         var result = TestHarness.CompileWithEffects(NativeSource(source, """
             module Test Test
-              func Apply (Func<int,int>:transform, int:value) → int
+              func Apply (Func<int,int>:transform ! unknown, int:value) → int
+                !
                 return transform(value)
             """), enforceEffects: true,
             policy: UnknownCallPolicy.Permissive);
@@ -112,6 +115,7 @@ public class StrictnessBatchTests
               func Helper private (int:x) → int
                 return x + 1
               func Main () → int
+                !
                 return Helper(1)
             """));
 
@@ -139,6 +143,7 @@ public class StrictnessBatchTests
             module Test Test
               class Mapper
                 func Apply (int:value) → int
+                  !
                   return transform(value)
             """));
 
@@ -365,6 +370,7 @@ public class StrictnessBatchTests
                 func Describe () → void
                   ! cw
               func Draw (IShape:shape) → void
+                !
                 shape.Describe()
             """));
         Assert.True(failing.HasErrors, "Caller must declare the interface's declared effect");
@@ -483,6 +489,7 @@ var x = 1;
         var result = TestHarness.Compile(NativeSource(source, """
             module Test Test
               func AddItem () → void
+                !
                 items.Add(1)
             """));
 
@@ -508,6 +515,7 @@ var x = 1;
         var failing = TestHarness.Compile(NativeSource(missing, """
             module Test Test
               func AddItem () → void
+                !
                 let List<int>:items = new List<int>()
                 items.Add(1)
             """));
@@ -616,7 +624,7 @@ var x = 1;
                 ! cw
                 System.Console.WriteLine("laundered")
                 return 2
-              func Go (Func<int>:Helper) → int
+              func Go (Func<int>:Helper ! unknown) → int
                 !
                 return Helper()
               func Main () → void
@@ -1093,7 +1101,7 @@ var x = 1;
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module Wrap Wrap
-              func Apply (Func<int,int>:f, int:x) → int
+              func Apply (Func<int,int>:f ! unknown, int:x) → int
                 !
                 return f(x)
             """));
@@ -1121,7 +1129,7 @@ var x = 1;
 ";
         var result = TestHarness.Compile(NativeSource(source, """
             module E E
-              func GetF () → Func<int>
+              func GetF () → Func<int> ! unknown
                 !
                 return () =>
                   return 1
@@ -1274,7 +1282,7 @@ var x = 1;
                 §R INT:1
             """, """
             module M M
-              func Main (Func<int,int>:src) → int
+              func Main (Func<int,int>:src ! unknown) → int
                 ! cw
                 let Func<int,int>:f ! = src
                 return 1
@@ -1427,7 +1435,7 @@ var x = 1;
                 ! cw
                 System.Console.WriteLine(x)
                 return x
-              func Apply (Func<int,int>:transform, int:value) → int
+              func Apply (Func<int,int>:transform ! unknown, int:value) → int
                 !
                 return value
               func Main () → int
@@ -1509,7 +1517,7 @@ var x = 1;
                 §R src
             """, """
             module M M
-              func Pick (Func<int,int>:src) → Func<int,int> ! cw
+              func Pick (Func<int,int>:src ! unknown) → Func<int,int> ! cw
                 !
                 return src
             """));
@@ -1763,7 +1771,7 @@ var x = 1;
               func Map <! e> (int:x, Func<int,int>:f ! e) → int
                 ! e
                 return x
-              func Use (Func<int,int>:cb) → int
+              func Use (Func<int,int>:cb ! unknown) → int
                 !
                 return Map(1, cb)
             """));
@@ -2300,7 +2308,7 @@ var x = 1;
 
         Assert.Contains(TestHarness.Compile(NativeSource(source, """
             module M M
-              func Main (Func<int,int>:src) → int
+              func Main (Func<int,int>:src ! unknown) → int
                 ! cw
                 let Func<int,int>:f ! = src
                 return 1
@@ -2308,7 +2316,7 @@ var x = 1;
             d => d.Code == DiagnosticCode.EffectRowUnknown);
         Assert.DoesNotContain(Permissive(NativeSource(source, """
             module M M
-              func Main (Func<int,int>:src) → int
+              func Main (Func<int,int>:src ! unknown) → int
                 ! cw
                 let Func<int,int>:f ! = src
                 return 1
@@ -2334,7 +2342,7 @@ var x = 1;
                 §R INT:1
             """, """
             module M M
-              func Main (Func<int,int>:src) → int
+              func Main (Func<int,int>:src ! unknown) → int
                 ! cw
                 let Func<int,int>:f ! = src
                 return 1
@@ -2651,7 +2659,7 @@ var x = 1;
 
         var strict = TestHarness.Compile(NativeSource(source, """
             module F15 F15
-              func Main (Func<int,int>:opaque) → int
+              func Main (Func<int,int>:opaque ! unknown) → int
                 !
                 let Func<int,int>:g ! cw = opaque
                 return g(1)
@@ -2672,7 +2680,7 @@ var x = 1;
         // the flag). The assertion is waivable; the row asserted is not.
         var permissive = Permissive(NativeSource(source, """
             module F15 F15
-              func Main (Func<int,int>:opaque) → int
+              func Main (Func<int,int>:opaque ! unknown) → int
                 !
                 let Func<int,int>:g ! cw = opaque
                 return g(1)
@@ -3187,10 +3195,9 @@ var x = 1;
     public void PolymorphicSource_IntoRowlessDestination_IsCannotTell_NotDoesNotFit()
     {
         // F6 (pre-existing since E3b, made visible by PP-E1's L7-MID mutant):
-        // `next §E{e}` passed to a parameter with NO row. §4.3 says Unknown never
-        // yields DoesNotFit on either side, so this is Calor0425 (the row-less
-        // destination message) and never a Calor0424 reading "declared row:
-        // [unknown]" with a leaked "(binder #0)".
+        // The historical rowless destination is explicit Unknown in current
+        // syntax. Unknown never yields DoesNotFit on either side: this is
+        // Calor0425, not Calor0424 with a leaked "(binder #0)".
         var result = TestHarness.Compile(NativeSource("""
             §M{F6}
               §F{RunTwice:pub} (Func<i32>:g) -> i32
@@ -3201,7 +3208,7 @@ var x = 1;
                 §R §C{RunTwice} §A next §/C
             """, """
             module F6 F6
-              func RunTwice (Func<int>:g) → int
+              func RunTwice (Func<int>:g ! unknown) → int
                 !
                 return 0
               func Handle <! e> (Func<int>:next ! e) → int
@@ -3212,7 +3219,7 @@ var x = 1;
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowMismatch);
         Assert.Contains(result.Diagnostics.Warnings, d =>
             d.Code == DiagnosticCode.EffectRowUnknown
-            && d.Message.StartsWith("Parameter 'g' of 'RunTwice' is function-typed with no effect row", StringComparison.Ordinal));
+            && d.Message.StartsWith("Parameter 'g' of 'RunTwice' explicitly declares Unknown effects", StringComparison.Ordinal));
     }
 
     /// <summary>

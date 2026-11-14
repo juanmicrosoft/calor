@@ -1,6 +1,7 @@
 module Proxy Proxy
   module ProxyModule
     func HasAccess public (int:userRole, int:requiredRole) → bool
+      !
       return userRole >= requiredRole
 
     func LogAccess public (int:userId, bool:granted) → int
@@ -12,4 +13,5 @@ module Proxy Proxy
       return userId
 
     func CacheHit public (bool:isCached) → bool
+      !
       return isCached

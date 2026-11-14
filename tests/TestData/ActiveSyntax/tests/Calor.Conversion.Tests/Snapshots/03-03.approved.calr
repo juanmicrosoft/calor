@@ -1,6 +1,7 @@
 module Test_03_03 Test_03_03 overflow unchecked
   class Loops public
     func CountDown public (int:start) → int
+      !
       var int:count = 0
       while start > 0
         set start start - 1

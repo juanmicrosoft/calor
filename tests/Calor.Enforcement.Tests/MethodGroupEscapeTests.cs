@@ -60,7 +60,7 @@ public sealed class MethodGroupEscapeTests
                 func {{(shadowsModuleFunction ? "Loud" : "Quiet")}} () → int
                   !
                   return 2
-                func Choose (Func<int>:fallback) → void
+                func Choose (Func<int>:fallback ! unknown) → void
                   !
                   let Func<int>:chosen = fallback ?? Loud
             """;
@@ -97,7 +97,7 @@ public sealed class MethodGroupEscapeTests
               ! cw
               Console.WriteLine("loud")
               return 1
-          func Make (Func<int>:fallback, bool:condition, Holder:holder, Func<int>[]:items) → void
+          func Make (Func<int>:fallback ! unknown, bool:condition, Holder:holder, Func<int>[]:items) → void
             ! {{effects}}
             {{statement}}
         """;

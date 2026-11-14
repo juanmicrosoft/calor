@@ -87,6 +87,9 @@ policy for those shapes. See the
 [nullability guide](/docs/guides/nullability-and-dotnet-interop/) for complete
 examples and mode behavior.
 
+Merely changing the declaration to `string?` preserves possible absence and
+moves the obligation to consumers; it does not prove those consumers safe.
+
 General mutation, member writes, constructor inputs, and outer generic-container
 enforcement remain excluded; array annotations do not prove every slot initialized.
 These checks do not establish whole-program non-nullness. The D3/D12/D14 safeguards

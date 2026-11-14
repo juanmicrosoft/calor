@@ -1,4 +1,5 @@
 module Test_09_02 Test_09_02 overflow unchecked
   class IndexDemo public
     func GetLast public (int[]:items) → int
+      !
       return items[^1]

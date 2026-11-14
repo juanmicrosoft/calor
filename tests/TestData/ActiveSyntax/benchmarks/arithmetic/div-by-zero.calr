@@ -3,11 +3,13 @@
 
 module DivByZeroBenchmark DivByZeroBenchmark
   func VulnerableDivision public (int:x, int:y) → int
+    !
     // BUG: Division by unchecked parameter
     // EXPECTED: Calor0920 Division by Zero
     return x / y
 
   func SafeDivisionWithGuard public (int:x, int:y) → int
+    !
     // SAFE: Division with zero check
     // EXPECTED: No warnings
     if y != 0
@@ -16,16 +18,19 @@ module DivByZeroBenchmark DivByZeroBenchmark
       return 0
 
   func VulnerableModulo public (int:a, int:b) → int
+    !
     // BUG: Modulo by unchecked parameter
     // EXPECTED: Calor0920 Division by Zero
     return a % b
 
   func SafeDivisionByLiteral public (int:x) → int
+    !
     // SAFE: Division by non-zero literal
     // EXPECTED: No warnings
     return x / 2
 
   func VulnerableDivisionInLoop public (int:n) → int
+    !
     // BUG: Division in loop where counter can be zero
     // EXPECTED: Calor0920 Division by Zero
     var int:result = 0
@@ -34,6 +39,7 @@ module DivByZeroBenchmark DivByZeroBenchmark
     return result
 
   func SafeDivisionInLoopFromOne public (int:n) → int
+    !
     // SAFE: Loop starts from 1
     // EXPECTED: No warnings
     var int:result = 0
@@ -42,12 +48,14 @@ module DivByZeroBenchmark DivByZeroBenchmark
     return result
 
   func VulnerableDivisionAfterDecrement public (int:x, int:y) → int
+    !
     // BUG: Division after value can become zero
     // EXPECTED: Calor0920 Division by Zero
     let int:divisor = y - 1
     return x / divisor
 
   func SafeDivisionWithContract public (int:x, int:y) → int
+    !
     // SAFE: Precondition guarantees non-zero
     // EXPECTED: No warnings
     requires y > 0

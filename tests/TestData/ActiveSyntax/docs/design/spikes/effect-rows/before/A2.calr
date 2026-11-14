@@ -1,31 +1,31 @@
-§M{MediatR.Pipeline}
-  §NS{MediatR.Pipeline:file}
-    §U{System.Collections.Generic}
-    §U{System.Threading}
-    §U{System.Threading.Tasks}
+module MediatR.Pipeline MediatR.Pipeline
+  namespace using System.Collections.Generic
+  namespace using System.Threading
+  namespace using System.Threading.Tasks
+  interface IRequestPreProcessor<in TRequest>
+    func Process (TRequest:request, CancellationToken:cancellationToken) → Task
+      !
 
-    §IFACE{IRequestPreProcessor<in TRequest>}
-      §MT{Process} (TRequest:request, CancellationToken:cancellationToken) -> Task
+  interface IPipelineBehavior<TRequest,TResponse>
+    func Handle (TRequest:request, RequestHandlerDelegate<TResponse>:next, CancellationToken:cancellationToken) → Task<TResponse>
+      !
 
-    §IFACE{IPipelineBehavior<TRequest,TResponse>}
-      §MT{Handle} (TRequest:request, RequestHandlerDelegate<TResponse>:next, CancellationToken:cancellationToken) -> Task<TResponse>
+  class RequestPreProcessorBehavior<TRequest,TResponse>
+    implements IPipelineBehavior<TRequest, TResponse>
 
-    §CL{RequestPreProcessorBehavior<TRequest,TResponse>:pub}
-      §IMPL{IPipelineBehavior<TRequest, TResponse>}
+    field IEnumerable<IRequestPreProcessor<TRequest>>:_preProcessors private readonly
+    ctor (IEnumerable<IRequestPreProcessor<TRequest>>:preProcessors)
+      set _preProcessors preProcessors
 
-      §FLD{Seq<IRequestPreProcessor<TRequest>>:_preProcessors:priv:readonly}
-
-      §CTOR{pub} (Seq<IRequestPreProcessor<TRequest>>:preProcessors)
-        §ASSIGN _preProcessors preProcessors
-
-      §AMT{Handle:pub} (TRequest:request, RequestHandlerDelegate<TResponse>:next, CancellationToken:cancellationToken) -> TResponse
-        §EACH{processor:var} _preProcessors
-          §B{_chainProcess010} §C{processor.Process} §A request §A cancellationToken §/C
-          §B{_} §AWAIT §C{_chainProcess010.ConfigureAwait} false
-        §B{_chainNext011} §C{next}
-        §R §AWAIT §C{_chainNext011.ConfigureAwait} false
+    func Handle async (TRequest:request, RequestHandlerDelegate<TResponse>:next, CancellationToken:cancellationToken) → TResponse
+      !
+      each processor in _preProcessors
+        let _chainProcess010 = processor.Process(request, cancellationToken)
+        let _ = await _chainProcess010.ConfigureAwait(false)
+      let _chainNext011 = next()
+      return await _chainNext011.ConfigureAwait(false)
 
 
-    §CSHARP{public delegate Task<TResponse> RequestHandlerDelegate<TResponse>();}§/CSHARP
-
+  raw member 68
+public delegate Task<TResponse> RequestHandlerDelegate<TResponse>();
 

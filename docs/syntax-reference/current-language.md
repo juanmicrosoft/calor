@@ -369,7 +369,7 @@ Complete example: [SafeDivide](#example-task_8).
 
 ## side effects
 
-Declares authoritative effects in the function header-clause region before the first body statement. Empty ! is a declared pure row. Private and internal callables without a declaration use their inferred body rows; public callers must still cover those effects. A body row does not certify open virtual dispatch. An omitted callback parameter, returned-callback or delegate contract is Unknown, as is explicit ! unknown in those positions. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. Transporting Unknown can report Calor0425 when a row fit cannot be proved; permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with <! e> and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.
+Declares authoritative effects in the function header-clause region before the first body statement. Public/protected and declaration-only boundaries require an explicit own row; empty ! declares Pure. Private/internal bodies infer their rows and reject own annotations. Public callers must still cover every reachable effect. A body row does not certify open virtual dispatch. Callback parameter, returned-callback and delegate contracts require explicit rows, including ! unknown when no invocation contract is known. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. An unused declared Unknown callback is allowed; transporting it can report Calor0425 when a row fit cannot be proved. Permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with <! e> and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =>. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.
 
 Syntax: `! effect1,effect2,...`
 
@@ -829,7 +829,7 @@ Complete example: [Event declaration; subscription statements are not yet native
 
 ## operator overload
 
-Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. An optional standalone ! effect row precedes contracts and body statements, as for functions. An explicit row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. Without a row, only intrinsic mutation and allocation are allowed; I/O, throwing and unknown calls remain rejected. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.
+Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. Public operators require a standalone ! effect row before contracts and body statements; an empty ! declares Pure. The row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. A missing row is a parse error, even when optional effect checking is disabled. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.
 
 Syntax: `op + (type:left, type:right) → resultType; op implicit (type:value) → resultType`
 
@@ -1446,6 +1446,7 @@ SquareRoot
 ```calor
 module AgentReference3
   func SquareRoot (int:x) → int
+    !
     requires (x >= 0)
     return x
 ```
@@ -1457,6 +1458,7 @@ Abs
 ```calor
 module AgentReference4
   func Abs (int:x) → int
+    !
     => (result >= 0)
     return ((x < 0) ? (0 - x) : x)
 ```
@@ -1521,6 +1523,7 @@ Classify
 ```calor
 module AgentReference9
   func Classify (int:n) → string
+    !
     if (n < 0)
       return "negative"
     else if (n == 0)
@@ -1536,6 +1539,7 @@ Max
 ```calor
 module AgentReference10
   func Max (int:a, int:b) → int
+    !
     if (a >= b)
       return a
     else
@@ -1549,6 +1553,7 @@ GetGrade
 ```calor
 module AgentReference11
   func GetGrade (int:score) → string
+    !
     var string:grade = "F"
     if (score >= 90)
       set grade "A"
@@ -1643,6 +1648,7 @@ GetDataAsync
 ```calor
 module AgentReference17
   func GetDataAsync async () → Task<int>
+    !
     return 42
 ```
 
@@ -1653,6 +1659,7 @@ GetStatus
 ```calor
 module AgentReference18
   func GetStatus (int:code) → string
+    !
     return match code
       case 200 → "OK"
       case 404 → "Not Found"
@@ -1667,6 +1674,7 @@ DayName
 ```calor
 module AgentReference19
   func DayName (int:day) → int
+    !
     return match day
       case 1 → 100
       case 2 → 100
@@ -1685,6 +1693,7 @@ GetGrade
 ```calor
 module AgentReference20
   func GetGrade (int:score) → string
+    !
     return match score
       case >= 90 → "A"
       case >= 80 → "B"
@@ -1699,6 +1708,7 @@ Describe
 ```calor
 module AgentReference21
   func Describe (int:x) → string
+    !
     return match x
       case var n when (n > 100) → "large"
       case var n when (n < 0) → "negative"
@@ -1713,6 +1723,7 @@ IsSingleDigit
 ```calor
 module AgentReference22
   func IsSingleDigit (int:n) → bool
+    !
     return match n
       case 0 → true
       case 1 → true
@@ -1744,6 +1755,7 @@ ApplyDouble
 ```calor
 module AgentReference24
   func ApplyDouble (int:x) → int
+    !
     let Func<int,int>:doubler = (int:n) => (n * 2)
     return doubler(x)
 ```
@@ -1755,6 +1767,7 @@ ApplyComplex
 ```calor
 module AgentReference25
   func ApplyComplex (int:x) → int
+    !
     let Func<int,int>:process = (int:n) =>
       return n > 0 ? n * 2 : 0
     return process(x)
@@ -1767,6 +1780,7 @@ MathOperation
 ```calor
 module AgentReference26
   delegate MathOperation (int:x, int:y) → int
+    ! unknown
 ```
 
 ## Example task_27
@@ -1776,6 +1790,7 @@ Accumulate
 ```calor
 module AgentReference27
   func Accumulate (int:n) → int
+    !
     var int:acc = 0          // Bind mutable variable acc = 0
     set acc (acc + n)   // Assign acc = acc + n
     set acc (acc + n)   // Assign again
@@ -1791,6 +1806,7 @@ Calculator
 module AgentReference28
   class Calculator
     func Add (int:a, int:b) → int
+      !
       return (a + b)
 ```
 
@@ -1803,6 +1819,7 @@ module AgentReference29
   class Container<T>
     field T:_value private
     func Get () → T
+      !
       return _value
     func HashSet (T:value) → void
       ! mut
@@ -1863,6 +1880,7 @@ module AgentReference33
       set _name name
       set _age age
     func GetName () → string
+      !
       return _name
 ```
 
@@ -1873,6 +1891,7 @@ AbsoluteValue
 ```calor
 module AgentReference34
   func AbsoluteValue (int:x) → int
+    !
     => (result >= 0)
     => (!((x >= 0)) || (result == x))
     => (!((x < 0)) || (result == (0 - x)))
@@ -1946,6 +1965,7 @@ AllPositive
 ```calor
 module AgentReference39
   func AllPositive (int[]:arr, int:n) → bool
+    !
     requires n == arr.Length
     => !result || !(exists int:i in 0..n : arr[i] <= 0)
     var bool:allPos = true
@@ -1962,6 +1982,7 @@ HasNegative
 ```calor
 module AgentReference40
   func HasNegative (int[]:arr, int:n) → bool
+    !
     requires n == arr.Length
     => result == (exists int:i in 0..n : arr[i] < 0)
     for i from 0 to arr.Length - 1 step 1
@@ -2000,11 +2021,13 @@ Contracts
 ```calor
 module Contracts
   func Square (int:x) → int
+    !
     requires x >= 0
     => result >= 0
     return x * x
 
   func Divide (int:a, int:b) → int
+    !
     requires b != 0
     return a / b
 ```
@@ -2016,6 +2039,7 @@ Branching
 ```calor
 module Branching
   func Sign (int:x) → int
+    !
     if (x > 0)
       return 1
     else if (x < 0)
@@ -2123,6 +2147,7 @@ Classes
 module Classes
   class Greeter
     func Greet () → string
+      !
       return "hello"
 ```
 
@@ -2159,18 +2184,21 @@ module PointModule
       set this._y y
 
     func Equals (Point:other) → bool
+      !
       if (other == null)
         return false
       else
         return true
 
     op == (Point:left, Point:right) → bool
+      !
       if (left == null)
         return (right == null)
       else
         return left.Equals(right)
 
     op != (Point:left, Point:right) → bool
+      !
       return (!(left == right))
 ```
 
@@ -2184,6 +2212,7 @@ module ConvertedModule
   using System.Threading.Tasks
   class DataService
     func FetchAsync async (string:url) → string
+      !
       try
         await Task.Delay(100)
         return "data from " + url
@@ -2205,6 +2234,7 @@ module ConvertedModule
 
   class StatusHelper
     func GetLabel static (Status:s) → string
+      !
       return match s
         case Status.Pending → "Pending Review"
         case Status.Active → "Active"
@@ -2223,6 +2253,7 @@ module ConvertedModule
 
   class NumberGen
     func GetEvens (int:max) → IEnumerable<int>
+      !
       for i from 0 to max step 2
         yield i
 ```
@@ -2241,6 +2272,7 @@ module Objects
     ! alloc
     return new Person()
   func ReadName (Person:person) → string?
+    !
     return person?.Name
 ```
 
@@ -2264,6 +2296,7 @@ invariant
 module Invariants
   invariant (1 > 0)
   func Read () → int
+    !
     return 1
 ```
 
@@ -2275,9 +2308,11 @@ interface
 module Interfaces
   interface ICounter
     func Count () → int
+      !
   class Counter
     implements ICounter
     func Count () → int
+      !
       return 1
 ```
 
@@ -2322,6 +2357,7 @@ interpolation
 ```calor
 module Interpolation
   func Greet (string:name) → string
+    !
     return "Hello ${name}"
 ```
 
@@ -2350,13 +2386,17 @@ inheritance
 module Inheritance
   class Base abstract
     func Read abstract () → int
+      !
     func Label virtual () → string
+      !
       return "base"
   class Derived sealed
     extends Base
     func Read override () → int
+      !
       return 7
     func Label override () → string
+      !
       return "derived"
 ```
 
@@ -2367,6 +2407,7 @@ sync
 ```calor
 module Synchronization
   func Read (object:gate) → int
+    !
     lock (gate)
       return 7
 ```
@@ -2381,6 +2422,7 @@ module Documentation
   // Complexity: O(1).
   /// deprecated 1.0.0 ReadCurrent
   func Read () → int
+    !
     return 7
   /// since 1.0.0
   /// breaking 2.0.0 "Returns the current value instead of the cached value."
@@ -2395,6 +2437,7 @@ decimal
 ```calor
 module Decimals
   func Price () → decimal
+    !
     return 18.00m
 ```
 
@@ -2405,6 +2448,7 @@ preprocessor
 ```calor
 module Preprocessor
   func Mode () → string
+    !
     pp DEBUG
       return "debug"
     pp else
@@ -2431,6 +2475,7 @@ partial
 module PartialTypes
   class Counter partial
     func Read () → int
+      !
       return 1
 ```
 
@@ -2453,6 +2498,7 @@ nullable
 ```calor
 module NullableValues
   func DefaultName (string?:name) → string
+    !
     var string?:value = name
     if (value == null)
       set value "unknown"
@@ -2466,6 +2512,7 @@ patterns
 ```calor
 module Patterns
   func InRange (int:value) → bool
+    !
     return ((value > 0) && (value < 100))
 ```
 
@@ -2476,6 +2523,7 @@ tuples
 ```calor
 module Tuples
   func Pair (int:value) → (int, string)
+    !
     return (value, "value")
 ```
 
@@ -2486,6 +2534,7 @@ goto
 ```calor
 module Jumps
   func Normalize (int:value) → int
+    !
     match value
       case 0
         goto case 1
@@ -2502,6 +2551,7 @@ array ranges
 ```calor
 module ArrayRanges
   func FirstTwo (int[]:values) → int[]
+    !
     return values[0..2]
 ```
 
@@ -2545,8 +2595,10 @@ Named static module with implicit static function
 module StaticTypes
   module Counter
     func Read () → int
+      !
       return 7
   func Run () → int
+    !
     return Counter.Read()
 ```
 
@@ -2560,6 +2612,7 @@ module NamespaceFile Contoso.Tools
   class Box
     field Text.StringBuilder?:Builder
     func Read () → int
+      !
       return 7
 ```
 
@@ -2573,6 +2626,7 @@ module BlockFile Contoso.Tools block
   class Box
     field Text.StringBuilder?:Builder
     func Read () → int
+      !
       return 7
 ```
 

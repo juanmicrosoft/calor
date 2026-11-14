@@ -1,19 +1,23 @@
 module MixedMath MixedMath
   module MixedMathModule
     func GoodSquare public (int:x) → int
+      !
       => result >= 0
       return x * x
 
     func BadNegate public (int:x) → int
+      !
       => result < 0
       return 0 - x
 
     func SafeDivide public (int:a, int:b) → int
+      !
       requires{"divisor must not be zero"} b != 0
       => result == a / b
       return a / b
 
     func ComplexCondition public (int:x, int:y) → int
+      !
       requires{"x must be positive"} x > 0
       requires{"y must be positive"} y > 0
       => result > 0

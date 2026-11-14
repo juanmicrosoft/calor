@@ -1,4 +1,5 @@
 module Test_08_04 Test_08_04 overflow unchecked
   class NullDemo public
     func GetValue public (string?:input) → string
+      !
       return input ?? "default"

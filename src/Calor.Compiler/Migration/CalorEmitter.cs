@@ -6,8 +6,8 @@ using Calor.Compiler.Parsing;
 namespace Calor.Compiler.Migration;
 
 /// <summary>
-/// Emits Calor v2+ source code from an Calor AST.
-/// Uses Lisp-style expressions and arrow syntax for control flow.
+/// Emits native Calor source from a Calor AST.
+/// Uses infix expressions and indentation-only block structure.
 /// </summary>
 public sealed class CalorEmitter : IAstVisitor<string>
 {
@@ -950,7 +950,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // travel to the interface it implements or the converter would trade
         // Calor0410 for Calor0421.
         Indent();
-        EmitEffects(node.Effects);
+        EmitEffects(node.Effects, required: true);
         foreach (var precondition in node.Preconditions) Visit(precondition);
         foreach (var postcondition in node.Postconditions) Visit(postcondition);
         Dedent();
@@ -1548,7 +1548,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Effects
-        EmitEffects(node.Effects);
+        if (node.IsAbstract || node.IsExtern
+            || node.Visibility is not (Visibility.Private or Visibility.Internal))
+            EmitEffects(node.Effects, required: true);
 
         // Preconditions
         foreach (var pre in node.Preconditions)
@@ -1663,7 +1665,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Effects
-        EmitEffects(node.Effects);
+        if (node.Visibility is not (Visibility.Private or Visibility.Internal))
+            EmitEffects(node.Effects, required: true);
 
         // Preconditions
         foreach (var pre in node.Preconditions)
@@ -2664,11 +2667,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(CollectionPushNode node)
-    {
-        var value = node.Value.Accept(this);
-        AppendLine($"§PUSH{{{node.CollectionName}}} {value}");
-        return "";
-    }
+        => Visit(new ExpressionStatementNode(node.Span,
+            new CallExpressionNode(node.Span, $"{EscapeCalorIdentifier(node.CollectionName)}.Add", [node.Value])));
 
     public string Visit(DictionaryPutNode node)
         => Visit(new AssignmentStatementNode(node.Span,
@@ -2676,11 +2676,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             node.Value));
 
     public string Visit(CollectionRemoveNode node)
-    {
-        var keyOrValue = node.KeyOrValue.Accept(this);
-        AppendLine($"§REM{{{node.CollectionName}}} {keyOrValue}");
-        return "";
-    }
+        => Visit(new ExpressionStatementNode(node.Span,
+            new CallExpressionNode(node.Span, $"{EscapeCalorIdentifier(node.CollectionName)}.Remove", [node.KeyOrValue])));
 
     public string Visit(CollectionSetIndexNode node)
         => Visit(new AssignmentStatementNode(node.Span,
@@ -2688,30 +2685,23 @@ public sealed class CalorEmitter : IAstVisitor<string>
             node.Value));
 
     public string Visit(CollectionClearNode node)
-    {
-        AppendLine($"§CLR{{{node.CollectionName}}}");
-        return "";
-    }
+        => Visit(new ExpressionStatementNode(node.Span,
+            new CallExpressionNode(node.Span, $"{EscapeCalorIdentifier(node.CollectionName)}.Clear", [])));
 
     public string Visit(CollectionInsertNode node)
-    {
-        // AcceptInInlineSibling: see DictionaryPutNode.
-        var index = AcceptInInlineSibling(node.Index);
-        var value = AcceptInInlineSibling(node.Value);
-        AppendLine($"§INS{{{node.CollectionName}}} {index} {value}");
-        return "";
-    }
+        => Visit(new ExpressionStatementNode(node.Span,
+            new CallExpressionNode(node.Span, $"{EscapeCalorIdentifier(node.CollectionName)}.Insert", [node.Index, node.Value])));
 
     public string Visit(CollectionContainsNode node)
     {
-        var keyOrValue = node.KeyOrValue.Accept(this);
-        var modePrefix = node.Mode switch
+        var method = node.Mode switch
         {
-            ContainsMode.Key => "§KEY ",
-            ContainsMode.DictValue => "§VAL ",
-            _ => ""
+            ContainsMode.Key => "ContainsKey",
+            ContainsMode.DictValue => "ContainsValue",
+            _ => "Contains"
         };
-        return $"§HAS{{{node.CollectionName}}} {modePrefix}{keyOrValue}";
+        return Visit(new CallExpressionNode(node.Span,
+            $"{EscapeCalorIdentifier(node.CollectionName)}.{method}", [node.KeyOrValue]));
     }
 
     public string Visit(DictionaryForeachNode node)
@@ -2731,10 +2721,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(CollectionCountNode node)
-    {
-        var collection = node.Collection.Accept(this);
-        return $"§CNT {collection}";
-    }
+        => Visit(new FieldAccessNode(node.Span, node.Collection, "Count"));
 
     public string Visit(TryStatementNode node)
     {
@@ -4000,13 +3987,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var output = node.Output == null ? "" : $" → {TypeMapper.ToSurfaceType(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}";
         AppendLine($"delegate {EscapeCalorIdentifier(node.Name)} ({parameters}){output}");
         Indent();
-        if (node.Effects != null)
-        {
-            // Was `string.Join(",", node.Effects.Effects)`, which stringifies
-            // KeyValuePairs and emits `§E{[console, write]}` — a §DEL row did not
-            // survive a round trip at all. P4 pins position 3, so it does now.
-            AppendLine(FormatEffectsTag(node.Effects));
-        }
+        AppendLine(node.Effects == null ? "! unknown" : FormatEffectsTag(node.Effects));
 
         Dedent();
         EmitBlockEnd($"§/DEL");
@@ -4344,10 +4325,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
             ? $"@{bareName}" : bareName;
     }
 
-    private void EmitEffects(EffectsNode? effects)
+    private void EmitEffects(EffectsNode? effects, bool required = false)
     {
         if (effects == null)
+        {
+            if (required)
+                AppendLine("!");
             return;
+        }
 
         AppendLine(FormatEffectsTag(effects));
     }
@@ -5109,8 +5094,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ProofObligationNode node)
     {
         var condition = node.Condition.Accept(this);
-        var description = node.Description == null ? "" : Visit(new StringLiteralNode(node.Span, node.Description));
-        AppendLine($"§PROOF{{{description}}} {condition}");
+        var header = node.Description == null
+            ? "proof"
+            : $"proof{{{Visit(new StringLiteralNode(node.Span, node.Description))}}}";
+        AppendLine($"{header} {condition}");
         return "";
     }
 

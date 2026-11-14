@@ -4,6 +4,7 @@ using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -24,6 +25,67 @@ public class CollectionOperationsTests
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
         return lexer.TokenizeAllForParser();
+    }
+
+    [Theory]
+    [InlineData("add")]
+    [InlineData("remove")]
+    [InlineData("clear")]
+    [InlineData("insert")]
+    [InlineData("contains-key")]
+    [InlineData("contains-value")]
+    [InlineData("contains")]
+    [InlineData("count")]
+    [InlineData("keyword-add")]
+    public void NativeCollectionVisitors_RoundTripCallsWithoutRetiredTags(string operation)
+    {
+        var returnType = operation.StartsWith("contains", StringComparison.Ordinal) ? "bool"
+            : operation == "count" ? "int" : "void";
+        var source = $$"""
+            module CollectionRoundTrip
+              func Probe public (System.Collections.Generic.List<int>:items, System.Collections.Generic.Dictionary<string, int>:map, System.Collections.Generic.List<int>:@base) → {{returnType}}
+                ! mut
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        var span = TextSpan.Empty;
+        var value = new IntLiteralNode(span, 1);
+        StatementNode statement = operation switch
+        {
+            "add" => new CollectionPushNode(span, "items",
+                new CollectionCountNode(span, new ReferenceNode(span, "items"))),
+            "remove" => new CollectionRemoveNode(span, "items", value),
+            "clear" => new CollectionClearNode(span, "items"),
+            "insert" => new CollectionInsertNode(span, "items", new IntLiteralNode(span, 0), value),
+            "contains-key" => new ReturnStatementNode(span,
+                new CollectionContainsNode(span, "map", new StringLiteralNode(span, "key"), ContainsMode.Key)),
+            "contains-value" => new ReturnStatementNode(span,
+                new CollectionContainsNode(span, "map", value, ContainsMode.DictValue)),
+            "contains" => new ReturnStatementNode(span,
+                new CollectionContainsNode(span, "items", value, ContainsMode.Value)),
+            "count" => new ReturnStatementNode(span,
+                new CollectionCountNode(span, new ReferenceNode(span, "items"))),
+            "keyword-add" => new CollectionPushNode(span, "base", value),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+        var function = Assert.Single(module.Functions);
+        var updatedFunction = new FunctionNode(function.Span,
+            function.Id, function.Name, function.Visibility, function.Parameters, function.Output,
+            function.Effects, [statement], function.Attributes);
+        module = module.With(update =>
+        {
+            update.Functions = [updatedFunction];
+            update.Items = [updatedFunction];
+        });
+
+        var native = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain("§", native);
+        var reparsed = Parse(native, out diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+        static string[] Tokens(string code) => CSharpSyntaxTree.ParseText(code).GetRoot()
+            .DescendantTokens().Select(token => token.RawKind + ":" + token.ValueText).ToArray();
+        Assert.Equal(Tokens(new CSharpEmitter().Emit(module)),
+            Tokens(new CSharpEmitter().Emit(reparsed)));
     }
 
     #region Lexer Tests

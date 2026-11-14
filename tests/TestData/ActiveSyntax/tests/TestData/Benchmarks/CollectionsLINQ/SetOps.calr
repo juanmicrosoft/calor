@@ -1,12 +1,15 @@
 module SetOps SetOps
   module SetOpsModule
     func Contains public (bool:found) → bool
+      !
       return found
 
     func SetSize public (int:size) → int
+      !
       => result >= 0
       return size
 
     func UnionSize public (int:sizeA, int:sizeB, int:overlapCount) → int
+      !
       => result >= 0
       return (sizeA + sizeB) - overlapCount

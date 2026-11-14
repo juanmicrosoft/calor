@@ -570,10 +570,18 @@ internal sealed record RawCSharpFrame(
                 continue;
             if (token.Value is not RawCSharpFrame frame
                 || string.IsNullOrWhiteSpace(frame.FeatureName) || string.IsNullOrWhiteSpace(frame.Reason))
+            {
                 diagnostics.ReportError(token.Span, Diagnostics.DiagnosticCode.InvalidCSharpInteropReason,
                     "Raw C# passthrough requires nonempty feature and reason metadata. "
                     + "Write native Calor instead, or run calor convert on the original C# and retain its marked fallback. "
                     + "A marker alone does not establish converter origin or reason applicability.");
+                continue;
+            }
+            if (!Migration.FeatureSupport.IsKnownPreservationReason(frame.FeatureName))
+                diagnostics.ReportError(token.Span, Diagnostics.DiagnosticCode.InvalidCSharpInteropReason,
+                    $"Unknown C# preservation feature '{frame.FeatureName}'. "
+                    + "Write native Calor instead, or run calor convert on the original C# to obtain a current reason. "
+                    + "A recognized feature alone does not establish converter origin or reason applicability.");
         }
     }
 

@@ -1282,6 +1282,7 @@ public sealed class LosslessConversionContractTests
             """
             module Library Library
               func Square public (int:x) → int
+                !
                 return x * x
             """);
         await File.WriteAllTextAsync(
@@ -1289,6 +1290,7 @@ public sealed class LosslessConversionContractTests
             """
             module Consumer Consumer
               func UseSquare public (int:x) → int
+                !
                 return Square(x)
             """);
 
@@ -1421,6 +1423,7 @@ public sealed class LosslessConversionContractTests
             """
             module Consumer Consumer
               func Read public () → int
+                !
                 return 42
             """);
         var plan = new MigrationPlan

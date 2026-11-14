@@ -125,6 +125,7 @@ public class OperatorOverloadTests
               class Number struct
                 field int:Value public
                 op + (Number:left, int:right) → int
+                  !
                   requires left.Value >= 0
                   => result >= 0
                   return left.Value + right
@@ -153,6 +154,7 @@ public class OperatorOverloadTests
             module Operators
               class Number struct
                 op + (Number:left, int:right) → int
+                  !
                   return right
                   => result >= 0
             """;
@@ -170,6 +172,7 @@ public class OperatorOverloadTests
 module Test
   class MyType
     op + (MyType:left, MyType:right) → MyType
+      !
       return left
 ";
 
@@ -196,6 +199,7 @@ module Test
 module Test
   class MyType
     op - (MyType:value) → MyType
+      !
       return value
 ";
 
@@ -217,6 +221,7 @@ module Test
 module Test
   class MyType
     op implicit (MyType:value) → int
+      !
       return 0
 ";
 
@@ -238,6 +243,7 @@ module Test
 module Test
   class MyType
     op explicit (int:value) → MyType
+      !
       return value
 ";
 
@@ -257,6 +263,7 @@ module Test
 module Test
   class MyType
     op + (MyType:left, MyType:right) → MyType
+      !
       requires left >= 0
       => result >= 0
       return left
@@ -321,6 +328,7 @@ module Test
 module Test
   class MyType
     op {operatorSymbol} (MyType:left, MyType:right) → MyType
+      !
       return left
 ";
 
@@ -342,6 +350,7 @@ module Test
 module Test
   class MyType
     op {operatorSymbol} (MyType:value) → MyType
+      !
       return value
 ";
 
@@ -364,6 +373,7 @@ module Test
 module Test
   class MyType
     op {operatorSymbol} (MyType:value) → bool
+      !
       return {operatorSymbol}
 ";
 
@@ -386,6 +396,7 @@ module Test
 module Test
   class MyType
     op {operatorSymbol} (MyType:value) → MyType
+      !
       return value
 ";
 
@@ -410,6 +421,7 @@ module Test
 module Test
   class MyType
     op + (MyType:left, MyType:right) → MyType
+      !
       return left
 ";
 
@@ -425,6 +437,7 @@ module Test
 module Test
   class MyType
     op - (MyType:value) → MyType
+      !
       return value
 ";
 
@@ -440,6 +453,7 @@ module Test
 module Test
   class MyType
     op == (MyType:left, MyType:right) → bool
+      !
       return true
 ";
 
@@ -455,6 +469,7 @@ module Test
 module Test
   class MyType
     op implicit (MyType:value) → int
+      !
       return 0
 ";
 
@@ -470,6 +485,7 @@ module Test
 module Test
   class MyType
     op explicit (int:value) → MyType
+      !
       return value
 ";
 
@@ -485,6 +501,7 @@ module Test
 module Test
   class MyType
     op + (int:left, int:right) → int
+      !
       requires left >= 0
       return left + right
 ";
@@ -503,10 +520,13 @@ module Test
 module Test
   class MyType
     op + (MyType:left, MyType:right) → MyType
+      !
       return left
     op - (MyType:left, MyType:right) → MyType
+      !
       return left
     op == (MyType:left, MyType:right) → bool
+      !
       return true
 ";
 
@@ -524,6 +544,7 @@ module Test
 module Test
   class MyType
     op + (int:left, int:right) → int
+      !
       => result >= 0
       return left + right
 ";
@@ -543,6 +564,7 @@ module Test
 module Test
   class MyType
     op ! (MyType:value) → MyType
+      !
       return value
 ";
 
@@ -558,6 +580,7 @@ module Test
 module Test
   class MyType
     op ~ (MyType:value) → MyType
+      !
       return value
 ";
 
@@ -573,6 +596,7 @@ module Test
 module Test
   class MyType
     op true (MyType:value) → bool
+      !
       return true
 ";
 
@@ -588,6 +612,7 @@ module Test
 module Test
   class MyType
     op + (MyType:value) → MyType
+      !
       return value
 ";
 
@@ -610,6 +635,7 @@ module Test
 module Test
   class MyType
     op + (MyType:left, MyType:right) → MyType
+      !
       return left
 ";
 
@@ -636,6 +662,7 @@ module Test
 module Test
   class MyType
     op ++ (MyType:value) → MyType
+      !
       return value
 ";
 
@@ -843,6 +870,7 @@ public class Wrapper
 module Test
   class MyType
     op + (MyType:left, MyType:right) → MyType
+      !
       return left
 ";
 
@@ -873,6 +901,7 @@ module Test
 module Test
   class MyType
     op + (int:left, int:right) → int
+      !
       requires left >= 0
       => result >= 0
       return left + right
@@ -907,6 +936,7 @@ module Test
 module Test
   class MyType
     op implicit (MyType:value) → int
+      !
       return 0
 ";
 
@@ -932,6 +962,7 @@ module Test
 module Test
   class MyType
     op + (int:left, int:right) → int
+      !
       requires left >= 0
       => result >= 0
       return left + right
@@ -954,6 +985,7 @@ module Test
 module Test
   class MyType
     op + (int:left, int:right) → int
+      !
       requires left >= 0
       => result >= 0
       return left + right
@@ -1139,6 +1171,7 @@ module Test
               class Vector<T> public
                 where T : struct
                 op + (Vector<T>:a, Vector<T>:b) → Vector<T>
+                  ! alloc, mut
                   return new Vector<T>()
             """;
 

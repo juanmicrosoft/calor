@@ -55,6 +55,7 @@ public class BindInferenceDocsTests
         var source = """
 module Test Test
   func Foo () → int
+    !
     let x = 42
     return x
 """;
@@ -70,6 +71,7 @@ module Test Test
         var source = """
 module Test Test
   func Foo () → string
+    !
     let s = "hello"
     return s
 """;
@@ -85,6 +87,7 @@ module Test Test
         var source = """
 module Test Test
   func Foo () → bool
+    !
     let b = true
     return b
 """;
@@ -100,6 +103,7 @@ module Test Test
         var source = """
 module Test Test
   func Foo () → double
+    !
     let x = 3.14
     return x
 """;
@@ -116,6 +120,7 @@ module Test Test
         var source = """
 module Test Test
   func Foo () → int
+    !
     let int:x = 0
     return x
 """;
@@ -181,6 +186,7 @@ module Test Test
         var source = """
 module Test Test
   func Foo () → int
+    !
     var counter = 0
     return counter
 """;

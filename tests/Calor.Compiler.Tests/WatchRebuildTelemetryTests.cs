@@ -65,6 +65,7 @@ public sealed class WatchRebuildTelemetryTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "mod.calr"), """
             module WatchMod
               func answer public () → int
+                !
                 return 42
             """);
 
@@ -81,6 +82,7 @@ public sealed class WatchRebuildTelemetryTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "mod.calr"), """
             module WatchMod
               func answer public () → int
+                !
                 return 42
             """);
         var logPath = Path.Combine(_root, "watch-rebuilds.jsonl");
@@ -104,6 +106,7 @@ public sealed class WatchRebuildTelemetryTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "mod.calr"), """
             module WatchMod
               func answer public () → int
+                !
                 return 42
             """);
 

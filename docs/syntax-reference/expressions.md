@@ -257,6 +257,7 @@ module CollectionExpressions
     !
     requires items.Count > 0
     => result > 0
+    // Get count
     return items.Count
 
   func Main () → (bool, bool, bool, int, int)
@@ -265,6 +266,7 @@ module CollectionExpressions
     items.Add(5)
     let Dictionary<string,int>:ages = new Dictionary<string,int>()
     ages.Add("alice", 30)
+    // Check if list contains element
     return (items.Contains(5), ages.ContainsKey("alice"), ages.ContainsValue(30), NonEmptyCount(items), items[0])
 ```
 

@@ -201,8 +201,10 @@ public class InfixOperatorTests
         var type = Compile("""
             module Infix Infix
               func Probe (bool:cast) → int
+                !
                 return (cast?4:9)
               func Nullable (object:value) → int?
+                !
                 return (int?)value
             """);
         Assert.Equal(4, Invoke(type, "Probe", true));
@@ -281,8 +283,10 @@ public class InfixOperatorTests
         var typeWithOperations = Compile("""
             module Infix Infix
               func As (object:value) → bool
+                !
                 return (value as string) is string text && text.Length > 0
               func Is (object:value) → bool
+                !
                 return (value is string) is bool flag && flag
             """);
         foreach (var value in new object?[] { "text", "", 7, null })
@@ -339,6 +343,7 @@ public class InfixOperatorTests
         var module = Parse($$"""
             module Infix Infix
               func Probe () → void
+                !
                 let _expr004 = AccessorCache<Person>
                 {{nativeStatement}}
             """);
@@ -407,12 +412,14 @@ public class InfixOperatorTests
         const string source = """
             module Infix Infix
               func Probe (int:x = 1 + 2 * 3) → int
+                !
                 requires x >= 0 && x < 10
                 => result > x
                 let int:n = x + 1
                 Sink(n * 2, x - 1)
                 return n
               func Next () → int
+                !
                 return 4
             """;
         var module = Parse(source);
@@ -459,12 +466,13 @@ public class InfixOperatorTests
     public void PositionalStatementOperands_DoNotConsumeANegativeValue(string statement, string nativeStatement)
     {
         var diagnostics = new DiagnosticBag();
-        Parse($"module Infix\n  func Probe () → void\n    {statement}", diagnostics);
+        Parse($"module Infix\n  func Probe () → void\n    !\n    {statement}", diagnostics);
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownSectionMarker
             && diagnostic.Message.Contains("Legacy section marker", StringComparison.Ordinal));
         var module = Parse($$"""
             module Infix Infix
               func Probe () → void
+                !
                 {{nativeStatement}}
             """);
         var parsed = Assert.Single(Assert.Single(module.Functions).Body);
@@ -579,10 +587,13 @@ public class InfixOperatorTests
         var type = Compile($$"""
             module Infix Infix
               func Double () → double
+                !
                 return -0.0
               func Single () → float
+                !
                 return -0.0f
               func Decimal () → decimal
+                !
                 return -{{decimalLiteral}}
             """);
         Assert.Equal(long.MinValue, BitConverter.DoubleToInt64Bits(Assert.IsType<double>(Invoke(type, "Double"))));
@@ -621,17 +632,19 @@ public class InfixOperatorTests
         var type = Compile("""
             module Infix Infix
               func Number private (List<int>:trace, int:n) → int
-                ! mut
                 trace.Add(n)
                 return n
               func Probe (List<int>:trace, int?:x, bool:condition) → int
                 ! mut
                 return condition ? x ?? Number(trace, 1) + Number(trace, 2) * Number(trace, 3) : Number(trace, 4)
               func And (bool:left, int:zero) → bool
+                !
                 return left && 1 / zero > 0
               func Or (bool:left, int:zero) → bool
+                !
                 return left || 1 / zero > 0
               func Eager (bool:left, int:zero) → bool
+                !
                 return left & (1 / zero > 0)
             """);
         var trace = new List<int>();
@@ -658,8 +671,10 @@ public class InfixOperatorTests
         var type = Compile("""
             module Infix Infix overflow checked
               func Probe (int:x) → int
+                !
                 return x + 1 * 2
               func Negate (int:x) → int
+                !
                 return -x
             """);
         Assert.IsType<OverflowException>(
@@ -674,6 +689,7 @@ public class InfixOperatorTests
         const string source = """
             module Infix Infix
               func Probe (int:x) → string
+                !
                 return "v=${x + 2 * 3}"
             """;
         var function = Assert.Single(Parse(source).Functions);
@@ -701,6 +717,7 @@ public class InfixOperatorTests
     private static string Source(string expression, string type = "int") => $$"""
         module Infix Infix
           func Probe () → {{type}}
+            !
             return {{expression}}
         """;
 

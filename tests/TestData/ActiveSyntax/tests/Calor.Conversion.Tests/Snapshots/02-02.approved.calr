@@ -4,5 +4,8 @@ module Test_02_02 Test_02_02 overflow unchecked
   interface IRepository<T> public
     where T : class
     func GetById (int:id) → T
+      !
     func Save (T:entity)
+      !
     func GetAll () → IEnumerable<T>
+      !

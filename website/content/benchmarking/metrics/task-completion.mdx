@@ -154,6 +154,7 @@ These are different questions that require different benchmarks.
 ```calor
 module TaskSafeDivide
   func SafeDivide public (int:a, int:b) → int
+    !
     requires b != 0
     return a / b
 ```
@@ -186,6 +187,7 @@ task-completion score or a claim of exception equivalence.
 ```calor
 module TaskNormalizeScore
   func NormalizeScore public (int:score, int:maxScore) → int
+    !
     requires score >= 0
     requires maxScore > 0
     requires score <= maxScore

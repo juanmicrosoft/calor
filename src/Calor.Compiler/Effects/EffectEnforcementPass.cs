@@ -275,6 +275,15 @@ public sealed class EffectEnforcementPass
         _callGraphAnalysis = CallGraphAnalysis.Build(
             module, CrossModuleFunctionModules, contractInheritance, ProjectionContractMode,
             CrossModuleTypes, SourcePath);
+        if (_callGraphAnalysis.RuntimeQuantifierRejections.Count > 0)
+        {
+            foreach (var error in _callGraphAnalysis.RuntimeQuantifierRejections)
+                if (!_diagnostics.Any(existing =>
+                    existing.Code == error.Code && existing.Span == error.Span
+                    && existing.Message == error.Message))
+                    _diagnostics.Add(error);
+            return;
+        }
         if (_callGraphAnalysis.SourceConstructionErrors.Count > 0)
         {
             foreach (var error in _callGraphAnalysis.SourceConstructionErrors)
@@ -345,9 +354,6 @@ public sealed class EffectEnforcementPass
             {
                 var id = $"{cls.Name}.{op.Id}";
                 _ownerClassByFunctionId[id] = cls;
-                if (op.Effects is null)
-                    _implicitAccessorsByFunctionId[id] =
-                        new ImplicitAccessorDeclaration(cls.Name, $"op_{op.Kind}", "operator", op);
             }
             foreach (var indexer in CallGraphAnalysis.EnumerateIndexers(cls))
             {
@@ -723,7 +729,8 @@ public sealed class EffectEnforcementPass
 
     private InferenceContext CreateInferenceContext(
         string functionId, HashSet<string> sccMembers, ClassDefinitionNode? owner,
-        ConstructorDeclaration? constructor, List<string> assumptions) =>
+        ConstructorDeclaration? constructor, List<string> assumptions,
+        IReadOnlySet<string>? ownedByRefParameters = null) =>
         new(
             _resolver, _computedEffects,
             _callGraphAnalysis.Functions,
@@ -746,7 +753,18 @@ public sealed class EffectEnforcementPass
             AstResolution = AstResolution,
             EnclosingTypeParameters = owner is not null
                 ? ReturnShape.GetCallableTypeParameters(owner, _module) : [],
+            OwnedByRefParameters = ownedByRefParameters,
+            ResolveOwnedByRefCall = InferOwnedByRefCall,
         };
+
+    private EffectSet InferOwnedByRefCall(string functionId, IReadOnlySet<string> ownedParameters)
+    {
+        var function = _callGraphAnalysis.Functions[functionId];
+        var context = CreateInferenceContext(functionId, [],
+            _ownerClassByFunctionId.GetValueOrDefault(functionId), null, [],
+            ownedParameters);
+        return new EffectInferrer(context).InferFromFunction(function);
+    }
 
     private void CheckImplicitStaticInitializers(ModuleNode module)
     {
@@ -3573,6 +3591,8 @@ public sealed class EffectEnforcementPass
         public IReadOnlyList<TypeParameterNode> EnclosingTypeParameters { get; init; } = [];
         public ConstructorDeclaration? CurrentConstructor { get; }
         public Func<string, EffectSet> ResolveInternalEffects { get; }
+        public IReadOnlySet<string>? OwnedByRefParameters { get; init; }
+        public Func<string, IReadOnlySet<string>, EffectSet>? ResolveOwnedByRefCall { get; init; }
 
         /// <summary>
         /// Sink for D-W2.3 assumption reasons collected while inferring the current
@@ -3843,7 +3863,7 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromCompoundAssignment(CompoundAssignmentStatementNode compound)
         {
-            return InferFromAssignmentTarget(compound.Target, readValue: true)
+            return InferFromAssignmentTarget(compound.Target, readValue: true, ownedStore: true)
                 .Union(InferFromExpression(compound.Value));
         }
 
@@ -3861,7 +3881,8 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromCallStatement(CallStatementNode call)
         {
-            var effects = InferFromCallTarget(call.Target, call.Span, call.Arguments);
+            var effects = InferFromCallTarget(call.Target, call.Span, call.Arguments,
+                argumentModifiers: call.ArgumentModifiers, argumentNames: call.ArgumentNames);
             return effects.Union(InferFromCallArguments(call.Target, call.Arguments, call.ArgumentModifiers));
         }
 
@@ -3925,7 +3946,9 @@ public sealed class EffectEnforcementPass
             string target,
             TextSpan span,
             IReadOnlyList<ExpressionNode>? arguments = null,
-            TextSpan? referenceSpan = null)
+            TextSpan? referenceSpan = null,
+            IReadOnlyList<string?>? argumentModifiers = null,
+            IReadOnlyList<string?>? argumentNames = null)
         {
             // 0.25 F3 (#847): the binder decides; without binder data a possible
             // local-function call is Unknown, never a same-named member. A call
@@ -3939,16 +3962,63 @@ public sealed class EffectEnforcementPass
                     return EffectSet.Unknown;
                 case false when IsLocalFunctionName(target):
                     return LocalFunctionUseCharge().Union(
-                        InferFromCallTargetCore(target, span, arguments, referenceSpan));
+                        InferFromCallTargetCore(target, span, arguments, referenceSpan,
+                            argumentModifiers, argumentNames));
             }
-            return InferFromCallTargetCore(target, span, arguments, referenceSpan);
+            return InferFromCallTargetCore(target, span, arguments, referenceSpan,
+                argumentModifiers, argumentNames);
+        }
+
+        private EffectSet InstantiateOwnedByRefEffects(
+            FunctionNode function, EffectSet effects, IReadOnlyList<ExpressionNode>? arguments,
+            IReadOnlyList<string?>? modifiers, IReadOnlyList<string?>? names)
+        {
+            if (!UsesInferredEffects(function) || effects.IsUnknown
+                || Binding.BoundTypes.EffectRow.Fits(EffectSet.From("mut").ToRow(), effects.ToRow())
+                    != Binding.BoundTypes.EffectFit.Fits
+                || _context.OwnedByRefParameters != null
+                || _context.CurrentConstructor != null || _lambdaDepth != 0
+                || _localFunctionScope != null || _context.SccMembers.Contains(function.Id)
+                || arguments == null || arguments.Count != function.Parameters.Count)
+                return effects;
+
+            var ownedParameters = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < arguments.Count; index++)
+            {
+                if (modifiers == null || index >= modifiers.Count
+                    || modifiers[index] is not ("ref" or "out")
+                    || arguments[index] is not ReferenceNode reference
+                    || reference.Name.Contains('.')
+                    || _context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span)
+                        is not { } variable
+                    || variable.StorageIdentity is not { IsField: false, IsProperty: false } storage
+                    || (storage.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) != 0)
+                    continue;
+
+                var parameter = names != null && index < names.Count && names[index] is { } name
+                    ? function.Parameters.FirstOrDefault(candidate => candidate.Name == name)
+                    : function.Parameters[index];
+                if (parameter != null
+                    && (parameter.Modifier & (ParameterModifier.Ref | ParameterModifier.Out)) != 0)
+                    ownedParameters.Add(parameter.Name);
+            }
+            if (ownedParameters.Count == 0 || _context.ResolveOwnedByRefCall == null)
+                return effects;
+
+            // Re-infer only these proven local stores; keep the declaration's whole row.
+            // Nested calls, escaping callables and every other mutation remain charged.
+            var instantiated = _context.ResolveOwnedByRefCall(function.Id, ownedParameters);
+            return Binding.BoundTypes.EffectRow.Fits(instantiated.ToRow(), effects.ToRow())
+                == Binding.BoundTypes.EffectFit.Fits ? instantiated : effects.Union(instantiated);
         }
 
         private EffectSet InferFromCallTargetCore(
             string target,
             TextSpan span,
             IReadOnlyList<ExpressionNode>? arguments,
-            TextSpan? referenceSpan)
+            TextSpan? referenceSpan,
+            IReadOnlyList<string?>? argumentModifiers,
+            IReadOnlyList<string?>? argumentNames)
         {
             // Unknown argument inference cannot authorize a same-named manifest
             // overload. A declared delegate still supplies its invocation row.
@@ -3979,6 +4049,11 @@ public sealed class EffectEnforcementPass
 
                     if (_context.ComputedEffects.TryGetValue(exactInternalId, out var exactEffects))
                     {
+                        if (exactInternalIds.Count == 1
+                            && _context.CallGraph.IsBinderResolvedCallSite(
+                                _context.CurrentFunctionId, target, span))
+                            exactEffects = InstantiateOwnedByRefEffects(
+                                function, exactEffects, arguments, argumentModifiers, argumentNames);
                         effects = effects.Union(exactEffects);
                     }
                     else if (_context.SccMembers.Contains(exactInternalId))
@@ -5882,7 +5957,7 @@ public sealed class EffectEnforcementPass
             if (_context.CallGraph.AnonymousPropertyRead(_context.CurrentFunctionId, expression.Span)
                 is { Type: not Binding.BoundTypes.UnresolvedBoundType } anonymousProperty)
                 return EffectResolver.NormalizeParameterType(anonymousProperty.Type.DisplayString);
-            if (expression is ReferenceNode or FieldAccessNode or NewExpressionNode
+            if (expression is ReferenceNode or FieldAccessNode or NewExpressionNode or NullCoalesceNode
                 && _context.CallGraph.MetadataValueType(_context.CurrentFunctionId, expression.Span) is { } metadataType)
                 return EffectResolver.NormalizeParameterType(metadataType.ToDisplayString());
             return expression switch
@@ -5913,6 +5988,11 @@ public sealed class EffectEnforcementPass
                 ConditionalExpressionNode conditional => CommonType(
                     InferExpressionType(conditional.WhenTrue),
                     InferExpressionType(conditional.WhenFalse)),
+                NullCoalesceNode { Right: ThrowExpressionNode } coalesce =>
+                    Parsing.AttributeHelper.TryUnwrapNullableAnnotation(
+                        InferExpressionType(coalesce.Left), out var referent)
+                        ? EffectResolver.NormalizeParameterType(referent)
+                        : InferExpressionType(coalesce.Left),
                 CallExpressionNode call => InferCallReturnType(call),
                 ExpressionCallNode call => InferKnownComputedCallResultType(call) ?? "?",
                 FieldAccessNode field => InferFieldAccessType(field),
@@ -6669,13 +6749,13 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromAssignment(AssignmentStatementNode assign)
         {
-            return InferFromAssignmentTarget(assign.Target, readValue: false)
+            return InferFromAssignmentTarget(assign.Target, readValue: false, ownedStore: true)
                 .Union(assign.Target is ReferenceNode target && !target.Name.Contains('.')
                     ? InferFromRowCheckedValue(assign.Value)
                     : InferFromExpression(assign.Value));
         }
 
-        private EffectSet InferFromAssignmentTarget(ExpressionNode target, bool readValue)
+        private EffectSet InferFromAssignmentTarget(ExpressionNode target, bool readValue, bool ownedStore = false)
         {
             if (_context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, target.Span)
                 is { SourceStaticFieldOwner: { } sourceOwner })
@@ -6696,7 +6776,7 @@ public sealed class EffectEnforcementPass
                 return effects.Union(EffectSet.From("mut"))
                     .Union(InferSetterEffects(receiver, member, reference.Span));
             }
-            if (target is ReferenceNode bare && IsBareMutationTarget(bare))
+            if (target is ReferenceNode bare && IsBareMutationTarget(bare, ownedStore))
                 return EffectSet.From("mut");
 
             var targetEffects = InferFromExpression(target);
@@ -6705,11 +6785,13 @@ public sealed class EffectEnforcementPass
                 : targetEffects;
         }
 
-        private bool IsBareMutationTarget(ReferenceNode reference)
+        private bool IsBareMutationTarget(ReferenceNode reference, bool ownedStore)
         {
             if (_context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span) is { } variable)
                 return variable.IsField || variable.IsParameter
-                    && (variable.Modifier & (ParameterModifier.Ref | ParameterModifier.Out)) != 0;
+                    && (variable.Modifier & (ParameterModifier.Ref | ParameterModifier.Out)) != 0
+                    && !(ownedStore && _lambdaDepth == 0 && _localFunctionScope == null
+                        && _context.OwnedByRefParameters?.Contains(variable.Name) == true);
 
             // AST-only inference has no lexical identity. Never let a possible
             // shadow make a state write silently pure when binding is unavailable.
@@ -7189,7 +7271,8 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromCallExpression(CallExpressionNode call)
         {
-            var effects = InferFromCallTarget(call.Target, call.Span, call.Arguments);
+            var effects = InferFromCallTarget(call.Target, call.Span, call.Arguments,
+                argumentModifiers: call.ArgumentModifiers, argumentNames: call.ArgumentNames);
             return effects.Union(InferFromCallArguments(call.Target, call.Arguments, call.ArgumentModifiers));
         }
 

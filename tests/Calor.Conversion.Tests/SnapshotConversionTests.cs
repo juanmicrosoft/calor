@@ -478,9 +478,9 @@ public class SnapshotConversionTests
         var methods = Assert.Single(module.Classes).Methods;
         Assert.Equal(2, methods.Count);
         if (id == "07-04")
-            Assert.Null(methods.Single(method => method.Name == "Handle").Parameters[1].Row);
+            Assert.True(methods.Single(method => method.Name == "Handle").Parameters[1].Row!.IsUnknown);
         else
-            Assert.Null(methods.Single(method => method.Name == "GetComparer").Output!.Row);
+            Assert.True(methods.Single(method => method.Name == "GetComparer").Output!.Row!.IsUnknown);
     }
 
     [Theory]

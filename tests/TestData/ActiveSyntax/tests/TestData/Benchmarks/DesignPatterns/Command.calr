@@ -1,13 +1,17 @@
 module Command Command
   module CommandModule
     func Execute public (int:value, int:delta) → int
+      !
       return value + delta
 
     func Undo public (int:value, int:delta) → int
+      !
       return value - delta
 
     func CanUndo public (int:historySize) → bool
+      !
       return historySize > 0
 
     func HistoryPush public (int:historySize) → int
+      !
       return historySize + 1

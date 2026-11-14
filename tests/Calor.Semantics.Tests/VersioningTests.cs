@@ -229,9 +229,8 @@ public class VersioningTests
     }
 
     /// <summary>
-    /// Review round 1 finding 4: the legacy bracket form the hook used to recommend is
-    /// exactly one clear Calor0702 pointing at braces — not an empty-string 0702 plus a
-    /// cascade of parser errors.
+    /// Retain the historical test identity: the retired bracket directive is rejected
+    /// by the lexer. Native malformed-version recovery is covered separately below.
     /// </summary>
     [Fact]
     public void Compile_BracketSemver_IsSingleError_Calor0702_UseBraces()
@@ -239,13 +238,12 @@ public class VersioningTests
         var result = CompileModule("  §SEMVER[1.0.0]");
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
-        Assert.Contains("use braces: §SEMVER{MAJOR.MINOR.PATCH}", diagnostic.Message);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
+        Assert.Contains("Legacy section marker '§SEMVER' is removed.", diagnostic.Message);
     }
 
     /// <summary>
-    /// Review round 1 finding 9: an unterminated §SEMVER{ stops at the end of its line and
-    /// reports one Calor0702 instead of swallowing the statements that follow it.
+    /// An unterminated retired directive remains a single lexer rejection.
     /// </summary>
     [Fact]
     public void Compile_UnterminatedSemver_IsSingleError_Calor0702()
@@ -253,20 +251,20 @@ public class VersioningTests
         var result = CompileModule("  §SEMVER{2.0.0");
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
-        Assert.Contains("Unterminated §SEMVER", diagnostic.Message);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
+        Assert.Contains("Legacy section marker '§SEMVER' is removed.", diagnostic.Message);
         Assert.Equal(2, diagnostic.Span.Line);
     }
 
-    /// <summary>Bare §SEMVER with no brace group at all is a single Calor0702.</summary>
+    /// <summary>Bare §SEMVER is rejected as a retired marker, not a native version declaration.</summary>
     [Fact]
     public void Compile_BareSemver_IsSingleError_Calor0702()
     {
         var result = CompileModule("  §SEMVER");
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
-        Assert.Contains("expected §SEMVER{MAJOR.MINOR.PATCH}", diagnostic.Message);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
+        Assert.Contains("Legacy section marker '§SEMVER' is removed.", diagnostic.Message);
     }
 
     /// <summary>

@@ -9,4 +9,5 @@ module DbService DbService
       System.Console.WriteLine(data)
 
     func PureTransform public (string:data) → string
+      !
       return data

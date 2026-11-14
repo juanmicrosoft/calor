@@ -1,6 +1,7 @@
 module RangeContracts RangeContracts
   module RangeContractsModule
     func ClampByte public (int:value) → int
+      !
       => result >= 0
       => result <= 255
       if value < 0
@@ -11,6 +12,7 @@ module RangeContracts RangeContracts
         return value
 
     func Percentage public (int:part, int:whole) → int
+      !
       requires whole > 0
       requires part >= 0
       requires part <= whole
@@ -19,6 +21,7 @@ module RangeContracts RangeContracts
       return (part * 100) / whole
 
     func MapRange public (int:value, int:inMin, int:inMax, int:outMin, int:outMax) → int
+      !
       requires inMin < inMax
       requires outMin < outMax
       requires value >= inMin

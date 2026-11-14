@@ -1,6 +1,7 @@
 module StringAnalysis StringAnalysis
   module StringAnalysisModule
     func IsVowel public (string:ch) → bool
+      !
       if ch == "a"
         return true
       else if ch == "e"

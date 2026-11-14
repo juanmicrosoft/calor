@@ -74,11 +74,11 @@ public sealed class EnumExtensionIdentityMigrationTests : IDisposable
     [Fact]
     public void ArbitraryFunctionToMethodRelocationIsStillRejected()
     {
-        const string before = "module Native\n  func Read () → int\n    return 7";
+        const string before = "module Native\n  func Read () → int\n    !\n    return 7";
         Directory.CreateDirectory(_root);
         File.WriteAllText(FilePath, before);
         var initial = Store.Sync([FilePath]);
-        const string after = "module Native\n  module Owner\n    func Read () → int\n      return 7";
+        const string after = "module Native\n  module Owner\n    func Read () → int\n      !\n      return 7";
         var target = DeclarationIdentityStore.Describe("Extensions.calr", after)
             .Single(declaration => declaration.Kind == IdKind.Method);
         var method = initial.Declarations.Single(declaration => declaration.Kind == IdKind.Function);
@@ -117,6 +117,7 @@ public sealed class EnumExtensionIdentityMigrationTests : IDisposable
 
               module Other
                 func Read (Mode:self, int:delta) → int
+                  !
                   return delta
             """;
         var destinations = DeclarationIdentityStore.Describe("Extensions.calr", after);
@@ -299,7 +300,7 @@ public sealed class EnumExtensionIdentityMigrationTests : IDisposable
     }
 
     [Theory]
-    [InlineData("class Owner\n    module Nested\n      func Read (this Mode:self) → int\n        return 7")]
+    [InlineData("class Owner\n    module Nested\n      func Read (this Mode:self) → int\n        !\n        return 7")]
     [InlineData("module Owner<T>\n    func Read (this Mode:self) → int\n      return 7")]
     public void NativeExtensionOwnersStillRejectNestedAndGenericContainers(string declaration)
     {

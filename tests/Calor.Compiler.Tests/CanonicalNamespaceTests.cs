@@ -23,7 +23,7 @@ public sealed class CanonicalNamespaceTests
     public void PositionalNamespaceIsSeparateFromWrapperAndStaticContainer(
         string header, string expectedNamespace, bool fileScoped)
     {
-        var module = Parse($"{header}\n  module Area\n    func Square (int:side) → int\n      return side * side");
+        var module = Parse($"{header}\n  module Area\n    func Square (int:side) → int\n      !\n      return side * side");
         Assert.Equal("Grid", module.Name);
         var scope = Assert.Single(module.NamespaceScopes);
         Assert.Equal(expectedNamespace, scope.FullName);
@@ -527,7 +527,8 @@ public sealed class CanonicalNamespaceTests
               namespace using System
 
               module Probe
-                func Keep (Func<int>:callback) → Func<int>
+                func Keep (Func<int>:callback ! unknown) → Func<int> ! unknown
+                  !
                   return callback
             """;
         Compile(source);
@@ -548,7 +549,7 @@ public sealed class CanonicalNamespaceTests
         Assert.Empty(result.Losses);
         Assert.Equal("failed", result.Paths.RoundTrip);
         Assert.Contains(result.Issues, issue => issue.Feature == "scoped-namespace-fidelity"
-            && issue.Message.Contains("The return of 'Keep' is function-typed with no effect row"));
+            && issue.Message.Contains("The return of 'Keep' explicitly declares Unknown effects"));
     }
 
     [Fact]
@@ -909,7 +910,7 @@ public sealed class CanonicalNamespaceTests
     [InlineData("Root::EventArgs.Empty", 16)]
     public void AuthoredAliasQualifiedValuesRemainExplicitCapabilityErrors(string expression, int column)
     {
-        var source = $"module Values\n  func Read () → object\n    return {expression}";
+        var source = $"module Values\n  func Read () → object\n    !\n    return {expression}";
         var diagnostics = new DiagnosticBag();
         _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken

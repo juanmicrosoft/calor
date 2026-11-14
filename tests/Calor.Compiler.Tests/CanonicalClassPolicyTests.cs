@@ -175,9 +175,11 @@ public sealed class CanonicalClassPolicyTests
             module StaticTypes
               module Counter
                 func Read () → int
+                  !
                   return 7
               class Ordinary
                 func Read static () → int
+                  !
                   return 9
             """;
         var module = Parse(source);

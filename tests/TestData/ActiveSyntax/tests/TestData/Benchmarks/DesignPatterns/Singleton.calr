@@ -1,10 +1,13 @@
 module Singleton Singleton
   module SingletonModule
     func IsInitialized public (bool:hasInstance) → bool
+      !
       return hasInstance
 
     func GetValue public (int:value) → int
+      !
       return value
 
     func SetValue public (int:oldValue, int:newValue) → int
+      !
       return newValue

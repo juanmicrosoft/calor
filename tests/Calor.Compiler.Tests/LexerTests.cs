@@ -98,6 +98,7 @@ public class LexerTests
               class Derived extends Parent
                 field int:shared private
                 func Sum () → int
+                  !
                   return this.shared + base.shared
             """;
         var compilation = Program.Compile(source);
@@ -395,7 +396,7 @@ public class LexerTests
     public void SupplementalPreprocessor_PreservesThePhysicalLineWithoutConsumingTokens(string newline)
     {
         const string condition = "\tDEBUG  && !TRACE /* preserve  spacing */ \t";
-        var source = "/// since 1.0" + newline + "pp" + condition + newline + "func Next () → void";
+        var source = "/// since 1.0" + newline + "pp" + condition + newline + "func Next () → void\n  !";
         var tokens = Tokenize(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
@@ -490,7 +491,7 @@ public class LexerTests
     public void IdentityParsing_StillRejectsParserErrorsAfterSuccessfulLexing()
     {
         DeclarationIdentityStore.Describe("valid-parser-boundary.calr",
-            "module Good\n  func Main () → int\n    return 1\n");
+            "module Good\n  func Main () → int\n    !\n    return 1\n");
         const string source = "module Bad\n  func Main () → void\n    return f(,)\n";
         var lexicalDiagnostics = new DiagnosticBag();
         new Lexer(source, lexicalDiagnostics).TokenizeAllForParser();

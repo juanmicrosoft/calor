@@ -15,6 +15,7 @@ public class ContractEnforcementTests
     private const string RequiresCurrentNativeProgram = """
         module Test Test
           func Divide public (int:a, int:b) → int
+            !
             requires b != 0
             return a / b
         """;
@@ -22,6 +23,7 @@ public class ContractEnforcementTests
     private const string EnsuresCurrentNativeProgram = """
         module Test Test
           func GetPositive public (int:n) → int
+            !
             => result > 0
             return n
         """;
@@ -29,6 +31,7 @@ public class ContractEnforcementTests
     private const string ModeOffCurrentNativeProgram = """
         module Test Test
           func Divide public (int:a, int:b) → int
+            !
             requires b != 0
             return a / b
         """;
@@ -36,6 +39,7 @@ public class ContractEnforcementTests
     private const string MultipleReturnsCurrentNativeProgram = """
         module Test Test
           func Abs public (int:n) → int
+            !
             => result >= 0
             if n < 0
               return 0 - n
@@ -45,6 +49,7 @@ public class ContractEnforcementTests
     private const string FunctionIdCurrentNativeProgram = """
         module Test Test
           func RequirePositive public (int:n) → int
+            !
             requires n > 0
             return n
         """;
@@ -52,6 +57,7 @@ public class ContractEnforcementTests
     private const string NoEffectsCurrentNativeProgram = """
         module Test Test
           func SafeAdd public (int:a, int:b) → int
+            !
             requires a >= 0
             => result >= a
             return a + b

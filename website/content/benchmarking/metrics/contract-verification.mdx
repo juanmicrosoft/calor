@@ -70,6 +70,7 @@ The repository includes a deliberately refutable postcondition fixture:
 ```calor
 module OutcomeRefuted
   func Dec (int:x) → int
+    !
     requires x > 0
     => result > 10
     return x - 1
@@ -133,20 +134,20 @@ Z3 verification supports:
 
 | Calor | Z3 | Description |
 |:------|:---|:------------|
-| `(+ a b)` | `a + b` | Addition |
-| `(- a b)` | `a - b` | Subtraction |
-| `(* a b)` | `a * b` | Multiplication |
-| `(/ a b)` | `a div b` | Division |
-| `(% a b)` | `a mod b` | Modulo |
-| `(== a b)` | `a = b` | Equality |
-| `(!= a b)` | `a ≠ b` | Inequality |
-| `(< a b)` | `a < b` | Less than |
-| `(<= a b)` | `a ≤ b` | Less or equal |
-| `(> a b)` | `a > b` | Greater than |
-| `(>= a b)` | `a ≥ b` | Greater or equal |
-| `(&& p q)` | `p ∧ q` | Logical and |
-| `(\|\| p q)` | `p ∨ q` | Logical or |
-| `(! p)` | `¬p` | Logical not |
+| `a + b` | `a + b` | Addition |
+| `a - b` | `a - b` | Subtraction |
+| `a * b` | `a * b` | Multiplication |
+| `a / b` | `a div b` | Division |
+| `a % b` | `a mod b` | Modulo |
+| `a == b` | `a = b` | Equality |
+| `a != b` | `a ≠ b` | Inequality |
+| `a < b` | `a < b` | Less than |
+| `a <= b` | `a ≤ b` | Less or equal |
+| `a > b` | `a > b` | Greater than |
+| `a >= b` | `a ≥ b` | Greater or equal |
+| `p && q` | `p ∧ q` | Logical and |
+| `p \|\| q` | `p ∨ q` | Logical or |
+| `!p` | `¬p` | Logical not |
 
 Integers use fixed-width bit-vectors, supported C# promotion rules, and the
 module's overflow policy. A bit-vector encoding does not mean native arithmetic

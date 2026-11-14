@@ -1,15 +1,19 @@
 module ScoreBoard ScoreBoard
   module ScoreBoardModule
     func UpdateScore public (int:current, int:points) → int
+      !
       return current + points
 
     func IsHighScore public (int:score, int:highScore) → bool
+      !
       return score > highScore
 
     func Rank public (int:winsAbove) → int
+      !
       => result >= 1
       return winsAbove + 1
 
     func AverageScore public (int:totalScore, int:games) → float
+      !
       requires games > 0
       return (double)totalScore / (double)games

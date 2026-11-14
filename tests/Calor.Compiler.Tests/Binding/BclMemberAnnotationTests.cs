@@ -110,7 +110,7 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
                 module GetterEffects
                   using Env = System.Environment
                   func Probe public () → {{returnType}}
-                    {{row}}
+                    {{(row.Length == 0 ? "!" : row)}}
                     return {{expression}}
                 """;
             var result = Program.Compile(source, "getter-effects.calr");
@@ -195,8 +195,10 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         string Source(bool guarded) => $$"""
             module GuardedLegacy
               func Take public (System.IO.DirectoryInfo:value) → System.IO.DirectoryInfo
+                !
                 return value
               func Probe public (N5Fixture.Legacy:value) → System.IO.DirectoryInfo
+                !
                 let legacy = value.DirectoryField
                 {{(guarded ? "if legacy != null\n      " : "")}}{{nativeStatement}}
             """;
@@ -434,7 +436,8 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         return $$"""
             module BclMembers
               func Probe public ({{parameters}}) → {{(boundary == "return" ? nativeType : "void")}}
-                {{(effects is null ? "" : $"! {effects}\n    ")}}{{body}}
+                {{(effects is null ? "!" : $"! {effects}")}}
+                {{body}}
             """;
     }
 

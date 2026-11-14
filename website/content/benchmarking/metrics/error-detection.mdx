@@ -88,6 +88,7 @@ Base score: 0.30, cap at 0.90
 ```calor
 module DivisionSignals
   func Divide public (int:a, int:b) → int
+    !
     requires b != 0
     requires a >= 0
     => result >= 0
@@ -139,6 +140,7 @@ C# build configuration and is not Calor's runtime postcondition mechanism.
 ```calor
 module NullSignals
   func Length public (string:input) → int
+    !
     requires input != null
     return input.Length
 ```
@@ -160,6 +162,7 @@ input ?? throw new ArgumentNullException();
 ```calor
 module BoundsSignals
   func At public (int[]:array, int:index) → int
+    !
     requires index >= 0
     requires index < array.Length
     return array[index]
@@ -193,12 +196,14 @@ Given this buggy call:
 ```calor
 module BuggyCaller
   func Divide (int:a, int:b) → int
+    !
     requires b != 0
     requires a >= 0
     => result >= 0
     return a / b
 
   func Trigger public (int:x, int:y) → int
+    !
     let int:result = Divide(x, y - y)
     return result
 ```
@@ -233,6 +238,7 @@ type does not make the enabled precondition optional.
 ```calor
 module NullableSignals
   func SafeDivide public (int:a, int:b) → int?
+    !
     requires b != 0
     => result == a / b
     if b == 0

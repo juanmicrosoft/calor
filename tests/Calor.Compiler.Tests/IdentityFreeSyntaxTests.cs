@@ -341,6 +341,7 @@ public sealed class IdentityFreeSyntaxTests
             module m001
               class c001 extends Value
               func f001 () → void
+                !
                 let handler = (x:lam1, @i32) => lam1
               interface i001 extends IValue
             """;
@@ -367,34 +368,34 @@ public sealed class IdentityFreeSyntaxTests
     [Theory]
     [InlineData("module Demo\n  func Run () → void\n    !")]
     [InlineData("module Demo\n  func Run async () → Task\n    !")]
-    [InlineData("module Demo Outer block\n  class Value\n    ctor ()\n    func Run () → void")]
+    [InlineData("module Demo Outer block\n  class Value\n    ctor ()\n    func Run () → void\n      !")]
     [InlineData("module Demo\n  class Value\n    property int:Count\n      get\n      set\n    this[int:index] → int\n      get\n      set")]
-    [InlineData("module Demo\n  interface IValue\n    func Get () → int")]
+    [InlineData("module Demo\n  interface IValue\n    func Get () → int\n      !")]
     [InlineData("module Demo\n  enum Color int\n    Red\n    Blue")]
-    [InlineData("module Demo\n  delegate Handler (int:value) → void")]
+    [InlineData("module Demo\n  delegate Handler (int:value) → void\n    ! unknown")]
     [InlineData("module Demo\n  class Value\n    event Action:Changed")]
     [InlineData("§M{Demo}\n  §RTYPE{Positive:i32} (> # 0)\n  §ITYPE{Vector:i32:n}")]
-    [InlineData("module Demo\n  func Run () → void\n    proof{\"positive\"} 1 > 0")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    proof{\"positive\"} 1 > 0")]
     [InlineData("module Demo\n  class Value\n    op + (Value:a, Value:b) → Value\n      return a")]
-    [InlineData("module Demo\n  func Run () → void\n    for i from 0 to 2 step 1\n      if i > 0\n        Console.WriteLine(i)")]
-    [InlineData("module Demo\n  func Run () → void\n    while false\n      break\n    do\n      break\n    while false")]
-    [InlineData("module Demo\n  func Run () → void\n    each int:value in values\n      Console.WriteLine(value)\n    each key, value in map\n      Console.WriteLine(value)")]
-    [InlineData("module Demo\n  func Run () → void\n    try\n      throw \"error\"\n    catch Exception:ex\n      Console.WriteLine(ex)")]
-    [InlineData("module Demo\n  func Run () → void\n    lock gate\n      Console.WriteLine(1)\n    unsafe\n      Console.WriteLine(2)")]
-    [InlineData("module Demo\n  func Run () → void\n    using IDisposable:resource = value\n      Console.WriteLine(1)")]
-    [InlineData("module Demo\n  func Run () → int\n    return match value\n      case 0\n        return 1\n      case _\n        return 2")]
-    [InlineData("module Demo\n  func Run () → void\n    let handler = (int:x) => x + 1")]
-    [InlineData("module Demo\n  func Run () → void\n    let handler = () => 1")]
-    [InlineData("module m001\n  func f001 () → void\n    let handler = (int:x1) => x1")]
-    [InlineData("module m_7k9m2npqrstv\n  class c001\n    func mt001 () → void")]
-    [InlineData("module Demo\n  enum e001 int\n    Value\n  delegate d001 () → void")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    for i from 0 to 2 step 1\n      if i > 0\n        Console.WriteLine(i)")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    while false\n      break\n    do\n      break\n    while false")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    each int:value in values\n      Console.WriteLine(value)\n    each key, value in map\n      Console.WriteLine(value)")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    try\n      throw \"error\"\n    catch Exception:ex\n      Console.WriteLine(ex)")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    lock gate\n      Console.WriteLine(1)\n    unsafe\n      Console.WriteLine(2)")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    using IDisposable:resource = value\n      Console.WriteLine(1)")]
+    [InlineData("module Demo\n  func Run () → int\n    !\n    return match value\n      case 0\n        return 1\n      case _\n        return 2")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let handler = (int:x) => x + 1")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let handler = () => 1")]
+    [InlineData("module m001\n  func f001 () → void\n    !\n    let handler = (int:x1) => x1")]
+    [InlineData("module m_7k9m2npqrstv\n  class c001\n    func mt001 () → void\n      !")]
+    [InlineData("module Demo\n  enum e001 int\n    Value\n  delegate d001 () → void\n    ! unknown")]
     [InlineData("module Demo\n  class c001 extends Base\n  interface i001 extends IBase")]
-    [InlineData("module Demo\n  func Run () → void\n    let items = new int[] {1, 2}")]
-    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.List<int> {1, 2}")]
-    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.Dictionary<string,int> {{\"a\", 1}}")]
-    [InlineData("module Demo\n  func Run () → void\n    let items = new System.Collections.Generic.HashSet<string> {\"a\"}")]
-    [InlineData("module Demo\n  func Run () → void\n    let items = new int[1, 2]")]
-    [InlineData("module Demo\n  func Run () → void\n    let System.Collections.Generic.List<int>:items = new System.Collections.Generic.List<int> {1, 2}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let items = new int[] {1, 2}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let items = new System.Collections.Generic.List<int> {1, 2}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let items = new System.Collections.Generic.Dictionary<string,int> {{\"a\", 1}}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let items = new System.Collections.Generic.HashSet<string> {\"a\"}")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let items = new int[1, 2]")]
+    [InlineData("module Demo\n  func Run () → void\n    !\n    let System.Collections.Generic.List<int>:items = new System.Collections.Generic.List<int> {1, 2}")]
     [InlineData("module Demo overflow checked")]
     [InlineData("module Demo overflow unchecked")]
     public void CurrentHeadersHaveNoIdentityField(string source)
@@ -446,5 +447,34 @@ public sealed class IdentityFreeSyntaxTests
         Assert.Contains(expected, diagnostic.Message);
         Assert.Equal(column, diagnostic.Span.Column);
         Assert.DoesNotContain("Remove the leading ID", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("proof 1 > 0", null)]
+    [InlineData("proof{\"positive\"} 1 > 0", "positive")]
+    [InlineData("proof{\"range: \\\"quoted\\\" \\\\ slash\"} 1 > 0", "range: \"quoted\" \\ slash")]
+    [InlineData("proof{\"line\\nbreak\"} 1 > 0", "line\nbreak")]
+    public void NativeProofEmissionRetainsConditionAndDescription(string statement, string? description)
+    {
+        var source = $$"""
+            module ProofRoundTrip
+              func Probe public () → int
+                !
+                {{statement}}
+                return 1
+            """;
+        var module = ParseCorpusShape(source);
+        var originalProof = Assert.IsType<ProofObligationNode>(Assert.Single(module.Functions).Body[0]);
+        Assert.Equal(description, originalProof.Description);
+
+        var emitted = new CalorEmitter().Emit(module);
+
+        Assert.DoesNotContain("§PROOF", emitted);
+        Assert.Contains(description is null ? "proof " : "proof{", emitted);
+        var reparsed = ParseCorpusShape(emitted);
+        var proof = Assert.IsType<ProofObligationNode>(Assert.Single(reparsed.Functions).Body[0]);
+        Assert.Equal(description, proof.Description);
+        Assert.Equal(new CSharpEmitter().Emit(module), new CSharpEmitter().Emit(reparsed));
+        Assert.Equal(emitted, new CalorEmitter().Emit(reparsed));
     }
 }

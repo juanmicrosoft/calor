@@ -396,6 +396,7 @@ public class AttributeConversionTests
               class TestController
                 extends ControllerBase
                 func Post [@HttpPost] public () → void
+                  !
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -983,6 +984,7 @@ public class AttributeConversionTests
         var calorSource = """
             module TestModule
               func Fn public () → string
+                !
                 return nameof(value)
             """;
 
@@ -1006,6 +1008,7 @@ public class AttributeConversionTests
         var calorSource = """
             module TestModule
               func Fn public () → string
+                !
                 return nameof(obj.Property)
             """;
 
@@ -1030,6 +1033,7 @@ public class AttributeConversionTests
         var calorSource = """
             module Test
               func GetName (int:value) → string
+                !
                 return nameof(value)
             """;
 

@@ -1,6 +1,7 @@
 module Test_03_04 Test_03_04 overflow unchecked
   class Router public
     func Route public (int:code) → string
+      !
       match code
         case 200
           return "OK"

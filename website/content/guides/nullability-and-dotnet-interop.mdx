@@ -55,8 +55,10 @@ would permit nullable writes that break the original element contract.
 Covariant read-only targets can accept nullable elements. Matching invariant
 contracts and nullable-container targets remain supported.
 
-The older string-generic policy is unchanged: its outer container annotation
-is retained as information, not enforced by this extension. External-call
+The older one-level string-generic policy is unchanged: **Generic payload checks
+do not enforce the generic container's own nullability** for that bounded shape.
+Its outer annotation is retained as information, unlike the source-reference
+generic rule above. External-call
 effect checks remain independent; a selected metadata method is not permission
 to call an unknown library API.
 
@@ -194,6 +196,8 @@ A built-in `== null` guard can establish non-null local or parameter facts when
 its guarded branch actually returns or throws. A false `||` guard can establish
 facts for each checked value. Overloaded or unresolved comparisons do not
 provide this proof.
+The Stage A limitation, "An early return after a null test does not currently
+narrow a later method argument", no longer applies to these certified guards.
 
 Scalar string property reads also qualify when the compiler certifies a
 nonvirtual, getter-only auto-property with a readonly backing field in a complete
@@ -248,6 +252,7 @@ or correct inaccurate upstream annotations. Changing a destination to `string?`
 only moves the obligation to its consumers. A working manual default/throw
 example does not establish behavior-preserving automatic conversion or
 automatic guard insertion.
+This is a manual migration, not an automatic converter rewrite.
 
 ## Modes and entry points
 

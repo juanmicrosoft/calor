@@ -1,3 +1,4 @@
+using Calor.Compiler;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
@@ -11,6 +12,95 @@ namespace Calor.Verification.Tests;
 
 public sealed class DottedFieldTypeResolutionTests
 {
+    [Fact]
+    public void NativeCaseDistinctClasses_KeepTheirOwnFieldProofs()
+    {
+        const string source = """
+            module CaseDistinctFields
+              class Box public
+                field long:Value public
+              class box public
+                field byte:Value public
+              func WideBoundary public (Box:item) → bool
+                !
+                => item.Value >= -2147483648
+                return true
+              func SmallBoundary public (box:item) → bool
+                !
+                => item.Value >= 0 && item.Value <= 255
+                return true
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyContracts = true,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+        };
+        var compilation = Program.Compile(source, "case-distinct-fields.calr", options);
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors.Select(error => error.Message)));
+        var registry = ContractTranslator.BuildUserTypeRegistry(compilation.Ast!);
+        Assert.Equal("long", registry["Box"]["Value"]);
+        Assert.Equal("byte", registry["box"]["Value"]);
+
+        var wide = options.VerificationResults!.Functions.Single(function => function.FunctionName == "WideBoundary");
+        var small = options.VerificationResults.Functions.Single(function => function.FunctionName == "SmallBoundary");
+        Assert.Equal(ProofStatus.Refuted, Assert.Single(wide.PostconditionResults).EffectiveOutcome.Status);
+        Assert.Equal(ProofStatus.Assumed, Assert.Single(small.PostconditionResults).EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void CaseDistinctUserTypes_DoNotShareSolverSorts()
+    {
+        using var context = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(context);
+        Assert.True(translator.DeclareVariable("upper", "Box"));
+        Assert.True(translator.DeclareVariable("lower", "box"));
+
+        Assert.NotEqual(
+            translator.Variables["upper"].Expr.Sort,
+            translator.Variables["lower"].Expr.Sort);
+    }
+
+    [Theory]
+    [InlineData("byte", 8u, false)]
+    [InlineData("sbyte", 8u, true)]
+    [InlineData("short", 16u, true)]
+    [InlineData("ushort", 16u, false)]
+    public void NativeSmallFieldTypes_KeepTheirWidthAndSignedness(string type, uint width, bool signed)
+    {
+        var module = Parse($$"""
+            module SmallFieldTypes
+              class Payload public
+                field {{type}}:Value public
+            """);
+        using var context = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(context);
+        translator.SetUserTypeRegistry(ContractTranslator.BuildUserTypeRegistry(module));
+        Assert.True(translator.DeclareVariable("item", "Payload"));
+        var field = new FieldAccessNode(default, new ReferenceNode(default, "item"), "Value");
+        var translatedField = translator.TranslateBitVecExpr(field);
+        Assert.NotNull(translatedField);
+        Assert.Equal(width, translatedField.SortSize);
+
+        var nonnegative = translator.TranslateBoolExpr(new BinaryOperationNode(
+            default, BinaryOperator.GreaterOrEqual, field, new IntLiteralNode(default, 0)));
+        Assert.NotNull(nonnegative);
+        using var solver = context.MkSolver();
+        solver.Assert(context.MkNot(nonnegative));
+        Assert.Equal(signed ? Status.SATISFIABLE : Status.UNSATISFIABLE, solver.Check());
+    }
+
+    [Fact]
+    public void CaseFoldedTypeCacheEntries_AreNotReused()
+    {
+        var entry = new VerificationCacheEntry
+        {
+            Version = "1.23",
+            Status = ContractVerificationStatus.Proven
+        };
+        Assert.False(entry.IsValidFor(currentZ3Version: null));
+    }
+
     private const string Source = """
         §M{DottedFields}
           §CL{Outer:pub:partial}

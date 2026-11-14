@@ -107,8 +107,9 @@ nullable input would need its own null guard before reading `Length`.
 
 ## Runtime modes and verification
 
-`--contract-mode debug` emits detailed runtime checks. `release` emits leaner
-checks; `off` emits none. Turning checks off does not make invalid inputs valid,
+`--contract-mode debug` emits detailed runtime checks. `--contract-mode release`
+emits leaner checks; `--contract-mode off` emits none.
+Turning checks off does not make invalid inputs valid,
 prove a contract or prevent exceptions from the body.
 
 The verifier reports `proven`, `refuted`, `assumed`, `unknown`, `timeout`,
@@ -254,6 +255,14 @@ Signed and unsigned primitive integer domains retain their own bounds.
 Nested quantifiers cost the product of their domain sizes at runtime:
 two ranges of lengths `n` and `m` may require `n * m` predicate evaluations.
 A proof result does not make unsupported requested runtime lowering valid.
+
+If runtime quantifier lowering is the only compilation error, explicitly
+requested static verification still reports its result, including `Unsupported`
+for nested quantifiers. Compilation fails without generated code.
+
+Write a proof-obligation statement as `proof condition`, or
+`proof{"description"} condition` to name it. Formatting preserves its
+condition and description, including escaped quotes and newlines.
 
 ## Typed .NET calls in verified contracts
 

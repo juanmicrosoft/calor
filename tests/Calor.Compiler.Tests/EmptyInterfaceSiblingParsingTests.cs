@@ -30,9 +30,9 @@ public class EmptyInterfaceSiblingParsingTests
 
     [Theory]
     [InlineData("class Impl public\n    implements IMarker")]
-    [InlineData("interface IOther\n    func Run () → void")]
+    [InlineData("interface IOther\n    func Run () → void\n      !")]
     [InlineData("enum Mode public\n    Fast\n    Slow")]
-    [InlineData("delegate Handler (int:x) → bool")]
+    [InlineData("delegate Handler (int:x) → bool\n  ! unknown")]
     [InlineData("raw member 24\npublic class Sibling { }\n")]
     public void EmptyInterface_FollowedBySameColumnSibling_Parses(string sibling)
     {
@@ -57,6 +57,7 @@ public class EmptyInterfaceSiblingParsingTests
               class Impl public
                 implements IMarker
                 func Run public () → void
+                  !
                   return
             """;
 
@@ -170,6 +171,7 @@ public class EmptyInterfaceSiblingParsingTests
             module Markers
               interface IShape
                 func Area () → double
+                  !
               class Square public
                 implements IShape
             """;

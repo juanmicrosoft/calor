@@ -1,6 +1,7 @@
 module BitSet BitSet
   module BitSetModule
     func PowerOfTwo public (int:pos) → int
+      !
       requires pos >= 0
       requires pos < 32
       => result > 0
@@ -10,12 +11,14 @@ module BitSet BitSet
       return 2 * sub
 
     func SetBit public (int:bits, int:pos) → int
+      !
       requires pos >= 0
       requires pos < 32
       let mask = PowerOfTwo(pos)
       return bits + mask
 
     func TestBit public (int:bits, int:pos) → bool
+      !
       requires pos >= 0
       requires pos < 32
       let mask = PowerOfTwo(pos)
@@ -23,6 +26,7 @@ module BitSet BitSet
       return div % 2 != 0
 
     func PopCount public (int:bits) → int
+      !
       => result >= 0
       if bits == 0
         return 0

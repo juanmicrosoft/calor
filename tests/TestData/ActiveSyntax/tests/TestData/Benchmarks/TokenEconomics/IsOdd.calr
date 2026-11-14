@@ -1,4 +1,5 @@
 module IsOdd IsOdd
   module IsOddModule
     func IsOdd public (int:n) → bool
+      !
       return n % 2 != 0

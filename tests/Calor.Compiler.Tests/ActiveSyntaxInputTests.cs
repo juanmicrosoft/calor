@@ -79,12 +79,11 @@ public class ActiveSyntaxInputTests
         var activeRoot = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot);
         var registered = ActiveSyntaxInputs.OriginalPaths
             .Concat(ActiveSyntaxInputs.TypedRegistrations.Keys)
+            .Concat(ActiveSyntaxInputs.IdentitySidecarPaths)
             .Concat(ActiveSyntaxInputs.ExecutableRegistrations.Values.SelectMany(entry =>
                 new[] { entry.OriginalPath, entry.TranscriptPath })).ToArray();
         Assert.Equal(registered.Length, registered.Distinct(StringComparer.Ordinal).Count());
-        var mirrors = Directory.EnumerateFiles(activeRoot, "*", SearchOption.AllDirectories)
-            .Select(path => Path.GetRelativePath(activeRoot, path).Replace('\\', '/'))
-            .Where(path => path != "inputs.json").Order(StringComparer.Ordinal);
+        var mirrors = ActiveSyntaxInputs.EnumerateMirrorPaths(root);
         Assert.Equal(registered.Order(StringComparer.Ordinal), mirrors);
         foreach (var (original, kind) in ActiveSyntaxInputs.TypedRegistrations)
         {
@@ -175,5 +174,122 @@ public class ActiveSyntaxInputTests
             ActiveSyntaxInputs.ForCurrentCompiler(root, "../outside.calr"));
         Assert.Throws<ArgumentException>(() =>
             ActiveSyntaxInputs.ForCurrentCompiler(root, ActiveSyntaxInputs.RelativeRoot + source));
+    }
+
+    [Fact]
+    public void IdentitySidecars_ValidateWithoutChangingBytesOrAddingHistoricalSubjects()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var before = ActiveSyntaxInputs.IdentitySidecarPaths.ToDictionary(path => path,
+            path => File.ReadAllBytes(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, path)));
+        Assert.NotEmpty(before);
+        var mirrors = ActiveSyntaxInputs.EnumerateMirrorPaths(root);
+        foreach (var (path, bytes) in before)
+        {
+            Assert.Contains(path, mirrors);
+            Assert.DoesNotContain(path, ActiveSyntaxInputs.OriginalPaths);
+            Assert.DoesNotContain(path, ActiveSyntaxInputs.TypedRegistrations.Keys);
+            Assert.DoesNotContain(Path.ChangeExtension(path, ".lock"), mirrors);
+            Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, path)));
+            Assert.Throws<InvalidDataException>(() => ActiveSyntaxInputs.ForCurrentCompiler(root, path));
+        }
+    }
+
+    [Theory]
+    [InlineData("missing-sidecar")]
+    [InlineData("missing-source")]
+    [InlineData("unregistered-source")]
+    [InlineData("invalid-schema")]
+    [InlineData("transaction")]
+    public void IdentitySidecars_RejectInvalidOrIncompleteFixtures(string defect)
+    {
+        var root = CopyIdentityFixtures();
+        try
+        {
+            var sidecar = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot,
+                ActiveSyntaxInputs.IdentitySidecarPaths.Order(StringComparer.Ordinal).First());
+            var metadata = JsonNode.Parse(File.ReadAllText(sidecar))!.AsObject();
+            var project = Path.GetDirectoryName(Path.GetDirectoryName(sidecar))!;
+            switch (defect)
+            {
+                case "missing-sidecar":
+                    File.Delete(sidecar);
+                    break;
+                case "missing-source":
+                    File.Delete(Path.Combine(project, metadata["Files"]![0]!.GetValue<string>()));
+                    break;
+                case "unregistered-source":
+                    File.WriteAllText(Path.Combine(project, "unregistered.calr"), "module Unregistered\n");
+                    metadata["Files"] = new JsonArray("unregistered.calr");
+                    metadata["Declarations"] = new JsonArray();
+                    File.WriteAllText(sidecar, metadata.ToJsonString());
+                    break;
+                case "invalid-schema":
+                    metadata["Version"] = 0;
+                    File.WriteAllText(sidecar, metadata.ToJsonString());
+                    break;
+                case "transaction":
+                    File.WriteAllText(Path.Combine(project, ".calor", "ids.transaction.json"), "{}");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(defect));
+            }
+            if (defect == "missing-sidecar")
+                Assert.Throws<FileNotFoundException>(() => ActiveSyntaxInputs.EnumerateMirrorPaths(root));
+            else
+                Assert.Throws<InvalidDataException>(() => ActiveSyntaxInputs.EnumerateMirrorPaths(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(".calor/unrelated.lock")]
+    [InlineData(".calor/unregistered.json")]
+    [InlineData("other-project/.calor/ids.lock")]
+    public void IdentitySidecars_DoNotHideUnregisteredMetadata(string extra)
+    {
+        var root = CopyIdentityFixtures();
+        try
+        {
+            var activeRoot = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot);
+            var sidecar = ActiveSyntaxInputs.IdentitySidecarPaths.Order(StringComparer.Ordinal).First();
+            var project = Path.GetDirectoryName(Path.GetDirectoryName(sidecar))!;
+            var relative = Path.Combine(project, extra).Replace('\\', '/');
+            var path = Path.Combine(activeRoot, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "{}");
+            Assert.Contains(relative, ActiveSyntaxInputs.EnumerateMirrorPaths(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static string CopyIdentityFixtures()
+    {
+        var root = Directory.CreateTempSubdirectory("calor-active-identity-").FullName;
+        var repo = CliTestHarness.FindRepoRoot();
+        foreach (var relative in ActiveSyntaxInputs.IdentitySidecarPaths)
+        {
+            var source = Path.Combine(repo, ActiveSyntaxInputs.RelativeRoot, relative);
+            var destination = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(source, destination);
+            var metadata = JsonNode.Parse(File.ReadAllText(source))!.AsObject();
+            foreach (var entry in metadata["Files"]!.AsArray())
+            {
+                var input = entry!.GetValue<string>();
+                var sourceProject = Path.GetDirectoryName(Path.GetDirectoryName(source))!;
+                var destinationProject = Path.GetDirectoryName(Path.GetDirectoryName(destination))!;
+                var copy = Path.Combine(destinationProject, input);
+                Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
+                File.Copy(Path.Combine(sourceProject, input), copy);
+            }
+        }
+        return root;
     }
 }

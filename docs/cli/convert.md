@@ -46,8 +46,9 @@ Commented holes retain the existing preservation boundary.
 Conversion and generated-output validation default to an implicit `System`
 import, applied equally to original and emitted C#. Use `--no-implicit-system`
 for standalone validation. JSON output records the choice as `data.implicitSystem`.
-No other SDK namespace is implied. Preserved text and namespace-local imports
-are not rewritten, and preserved code remains non-native.
+No other SDK namespace is implied. Opaque C# does not add blanket SDK imports;
+native AST visitors register their own generated dependencies. Preserved text and
+namespace-local imports are not rewritten, and preserved code remains non-native.
 
 The downstream C# project must supply the same context. Calor SDK/init projects
 add the real `Using` item; compiling a saved `.g.cs` elsewhere does not inherit
@@ -68,6 +69,17 @@ lossless conversion preserves the original compilation unit instead.
 Mixed `#nullable` contexts, unresolved source context, or an uncertified native
 replacement retain the preservation boundary; raw C# is not native recovery.
 Conversion options and the default compilation context do not change.
+
+The library's explicit `Fidelity=Lossy, Mode=Interop` path also retains a uniform
+annotation-disabled context when the original C# resolves without errors and
+has no lexical nullable directives. For instance property reads and selected
+instance calls with no explicit or implicit arguments, it can express
+the CLR null-receiver failure as `receiver ?? throw null` rather than inventing
+a non-null declaration. The receiver is evaluated once. Reduced extension calls
+remain static calls and accept their declared nullable receiver. Calls with
+arguments retain receiving checks: moving a null guard ahead of their evaluation
+could change side effects or exception order. This does not certify
+effects, change the default lossless path, or disable explicit nullable checking.
 
 When this native candidate fails validation, conversion issues retain the compiler
 code, message, and location in the generated Calor or C#, rather than reporting a
@@ -102,6 +114,9 @@ parameter and return contracts remain explicit, and public callers still declare
 the effects reached through those helpers. Abstract and extern declarations
 retain their existing boundary rows. Recompilation must still reject an unknown
 body or unproved virtual-slot contract.
+Required boundary rows are always printed, including explicit Pure rows.
+Callback positions without a proved contract retain `! unknown`; emitting that
+row does not make their invocation eligible for native conversion.
 
 ### Generated output and refresh
 
@@ -309,6 +324,14 @@ members or substitutions do not qualify. Other active directives and unsupported
 namespace topologies stay closed. Default lossless single-file conversion still
 preserves these lexical import scopes as whole-file C#, rather than rewriting them.
 This explicit lossy path is not a claim of default native corpus acceptance.
+
+For a file with one uniform nullable-oblivious context, lossless conversion can
+retain direct, converter-owned member preservation under a `nullable oblivious`
+module header. The complete result must pass ordinary Calor compilation and
+preserve the original declared type and nullable-annotation metadata. Validation
+rescues and destructive losses do not qualify for this recovery. Preserved
+members remain recorded as interop losses; a hybrid result receives no fully
+native conversion credit.
 
 Compiler-affecting directives (`#nullable`, `#pragma`, `#warning`, `#error`,
 and `#line`) are preserved verbatim in source order. They remain explicit raw

@@ -465,7 +465,7 @@ public sealed class SafeConsumptionTypeCheckerTests
               func Double public (int:value) → int
                 !
                 return value * 2
-              func GetTransform public () → Func<int,int>
+              func GetTransform public () → Func<int,int> ! unknown
                 !
                 return Double
               func Probe public () → int
@@ -589,7 +589,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var wrongArgument = Check("""
             module SafeConsumption
-              func Probe public (Func<int,int>:transform) → int
+              func Probe public (Func<int,int>:transform ! unknown) → int
                 !
                 return transform("wrong")
             """);
@@ -597,7 +597,7 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         var invalidConsumer = Check("""
             module SafeConsumption
-              func Probe public (Func<int,int>:transform) → int
+              func Probe public (Func<int,int>:transform ! unknown) → int
                 !
                 return transform(1) ?? 2
             """);
@@ -636,7 +636,7 @@ public sealed class SafeConsumptionTypeCheckerTests
               func Pick public (int:value) → int
                 !
                 return value
-              func Map public (Func<int,int>:transform) → int
+              func Map public (Func<int,int>:transform ! unknown) → int
                 !
                 return transform(1)
               func Probe public () → int
@@ -653,6 +653,7 @@ public sealed class SafeConsumptionTypeCheckerTests
         var result = Check("""
             module SafeConsumption
               delegate Picker (int:value) → int
+                ! unknown
 
 
               func Pick public (string:value) → string
@@ -752,10 +753,11 @@ public sealed class SafeConsumptionTypeCheckerTests
         var result = Check("""
             module SafeConsumption
               delegate Picker (int:number, string:text) → string
+                ! unknown
 
 
 
-              func Probe public (Picker:pick) → string
+              func Probe public (Picker:pick ! unknown) → string
                 !
                 return pick(text: "x", number: 1)
             """);
@@ -834,7 +836,7 @@ public sealed class SafeConsumptionTypeCheckerTests
               func GetInt public () → int
                 !
                 return 1
-              func Make<T> public (Func<T>:factory) → T
+              func Make<T> public (Func<T>:factory ! unknown) → T
                 !
                 return factory()
               func Probe public () → int
@@ -1041,7 +1043,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var arityResult = Check("""
             module SafeConsumption
-              func Probe public (Func<int,int>:transform) → int
+              func Probe public (Func<int,int>:transform ! unknown) → int
                 !
                 return transform(1, 2)
             """);
@@ -1050,7 +1052,7 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         var namedResult = Check("""
             module SafeConsumption
-              func Probe public (Func<int,int>:transform) → int
+              func Probe public (Func<int,int>:transform ! unknown) → int
                 !
                 return transform(arg: 1) ?? 2
             """);
@@ -1069,7 +1071,7 @@ public sealed class SafeConsumptionTypeCheckerTests
               func Get public (string:value) → int
                 !
                 return 1
-              func Choose<T> public (Func<string,T>:factory, T:fallback) → T
+              func Choose<T> public (Func<string,T>:factory ! unknown, T:fallback) → T
                 !
                 return fallback
               func Probe public () → int
@@ -1104,7 +1106,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Probe public (Func<object,object>:transform, int:value) → object
+              func Probe public (Func<object,object>:transform ! unknown, int:value) → object
                 !
                 return transform(match value
                   case 0 → 1
@@ -1120,7 +1122,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Choose<T> public (Func<T>:factory, T:fallback) → T
+              func Choose<T> public (Func<T>:factory ! unknown, T:fallback) → T
                 !
                 return fallback
               func Probe public (int:value, object:fallback) → object
@@ -1206,7 +1208,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Probe public (Action<int>:consume) → void
+              func Probe public (Action<int>:consume ! unknown) → void
                 !
                 consume()
             """);
@@ -1221,9 +1223,10 @@ public sealed class SafeConsumptionTypeCheckerTests
         var modifierResult = Check("""
             module SafeConsumption
               delegate Mutator (ref int:value) → int
+                ! unknown
 
 
-              func Probe public (Mutator:mutate, int:value) → int
+              func Probe public (Mutator:mutate ! unknown, int:value) → int
                 !
                 return mutate(value)
             """);
@@ -1248,9 +1251,10 @@ public sealed class SafeConsumptionTypeCheckerTests
         var identityResult = Check("""
             module SafeConsumption
               delegate Mutator (ref double:value) → void
+                ! unknown
 
 
-              func Probe public (Mutator:mutate, ref int:value) → void
+              func Probe public (Mutator:mutate ! unknown, ref int:value) → void
                 !
                 mutate(ref value)
             """);
@@ -1315,7 +1319,7 @@ public sealed class SafeConsumptionTypeCheckerTests
               func Value public (string:value) → string
                 !
                 return value
-              func Use<T> public (Func<string,T>:factory) → T
+              func Use<T> public (Func<string,T>:factory ! unknown) → T
                 !
                 return factory("x")
               func Probe public () → int
@@ -1332,10 +1336,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Pick public (Func<int,int>:map) → int
+              func Pick public (Func<int,int>:map ! unknown) → int
                 !
                 return map(1)
-              func Pick public (Func<string,string>:map) → string
+              func Pick public (Func<string,string>:map ! unknown) → string
                 !
                 return map("x")
               func Probe public () → int
@@ -1413,10 +1417,10 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         var divergentResult = Check("""
             module SafeConsumption
-              func Pick public (Func<int,int>:map) → int
+              func Pick public (Func<int,int>:map ! unknown) → int
                 !
                 return map(1)
-              func Pick public (Func<string,string>:map) → string
+              func Pick public (Func<string,string>:map ! unknown) → string
                 !
                 return map("x")
               func Probe public () → int
@@ -1438,10 +1442,10 @@ public sealed class SafeConsumptionTypeCheckerTests
               func Map public (object:value) → object
                 !
                 return value
-              func Use public (Func<string,string>:map) → int
+              func Use public (Func<string,string>:map ! unknown) → int
                 !
                 return 1
-              func Use public (Func<object,object>:map) → string
+              func Use public (Func<object,object>:map ! unknown) → string
                 !
                 return "wide"
               func Probe public () → string
@@ -1485,10 +1489,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Pick public (Func<int,int>:map) → int
+              func Pick public (Func<int,int>:map ! unknown) → int
                 !
                 return map(1)
-              func Pick public (Func<string,int>:map) → int
+              func Pick public (Func<string,int>:map ! unknown) → int
                 !
                 return 1
               func Probe public () → int
@@ -1505,7 +1509,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Make<T> public (Func<T>:factory) → T
+              func Make<T> public (Func<T>:factory ! unknown) → T
                 !
                 return factory()
               func Probe public () → string
@@ -1558,7 +1562,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Apply<T,U> public (T:value, Func<T,U>:map) → U
+              func Apply<T,U> public (T:value, Func<T,U>:map ! unknown) → U
                 !
                 return map(value)
               func Probe public () → int
@@ -1574,7 +1578,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Make<T> public (Func<T>:factory) → T
+              func Make<T> public (Func<T>:factory ! unknown) → T
                 !
                 return factory()
               func Probe public () → int
@@ -1593,7 +1597,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Make<T> public (Func<T>:factory) → T
+              func Make<T> public (Func<T>:factory ! unknown) → T
                 !
                 return factory()
               func Probe public () → int
@@ -2343,7 +2347,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Make<T> public (Func<T>:factory) → T
+              func Make<T> public (Func<T>:factory ! unknown) → T
                 !
                 return factory()
               func Probe public () → int
@@ -2482,7 +2486,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Use public (Func<object>:factory) → void
+              func Use public (Func<object>:factory ! unknown) → void
                 !
               func Probe public () → void
                 !
@@ -2497,7 +2501,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Use public (Func<Func<object>>:factory) → void
+              func Use public (Func<Func<object>>:factory ! unknown) → void
                 !
               func Probe public () → void
                 !
@@ -2513,12 +2517,14 @@ public sealed class SafeConsumptionTypeCheckerTests
         var result = Check("""
             module SafeConsumption
               delegate First (string:value) → void
+                ! unknown
 
 
               delegate Second (string:value) → void
+                ! unknown
 
 
-              func Use public (First:callback) → void
+              func Use public (First:callback ! unknown) → void
                 !
               func Probe public () → void
                 !
@@ -2566,7 +2572,7 @@ public sealed class SafeConsumptionTypeCheckerTests
               func Pick public (object:left, string:right) → int
                 !
                 return right.Length
-              func Take public (Func<string,string,int>:picker) → void
+              func Take public (Func<string,string,int>:picker ! unknown) → void
                 !
               func Probe public () → void
                 !
@@ -2582,7 +2588,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Probe public (Func<int,int,int>:combine) → int
+              func Probe public (Func<int,int,int>:combine ! unknown) → int
                 !
                 return combine(arg2: 2, 1)
             """);
@@ -2616,10 +2622,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check("""
             module SafeConsumption
-              func Pick public (Func<object,int>:map) → string
+              func Pick public (Func<object,int>:map ! unknown) → string
                 !
                 return "object"
-              func Pick public (Func<string,int>:map) → int
+              func Pick public (Func<string,int>:map ! unknown) → int
                 !
                 return 1
               func Probe public () → int
@@ -2686,7 +2692,7 @@ public sealed class SafeConsumptionTypeCheckerTests
             module SafeConsumption
               func Take public (int:value) → void
                 !
-              func Probe public (Action<int>:consume) → void
+              func Probe public (Action<int>:consume ! unknown) → void
                 !
                 consume(1)
                 Take(1)
@@ -2775,8 +2781,10 @@ public sealed class SafeConsumptionTypeCheckerTests
         var result = Check($$"""
             module SafeConsumption
               delegate First (string:value) → void
+                ! unknown
               delegate Second (string:value) → void
-              func Use public (Func<First>:factory) → void
+                ! unknown
+              func Use public (Func<First>:factory ! unknown) → void
                 !
               func Probe public () → void
                 !
@@ -2785,7 +2793,7 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         if (invalid)
         {
-            var error = SingleErrorAt(result, 8);
+            var error = SingleErrorAt(result, 10);
             Assert.Contains("Method group 'Use' is not compatible", error.Message);
         }
         else

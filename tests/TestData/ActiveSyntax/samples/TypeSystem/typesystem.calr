@@ -11,14 +11,12 @@ module TypeSystem TypeSystem
       Console.WriteLine("Division by zero was caught")
 
   func TestNullable private () → void
-    ! cw
     let string?:present = "hello"
     let string?:missing = null
     Console.WriteLine(present ?? "fallback")
     Console.WriteLine(missing ?? "fallback")
 
   func Divide private (int:a, int:b) → int
-    ! throw,alloc
     if b == 0
       throw new ArgumentException("Division by zero")
     return a / b

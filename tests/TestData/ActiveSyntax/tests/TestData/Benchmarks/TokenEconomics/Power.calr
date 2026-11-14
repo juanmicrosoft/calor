@@ -1,6 +1,7 @@
 module MathPower MathPower
   module MathPowerModule
     func Power public (int:@base, int:exp) → int
+      !
       requires exp >= 0
       var result = 1
       var i = 0

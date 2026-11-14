@@ -1,11 +1,13 @@
 module Hypotenuse Hypotenuse
   module HypotenuseModule
     func HypotenuseSquared public (float:a, float:b) → float
+      !
       requires a > 0
       requires b > 0
       => result > 0
       return a * a + b * b
 
     func SumOfSquares public (float:x, float:y) → float
+      !
       => result >= 0
       return x * x + y * y

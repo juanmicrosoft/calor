@@ -37,7 +37,7 @@ public sealed class WebsiteExampleCheckerTests
     [InlineData("\n// Header\n\n")]
     public void NativeModuleAfterLeadingComments_IsChecked(string prefix)
     {
-        var source = prefix + "module Good\n  func Value () → int\n    return 1\n";
+        var source = prefix + "module Good\n  func Value () → int\n    !\n    return 1\n";
         var coverage = new WebsiteExampleChecker.Coverage();
         Assert.Empty(Check(Fence("calor", source), coverage));
         Assert.Equal(1, coverage.CompletePrograms);
@@ -514,7 +514,7 @@ public sealed class WebsiteExampleCheckerTests
     [InlineData("firstProgram", "Console.WriteLine(\"Hello from Calor!\")", "return (1 + )")]
     [InlineData("contracts", "x >= 0", "missing >= 0")]
     [InlineData("effects", "! db:rw,net:rw", "! db:rw,net:rw\nMissingType.Save()")]
-    [InlineData("stableId", "func Process () → void", "func Process (MissingType:x) → void")]
+    [InlineData("stableId", "func Process () → void\n  !", "func Process (MissingType:x) → void\n  !")]
     [InlineData("missingEffect", "! db:rw", "! db:rw,net:rw")]
     [InlineData("missingEffect", "NotifyCustomer", "MissingCustomer")]
     public void Landing_MutatedDisplayedCodeFails(string id, string original, string replacement)
@@ -613,7 +613,7 @@ public sealed class WebsiteExampleCheckerTests
     {
         var (source, components) = LandingInputs();
         var brokenType = MutateLanding(source, json =>
-            json["stableId"]!["code"] = "func Process (MissingType:x) → void");
+            json["stableId"]!["code"] = "func Process (MissingType:x) → void\n  !");
         Assert.Contains(WebsiteExampleChecker.CheckLanding(brokenType, components),
             d => d.Message.Contains("Calor1002") && d.Message.Contains("CS0246") && d.Message.Contains("MissingType"));
 

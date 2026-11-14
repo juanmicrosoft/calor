@@ -139,10 +139,12 @@ public sealed class NativeComputedMemberReadTests
         var source = $$"""
             module ComputedEffects
               func Receiver (string?:value) → string?
+                !
                 {{(receiverWrites ? "! cw" : "!")}}
                 {{(receiverWrites ? "System.Console.WriteLine(\"receiver\")" : "")}}
                 return value
               func Fallback () → string
+                !
                 {{(fallbackWrites ? "! cw" : "!")}}
                 {{(fallbackWrites ? "System.Console.WriteLine(\"fallback\")" : "")}}
                 return "none"
@@ -354,6 +356,7 @@ public sealed class NativeComputedMemberReadTests
             module ForeignIdentity
               using System.Text
               func Read (StringBuilder:value) → int
+                !
                 return (value ?? value).Length
             """);
         var foreignMember = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(foreign).OfType<BoundFieldAccessExpression>());

@@ -8,7 +8,7 @@ import agents from '../public/data/agent-benchmark-results.json';
 import refactoring from '../public/data/agent-refactoring-results.json';
 import provenance from '../public/data/benchmark-provenance.json';
 import featureSupport from '../public/data/feature-support.json';
-import { expandSupportLevels } from '../src/lib/feature-support';
+import { expandSupportLevels, supportLevelName } from '../src/lib/feature-support';
 
 const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-detection',
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
@@ -116,12 +116,13 @@ test('C# interoperability guide is discoverable, development-scoped and bounded'
 // fenced code or a code span (any fence or backtick run) stays as written.
 test('search index expansion renders tags in prose and leaves code as written', () => {
   const tag = '<SupportLevel feature="record" />';
+  const level = supportLevelName('record');
   const cases: [string, string][] = [
-    [`a ${tag} b`, 'a NotSupported b'],
-    ['```\n' + tag + '\n```\nx ' + tag, '```\n' + tag + '\n```\nx NotSupported'],
+    [`a ${tag} b`, `a ${level} b`],
+    ['```\n' + tag + '\n```\nx ' + tag, '```\n' + tag + '\n```\nx ' + level],
     ['~~~\n' + tag + '\n~~~', '~~~\n' + tag + '\n~~~'],
     ['  ```\n  ' + tag + '\n  ```', '  ```\n  ' + tag + '\n  ```'],
-    ['`` ' + tag + ' `` and ' + tag, '`` ' + tag + ' `` and NotSupported'],
+    ['`` ' + tag + ' `` and ' + tag, '`` ' + tag + ' `` and ' + level],
     ['`' + tag + '`', '`' + tag + '`'],
     ['text\n\n    ' + tag + '\n', 'text\n\n    ' + tag + '\n'],
     ['<SupportLevel feature="not-a-feature" />', '<SupportLevel feature="not-a-feature" />'],

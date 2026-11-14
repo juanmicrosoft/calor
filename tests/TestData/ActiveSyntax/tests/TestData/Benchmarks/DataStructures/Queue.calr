@@ -1,12 +1,15 @@
 module Queue Queue
   module QueueModule
     func IsEmpty public (int:count) → bool
+      !
       return count == 0
 
     func Size public (int:count) → int
+      !
       return count
 
     func NewCount public (int:oldCount, bool:isEnqueue) → int
+      !
       if isEnqueue
         return oldCount + 1
       else

@@ -1,7 +1,9 @@
 module TryFinally TryFinally
   module TryFinallyModule
     func Cleanup public (bool:resourceOpen) → bool
+      !
       return false
 
     func Process public (int:input) → int
+      !
       return input * 2

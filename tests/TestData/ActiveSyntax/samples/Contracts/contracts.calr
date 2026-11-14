@@ -13,10 +13,12 @@ module Contracts Contracts
     Console.WriteLine("Contracts are enforced at runtime with clear error messages.")
 
   func Square public (int:x) → int
+    !
     requires x >= 0
     => result >= 0
     return x * x
 
   func Divide public (int:a, int:b) → int
+    !
     requires b != 0
     return a / b

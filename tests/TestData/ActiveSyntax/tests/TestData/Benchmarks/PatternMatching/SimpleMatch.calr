@@ -1,6 +1,7 @@
 module SimpleMatch SimpleMatch
   module SimpleMatchModule
     func DayName public (int:day) → int
+      !
       if day == 1
         return 1
       else if day == 2

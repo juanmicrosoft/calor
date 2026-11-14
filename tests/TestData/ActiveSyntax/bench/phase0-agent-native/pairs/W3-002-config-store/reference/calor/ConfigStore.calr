@@ -1,45 +1,48 @@
-§M{ConfigStore}
-  §F{Get:pub} (str:path, str:key) -> str
-    §E{fs:r}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R ""
-    §B{prefix:str} (+ key "=")
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §EACH{line} lines
-      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
-      §IF matches
-        §R §C{line.Substring} §A §LEN prefix §/C
-    §R ""
+module ConfigStore ConfigStore block
+  module ConfigStoreModule partial
+    func Get (string:path, string:key) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      let string:prefix = (key + "=")
+      let string[]:lines = File.ReadAllLines(path)
+      each line in lines
+        let bool:matches = line.StartsWith(prefix)
+        if matches
+          return line.Substring(prefix.Length)
+      return ""
 
-  §F{Set:pub} (str:path, str:key, str:value) -> void
-    §E{fs:rw}
-    §B{prefix:str} (+ key "=")
-    §B{~content:str} ""
-    §B{~found:bool} false
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF exists
-      §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-      §EACH{line} lines
-        §B{matches:bool} §C{line.StartsWith} §A prefix §/C
-        §IF (&& (! found) matches)
-          §ASSIGN content (+ content (+ prefix (+ value "\n")))
-          §ASSIGN found true
-        §EL
-          §ASSIGN content (+ content (+ line "\n"))
-    §IF (! found)
-      §ASSIGN content (+ content (+ prefix (+ value "\n")))
-    §C{File.WriteAllText} §A path §A content §/C
+    func Set (string:path, string:key, string:value) → void
+      ! fs:rw
+      let string:prefix = (key + "=")
+      var string:content = ""
+      var bool:found = false
+      let bool:exists = File.Exists(path)
+      if exists
+        let string[]:lines = File.ReadAllLines(path)
+        each line in lines
+          let bool:matches = line.StartsWith(prefix)
+          if ((!found) && matches)
+            set content (content + (prefix + (value + "\n")))
+            set found true
+          else
+            set content (content + (line + "\n"))
+      if (!found)
+        set content (content + (prefix + (value + "\n")))
+      File.WriteAllText(path, content)
 
-  §F{Has:pub} (str:path, str:key) -> bool
-    §E{fs:r}
-    §B{exists:bool} §C{File.Exists} §A path §/C
-    §IF (! exists)
-      §R false
-    §B{prefix:str} (+ key "=")
-    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
-    §EACH{line} lines
-      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
-      §IF matches
-        §R true
-    §R false
+    func Has (string:path, string:key) → bool
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return false
+      let string:prefix = (key + "=")
+      let string[]:lines = File.ReadAllLines(path)
+      each line in lines
+        let bool:matches = line.StartsWith(prefix)
+        if matches
+          return true
+      return false
+
+

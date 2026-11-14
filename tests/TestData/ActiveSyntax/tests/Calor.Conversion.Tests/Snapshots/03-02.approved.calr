@@ -1,6 +1,7 @@
 module Test_03_02 Test_03_02 overflow unchecked
   class Loops public
     func Sum public (int:n) → int
+      !
       var int:total = 0
       if true
         var int:i = 0

@@ -2,6 +2,7 @@ module Fixture Fixture overflow unchecked
   pp FEATURE
     class ConditionalClass
       func Value static () → int
+        !
         return 1
 
 
@@ -9,15 +10,18 @@ module Fixture Fixture overflow unchecked
 
 
     delegate ConditionalDelegate (int:value) → int
+      ! unknown
 
     class ConditionalPartial partial
       func PartialValue static () → int
+        !
         return 10
 
 
   pp else
     class ConditionalClass
       func Value static () → int
+        !
         return 2
 
 
@@ -30,15 +34,18 @@ module Fixture Fixture overflow unchecked
 
 
     delegate ConditionalDelegate (int:value) → int
+      ! unknown
 
     class ConditionalPartial partial
       func PartialValue static () → int
+        !
         return 20
 
 
 
   class ConditionalPartial partial
     func Shared static () → int
+      !
       return 100
 
 

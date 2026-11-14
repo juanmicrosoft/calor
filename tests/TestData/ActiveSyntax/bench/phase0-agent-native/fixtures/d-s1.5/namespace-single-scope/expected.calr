@@ -1,4 +1,5 @@
 module Fixture SingleScope block overflow unchecked
   module Value
     func Get () → int
+      !
       return 42

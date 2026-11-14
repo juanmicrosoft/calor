@@ -5,4 +5,5 @@ module SimpleAsync SimpleAsync
       return 42
 
     func Fallback public () → int
+      !
       return 0

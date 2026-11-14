@@ -20,10 +20,10 @@ public class ParameterPoststateTests
     {
         foreach (var mutation in new[]
         {
-            "§ASSIGN x INT:-1",
-            "§IF (> x 0)\n      §ASSIGN x INT:-1",
-            "§ASSIGN x (- x 1)\n    §B{first:i32} x\n    §ASSIGN x (- x 1)\n    §B{second:i32} x",
-            "§B{first:i32} x\n    §ASSIGN x (- x 1)\n    §B{second:i32} x\n    §ASSIGN x (- x 1)"
+            "set x -1",
+            "if x > 0\n      set x -1",
+            "set x x - 1\n    let int:first = x\n    set x x - 1\n    let int:second = x",
+            "let int:first = x\n    set x x - 1\n    let int:second = x\n    set x x - 1"
         })
         {
             var result = Compile(Source(isVoid, mutation), verify);
@@ -64,7 +64,7 @@ public class ParameterPoststateTests
             var warm = Compile(original, true, directory);
             Assert.Equal(isVoid ? null : (object)1, Invoke(warm));
 
-            var edited = Compile(Source(isVoid, "§ASSIGN x INT:-1"), true, directory);
+            var edited = Compile(Source(isVoid, "set x -1"), true, directory);
             Assert.Contains(edited.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
             var exception = Assert.Throws<TargetInvocationException>(() => Invoke(edited));
             Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
@@ -166,13 +166,14 @@ public class ParameterPoststateTests
     }
 
     private static string Source(bool isVoid, string mutation) => $$"""
-        §M{ParameterPoststate}
-          §F{Change:pub} (i32:x) -> {{(isVoid ? "void" : "i32")}}
-            §E{}
-            §Q (>= x 0)
-            §S (>= x 0)
-            {{mutation}}
-            §R{{(isVoid ? "" : " x")}}
+        module ParameterPoststate
+          module ParameterPoststateModule
+            func Change public (int:x) → {{(isVoid ? "void" : "int")}}
+              !
+              requires x >= 0
+              => x >= 0
+              {{mutation.Replace("\n", "\n  ")}}
+              return{{(isVoid ? "" : " x")}}
         """;
 
     private static CompilationResult Compile(string source, bool verify, string? cacheDirectory = null)

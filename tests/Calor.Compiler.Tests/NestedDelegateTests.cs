@@ -11,7 +11,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_InClass_ParsesSuccessfully()
     {
-        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n      ! unknown\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -33,7 +33,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_EmitsCSharp()
     {
-        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n      ! unknown\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -52,7 +52,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_EmitsCalor()
     {
-        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n      ! unknown\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
