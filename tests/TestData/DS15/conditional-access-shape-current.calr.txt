@@ -3,7 +3,6 @@ module Fixture overflow unchecked
     field int:ArgumentCalls private static
 
     func Argument private () → int
-      ! mut
       set ArgumentCalls (ArgumentCalls + 1)
       return 7
 

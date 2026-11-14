@@ -1,6 +1,7 @@
 module Fixture overflow unchecked
   module LocalFunctionFixture
     func Add (int:x) → int
+      !
       return (x + 1000)
 
     raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Run%28%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20shadowed%20%3D%20Add%282%29%3B%0A%20%20%20%20%20%20%20%20if%20%28shad... 554
