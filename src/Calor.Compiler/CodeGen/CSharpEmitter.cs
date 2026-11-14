@@ -5025,6 +5025,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         var target = node.Target is ReferenceNode { IsVerbatim: false } reference
             && SyntaxFactory.ParseTypeName(reference.Name) is PredefinedTypeSyntax
                 ? reference.Name : EmitGroupedOperand(node.Target);
+        // A negative literal is atomic as an operand but not as a receiver:
+        // `-1.ToString()` binds as `-(1.ToString())`.
+        if (target.StartsWith('-'))
+            target = $"({target})";
         var fieldName = SanitizeIdentifier(node.FieldName);
         return $"{target}.{fieldName}";
     }

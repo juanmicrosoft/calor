@@ -1548,8 +1548,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Effects
+        // A private/internal body infers its row; ! unknown is the one own row it may carry.
         if (node.IsAbstract || node.IsExtern
             || node.Visibility is not (Visibility.Private or Visibility.Internal))
+            EmitEffects(node.Effects, required: true);
+        else if (node.Effects is { IsUnknown: true, EffectVariables.Count: 0 })
             EmitEffects(node.Effects, required: true);
 
         // Preconditions
@@ -1664,8 +1667,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitOutputLine(node.Output);
         }
 
-        // Effects
-        if (node.Visibility is not (Visibility.Private or Visibility.Internal))
+        // Effects (a private/internal body may carry only ! unknown)
+        if (node.Visibility is not (Visibility.Private or Visibility.Internal)
+            || node.Effects is { IsUnknown: true, EffectVariables.Count: 0 })
             EmitEffects(node.Effects, required: true);
 
         // Preconditions

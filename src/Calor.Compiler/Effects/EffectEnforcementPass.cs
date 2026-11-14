@@ -969,7 +969,9 @@ public sealed class EffectEnforcementPass
 
         // D-W2.3: surface assumption provenance. An assumed-effect function satisfies
         // its declaration only WITH the assumption named; strict mode fails loud.
-        if (_assumedEffects.TryGetValue(function.Id, out var reasons) && reasons.Count > 0)
+        // 0.30: a declared ! unknown row assumes nothing — it already admits every effect.
+        if (!declaredEffects.IsUnknown
+            && _assumedEffects.TryGetValue(function.Id, out var reasons) && reasons.Count > 0)
         {
             var assumedSeverity = _strictEffects
                 ? DiagnosticSeverity.Error
@@ -1176,12 +1178,20 @@ public sealed class EffectEnforcementPass
                 var strict = new EffectEnforcementPass(new DiagnosticBag(), UnknownCallPolicy.Strict, resolver);
                 strict.Enforce(module);
                 changed |= strict.SynthesizeCallbackContracts(module, synthesizedOutputs, blockedOutputs);
-                // 0.30: permissive inference treats a call without an effect contract
-                // as pure, so the rows above can claim ! where the truth is "unknown".
-                // Strict inference names those callables; they declare ! unknown.
-                changed |= strict.DeclareUnknownRows(module);
             }
-            if (!changed)
+            if (changed)
+                continue;
+            if (!synthesizeCallbackContracts)
+                return true;
+            // 0.30: permissive inference treats a call without an effect contract as
+            // pure, so the converged rows can claim ! where the truth is "unknown".
+            // Strict inference over the CONVERGED rows (callback contracts included)
+            // names those callables; they declare ! unknown, and the rounds rerun so
+            // their callers see it. Running this before convergence marked callables
+            // that only invoke their own callbacks, and an unknown row never narrows.
+            var final = new EffectEnforcementPass(new DiagnosticBag(), UnknownCallPolicy.Strict, resolver);
+            final.Enforce(module);
+            if (!final.DeclareUnknownRows(module))
                 return true;
         }
 
