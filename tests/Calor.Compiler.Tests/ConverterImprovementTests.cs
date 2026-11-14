@@ -627,13 +627,12 @@ public class ConverterImprovementTests
     public void Parser_NewExpressionWithClosingTag_ParsesCorrectly()
     {
         var calorSource = """
-            §M{Test}
-              §CL{Service}
-                §MT{Create:pub}
-                    §O{string}
-                    §E{alloc}
-                    §B{string:x} §NEW{StringBuilder} §A "hello" §/NEW
-                    §R x
+            module Test Test block
+              class Service internal
+                func Create () → string
+                  ! alloc
+                  let string:x = new StringBuilder("hello")
+                  return x
             """;
 
         var compilationResult = Program.Compile(
@@ -649,13 +648,12 @@ public class ConverterImprovementTests
     public void Parser_NewExpressionWithoutArgs_ClosingTagParsesCorrectly()
     {
         var calorSource = """
-            §M{Test}
-              §CL{Service}
-                §MT{Create:pub}
-                    §O{string}
-                    §E{alloc}
-                    §B{List<i32>:items} §NEW{List<i32>} §/NEW
-                    §R items
+            module Test Test block
+              class Service internal
+                func Create () → string
+                  ! alloc
+                  let List<int>:items = new List<int>()
+                  return items
             """;
 
         var compilationResult = Program.Compile(
@@ -672,13 +670,12 @@ public class ConverterImprovementTests
     {
         // Backward compatibility: §/NEW is optional
         var calorSource = """
-            §M{Test}
-              §CL{Service}
-                §MT{Create:pub}
-                    §O{string}
-                    §E{alloc}
-                    §B{string:x} §NEW{StringBuilder} §A "hello"
-                    §R x
+            module Test Test block
+              class Service internal
+                func Create () → string
+                  ! alloc
+                  let string:x = new StringBuilder("hello")
+                  return x
             """;
 
         var compilationResult = Program.Compile(
@@ -1201,8 +1198,8 @@ public class ConverterImprovementTests
     public void CalorEmitter_NamedModule_EmitsNoRedundantStaticModifier()
     {
         var source = """
-            §M{TestMod}
-              §M{Helper:pub}
+            module TestMod TestMod block
+              module Helper
             """;
 
         var ast = Parse(source);
@@ -1218,8 +1215,8 @@ public class ConverterImprovementTests
     public void CalorEmitter_SealedClass_EmitsSealAbbreviation()
     {
         var source = """
-            §M{TestMod}
-              §CL{Final:pub:seal}
+            module TestMod TestMod block
+              class Final sealed
             """;
 
         var ast = Parse(source);
@@ -1234,8 +1231,8 @@ public class ConverterImprovementTests
     public void RoundTrip_NamedModule_PreservesStaticIdentity()
     {
         var source = """
-            §M{TestMod}
-              §M{Helper:pub}
+            module TestMod TestMod block
+              module Helper
             """;
 
         // Step 1: Parse original
@@ -1284,9 +1281,9 @@ public class ConverterImprovementTests
     public void CalorEmitter_StaticField_EmitsStatAbbreviation()
     {
         var source = """
-            §M{TestMod}
-              §CL{Counter:pub}
-                  §FLD{i32:Count:pub:stat}
+            module TestMod TestMod block
+              class Counter
+                field int:Count static
             """;
 
         var ast = Parse(source);
@@ -1303,12 +1300,11 @@ public class ConverterImprovementTests
         // Parse Calor source with a static property, verify CalorEmitter
         // emits "stat" in the PROP tag (not "static")
         var source = """
-            §M{TestMod}
-              §CL{Counter:pub}
-                  §PROP{Count:i32:pub:stat}
-                    §GET
-                    §SET
-                  §/PROP
+            module TestMod TestMod block
+              class Counter
+                property int:Count static
+                  get
+                  set
             """;
 
         var ast = Parse(source);
@@ -1324,12 +1320,11 @@ public class ConverterImprovementTests
     public void RoundTrip_StaticProperty_PreservesModifier()
     {
         var source = """
-            §M{TestMod}
-              §CL{Counter:pub}
-                  §PROP{Instance:Counter:pub:stat}
-                    §GET
-                    §SET
-                  §/PROP
+            module TestMod TestMod block
+              class Counter
+                property Counter:Instance static
+                  get
+                  set
             """;
 
         // Parse → emit → reparse
@@ -1568,13 +1563,11 @@ public class ConverterImprovementTests
     public void Parser_DefaultParameterValue_ParsesDirectly()
     {
         var calorSource = """
-            §M{Test}
-              §CL{Service:pub}
-                §MT{Greet:pub}
-                    §I{str:name}
-                    §I{str:greeting} = "Hello"
-                    §O{str}
-                    §R greeting
+            module Test Test block
+              class Service
+                func Greet (string:name, string:greeting = "Hello") → string
+                  !
+                  return greeting
             """;
 
         var ast = Parse(calorSource);
@@ -1592,13 +1585,11 @@ public class ConverterImprovementTests
     public void Parser_DefaultNumericParameterValue_ParsesCorrectly()
     {
         var calorSource = """
-            §M{Test}
-              §CL{Service:pub}
-                §MT{Add:pub}
-                    §I{i32:a}
-                    §I{i32:b} = 0
-                    §O{i32}
-                    §R (+ a b)
+            module Test Test block
+              class Service
+                func Add (int:a, int:b = 0) → int
+                  !
+                  return (a + b)
             """;
 
         var ast = Parse(calorSource);
@@ -1702,13 +1693,11 @@ public class ConverterImprovementTests
     {
         // Existing Calor files without default values should continue to parse correctly
         var calorSource = """
-            §M{Test}
-              §CL{Service:pub}
-                §MT{Greet:pub}
-                    §I{str:name}
-                    §I{str:greeting}
-                    §O{str}
-                    §R greeting
+            module Test Test block
+              class Service
+                func Greet (string:name, string:greeting) → string
+                  !
+                  return greeting
             """;
 
         var ast = Parse(calorSource);
@@ -1726,14 +1715,11 @@ public class ConverterImprovementTests
     public void RoundTrip_DefaultEnumParameter_PreservesFieldAccess()
     {
         var calorSource = """
-            §M{Test}
-              §CL{Service:pub}
-                §MT{Compare:pub}
-                    §I{str:a}
-                    §I{str:b}
-                    §I{StringComparison:comparison} = StringComparison.Ordinal
-                    §O{bool}
-                    §R true
+            module Test Test block
+              class Service
+                func Compare (string:a, string:b, StringComparison:comparison = StringComparison.Ordinal) → bool
+                  !
+                  return true
             """;
 
         // Parse → emit → reparse

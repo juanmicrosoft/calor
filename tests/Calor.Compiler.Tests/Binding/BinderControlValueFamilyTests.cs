@@ -190,9 +190,10 @@ public class BinderControlValueFamilyTests
         // fallback is a real latent bug (it is about WHEN it executes, not WHETHER the
         // expression is wrong) — Of() includes it, and the finding fires.
         const string source = @"
-§M{Test}
-  §F{Trap:pub} (?i32:x) -> i32
-    §R (?? x (/ 10 0))";
+module Test Test block
+  func Trap (int?:x) → int
+    !
+    return (x ?? (10 / 0))";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
         {

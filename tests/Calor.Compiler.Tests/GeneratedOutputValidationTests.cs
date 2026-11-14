@@ -10,9 +10,10 @@ namespace Calor.Compiler.Tests;
 public class GeneratedOutputValidationTests
 {
     private const string TypeInvalidSource = """
-        §M{Validation}
-          §F{Main:pub} () -> void
-            §B{x:i32} STR:"not an int"
+        module Validation Validation block
+          func Main () → void
+            !
+            let int:x = "not an int"
         """;
 
     [Fact]
@@ -73,16 +74,16 @@ public class GeneratedOutputValidationTests
             var callee = Path.Combine(workspace, "callee.calr");
             var caller = Path.Combine(workspace, "caller.calr");
             File.WriteAllText(callee, """
-                §M{Lib}
-                  §F{Ping:pub} () -> i32
-                    §E{}
-                    §R INT:1
+                module Lib Lib block
+                  func Ping () → int
+                    !
+                    return 1
                 """);
             File.WriteAllText(caller, """
-                §M{App}
-                  §F{Main:pub} () -> i32
-                    §E{}
-                    §R §C{Ping} §/C
+                module App App block
+                  func Main () → int
+                    !
+                    return Ping()
                 """);
 
             // Warm the cache with a clean state: both files compile, no findings.
@@ -92,11 +93,11 @@ public class GeneratedOutputValidationTests
 
             // The callee now fails effect enforcement; the caller is untouched.
             File.WriteAllText(callee, """
-                §M{Lib}
-                  §F{Ping:pub} () -> i32
-                    §E{}
-                    §P "ping"
-                    §R INT:1
+                module Lib Lib block
+                  func Ping () → int
+                    !
+                    Console.WriteLine("ping")
+                    return 1
                 """);
 
             var warm = DriveAll(workspace, clearFirst: false);
@@ -130,10 +131,10 @@ public class GeneratedOutputValidationTests
         try
         {
             File.WriteAllText(Path.Combine(workspace, "ok.calr"), """
-                §M{Ok}
-                  §F{One:pub} () -> i32
-                    §E{}
-                    §R INT:1
+                module Ok Ok block
+                  func One () → int
+                    !
+                    return 1
                 """);
             File.WriteAllText(Path.Combine(workspace, "bad.calr"), TypeInvalidSource);
 
@@ -175,17 +176,17 @@ public class GeneratedOutputValidationTests
         try
         {
             File.WriteAllText(Path.Combine(workspace, "broken.calr"), """
-                §M{Broken}
-                  §F{Boom:pub} () -> i32
-                    §E{}
-                    §P "x"
-                    §R INT:1
+                module Broken Broken block
+                  func Boom () → int
+                    !
+                    Console.WriteLine("x")
+                    return 1
                 """);
             File.WriteAllText(Path.Combine(workspace, "interop.calr"), """
-                §M{Interop}
-                  §F{Use:pub} () -> void
-                    §E{}
-                    §B{x:i32} STR:"not an int"
+                module Interop Interop block
+                  func Use () → void
+                    !
+                    let int:x = "not an int"
                 """);
 
             var result = DriveAll(workspace, clearFirst: true, enableTypeChecking: false);
@@ -216,17 +217,17 @@ public class GeneratedOutputValidationTests
         try
         {
             File.WriteAllText(Path.Combine(workspace, "callee.calr"), """
-                §M{Lib}
-                  §F{Ping:pub} () -> i32
-                    §E{}
-                    §P "ping"
-                    §R INT:1
+                module Lib Lib block
+                  func Ping () → int
+                    !
+                    Console.WriteLine("ping")
+                    return 1
                 """);
             File.WriteAllText(Path.Combine(workspace, "caller.calr"), """
-                §M{App}
-                  §F{Main:pub} () -> i32
-                    §E{}
-                    §R §C{Ping} §/C
+                module App App block
+                  func Main () → int
+                    !
+                    return Ping()
                 """);
 
             var result = DriveAll(workspace, clearFirst: true);
@@ -257,27 +258,27 @@ public class GeneratedOutputValidationTests
         {
             var callee = Path.Combine(workspace, "callee.calr");
             File.WriteAllText(callee, """
-                §M{Lib}
-                  §F{Ping:pub} () -> i32
-                    §E{}
-                    §R INT:1
+                module Lib Lib block
+                  func Ping () → int
+                    !
+                    return 1
                 """);
             File.WriteAllText(Path.Combine(workspace, "caller.calr"), """
-                §M{App}
-                  §F{Main:pub} () -> i32
-                    §E{}
-                    §R §C{Ping} §/C
+                module App App block
+                  func Main () → int
+                    !
+                    return Ping()
                 """);
 
             var clean = DriveAll(workspace, clearFirst: true);
             Assert.Empty(clean.Codes);
 
             File.WriteAllText(callee, """
-                §M{Lib}
-                  §F{Ping:pub} () -> i32
-                    §E{}
-                    §P "ping"
-                    §R INT:1
+                module Lib Lib block
+                  func Ping () → int
+                    !
+                    Console.WriteLine("ping")
+                    return 1
                 """);
 
             var warm = DriveAll(workspace, clearFirst: false);
@@ -364,10 +365,10 @@ public class GeneratedOutputValidationTests
             var interop = Path.Combine(directory, "interop.calr");
             File.WriteAllText(broken, UnlexableSource);
             File.WriteAllText(interop, """
-                §M{Interop}
-                  §F{Use:pub} () -> void
-                    §E{}
-                    §B{x:i32} STR:"not an int"
+                module Interop Interop block
+                  func Use () → void
+                    !
+                    let int:x = "not an int"
                 """);
 
             var run = CliTestHarness.RunCli(
@@ -396,10 +397,10 @@ public class GeneratedOutputValidationTests
     {
         var module = Program.Compile(
             """
-            §M{Lib}
-              §F{Map:pub} () -> i32
-                §E{}
-                §R INT:1
+            module Lib Lib block
+              func Map () → int
+                !
+                return 1
             """,
             "lib.calr",
             new CompilationOptions { UnsafeTranspileOnly = true }).Ast;
@@ -481,10 +482,10 @@ public class GeneratedOutputValidationTests
         {
             File.WriteAllText(Path.Combine(workspace, "broken.calr"), UnlexableSource);
             File.WriteAllText(Path.Combine(workspace, "good.calr"), """
-                §M{Good}
-                  §F{One:pub} () -> i32
-                    §E{}
-                    §R INT:1
+                module Good Good block
+                  func One () → int
+                    !
+                    return 1
                 """);
 
             var sources = Directory.GetFiles(workspace, "*.calr")
@@ -568,10 +569,11 @@ public class GeneratedOutputValidationTests
     {
         var result = Program.Compile(
             """
-            §M{Defaults}
-              §F{Read:pub} () -> i32
-                §B{default:i32} INT:42
-                §R default
+            module Defaults Defaults block
+              func Read () → int
+                !
+                let int:@default = 42
+                return @default
             """,
             "defaults.calr");
 
@@ -831,9 +833,10 @@ public class GeneratedOutputValidationTests
             File.WriteAllText(
                 sourcePath,
                 """
-                §M{Validation}
-                  §F{Read:pub} () -> i32
-                    §R INT:42
+                module Validation Validation block
+                  func Read () → int
+                    !
+                    return 42
                 """);
             var successful = CliTestHarness.RunCli(directory, "--input", sourcePath);
             Assert.Equal(0, successful.ExitCode);

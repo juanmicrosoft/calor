@@ -83,18 +83,19 @@ public sealed class LoopDiscoveryRollbackTests
     public void NestedLoops_DoNotLeakDiscoveryDeclarationIds()
     {
         var bound = Bind("""
-            §M{Nested}
-              §F{Run:pub} (i32:n) -> i32
-                §B{~total:i32} 0
-                §L{i:0:n:1}
-                  §B{a:i32} i
-                  §L{j:0:n:1}
-                    §B{a2:i32} (+ a j)
-                    §ASSIGN total (+ total a2)
-                §L{k:0:n:1}
-                  §B{a:i32} k
-                  §ASSIGN total (+ total a)
-                §R total
+            module Nested Nested block
+              func Run (int:n) → int
+                !
+                var int:total = 0
+                for i from 0 to n step 1
+                  let int:a = i
+                  for j from 0 to n step 1
+                    let int:a2 = (a + j)
+                    set total (total + a2)
+                for k from 0 to n step 1
+                  let int:a = k
+                  set total (total + a)
+                return total
             """);
 
         // Distinct source offsets distinguish the two locals named `a`.

@@ -183,13 +183,15 @@ public class RefinementStaticGapsTests
     public void Print_InAModuleWithoutRefinements_StillCompiles()
     {
         var result = Program.Compile("""
-            §M{P}
-              §F{Twice:pub} (i32:x) -> i32
-                §R (* x INT:2)
-              §F{Main:pub} () -> void
-                §E{cw}
-                §P §C{Twice} §A INT:21 §/C
-                §P (+ STR:"a" STR:"b")
+            module P P block
+              func Twice (int:x) → int
+                !
+                return (x * 2)
+
+              func Main () → void
+                ! cw
+                Console.WriteLine(Twice(21))
+                Console.WriteLine(("a" + "b"))
             """, "print-plain.calr", new CompilationOptions { EnableTypeChecking = true });
         Assert.False(result.HasErrors, Errors(result));
     }
@@ -614,7 +616,7 @@ public class RefinementStaticGapsTests
     public void Print_MemberAccessTheCheckerCannotType_StillCompiles(bool withRefinements)
     {
         // §P keeps only refinement errors: the checker cannot type `s.Length`, Roslyn can.
-        var header = withRefinements ? Header : "§M{Rt}";
+        var header = withRefinements ? Header : "module Rt Rt block";
         var result = Program.Compile(header + "\n" + """
               §F{Show:pub} (str:s) -> void
                 §E{cw}

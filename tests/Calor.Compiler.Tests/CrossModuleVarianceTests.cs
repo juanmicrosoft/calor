@@ -866,10 +866,10 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void InterfaceVarianceChecksDirectAndInheritedImplementations(bool inherited)
     {
         Write("interface", """
-            §M{Shared}
-              §IFACE{IQuiet}
-                §MT{Render} () -> void
-                  §E{}
+            module Shared Shared block
+              interface IQuiet
+                func Render () → void
+                  !
             """);
         Write("implementation", """
             §M{Shared}
@@ -880,9 +880,10 @@ public sealed class CrossModuleVarianceTests : IDisposable
         if (inherited)
         {
             Write("derived", """
-                §M{Shared}
-                  §CL{Derived:Writer:pub}
-                    §IMPL{IQuiet}
+                module Shared Shared block
+                  class Derived internal
+                    extends Writer
+                    implements IQuiet
                 """);
         }
 
@@ -956,16 +957,20 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void GenericBaseArgumentsAreSubstitutedBeforeMatchingMethods()
     {
         Write("base", """
-            §M{Shared}
-              §CL{Base:pub}<T>
-                §MT{Render:pub:virt} (T:value) -> void
-                  §E{}
+            module Shared Shared block
+              class Base<T>
+                func Render virtual (T:value) → void
+                  !
+                  return
             """);
         Write("derived", """
-            §M{Shared}
-              §CL{Derived:Base<i32>:pub}
-                §MT{Render:pub:over} (i32:value) -> void
-                  §E{cw}
+            module Shared Shared block
+              class Derived internal
+                extends Base<int>
+
+                func Render override (int:value) → void
+                  ! cw
+                  return
             """);
 
         var (_, diagnostics) = Compile();
@@ -981,8 +986,8 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Assert.Contains("§CL{Base:pub:partial}", firstPart);
         Write("base", firstPart);
         Write("other", """
-            §M{Shared}
-              §CL{Base:pub:partial}
+            module Shared Shared block
+              class Base partial
             """);
         Write("derived", Derived);
 
@@ -996,26 +1001,28 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void GenericInterfaceAndImplementationChainsPreserveTypeArguments()
     {
         Write("parent", """
-            §M{Shared}
-              §IFACE{IQuiet}<T>
-                §MT{Render} (T:value) -> void
-                  §E{}
+            module Shared Shared block
+              interface IQuiet<T>
+                func Render (T:value) → void
+                  !
             """);
         Write("child", """
-            §M{Shared}
-              §IFACE{IChild}<U>
-                §EXT{IQuiet<U>}
+            module Shared Shared block
+              interface IChild<U>
+                extends IQuiet<U>
             """);
         Write("base", """
-            §M{Shared}
-              §CL{Writer:pub}<V>
-                §MT{Render:pub} (V:value) -> void
-                  §E{cw}
+            module Shared Shared block
+              class Writer<V>
+                func Render (V:value) → void
+                  ! cw
+                  return
             """);
         Write("derived", """
-            §M{Shared}
-              §CL{Derived:Writer<i32>:pub}
-                §IMPL{IChild<i32>}
+            module Shared Shared block
+              class Derived internal
+                extends Writer<int>
+                implements IChild<int>
             """);
 
         var (_, diagnostics) = Compile();
@@ -1055,10 +1062,11 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void ClosedGenericTypeAliasCarriesItsArguments()
     {
         Write("base", """
-            §M{Shared}
-              §CL{Base:pub}<T>
-                §MT{Render:pub:virt} (T:value) -> void
-                  §E{}
+            module Shared Shared block
+              class Base<T>
+                func Render virtual (T:value) → void
+                  !
+                  return
             """);
         Write("derived", """
             §M{Consumer}
@@ -1100,10 +1108,13 @@ public sealed class CrossModuleVarianceTests : IDisposable
                   §E{ {{baseRow}} }
             """);
         Write("derived", """
-            §M{Shared}
-              §CL{Derived:Base:pub}
-                §MT{Render:pub:over}<eff renamed> () -> void
-                  §E{renamed}
+            module Shared Shared block
+              class Derived internal
+                extends Base
+
+                func Render <! renamed> override () → void
+                  ! renamed
+                  return
             """);
 
         var (_, diagnostics) = Compile();
@@ -1118,19 +1129,21 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void AmbiguousInterfaceContractsRemainUnknown()
     {
         const string contract = """
-            §M{Shared}
-              §IFACE{IQuiet}
-                §MT{Render} () -> void
-                  §E{}
+            module Shared Shared block
+              interface IQuiet
+                func Render () → void
+                  !
             """;
         Write("first", contract);
         Write("second", contract);
         Write("implementation", """
-            §M{Shared}
-              §CL{Writer:pub}
-                §IMPL{IQuiet}
-                §MT{Render:pub} () -> void
-                  §E{cw}
+            module Shared Shared block
+              class Writer
+                implements IQuiet
+
+                func Render () → void
+                  ! cw
+                  return
             """);
 
         var (_, diagnostics) = Compile();

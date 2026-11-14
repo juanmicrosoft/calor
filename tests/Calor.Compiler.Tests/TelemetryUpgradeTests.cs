@@ -387,9 +387,10 @@ public class TelemetryUpgradeTests
 
         var result = Program.Compile(
             """
-            §M{Invalid}
-              §F{Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module Invalid Invalid block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """,
             "invalid.calr",
             new CompilationOptions { EnableTypeChecking = false });
@@ -414,9 +415,10 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             path,
             """
-            §M{Invalid}
-              §F{Main:pub} () -> i32
-                §R missing
+            module Invalid Invalid block
+              func Main () → int
+                !
+                return missing
             """);
 
         try
@@ -451,9 +453,10 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             path,
             """
-            §M{Invalid}
-              §F{Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module Invalid Invalid block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
 
         try
@@ -492,17 +495,18 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             libraryPath,
             """
-            §M{Library}
-              §F{Write:pub} () -> void
-                §E{cw}
-                §P "written"
+            module Library Library block
+              func Write () → void
+                ! cw
+                Console.WriteLine("written")
             """);
         File.WriteAllText(
             consumerPath,
             """
-            §M{Consumer}
-              §F{Run:pub} () -> void
-                §C{Write} §/C
+            module Consumer Consumer block
+              func Run () → void
+                !
+                Write()
             """);
 
         try

@@ -111,27 +111,44 @@ public class LintRegressionTests
         bool existingSurfaceSpellingSidecar, bool mergeConflict)
     {
         const string source = """
-            §M{Types}
-              §CL{Token:pub}
-              §CL{token:pub}
-              §F{Echo:pub} (i32:value) -> i32
-                §PROOF{"positive"} (> 1 0)
-                §R value
-              §F{Echo:pub} (str:value) -> str
-                §PROOF{"positive"} (> 1 0)
-                §R value
-              §F{Echo:pub} (Token:value) -> Token
-                §R value
-              §F{Echo:pub} (token:value) -> token
-                §R value
-              §F{Echo:pub} (f32:value) -> f32
-                §R value
-              §F{Echo:pub} (f64:value) -> f64
-                §R value
-              §F{Echo:pub} (?i32:value) -> ?i32
-                §R value
-              §F{Echo:pub} ([i32]:value) -> [i32]
-                §R value
+            module Types Types block
+              class Token
+
+              class token
+
+              func Echo (int:value) → int
+                !
+                proof{"positive"} (1 > 0)
+                return value
+
+              func Echo (string:value) → string
+                !
+                proof{"positive"} (1 > 0)
+                return value
+
+              func Echo (Token:value) → Token
+                !
+                return value
+
+              func Echo (token:value) → token
+                !
+                return value
+
+              func Echo (float:value) → float
+                !
+                return value
+
+              func Echo (double:value) → double
+                !
+                return value
+
+              func Echo (int?:value) → int?
+                !
+                return value
+
+              func Echo (int[]:value) → int[]
+                !
+                return value
             """;
         static string SurfaceSpelling(string signature) => signature
             .Replace("\"i32\"", "\"int\"", StringComparison.Ordinal)

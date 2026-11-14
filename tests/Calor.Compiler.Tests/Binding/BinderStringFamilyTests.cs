@@ -143,10 +143,10 @@ public class BinderStringFamilyTests
         // The family's span-anchored e2e pin: /0 nested in a string-op argument must
         // produce the real Calor0920 pointing at the right line. ((str x) = ToString.)
         const string source = @"
-§M{Test}
-  §F{Trap:pub} () -> void
-    §E{cw}
-    §P (contains STR:""ab"" (str (/ 10 0)))";
+module Test Test block
+  func Trap () → void
+    ! cw
+    Console.WriteLine((""ab"").Contains(((10 / 0)).ToString()))";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
         {

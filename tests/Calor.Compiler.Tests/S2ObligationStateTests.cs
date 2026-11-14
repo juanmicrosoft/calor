@@ -189,17 +189,15 @@ public sealed class S2ObligationStateTests
             §R x
         """)]
     [InlineData("""
-        §M{M}
-          §CL{Box:pub}
-            §FLD{i32:Value:pub}
-            §MT{Probe:pub}
-              §I{i32:x:ref}
-              §O{i32}
-              §E{mut}
-              §Q (> x INT:0)
-              §ASSIGN this.Value INT:-5
-              §PROOF{claim} (> x INT:0)
-              §R x
+        module M M block
+          class Box
+            field int:Value
+            func Probe (ref int:x) → int
+              ! mut
+              requires (x > 0)
+              set this.Value -5
+              proof{"claim"} (x > 0)
+              return x
         """)]
     public void IndirectWrite_KillsFacts(string source)
     {
@@ -213,14 +211,11 @@ public sealed class S2ObligationStateTests
         // Review round 2 witness: the entry guard enforces y > 0, but the refinement is dropped
         // because x is reassigned, so a model y <= 0 must not become a Failed compile error.
         const string source = """
-            §M{M}
-              §F{Probe:pub}
-                §I{i32:x} | (&& (> # INT:0) (> y INT:0))
-                §I{i32:y}
-                §O{void}
-                §E{}
-                §ASSIGN x INT:1
-                §PROOF{claim} (> y INT:0)
+            module M M block
+              func Probe (int:x | ((# > 0) && (y > 0)), int:y) → void
+                !
+                set x 1
+                proof{"claim"} (y > 0)
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
@@ -233,16 +228,12 @@ public sealed class S2ObligationStateTests
         // Review round 3 witness: y > 0 (dropped entry refinement) and y == z (retained
         // precondition) make the claim hold; a model y = z = 0 is unreachable.
         const string source = """
-            §M{M}
-              §F{Probe:pub}
-                §I{i32:x} | (&& (> # INT:0) (> y INT:0))
-                §I{i32:y}
-                §I{i32:z}
-                §O{void}
-                §E{}
-                §Q (== y z)
-                §ASSIGN x INT:1
-                §PROOF{claim} (> z INT:0)
+            module M M block
+              func Probe (int:x | ((# > 0) && (y > 0)), int:y, int:z) → void
+                !
+                requires (y == z)
+                set x 1
+                proof{"claim"} (z > 0)
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
@@ -274,21 +265,19 @@ public sealed class S2ObligationStateTests
         // Review round 3 witness: box.Probe(ref box.Value) with Value = 1; reading Trigger
         // runs a getter that stores -5 through the alias.
         const string source = """
-            §M{M}
-              §CL{Box:pub}
-                §FLD{i32:Value:pub}
-                §PROP{Trigger:i32:pub}
-                  §GET
-                    §ASSIGN this.Value INT:-5
-                    §R INT:0
-                §MT{Probe:pub}
-                  §I{i32:x:ref}
-                  §O{i32}
-                  §E{mut}
-                  §Q (> x INT:0)
-                  §B{sink:i32} this.Trigger
-                  §PROOF{claim} (> x INT:0)
-                  §R x
+            module M M block
+              class Box
+                field int:Value
+                property int:Trigger
+                  get
+                    set this.Value -5
+                    return 0
+                func Probe (ref int:x) → int
+                  ! mut
+                  requires (x > 0)
+                  let int:sink = this.Trigger
+                  proof{"claim"} (x > 0)
+                  return x
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
@@ -300,21 +289,19 @@ public sealed class S2ObligationStateTests
         // Verification-pass witness: p0's retained guard runs the getter, which stores -5 through
         // the alias before p1 is checked.
         const string source = """
-            §M{M}
-              §CL{Box:pub}
-                §FLD{i32:Value:pub}
-                §PROP{Trigger:i32:pub}
-                  §GET
-                    §ASSIGN this.Value INT:-5
-                    §R INT:0
-                §MT{Probe:pub}
-                  §I{i32:x:ref}
-                  §O{i32}
-                  §E{mut}
-                  §Q (> x INT:0)
-                  §PROOF{trigger} (== this.Trigger INT:0)
-                  §PROOF{claim} (> x INT:0)
-                  §R x
+            module M M block
+              class Box
+                field int:Value
+                property int:Trigger
+                  get
+                    set this.Value -5
+                    return 0
+                func Probe (ref int:x) → int
+                  ! mut
+                  requires (x > 0)
+                  proof{"trigger"} (this.Trigger == 0)
+                  proof{"claim"} (x > 0)
+                  return x
             """;
         var proof = Assert.Single(Solve(source).Obligations,
             obligation => obligation.Kind == ObligationKind.ProofObligation && obligation.Description == "claim");

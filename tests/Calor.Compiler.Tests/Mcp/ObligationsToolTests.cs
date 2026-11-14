@@ -116,10 +116,10 @@ public sealed class ObligationsToolTests
     public async Task RefineTool_Obligations_WithNoRefinements_ReturnsEmptyObligations()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -142,13 +142,14 @@ public sealed class ObligationsToolTests
     public async Task RefineTool_Obligations_WithFunctionIdFilter_FiltersResults()
     {
         var source = """
-            §M{Test}
-              §F{Func1:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
-              §F{Func2:pub}
-                  §I{i32:y} | (> # INT:0)
-                  §O{void}
+            module Test Test block
+              func Func1 (int:x | (# >= 0)) → void
+                !
+                return
+
+              func Func2 (int:y | (# > 0)) → void
+                !
+                return
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -186,11 +187,10 @@ public sealed class ObligationsToolTests
     public async Task RefineTool_Fixes_WithValidSource_ReturnsFixSuggestions()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
-                  §PROOF{always-positive} (> x INT:0)
+            module Test Test block
+              func Main (int:x | (# >= 0)) → void
+                !
+                proof{"always-positive"} (x > 0)
             """;
 
         var args = JsonDocument.Parse($$"""

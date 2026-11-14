@@ -151,7 +151,7 @@ public class CloserHealMigratorTests
     [Fact]
     public void T_heal_i_NoClosers_NoOp()
     {
-        const string src = "§M{Calc}\n  §F{run:pub}\n    §R INT:0\n";
+        const string src = "module Calc Calc block\n  func run ()\n    !\n    return 0\n";
         var (migrated, removals) = Sut.Process(src, "i.calr");
         Assert.Empty(removals);
         Assert.Equal(src, migrated);

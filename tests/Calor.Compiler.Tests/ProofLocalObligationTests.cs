@@ -66,15 +66,13 @@ public sealed class ProofLocalObligationTests
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{Banking}
-              §F{Transfer:pub}
-                §I{i32:balance}
-                §I{i32:amount} | (> # INT:0)
-                §O{i32}
-                §Q (>= balance amount)
-                §B{newBalance:i32} (- balance amount)
-                §PROOF{non-negative} (>= newBalance INT:0)
-                §R newBalance
+            module Banking Banking block
+              func Transfer (int:balance, int:amount | (# > 0)) → int
+                !
+                requires (balance >= amount)
+                let int:newBalance = (balance - amount)
+                proof{"non-negative"} (newBalance >= 0)
+                return newBalance
             """;
         var options = new CompilationOptions { VerifyRefinements = true };
         Program.Compile(source, "test.calr", options);

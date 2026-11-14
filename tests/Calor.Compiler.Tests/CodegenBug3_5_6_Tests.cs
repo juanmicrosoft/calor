@@ -20,8 +20,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_NamedModule_SetsIsStatic()
     {
         var source = @"
-§M{Test}
-  §M{Helper}
+module Test Test block
+  module Helper internal
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -34,8 +34,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_ParseAndEmit_StaticClass_EmitsStaticKeyword()
     {
         var source = @"
-§M{Test}
-  §M{Helper:pub}
+module Test Test block
+  module Helper
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
@@ -66,8 +66,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_PartialClass_EmitsPartialKeyword()
     {
         var source = @"
-§M{Test}
-  §CL{DataService:pub:partial}
+module Test Test block
+  class DataService partial
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public partial class DataService", result);
@@ -98,8 +98,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_StaticPartialClass_EmitsCombinedModifiers()
     {
         var source = @"
-§M{Test}
-  §M{Helper:pub:partial}
+module Test Test block
+  module Helper partial
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static partial class Helper", result);
@@ -109,8 +109,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_PartialModifier_SetsIsPartial()
     {
         var source = @"
-§M{Test}
-  §CL{MyClass:partial}
+module Test Test block
+  class MyClass internal partial
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -121,8 +121,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_NamedModule_KeepsModuleIdentity()
     {
         var source = @"
-§M{Test}
-  §M{Helper}
+module Test Test block
+  module Helper internal
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -134,8 +134,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_ParseAndEmit_PublicModule_EmitsStaticKeyword()
     {
         var source = @"
-§M{Test}
-  §M{Helper:pub}
+module Test Test block
+  module Helper
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
@@ -145,8 +145,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_PartialModule_KeepsBothFlags()
     {
         var source = @"
-§M{Test}
-  §M{Helper:partial}
+module Test Test block
+  module Helper internal partial
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -160,8 +160,9 @@ public class CodegenBug3_5_6_Tests
     {
         // An unrecognized modifier like "foo" should not set any known flags
         var source = @"
-§M{Test}
-  §CL{Helper:foo}
+module Test Test block
+  class Helper internal
+    extends foo
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -180,8 +181,9 @@ public class CodegenBug3_5_6_Tests
     {
         // §CL{name:BaseClass:modifiers}
         var source = @"
-§M{Test}
-  §CL{Child:Parent:sealed}
+module Test Test block
+  class Child internal sealed
+    extends Parent
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -194,8 +196,8 @@ public class CodegenBug3_5_6_Tests
     {
         // §CL{name:abs} — original 3-positional format
         var source = @"
-§M{Test}
-  §CL{Shape:abs}
+module Test Test block
+  class Shape internal abstract
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -208,9 +210,9 @@ public class CodegenBug3_5_6_Tests
     {
         // §EXT{Parent} as child tag
         var source = @"
-§M{Test}
-  §CL{Child}
-    §EXT{Parent}
+module Test Test block
+  class Child internal
+    extends Parent
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -283,8 +285,8 @@ public class CodegenBug3_5_6_Tests
     {
         // §CL{Foo:pub:abs} — pos2 is visibility keyword, should be ignored; pos3 is modifiers
         var source = @"
-§M{Test}
-  §CL{Foo:pub:abs}
+module Test Test block
+  class Foo abstract
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -297,8 +299,9 @@ public class CodegenBug3_5_6_Tests
     {
         // §CL{Foo:MyBase:sealed} — pos2 is base class, pos3 is modifiers
         var source = @"
-§M{Test}
-  §CL{Foo:MyBase:sealed}
+module Test Test block
+  class Foo internal sealed
+    extends MyBase
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -311,8 +314,8 @@ public class CodegenBug3_5_6_Tests
     {
         // §CL{Base:abs seal} — space-separated modifiers in 3-positional format
         var source = @"
-§M{Test}
-  §CL{Base:abs seal}
+module Test Test block
+  class Base internal abstract sealed
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -344,8 +347,9 @@ public class CodegenBug3_5_6_Tests
     {
         // §CL{Child:ParentWidget} — "ParentWidget" is not a known modifier → treated as base class
         var source = @"
-§M{Test}
-  §CL{Child:ParentWidget}
+module Test Test block
+  class Child internal
+    extends ParentWidget
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -362,10 +366,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_DottedAccess_InterpolatedCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Greet:pub}
-                  §O{str}
-                  §B{~result:str} STR:"Hello ${p.Name}"
+            module Test Test block
+              func Greet () → string
+                !
+                var string:result = "Hello ${p.Name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -376,10 +380,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MultiLevelDottedAccess()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${a.B.C}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${a.B.C}"
             """;
 
         var result = ParseAndEmit(source);
@@ -390,10 +394,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_NullConditionalAccess()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${x?.Y}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${x?.Y}"
             """;
 
         var result = ParseAndEmit(source);
@@ -404,10 +408,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_SimpleInterpolation_BackwardCompat()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"Hello ${name}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "Hello ${name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -418,10 +422,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_IndexerAccess()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${arr[0]}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${arr[0]}"
             """;
 
         var result = ParseAndEmit(source);
@@ -432,10 +436,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MethodCall()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${obj.Method()}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${obj.Method()}"
             """;
 
         var result = ParseAndEmit(source);
@@ -446,10 +450,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_ChainedIndexerProperty()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${list[i].Name}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${list[i] . Name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -460,10 +464,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MethodWithArgument()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${obj.GetValue(x)}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${obj.GetValue(x)}"
             """;
 
         var result = ParseAndEmit(source);
@@ -494,10 +498,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_DigitHole_IsRuntimeInterpolation()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${0}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${0}"
             """;
 
         var result = ParseAndEmit(source);
@@ -508,10 +512,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MultipleInterpolations()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${a} and ${b[0]}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${a} and ${b[0]}"
             """;
 
         var result = ParseAndEmit(source);

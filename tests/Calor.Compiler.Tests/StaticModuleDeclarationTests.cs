@@ -420,10 +420,11 @@ public class StaticModuleDeclarationTests
     public void NestedModuleClassCollision_IsDiagnosed()
     {
         var module = Parse("""
-            §M{Library}
-              §CL{Outer:pub}
-                §M{Helpers:pub}
-                §CL{Helpers:pub}
+            module Library Library block
+              class Outer
+                module Helpers
+
+                class Helpers
             """);
         Assert.Contains(Bind(module), diagnostic => diagnostic.Code == DiagnosticCode.DuplicateDefinition);
     }
@@ -626,17 +627,19 @@ public class StaticModuleDeclarationTests
     public void PartialMergeAndContractSimplification_PreserveModuleOwnership()
     {
         var first = Parse("""
-            §M{Library}
-              §M{Helpers:pub:partial}
-                §F{First:pub} (i32:value) -> i32
-                  §Q (> 2 1)
-                  §R value
+            module Library Library block
+              module Helpers partial
+                func First (int:value) → int
+                  !
+                  requires (2 > 1)
+                  return value
             """);
         var second = Parse("""
-            §M{Library}
-              §M{Helpers:pub:partial}
-                §F{Second:pub} () -> i32
-                  §R 2
+            module Library Library block
+              module Helpers partial
+                func Second () → int
+                  !
+                  return 2
             """);
         var merged = new PartialClassMerger().Merge([first, second]);
         var declaration = Assert.Single(merged.SelectMany(module => module.Classes));

@@ -83,18 +83,15 @@ public class VerificationAnalysisPassTests
     public void PreconditionFacts_AreScopedToExactOverloadSymbol()
     {
         var source = """
-            §M{Test}
-              §F{Divide:pub}
-                §I{i32:x}
-                §I{i32:y}
-                §O{i32}
-                §Q (!= y INT:0)
-                §R (/ x y)
-              §F{Divide:pub}
-                §I{i64:x}
-                §I{i64:y}
-                §O{i64}
-                §R (/ x y)
+            module Test Test block
+              func Divide (int:x, int:y) → int
+                !
+                requires (y != 0)
+                return (x / y)
+
+              func Divide (long:x, long:y) → long
+                !
+                return (x / y)
             """;
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors);
@@ -238,12 +235,10 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_SimpleFunction_Completes()
     {
         var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ x y)";
+module Test Test block
+  func Add (int:x, int:y) → int
+    !
+    return (x + y)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -260,12 +255,10 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_BoundModule_Completes()
     {
         var source = @"
-§M{Test}
-  §F{Multiply:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (* x y)";
+module Test Test block
+  func Multiply (int:x, int:y) → int
+    !
+    return (x * y)";
 
         var bound = Bind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -281,16 +274,18 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_MultipleFunctions_AnalyzesAll()
     {
         var source = @"
-§M{Test}
-  §F{Foo:pub}
-      §O{i32}
-      §R INT:1
-  §F{Bar:pub}
-      §O{i32}
-      §R INT:2
-  §F{Baz:pub}
-      §O{i32}
-      §R INT:3";
+module Test Test block
+  func Foo () → int
+    !
+    return 1
+
+  func Bar () → int
+    !
+    return 2
+
+  func Baz () → int
+    !
+    return 3";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -306,12 +301,10 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_DivisionByZero_DetectsBug()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (/ x y)";
+module Test Test block
+  func Divide (int:x, int:y) → int
+    !
+    return (x / y)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -327,11 +320,10 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_SafeCode_FewIssues()
     {
         var source = @"
-§M{Test}
-  §F{Safe:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x INT:1)";
+module Test Test block
+  func Safe (int:x) → int
+    !
+    return (x + 1)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -348,11 +340,11 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_DisabledDataflow_SkipsDataflow()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §O{i32}
-      §B{x:i32} INT:1
-      §R x";
+module Test Test block
+  func Test () → int
+    !
+    let int:x = 1
+    return x";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -378,16 +370,13 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_WithLoop_AnalyzesLoop()
     {
         var source = @"
-§M{Test}
-  §F{Sum:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{sum:i32} INT:0
-      §L{i:0:10:1}
-          §C{Console.WriteLine}
-            §A i
-          §/C
-      §R sum";
+module Test Test block
+  func Sum (int:n) → int
+    !
+    let int:sum = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
+    return sum";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -405,13 +394,11 @@ public class VerificationAnalysisPassTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{Test}
-  §F{SafeDivide:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §Q (!= y INT:0)
-      §R (/ x y)";
+module Test Test block
+  func SafeDivide (int:x, int:y) → int
+    !
+    requires (y != 0)
+    return (x / y)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -440,17 +427,14 @@ public class VerificationAnalysisPassTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{Test}
-  §F{Sum:pub}
-      §I{i32:n}
-      §O{i32}
-      §Q (>= n INT:0)
-      §B{sum:i32} INT:0
-      §L{i:0:10:1}
-          §C{Console.WriteLine}
-            §A i
-          §/C
-      §R sum";
+module Test Test block
+  func Sum (int:n) → int
+    !
+    requires (n >= 0)
+    let int:sum = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
+    return sum";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -529,7 +513,7 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_EmptyModule_Handles()
     {
         var source = @"
-§M{Test}";
+module Test Test block";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);

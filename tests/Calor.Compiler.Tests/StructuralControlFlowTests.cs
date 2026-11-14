@@ -84,15 +84,16 @@ public class StructuralControlFlowTests
     {
         var assembly = Compile(
             """
-            §M{GuardedMatch}
-              §F{Classify:pub} (i32 value) -> str
-                §W value
-                  §K §VAR{n} §WHEN (> n INT:10)
-                    §R STR:"large"
-                  §K §VAR{n} §WHEN (> n INT:0)
-                    §R STR:"positive"
-                  §K _
-                    §R STR:"other"
+            module GuardedMatch GuardedMatch block
+              func Classify (int:value) → string
+                !
+                match value
+                  case var n when (n > 10)
+                    return "large"
+                  case var n when (n > 0)
+                    return "positive"
+                  case _
+                    return "other"
             """,
             out var generated);
 
@@ -696,11 +697,10 @@ public class StructuralControlFlowTests
     {
         var result = Program.Compile(
             """
-            §M{IteratorParameters}
-              §F{Values:pub}
-                §I{i32:value}
-                §O{i32}
-                §YIELD value
+            module IteratorParameters IteratorParameters block
+              func Values (int:value) → int
+                !
+                yield value
             """);
 
         Assert.False(
@@ -715,19 +715,17 @@ public class StructuralControlFlowTests
         foreach (var source in new[]
                  {
                      """
-                     §M{AsyncIteratorParameters}
-                       §AF{Values:pub}
-                         §I{i32:value:ref}
-                         §O{i32}
-                         §YIELD value
+                     module AsyncIteratorParameters AsyncIteratorParameters block
+                       func Values async (ref int:value) → int
+                         !
+                         yield value
                      """,
                      """
-                     §M{GenericIteratorParameters}
-                       §CL{Container:pub}
-                         §MT{Values:pub:stat}<T>
-                           §I{T:value:ref}
-                           §O{T}
-                           §YIELD value
+                     module GenericIteratorParameters GenericIteratorParameters block
+                       class Container
+                         func Values<T> static (ref T:value) → T
+                           !
+                           yield value
                      """
                  })
         {

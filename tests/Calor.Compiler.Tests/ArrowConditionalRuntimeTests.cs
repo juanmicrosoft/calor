@@ -32,13 +32,13 @@ public class ArrowConditionalRuntimeTests
     public void BlockReturn_DoesNotStealLoopDedent()
     {
         const string source = """
-            §M{Arrow}
-              §F{HasNegative:pub} ([i32]:arr) -> bool
-                §E{}
-                §L{i:0:(- (len arr) 1):1}
-                  §IF (< arr{i} 0)
-                    §R true
-                §R false
+            module Arrow Arrow block
+              func HasNegative (int[]:arr) → bool
+                !
+                for i from 0 to (arr.Length - 1) step 1
+                  if (arr[i] < 0)
+                    return true
+                return false
             """;
         var module = Parse(source);
         var function = Assert.Single(module.Functions);
@@ -84,20 +84,21 @@ public class ArrowConditionalRuntimeTests
     public void NestedInlineIf_LeavesOuterElseAndNextFunctionIntact()
     {
         var type = Compile("""
-            §M{Arrow}
-              §F{Probe:pub} (i32:x) -> i32
-                §E{}
-                §IF (> x 0)
-                  §IF (> x 1)
-                    §R 2
-                §EL
-                  §R -1
-                §R 1
-              §F{Other:pub} () -> i32
-                §E{}
-                §IF true
-                  §R 3
-                §R 4
+            module Arrow Arrow block
+              func Probe (int:x) → int
+                !
+                if (x > 0)
+                  if (x > 1)
+                    return 2
+                else
+                  return -1
+                return 1
+
+              func Other () → int
+                !
+                if true
+                  return 3
+                return 4
             """);
         Assert.Equal(-1, Invoke(type, "Probe", 0));
         Assert.Equal(1, Invoke(type, "Probe", 1));

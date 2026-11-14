@@ -293,9 +293,10 @@ public sealed class ValidationLoopTests : IDisposable
     {
         WriteFixture();
         File.WriteAllText(Path.Combine(_directory, "other.calr"), """
-            §M{Other}
-              §F{Sum:pub} () -> i32
-                §R §C{Add} §A 2 §A 3 §/C
+            module Other Other block
+              func Sum () → int
+                !
+                return Add(2, 3)
             """);
         var result = await RunAsync(mcp: true);
         Assert.True(result.GetProperty("success").GetBoolean(), result.ToString());

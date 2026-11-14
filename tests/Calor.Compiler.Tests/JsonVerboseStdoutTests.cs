@@ -30,14 +30,15 @@ public class JsonVerboseStdoutTests : IDisposable
         "}\n";
 
     private const string CalorSource =
-        "§M{Demo}\n" +
-        "  §F{Add:pub} (i32:a, i32:b) -> i32\n" +
-        "    §Q (>= a 0)\n" +
-        "    §E{}\n" +
-        "    §R (+ a b)\n" +
-        "  §F{Main:pub} () -> void\n" +
-        "    §E{cw}\n" +
-        "    §P \"hi\"\n";
+        "module Demo Demo block\n" +
+        "  func Add (int:a, int:b) → int\n" +
+        "    !\n" +
+        "    requires (a >= 0)\n" +
+        "    return (a + b)\n" +
+        "\n" +
+        "  func Main () → void\n" +
+        "    ! cw\n" +
+        "    Console.WriteLine(\"hi\")\n";
 
     public JsonVerboseStdoutTests()
     {

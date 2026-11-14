@@ -473,13 +473,14 @@ public class Calor0425CorpusLedgerTests
     }
 
     private const string FirstCliModule = """
-        §M{Probe}
-          §F{First:pub} (i32:x) -> i32
-            §E{}
-            §R x
-          §F{Second:pub} (i32:x) -> i32
-            §E{}
-            §R x
+        module Probe Probe block
+          func First (int:x) → int
+            !
+            return x
+
+          func Second (int:x) → int
+            !
+            return x
         """;
 
     private static string NextCliModule => FirstCliModule.Replace("First", "Third").Replace("Second", "Fourth");
@@ -1116,10 +1117,10 @@ public class Calor0425CorpusLedgerTests
         // the effect the caller declares, so a pass that reads the manifest is
         // silent and a pass that does not is not.
         const string source = """
-            §M{ScratchCwd}
-              §F{Main:pub} () -> void
-                §E{cw}
-                §C{K1ScratchWidget.Ping} §/C
+            module ScratchCwd ScratchCwd block
+              func Main () → void
+                ! cw
+                K1ScratchWidget.Ping()
             """;
 
         var scratch = Path.Combine(Path.GetTempPath(), "calor-k1-manifest-" + Guid.NewGuid().ToString("N"));

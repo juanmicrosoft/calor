@@ -309,7 +309,7 @@ public sealed class TolerantParseTests : IDisposable
         // Deep §IF nesting recurses through the statement parser, outside
         // the expression depth counter — the stack backstop must turn an
         // imminent overflow into a catchable failure, never a process abort.
-        var builder = new System.Text.StringBuilder("§M{DeepIf}\n  §F{deep:pub}\n    §O{void}\n");
+        var builder = new System.Text.StringBuilder("module DeepIf DeepIf block\n  func deep () → void\n    !\n    return\n");
         var indent = "    ";
         for (var i = 0; i < 4000; i++)
         {

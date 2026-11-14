@@ -79,9 +79,9 @@ public class EventAccessorTests
     public void Parser_SimpleEventField_StillWorks()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §EVT{Click:pub:EventHandler}
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
             """;
 
         var diag = new DiagnosticBag();
@@ -107,16 +107,13 @@ public class EventAccessorTests
     public void Parser_EventWithAccessors_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §EVT{Click:pub:EventHandler}
-                §EADD
-                §R INT:0
-                §/EADD
-                §EREM
-                §R INT:1
-                §/EREM
-                §/EVT
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
+                  add
+                    return 0
+                  remove
+                    return 1
             """;
 
         var diag = new DiagnosticBag();
@@ -366,9 +363,9 @@ public class EventAccessorTests
     public void RoundTrip_SimpleEventField_ParseAndEmit()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §EVT{Click:pub:EventHandler}
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
             """;
 
         var diag = new DiagnosticBag();
@@ -389,16 +386,13 @@ public class EventAccessorTests
     public void RoundTrip_EventWithAccessors_ParseAndEmit()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §EVT{Click:pub:EventHandler}
-                §EADD
-                §R INT:0
-                §/EADD
-                §EREM
-                §R INT:1
-                §/EREM
-                §/EVT
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
+                  add
+                    return 0
+                  remove
+                    return 1
             """;
 
         var diag = new DiagnosticBag();

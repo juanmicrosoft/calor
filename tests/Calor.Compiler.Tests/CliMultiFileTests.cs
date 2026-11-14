@@ -34,17 +34,16 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "a.calr");
         var bPath = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(aPath, """
-            §M{OrderService}
-              §F{SaveOrder:pub}
-                §O{void}
-                §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """);
         File.WriteAllText(bPath, """
-            §M{Handler}
-              §F{HandleRequest:pub}
-                §O{void}
-                §C{SaveOrder}
-                §/C
+            module Handler Handler block
+              func HandleRequest () → void
+                !
+                SaveOrder()
             """);
         return (aPath, bPath);
     }
@@ -85,18 +84,16 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "a.calr");
         var bPath = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(aPath, """
-            §M{OrderService}
-              §F{SaveOrder:pub}
-                §O{void}
-                §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """);
         File.WriteAllText(bPath, """
-            §M{Handler}
-              §F{HandleRequest:pub}
-                §O{void}
-                §E{db:w}
-                §C{SaveOrder}
-                §/C
+            module Handler Handler block
+              func HandleRequest () → void
+                ! db:w
+                SaveOrder()
             """);
 
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
@@ -113,14 +110,16 @@ public class CliMultiFileTests : IDisposable
         var bPath = Path.Combine(_tempDir, "b.calr");
         var outPath = Path.Combine(_tempDir, "out.cs");
         File.WriteAllText(aPath, """
-            §M{A}
-              §F{Foo:pub}
-                §O{void}
+            module A A block
+              func Foo () → void
+                !
+                return
             """);
         File.WriteAllText(bPath, """
-            §M{B}
-              §F{Bar:pub}
-                §O{void}
+            module B B block
+              func Bar () → void
+                !
+                return
             """);
 
         var (exit, stdOut, stdErr) = RunCli(
@@ -141,16 +140,16 @@ public class CliMultiFileTests : IDisposable
         var storePath = Path.Combine(_tempDir, "store.calr");
         var catalogPath = Path.Combine(_tempDir, "catalog.calr");
         File.WriteAllText(storePath, """
-            §M{Store}
-              §F{SaveSnapshot:pub} (str:path, str:name) -> void
-                §E{fs:w}
-                §C{File.WriteAllText} §A path §A name §/C
+            module Store Store block
+              func SaveSnapshot (string:path, string:name) → void
+                ! fs:w
+                File.WriteAllText(path, name)
             """);
         File.WriteAllText(catalogPath, """
-            §M{Catalog}
-              §F{Ping:pub} (str:path) -> void
-                §E{fs:w}
-                §C{SaveSnapshot} §A path §A "x" §/C
+            module Catalog Catalog block
+              func Ping (string:path) → void
+                ! fs:w
+                SaveSnapshot(path, "x")
             """);
         return (storePath, catalogPath);
     }
@@ -182,9 +181,10 @@ public class CliMultiFileTests : IDisposable
                   §R §C{Foo}
             """);
         File.WriteAllText(unrelatedPath, """
-            §M{Unrelated}
-              §F{Foo:pub} () -> i32
-                §R INT:99
+            module Unrelated Unrelated block
+              func Foo () → int
+                !
+                return 99
             """);
 
         var files = new[]
@@ -235,19 +235,22 @@ public class CliMultiFileTests : IDisposable
         var betaPath = Path.Combine(_tempDir, "beta.calr");
         var consumerPath = Path.Combine(_tempDir, "consumer.calr");
         File.WriteAllText(alphaPath, """
-            §M{Alpha}
-              §F{Emit:pub} () -> i32
-                §R INT:1
+            module Alpha Alpha block
+              func Emit () → int
+                !
+                return 1
             """);
         File.WriteAllText(betaPath, """
-            §M{Beta}
-              §F{Emit:pub} () -> i32
-                §R INT:2
+            module Beta Beta block
+              func Emit () → int
+                !
+                return 2
             """);
         File.WriteAllText(consumerPath, """
-            §M{Consumer}
-              §F{Read:pub} () -> i32
-                §R §C{Alpha.Emit} §/C
+            module Consumer Consumer block
+              func Read () → int
+                !
+                return Alpha.Emit()
             """);
         var map = CompilationDriver.BuildCrossModuleFunctionMap(
             [new FileInfo(alphaPath), new FileInfo(betaPath), new FileInfo(consumerPath)]);
@@ -320,23 +323,22 @@ public class CliMultiFileTests : IDisposable
         var bPath = Path.Combine(_tempDir, "b.calr");
         var cPath = Path.Combine(_tempDir, "c.calr");
         File.WriteAllText(aPath, """
-            §M{Alpha}
-              §F{Emit:pub} () -> void
-                §E{cw}
-                §P "alpha"
+            module Alpha Alpha block
+              func Emit () → void
+                ! cw
+                Console.WriteLine("alpha")
             """);
         File.WriteAllText(bPath, """
-            §M{Beta}
-              §F{Emit:pub} () -> void
-                §E{cw}
-                §P "beta"
+            module Beta Beta block
+              func Emit () → void
+                ! cw
+                Console.WriteLine("beta")
             """);
         File.WriteAllText(cPath, """
-            §M{Caller}
-              §F{Run:pub} () -> void
-                §E{cw}
-                §C{Emit}
-                §/C
+            module Caller Caller block
+              func Run () → void
+                ! cw
+                Emit()
             """);
 
         // WS-W2 (D-W2.1): an ambiguous cross-module bare name is not in the
@@ -363,19 +365,20 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "self.calr");
         var bPath = Path.Combine(_tempDir, "other.calr");
         File.WriteAllText(aPath, """
-            §M{SelfMod}
-              §F{Helper:pub} () -> void
-                §E{cw}
-                §P "hi"
-              §F{Run:pub} () -> void
-                §E{cw}
-                §C{Helper}
-                §/C
+            module SelfMod SelfMod block
+              func Helper () → void
+                ! cw
+                Console.WriteLine("hi")
+
+              func Run () → void
+                ! cw
+                Helper()
             """);
         File.WriteAllText(bPath, """
-            §M{OtherMod}
-              §F{Unrelated:pub} () -> void
-                §E{}
+            module OtherMod OtherMod block
+              func Unrelated () → void
+                !
+                return
             """);
 
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
@@ -394,19 +397,21 @@ public class CliMultiFileTests : IDisposable
         var mathPath = Path.Combine(_tempDir, "math.calr");
         var appPath = Path.Combine(_tempDir, "app.calr");
         File.WriteAllText(mathPath, """
-            §M{MathMod}
-              §F{Clamp:pub} (i32:x) -> i32
-                §Q (>= x (- 0 1000))
-                §S (>= result 0)
-                §IF (< x 0)
-                  §R 0
-                §EL
-                  §R x
+            module MathMod MathMod block
+              func Clamp (int:x) → int
+                !
+                requires (x >= (0 - 1000))
+                => (result >= 0)
+                if (x < 0)
+                  return 0
+                else
+                  return x
             """);
         File.WriteAllText(appPath, """
-            §M{AppMod}
-              §F{Use:pub} (i32:v) -> void
-                §C{Clamp} §A v §/C
+            module AppMod AppMod block
+              func Use (int:v) → void
+                !
+                Clamp(v)
             """);
 
         var (exit, stdOut, stdErr) = RunCli(
@@ -427,21 +432,21 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "alpha.calr");
         var bPath = Path.Combine(_tempDir, "beta.calr");
         File.WriteAllText(aPath, """
-            §M{Alpha}
-              §CL{Keeper:pub}
-                §MT{Save:pub} () -> void
-                  §E{cw}
-                  §P "keeper-save"
-                §MT{Other:pub} () -> void
-                  §E{cw}
-                  §C{Save}
-                  §/C
+            module Alpha Alpha block
+              class Keeper
+                func Save () → void
+                  ! cw
+                  Console.WriteLine("keeper-save")
+
+                func Other () → void
+                  ! cw
+                  Save()
             """);
         File.WriteAllText(bPath, """
-            §M{Beta}
-              §F{Save:pub} () -> void
-                §E{cw}
-                §P "beta-save"
+            module Beta Beta block
+              func Save () → void
+                ! cw
+                Console.WriteLine("beta-save")
             """);
 
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
@@ -463,16 +468,16 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "caller.calr");
         var bPath = Path.Combine(_tempDir, "lib.calr");
         File.WriteAllText(aPath, """
-            §M{CallerMod}
-              §F{Run:pub} (Func<i32,i32>:Notify) -> void
-                §E{cw}
-                §C{Notify} §A INT:42 §/C
+            module CallerMod CallerMod block
+              func Run (Func<int, int>:Notify) → void
+                ! cw
+                Notify(42)
             """);
         File.WriteAllText(bPath, """
-            §M{Lib}
-              §F{Notify:pub} (i32:x) -> void
-                §E{cw}
-                §P x
+            module Lib Lib block
+              func Notify (int:x) → void
+                ! cw
+                Console.WriteLine(x)
             """);
 
         // v0.15 E4: invoking the row-less Func-typed 'Notify' parameter charges
@@ -505,10 +510,10 @@ public class CliMultiFileTests : IDisposable
                 §C{File.WriteAllText} §A path §A "x" §/C
             """);
         File.WriteAllText(catalogPath, """
-            §M{ICatalog}
-              §F{Ping:pub} (str:path) -> void
-                §E{fs:w}
-                §C{Stash} §A path §/C
+            module ICatalog ICatalog block
+              func Ping (string:path) → void
+                ! fs:w
+                Stash(path)
             """);
 
         var (exit, stdOut, stdErr) = RunCli("--input", storePath, "--input", catalogPath);
@@ -527,22 +532,22 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "nest.calr");
         var bPath = Path.Combine(_tempDir, "nbeta.calr");
         File.WriteAllText(aPath, """
-            §M{NAlpha}
-              §CL{Outer:pub}
-                §MT{Save:pub:stat} () -> void
-                  §E{cw}
-                  §P "outer-static-save"
-                §CL{Inner:pub}
-                  §MT{Go:pub} () -> void
-                    §E{cw}
-                    §C{Save}
-                    §/C
+            module NAlpha NAlpha block
+              class Outer
+                func Save static () → void
+                  ! cw
+                  Console.WriteLine("outer-static-save")
+
+                class Inner
+                  func Go () → void
+                    ! cw
+                    Save()
             """);
         File.WriteAllText(bPath, """
-            §M{NBeta}
-              §F{Save:pub} () -> void
-                §E{cw}
-                §P "beta-save"
+            module NBeta NBeta block
+              func Save () → void
+                ! cw
+                Console.WriteLine("beta-save")
             """);
 
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
@@ -562,22 +567,24 @@ public class CliMultiFileTests : IDisposable
         var aPath = Path.Combine(_tempDir, "derived.calr");
         var bPath = Path.Combine(_tempDir, "dlib.calr");
         File.WriteAllText(aPath, """
-            §M{DApp}
-              §CL{Base:pub}
-                §MT{Ping:pub} () -> void
-                  §E{cw}
-                  §P "base-ping"
-              §CL{Derived:Base}
-                §MT{Go:pub} () -> void
-                  §E{cw}
-                  §C{Ping}
-                  §/C
+            module DApp DApp block
+              class Base
+                func Ping () → void
+                  ! cw
+                  Console.WriteLine("base-ping")
+
+              class Derived internal
+                extends Base
+
+                func Go () → void
+                  ! cw
+                  Ping()
             """);
         File.WriteAllText(bPath, """
-            §M{DLib}
-              §F{Ping:pub} () -> void
-                §E{cw}
-                §P "lib-ping"
+            module DLib DLib block
+              func Ping () → void
+                ! cw
+                Console.WriteLine("lib-ping")
             """);
 
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);

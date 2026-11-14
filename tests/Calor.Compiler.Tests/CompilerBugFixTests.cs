@@ -70,11 +70,14 @@ public class CompilerBugFixTests
     public void Emitter_AllModuleFunctions_AreStatic()
     {
         var source = """
-            §M{TestMod}
-              §F{Helper:pub}
-                  §O{void}
-              §F{Main:pub}
-                  §O{void}
+            module TestMod TestMod block
+              func Helper () → void
+                !
+                return
+
+              func Main () → void
+                !
+                return
             """;
 
         var result = Program.Compile(source);
@@ -92,11 +95,10 @@ public class CompilerBugFixTests
     public void CnfLowering_StringParameter_HasStringType()
     {
         var source = """
-            §M{Test}
-              §F{Greet:pub}
-                  §I{string:name}
-                  §O{string}
-                  §R name
+            module Test Test block
+              func Greet (string:name) → string
+                !
+                return name
             """;
 
         var module = Parse(source, out var diag);
@@ -115,11 +117,10 @@ public class CompilerBugFixTests
     public void CnfLowering_BoolParameter_HasBoolType()
     {
         var source = """
-            §M{Test}
-              §F{Check:pub}
-                  §I{bool:flag}
-                  §O{bool}
-                  §R flag
+            module Test Test block
+              func Check (bool:flag) → bool
+                !
+                return flag
             """;
 
         var module = Parse(source, out var diag);
@@ -136,13 +137,11 @@ public class CompilerBugFixTests
     public void CnfLowering_BindTracksType_AssignHasCorrectType()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{msg:string} STR:"hello"
-                  §C{Console.WriteLine}
-                    §A msg
-                  §/C
+            module Test Test block
+              func Foo () → void
+                !
+                let string:msg = "hello"
+                Console.WriteLine(msg)
             """;
 
         var module = Parse(source, out var diag);
@@ -223,12 +222,10 @@ public class CompilerBugFixTests
     public void TypeChecker_IntArithmetic_NoError()
     {
         var source = """
-            §M{Test}
-              §F{Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
+            module Test Test block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
             """;
 
         var module = Parse(source, out var diag);
@@ -242,12 +239,10 @@ public class CompilerBugFixTests
     public void TypeChecker_FloatArithmetic_NoError()
     {
         var source = """
-            §M{Test}
-              §F{Add:pub}
-                  §I{f64:a}
-                  §I{f64:b}
-                  §O{f64}
-                  §R (+ a b)
+            module Test Test block
+              func Add (double:a, double:b) → double
+                !
+                return (a + b)
             """;
 
         var module = Parse(source, out var diag);
@@ -265,13 +260,10 @@ public class CompilerBugFixTests
     public void TypeChecker_PrintStatement_NoError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §C{Console.WriteLine}
-                    §A STR:"hello"
-                  §/C
+            module Test Test block
+              func Main () → void
+                ! cw
+                Console.WriteLine("hello")
             """;
 
         var module = Parse(source, out var diag);
@@ -540,9 +532,10 @@ public class CompilerBugFixTests
     public void ContractVerificationPass_EmptyContracts_NoCrash()
     {
         var source = """
-            §M{Test}
-              §F{Simple:pub}
-                  §O{void}
+            module Test Test block
+              func Simple () → void
+                !
+                return
             """;
 
         var result = Program.Compile(source);
@@ -557,18 +550,14 @@ public class CompilerBugFixTests
     public void E2E_CompleteProgram_WithArithmetic_Compiles()
     {
         var source = """
-            §M{Calculator}
-              §F{Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
-              §F{Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §C{Console.WriteLine}
-                    §A INT:42
-                  §/C
+            module Calculator Calculator block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
+
+              func Main () → void
+                ! cw
+                Console.WriteLine(42)
             """;
 
         var result = Program.Compile(source);
@@ -582,13 +571,11 @@ public class CompilerBugFixTests
     public void E2E_ProgramWithContracts_CompilesCleanly()
     {
         var source = """
-            §M{Safe}
-              §F{Divide:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §Q (!= b INT:0)
-                  §R (/ a b)
+            module Safe Safe block
+              func Divide (int:a, int:b) → int
+                !
+                requires (b != 0)
+                return (a / b)
             """;
 
         var result = Program.Compile(source);
@@ -643,10 +630,10 @@ public class CompilerBugFixTests
     {
         // §B{x:i32} (typed, no initializer) is valid — default-initializes.
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x:i32}
+            module Test Test block
+              func Foo () → void
+                !
+                let int:x
             """;
 
         var result = Program.Compile(source);
@@ -661,10 +648,10 @@ public class CompilerBugFixTests
     {
         // §B{x} INT:42 (untyped, with initializer) is valid — type is inferred.
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} INT:42
+            module Test Test block
+              func Foo () → void
+                !
+                let x = 42
             """;
 
         var result = Program.Compile(source);
@@ -724,10 +711,10 @@ public class CompilerBugFixTests
     {
         // A null initializer requires an explicit nullable type.
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} null
+            module Test Test block
+              func Foo () → void
+                !
+                let x = null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -742,10 +729,10 @@ public class CompilerBugFixTests
     public void StrictBindInference_NullInitializer_NoStrict_DoesNotReportCalor0251()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} null
+            module Test Test block
+              func Foo () → void
+                !
+                let x = null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -761,10 +748,10 @@ public class CompilerBugFixTests
     public void StrictBindInference_TypedNull_DoesNotReportCalor0251()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x:?i32} null
+            module Test Test block
+              func Foo () → void
+                !
+                let int?:x = null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -779,10 +766,10 @@ public class CompilerBugFixTests
     {
         // §B{x} §C{Vec.empty} §/C is a known generic factory; strict mode flags it.
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} §C{Vec.empty} §/C
+            module Test Test block
+              func Foo () → void
+                !
+                let x = Vec.empty()
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -797,10 +784,10 @@ public class CompilerBugFixTests
     public void StrictBindInference_GenericFactoryCall_NoStrict_Compiles()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} §C{Vec.empty} §/C
+            module Test Test block
+              func Foo () → void
+                !
+                let x = Vec.empty()
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -815,10 +802,10 @@ public class CompilerBugFixTests
     {
         // (+ INT:0 FLOAT:0.0) mixes integer and float literals: ambiguous widening.
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} (+ INT:0 FLOAT:0.0)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (0 + 0.0)
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -833,10 +820,10 @@ public class CompilerBugFixTests
     public void StrictBindInference_AmbiguousNumeric_NoStrict_Compiles()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} (+ INT:0 FLOAT:0.0)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (0 + 0.0)
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -851,10 +838,10 @@ public class CompilerBugFixTests
     {
         // Same-type operands: no ambiguity, no diagnostic.
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} (+ INT:1 INT:2)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (1 + 2)
             """;
 
         var result = Program.Compile(source, "test.calr",

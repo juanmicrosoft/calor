@@ -32,21 +32,19 @@ public class EditPrecisionMcpToolTests
 ";
 
     private static readonly string SampleSourceWithEffects = @"
-§M{IoModule}
-  §F{readInput:pub}
-      §O{str}
-      §E{cr}
-      §R STR:""hello""
-  §F{processAndPrint:pub}
-      §I{str:input}
-      §O{void}
-      §E{cw}
-      §P input
-  §F{main:pub}
-      §O{void}
-      §E{cw, cr}
-      §B{data:str} §C{readInput} §/C
-      §C{processAndPrint} §A data §/C
+module IoModule IoModule block
+  func readInput () → string
+    ! cr
+    return ""hello""
+
+  func processAndPrint (string:input) → void
+    ! cw
+    Console.WriteLine(input)
+
+  func main () → void
+    ! cw, cr
+    let string:data = readInput()
+    processAndPrint(data)
 ";
 
     #region ImpactAnalysisTool Tests

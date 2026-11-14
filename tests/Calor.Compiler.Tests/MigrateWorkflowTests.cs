@@ -892,14 +892,12 @@ public class MigrateWorkflowTests : IDisposable
 
         // Write a .calr file directly with known contracts
         var calrSource = """
-            §M{VerifyTest}
-
-              §F{Square:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q (>= x 0)
-                  §S (>= result 0)
-                  §R (* x x)
+            module VerifyTest VerifyTest block
+              func Square (int:x) → int
+                !
+                requires (x >= 0)
+                => (result >= 0)
+                return (x * x)
 
             """;
 

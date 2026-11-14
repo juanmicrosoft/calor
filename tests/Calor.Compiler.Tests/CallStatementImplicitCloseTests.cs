@@ -35,9 +35,10 @@ public class CallStatementImplicitCloseTests
         // The implicit-close form: §C{Target} expr (no §A, no §/C)
         // is legal for STATEMENT context per Parser.cs:1374-1382.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Console.WriteLine} STR:"hello"
+module Test Test block
+  func Foo ()
+    !
+    Console.WriteLine("hello")
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -54,9 +55,10 @@ public class CallStatementImplicitCloseTests
     {
         // The canonical form: §C{Target} §A expr §/C
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Console.WriteLine} §A STR:"hello" §/C
+module Test Test block
+  func Foo ()
+    !
+    Console.WriteLine("hello")
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -72,9 +74,10 @@ public class CallStatementImplicitCloseTests
     {
         // Zero-arg form requires §/C today.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{DoWork} §/C
+module Test Test block
+  func Foo ()
+    !
+    DoWork()
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -90,9 +93,10 @@ public class CallStatementImplicitCloseTests
     {
         // Multi-arg form: §C{Target} §A x §A y §/C
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Math.Max} §A INT:1 §A INT:2 §/C
+module Test Test block
+  func Foo ()
+    !
+    Math.Max(1, 2)
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -112,9 +116,10 @@ public class CallStatementImplicitCloseTests
         //
         // This passes today because §/C is present:
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x:str} §C{Greeting} §/C
+module Test Test block
+  func Foo ()
+    !
+    let string:x = Greeting()
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -147,9 +152,10 @@ public class CallStatementImplicitCloseTests
     public void V062_ZeroArgStmt_FlagOn_ElidesCloser()
     {
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{DoWork} §/C
+module Test Test block
+  func Foo ()
+    !
+    DoWork()
 """;
         var emitted = EmitModule(source);
         Assert.Contains("§C{DoWork}", emitted);
@@ -160,9 +166,10 @@ public class CallStatementImplicitCloseTests
     public void V062_ZeroArgStmt_FlagOff_KeepsCloser()
     {
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{DoWork} §/C
+module Test Test block
+  func Foo ()
+    !
+    DoWork()
 """;
         var emitted = EmitModule(source, useImplicitCallCloser: false);
         Assert.Contains("§C{DoWork} §/C", emitted);
@@ -172,9 +179,10 @@ public class CallStatementImplicitCloseTests
     public void V062_OneArgStmt_LiteralArg_FlagOn_ElidesAAndCloser()
     {
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Console.WriteLine} §A STR:"hello" §/C
+module Test Test block
+  func Foo ()
+    !
+    Console.WriteLine("hello")
 """;
         var emitted = EmitModule(source);
         // CalorEmitter strips typed-literal prefixes for strings: STR:"x" -> "x"
@@ -187,9 +195,10 @@ public class CallStatementImplicitCloseTests
     public void V062_OneArgStmt_IdentifierArg_FlagOn_ElidesAAndCloser()
     {
         var source = """
-§M{Test}
-  §F{Foo:pub} (str:msg)
-      §C{Console.WriteLine} §A msg §/C
+module Test Test block
+  func Foo (string:msg)
+    !
+    Console.WriteLine(msg)
 """;
         var emitted = EmitModule(source);
         Assert.Contains("§C{Console.WriteLine} msg", emitted);
@@ -202,9 +211,10 @@ public class CallStatementImplicitCloseTests
         // Inner zero-arg call is visited in inline-sibling context, so it
         // must keep §/C; outer stmt call elides because it's at top level.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Outer} §A §C{Inner} §/C §/C
+module Test Test block
+  func Foo ()
+    !
+    Outer(Inner())
 """;
         var emitted = EmitModule(source);
         // Outer elided, inner kept its §/C
@@ -219,10 +229,11 @@ public class CallStatementImplicitCloseTests
     {
         // §NEW{T} on the same line — IsExpressionStart accepts §NEW.
         var source = """
-§M{Test}
-  §U{System.Text}
-  §F{Foo:pub}
-      §C{Process} §A §NEW{StringBuilder} §/NEW §/C
+module Test Test block
+  using System.Text
+  func Foo ()
+    !
+    Process(new StringBuilder())
 """;
         var emitted = EmitModule(source);
         Assert.Contains("§C{Process} §NEW{StringBuilder} §/NEW", emitted);
@@ -233,9 +244,10 @@ public class CallStatementImplicitCloseTests
     {
         // Named one-arg cannot use the inline form (§A[name] is required).
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Greet} §A[who] STR:"world" §/C
+module Test Test block
+  func Foo ()
+    !
+    Greet(who: "world")
 """;
         var emitted = EmitModule(source);
         Assert.Contains("§A[who] \"world\"", emitted);
@@ -246,9 +258,10 @@ public class CallStatementImplicitCloseTests
     public void V062_MultiArgStmt_StaysStandardForm()
     {
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Math.Max} §A INT:1 §A INT:2 §/C
+module Test Test block
+  func Foo ()
+    !
+    Math.Max(1, 2)
 """;
         var emitted = EmitModule(source);
         // Emitter strips INT: prefix on int literals.
@@ -261,10 +274,11 @@ public class CallStatementImplicitCloseTests
         // Source has standard form; emit-then-reparse must produce the
         // same logical AST as the original.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Console.WriteLine} §A STR:"hello" §/C
-      §C{Process} §A INT:42 §/C
+module Test Test block
+  func Foo ()
+    !
+    Console.WriteLine("hello")
+    Process(42)
 """;
         var module1 = Parse(source, out var diags1);
         Assert.False(diags1.HasErrors);
@@ -289,10 +303,11 @@ public class CallStatementImplicitCloseTests
     {
         // emit(parse(emit(parse(src)))) == emit(parse(src))
         var source = """
-§M{Test}
-  §F{Foo:pub} (str:msg)
-      §C{Console.WriteLine} §A msg §/C
-      §C{DoWork} §/C
+module Test Test block
+  func Foo (string:msg)
+    !
+    Console.WriteLine(msg)
+    DoWork()
 """;
         var emitted1 = EmitModule(source);
         var emitted2 = EmitModule(emitted1);
@@ -359,10 +374,11 @@ public class CallStatementImplicitCloseTests
     {
         // Last statement in a function body — followed by Dedent, not a sibling.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Setup} §/C
-      §C{Run} §/C
+module Test Test block
+  func Foo ()
+    !
+    Setup()
+    Run()
 """;
         var emitted = EmitModule(source);
         Assert.DoesNotContain("§C{Run} §/C", emitted);

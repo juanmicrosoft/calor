@@ -128,12 +128,13 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "pricing.calr");
         File.WriteAllText(path,
-            "§M{Pricing}\n"
-            + "  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32\n"
-            + "    §Q (>= cap 0)\n"
-            + "    §IF (> amount cap)\n"
-            + "      §R cap\n"
-            + "    §R amount\n");
+            "module Pricing Pricing block\n"
+            + "  func ClampToCap (int:amount, int:cap) → int\n"
+            + "    !\n"
+            + "    requires (cap >= 0)\n"
+            + "    if (amount > cap)\n"
+            + "      return cap\n"
+            + "    return amount\n");
         return path;
     }
 
@@ -213,13 +214,14 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
         var path = Path.Combine(_tempDir, "eject.calr");
         var outputPath = Path.Combine(_tempDir, "eject.out.cs");
         File.WriteAllText(path,
-            "§M{Pricing}\n"
-            + "  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32\n"
-            + "    §Q (>= cap 0)\n"
-            + "    §S (<= result cap)\n"
-            + "    §IF (> amount cap)\n"
-            + "      §R cap\n"
-            + "    §R amount\n");
+            "module Pricing Pricing block\n"
+            + "  func ClampToCap (int:amount, int:cap) → int\n"
+            + "    !\n"
+            + "    requires (cap >= 0)\n"
+            + "    => (result <= cap)\n"
+            + "    if (amount > cap)\n"
+            + "      return cap\n"
+            + "    return amount\n");
 
         var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(_tempDir,
             "convert", path, "-o", outputPath);

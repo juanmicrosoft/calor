@@ -42,20 +42,19 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         """;
 
     private const string OtherSource = """
-        §M{OtherModule}
-          §F{describe:pub}
-            §O{str}
-            §R STR:"standalone module"
+        module OtherModule OtherModule block
+          func describe () → string
+            !
+            return "standalone module"
         """;
 
     /// <summary>A module with a real call site targeting `add` by name.</summary>
     private const string CallerSource = """
-        §M{CallerModule}
-          §F{callsAdd:pub}
-            §I{i32:x}
-            §O{i32}
-            §B{total:i32} §C{add} §A x §A INT:1 §/C
-            §R total
+        module CallerModule CallerModule block
+          func callsAdd (int:x) → int
+            !
+            let int:total = add(x, 1)
+            return total
         """;
 
     public SessionAndFileWriteToolTests()
@@ -412,10 +411,10 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         // must not veto the write.
         var mathPath = WriteFile("math.calr", MathSource);
         WriteFile("prose.calr", """
-            §M{ProseModule}
-              §F{label:pub}
-                §O{str}
-                §R STR:"documentation mentions add and f001 in prose"
+            module ProseModule ProseModule block
+              func label () → string
+                !
+                return "documentation mentions add and f001 in prose"
             """);
         var sessionId = await OpenSessionAsync();
 

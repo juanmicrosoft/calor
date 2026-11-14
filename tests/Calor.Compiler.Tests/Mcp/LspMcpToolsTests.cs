@@ -12,23 +12,18 @@ namespace Calor.Compiler.Tests.Mcp;
 public class LspMcpToolsTests
 {
     private static readonly string SampleSource = """
-        §M{UserModule}
-          §F{calculateTotal:pub}
-            §I{f64:total}
-            §O{f64}
-            §R total
+        module UserModule UserModule block
+          func calculateTotal (double:total) → double
+            !
+            return total
 
+          class Item
+            field double:Price
+            field string:Name
 
-          §CL{Item:pub}
-            §FLD{f64:Price:pub}
-            §FLD{str:Name:pub}
-
-
-          §F{greet:pub}
-            §I{str:name}
-            §O{str}
-            §R name
-
+          func greet (string:name) → string
+            !
+            return name
 
         """;
 
@@ -246,9 +241,10 @@ public class LspMcpToolsTests
     public async Task NativeRecord_SearchKindDoesNotLaunderOrdinaryClasses(string kind, string expected)
     {
         const string source = """
-            §M{Records}
-              record PointRecord:pub (int:X)
-              §CL{PointClass:pub}
+            module Records Records block
+              record PointRecord (int:X)
+
+              class PointClass
             """;
         var result = await new NavigateTool().ExecuteAsync(CreateFindSymbolArgsWithKind(source, "Point", kind));
         Assert.False(result.IsError);
@@ -261,8 +257,8 @@ public class LspMcpToolsTests
     public async Task NativeRecord_InfoAndOutlineRetainRecordIdentity()
     {
         const string source = """
-            §M{Records}
-              record PointRecord:pub (int:X)
+            module Records Records block
+              record PointRecord (int:X)
             """;
         var info = await new NavigateTool().ExecuteAsync(CreateArgs(source, 2, 11, "info"));
         Assert.False(info.IsError);

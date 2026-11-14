@@ -94,9 +94,6 @@ public sealed class EffectRowCorpusShapeTests
     /// a silent widening.
     ///
     /// <list type="bullet">
-    /// <item><c>tests/TestData/QueryCorpus/project/app.calr</c> — v0.15 E5 (review
-    /// round 1, #2): gate 7's polymorphic golden, <c>Map&lt;eff e&gt; (Func&lt;i32,i32&gt;:f §E{e}, …)</c>,
-    /// pins that the inferred row of a rank-1 body keeps its variable part.</item>
     /// <item><c>tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr</c>
     /// and <c>…/step-01-callee-row-widens/combinators.calr</c> — v0.16 kickoff sweep: the
     /// effect-row edit script (F-3′ §6), whose callee is the same rank-1 shape
@@ -107,7 +104,6 @@ public sealed class EffectRowCorpusShapeTests
     /// </summary>
     private static readonly HashSet<string> AuthoredUnderDecisionOne = new(StringComparer.Ordinal)
     {
-        "tests/TestData/QueryCorpus/project/app.calr",
         "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr",
         "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/combinators.calr",
     };

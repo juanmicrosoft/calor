@@ -52,10 +52,10 @@ public class CompilerGapFixTests
     public void Struct_BasicDeclaration()
     {
         var source = @"
-§M{TestMod}
-  §CL{MyPoint:pub:struct}
-      §FLD{i32:X:pub}
-      §FLD{i32:Y:pub}
+module TestMod TestMod block
+  class MyPoint struct
+    field int:X
+    field int:Y
 ";
 
         var result = ParseAndEmit(source);
@@ -69,9 +69,9 @@ public class CompilerGapFixTests
     {
         // §CL{Name:pub:struct} — modifiers span _pos2 and _pos3
         var source = @"
-§M{TestMod}
-  §CL{MyPoint:pub:struct}
-      §FLD{i32:X:pub}
+module TestMod TestMod block
+  class MyPoint struct
+    field int:X
 ";
 
         var result = ParseAndEmit(source);
@@ -83,8 +83,8 @@ public class CompilerGapFixTests
     public void Struct_BackwardCompat()
     {
         var source = @"
-§M{TestMod}
-  §CL{MyClass:pub}
+module TestMod TestMod block
+  class MyClass
 ";
 
         var result = ParseAndEmit(source);
@@ -98,8 +98,8 @@ public class CompilerGapFixTests
     {
         // C# structs are implicitly sealed, so "sealed" is correctly omitted from output
         var source = @"
-§M{TestMod}
-  §CL{MyVal:pub:struct seal}
+module TestMod TestMod block
+  class MyVal sealed struct
 ";
 
         var result = ParseAndEmit(source);
@@ -131,9 +131,9 @@ public class CompilerGapFixTests
     public void StaticField_EmitsStaticKeyword()
     {
         var source = @"
-§M{TestMod}
-  §CL{Counter:pub}
-      §FLD{i32:Count:pub:stat}
+module TestMod TestMod block
+  class Counter
+    field int:Count static
 ";
 
         var result = ParseAndEmit(source);
@@ -145,9 +145,9 @@ public class CompilerGapFixTests
     public void StaticField_BackwardCompat()
     {
         var source = @"
-§M{TestMod}
-  §CL{MyClass:pub}
-      §FLD{str:_name:priv}
+module TestMod TestMod block
+  class MyClass
+    field string:_name private
 ";
 
         var result = ParseAndEmit(source);
@@ -164,8 +164,8 @@ public class CompilerGapFixTests
     public void GlobalNamespace_SuppressesWrapper()
     {
         var source = @"
-§M{_global}
-  §CL{MyClass:pub}
+module _global
+  class MyClass
 ";
 
         var result = ParseAndEmit(source);
@@ -178,8 +178,8 @@ public class CompilerGapFixTests
     public void GlobalNamespace_BackwardCompat()
     {
         var source = @"
-§M{MyApp}
-  §CL{MyClass:pub}
+module MyApp MyApp block
+  class MyClass
 ";
 
         var result = ParseAndEmit(source);
@@ -195,12 +195,13 @@ public class CompilerGapFixTests
     public void Increment_PrefixReplacement_UsesUpdatedValue()
     {
         var source = @"
-§M{TestMod}
-  §F{Main:pub} () -> i32
-    §B{~x:i32} 0
-    §ASSIGN x (+ x 1)
-    §B{value:i32} x
-    §R value
+module TestMod TestMod block
+  func Main () → int
+    !
+    var int:x = 0
+    set x (x + 1)
+    let int:value = x
+    return value
 ";
 
         var result = ParseAndEmit(source);
@@ -216,12 +217,13 @@ public class CompilerGapFixTests
     public void Increment_PostfixReplacement_CapturesPreviousValue()
     {
         var source = @"
-§M{TestMod}
-  §F{Main:pub} () -> i32
-    §B{~x:i32} 0
-    §B{previous:i32} x
-    §ASSIGN x (+ x 1)
-    §R previous
+module TestMod TestMod block
+  func Main () → int
+    !
+    var int:x = 0
+    let int:previous = x
+    set x (x + 1)
+    return previous
 ";
 
         var result = ParseAndEmit(source);
@@ -237,12 +239,13 @@ public class CompilerGapFixTests
     public void Decrement_PrefixReplacement_UsesUpdatedValue()
     {
         var source = @"
-§M{TestMod}
-  §F{Main:pub} () -> i32
-    §B{~x:i32} 0
-    §ASSIGN x (- x 1)
-    §B{value:i32} x
-    §R value
+module TestMod TestMod block
+  func Main () → int
+    !
+    var int:x = 0
+    set x (x - 1)
+    let int:value = x
+    return value
 ";
 
         var result = ParseAndEmit(source);
@@ -258,12 +261,13 @@ public class CompilerGapFixTests
     public void Decrement_PostfixReplacement_CapturesPreviousValue()
     {
         var source = @"
-§M{TestMod}
-  §F{Main:pub} () -> i32
-    §B{~x:i32} 0
-    §B{previous:i32} x
-    §ASSIGN x (- x 1)
-    §R previous
+module TestMod TestMod block
+  func Main () → int
+    !
+    var int:x = 0
+    let int:previous = x
+    set x (x - 1)
+    return previous
 ";
 
         var result = ParseAndEmit(source);
@@ -283,15 +287,15 @@ public class CompilerGapFixTests
     public void Integration_AllFixes()
     {
         var source = @"
-§M{_global}
-  §CL{Vector2:pub:struct}
-      §FLD{i32:X:pub}
-      §FLD{i32:Y:pub}
-      §FLD{i32:InstanceCount:pub:stat}
-      §MT{Advance:pub}
-          §O{void}
-          §ASSIGN X (+ X 1)
-          §ASSIGN InstanceCount (+ InstanceCount 1)
+module _global
+  class Vector2 struct
+    field int:X
+    field int:Y
+    field int:InstanceCount static
+    func Advance () → void
+      !
+      set X (X + 1)
+      set InstanceCount (InstanceCount + 1)
 ";
 
         var result = ParseAndEmit(source);

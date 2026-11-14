@@ -66,14 +66,17 @@ public class BclLoweringPrerequisiteTests
     public void MetadataArrayResults_AreIndexedByCallerAndExpressionSpan()
     {
         var source = """
-            §M{MetadataArrays}
-              §U{ReflectionType:System.Type}
-              §F{Known:pub} (ReflectionType:receiver) -> i32
-                §B{arguments} §C{receiver.GetGenericArguments}
-                §R arguments.Length
-              §F{Unknown:pub} (Missing:receiver) -> i32
-                §B{arguments} §C{receiver.GetGenericArguments}
-                §R arguments.Length
+            module MetadataArrays MetadataArrays block
+              using ReflectionType = System.Type
+              func Known (ReflectionType:receiver) → int
+                !
+                let arguments = receiver.GetGenericArguments()
+                return arguments.Length
+
+              func Unknown (Missing:receiver) → int
+                !
+                let arguments = receiver.GetGenericArguments()
+                return arguments.Length
             """;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -96,11 +99,12 @@ public class BclLoweringPrerequisiteTests
     public void MetadataArrayResult_IsInvalidatedByMutableRebinding()
     {
         var source = """
-            §M{MetadataArrays}
-              §F{Run:pub} (System.Type:receiver) -> i32
-                §B{~values} §C{receiver.GetGenericArguments}
-                §B{~values} 3
-                §R values.Length
+            module MetadataArrays MetadataArrays block
+              func Run (System.Type:receiver) → int
+                !
+                var values = receiver.GetGenericArguments()
+                var values = 3
+                return values.Length
             """;
         var compiled = Program.Compile(source, "rebound-array.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
@@ -112,12 +116,13 @@ public class BclLoweringPrerequisiteTests
     public void MutableCapturedArrayResult_IsNotADeferredTypeGuarantee()
     {
         var source = """
-            §M{MetadataArrays}
-              §F{Run:pub} (System.Type:receiver) -> i32
-                §B{~values} §C{receiver.GetGenericArguments}
-                §B{read} §LAM{} values.Length §/LAM
-                §B{~values} 3
-                §R §C{read}
+            module MetadataArrays MetadataArrays block
+              func Run (System.Type:receiver) → int
+                !
+                var values = receiver.GetGenericArguments()
+                let read = () => values.Length
+                var values = 3
+                return read()
             """;
         var compiled = Program.Compile(source, "captured-array.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
@@ -131,10 +136,11 @@ public class BclLoweringPrerequisiteTests
     public void InstanceArrayCallThroughType_DoesNotEstablishAProducerType()
     {
         var source = """
-            §M{MetadataArrays}
-              §F{Run:pub} () -> i32
-                §B{values} §C{System.Type.GetGenericArguments}
-                §R values.Length
+            module MetadataArrays MetadataArrays block
+              func Run () → int
+                !
+                let values = System.Type.GetGenericArguments()
+                return values.Length
             """;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -381,12 +387,12 @@ public class BclLoweringPrerequisiteTests
     public void BclContracts_CompileAndExecuteWithAndWithoutVerification(bool verify)
     {
         var source = """
-            §M{BclContracts}
-              §F{Run:pub} (str:s) -> bool
-                §E{}
-                §Q §C{s.Contains} §A "b" §/C
-                §S (== result §C{s.StartsWith} §A "a" §A System.StringComparison.Ordinal §/C)
-                §R §C{s.StartsWith} §A "a" §A System.StringComparison.Ordinal §/C
+            module BclContracts BclContracts block
+              func Run (string:s) → bool
+                !
+                requires s.Contains("b")
+                => (result == s.StartsWith("a", System.StringComparison.Ordinal))
+                return s.StartsWith("a", System.StringComparison.Ordinal)
             """;
         var options = new CompilationOptions
         {

@@ -242,7 +242,7 @@ public sealed class LosslessFormattingTests : IDisposable
         const string rawLine = "  var user001 = \"// not a Calor comment\";   ";
         var source = string.Join(
             "\n",
-            "§M{Raw}",
+            "module Raw Raw block",
             "    §F{Main:pub} () -> void",
             "        §E{cw}",
             "        §P \"user001 // literal\"   // inline comment   ",
@@ -335,10 +335,10 @@ public sealed class LosslessFormattingTests : IDisposable
     public void CrOnlyInput_FormatsWithoutLineDesynchronization()
     {
         const string source =
-            "§M{CrOnly}\r" +
-            "    §F{Main:pub} () -> void   \r" +
-            "        §E{cw}\r" +
-            "        §P \"ok\"   \r";
+            "module CrOnly CrOnly block\n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"ok\")";
 
         var result = new CalorFormatter().FormatSource(source, "cr-only.calr");
 
@@ -356,10 +356,10 @@ public sealed class LosslessFormattingTests : IDisposable
     public void MixedLoneCrInput_PreservesEveryTerminatorAndRemainsIdempotent()
     {
         const string source =
-            "§M{MixedCr}\r\n" +
-            "    §F{Main:pub} () -> void   \r" +
-            "        §E{cw}\n" +
-            "        §P \"ok\"   \r\n";
+            "module MixedCr MixedCr block\n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"ok\")\n";
         var formatter = new CalorFormatter();
 
         var once = formatter.FormatSource(source, "mixed-cr.calr");
@@ -383,7 +383,7 @@ public sealed class LosslessFormattingTests : IDisposable
     {
         var source = string.Join(
             "\n",
-            "§M{Trivia}   ",
+            "module Trivia Trivia block",
             "  // comment whitespace is content   ",
             "  §RAW",
             "var value001 = 1;   ",
@@ -404,10 +404,10 @@ public sealed class LosslessFormattingTests : IDisposable
     {
         var path = Path.Combine(_testDirectory, $"{encodingName}.calr");
         const string source =
-            "§M{Encoding}\r\n" +
-            "    §F{Main:pub} () -> void   \n" +
-            "        §E{cw}\r\n" +
-            "        §P \"é\" \r\n";
+            "module Encoding Encoding block\n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"é\")\n";
         var encoding = encodingName == "utf8-bom"
             ? (Encoding)new UTF8Encoding(encoderShouldEmitUTF8Identifier: true)
             : new UnicodeEncoding(bigEndian: false, byteOrderMark: true);
@@ -439,7 +439,7 @@ public sealed class LosslessFormattingTests : IDisposable
         var path = Path.Combine(_testDirectory, "atomic.calr");
         var original = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true)
             .GetPreamble()
-            .Concat(Encoding.UTF8.GetBytes("§M{Atomic}   \r\n"))
+            .Concat(Encoding.UTF8.GetBytes("module Atomic Atomic block\r\n"))
             .ToArray();
         await File.WriteAllBytesAsync(path, original);
 
@@ -470,8 +470,10 @@ public sealed class LosslessFormattingTests : IDisposable
         var target = Path.Combine(_testDirectory, "symlink-target.calr");
         var link = Path.Combine(_testDirectory, "symlink.calr");
         const string source =
-            "§M{Symlink}\n" +
-            "    §F{Main:pub} () -> void   \n";
+            "module Symlink Symlink block\n" +
+            "  func Main () → void\n" +
+            "    !\n" +
+            "    return\n";
         await File.WriteAllTextAsync(target, source);
         File.CreateSymbolicLink(link, target);
 
@@ -498,8 +500,10 @@ public sealed class LosslessFormattingTests : IDisposable
         var path = Path.Combine(_testDirectory, "hardlink-source.calr");
         var alias = Path.Combine(_testDirectory, "hardlink-alias.calr");
         const string source =
-            "§M{HardLink}\n" +
-            "    §F{Main:pub} () -> void   \n";
+            "module HardLink HardLink block\n" +
+            "  func Main () → void\n" +
+            "    !\n" +
+            "    return\n";
         await File.WriteAllTextAsync(path, source);
         Assert.Equal(0, CreateHardLink(path, alias));
         Assert.True(NativeFileLinks.TryGetLinkCount(path) > 1);
@@ -693,8 +697,10 @@ public sealed class LosslessFormattingTests : IDisposable
 
         var path = Path.Combine(_testDirectory, "mode.calr");
         const string source =
-            "§M{Mode}\n" +
-            "    §F{Main:pub} () -> void   \n";
+            "module Mode Mode block\n" +
+            "  func Main () → void\n" +
+            "    !\n" +
+            "    return\n";
         await File.WriteAllTextAsync(path, source);
         var originalMode = UnixFileMode.UserRead
             | UnixFileMode.UserWrite
@@ -734,9 +740,10 @@ public sealed class LosslessFormattingTests : IDisposable
     public void SemanticHashGeneratedCSharpAndPublicApi_AreEquivalent()
     {
         const string source = """
-            §M{Api}
-                §F{Add001:pub} (i32:user001, i32:value001) -> i32
-                    §R (+ user001 value001)
+            module Api Api block
+              func Add001 (int:user001, int:value001) → int
+                !
+                return (user001 + value001)
             """;
         var formatter = new CalorFormatter();
         var formatted = formatter.FormatSource(source, "api.calr");
@@ -764,9 +771,10 @@ public sealed class LosslessFormattingTests : IDisposable
     public void SemanticallyUnsupportedInput_UsesDocumentedConservativeFallback()
     {
         const string source = """
-            §M{Unsupported}
-                §F{Main:pub} () -> void
-                    §P "missing effect declaration"
+            module Unsupported Unsupported block
+              func Main () → void
+                !
+                Console.WriteLine("missing effect declaration")
             """;
 
         var result = new CalorFormatter().FormatSource(source, "unsupported.calr");

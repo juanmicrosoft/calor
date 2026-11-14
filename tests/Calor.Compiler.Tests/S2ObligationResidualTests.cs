@@ -51,17 +51,20 @@ public sealed class S2ObligationResidualTests
         // D-OBL-PROOF-GETTER: the getter always returns 0, but the solver models the inherited
         // field Base.Trigger as a free value.
         const string source = """
-            §M{M}
-              §CL{Base:pub}
-                §FLD{i32:Trigger:pub}
-              §CL{Box:pub}
-                §EXT{Base}
-                §PROP{Trigger:i32:pub}
-                  §GET
-                    §R INT:0
-              §F{Probe:pub} (Box:box) -> void
-                §E{}
-                §PROOF{claim} (== box.Trigger INT:0)
+            module M M block
+              class Base
+                field int:Trigger
+
+              class Box
+                extends Base
+
+                property int:Trigger
+                  get
+                    return 0
+
+              func Probe (Box:box) → void
+                !
+                proof{"claim"} (box.Trigger == 0)
             """;
         var (obligations, csharp, codes) = Solve(source);
         AssertWithheld(Proof(obligations, "claim"));
@@ -100,12 +103,12 @@ public sealed class S2ObligationResidualTests
         // claim with x = 0, yet the solver's model is x = 0.
         Assert.Throws<DivideByZeroException>(() => { var x = 0; return 10 / x; });
         const string source = """
-            §M{M}
-              §F{Probe:pub} (i32:x) -> i32
-                §E{}
-                §B{q:i32} (/ INT:10 x)
-                §PROOF{claim} (!= x INT:0)
-                §R q
+            module M M block
+              func Probe (int:x) → int
+                !
+                let int:q = (10 / x)
+                proof{"claim"} (x != 0)
+                return q
             """;
         AssertWithheld(Proof(Solve(source).Obligations, "claim"));
     }
@@ -115,12 +118,12 @@ public sealed class S2ObligationResidualTests
     {
         // A retained earlier §PROOF guard throws when false, so its negation never reaches p2.
         const string source = """
-            §M{M}
-              §F{Probe:pub} (i32:x) -> i32
-                §E{}
-                §PROOF{first} (> x INT:5)
-                §PROOF{second} (> x INT:0)
-                §R x
+            module M M block
+              func Probe (int:x) → int
+                !
+                proof{"first"} (x > 5)
+                proof{"second"} (x > 0)
+                return x
             """;
         AssertWithheld(Proof(Solve(source).Obligations, "second"));
     }
@@ -170,14 +173,14 @@ public sealed class S2ObligationResidualTests
         // Review round 1 control: the elseif condition is never evaluated on the then path, so
         // x = 1 genuinely reaches and violates the claim.
         const string source = """
-            §M{M}
-              §F{Probe:pub} (i32:x) -> i32
-                §E{}
-                §IF (> x INT:0)
-                  §PROOF{claim} (> x INT:1)
-                §EI (> (/ INT:10 x) INT:1)
-                  §R INT:2
-                §R x
+            module M M block
+              func Probe (int:x) → int
+                !
+                if (x > 0)
+                  proof{"claim"} (x > 1)
+                else if ((10 / x) > 1)
+                  return 2
+                return x
             """;
         Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "claim").Status);
     }
@@ -208,18 +211,21 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 1: properties of nested types count as well.
         const string source = """
-            §M{M}
-              §CL{Base:pub}
-                §FLD{i32:Trigger:pub}
-              §CL{Outer:pub}
-                §CL{Box:pub}
-                  §EXT{Base}
-                  §PROP{Trigger:i32:pub}
-                    §GET
-                      §R INT:0
-              §F{Probe:pub} (Outer.Box:box) -> void
-                §E{}
-                §PROOF{claim} (== box.Trigger INT:0)
+            module M M block
+              class Base
+                field int:Trigger
+
+              class Outer
+                class Box
+                  extends Base
+
+                  property int:Trigger
+                    get
+                      return 0
+
+              func Probe (Outer.Box:box) → void
+                !
+                proof{"claim"} (box.Trigger == 0)
             """;
         AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
@@ -229,15 +235,12 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 2: the unannotated rebind of q runs q's refinement guard, which throws at x = 0.
         const string source = """
-            §M{M}
-              §F{Probe:pub}
-                §I{i32:q} | (!= # INT:0)
-                §I{i32:x}
-                §O{i32}
-                §E{}
-                §B{~q} x
-                §PROOF{claim} (!= x INT:0)
-                §R q
+            module M M block
+              func Probe (int:q | (# != 0), int:x) → int
+                !
+                var q = x
+                proof{"claim"} (x != 0)
+                return q
             """;
         AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
@@ -272,24 +275,22 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 2: C# migration declares operators as op_* methods.
         const string source = """
-            §M{M}
-              §CL{Box:pub}
-                §FLD{i32:Value:pub}
-                §MT{op_LessThan:pub:stat}
-                  §I{Box:left}
-                  §I{i32:right}
-                  §O{bool}
-                  §R (> (/ INT:10 right) INT:0)
-                §MT{op_GreaterThan:pub:stat}
-                  §I{Box:left}
-                  §I{i32:right}
-                  §O{bool}
-                  §R true
-              §F{Probe:pub} (Box:box, i32:x) -> i32
-                §E{}
-                §B{q:bool} (< box x)
-                §PROOF{claim} (!= x INT:0)
-                §R x
+            module M M block
+              class Box
+                field int:Value
+                func op_LessThan static (Box:left, int:right) → bool
+                  !
+                  return ((10 / right) > 0)
+
+                func op_GreaterThan static (Box:left, int:right) → bool
+                  !
+                  return true
+
+              func Probe (Box:box, int:x) → int
+                !
+                let bool:q = (box < x)
+                proof{"claim"} (x != 0)
+                return x
             """;
         var (obligations, csharp, codes) = Solve(source, typeCheck: false);
         AssertWithheld(Proof(obligations, "claim"));
@@ -325,12 +326,12 @@ public sealed class S2ObligationResidualTests
         // Review round 2: x = 2147483647 satisfies the modeled precondition, but its checked
         // addition throws before the body; only x = 0 enters, and it satisfies the claim.
         const string source = """
-            §M{M}
-              §F{Probe:pub} (i32:x) -> i32
-                §E{}
-                §Q (|| (== x INT:0) (== (+ x INT:1) INT:-2147483648))
-                §PROOF{claim} (< x INT:2147483647)
-                §R x
+            module M M block
+              func Probe (int:x) → int
+                !
+                requires ((x == 0) || ((x + 1) == -2147483648))
+                proof{"claim"} (x < 2147483647)
+                return x
             """;
         AssertWithheld(Proof(Solve(source).Obligations, "claim"));
     }
@@ -357,12 +358,12 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 3: an initializer-free array local is null, so its length throws first.
         const string source = """
-            §M{M}
-              §F{Probe:pub} (i32:x) -> void
-                §E{}
-                §B{items:i32[]}
-                §B{length:i32} §LEN items
-                §PROOF{claim} (> x INT:0)
+            module M M block
+              func Probe (int:x) → void
+                !
+                let int[]:items
+                let int:length = items.Length
+                proof{"claim"} (x > 0)
             """;
         AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
@@ -372,14 +373,15 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 3: §LEN emits `.Length`, here a getter that always returns 0.
         const string source = """
-            §M{M}
-              §CL{Box:pub}
-                §PROP{Length:i32:pub}
-                  §GET
-                    §R INT:0
-              §F{Probe:pub} (Box:box) -> void
-                §E{}
-                §PROOF{claim} (== §LEN box INT:0)
+            module M M block
+              class Box
+                property int:Length
+                  get
+                    return 0
+
+              func Probe (Box:box) → void
+                !
+                proof{"claim"} (box.Length == 0)
             """;
         var proof = Proof(Solve(source, typeCheck: false).Obligations, "claim");
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
@@ -411,18 +413,16 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 3: the base(...) argument (/ 10 x) runs before the body; x = 0 never reaches p1.
         const string source = """
-            §M{M}
-              §CL{Base:pub}
-                §CTOR{pub}
-                  §I{i32:v}
-              §CL{Derived:pub}
-                §EXT{Base}
-                §CTOR{pub}
-                  §I{i32:x}
-                  §BASE
-                    §A (/ INT:10 x)
-                  §/BASE
-                  §PROOF{claim} (!= x INT:0)
+            module M M block
+              class Base
+                ctor (int:v)
+
+              class Derived
+                extends Base
+
+                ctor (int:x)
+                  base((10 / x))
+                  proof{"claim"} (x != 0)
             """;
         AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
     }
@@ -431,12 +431,12 @@ public sealed class S2ObligationResidualTests
     public void Control_NonThrowingPredecessor_StillRefutedWithAReachingModel()
     {
         const string source = """
-            §M{M}
-              §F{Probe:pub} (i32:x) -> i32
-                §E{}
-                §B{q:i32} x
-                §PROOF{claim} (> x INT:0)
-                §R q
+            module M M block
+              func Probe (int:x) → int
+                !
+                let int:q = x
+                proof{"claim"} (x > 0)
+                return q
             """;
         Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "claim").Status);
     }
@@ -445,12 +445,13 @@ public sealed class S2ObligationResidualTests
     public void Control_ProofReadingAField_StillRefuted()
     {
         const string source = """
-            §M{M}
-              §CL{Box:pub}
-                §FLD{i32:Value:pub}
-              §F{Probe:pub} (Box:box) -> void
-                §E{}
-                §PROOF{claim} (> box.Value INT:0)
+            module M M block
+              class Box
+                field int:Value
+
+              func Probe (Box:box) → void
+                !
+                proof{"claim"} (box.Value > 0)
             """;
         Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "claim").Status);
     }

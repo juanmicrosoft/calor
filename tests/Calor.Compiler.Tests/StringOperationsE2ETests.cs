@@ -29,11 +29,10 @@ public class StringOperationsE2ETests
     public void E2E_StringUpper_ReturnsUppercased(string input, string expected)
     {
         var source = """
-            §M{Test}
-              §F{ToUpperCase:pub}
-                  §I{string:s}
-                  §O{string}
-                  §R (upper s)
+            module Test Test block
+              func ToUpperCase (string:s) → string
+                !
+                return (s).ToUpper()
             """;
 
         var result = Execute(source, "ToUpperCase", new object[] { input });
@@ -48,11 +47,10 @@ public class StringOperationsE2ETests
     public void E2E_StringLower_ReturnsLowercased(string input, string expected)
     {
         var source = """
-            §M{Test}
-              §F{ToLowerCase:pub}
-                  §I{string:s}
-                  §O{string}
-                  §R (lower s)
+            module Test Test block
+              func ToLowerCase (string:s) → string
+                !
+                return (s).ToLower()
             """;
 
         var result = Execute(source, "ToLowerCase", new object[] { input });
@@ -67,11 +65,10 @@ public class StringOperationsE2ETests
     public void E2E_StringTrim_ReturnsTrimmed(string input, string expected)
     {
         var source = """
-            §M{Test}
-              §F{TrimString:pub}
-                  §I{string:s}
-                  §O{string}
-                  §R (trim s)
+            module Test Test block
+              func TrimString (string:s) → string
+                !
+                return (s).Trim()
             """;
 
         var result = Execute(source, "TrimString", new object[] { input });
@@ -87,12 +84,10 @@ public class StringOperationsE2ETests
     public void E2E_StringContains_ReturnsCorrectResult(string input, string search, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{ContainsString:pub}
-                  §I{string:s}
-                  §I{string:search}
-                  §O{bool}
-                  §R (contains s search)
+            module Test Test block
+              func ContainsString (string:s, string:search) → bool
+                !
+                return (s).Contains(search)
             """;
 
         var result = Execute(source, "ContainsString", new object[] { input, search });
@@ -107,13 +102,10 @@ public class StringOperationsE2ETests
     public void E2E_StringSubstring_ReturnsSubstring(string input, int start, int length, string expected)
     {
         var source = """
-            §M{Test}
-              §F{GetSubstring:pub}
-                  §I{string:s}
-                  §I{i32:start}
-                  §I{i32:len}
-                  §O{string}
-                  §R (substr s start len)
+            module Test Test block
+              func GetSubstring (string:s, int:start, int:len) → string
+                !
+                return (s).Substring(start, len)
             """;
 
         var result = Execute(source, "GetSubstring", new object[] { input, start, length });
@@ -174,12 +166,10 @@ public class StringOperationsE2ETests
     public void E2E_StringEqualsOrdinal_ReturnsCorrectResult(string a, string b, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{EqualsOrdinal:pub}
-                  §I{string:a}
-                  §I{string:b}
-                  §O{bool}
-                  §R (equals a b :ordinal)
+            module Test Test block
+              func EqualsOrdinal (string:a, string:b) → bool
+                !
+                return (a).Equals(b, StringComparison.Ordinal)
             """;
 
         var result = Execute(source, "EqualsOrdinal", new object[] { a, b });
@@ -215,12 +205,10 @@ public class StringOperationsE2ETests
     public void E2E_StringStartsWithOrdinal_ReturnsCorrectResult(string input, string prefix, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{StartsOrdinal:pub}
-                  §I{string:s}
-                  §I{string:prefix}
-                  §O{bool}
-                  §R (starts s prefix :ordinal)
+            module Test Test block
+              func StartsOrdinal (string:s, string:prefix) → bool
+                !
+                return (s).StartsWith(prefix, StringComparison.Ordinal)
             """;
 
         var result = Execute(source, "StartsOrdinal", new object[] { input, prefix });
@@ -343,11 +331,10 @@ public class StringOperationsE2ETests
     public void E2E_RegexSplit_ReturnsSplitArray()
     {
         var source = """
-            §M{Test}
-              §F{SplitRegex:pub}
-                  §I{string:s}
-                  §O{i32}
-                  §R (len (regex-split s ","))
+            module Test Test block
+              func SplitRegex (string:s) → int
+                !
+                return (System.Text.RegularExpressions.Regex.Split(s, ",")).Length
             """;
 
         var result = Execute(source, "SplitRegex", new object[] { "a,b,c,d" });
@@ -367,12 +354,10 @@ public class StringOperationsE2ETests
     public void E2E_CharAt_ReturnsCorrectChar(string input, int index, char expected)
     {
         var source = """
-            §M{Test}
-              §F{GetCharAt:pub}
-                  §I{string:s}
-                  §I{i32:idx}
-                  §O{char}
-                  §R (char-at s idx)
+            module Test Test block
+              func GetCharAt (string:s, int:idx) → char
+                !
+                return (s)[idx]
             """;
 
         var result = Execute(source, "GetCharAt", new object[] { input, index });
@@ -389,11 +374,10 @@ public class StringOperationsE2ETests
     public void E2E_IsLetter_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{CheckIsLetter:pub}
-                  §I{char:c}
-                  §O{bool}
-                  §R (is-letter c)
+            module Test Test block
+              func CheckIsLetter (char:c) → bool
+                !
+                return char.IsLetter(c)
             """;
 
         var result = Execute(source, "CheckIsLetter", new object[] { input });
@@ -410,11 +394,10 @@ public class StringOperationsE2ETests
     public void E2E_IsDigit_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{CheckIsDigit:pub}
-                  §I{char:c}
-                  §O{bool}
-                  §R (is-digit c)
+            module Test Test block
+              func CheckIsDigit (char:c) → bool
+                !
+                return char.IsDigit(c)
             """;
 
         var result = Execute(source, "CheckIsDigit", new object[] { input });
@@ -430,11 +413,10 @@ public class StringOperationsE2ETests
     public void E2E_CharUpper_ReturnsUppercased(char input, char expected)
     {
         var source = """
-            §M{Test}
-              §F{ToUpperChar:pub}
-                  §I{char:c}
-                  §O{char}
-                  §R (char-upper c)
+            module Test Test block
+              func ToUpperChar (char:c) → char
+                !
+                return char.ToUpper(c)
             """;
 
         var result = Execute(source, "ToUpperChar", new object[] { input });
@@ -492,11 +474,10 @@ public class StringOperationsE2ETests
     public void E2E_IsWhiteSpace_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{CheckIsWhiteSpace:pub}
-                  §I{char:c}
-                  §O{bool}
-                  §R (is-whitespace c)
+            module Test Test block
+              func CheckIsWhiteSpace (char:c) → bool
+                !
+                return char.IsWhiteSpace(c)
             """;
 
         var result = Execute(source, "CheckIsWhiteSpace", new object[] { input });
@@ -513,11 +494,10 @@ public class StringOperationsE2ETests
     public void E2E_IsUpper_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{CheckIsUpper:pub}
-                  §I{char:c}
-                  §O{bool}
-                  §R (is-upper c)
+            module Test Test block
+              func CheckIsUpper (char:c) → bool
+                !
+                return char.IsUpper(c)
             """;
 
         var result = Execute(source, "CheckIsUpper", new object[] { input });
@@ -534,11 +514,10 @@ public class StringOperationsE2ETests
     public void E2E_IsLower_ReturnsCorrectResult(char input, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{CheckIsLower:pub}
-                  §I{char:c}
-                  §O{bool}
-                  §R (is-lower c)
+            module Test Test block
+              func CheckIsLower (char:c) → bool
+                !
+                return char.IsLower(c)
             """;
 
         var result = Execute(source, "CheckIsLower", new object[] { input });
@@ -554,11 +533,10 @@ public class StringOperationsE2ETests
     public void E2E_CharLower_ReturnsLowercased(char input, char expected)
     {
         var source = """
-            §M{Test}
-              §F{ToLowerChar:pub}
-                  §I{char:c}
-                  §O{char}
-                  §R (char-lower c)
+            module Test Test block
+              func ToLowerChar (char:c) → char
+                !
+                return char.ToLower(c)
             """;
 
         var result = Execute(source, "ToLowerChar", new object[] { input });
@@ -710,11 +688,10 @@ public class StringOperationsE2ETests
     {
         // Test: is first char of uppercased string a letter?
         var source = """
-            §M{Test}
-              §F{IsFirstCharLetter:pub}
-                  §I{string:s}
-                  §O{bool}
-                  §R (is-letter (char-at (upper s) 0))
+            module Test Test block
+              func IsFirstCharLetter (string:s) → bool
+                !
+                return char.IsLetter(((s).ToUpper())[0])
             """;
 
         var result = Execute(source, "IsFirstCharLetter", new object[] { "hello" });
@@ -729,11 +706,10 @@ public class StringOperationsE2ETests
         // Test: does trimmed string contain digits?
         // Raw string \\d becomes Calor source "\\d", Calor parses as \d regex
         var source = """
-            §M{Test}
-              §F{TrimmedHasDigits:pub}
-                  §I{string:s}
-                  §O{bool}
-                  §R (regex-test (trim s) "\\d")
+            module Test Test block
+              func TrimmedHasDigits (string:s) → bool
+                !
+                return System.Text.RegularExpressions.Regex.IsMatch((s).Trim(), "\\d")
             """;
 
         var result = Execute(source, "TrimmedHasDigits", new object[] { "  abc123  " });
@@ -773,11 +749,10 @@ public class StringOperationsE2ETests
     public void E2E_CharAt_IndexOutOfBounds_ThrowsException()
     {
         var source = """
-            §M{Test}
-              §F{GetCharAt:pub}
-                  §I{string:s}
-                  §O{char}
-                  §R (char-at s 100)
+            module Test Test block
+              func GetCharAt (string:s) → char
+                !
+                return (s)[100]
             """;
 
         var result = Execute(source, "GetCharAt", new object[] { "hello" });
@@ -790,11 +765,10 @@ public class StringOperationsE2ETests
     public void E2E_CharAt_NegativeIndex_ThrowsException()
     {
         var source = """
-            §M{Test}
-              §F{GetCharAt:pub}
-                  §I{string:s}
-                  §O{char}
-                  §R (char-at s (- 0 1))
+            module Test Test block
+              func GetCharAt (string:s) → char
+                !
+                return (s)[(0 - 1)]
             """;
 
         var result = Execute(source, "GetCharAt", new object[] { "hello" });
@@ -807,11 +781,10 @@ public class StringOperationsE2ETests
     public void E2E_Substring_IndexOutOfBounds_ThrowsException()
     {
         var source = """
-            §M{Test}
-              §F{GetSubstr:pub}
-                  §I{string:s}
-                  §O{string}
-                  §R (substr s 10 5)
+            module Test Test block
+              func GetSubstr (string:s) → string
+                !
+                return (s).Substring(10, 5)
             """;
 
         var result = Execute(source, "GetSubstr", new object[] { "hello" });
@@ -857,11 +830,10 @@ public class StringOperationsE2ETests
     {
         // Invalid regex pattern: unclosed bracket
         var source = """
-            §M{Test}
-              §F{TestRegex:pub}
-                  §I{string:s}
-                  §O{bool}
-                  §R (regex-test s "[invalid")
+            module Test Test block
+              func TestRegex (string:s) → bool
+                !
+                return System.Text.RegularExpressions.Regex.IsMatch(s, "[invalid")
             """;
 
         var result = Execute(source, "TestRegex", new object[] { "test" });
@@ -894,11 +866,10 @@ public class StringOperationsE2ETests
     public void E2E_StringUpper_EmptyString_ReturnsEmpty()
     {
         var source = """
-            §M{Test}
-              §F{ToUpper:pub}
-                  §I{string:s}
-                  §O{string}
-                  §R (upper s)
+            module Test Test block
+              func ToUpper (string:s) → string
+                !
+                return (s).ToUpper()
             """;
 
         var result = Execute(source, "ToUpper", new object[] { "" });
@@ -911,11 +882,10 @@ public class StringOperationsE2ETests
     public void E2E_StringLen_EmptyString_ReturnsZero()
     {
         var source = """
-            §M{Test}
-              §F{GetLen:pub}
-                  §I{string:s}
-                  §O{i32}
-                  §R (len s)
+            module Test Test block
+              func GetLen (string:s) → int
+                !
+                return s.Length
             """;
 
         var result = Execute(source, "GetLen", new object[] { "" });
@@ -928,11 +898,10 @@ public class StringOperationsE2ETests
     public void E2E_StringContains_EmptySearch_ReturnsTrue()
     {
         var source = """
-            §M{Test}
-              §F{ContainsEmpty:pub}
-                  §I{string:s}
-                  §O{bool}
-                  §R (contains s "")
+            module Test Test block
+              func ContainsEmpty (string:s) → bool
+                !
+                return (s).Contains("")
             """;
 
         var result = Execute(source, "ContainsEmpty", new object[] { "hello" });
@@ -945,11 +914,10 @@ public class StringOperationsE2ETests
     public void E2E_RegexSplit_NoMatches_ReturnsSingleElement()
     {
         var source = """
-            §M{Test}
-              §F{SplitRegex:pub}
-                  §I{string:s}
-                  §O{i32}
-                  §R (len (regex-split s "NOMATCH"))
+            module Test Test block
+              func SplitRegex (string:s) → int
+                !
+                return (System.Text.RegularExpressions.Regex.Split(s, "NOMATCH")).Length
             """;
 
         var result = Execute(source, "SplitRegex", new object[] { "hello world" });
@@ -978,11 +946,10 @@ public class StringOperationsE2ETests
     public void E2E_IndexOf_NotFound_ReturnsNegativeOne()
     {
         var source = """
-            §M{Test}
-              §F{FindIndex:pub}
-                  §I{string:s}
-                  §O{i32}
-                  §R (indexof s "xyz")
+            module Test Test block
+              func FindIndex (string:s) → int
+                !
+                return (s).IndexOf("xyz")
             """;
 
         var result = Execute(source, "FindIndex", new object[] { "hello" });

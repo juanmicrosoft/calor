@@ -16,12 +16,12 @@ public sealed class TransientSymbolIdentityTests
     public void SameWidthNonScalarSemanticEditsInvalidateSnapshotHandles(string edit)
     {
         var source = """
-            §M{Demo}
-              §F{Run:pub}<eff e, eff f> (i32:value) -> i32
-                §E{cw,e,f}
-                §B{offset:i32} 1
-                §B{callback:System.Func<i32,i32>} §LAM{x:i32} (+ x value)
-                §R value
+            module Demo Demo block
+              func Run <! e,! f> (int:value) → int
+                ! cw, e, f
+                let int:offset = 1
+                let System.Func<int, int>:callback = (int:x) => (x + value)
+                return value
             """;
         var changed = edit switch
         {
@@ -50,7 +50,7 @@ public sealed class TransientSymbolIdentityTests
     [Fact]
     public void UnorderedEffectMapInsertionOrderDoesNotChangeSnapshotHandles()
     {
-        const string source = "§M{Demo}\n  §F{Run:pub} () -> i32\n    §E{cw,mut:col}\n    §B{value:i32} 1\n    §R value\n";
+        const string source = "module Demo Demo block\n  func Run () → int\n    ! cw, mut:col\n    let int:value = 1\n    return value\n";
         var first = Bind(source);
         var second = Bind(source.Replace("cw,mut:col", "mut:col,cw"));
         Assert.Equal(first.SymbolsById.Keys.OrderBy(id => id.Value), second.SymbolsById.Keys.OrderBy(id => id.Value));
@@ -132,7 +132,7 @@ public sealed class TransientSymbolIdentityTests
     [Fact]
     public void AmbiguousTransientDeclarationsReportAnErrorAndDoNotReuseAStaleKey()
     {
-        const string original = "§M{Demo}\n  §F{Pick:pub} () -> i32\n    §R 1\n";
+        const string original = "module Demo Demo block\n  func Pick () → int\n    !\n    return 1\n";
         var old = Assert.Single(Bind(original).Functions).Symbol.Id;
         var diagnostics = new DiagnosticBag();
         var source = original + "  §F{Pick:pub} () -> i32\n    §R 2\n";
@@ -146,20 +146,28 @@ public sealed class TransientSymbolIdentityTests
     public void InsertionAndOverloadReorderingNeverRetargetExistingFunctionKeys()
     {
         const string first = """
-            §M{Demo}
-              §F{Pick:pub} (i32:value) -> i32
-                §R value
-              §F{Pick:pub} (str:value) -> str
-                §R value
+            module Demo Demo block
+              func Pick (int:value) → int
+                !
+                return value
+
+              func Pick (string:value) → string
+                !
+                return value
             """;
         const string reordered = """
-            §M{Demo}
-              §F{Before:pub} () -> i32
-                §R 0
-              §F{Pick:pub} (str:value) -> str
-                §R value
-              §F{Pick:pub} (i32:value) -> i32
-                §R value
+            module Demo Demo block
+              func Before () → int
+                !
+                return 0
+
+              func Pick (string:value) → string
+                !
+                return value
+
+              func Pick (int:value) → int
+                !
+                return value
             """;
         var old = Bind(first);
         var current = Bind(reordered);

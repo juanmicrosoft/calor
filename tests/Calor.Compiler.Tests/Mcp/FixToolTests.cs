@@ -128,7 +128,7 @@ public class FixToolTests
     public async Task ExecuteAsync_UnknownRule_ReturnsError()
     {
         var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
-            new { source = "§M{Test}", errors = new[] { "unknown_rule" } }));
+            new { source = "module Test Test block", errors = new[] { "unknown_rule" } }));
 
         Assert.True(result.IsError);
         Assert.Contains("Unsupported fix rule", result.Content[0].Text!);

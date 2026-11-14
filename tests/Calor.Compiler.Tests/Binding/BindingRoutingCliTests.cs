@@ -7,11 +7,14 @@ namespace Calor.Compiler.Tests;
 public class BindingRoutingCliTests : IDisposable
 {
     private const string Duplicate = """
-        §M{Routing}
-          §F{Probe:pub} () -> i32
-            §R 1
-          §F{Probe:pub} () -> i32
-            §R 2
+        module Routing Routing block
+          func Probe () → int
+            !
+            return 1
+
+          func Probe () → int
+            !
+            return 2
         """;
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "calor-routing-" + Guid.NewGuid().ToString("N"));
 
@@ -163,8 +166,14 @@ public class BindingRoutingCliTests : IDisposable
         _ = boundary;
         var file = Path.Combine(_directory, "input.calr");
         var source = NativeCounterpart(code == DiagnosticCode.NullableArgumentToNonNullableParameter
-            ? "§M{Routing}\n  §F{Take:pub} (str:value) -> i32\n    §R 1\n"
-                + "  §F{Probe:pub} (?str:value) -> i32\n    §R §C{Take} §A value §/C\n"
+            ? "module Routing Routing block\n"
+                + "  func Take (string:value) → int\n"
+                + "    !\n"
+                + "    return 1\n"
+                + "\n"
+                + "  func Probe (string?:value) → int\n"
+                + "    !\n"
+                + "    return Take(value)\n"
             : $"§M{{Routing}}\n  §F{{Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n",
             NativeScalarSource(code, boundary, body, returnType));
         File.WriteAllText(file, source);
@@ -192,10 +201,10 @@ public class BindingRoutingCliTests : IDisposable
         Directory.CreateDirectory(projectDirectory);
         var sourcePath = Path.Combine(projectDirectory, "input.calr");
         File.WriteAllText(sourcePath, NativeCounterpart("""
-            §M{Installed}
-              §F{Probe:pub} () -> void
-                §E{env}
-                §B{value:str} §C{System.Environment.GetEnvironmentVariable} §A "CALOR_INSTALLED_ABSENT" §/C
+            module Installed Installed block
+              func Probe () → void
+                ! env
+                let string:value = System.Environment.GetEnvironmentVariable("CALOR_INSTALLED_ABSENT")
             """, """
             module Installed Installed block
               func Probe public () → void

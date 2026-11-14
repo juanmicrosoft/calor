@@ -180,12 +180,11 @@ public class QuantifierTests
     public void Parser_ParsesForallWithImplication()
     {
         var source = @"
-§M{Test}
-  §F{ArrayAllNonNeg:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
-      §R true
+module Test Test block
+  func ArrayAllNonNeg (int:n) → bool
+    !
+    requires (forall int:i in 0..n : (i >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -665,12 +664,11 @@ public class QuantifierTests
     public void Integration_ParseAndEmitQuantifiedContract()
     {
         var source = @"
-§M{Test}
-  §F{CheckAllPositive:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
-      §R true
+module Test Test block
+  func CheckAllPositive (int:n) → bool
+    !
+    requires (forall int:i in 0..n : (i >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -720,13 +718,11 @@ public class QuantifierTests
     {
         // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
-§M{Test}
-  §F{AllNonNegative:pub}
-      §I{i32[]:arr}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= arr{i} INT:0)))
-      §R true
+module Test Test block
+  func AllNonNegative (int[]:arr, int:n) → bool
+    !
+    requires (forall int:i in 0..n : (arr[i] >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -750,14 +746,11 @@ public class QuantifierTests
     {
         // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
-§M{Test}
-  §F{ContainsTarget:pub}
-      §I{i32[]:arr}
-      §I{i32:n}
-      §I{i32:target}
-      §O{bool}
-      §Q (exists ((i i32)) (&& (>= i INT:0) (< i n) (== arr{i} target)))
-      §R true
+module Test Test block
+  func ContainsTarget (int[]:arr, int:n, int:target) → bool
+    !
+    requires (exists int:i in 0..n : (arr[i] == target))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -857,12 +850,11 @@ public class QuantifierTests
     {
         // Parse source with quantifiers
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
-      §R true
+module Test Test block
+  func TestFunc (int:n) → bool
+    !
+    requires (forall int:i in 0..n : (i >= 0))
+    return true
 ";
 
         var module1 = Parse(source, out var diag1);
@@ -888,12 +880,11 @@ public class QuantifierTests
     {
         // Test that integer types are accepted without warnings
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
-      §R true
+module Test Test block
+  func TestFunc (int:n) → bool
+    !
+    requires (forall int:i in 0..n : (i >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -985,12 +976,11 @@ public class QuantifierTests
     {
         // Test: quantifier in postcondition referencing 'result'
         var source = @"
-§M{Test}
-  §F{SumPositive:pub}
-      §I{i32:n}
-      §O{i32}
-      §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i result)) (>= i INT:0)))
-      §R n
+module Test Test block
+  func SumPositive (int:n) → int
+    !
+    => (forall int:i in 0..result : (i >= 0))
+    return n
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1220,19 +1210,15 @@ public class QuantifierTests
     public void RealWorld_MatrixDimensionContract()
     {
         var source = @"
-§M{Matrix}
-  §F{MultiplyDimCheck:pub}
-      §I{i32:rowsA}
-      §I{i32:colsA}
-      §I{i32:rowsB}
-      §I{i32:colsB}
-      §O{bool}
-      §Q (> rowsA INT:0)
-      §Q (> colsA INT:0)
-      §Q (> rowsB INT:0)
-      §Q (> colsB INT:0)
-      §Q (== colsA rowsB)
-      §R true
+module Matrix Matrix block
+  func MultiplyDimCheck (int:rowsA, int:colsA, int:rowsB, int:colsB) → bool
+    !
+    requires (rowsA > 0)
+    requires (colsA > 0)
+    requires (rowsB > 0)
+    requires (colsB > 0)
+    requires (colsA == rowsB)
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1312,14 +1298,12 @@ public class QuantifierTests
     public void RealWorld_EmitSortedArrayContract()
     {
         var source = @"
-§M{Sorting}
-  §F{Sort:pub}
-      §I{i32[]:arr}
-      §I{i32:n}
-      §O{bool}
-      §Q (> n INT:0)
-      §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
-      §R true
+module Sorting Sorting block
+  func Sort (int[]:arr, int:n) → bool
+    !
+    requires (n > 0)
+    => (forall int:i in 0..(n - 1) : (arr[i] <= arr[(i + 1)]))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);

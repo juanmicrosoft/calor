@@ -131,20 +131,16 @@ public class Foo
     {
         // Minimal Calor source with a goto case inside a switch
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-      §W x
-          §K 1
-            §GOTO{CASE:2}
-          §/K
-          §K 2
-            §R x
-          §/K
-          §K _
-            §R 0
-          §/K";
+module Test Test block
+  func Test (int:x) → int
+    !
+    match x
+      case 1
+        goto case 2
+      case 2
+        return x
+      case _
+        return 0";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -155,17 +151,14 @@ public class Foo
     public void ParseGotoDefault_ProducesCorrectAst()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-      §W x
-          §K 1
-            §GOTO{DEFAULT}
-          §/K
-          §K _
-            §R 0
-          §/K";
+module Test Test block
+  func Test (int:x) → int
+    !
+    match x
+      case 1
+        goto default
+      case _
+        return 0";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -176,20 +169,16 @@ public class Foo
     public void GotoCaseInteger_EmitsCSharpCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-      §W x
-          §K 1
-            §GOTO{CASE:2}
-          §/K
-          §K 2
-            §R x
-          §/K
-          §K _
-            §R 0
-          §/K";
+module Test Test block
+  func Test (int:x) → int
+    !
+    match x
+      case 1
+        goto case 2
+      case 2
+        return x
+      case _
+        return 0";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -201,17 +190,14 @@ public class Foo
     public void GotoDefault_EmitsCSharpCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Test:pub}
-      §I{i32:x}
-      §O{i32}
-      §W x
-          §K 1
-            §GOTO{DEFAULT}
-          §/K
-          §K _
-            §R 0
-          §/K";
+module Test Test block
+  func Test (int:x) → int
+    !
+    match x
+      case 1
+        goto default
+      case _
+        return 0";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,

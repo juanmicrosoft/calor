@@ -27,12 +27,13 @@ public class W1Slice1EmitterTests
     public void NestedReturn_LowersToSharedExit()
     {
         var source = """
-            §M{T}
-              §F{Pick:pub} (i32:x) -> i32
-                §S (>= result 0)
-                §IF (> x 10)
-                  §R x
-                §R 0
+            module T T block
+              func Pick (int:x) → int
+                !
+                => (result >= 0)
+                if (x > 10)
+                  return x
+                return 0
             """;
 
         var (code, diagnostics) = EmitWithDiagnostics(source);
@@ -48,11 +49,12 @@ public class W1Slice1EmitterTests
     public void EarlyTopLevelReturn_LowersWithoutFallthrough()
     {
         var source = """
-            §M{T}
-              §F{First:pub} (i32:x) -> i32
-                §S (>= result 0)
-                §R x
-                §R 0
+            module T T block
+              func First (int:x) → int
+                !
+                => (result >= 0)
+                return x
+                return 0
             """;
 
         var (code, diagnostics) = EmitWithDiagnostics(source);
@@ -67,10 +69,11 @@ public class W1Slice1EmitterTests
     public void SingleFinalReturn_UsesStructuralResultBinding()
     {
         var source = """
-            §M{T}
-              §F{Id:pub} (i32:x) -> i32
-                §S (== result x)
-                §R x
+            module T T block
+              func Id (int:x) → int
+                !
+                => (result == x)
+                return x
             """;
 
         var (code, diagnostics) = EmitWithDiagnostics(source);

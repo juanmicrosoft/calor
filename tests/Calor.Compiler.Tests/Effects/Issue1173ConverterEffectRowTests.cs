@@ -320,10 +320,11 @@ public class Issue1173ConverterEffectRowTests
     {
         var module = Parse(
             """
-            §M{RoundTrip}
-              §F{Run:pub} () -> void
-                §B{buffer} §NEW{List<i32>} §/NEW
-                §P "done"
+            module RoundTrip RoundTrip block
+              func Run () → void
+                !
+                let buffer = new List<int>()
+                Console.WriteLine("done")
             """);
 
         Assert.True(EffectEnforcementPass.SynthesizeDeclaredRows(module));
@@ -351,10 +352,10 @@ public class Issue1173ConverterEffectRowTests
     {
         var module = Parse(
             """
-            §M{Widen}
-              §F{Run:pub} () -> void
-                §E{fs:w}
-                §P "done"
+            module Widen Widen block
+              func Run () → void
+                ! fs:w
+                Console.WriteLine("done")
             """);
 
         EffectEnforcementPass.SynthesizeDeclaredRows(module);

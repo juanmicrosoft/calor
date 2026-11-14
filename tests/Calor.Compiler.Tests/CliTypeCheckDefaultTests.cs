@@ -40,11 +40,11 @@ public class CliTypeCheckDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "violation.calr");
         File.WriteAllText(path, """
-            §M{Test}
-              §F{Main:pub} () -> void
-                §E{}
-                §B{x:i32} STR:"not an int"
-                §R
+            module Test Test block
+              func Main () → void
+                !
+                let int:x = "not an int"
+                return
             """);
         return path;
     }

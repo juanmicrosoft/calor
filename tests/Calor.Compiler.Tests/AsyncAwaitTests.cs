@@ -144,11 +144,10 @@ public class AsyncAwaitTests
     public void Parse_AsyncFunction_SetsIsAsyncFlag()
     {
         var calorSource = """
-            §M{AsyncTests}
-                §AF{FetchDataAsync:pub}
-                    §I{str:url}
-                    §O{str}
-                    §R "data"
+            module AsyncTests AsyncTests block
+              func FetchDataAsync async (string:url) → string
+                !
+                return "data"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -166,11 +165,10 @@ public class AsyncAwaitTests
     public void Parse_RegularFunction_DoesNotSetIsAsyncFlag()
     {
         var calorSource = """
-            §M{SyncTests}
-                §F{GetData:pub}
-                    §I{str:url}
-                    §O{str}
-                    §R "data"
+            module SyncTests SyncTests block
+              func GetData (string:url) → string
+                !
+                return "data"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -191,13 +189,11 @@ public class AsyncAwaitTests
     public void Parse_AsyncMethod_SetsIsAsyncFlag()
     {
         var calorSource = """
-            §M{AsyncMethodTests}
-                §CL{Service:pub}
-                    §AMT{ProcessAsync:pub}
-                      §I{i32:id}
-                      §O{str}
-                      §R "done"
-                    §/AMT
+            module AsyncMethodTests AsyncMethodTests block
+              class Service
+                func ProcessAsync async (int:id) → string
+                  !
+                  return "done"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -216,12 +212,11 @@ public class AsyncAwaitTests
     public void Parse_RegularMethod_DoesNotSetIsAsyncFlag()
     {
         var calorSource = """
-            §M{SyncMethodTests}
-                §CL{Service:pub}
-                    §MT{Process:pub}
-                        §I{i32:id}
-                        §O{str}
-                        §R "done"
+            module SyncMethodTests SyncMethodTests block
+              class Service
+                func Process (int:id) → string
+                  !
+                  return "done"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -243,10 +238,10 @@ public class AsyncAwaitTests
     public void Emit_AsyncFunction_IncludesAsyncKeywordAndTaskReturnType()
     {
         var calorSource = """
-            §M{AsyncEmitTests}
-                §AF{GetDataAsync:pub}
-                    §O{str}
-                    §R "data"
+            module AsyncEmitTests AsyncEmitTests block
+              func GetDataAsync async () → string
+                !
+                return "data"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -266,12 +261,11 @@ public class AsyncAwaitTests
     public void Emit_AsyncMethod_IncludesAsyncKeywordAndTaskReturnType()
     {
         var calorSource = """
-            §M{AsyncMethodEmitTests}
-                §CL{Service:pub}
-                    §AMT{ProcessAsync:pub}
-                      §O{i32}
-                      §R 42
-                    §/AMT
+            module AsyncMethodEmitTests AsyncMethodEmitTests block
+              class Service
+                func ProcessAsync async () → int
+                  !
+                  return 42
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -289,9 +283,10 @@ public class AsyncAwaitTests
     public void Emit_AsyncVoidFunction_EmitsTaskReturnType()
     {
         var calorSource = """
-            §M{AsyncVoidTests}
-                §AF{DoWorkAsync:pub}
-                    §R
+            module AsyncVoidTests AsyncVoidTests block
+              func DoWorkAsync async ()
+                !
+                return
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -311,10 +306,10 @@ public class AsyncAwaitTests
     public void Emit_SyncFunction_DoesNotIncludeAsyncKeyword()
     {
         var calorSource = """
-            §M{SyncEmitTests}
-                §F{GetData:pub}
-                    §O{str}
-                    §R "data"
+            module SyncEmitTests SyncEmitTests block
+              func GetData () → string
+                !
+                return "data"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -389,12 +384,11 @@ public class AsyncAwaitTests
     {
         // If someone explicitly declares Task<T> as output, we shouldn't wrap it again
         var calorSource = """
-            §M{NoDoubleWrap}
-                §CL{Service:pub}
-                    §AMT{GetTaskAsync:pub}
-                      §O{Task<i32>}
-                      §R 42
-                    §/AMT
+            module NoDoubleWrap NoDoubleWrap block
+              class Service
+                func GetTaskAsync async () → Task<int>
+                  !
+                  return 42
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -414,15 +408,15 @@ public class AsyncAwaitTests
     public void Emit_MixedSyncAsyncMethods_CorrectlyHandlesBoth()
     {
         var calorSource = """
-            §M{MixedMethods}
-                §CL{Service:pub}
-                    §MT{GetSync:pub}
-                        §O{str}
-                        §R "sync"
-                    §AMT{GetAsync:pub}
-                      §O{str}
-                      §R "async"
-                    §/AMT
+            module MixedMethods MixedMethods block
+              class Service
+                func GetSync () → string
+                  !
+                  return "sync"
+
+                func GetAsync async () → string
+                  !
+                  return "async"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -450,12 +444,11 @@ public class AsyncAwaitTests
     public void Parse_AsyncMethodWithModifiers_PreservesAllModifiers()
     {
         var calorSource = """
-            §M{ModifierTests}
-                §CL{Service:pub}
-                    §AMT{ProcessAsync:pub:virt}
-                      §O{str}
-                      §R "done"
-                    §/AMT
+            module ModifierTests ModifierTests block
+              class Service
+                func ProcessAsync virtual async () → string
+                  !
+                  return "done"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -563,11 +556,11 @@ public class AsyncAwaitTests
     {
         // Test using §B (Bind) statement with await expression
         var calorSource = """
-            §M{ConfigureAwaitTests}
-                §AF{FetchAsync:pub}
-                    §O{str}
-                    §B{str:result} §AWAIT{false} §C{client.GetStringAsync} §A "url" §/C
-                    §R result
+            module ConfigureAwaitTests ConfigureAwaitTests block
+              func FetchAsync async () → string
+                !
+                let string:result = await (client.GetStringAsync("url")).ConfigureAwait(false)
+                return result
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -591,11 +584,11 @@ public class AsyncAwaitTests
     public void Parse_AwaitWithConfigureAwaitTrue_SetsConfigureAwaitProperty()
     {
         var calorSource = """
-            §M{ConfigureAwaitTests}
-                §AF{FetchAsync:pub}
-                    §O{str}
-                    §B{str:result} §AWAIT{true} §C{client.GetStringAsync} §A "url" §/C
-                    §R result
+            module ConfigureAwaitTests ConfigureAwaitTests block
+              func FetchAsync async () → string
+                !
+                let string:result = await (client.GetStringAsync("url")).ConfigureAwait(true)
+                return result
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -617,11 +610,11 @@ public class AsyncAwaitTests
     public void Emit_AwaitWithConfigureAwaitFalse_EmitsConfigureAwaitCall()
     {
         var calorSource = """
-            §M{ConfigureAwaitEmit}
-                §AF{FetchAsync:pub}
-                    §O{str}
-                    §B{str:result} §AWAIT{false} §C{client.GetStringAsync} §A "url" §/C
-                    §R result
+            module ConfigureAwaitEmit ConfigureAwaitEmit block
+              func FetchAsync async () → string
+                !
+                let string:result = await (client.GetStringAsync("url")).ConfigureAwait(false)
+                return result
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -639,11 +632,11 @@ public class AsyncAwaitTests
     public void Parse_AwaitWithoutConfigureAwait_HasNullConfigureAwait()
     {
         var calorSource = """
-            §M{NoConfigureAwait}
-                §AF{FetchAsync:pub}
-                    §O{str}
-                    §B{str:result} §AWAIT §C{client.GetStringAsync} §A "url" §/C
-                    §R result
+            module NoConfigureAwait NoConfigureAwait block
+              func FetchAsync async () → string
+                !
+                let string:result = await client.GetStringAsync("url")
+                return result
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -971,11 +964,10 @@ public class AsyncAwaitTests
     {
         // Correct syntax: type params come after the brace
         var calorSource = """
-            §M{GenericAsyncTests}
-                §AF{GetAsync:pub}<T>
-                    §I{T:item}
-                    §O{T}
-                    §R item
+            module GenericAsyncTests GenericAsyncTests block
+              func GetAsync<T> async (T:item) → T
+                !
+                return item
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -994,11 +986,10 @@ public class AsyncAwaitTests
     public void Emit_AsyncGenericFunction_EmitsTaskOfT()
     {
         var calorSource = """
-            §M{GenericAsyncEmitTests}
-                §AF{GetAsync:pub}<T>
-                    §I{T:item}
-                    §O{T}
-                    §R item
+            module GenericAsyncEmitTests GenericAsyncEmitTests block
+              func GetAsync<T> async (T:item) → T
+                !
+                return item
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1046,13 +1037,11 @@ public class AsyncAwaitTests
     public void Parse_StaticAsyncMethod_PreservesBothModifiers()
     {
         var calorSource = """
-            §M{StaticAsyncTests}
-                §CL{Helper:pub}
-                    §AMT{ComputeAsync:pub:stat}
-                      §I{i32:x}
-                      §O{i32}
-                      §R 42
-                    §/AMT
+            module StaticAsyncTests StaticAsyncTests block
+              class Helper
+                func ComputeAsync static async (int:x) → int
+                  !
+                  return 42
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1071,13 +1060,11 @@ public class AsyncAwaitTests
     public void Emit_StaticAsyncMethod_EmitsCorrectSignature()
     {
         var calorSource = """
-            §M{StaticAsyncEmitTests}
-                §CL{Helper:pub}
-                    §AMT{ComputeAsync:pub:stat}
-                      §I{i32:x}
-                      §O{i32}
-                      §R 42
-                    §/AMT
+            module StaticAsyncEmitTests StaticAsyncEmitTests block
+              class Helper
+                func ComputeAsync static async (int:x) → int
+                  !
+                  return 42
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1123,12 +1110,12 @@ public class AsyncAwaitTests
     {
         // Use §B (Bind) for variable declarations
         var calorSource = """
-            §M{MultipleAwaitsTests}
-                §AF{ChainAsync:pub}
-                    §O{str}
-                    §B{str:first} §AWAIT §C{GetFirstAsync}§/C
-                    §B{str:second} §AWAIT §C{GetSecondAsync}§/C
-                    §R second
+            module MultipleAwaitsTests MultipleAwaitsTests block
+              func ChainAsync async () → string
+                !
+                let string:first = await GetFirstAsync()
+                let string:second = await GetSecondAsync()
+                return second
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1146,12 +1133,12 @@ public class AsyncAwaitTests
     public void Emit_AsyncFunctionWithMultipleAwaits_EmitsAllAwaits()
     {
         var calorSource = """
-            §M{MultipleAwaitsEmit}
-                §AF{ChainAsync:pub}
-                    §O{str}
-                    §B{str:first} §AWAIT §C{GetFirstAsync}§/C
-                    §B{str:second} §AWAIT{false} §C{GetSecondAsync}§/C
-                    §R second
+            module MultipleAwaitsEmit MultipleAwaitsEmit block
+              func ChainAsync async () → string
+                !
+                let string:first = await GetFirstAsync()
+                let string:second = await (GetSecondAsync()).ConfigureAwait(false)
+                return second
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1239,13 +1226,16 @@ public class AsyncAwaitTests
     public async Task Compile_GenericAsyncMethodGroup_PreservesTaskResult()
     {
         var assembly = CompileAndLoad("""
-            §M{AsyncGeneric}
-              §AF{Identity:pub}<T> (T:value) -> T
-                §R value
-              §AF{Consume:pub} () -> i32
-                §B{factory:Func<i32,Task<i32>>} Identity
-                §B{pending:Task<i32>} §C{factory} §A 42 §/C
-                §R §AWAIT pending
+            module AsyncGeneric AsyncGeneric block
+              func Identity<T> async (T:value) → T
+                !
+                return value
+
+              func Consume async () → int
+                !
+                let Func<int, Task<int>>:factory = Identity
+                let Task<int>:pending = factory(42)
+                return await pending
             """);
         var module = assembly.GetType("AsyncGeneric.AsyncGenericModule", throwOnError: true)!;
         Assert.Equal(typeof(Task<int>), module.GetMethod("Identity")!.MakeGenericMethod(typeof(int)).ReturnType);
@@ -1256,15 +1246,19 @@ public class AsyncAwaitTests
     public async Task Compile_ClassAndInheritedAsyncCalls_PreserveTaskResult()
     {
         var assembly = CompileAndLoad("""
-            §M{AsyncClasses}
-              §CL{Base:pub}
-                §AMT{Produce:pub} () -> i32
-                  §R 42
-              §CL{Derived:pub}
-                §EXT{Base}
-                §AMT{Consume:pub} () -> i32
-                  §B{pending:Task<i32>} §C{Produce} §/C
-                  §R §AWAIT pending
+            module AsyncClasses AsyncClasses block
+              class Base
+                func Produce async () → int
+                  !
+                  return 42
+
+              class Derived
+                extends Base
+
+                func Consume async () → int
+                  !
+                  let Task<int>:pending = Produce()
+                  return await pending
             """);
         var derived = assembly.GetType("AsyncClasses.Derived", throwOnError: true)!;
         Assert.Equal(42, await (Task<int>)derived.GetMethod("Consume")!.Invoke(Activator.CreateInstance(derived), null)!);
@@ -1369,12 +1363,15 @@ public class AsyncAwaitTests
     public async Task Compile_SynchronousTaskReturn_IsNotUnwrapped()
     {
         var assembly = CompileAndLoad("""
-            §M{AsyncSyncCarrier}
-              §F{Pass:pub} (Task<i32>:pending) -> Task<i32>
-                §R pending
-              §AF{Consume:pub} (Task<i32>:pending) -> i32
-                §B{copy:Task<i32>} §C{Pass} §A pending §/C
-                §R §AWAIT copy
+            module AsyncSyncCarrier AsyncSyncCarrier block
+              func Pass (Task<int>:pending) → Task<int>
+                !
+                return pending
+
+              func Consume async (Task<int>:pending) → int
+                !
+                let Task<int>:copy = Pass(pending)
+                return await copy
             """);
         var module = assembly.GetType("AsyncSyncCarrier.AsyncSyncCarrierModule", throwOnError: true)!;
         var value = Task.FromResult(42);
@@ -1468,9 +1465,10 @@ public class AsyncAwaitTests
     public async Task Compile_TypeParameterNamedTask_IsNotBclTask()
     {
         var assembly = CompileAndLoad("""
-            §M{AsyncParameter}
-              §AF{Identity:pub}<Task> (Task:value) -> Task
-                §R value
+            module AsyncParameter AsyncParameter block
+              func Identity<Task> async (Task:value) → Task
+                !
+                return value
             """);
         var method = assembly.GetType("AsyncParameter.AsyncParameterModule", throwOnError: true)!
             .GetMethod("Identity")!.MakeGenericMethod(typeof(int));
@@ -1496,12 +1494,15 @@ public class AsyncAwaitTests
     public void Compile_BoundNativeAsyncResult_AgreesWithCallableAndBodyTypes()
     {
         var result = Program.Compile("""
-            §M{AsyncBound}
-              §AF{Produce:pub} () -> i32
-                §R 42
-              §AF{Consume:pub} () -> i32
-                §B{pending} §C{Produce} §/C
-                §R §AWAIT pending
+            module AsyncBound AsyncBound block
+              func Produce async () → int
+                !
+                return 42
+
+              func Consume async () → int
+                !
+                let pending = Produce()
+                return await pending
             """, "async-bound.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
         var diagnostics = new DiagnosticBag();
@@ -1522,12 +1523,15 @@ public class AsyncAwaitTests
     public async Task Compile_TaskOfValueCanInitializeNonGenericTask()
     {
         var assembly = CompileAndLoad("""
-            §M{AsyncBaseCarrier}
-              §AF{Produce:pub} () -> i32
-                §R 42
-              §AF{Consume:pub} () -> void
-                §B{pending:Task} §C{Produce} §/C
-                §AWAIT pending
+            module AsyncBaseCarrier AsyncBaseCarrier block
+              func Produce async () → int
+                !
+                return 42
+
+              func Consume async () → void
+                !
+                let Task:pending = Produce()
+                await pending
             """);
         var module = assembly.GetType("AsyncBaseCarrier.AsyncBaseCarrierModule", throwOnError: true)!;
         await (Task)module.GetMethod("Consume")!.Invoke(null, null)!;

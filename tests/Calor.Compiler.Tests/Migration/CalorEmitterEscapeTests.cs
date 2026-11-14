@@ -163,10 +163,11 @@ public class Test
     public void ValidateCalorSource_ValidSource_ReturnsNoErrors()
     {
         var validCalor = @"
-§M{Test}
-    §CL{Test}
-        §MT{M:pub}
-            §O{void}
+module Test Test block
+  class Test internal
+    func M () → void
+      !
+      return
 ";
         var errors = ConvertCommand.ValidateCalorSource(validCalor);
         Assert.Empty(errors);

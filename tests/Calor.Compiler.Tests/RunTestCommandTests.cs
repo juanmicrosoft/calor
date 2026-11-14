@@ -51,9 +51,10 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "exitcoder.calr");
         File.WriteAllText(file, """
-            §M{ExitCoder}
-              §F{Main:pub} () -> i32
-                §R INT:3
+            module ExitCoder ExitCoder block
+              func Main () → int
+                !
+                return 3
             """);
 
         var (exitCode, stdOut, stdErr) = RunCli("run", file);
@@ -66,9 +67,10 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "broken.calr");
         File.WriteAllText(file, """
-            §M{Broken}
-              §F{Main:pub} () -> void
-                §P undefined_variable_xyz
+            module Broken Broken block
+              func Main () → void
+                !
+                Console.WriteLine(undefined_variable_xyz)
             """);
 
         var (exitCode, _, stdErr) = RunCli("run", file);
@@ -91,10 +93,10 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "hello.calr");
         File.WriteAllText(file, """
-            §M{Hello}
-              §F{Main:pub} () -> void
-                §E{cw}
-                §P "hello from calor run"
+            module Hello Hello block
+              func Main () → void
+                ! cw
+                Console.WriteLine("hello from calor run")
             """);
 
         var (exitCode, stdOut, stdErr) = RunCli("run", file, "--keep-temp");
@@ -118,17 +120,17 @@ public class RunTestCommandTests : IDisposable
         // A genuine ∀-proof (x in [0, 46340] ⇒ x*x >= 0) on a function that Main calls.
         var file = Path.Combine(_tempDir, "square.calr");
         File.WriteAllText(file, """
-            §M{SquareApp}
-              §F{Square:pub}
-                §I{i32:x}
-                §O{i32}
-                §Q (>= x 0)
-                §Q (<= x 46340)
-                §S (>= result 0)
-                §R (* x x)
-              §F{Main:pub} () -> void
-                §E{cw}
-                §P §C{Square} §A INT:7 §/C
+            module SquareApp SquareApp block
+              func Square (int:x) → int
+                !
+                requires (x >= 0)
+                requires (x <= 46340)
+                => (result >= 0)
+                return (x * x)
+
+              func Main () → void
+                ! cw
+                Console.WriteLine(Square(7))
             """);
         return file;
     }
@@ -201,16 +203,16 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "unknowncharger.calr");
         File.WriteAllText(file, """
-            §M{UnknownCharger}
-              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
-                §E{e}
-                §R (+ §C{stage} §/C §C{stage} §/C)
+            module UnknownCharger UnknownCharger block
+              func RunTwice <! e> (Func<int>:stage ! e) → int
+                ! e
+                return (stage() + stage())
 
-              §CL{Holder:pub}
-                §FLD{Func<i32>:stage:priv} §E{cw}
-                §MT{Twice:pub} () -> i32
-                  §E{}
-                  §R §C{RunTwice} §A this.stage §/C
+              class Holder
+                field Func<int>:stage private ! cw
+                func Twice () → int
+                  !
+                  return RunTwice(this.stage)
             """);
         return file;
     }
@@ -220,10 +222,10 @@ public class RunTestCommandTests : IDisposable
         // Declares §E{} (pure) but prints — a forbidden 'cw' effect.
         var file = Path.Combine(_tempDir, "pureviolator.calr");
         File.WriteAllText(file, """
-            §M{PureViolator}
-              §F{Main:pub} () -> void
-                §E{}
-                §P "side effect!"
+            module PureViolator PureViolator block
+              func Main () → void
+                !
+                Console.WriteLine("side effect!")
             """);
         return file;
     }
@@ -339,9 +341,10 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "lib.calr");
         File.WriteAllText(file, """
-            §M{LibOnly}
-              §F{Double:pub} (i32:x) -> i32
-                §R (* x INT:2)
+            module LibOnly LibOnly block
+              func Double (int:x) → int
+                !
+                return (x * 2)
             """);
 
         var (exitCode, stdOut, stdErr) = RunCli("test", file);

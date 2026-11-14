@@ -43,16 +43,12 @@ public class IndexerTests
     public void Parser_FullFormIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §IXER{int:pub}
-                §I{int:index}
-                §GET
-                §R INT:0
-                §/GET
-                §SET
-                §/SET
-                §/IXER
+            module Test Test block
+              class MyClass
+                this[int:index] → int
+                  get
+                    return 0
+                  set
             """;
 
         var diag = new DiagnosticBag();

@@ -36,10 +36,10 @@ public class BindInferenceQuickfixTests
     public void Calor0251_Null_AttachesNullableFix()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} null
+            module Test Test block
+              func Foo () → void
+                !
+                let x = null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -58,10 +58,10 @@ public class BindInferenceQuickfixTests
     public void Calor0252_VecEmpty_AttachesVecFix()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{xs} §C{Vec.empty}
+            module Test Test block
+              func Foo () → void
+                !
+                let xs = Vec.empty()
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -80,10 +80,10 @@ public class BindInferenceQuickfixTests
     public void Calor0252_MapEmpty_AttachesMapFixWithTwoParams()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{m} §C{Map.empty}
+            module Test Test block
+              func Foo () → void
+                !
+                let m = Map.empty()
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -99,10 +99,10 @@ public class BindInferenceQuickfixTests
     public void Calor0253_AmbiguousNumeric_AttachesF64Fix()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} (+ INT:0 FLOAT:0.0)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (0 + 0.0)
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -123,10 +123,10 @@ public class BindInferenceQuickfixTests
         // The fix's insertion column must account for the leading '~' on
         // mutable bindings; column math is (Span.Column + 3 + 1 + name.Length).
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{~items} null
+            module Test Test block
+              func Foo () → void
+                !
+                var items = null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -142,12 +142,12 @@ public class BindInferenceQuickfixTests
     public void MultipleBindings_EachGetsItsOwnFix()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{a} null
-                  §B{b} §C{Vec.empty}
-                  §B{c} (+ INT:1 FLOAT:1.0)
+            module Test Test block
+              func Foo () → void
+                !
+                let a = null
+                let b = Vec.empty()
+                let c = (1 + 1.0)
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -167,10 +167,10 @@ public class BindInferenceQuickfixTests
     public void NoStrict_NoDiagnosticAndNoFix()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x} null
+            module Test Test block
+              func Foo () → void
+                !
+                let x = null
             """;
 
         var result = Program.Compile(source, "test.calr",

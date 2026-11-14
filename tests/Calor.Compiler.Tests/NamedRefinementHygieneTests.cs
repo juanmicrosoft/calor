@@ -207,7 +207,7 @@ public sealed class NamedRefinementHygieneTests
         ];
         foreach (var expression in expressions)
         {
-            var module = Parse("§M{Hygiene}\n").With(update =>
+            var module = Parse("module Hygiene Hygiene block\n").With(update =>
                 update.RefinementTypes =
                 [new RefinementTypeNode(span, "r1", "Closed", "i32", expression, new AttributeCollection())]);
             var diagnostics = new DiagnosticBag();
@@ -245,9 +245,10 @@ public sealed class NamedRefinementHygieneTests
     public void InlineCrossParameterPredicate_StillCompilesAndExecutes(bool typeCheck)
     {
         var result = Program.Compile("""
-            §M{Hygiene}
-              §F{Take:pub} (i32:n, i32:x | (> # n)) -> i32
-                §R x
+            module Hygiene Hygiene block
+              func Take (int:n, int:x | (# > n)) → int
+                !
+                return x
             """, "hygiene.calr", Options(typeCheck));
         Assert.False(result.HasErrors, Errors(result));
         Assert.NotEmpty(result.GeneratedCode);

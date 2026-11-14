@@ -38,17 +38,17 @@ public sealed class ProjectIndexTests : IDisposable
         new(dir, token, ProjectIndexBuilder.DiscoverSources(dir));
 
     private const string Library = """
-        §M{Lib}
-          §F{Double:pub} (i32:n) -> i32
-            §E{}
-            §R (* n INT:2)
+        module Lib Lib block
+          func Double (int:n) → int
+            !
+            return (n * 2)
         """;
 
     private const string App = """
-        §M{App}
-          §F{Run:pub} () -> i32
-            §E{}
-            §R §C{Double} §A INT:5 §/C
+        module App App block
+          func Run () → int
+            !
+            return Double(5)
         """;
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class ProjectIndexTests : IDisposable
             repeated.CallEdges.Select(edge => (edge.CallerSymbolId, edge.CalleeSymbolId)));
 
         File.WriteAllText(Path.Combine(root, "new.calr"),
-            "§M{Added}\n  §F{Fresh:pub} () -> i32\n    §E{}\n    §R INT:1\n");
+            "module Added Added block\n  func Fresh () → int\n    !\n    return 1\n");
         var extended = ProjectIndexBuilder.Build(OptionsFor(root));
         Assert.Contains(extended.Declarations, declaration => declaration.Name == "Fresh");
         Assert.All(first.Declarations, declaration =>
@@ -170,16 +170,18 @@ public sealed class ProjectIndexTests : IDisposable
     public void BoundPositionRow_AgreesWithTheDeclaredRow_WhereTheBinderDoesNotCollapse()
     {
         var dir = NewProject(("rows.calr", """
-            §M{Rows}
-              §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-                §E{cw}
-                §R §C{transform} §A value §/C
-              §F{Make:pub} (Func<i32,i32>:g §E{fs:w}) -> Func<i32,i32> §E{fs:w}
-                §E{}
-                §R g
-              §F{Map:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:value) -> i32
-                §E{e}
-                §R §C{f} §A value §/C
+            module Rows Rows block
+              func Apply (Func<int, int>:transform ! cw, int:value) → int
+                ! cw
+                return transform(value)
+
+              func Make (Func<int, int>:g ! fs:w) → Func<int, int> ! fs:w
+                !
+                return g
+
+              func Map <! e> (Func<int, int>:f ! e, int:value) → int
+                ! e
+                return f(value)
             """));
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
@@ -245,10 +247,10 @@ public sealed class ProjectIndexTests : IDisposable
         var dir = NewProject(
             ("lib.calr", Library),
             ("broken.calr", """
-                §M{Broken}
-                  §F{Uses:pub} () -> i32
-                    §E{}
-                    §R (+ undefinedName INT:1)
+                module Broken Broken block
+                  func Uses () → int
+                    !
+                    return (undefinedName + 1)
                 """));
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
@@ -315,7 +317,7 @@ public sealed class ProjectIndexTests : IDisposable
     /// </summary>
     private static string DoubleChain(int n)
     {
-        var sb = new System.Text.StringBuilder("§M{M}\n");
+        var sb = new System.Text.StringBuilder("module M M block\n");
         for (var i = 1; i <= n; i++)
         {
             sb.Append($"  §F{{A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
@@ -550,41 +552,46 @@ public sealed class ProjectIndexTests : IDisposable
     /// means round 1 changes every member, so a cap of 1 fires.
     /// </summary>
     private const string ThreeHopMutualRecursion = """
-        §M{Ring}
-          §F{A:pub} (i32:n) -> i32
-            §E{cw}
-            §P "a"
-            §IF (> n 0)
-              §R §C{B} §A (- n 1) §/C
-            §R n
-          §F{B:pub} (i32:n) -> i32
-            §E{cw}
-            §P "b"
-            §IF (> n 0)
-              §R §C{C} §A (- n 1) §/C
-            §R n
-          §F{C:pub} (i32:n) -> i32
-            §E{cw}
-            §P "c"
-            §IF (> n 0)
-              §R §C{A} §A (- n 1) §/C
-            §R n
+        module Ring Ring block
+          func A (int:n) → int
+            ! cw
+            Console.WriteLine("a")
+            if (n > 0)
+              return B((n - 1))
+            return n
+
+          func B (int:n) → int
+            ! cw
+            Console.WriteLine("b")
+            if (n > 0)
+              return C((n - 1))
+            return n
+
+          func C (int:n) → int
+            ! cw
+            Console.WriteLine("c")
+            if (n > 0)
+              return A((n - 1))
+            return n
         """;
 
     private const string ThreeHopRank1Chain = """
-        §M{Chain}
-          §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-            §E{e}
-            §R §C{g}
-          §F{Outer:pub} (Func<i32>:h §E{cw}) -> i32
-            §E{cw}
-            §R §C{Run} §A h §/C
-          §F{Top:pub} (Func<i32>:q §E{cw}) -> i32
-            §E{cw}
-            §R §C{Outer} §A q §/C
-          §F{Top2:pub} (Func<i32>:r §E{cw}) -> i32
-            §E{cw}
-            §R §C{Top} §A r §/C
+        module Chain Chain block
+          func Run <! e> (Func<int>:g ! e) → int
+            ! e
+            return g()
+
+          func Outer (Func<int>:h ! cw) → int
+            ! cw
+            return Run(h)
+
+          func Top (Func<int>:q ! cw) → int
+            ! cw
+            return Outer(q)
+
+          func Top2 (Func<int>:r ! cw) → int
+            ! cw
+            return Top(r)
         """;
 
     [Fact]
@@ -594,10 +601,10 @@ public sealed class ProjectIndexTests : IDisposable
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
         File.WriteAllText(Path.Combine(dir, "extra.calr"), """
-            §M{Extra}
-              §F{Nothing:pub} () -> i32
-                §E{}
-                §R INT:0
+            module Extra Extra block
+              func Nothing () → int
+                !
+                return 0
             """);
         var afterAdd = ProjectIndexBuilder.CurrentInputs(OptionsFor(dir));
         Assert.Equal(
@@ -683,25 +690,26 @@ public sealed class ProjectIndexTests : IDisposable
         // not resolve is the shape this project keeps paying for.
         var dir = NewProject(
             ("a.calr", """
-                §M{A}
-                  §F{Shared:pub} () -> i32
-                    §E{}
-                    §R INT:1
-                  §F{Caller:pub} () -> i32
-                    §E{}
-                    §R §C{Missing} §/C
+                module A A block
+                  func Shared () → int
+                    !
+                    return 1
+
+                  func Caller () → int
+                    !
+                    return Missing()
                 """),
             ("b.calr", """
-                §M{B}
-                  §F{Shared:pub} () -> i32
-                    §E{}
-                    §R INT:2
+                module B B block
+                  func Shared () → int
+                    !
+                    return 2
                 """),
             ("c.calr", """
-                §M{C}
-                  §F{Ask:pub} () -> i32
-                    §E{}
-                    §R §C{Shared} §/C
+                module C C block
+                  func Ask () → int
+                    !
+                    return Shared()
                 """));
 
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));

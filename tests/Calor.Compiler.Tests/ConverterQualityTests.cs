@@ -320,10 +320,10 @@ public class ConverterQualityTests
     public void NamedArgs_CalorParsesCorrectly()
     {
         var calorSource = """
-            §M{Test}
-              §F{Configure:pub}
-                  §O{void}
-                  §C{Register} §A[name] "en-US" §A[flag] true §/C
+            module Test Test block
+              func Configure () → void
+                !
+                Register(name: "en-US", flag: true)
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -1083,7 +1083,7 @@ public class Foo
     [Fact]
     public void ScientificNotation_ParsesCorrectly()
     {
-        var source = "§M{Test}\n  §CL{Foo:pub}\n    §MT{Foo:pub} () -> f64\n      §B{f64:epsilon} 2.2204460492503131E-16\n      §R epsilon\n\n\n";
+        var source = "module Test Test block\n  class Foo\n    func Foo () → double\n      !\n      let double:epsilon = 2.220446049250313E-16\n      return epsilon\n";
         var diag = new DiagnosticBag();
         var tokens = new Lexer(source, diag).TokenizeAll();
         // Check lexer recognized the scientific notation as a float literal

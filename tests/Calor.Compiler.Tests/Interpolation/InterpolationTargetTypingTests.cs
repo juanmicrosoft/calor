@@ -499,9 +499,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void UndefinedHoleName_IsReportedAtTheHole()
     {
         const string calor = """
-            §M{InterpBinding}
-              §F{Show:pub} (i32:n) -> str
-                §R "value=${nope}"
+            module InterpBinding InterpBinding block
+              func Show (int:n) → string
+                !
+                return "value=${nope}"
             """;
         var result = Program.Compile(calor, "f2-interp-05.calr");
         var error = Assert.Single(result.Diagnostics.Errors, d => d.Code == "Calor0200");
@@ -512,10 +513,11 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void HoleDiagnostic_OnALaterLine_KeepsItsLineAndColumn()
     {
         const string calor = """
-            §M{InterpBinding}
-              §F{Show:pub} (i32:n) -> str
-                §B{str:a} "first ${n}"
-                §R "x=${n} y=${(+ n missing)}"
+            module InterpBinding InterpBinding block
+              func Show (int:n) → string
+                !
+                let string:a = "first ${n}"
+                return "x=${n} y=${(n + missing)}"
             """;
         var result = Program.Compile(calor, "f2-interp-05b.calr");
         var error = Assert.Single(result.Diagnostics.Errors, d => d.Code == "Calor0200");
@@ -528,10 +530,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void CallHole_InAPureFunction_IsAnUndeclaredEffect()
     {
         const string calor = """
-            §M{InterpEffects}
-              §F{Greet:pub} () -> str
-                §E{}
-                §R "hello ${Console.ReadLine()}"
+            module InterpEffects InterpEffects block
+              func Greet () → string
+                !
+                return "hello ${Console.ReadLine()}"
             """;
         var result = Program.Compile(calor, "f2-interp-06.calr");
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == "Calor0410" && d.Message.Contains("'cr'"));
@@ -542,10 +544,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void CallHole_WithTheDeclaredEffect_Compiles()
     {
         const string calor = """
-            §M{InterpEffects}
-              §F{Greet:pub} () -> str
-                §E{cr}
-                §R "hello ${Console.ReadLine()} ${Math.Max(1, 2)}"
+            module InterpEffects InterpEffects block
+              func Greet () → string
+                ! cr
+                return "hello ${Console.ReadLine()} ${Math.Max(1, 2)}"
             """;
         var result = Program.Compile(calor, "f2-interp-06b.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
@@ -557,13 +559,13 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void NamedCallHole_IsAnalyzedNativelyAndExecutes()
     {
         const string calor = """
-            §M{InterpEffects}
-              §CL{Probe:pub}
-                §MT{Run:pub:stat} () -> str
-                  §E{}
-                  §B{n:i32} 1
-                  §B{higher:i32} 5
-                  §R "v=${Math.Max(val1: n, val2: 3)}|v=${Math.Max(val1: higher, val2: 3)}"
+            module InterpEffects InterpEffects block
+              class Probe
+                func Run static () → string
+                  !
+                  let int:n = 1
+                  let int:higher = 5
+                  return "v=${Math.Max(val1: n, val2: 3)}|v=${Math.Max(val1: higher, val2: 3)}"
             """;
         var result = Program.Compile(calor, "f2-interp-named.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
@@ -604,9 +606,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     {
         // F2-INTERP-04 negative control at the compiler: an escaped \${x} is text, not a hole.
         const string calor = """
-            §M{Literal}
-              §F{Show:pub} (i32:x) -> str
-                §R "\${x}|{x}"
+            module Literal Literal block
+              func Show (int:x) → string
+                !
+                return "\${x}|{x}"
             """;
         var result = Program.Compile(calor, "f2-interp-04.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));

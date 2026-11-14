@@ -331,11 +331,11 @@ public class ProductionOverflowRuntimeTests
     public void OverflowPolicy_RoundTripsAndSeparatesWarmProofCaches()
     {
         const string source = """
-            §M{Overflow:overflow=unchecked}
-              §F{Probe:pub} (i32:value) -> i32
-                §E{}
-                §S (== (- (+ value 1) 1) value)
-                §R value
+            module Overflow Overflow block overflow unchecked
+              func Probe (int:value) → int
+                !
+                => (((value + 1) - 1) == value)
+                return value
             """;
         var directory = Path.Combine(AppContext.BaseDirectory, "overflow-cache-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -391,11 +391,11 @@ public class ProductionOverflowRuntimeTests
     public void UnsignedConditional_BodySafetyCannotExcludeValidNormalReturns()
     {
         const string source = """
-            §M{Overflow}
-              §F{Probe:pub} (u32:value) -> u32
-                §E{}
-                §S (&& (== result result) (!= value 2147483647))
-                §R (+ (? true value value) 1)
+            module Overflow Overflow block
+              func Probe (uint:value) → uint
+                !
+                => ((result == result) && (value != 2147483647))
+                return ((true ? value : value) + 1)
             """;
         foreach (var elide in new[] { false, true })
         {
@@ -412,11 +412,11 @@ public class ProductionOverflowRuntimeTests
     public void UnsignedConditional_IdentityCannotElideOverflowingCheck()
     {
         const string source = """
-            §M{Overflow}
-              §F{Probe:pub} (u32:value) -> u32
-                §E{}
-                §S (== (+ (? true value value) 1) (+ value 1))
-                §R value
+            module Overflow Overflow block
+              func Probe (uint:value) → uint
+                !
+                => (((true ? value : value) + 1) == (value + 1))
+                return value
             """;
         foreach (var elide in new[] { false, true })
             Assert.IsType<OverflowException>(
@@ -484,12 +484,12 @@ public class ProductionOverflowRuntimeTests
     public void VerifiedBody_NormalReturnProofDoesNotSuppressBodyOverflow()
     {
         const string source = """
-            §M{Overflow}
-              §F{Probe:pub} (i32:value) -> i32
-                §E{}
-                §Q (>= value 0)
-                §S (>= result 0)
-                §R (* value value)
+            module Overflow Overflow block
+              func Probe (int:value) → int
+                !
+                requires (value >= 0)
+                => (result >= 0)
+                return (value * value)
             """;
         var options = VerifiedOptions();
         var compiled = Program.Compile(source, "overflow.calr", options);
@@ -558,11 +558,11 @@ public class ProductionOverflowRuntimeTests
     public void ObligationSolver_CannotElideOverflowingIdentity()
     {
         const string source = """
-            §M{Overflow}
-              §F{Probe:pub} (i32:value) -> i32
-                §E{}
-                §PROOF{checked} (== (- (+ value 1) 1) value)
-                §R value
+            module Overflow Overflow block
+              func Probe (int:value) → int
+                !
+                proof{"checked"} (((value + 1) - 1) == value)
+                return value
             """;
         var options = VerifiedOptions();
         Assert.IsType<OverflowException>(TestHarness.Execute(source, "Probe", [int.MaxValue], options).Exception);
@@ -614,10 +614,10 @@ public class ProductionOverflowRuntimeTests
     public void NegationAndCharacterNarrowing_Trap()
     {
         AssertOverflow("""
-            §M{Overflow}
-              §F{Probe:pub} (i32:value) -> i32
-                §E{}
-                §R (- value)
+            module Overflow Overflow block
+              func Probe (int:value) → int
+                !
+                return (-value)
             """, [int.MinValue]);
         AssertOverflow("""
             §M{Overflow}
@@ -646,10 +646,10 @@ public class ProductionOverflowRuntimeTests
     public async Task ShippedExecutionProject_TrapsNativeOverflowAndPreservesCSharpInterop()
     {
         const string source = """
-            §M{Overflow}
-              §F{Probe:pub} (i32:value) -> i32
-                §E{}
-                §R (+ value INT:1)
+            module Overflow Overflow block
+              func Probe (int:value) → int
+                !
+                return (value + 1)
             """;
         var result = Program.Compile(source, "overflow.calr", Options());
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));

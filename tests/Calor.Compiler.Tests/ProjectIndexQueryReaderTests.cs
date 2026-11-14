@@ -476,17 +476,17 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
     {
         var dir = TempDir();
         File.WriteAllText(Path.Combine(dir, "lib.calr"), """
-            §M{Lib}
-              §F{Double:pub} (i32:n) -> i32
-                §E{cw}
-                §P n
-                §R (* n INT:2)
+            module Lib Lib block
+              func Double (int:n) → int
+                ! cw
+                Console.WriteLine(n)
+                return (n * 2)
             """);
         File.WriteAllText(Path.Combine(dir, "broken.calr"), """
-            §M{Broken}
-              §F{Uses:pub} () -> i32
-                §E{}
-                §R (+ §C{Double} §A undefinedName §/C INT:1)
+            module Broken Broken block
+              func Uses () → int
+                !
+                return (Double(undefinedName) + 1)
             """);
         var index = BuildAndSave(dir);
 
@@ -509,10 +509,10 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
     {
         var dir = TempDir();
         File.WriteAllText(Path.Combine(dir, "broken.calr"), """
-            §M{Broken}
-              §F{Uses:pub} () -> i32
-                §E{}
-                §R (+ undefinedName INT:1)
+            module Broken Broken block
+              func Uses () → int
+                !
+                return (undefinedName + 1)
             """);
         var index = BuildAndSave(dir);
         var answer = ProjectIndexQueryReader.EffectImpact(index, Subject(index, "Uses"), null, out var error);

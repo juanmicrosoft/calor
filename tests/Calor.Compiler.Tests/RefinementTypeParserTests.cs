@@ -246,11 +246,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_ProofObligation_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{positive} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"positive"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -272,11 +271,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_ProofObligationWithoutDescription_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -297,10 +295,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_InlineRefinementOnParameter_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:age | (# >= 0)) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -321,10 +319,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_ParameterWithoutRefinement_HasNullInlineRefinement()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -360,11 +358,10 @@ public sealed class RefinementTypeParserTests
     public void CSharpEmit_ProofObligation_EmitsRuntimeGuard()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{positive} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"positive"} (x >= 0)
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -377,11 +374,10 @@ public sealed class RefinementTypeParserTests
     public void CSharpEmit_ProofObligationWithoutDescription_EmitsRuntimeGuard()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof (x >= 0)
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -410,11 +406,10 @@ public sealed class RefinementTypeParserTests
     public void CalorEmit_ProofObligation_RoundTrips()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{positive} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"positive"} (x >= 0)
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -532,11 +527,10 @@ public sealed class RefinementTypeParserTests
     public void IdScanner_ProofObligation_CollectsId()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{test} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"test"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -649,10 +643,10 @@ public sealed class RefinementTypeParserTests
     public void CalorEmit_InlineRefinement_RoundTrips()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:age | (# >= 0)) → void
+                !
+                return
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -667,10 +661,10 @@ public sealed class RefinementTypeParserTests
     public void CalorEmit_ParameterWithoutRefinement_NoBar()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -685,10 +679,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_InlineRefinementWithDefaultValue_ParsesBothCorrectly()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:age} | (>= # INT:0) = INT:18
-                  §O{void}
+            module Test Test block
+              func Main (int:age | (# >= 0) = 18) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -711,12 +705,10 @@ public sealed class RefinementTypeParserTests
     {
         // | inside a Lisp expression should still be bitwise OR, not refinement
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §I{i32:x}
-                  §I{i32:y}
-                  §O{i32}
-                  §R (| x y)
+            module Test Test block
+              func Main (int:x, int:y) → int
+                !
+                return (x | y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -765,11 +757,10 @@ public sealed class RefinementTypeParserTests
     public void RoslynCompile_InlineRefinementErased_CSharpCompiles()
     {
         var source = """
-            §M{Test}
-              §F{Clamp:pub}
-                  §I{i32:value} | (>= # INT:0)
-                  §O{i32}
-                  §R value
+            module Test Test block
+              func Clamp (int:value | (# >= 0)) → int
+                !
+                return value
             """;
 
         var csharp = ParseAndEmitCSharp(source);

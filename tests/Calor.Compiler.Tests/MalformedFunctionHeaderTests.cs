@@ -85,9 +85,10 @@ public class MalformedFunctionHeaderTests
     public void Function_TwoFieldHeader_NoCalor0116()
     {
         const string src = """
-            §M{Calc}
-              §F{Add:pub} (i32:a, i32:b) -> i32
-                §R (+ a b)
+            module Calc Calc block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
             """;
         var (diags, hasErrors) = Parse(src);
 
@@ -100,10 +101,11 @@ public class MalformedFunctionHeaderTests
     {
         // §MT's third field is a legitimate modifier (virt) — never Calor0116.
         const string src = """
-            §M{Calc}
-              §CL{Greeter:pub}
-                §MT{Name:pub:virt} () -> str
-                  §R STR:"x"
+            module Calc Calc block
+              class Greeter
+                func Name virtual () → string
+                  !
+                  return "x"
             """;
         var (diags, _) = Parse(src);
 
@@ -115,10 +117,11 @@ public class MalformedFunctionHeaderTests
     {
         // §AMT's third field is a legitimate modifier (virt) — never Calor0116.
         const string src = """
-            §M{Calc}
-              §CL{Svc:pub}
-                §AMT{GetAsync:pub:virt} () -> i32
-                  §R (+ 1 2)
+            module Calc Calc block
+              class Svc
+                func GetAsync virtual async () → int
+                  !
+                  return (1 + 2)
             """;
         var (diags, _) = Parse(src);
 

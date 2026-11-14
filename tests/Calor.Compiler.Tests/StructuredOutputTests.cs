@@ -48,10 +48,10 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "good.calr");
         File.WriteAllText(file, """
-            §M{Good}
-              §F{Main:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Good Good block
+              func Main () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
         return file;
     }
@@ -60,9 +60,10 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "generated-error.calr");
         File.WriteAllText(file, """
-            §M{GeneratedError}
-              §F{Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module GeneratedError GeneratedError block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
         return file;
     }
@@ -295,10 +296,10 @@ public class StructuredOutputTests : IDisposable
         var file = Path.Combine(_tempDir, "style.calr");
         // Trailing whitespace on the module line is a lint style issue.
         File.WriteAllText(file,
-            "§M{Style}   \n" +
-            "  §F{Main:pub} () -> void\n" +
-            "    §E{cw}\n" +
-            "    §P \"hi\"\n");
+            "module Style Style block\n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"hi\")\n");
 
         var (exitCode, stdOut, _) = RunCli("lint", file, "--format", "json");
 
@@ -369,10 +370,10 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "check.calr");
         File.WriteAllText(file,
-            "§M{Check}   \n" +
-            "  §F{Main:pub} () -> void\n" +
-            "    §E{cw}\n" +
-            "    §P \"hi\"\n");
+            "module Check Check block\n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"hi\")\n");
 
         var (exitCode, _, _) = RunCli("lint", file, "--check");
 
@@ -588,10 +589,11 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "identity.calr");
         File.WriteAllText(file, """
-            §M{Identity}
-              §F{Answer:pub} (i32:value) -> i32
-                §S (== result value)
-                §R value
+            module Identity Identity block
+              func Answer (int:value) → int
+                !
+                => (result == value)
+                return value
             """);
         Assert.Equal(0, RunCli("verify", file, "--format", "json").ExitCode);
         var sidecar = Ids.DeclarationIdentityStore.Find(file)!.SidecarPath;

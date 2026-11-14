@@ -398,8 +398,20 @@ public class PreprocessorBindingTests
     [Fact]
     public void Binder_BranchBindingsHidingAMemberOnEveryPath_AreAccepted()
     {
-        var source = "§M{T}\n  §CL{K:pub}\n    §FLD{?str:x:pub}\n    §MT{Take:pub} (str:value) -> i32\n      §R (len value)\n" +
-            "    §MT{Run:pub} () -> i32\n      §PP{A}\n        §B{x:str} \"a\"\n      §PPE\n        §B{x:str} \"b\"\n      §R §C{Take} §A x §/C\n";
+        var source = "module T T block\n" +
+            "  class K\n" +
+            "    field string?:x\n" +
+            "    func Take (string:value) → int\n" +
+            "      !\n" +
+            "      return value.Length\n" +
+            "\n" +
+            "    func Run () → int\n" +
+            "      !\n" +
+            "      pp A\n" +
+            "        let string:x = \"a\"\n" +
+            "      pp else\n" +
+            "        let string:x = \"b\"\n" +
+            "      return Take(x)\n";
         var diagnostics = Bind(source);
 
         Assert.DoesNotContain(diagnostics.Errors, e => e.Code == DiagnosticCode.DuplicateDefinition);
