@@ -130,9 +130,11 @@ public sealed class EffectRowCorpusShapeTests
         // fixture, bringing it to 950.
         // #1541/#1524 (0.27) adds expected.calr and test.calr for the initializer-interop D-S1.5
         // fixture, bringing it to 952.
-        // The sweep below still covers every file. A drift from 952 means the sweep is no
+        // 0.30 adds expected.calr and test.calr for the record, checked-expression and
+        // unchecked-expression D-S1.5 fixtures, bringing it to 958.
+        // The sweep below still covers every file. A drift from 958 means the sweep is no
         // longer measuring the corpus it claims to.
-        Assert.Equal(952, files.Count);
+        Assert.Equal(958, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.

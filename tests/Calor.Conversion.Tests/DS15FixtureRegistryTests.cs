@@ -33,7 +33,8 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
 
     private static readonly HashSet<string> CurrentProducerFixtures =
         ["conditional-access-shape", "conditional-declaration", "string-interpolation-hole",
-            "local-function", "conditional-expression-hoisting", "conditional-using", "char-literal-surrogate"];
+            "local-function", "conditional-expression-hoisting", "conditional-using", "char-literal-surrogate",
+            "initializer-interop", "string-interpolation-formattable", "string-interpolation-to-string"];
 
     private static string CurrentManifestPath(string repoRoot, string name, string original) =>
         name == "conditional-declaration"
@@ -674,14 +675,17 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
             ? "Fixture.ConditionalExpressionFixture" : "ConditionalExpressionFixture",
         "conditional-using" => valueFixture ? "FixtureTest.ConditionalValue" : "ConditionalValue",
         "initializer-interop" => valueFixture
-            ? "InitializerInteropTest.InitializerInteropTest" : "Fixture.InitializerInterop",
+            ? "InitializerInteropTest.InitializerInteropTest" : "InitializerInterop",
         "local-function" => valueFixture ? "Fixture.LocalFunctionFixture" : "LocalFunctionFixture",
         "string-interpolation-formattable" => valueFixture
-            ? "InterpolationFormattableTest.FormattableProbe" : "Fixture.InterpolationFormattable",
+            ? "InterpolationFormattableTest.FormattableProbe" : "InterpolationFormattable",
         "string-interpolation-hole" => valueFixture
             ? "InterpolationHoleTest.InterpolationHoleTestModule" : "InterpolationHole",
         "string-interpolation-to-string" => valueFixture
-            ? "InterpolationToStringTest.InterpolationToStringTestModule" : "Fixture.InterpolationToString",
+            ? "InterpolationToStringTest.InterpolationToStringTestModule" : "InterpolationToString",
+        "record" => valueFixture ? "RecordTest.RecordFixture" : "RecordFixture",
+        "checked-expression" => valueFixture ? "CheckedExpressionTest.CheckedFixture" : "CheckedFixture",
+        "unchecked-expression" => valueFixture ? "UncheckedExpressionTest.UncheckedFixture" : "UncheckedFixture",
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unregistered fixture owner.")
     };
 
