@@ -79,21 +79,19 @@ public class ParameterPoststateTests
     public void PropertyGetterMutatingRefAlias_KeepsRuntimeGuard()
     {
         const string source = """
-            §M{HiddenMutation}
-              §CL{Counter:pub}
-                §FLD{i32:Value:pub}
-                §PROP{Mutate:i32:pub}
-                  §GET
-                    §ASSIGN Value INT:-1
-                    §R Value
-                §MT{Change:pub}
-                  §I{i32:x:ref}
-                  §O{i32}
-                  §E{}
-                  §Q (>= x 0)
-                  §S (>= x 0)
-                  §B{ignored:i32} Mutate
-                  §R x
+            module HiddenMutation HiddenMutation block
+              class Counter
+                field int:Value
+                property int:Mutate
+                  get
+                    set Value -1
+                    return Value
+                func Change (ref int:x) → int
+                  !
+                  requires (x >= 0)
+                  => (x >= 0)
+                  let int:ignored = Mutate
+                  return x
             """;
         const string harness = """
             public static class Caller

@@ -77,10 +77,11 @@ public sealed class InlineRefinementConvergenceTests
     public void LaterParameterRelationship_IsAssumedWithBothParameterNames()
     {
         var module = Parse("""
-            §M{Test}
-              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
-                §S (> result lo)
-                §R hi
+            module Test Test block
+              func Upper (int:lo, int:hi | (# > lo)) → int
+                !
+                => (result > lo)
+                return hi
             """, out var diagnostics);
         var result = Assert.Single(Verify(module, diagnostics).Functions);
         Assert.Equal(ContractVerificationStatus.Proven, Assert.Single(result.PostconditionResults).Status);
@@ -155,9 +156,10 @@ public sealed class InlineRefinementConvergenceTests
     public void UninhabitedRefinement_ReportsAtPredicateSpan()
     {
         const string source = """
-            §M{Test}
-              §F{Impossible:pub} (i32:x | (< # -2147483648)) -> i32
-                §R x
+            module Test Test block
+              func Impossible (int:x | (# < -2147483648)) → int
+                !
+                return x
             """;
         var module = Parse(source, out var diagnostics);
         var precondition = Assert.Single(Assert.Single(Verify(module, diagnostics).Functions).PreconditionResults);
@@ -170,10 +172,11 @@ public sealed class InlineRefinementConvergenceTests
     public void CapturedSelfSubstitution_DoesNotManufactureVacuity()
     {
         var module = Parse("""
-            §M{Test}
-              §F{Captured:pub} (i32:x | (exists ((x i32)) (== # x))) -> i32
-                §S (== result x)
-                §R x
+            module Test Test block
+              func Captured (int:x | (exists int:x where true : (# == x))) → int
+                !
+                => (result == x)
+                return x
             """, out var diagnostics);
         var result = Assert.Single(Verify(module, diagnostics).Functions);
         Assert.Equal(ContractVerificationStatus.Unsupported, Assert.Single(result.PostconditionResults).Status);

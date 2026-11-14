@@ -175,12 +175,12 @@ module Test
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         const string source = @"
-§M{Test}
-  §F{Chk:pub} (str:s) -> str
-    §E{}
-    §Q (== s STR:""abc"")
-    §S (! (starts result STR:""\u200dabc""))
-    §R s";
+module Test Test block
+  func Chk (string:s) → string
+    !
+    requires (s == ""abc"")
+    => (!(result).StartsWith(""‍abc""))
+    return s";
 
         var result = Program.Compile(source, "test.calr", NoCache());
 

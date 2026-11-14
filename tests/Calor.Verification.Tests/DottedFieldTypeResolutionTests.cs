@@ -124,18 +124,25 @@ public sealed class DottedFieldTypeResolutionTests
         """;
 
     private const string ProductionSource = """
-        §M{DottedProduction}
-          §CL{Base:pub}
-            §FLD{i64:Wide:pub}
-            §FLD{u8:Small:pub}
-          §CL{Derived:Base}
-            §FLD{bool:Own:priv}
-          §F{WideBoundary:pub} (Derived:item) -> bool
-            §S (>= item.Wide INT:-2147483648)
-            §R true
-          §F{SmallBoundary:pub} (Derived:item) -> bool
-            §S (&& (>= item.Small INT:0) (<= item.Small INT:255))
-            §R true
+        module DottedProduction DottedProduction block
+          class Base
+            field long:Wide
+            field byte:Small
+
+          class Derived internal
+            extends Base
+
+            field bool:Own private
+
+          func WideBoundary (Derived:item) → bool
+            !
+            => (item.Wide >= -2147483648)
+            return true
+
+          func SmallBoundary (Derived:item) → bool
+            !
+            => ((item.Small >= 0) && (item.Small <= 255))
+            return true
         """;
 
     [Fact]

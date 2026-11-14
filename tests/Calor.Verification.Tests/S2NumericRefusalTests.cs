@@ -196,11 +196,11 @@ public sealed class S2NumericRefusalTests
         // Review round 2: the simplifier folded the conditional to LONG:0 == LONG:0 before the
         // translator saw the refused INT: literal.
         const string source = """
-            §M{R1Case}
-              §F{Probe:pub} () -> i32
-                §E{}
-                §S (== (? BOOL:true LONG:0 INT:3000000000) LONG:0)
-                §R INT:0
+            module R1Case R1Case block
+              func Probe () → int
+                !
+                => ((true ? 0L : 3000000000L) == 0L)
+                return 0
             """;
         Assert.Equal(ContractVerificationStatus.Unsupported, VerifySinglePostcondition(source).Status);
     }
@@ -233,11 +233,11 @@ public sealed class S2NumericRefusalTests
     {
         // Review round 2: warming one spelling must not change the other's verdict, in either order.
         const string intSource = """
-            §M{R1Case}
-              §F{Probe:pub} (i64:x) -> i32
-                §E{}
-                §S (<= x INT:9223372036854775807)
-                §R INT:0
+            module R1Case R1Case block
+              func Probe (long:x) → int
+                !
+                => (x <= 9223372036854775807L)
+                return 0
             """;
         var longSource = intSource.Replace("INT:9223372036854775807", "LONG:9223372036854775807");
         foreach (var (first, second, expected) in new[]
