@@ -325,9 +325,14 @@ pass strict effect enforcement (`StrictEffects=true`), including rejection of
 unknown callback rows (`Calor0425`). Generated C# must
 compile and retain declared type and nullable-annotation metadata; preserved
 members or substitutions do not qualify. Other active directives and unsupported
-namespace topologies stay closed. Default lossless single-file conversion still
-preserves these lexical import scopes as whole-file C#, rather than rewriting them.
-This explicit lossy path is not a claim of default native corpus acceptance.
+namespace topologies stay closed.
+
+Since 0.30, default lossless conversion also handles a file that is exactly one
+named namespace with local imports. It uses the scoped-import projection described
+in [migrate](migrate.md) (`namespace using`), which keeps the imports inside the
+namespace and needs no file split. If that projection cannot be certified — for
+example the original C# does not compile against the conversion references — the
+file falls back to the ordinary single-file path and is preserved as before.
 
 For a file with one uniform nullable-oblivious context, lossless conversion can
 retain direct, converter-owned member preservation under a `nullable oblivious`

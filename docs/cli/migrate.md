@@ -83,8 +83,9 @@ For a single named namespace, the same opt-in can convert resolved local imports
 without splitting the file. The output remains `File.calr`, `IsSplit` is false in
 the API, and no `namespaceIndex` is assigned. `namespace using` retains local
 ordinary, alias and static imports; compilation-unit and global imports stay
-outside the C# namespace. Default single-file conversion still preserves local
-import topology as whole-file C#.
+outside the C# namespace. Since 0.30 this single-namespace case no longer needs
+the opt-in: `calor convert` and default `calor migrate` use it too, and fall back
+to whole-file C# preservation when it cannot be certified.
 Normal effect and nullability checks still apply; resolving an import does not
 prove that a call is pure. A scoped projection that changes declared types or
 nullable annotations stays as whole-file C#, with an explicit refusal reason.

@@ -531,6 +531,19 @@ public sealed class CSharpToCalorConverter
         return namespaces;
     }
 
+    /// <summary>
+    /// True when <paramref name="source"/> is exactly one named namespace whose
+    /// local imports the scoped-import projection can carry natively.
+    /// </summary>
+    internal bool IsSingleScopedNamespace(string source, string? sourceFile)
+    {
+        var root = CSharpSyntaxTree.ParseText(source, GetEffectiveParseOptions(sourceFile), sourceFile ?? "")
+            .GetCompilationUnitRoot();
+        return _options.Fidelity == ConversionFidelity.Lossless
+            && _options.PreprocessorMode == PreprocessorConversionMode.PreserveAllBranches
+            && CanConvertScopedNamespaceImports(root);
+    }
+
     private static bool CanConvertScopedNamespaceImports(
         CompilationUnitSyntax root, bool allowRegionDirectives = false)
         => root.SyntaxTree.Options.Kind == SourceCodeKind.Regular
@@ -2848,11 +2861,18 @@ internal sealed class ConversionGeneration(
         var original = await CSharpToCalorConverter.ReadSourceFileAsync(_sourcePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         ConversionResult result;
-        if (namespaceIndex.HasValue || projectConversion)
+        // 0.30: one named namespace with local imports needs no split, so the native
+        // scoped-import projection (formerly behind --split-namespaces) is the default.
+        // It falls back to the ordinary single-file path, preservation included.
+        var scopedDefault = !namespaceIndex.HasValue && !projectConversion
+            && converter.IsSingleScopedNamespace(original, _sourcePath);
+        if (namespaceIndex.HasValue || projectConversion || scopedDefault)
         {
             var project = converter.ConvertProjectCore(
                 original, _sourcePath, cancellationToken, capturePreservationContext: true);
-            if (namespaceIndex.HasValue
+            if (scopedDefault && (project.IsSplit || !project.Outputs[0].Conversion.Success))
+                result = converter.ConvertWithPreservationContext(original, _sourcePath, cancellationToken);
+            else if (namespaceIndex.HasValue
                     && (!project.IsSplit || namespaceIndex.Value >= project.Outputs.Count)
                 || !namespaceIndex.HasValue && project.IsSplit)
             {
