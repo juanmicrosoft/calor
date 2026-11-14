@@ -35,6 +35,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Functions can declare `! unknown`.** A function or method may write
+  `! unknown` as its own effect row when it calls an API with no effect contract.
+  Calls in its body are accepted, and every caller is charged `unknown`, so a
+  caller that claims `!` (pure) or known effects still fails with `Calor0410`.
+  Before, `! unknown` was allowed only on callback and delegate types.
+  `calor convert` now writes this row instead of preserving the whole file as C#:
+  on the 100-file conversion scorecard, one more file converts natively, and all
+  84 native outputs compile with default settings.
+
 - **`calor check` builds, tests and verifies one snapshot.** The matching MCP
   call is `calor_check` with `action: "loop"`. Both return only failures, keeping
   diagnostic fixes, proof assumptions and counterexamples. Missing tests,

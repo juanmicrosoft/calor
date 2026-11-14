@@ -583,31 +583,26 @@
   },
   "13-03": {
     "CSharpSource": "using System;\nusing System.Collections.Generic;\n\npublic class NullableGenericDemo\n{\n    public KeyValuePair<string, object?>[] GetPairs()\n    {\n        return new KeyValuePair<string, object?>[]\n        {\n            new(\"key\", null),\n            new(\"key2\", \"value\")\n        };\n    }\n\n    public Func<object?, object?, bool> GetComparer()\n    {\n        return (a, b) => Equals(a, b);\n    }\n}",
-    "CalorSource": "module Test_13_03 overflow unchecked\n  using System\n  using System.Collections.Generic\n\n  class NullableGenericDemo\n    func GetPairs () → KeyValuePair<string, object?>[]\n      ! alloc\n      return new KeyValuePair<string, object?>[] { new KeyValuePair<string, object?>(\"key\", null), new KeyValuePair<string, object?>(\"key2\", \"value\") }\n\n    func GetComparer () → Func<object?, object?, bool> ! unknown\n      !\n      return (object?:a, object?:b) => Equals(a, b)\n\n\n",
+    "CalorSource": "module Test_13_03 overflow unchecked\n  using System\n  using System.Collections.Generic\n\n  class NullableGenericDemo\n    func GetPairs () → KeyValuePair<string, object?>[]\n      ! unknown\n      return new KeyValuePair<string, object?>[] { new KeyValuePair<string, object?>(\"key\", null), new KeyValuePair<string, object?>(\"key2\", \"value\") }\n\n    func GetComparer () → Func<object?, object?, bool> ! unknown\n      ! unknown\n      return (object?:a, object?:b) => Equals(a, b)\n\n\n",
     "NativeConversionCount": 7,
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,
     "DropCount": 0,
-    "NativeErrors": [
-      "Calor0410: Function 'GetPairs' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect.",
-      "Calor0410: Function 'GetComparer' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect."
-    ],
-    "ProbeKind": "rejected",
-    "RuntimeDriver": null,
+    "NativeErrors": [],
+    "ProbeKind": "behavior",
+    "RuntimeDriver": "var x = new $N$NullableGenericDemo(); var p = x.GetPairs(); var eq = x.GetComparer(); return p[0].Key + \":\" + (p[0].Value == null) + \":\" + p[1].Key + \"=\" + p[1].Value + \":\" + eq(\"a\", \"a\") + \":\" + eq(\"a\", null);",
     "RuntimeSymbols": []
   },
   "13-04": {
     "CSharpSource": "public abstract class Result<T> { }\npublic class Ok<T> : Result<T>\n{\n    public T Value { get; }\n    public Ok(T value) { Value = value; }\n}\npublic class Error<T> : Result<T>\n{\n    public string Message { get; }\n    public Error(string message) { Message = message; }\n}\n\npublic static class ResultExtensions\n{\n    public static string Describe<T>(Result<T> result)\n    {\n        return result switch\n        {\n            Ok<T> ok => $\"Success: {ok.Value}\",\n            Error<T> err => $\"Error: {err.Message}\",\n            _ => \"Unknown\"\n        };\n    }\n}",
-    "CalorSource": "module Test_13_04 overflow unchecked\n  class Result<T> abstract\n\n  class Ok<T>\n    extends Result<T>\n\n    property T:Value\n      get public\n\n    ctor (T:value)\n      set Value value\n\n\n  class Error<T>\n    extends Result<T>\n\n    property string:Message\n      get public\n\n    ctor (string:message)\n      set Message message\n\n\n  module ResultExtensions\n    func Describe<T> (Result<T>:result) → string\n      !\n      return match result\n        case Ok<T> ok → \"Success: ${ok . Value}\"\n        case Error<T> err → \"Error: ${err . Message}\"\n        case _ → \"Unknown\"\n\n\n",
+    "CalorSource": "module Test_13_04 overflow unchecked\n  class Result<T> abstract\n\n  class Ok<T>\n    extends Result<T>\n\n    property T:Value\n      get public\n\n    ctor (T:value)\n      set Value value\n\n\n  class Error<T>\n    extends Result<T>\n\n    property string:Message\n      get public\n\n    ctor (string:message)\n      set Message message\n\n\n  module ResultExtensions\n    func Describe<T> (Result<T>:result) → string\n      ! unknown\n      return match result\n        case Ok<T> ok → \"Success: ${ok . Value}\"\n        case Error<T> err → \"Error: ${err . Message}\"\n        case _ → \"Unknown\"\n\n\n",
     "NativeConversionCount": 13,
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,
     "DropCount": 0,
-    "NativeErrors": [
-      "Calor0410: Function 'Describe' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect."
-    ],
-    "ProbeKind": "rejected",
-    "RuntimeDriver": null,
+    "NativeErrors": [],
+    "ProbeKind": "behavior",
+    "RuntimeDriver": "return $N$ResultExtensions.Describe(new $N$Ok<int>(5)) + \"|\" + $N$ResultExtensions.Describe(new $N$Error<int>(\"bad\")) + \"|\" + $N$ResultExtensions.Describe<int>(null!);",
     "RuntimeSymbols": []
   },
   "13-05": {

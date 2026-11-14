@@ -70,7 +70,9 @@ retain their implicit contracts.
 
 The C# converter omits synthesized own rows on private/internal bodies. Callback
 parameter and return rows stay explicit, as do existing abstract/extern contracts.
-Public callers still declare every reachable effect.
+Public callers still declare every reachable effect. A private or internal body
+may write `! unknown` as its own row; see
+[Declaring Unknown on a Function](#declaring-unknown-on-a-function).
 
 ## Effect Rows for Callbacks
 
@@ -119,8 +121,9 @@ not invoke it. Passing or returning one can still produce `Calor0425` when the
 compiler cannot prove that the source row fits the destination.
 
 The marker is case-sensitive and stands alone. It is not an effect code, so
-do not combine it with `cw` or use it as a function's own declaration, a binding
-row, a field row, a property row or a lambda row. An existing effect placeholder
+do not combine it with `cw` or use it as a binding row, a field row, a property
+row or a lambda row. A function's own declaration may use it; see
+[Declaring Unknown on a Function](#declaring-unknown-on-a-function). An existing effect placeholder
 named `unknown` keeps its normal binding identity; it is not the marker.
 These callback contracts do not change intrinsic constructor or accessor
 mutation/allocation contracts.
@@ -241,6 +244,34 @@ and the [project index](https://calor.dev/docs/cli/query/) before relying on a h
 boundary.
 
 ---
+
+## Declaring Unknown on a Function
+
+Since 0.30 a function or method may write `! unknown` as its own row. Use it
+when the body calls an API that has no effect contract, so the compiler cannot
+name the effects it performs.
+
+```calor
+module Encoding
+  func Encode public (string?:text) → string?
+    ! unknown
+    return System.Web.HttpUtility.UrlEncode(text)
+```
+
+- Calls in the body to APIs without a contract are accepted. `Calor0411` is not
+  reported for them.
+- Every caller is charged `unknown`. A caller that declares `!` or known codes
+  reports `Calor0410`. It must declare `! unknown` as well, or the API needs a
+  contract in a `.calor-effects.json` manifest.
+- `! unknown` stands alone. `! unknown, cw` is rejected, because Unknown already
+  admits every effect.
+- Private and internal bodies infer their effects, and an inferred row cannot be
+  Unknown. `! unknown` is the one own row such a body may write.
+- `calor convert` writes `! unknown` on a converted function whose effects it
+  cannot resolve, instead of preserving the whole file as raw C#.
+
+Prefer a manifest entry when you know what the API does. A known row keeps
+every caller's effects precise; `! unknown` only records that nobody checked.
 
 ## Static initialization
 

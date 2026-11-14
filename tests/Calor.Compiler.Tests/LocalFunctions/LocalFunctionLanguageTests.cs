@@ -698,8 +698,8 @@ public class LocalFunctionLanguageTests
         var error = Assert.Single(diagnostics.Errors);
         Assert.Equal("Calor0410", error.Code);
         Assert.Equal("Function 'Use' uses effect 'unknown' but does not declare it\n"
-            + "  Resolve the unknown call through an authoritative source declaration or effect contract; "
-            + "unknown is not a declarable effect.", error.Message);
+            + "  Resolve the unknown call through a source declaration or effect contract, "
+            + "or declare ! unknown on this callable.", error.Message);
     }
 
     private static void AssertRetiredLocal(CompilationResult compilation, int expectedCount = 1)

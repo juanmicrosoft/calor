@@ -930,9 +930,12 @@ public sealed class Parser
         if (required && row == null)
             _diagnostics.ReportError(span, DiagnosticCode.MissingBoundaryEffectRow,
                 $"Boundary '{name}' requires an explicit effect row. Write '!' for Pure or '! effects' before its body.");
-        else if (!required && row != null)
+        // 0.30: an inferred row cannot be unknown (Calor0410), so ! unknown is the one
+        // own row a private/internal body may write.
+        else if (!required && row != null && !(row.IsUnknown && row.EffectVariables.Count == 0))
             _diagnostics.ReportError(row.Span, DiagnosticCode.NonPublicEffectRow,
-                $"Private/internal body '{name}' infers its effects. Remove its own effect row; callback type rows remain explicit.");
+                $"Private/internal body '{name}' infers its effects. Remove its own effect row "
+                + "(only ! unknown is allowed there); callback type rows remain explicit.");
     }
 
     private void ValidateDefaultConstraintOwners(ModuleNode module)
@@ -2324,10 +2327,15 @@ public sealed class Parser
             && attrs.All().All(attribute => attribute.Key is "_pos0" or "_posCount")
             && !IsEffectVariableInScope("unknown"))
         {
-            if (position is not (EffectRowPosition.Parameter or EffectRowPosition.Return or EffectRowPosition.Delegate))
+            // 0.30 (maintainer decision 2026-11-14): a callable may declare ! unknown on
+            // itself. Its body may then call APIs without effect contracts, and every
+            // caller is charged unknown. Value rows (bindings, fields, properties) and
+            // lambda literals still require known effects.
+            if (position is not (EffectRowPosition.Declaration or EffectRowPosition.Parameter
+                    or EffectRowPosition.Return or EffectRowPosition.Delegate))
                 _diagnostics.ReportError(startToken.Span, DiagnosticCode.EffectRowMisplaced,
-                    "! unknown is permitted only on callback parameter, return and delegate contracts. "
-                    + "A callable's own declaration requires known effects, or ! for pure.");
+                    "! unknown is permitted only on a callable's own declaration and on callback "
+                    + "parameter, return and delegate contracts.");
             return new EffectsNode(startToken.Span, new Dictionary<string, string> { ["unknown"] = "*" });
         }
 

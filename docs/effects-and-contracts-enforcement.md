@@ -96,6 +96,13 @@ Unproved callback positions are emitted as `! unknown`, never Pure. Probe
 boundary rows are restrictive budgets, not evidence that a body satisfies them.
 Public callers must still cover every reachable effect.
 
+Since 0.30 the converter also writes `! unknown` as the own row of any function
+or method whose strict inference is Unknown — typically a call to an API with no
+effect contract. Permissive inference would have printed a narrower row (often
+`!`) that the next strict compile rejects with `Calor0410`. The marker is honest
+about the gap: the output compiles under default settings, and every caller is
+charged `unknown` until a manifest entry supplies the contract.
+
 ## Unknown External Call Policy
 
 | Mode              | Behavior                                      | When              |

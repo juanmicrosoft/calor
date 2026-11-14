@@ -117,6 +117,10 @@ body or unproved virtual-slot contract.
 Required boundary rows are always printed, including explicit Pure rows.
 Callback positions without a proved contract retain `! unknown`; emitting that
 row does not make their invocation eligible for native conversion.
+A function or method whose effects cannot be resolved — usually because it calls
+an API with no effect contract — is written with `! unknown` as its own row. The
+file stays native Calor and compiles with default settings; it is no longer
+preserved as raw C# for that reason alone.
 
 ### Generated output and refresh
 

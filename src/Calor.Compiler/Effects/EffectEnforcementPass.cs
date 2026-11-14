@@ -948,7 +948,7 @@ public sealed class EffectEnforcementPass
 
                 var message = $"Function '{function.Name}' uses effect '{surface}' but does not declare it{rowStr}{chainStr}";
                 if (kind == EffectKind.Unknown)
-                    message += "\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect.";
+                    message += "\n  Resolve the unknown call through a source declaration or effect contract, or declare ! unknown on this callable.";
 
                 if (fix != null)
                 {
@@ -1176,6 +1176,10 @@ public sealed class EffectEnforcementPass
                 var strict = new EffectEnforcementPass(new DiagnosticBag(), UnknownCallPolicy.Strict, resolver);
                 strict.Enforce(module);
                 changed |= strict.SynthesizeCallbackContracts(module, synthesizedOutputs, blockedOutputs);
+                // 0.30: permissive inference treats a call without an effect contract
+                // as pure, so the rows above can claim ! where the truth is "unknown".
+                // Strict inference names those callables; they declare ! unknown.
+                changed |= strict.DeclareUnknownRows(module);
             }
             if (!changed)
                 return true;
@@ -1184,6 +1188,38 @@ public sealed class EffectEnforcementPass
         foreach (var output in synthesizedOutputs)
             output.Row = null;
         return false;
+    }
+
+    /// <summary>
+    /// 0.30, converter only: writes <c>! unknown</c> on every function and method
+    /// whose STRICT inference is unknown — it calls an API with no effect contract,
+    /// or a callable that itself declares <c>! unknown</c>. Without this the
+    /// permissively synthesised row would claim effects the body may exceed, and
+    /// the converter's strict validation compile would reject the whole file.
+    /// Returns whether any row changed, so callers reach a fixpoint across rounds.
+    /// </summary>
+    private bool DeclareUnknownRows(ModuleNode module)
+    {
+        var changed = false;
+        void Declare(string id, EffectsNode? row, Action<EffectsNode> assign, TextSpan span)
+        {
+            if (!_computedEffects.TryGetValue(id, out var computed) || !computed.IsUnknown)
+                return;
+            if (row != null && GetDeclaredEffects(row).IsUnknown)
+                return;
+            assign(new EffectsNode(row?.Span ?? span,
+                new Dictionary<string, string>(StringComparer.Ordinal) { ["unknown"] = "*" }));
+            changed = true;
+        }
+
+        foreach (var function in module.Functions)
+            Declare(function.Id, function.Effects, row => function.Effects = row, function.Span);
+        foreach (var owner in CallGraphAnalysis.EnumerateClasses(module))
+        {
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(owner))
+                Declare($"{owner.Name}.{method.Id}", method.Effects, row => method.Effects = row, method.Span);
+        }
+        return changed;
     }
 
     private readonly Dictionary<string, PolyRow> _returnedRows = new(StringComparer.Ordinal);
@@ -4280,7 +4316,11 @@ public sealed class EffectEnforcementPass
             var unknownSeverity = _context.StrictEffects
                 ? DiagnosticSeverity.Error
                 : DiagnosticSeverity.Warning;
-            if (_context.Policy == UnknownCallPolicy.Strict || _context.StrictEffects)
+            if (CurrentDeclaresUnknown)
+            {
+                // The callable declares ! unknown; the charge below is admitted by its row.
+            }
+            else if (_context.Policy == UnknownCallPolicy.Strict || _context.StrictEffects)
             {
                 _context.Diagnostics.Report(
                     span,
@@ -5600,8 +5640,22 @@ public sealed class EffectEnforcementPass
                 typeName,
                 name => _context.DelegateTypeNames.Contains(name));
 
+        /// <summary>
+        /// 0.30: true when the callable being inferred declares <c>! unknown</c>
+        /// on itself. That row already admits every effect, so an unresolved call
+        /// inside it is accounted for and Calor0411 is not reported. Callers of
+        /// the callable are still charged <c>unknown</c>.
+        /// </summary>
+        private bool CurrentDeclaresUnknown =>
+            _context.Functions.TryGetValue(_context.CurrentFunctionId, out var current)
+            && current.Effects is { } row
+            && GetDeclaredEffects(row).IsUnknown;
+
         private void ReportUnknownCall(string target, TextSpan span)
         {
+            if (CurrentDeclaresUnknown)
+                return;
+
             // Calor0411: Unknown external call
             var severity = _context.StrictEffects
                 ? DiagnosticSeverity.Error

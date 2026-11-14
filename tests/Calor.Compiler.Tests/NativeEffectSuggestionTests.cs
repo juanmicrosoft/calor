@@ -122,7 +122,7 @@ public sealed class NativeEffectSuggestionTests
         Assert.True(compiled.HasErrors);
         var diagnostic = Assert.Single(compiled.Diagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
-        Assert.Contains("unknown is not a declarable effect", diagnostic.Message);
+        Assert.Contains("or declare ! unknown on this callable", diagnostic.Message);
         Assert.DoesNotContain(compiled.Diagnostics.DiagnosticsWithFixes,
             diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
         var response = await new FixTool().ExecuteAsync(JsonSerializer.SerializeToElement(new { source }));

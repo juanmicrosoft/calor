@@ -1794,7 +1794,9 @@ public sealed class CSharpToCalorConverter
             if (declaration is FunctionNode { Visibility: Visibility.Private or Visibility.Internal }
                 or MethodNode { Visibility: Visibility.Private or Visibility.Internal,
                     IsAbstract: false, IsExtern: false })
-                assignments.Add(() => assign(null));
+                // An inferred row cannot be unknown (Calor0410), so a non-public body
+                // that calls an API without an effect contract keeps ! unknown.
+                assignments.Add(() => assign(synthesized.Effects is { IsUnknown: true } unknown ? unknown : null));
             else if (synthesized.Effects != null)
                 assignments.Add(() => assign(synthesized.Effects));
             var sourceParameters = synthesized.Declaration switch

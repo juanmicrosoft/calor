@@ -274,7 +274,7 @@
     "EscapedDebugCSharp": null,
     "EscapedOffCSharp": null,
     "NativeErrors": [
-      "Calor0410: Function 'GetImmutableScores' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect."
+      "Calor0410: Function 'GetImmutableScores' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through a source declaration or effect contract, or declare ! unknown on this callable."
     ]
   },
   "tests/Calor.Conversion.Tests/Snapshots/12-01.approved.calr": {
@@ -335,8 +335,8 @@
     "EscapedDebugCSharp": null,
     "EscapedOffCSharp": null,
     "NativeErrors": [
-      "Calor0410: Function 'GetPairs' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect.",
-      "Calor0410: Function 'GetComparer' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect."
+      "Calor0410: Function 'GetPairs' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through a source declaration or effect contract, or declare ! unknown on this callable.",
+      "Calor0410: Function 'GetComparer' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through a source declaration or effect contract, or declare ! unknown on this callable."
     ]
   },
   "tests/Calor.Conversion.Tests/Snapshots/13-04.approved.calr": {

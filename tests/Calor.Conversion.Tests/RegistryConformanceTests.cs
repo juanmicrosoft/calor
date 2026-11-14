@@ -1095,10 +1095,12 @@ public class RegistryConformanceTests
         var result = Convert(csharp);
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(issue => issue.Message)));
         Assert.Single(Assert.Single(result.Ast!.Classes).InteropBlocks);
+        // 0.30: the converter declares ! unknown rather than claiming pure; the
+        // output compiles and the public caller's row stays unknown, never pure.
         var compiled = Calor.Compiler.Program.Compile(result.CalorSource!, "runtime-references.calr");
-        Assert.Contains(compiled.Diagnostics.Errors,
-            error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
-                && error.Message.Contains("effect 'unknown'", StringComparison.Ordinal));
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors.Select(e => e.Message)));
+        var caller = Assert.Single(Assert.Single(result.Ast!.Classes).Methods, method => method.Name == "Caller");
+        Assert.True(caller.Effects!.IsUnknown, result.CalorSource);
     }
 
     [Fact]

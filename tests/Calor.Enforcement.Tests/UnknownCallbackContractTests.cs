@@ -409,8 +409,6 @@ public sealed class UnknownCallbackContractTests
     }
 
     [Theory]
-    [InlineData("func Run () → void\n    ! unknown\n    return")]
-    [InlineData("func Run private () → void\n    ! unknown\n    return")]
     [InlineData("func Run (Action:callback ! unknown,cw) → void\n    !\n    return")]
     [InlineData("func Run (Action:callback ! UNKNOWN) → void\n    !\n    return")]
     [InlineData("func Run () → void\n    !\n    let Action:callback ! unknown = null")]
@@ -423,6 +421,72 @@ public sealed class UnknownCallbackContractTests
         _ = new Parser(new Lexer("module Contracts\n  " + declaration, diagnostics)
             .TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);
+    }
+
+    // 0.30 (maintainer decision 2026-11-14): a callable may declare ! unknown on itself.
+    [Theory]
+    [InlineData("func Run public (string?:s) → string?")]
+    [InlineData("func Run private (string?:s) → string?")]
+    public void UnknownIsDeclarableOnACallablesOwnRow(string signature)
+    {
+        var result = Compile($$"""
+            module Contracts
+              {{signature}}
+                ! unknown
+                return System.Web.HttpUtility.UrlEncode(s)
+            """);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowMisplaced);
+    }
+
+    [Fact]
+    public void UnknownIsDeclarableOnAMethodAndPropagatesToUnknownCallers()
+    {
+        var result = Compile("""
+            module Contracts
+              class Encoder public
+                func Encode public (string?:s) → string?
+                  ! unknown
+                  return System.Web.HttpUtility.UrlEncode(s)
+
+                func Twice public (string?:s) → string?
+                  ! unknown
+                  return Encode(Encode(s))
+            """);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("!")]
+    [InlineData("! cw")]
+    public void ACallerWithKnownEffectsCannotCallAnUnknownDeclaration(string callerRow)
+    {
+        var result = Compile($$"""
+            module Contracts
+              func Encode public (string?:s) → string?
+                ! unknown
+                return System.Web.HttpUtility.UrlEncode(s)
+
+              func Caller public (string?:s) → string?
+                {{callerRow}}
+                return Encode(s)
+            """);
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+            && d.Message.Contains("'Caller'") && d.Message.Contains("'unknown'"));
+    }
+
+    [Fact]
+    public void AnUndeclaredUnknownCallIsStillRejected()
+    {
+        var result = Compile("""
+            module Contracts
+              func Encode public (string?:s) → string?
+                !
+                return System.Web.HttpUtility.UrlEncode(s)
+            """);
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+            && d.Message.Contains("declare ! unknown"));
     }
 
     [Fact]
