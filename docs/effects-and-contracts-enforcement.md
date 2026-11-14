@@ -181,151 +181,34 @@ System.DateTime::get_UtcNow() → time
 System.Guid::NewGuid() → rand
 ```
 
-`System.String` has no blanket pure contract. Its built-in coverage is limited
-to exact signatures for `IsNullOrEmpty(string)`, `ToUpperInvariant()`,
-`ToLowerInvariant()`, `ToString()`, `Equals(string)`, `Equals(string,string)`,
-`CompareOrdinal(string,string)`, `Contains(char)`, `IndexOf(char)`,
-the `String(char[]?)` constructor, and the `Length` getter.
-Unlisted members and overloads remain Unknown.
+The built-in manifests declare these members pure, as Calor 0.29 did:
 
-`String(char[]?)` copies UTF-16 code units without invoking user code or
-ambient culture. It returns an empty string for null or empty input and
-otherwise copies the array; later array writes cannot change the string.
-It does not validate Unicode sequences and has no argument-error resource
-lookup. Allocation and runtime allocation failure follow the existing
-allocation-only convention, not a guarantee of successful allocation.
-Every other String constructor remains Unknown.
+- every `System.String` member, the `Length` getter and the `String(char[])`
+  constructor;
+- `Parse`, `TryParse` and `ToString` on `Int32`, `Int64`, `Double` and
+  `Boolean`, each of which also has a pure type default;
+- every `System.Convert` member, including the base64 and hex helpers in the
+  crypto manifest;
+- the `System.Linq.Enumerable` operators and the `System.Linq` namespace default;
+- `Object.Equals`, `GetHashCode`, `GetType`, `ReferenceEquals` and
+  `MemberwiseClone`;
+- `System.Nullable<T>` (type default), plus the exact `Single.IsNaN` and
+  `Double.IsNaN` overloads and the `CultureInfo.InvariantCulture` getter.
 
-`ToCharArray()` remains Unknown: the call site's null-receiver check can
-trigger exception resource lookup through the virtual `CurrentUICulture.Name`
-getter before method entry. Successful copies within the method do not prove
-the whole call safe. The ranged
-`ToCharArray(int,int)` overload also remains Unknown.
+Interpolating or concatenating a value of a built-in type, or a `Nullable<T>` of
+one, charges what the manifest records for that type's parameterless
+`ToString()`. Other types, including source types and type parameters, stay
+Unknown, because formatting them can run an arbitrary `ToString` override.
 
-Selected metadata String instance calls and getters require a proven non-null
-receiver. This is intentionally stricter than C# nullable warnings: the
-`callvirt` null check runs before the contracted method body, and constructing
-its exception can invoke an overridden `CurrentUICulture.Name` getter.
-Nullable, oblivious, and unknown receivers fail the hard receiving boundary
-(`Calor0274`), even with type checking disabled. Casting null to `string` is
-not proof. Non-null declarations and values, sound flow guards, non-null
-coalescing, and conditional access retain their existing annotations and
-behavior. Static helpers and constructors are not instance receiving
-boundaries; unlisted overloads still need an independent effect contract.
-
-In particular, `ToUpper()` and `ToLower()`, including their `CultureInfo`
-overloads, can invoke user-defined `TextInfo` getters. Culture-sensitive
-comparisons, formatting, and enumerable overloads can also dispatch to user
-code. They cannot inherit permission from a safe overload's name. Strict
-compilation rejects unresolved effects rather than guessing a `mut` row.
-
-`System.Int32`, `System.Int64`, `System.Double`, and `System.Boolean` also
-have no default or method-name-wide pure contracts. Their finite coverage is
-`Equals(T)`, `CompareTo(T)` (where `T` is the declaring type), and
-`GetHashCode()`. Boolean additionally covers `ToString()` and
-`ToString(IFormatProvider)`: both return fixed literals and ignore the provider.
-These .NET 10 implementations use value comparisons and bit operations;
-Double's NaN and signed-zero helpers do not dispatch to user code.
-
-The exact static `Single.IsNaN(Single)` and `Double.IsNaN(Double)` overloads
-are also covered. Both .NET 10 bodies compare the argument with itself and
-return the unordered result. They have no calls, type initializers, provider
-dispatch or exception helpers. No other Single member receives a contract.
-Metadata argument lookup preserves `float` as `System.Single`, not an
-unresolved placeholder; this type fact grants no additional effects.
-
-`System.Object.Equals(object)` and `GetHashCode()` have no built-in effect
-contract: both are open virtual slots, so their base implementations cannot
-prove arbitrary overrides pure. The static `Object.Equals(object, object)`
-overload is also Unknown. After identity and null checks, its .NET 10 body
-invokes the first operand's virtual `Equals` slot. No overload of either name
-retains pure authority on `System.Object`. `Object.ReferenceEquals` remains
-covered because it compares reference identity without invoking overrides.
-Its argument evaluation effects are still charged. The finite primitive
-`Equals(T)` and `GetHashCode()` contracts above remain separate and unchanged.
-This repair does not establish the safety of other `System.Object` entries.
-
-`System.Nullable<T>` has no type-wide pure default. Its `ToString`, `Equals`,
-and `GetHashCode` overrides can invoke the stored value's methods through a
-constrained virtual call, including callbacks that mutate struct storage.
-Even `int?.ToString()` can reach current-culture callbacks for negative values.
-These members remain Unknown; an `object` contract does not authorize them.
-The finite pure entries are the `HasValue` getter, parameterless
-`GetValueOrDefault()`, and the `int`-parameter `GetValueOrDefault` and constructor.
-They only read or copy fields and values. Other parameterized generic copies
-remain conservatively uncontracted: this does not add generic signature matching.
-Receiver and argument evaluation effects are still charged. The `Value` getter
-is not covered, because its empty-value path invokes exception resource helpers.
-Built-in nullable-to-nonnullable value conversions also select this getter for
-effect checking, even though Roslyn reports no user-defined `OperatorMethod`.
-The operation's nullable conversion classification, actual `System.Nullable<T>`
-operand and constructed `Value` member determine the getter catalog key.
-Ordinary expressions and source field/property initializers charge that same
-selected getter, in addition to operand evaluation. Unwrapping therefore remains
-Unknown, including casts following a `HasValue` guard; contextual guarded-value
-precision is not implemented here. Wrapping a value into a nullable type,
-nullable-to-nullable conversions and ordinary nonnullable primitive casts do not
-select `Value`. Source/user-defined conversion authority is unchanged. This is
-not a general nullable-purity guarantee.
-When a lossless conversion's native nullable candidate fails effect checking,
-the production converter preserves the original C# instead. Matching emitted C#
-metadata alone is not enough to certify native Calor. Preservation keeps exact
-source and declared metadata, but receives no native-coverage credit.
-
-Numeric `Parse`, `TryParse`, and `ToString` overloads remain Unknown.
-`NumberFormatInfo.GetInstance` can call an arbitrary provider's `GetFormat`;
-its current-culture path can call a `CultureInfo` override. Even parameterless
-integer formatting reaches that path for negative values. Passing an invariant
-provider at one call site does not justify a contract for every provider.
-Boolean `Parse` is also omitted: successful parsing avoids culture dispatch,
-but invalid input reaches exception resource lookup through the virtual
-`CurrentUICulture.Name` getter. Unlisted overloads, including Boolean
-`TryParse` with its output write, have no purity claim.
-
-Native interpolation has a separate, bounded .NET 10 proof for fixed-width
-integer `X`/`x` holes. Literal formats with zero to two precision digits take
-the bit/hex path for either sign without reading a provider. The complete
-interpolation, including constant alignment, must fit in the default handler's
-initial 256-character buffer. Its selected handler and integer types must be
-the runtime metadata definitions, not source lookalikes. Custom handlers,
-expression-tree/lambda contexts, other formats and larger results receive no
-new permission. Hole-expression effects remain charged. This is not a manifest
-grant for numeric `ToString`; see [compilation](cli/compile.md).
-
-One contextual exception is a selected `Int32.ToString()` whose receiver is
-the directly bound core-library `String.Length` getter. String lengths are
-nonnegative, so .NET 10 formats them through unsigned decimal conversion
-before any current-culture lookup. Its small-number cache contains only
-runtime-created decimal strings; cache initialization and string allocation
-follow the existing allocation-only convention. Direct and conditional access
-retain receiver evaluation effects and the getter's non-null boundary.
-This is not a general integer contract: locals, constants, array lengths,
-source getters named `Length`, nullable integers, boxed/interface receivers,
-and format/provider overloads do not acquire this proof. Existing source
-initializer and callback authority checks are unchanged.
-
-`System.Convert` has no type default, wildcard, or method-name-wide grant,
-including in the crypto manifest. Only the exact `ToString(string?)`,
-`ToString(bool)`, and `ToString(char)` overloads, with or without an
-`IFormatProvider`, are covered. String returns its input unchanged, including
-null. Boolean returns a fixed literal. Char allocates a one-code-unit string
-and writes only that new string. All six ignore the provider and ambient
-culture; allocation follows the existing allocation-only convention.
-
-`Convert.ToString(object?)` can call `IConvertible.ToString`,
-`IFormattable.ToString`, or a virtual `object.ToString` override. Numeric
-formatting can reach a provider or current-culture callback, including on
-the parameterless negative-integer path. These overloads remain Unknown,
-not pure because a base implementation or one input happens to be safe.
-Wrapping an uncontracted call in interpolation or string addition does not
-make it pure.
-All other Convert members, including base64 and hex helpers, remain
-uncontracted; this is not a claim that every omitted overload has an effect.
-
-The dispatch review uses .NET 10 CoreLib source at
-[`0427b9abbe`](https://github.com/dotnet/dotnet/tree/0427b9abbead3fa64c6655eb4290c537397131fa/src/runtime/src/libraries/System.Private.CoreLib/src/System),
-cross-checked against the selected runtime members and their IL.
-This is bounded contract coverage, not a proof of the whole BCL.
+**Known gap.** These contracts are approximations, not proofs. Culture-sensitive
+formatting and parsing read `CultureInfo.CurrentCulture`, whose providers can be
+overridden. `Enumerable` operators call the delegates, enumerators and comparers
+they are given. `Object.Equals` and `GetHashCode` dispatch to overrides. A
+November 2026 review withdrew these contracts. The withdrawal was reverted on
+2026-11-14 because it stopped ordinary code such as `n.ToString()` from
+compiling and turned converted code into preserved C#, which has no effect
+checking at all. Replacing them with exact, sound contracts is tracked as a
+separate issue.
 
 Selected metadata constants, such as `System.Math.PI`, do not evaluate their
 namespace/type qualifiers or run a type initializer. This does not grant purity

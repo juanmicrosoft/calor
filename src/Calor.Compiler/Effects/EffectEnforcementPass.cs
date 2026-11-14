@@ -6981,14 +6981,31 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFormattingEffects(
             CallGraphAnalysis.InterpolationFormatting? formatting, string operation, TextSpan span)
         {
-            // Numeric formatting can dispatch through CurrentCulture.NumberFormat.
-            // Only the binding image's closed, provider-independent cases are pure.
-            return formatting is { IsNull: true } or { HasBoundedIntegralHexProof: true }
+            if (formatting is { IsNull: true } or { HasBoundedIntegralHexProof: true }
                 || formatting?.Type?.SpecialType is CS.SpecialType.System_String
-                    or CS.SpecialType.System_Char or CS.SpecialType.System_Boolean
-                ? EffectSet.Empty
-                : UnknownResolvedOperation(
-                    $"{operation} formatting ({formatting?.Type?.ToDisplayString() ?? "<unresolved>"})", span);
+                    or CS.SpecialType.System_Char or CS.SpecialType.System_Boolean)
+                return EffectSet.Empty;
+            // Formatting a value calls its type's parameterless ToString(). For built-in
+            // types (and Nullable<T> of one), charge exactly what the effect manifests
+            // record for that member, as 0.29 did. Other types, and built-in types
+            // without a contract, stay Unknown.
+            if (formatting?.Type is { } type && IsBuiltInFormattable(type))
+            {
+                var resolved = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                    Binding.Metadata.MetadataBinderResult.ToBoundType(type), "ToString"));
+                if (resolved.Status != EffectResolutionStatus.Unknown)
+                    return resolved.Effects;
+            }
+            return UnknownResolvedOperation(
+                $"{operation} formatting ({formatting?.Type?.ToDisplayString() ?? "<unresolved>"})", span);
+
+            static bool IsBuiltInFormattable(Microsoft.CodeAnalysis.ITypeSymbol type) =>
+                type.SpecialType != CS.SpecialType.None
+                || type is Microsoft.CodeAnalysis.INamedTypeSymbol
+                {
+                    OriginalDefinition.SpecialType: CS.SpecialType.System_Nullable_T,
+                    TypeArguments: [{ SpecialType: not CS.SpecialType.None }]
+                };
         }
 
         private EffectSet InferFromExpressionCall(ExpressionCallNode call)

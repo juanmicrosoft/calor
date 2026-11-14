@@ -93,6 +93,19 @@
         "Fill": ["rand"],
         "Dispose": []
       }
+    },
+    {
+      "type": "System.Convert",
+      "defaultEffects": [],
+      "methods": {
+        "ToBase64String": [],
+        "FromBase64String": [],
+        "ToBase64CharArray": [],
+        "FromBase64CharArray": [],
+        "ToHexString": [],
+        "FromHexString": [],
+        "*": []
+      }
     }
   ]
 }

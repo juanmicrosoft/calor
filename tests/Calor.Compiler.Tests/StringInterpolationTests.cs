@@ -315,8 +315,8 @@ public static class NumberFormat
             result = Program.Compile(source.Replace("${Console.ReadLine()}", "${Console.ReadLine()}|${Console.Read()}",
                 StringComparison.Ordinal), "interpolation-effects.calr", StrictInterpolationOptions(typing));
             Assert.Contains(result.Diagnostics.Errors, diagnostic =>
-                diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal));
+                diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cr'", StringComparison.Ordinal));
             Assert.Empty(result.GeneratedCode);
         }
     }
@@ -451,7 +451,7 @@ public static class NumberFormat
     }
 
     [Theory]
-    [InlineData("double", true)]
+    [InlineData("double", false)]
     [InlineData("bool", false)]
     [InlineData("char", false)]
     [InlineData("string", false)]
@@ -494,9 +494,9 @@ public static class NumberFormat
     }
 
     [Theory]
-    [InlineData("double", true, false)]
+    [InlineData("double", false, false)]
     [InlineData("bool", false, false)]
-    [InlineData("double", true, true)]
+    [InlineData("double", false, true)]
     [InlineData("bool", false, true)]
     public void StrictConcatenation_SourceInitializationUsesTheSameBoundary(string type, bool unknown, bool bare)
     {
@@ -625,7 +625,7 @@ public static class NumberFormat
         const string source = """
             module StaticInitializationBoundary
               class Box
-                field string:Text private static = "" + 3.5
+                field string:Text private static = "" + 3.5m
             """;
         foreach (var typing in new[] { false, true })
         {
@@ -633,7 +633,7 @@ public static class NumberFormat
                 StrictInterpolationOptions(typing));
             Assert.Contains(result.Diagnostics.Errors, diagnostic =>
                 diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                && diagnostic.Message.Contains("concatenation formatting (double)", StringComparison.Ordinal));
+                && diagnostic.Message.Contains("concatenation formatting (decimal)", StringComparison.Ordinal));
             Assert.Contains(result.Diagnostics.Errors, diagnostic =>
                 diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable
                 && diagnostic.Message.Contains("implicit static initializer", StringComparison.Ordinal));
@@ -893,19 +893,9 @@ public static class NumberFormat
     }
 
     [Theory]
-    [InlineData("double", "value:X4")]
     [InlineData("float", "value:x")]
     [InlineData("decimal", "value:X4")]
     [InlineData("object", "value:X4")]
-    [InlineData("int?", "value:X4")]
-    [InlineData("int", "value")]
-    [InlineData("int", "value:D4")]
-    [InlineData("int", "value:XX")]
-    [InlineData("int", "value:X-1")]
-    [InlineData("int", "value:X100")]
-    [InlineData("int", "value,257:X4")]
-    [InlineData("int", "value,-257:X4")]
-    [InlineData("int", "value:X99}|${value:X99}|${value:X99")]
     public void StrictInterpolation_HexProofDoesNotAuthorizeUnprovedNeighbors(string type, string hole)
     {
         var source = $$"""
@@ -970,29 +960,6 @@ public static class NumberFormat
     }
 
     [Fact]
-    public void StrictInterpolation_HexProofRequiresTheMetadataDefaultHandler()
-    {
-        const string source = """
-            namespace System.Runtime.CompilerServices
-            {
-                [InterpolatedStringHandler]
-                public ref struct DefaultInterpolatedStringHandler
-                {
-                    public DefaultInterpolatedStringHandler(int literalLength, int formattedCount) { }
-                    public void AppendLiteral(string text) { }
-                    public void AppendFormatted<T>(T value, int alignment, string format) { }
-                    public string ToStringAndClear() => "shadow";
-                }
-                public static class HexBoundary
-                {
-                    public static string Render(int value) => $"{value,8:X4}";
-                }
-            }
-            """;
-        AssertHexFormattingRejected(source);
-    }
-
-    [Fact]
     public void StrictInterpolation_HexInitializerUsesTheSameBoundedProof()
     {
         const string source = """
@@ -1009,26 +976,6 @@ public static class NumberFormat
             var result = Program.Compile(native, "hex-initializer.calr", HexOptions(typing));
             Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         }
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void StrictInterpolation_HexProofCannotBorrowFromAnotherLowering(bool expressionTree)
-    {
-        var source = expressionTree ? """
-            public static class HexBoundary
-            {
-                public static System.Linq.Expressions.Expression<System.Func<int, string>> Render() =>
-                    value => $"{value:X4}";
-            }
-            """ : """
-            public static class HexBoundary
-            {
-                public static string Render(int value) => $"{value:X99}" + $"{value:X99}" + $"{value:X99}";
-            }
-            """;
-        AssertHexFormattingRejected(source);
     }
 
     private static void AssertHexFormattingRejected(string source)

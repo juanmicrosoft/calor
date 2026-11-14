@@ -41,16 +41,9 @@
     },
     {
       "type": "System.String",
+      "defaultEffects": [],
       "methods": {
-        "IsNullOrEmpty(System.String)": [],
-        "ToUpperInvariant()": [],
-        "ToLowerInvariant()": [],
-        "ToString()": [],
-        "Equals(System.String)": [],
-        "Equals(System.String,System.String)": [],
-        "CompareOrdinal(System.String,System.String)": [],
-        "Contains(System.Char)": [],
-        "IndexOf(System.Char)": []
+        "*": []
       },
       "getters": {
         "Length": []
@@ -68,18 +61,20 @@
     },
     {
       "type": "System.Int32",
+      "defaultEffects": [],
       "methods": {
-        "Equals(System.Int32)": [],
-        "CompareTo(System.Int32)": [],
-        "GetHashCode()": []
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
       }
     },
     {
       "type": "System.Int64",
+      "defaultEffects": [],
       "methods": {
-        "Equals(System.Int64)": [],
-        "CompareTo(System.Int64)": [],
-        "GetHashCode()": []
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
       }
     },
     {
@@ -90,21 +85,21 @@
     },
     {
       "type": "System.Double",
+      "defaultEffects": [],
       "methods": {
-        "Equals(System.Double)": [],
-        "CompareTo(System.Double)": [],
-        "GetHashCode()": [],
+        "Parse": [],
+        "TryParse": [],
+        "ToString": [],
         "IsNaN(System.Double)": []
       }
     },
     {
       "type": "System.Boolean",
+      "defaultEffects": [],
       "methods": {
-        "Equals(System.Boolean)": [],
-        "CompareTo(System.Boolean)": [],
-        "GetHashCode()": [],
-        "ToString()": [],
-        "ToString(System.IFormatProvider)": []
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
       }
     },
     {
@@ -115,13 +110,9 @@
     },
     {
       "type": "System.Convert",
+      "defaultEffects": [],
       "methods": {
-        "ToString(System.String)": [],
-        "ToString(System.String,System.IFormatProvider)": [],
-        "ToString(System.Boolean)": [],
-        "ToString(System.Boolean,System.IFormatProvider)": [],
-        "ToString(System.Char)": [],
-        "ToString(System.Char,System.IFormatProvider)": []
+        "*": []
       }
     },
     {
@@ -205,7 +196,70 @@
     },
     {
       "type": "System.Linq.Enumerable",
-      "extensionProvider": true
+      "extensionProvider": true,
+      "methods": {
+        "Where": [],
+        "Select": [],
+        "SelectMany": [],
+        "OrderBy": [],
+        "OrderByDescending": [],
+        "ThenBy": [],
+        "ThenByDescending": [],
+        "GroupBy": [],
+        "Join": [],
+        "GroupJoin": [],
+        "First": [],
+        "FirstOrDefault": [],
+        "Single": [],
+        "SingleOrDefault": [],
+        "Last": [],
+        "LastOrDefault": [],
+        "Any": [],
+        "All": [],
+        "Count": [],
+        "LongCount": [],
+        "Sum": [],
+        "Average": [],
+        "Min": [],
+        "Max": [],
+        "Distinct": [],
+        "DistinctBy": [],
+        "Union": [],
+        "UnionBy": [],
+        "Intersect": [],
+        "IntersectBy": [],
+        "Except": [],
+        "ExceptBy": [],
+        "Skip": [],
+        "Take": [],
+        "SkipWhile": [],
+        "TakeWhile": [],
+        "SkipLast": [],
+        "TakeLast": [],
+        "Concat": [],
+        "Zip": [],
+        "Aggregate": [],
+        "ToList": [],
+        "ToArray": [],
+        "ToDictionary": [],
+        "ToHashSet": [],
+        "ToLookup": [],
+        "OfType": [],
+        "Cast": [],
+        "AsEnumerable": [],
+        "DefaultIfEmpty": [],
+        "Prepend": [],
+        "Contains": [],
+        "SequenceEqual": [],
+        "Range": [],
+        "Repeat": [],
+        "Empty": [],
+        "ElementAt": [],
+        "ElementAtOrDefault": [],
+        "Chunk": [],
+        "Order": [],
+        "OrderDescending": []
+      }
     },
     {
       "type": "System.Text.StringBuilder",
@@ -224,6 +278,8 @@
       "type": "System.Object",
       "constructors": { "()": [] },
       "methods": {
+        "Equals": [],
+        "GetHashCode": [],
         "GetType": [],
         "ReferenceEquals": [],
         "MemberwiseClone": []
@@ -231,16 +287,7 @@
     },
     {
       "type": "System.Nullable`1",
-      "methods": {
-        "GetValueOrDefault()": [],
-        "GetValueOrDefault(System.Int32)": []
-      },
-      "getters": {
-        "HasValue": []
-      },
-      "constructors": {
-        "(System.Int32)": []
-      }
+      "defaultEffects": []
     },
     {
       "type": "System.Type",
@@ -349,6 +396,7 @@
     }
   ],
   "namespaceDefaults": {
-    "System.Collections.Immutable": []
+    "System.Collections.Immutable": [],
+    "System.Linq": []
   }
 }

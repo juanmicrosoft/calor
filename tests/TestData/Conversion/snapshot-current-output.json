@@ -210,11 +210,9 @@
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,
     "DropCount": 0,
-    "NativeErrors": [
-      "Calor0410: Function 'GetPositive' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect."
-    ],
-    "ProbeKind": "rejected",
-    "RuntimeDriver": null,
+    "NativeErrors": [],
+    "ProbeKind": "behavior",
+    "RuntimeDriver": "var x = new $N$Filter(); return string.Join(\",\", x.GetPositive(new System.Collections.Generic.List<int> { 3, -1, 0, 5, 2 }));",
     "RuntimeSymbols": []
   },
   "05-03": {
@@ -224,11 +222,9 @@
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,
     "DropCount": 0,
-    "NativeErrors": [
-      "Calor0410: Function 'GetNames' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect."
-    ],
-    "ProbeKind": "rejected",
-    "RuntimeDriver": null,
+    "NativeErrors": [],
+    "ProbeKind": "behavior",
+    "RuntimeDriver": "var x = new $N$Transform(); return string.Join(\",\", x.GetNames(new System.Collections.Generic.List<string> { \"beta\", \"\", \"alpha\", \"gamma\" }));",
     "RuntimeSymbols": []
   },
   "06-01": {
@@ -310,11 +306,9 @@
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,
     "DropCount": 0,
-    "NativeErrors": [
-      "Calor0410: Function 'Run' uses effect 'unknown' but does not declare it\n  Resolve the unknown call through an authoritative source declaration or effect contract; unknown is not a declarable effect."
-    ],
-    "ProbeKind": "rejected",
-    "RuntimeDriver": null,
+    "NativeErrors": [],
+    "ProbeKind": "completion",
+    "RuntimeDriver": "$N$BlockLambdaDemo.Run(); return \"completed\";",
     "RuntimeSymbols": []
   },
   "08-01": {

@@ -142,29 +142,16 @@ and honors `AllowUnsafeBlocks`, `OutputType`, `DefineConstants`, and
 `<CalorTranspileOnly>true</CalorTranspileOnly>` provides the same unsafe
 behavior as the CLI; the default is `false`.
 
-Effect checking also covers formatting performed by interpolation. A numeric
-hole can invoke a custom `CurrentCulture.NumberFormat` getter even when evaluating
-the number has no effects. Without a closed formatting proof, the compiler charges
-Unknown (`Calor0411`, and `Calor0410` in a pure function). A bounded exception uses
-the selected .NET 10 metadata default string handler: every hole must be a fixed-width
-8-, 16-, 32-, or 64-bit integer with literal `X` or `x` format and zero to two
-ASCII precision digits. The maximum entire result, including literal text and
-constant alignment padding, must fit in the handler's initial 256-character
-buffer. Both signs use bit/hex writers without consulting a provider. The bound
-avoids format-parser exceptions and buffer-growth/alignment failure paths.
-Other formats, larger results, nullable integers, arbitrary objects, custom
-handlers, source-shadow handlers, and unproved binding contexts receive no new
-permission. This does not contract numeric `ToString` or string concatenation.
-String, character, Boolean, and null holes remain supported
-when the Roslyn binding image proves their provider-independent types or null
-values. Custom-object, generic, and unresolved holes do not receive a purity
-grant. Effects from evaluating every runtime hole are still charged.
-
-The same boundary applies to Roslyn-selected built-in string concatenation,
-including numeric operands on either side of `+`, chained concatenation, and
-converted `+=` expressions. Standard boxing does not hide a numeric operand's
-formatting dispatch. String, character, Boolean, and proven null operands remain
-supported; custom-object, generic, and unresolved formatting remains Unknown.
+Effect checking also covers formatting performed by interpolation and by
+built-in string concatenation (`+`, chained `+`, and converted `+=`). Formatting
+a value of a built-in type, or a `Nullable<T>` of one, charges what the effect
+manifest records for that type's parameterless `ToString()`; with the built-in
+manifests that is pure for strings, characters, Booleans and the common numeric
+types. Custom-object, generic and unresolved values stay Unknown (`Calor0411`,
+and `Calor0410` in a pure function), because formatting them can run an
+arbitrary `ToString` override. Effects from evaluating every hole and operand
+are still charged. See the known gap in
+[effects and contracts enforcement](../effects-and-contracts-enforcement.md).
 Numeric addition is not string formatting. User-defined operators and operand
 conversions retain their own effect charges, as do operand evaluation,
 assignment targets, and bound source initialization. This includes bare
