@@ -4,3 +4,15 @@
 # The legacy source never parsed, so the test passed vacuously (no calls collected). The
 # native rewrite parses, and Console.WriteLine and Math.Abs come back unresolved.
 tests/Calor.Enforcement.Tests/EffectsSuggestTests.cs:804  exposes-latent-failure
+#
+# The product code under test still recognizes contracts by the legacy §Q/§S markers
+# (ErrorDetectionCalculator); with native input the score/marker checks fail.
+tests/Calor.Compiler.Tests/BugDetectionImprovementTests.cs:147  product-matches-legacy-markers
+tests/Calor.Compiler.Tests/BugDetectionImprovementTests.cs:175  product-matches-legacy-markers
+#
+# Intentionally legacy inputs that the rejection markers did not catch: an archived legacy
+# file `calor fix` must refuse, a fixer test asserting no → appears, and an invalid
+# native candidate that must stay invalid.
+tests/Calor.Compiler.Tests/AgentDiagnosticTests.cs:412  intentional-legacy-input
+tests/Calor.Compiler.Tests/Migration/PostConversionFixerTests.cs:169  intentional-legacy-input
+tests/Calor.Compiler.Tests/FinalExpressionGrammarTests.cs:677  intentional-legacy-input

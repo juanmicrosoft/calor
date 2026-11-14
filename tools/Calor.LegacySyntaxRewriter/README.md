@@ -68,7 +68,7 @@ $R calr --write --include-registered samples
 
 # Legacy Calor inside C# string literals (test sources)
 $R cs --log cs.tsv tests/Calor.Enforcement.Tests
-$R cs --write tests/Calor.Enforcement.Tests
+$R cs --write --skip-list tools/Calor.LegacySyntaxRewriter/skip-list.txt tests/Calor.Enforcement.Tests
 
 # Debugging one input
 $R literal Foo.cs 42        # value of the §-bearing literal on line 42
@@ -92,10 +92,22 @@ helper-inserted fragments are absolute columns). Skipped and logged: interpolate
 chains with non-literal operands, literals passed to text-inspection methods (`Contains`,
 `DoesNotContain`, `Replace`, `Split`, `Equal`, `StartsWith`, ...) or compared with `==`
 (they are patterns over other text, usually emitter output),
-and every literal in a member that tests legacy rejection (its text mentions `Calor0003`,
+every literal in a member that tests legacy rejection (its text mentions `Calor0003`,
 `Calor0006`, `Calor0007`, `Calor0830`, the corresponding diagnostic names, "Legacy section
 marker", "is removed", "retired", "backtick" or "legacy"; for a field or property, the members
-that use it are checked too).
+that use it are checked too), literals inside interpolation holes (pieces of a legacy
+template), literals equal to a `switch`/`case` key in the same file (legacy-to-current fixture
+tables), stored sources that the code then edits or searches with `§` patterns, and
+data-attribute edits that would make two theory cases of one method identical.
+
+Fragments are only rewritten in files that keep no other legacy program after the rewrite
+(intentional leftovers such as rejection inputs, patterns and keys do not count); elsewhere
+their consumer is still a legacy template, and a native fragment in a legacy template helps
+nobody.
+
+`skip-list.txt` (`--skip-list`) names literals (`path:line` of the legacy original) that the
+oracle accepts but a test run rejects. Rewriting a test project is only kept when its failing
+test names after the rewrite are a subset of those before it.
 
 ### Never touched
 
