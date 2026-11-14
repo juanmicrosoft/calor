@@ -206,7 +206,10 @@ public class DottedNameRoundTripTests
 
         var calrEmitter = new CalorEmitter();
         var calrText = calrEmitter.Emit(convertResult.Ast!);
-        Assert.Contains("StringComparison.Ordinal", calrText);
+        // The restored System.String contract converts this natively (it used to be preserved
+        // C#); the native emitter spaces member access, so match the dotted name loosely.
+        Assert.Matches(@"StringComparison\s*\.\s*Ordinal", calrText);
+        Assert.Equal(0, convertResult.InteropPreservationCount);
 
         var compileResult = Program.Compile(calrText, "round-trip.calr", new CompilationOptions
         {

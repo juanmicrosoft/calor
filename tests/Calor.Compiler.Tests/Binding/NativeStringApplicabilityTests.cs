@@ -203,10 +203,13 @@ public sealed class NativeStringApplicabilityTests
         Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
     }
 
+    // System.String carries a whole-type pure contract again (0.29 contracts restored),
+    // so the uncontracted neighbors probed here are extension methods and members
+    // reached from a string receiver that still have no effect contract.
     [Theory]
-    [InlineData("value.ToUpper()")]
-    [InlineData("value.ToLower()")]
-    [InlineData("value.Contains(\"a\")")]
+    [InlineData("value.AsMemory()")]
+    [InlineData("value.AsSpan().IsEmpty")]
+    [InlineData("value.GetType().FullName")]
     public void StringInstanceReceiver_UncontractedNeighborsRemainIndependentlyUnknown(string expression)
     {
         var source = $$"""

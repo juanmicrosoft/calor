@@ -361,13 +361,18 @@ public sealed class LosslessConversionContractTests
         Assert.Equal(original, Program.Compile(preserved.CalorSource!, null).GeneratedCode);
     }
 
+    // 0.30: the instance-initializer rows make Run's strict effects Unknown (the selected
+    // constructor runs initializers without an effect contract), so the converter declares
+    // ! unknown on Run and they compile honestly instead of failing. The static initializer
+    // and effectful constructor rows have no effect-contract surface and still fail closed.
     [Theory]
-    [InlineData("int value = System.Math.Abs(-1);")]
-    [InlineData("int Value { get; } = System.Math.Abs(-1);")]
-    [InlineData("static int value = System.Math.Abs(-1);")]
-    [InlineData("static int Value { get; } = System.Math.Abs(-1);")]
-    [InlineData("public Item() { System.Console.WriteLine(\"constructor\"); }")]
-    public void NamespaceSplitting_SelectedConstructorFailsClosedOnRealParsedNativeCalor(string declaration)
+    [InlineData("int value = System.Math.Abs(-1);", true)]
+    [InlineData("int Value { get; } = System.Math.Abs(-1);", true)]
+    [InlineData("static int value = System.Math.Abs(-1);", false)]
+    [InlineData("static int Value { get; } = System.Math.Abs(-1);", false)]
+    [InlineData("public Item() { System.Console.WriteLine(\"constructor\"); }", false)]
+    public void NamespaceSplitting_SelectedConstructorFailsClosedOnRealParsedNativeCalor(string declaration,
+        bool declaredUnknown)
     {
         var source = $$"""
             namespace Alpha
@@ -384,6 +389,13 @@ public sealed class LosslessConversionContractTests
         {
             var compiled = Program.Compile(native.CalorSource!, null,
                 new CompilationOptions { EnableTypeChecking = typed, DeferGeneratedOutputValidation = true });
+            if (declaredUnknown)
+            {
+                Assert.Contains("func Run () → Item\n      ! unknown\n",
+                    native.CalorSource!.Replace("\r\n", "\n", StringComparison.Ordinal));
+                Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+                continue;
+            }
             Assert.True(compiled.HasErrors);
             Assert.Contains(compiled.Diagnostics.Errors,
                 error => error.Code is Calor.Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect

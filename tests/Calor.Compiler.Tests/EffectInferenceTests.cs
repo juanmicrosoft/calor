@@ -360,13 +360,15 @@ public class EffectInferenceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void InferredRow_UnknownNullableGetterDoesNotBecomeAContract(bool typeChecking)
+    public void InferredRow_UnknownMetadataGetterDoesNotBecomeAContract(bool typeChecking)
     {
+        // Nullable<T>.Value is pure again under the restored 0.29 contract, so this probes
+        // a getter that still has no effect contract (System.Version.Major).
         const string source = """
             module InferredRows
-              func Read private (int?:value) → int
-                return value.Value
-              func Main public (int?:value) → int
+              func Read private (System.Version:value) → int
+                return value.Major
+              func Main public (System.Version:value) → int
                 ! alloc, mut
                 return Read(value)
             """;

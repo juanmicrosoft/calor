@@ -237,25 +237,27 @@ public sealed class Issue1401NullableContextConversionTests
             + "}\r\n// exact original EOF";
         var result = new CSharpToCalorConverter().Convert(source, "Formatting.cs");
 
+        // The restored 0.29 System.Double contract makes formatting a double pure, so the
+        // oblivious candidate no longer fails Calor0410: it is delivered natively, with no
+        // metadata mismatch, and behaves like the original.
         Assert.True(result.Success, FormatIssues(result));
-        Assert.Equal("whole-file-preservation", Assert.Single(result.Losses).Feature);
-        Assert.Equal(ConversionRoundTrip.Verified, result.Context.RoundTrip);
-        var issue = Assert.Single(result.Issues, issue => issue.Feature == "roundtrip-calor-validation");
-        Assert.Equal(ConversionIssueSeverity.Warning, issue.Severity);
-        Assert.Contains("Native oblivious module failed Calor compilation (Calor0410):", issue.Message);
-        Assert.Contains("'Render'", issue.Message);
-        Assert.Contains("'unknown'", issue.Message);
-        Assert.True(issue.Line > 0);
-        Assert.True(issue.Column > 0);
+        Assert.Empty(result.Losses);
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.DoesNotContain(result.Issues, issue => issue.Feature == "roundtrip-calor-validation");
         Assert.DoesNotContain(result.Issues, issue => issue.Feature == "nullable-module-fidelity");
-        var compiled = Program.Compile(result.CalorSource!, "preserved.calr", new CompilationOptions
+        var compiled = Program.Compile(result.CalorSource!, "native.calr", new CompilationOptions
         {
             StrictEffects = true,
             UnknownCallPolicy = Effects.UnknownCallPolicy.Strict
         });
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
-        Assert.Equal(source, compiled.GeneratedCode);
         Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
+        foreach (var value in new[] { 0d, 1234.5, -0.125 })
+            Assert.Equal(
+                EmitInMemory(source, "", NullableContextOptions.Disable).GetType("Fixture")!
+                    .GetMethod("Render")!.Invoke(null, [value]),
+                EmitInMemory(compiled.GeneratedCode, "", NullableContextOptions.Disable).GetType("Fixture")!
+                    .GetMethod("Render")!.Invoke(null, [value]));
     }
 
     [Fact]
@@ -1364,24 +1366,23 @@ public sealed class Issue1401NullableContextConversionTests
         var conversion = project
             ? Assert.Single(converter.ConvertProject(source, "052_NullableTypes.cs").Outputs).Conversion
             : converter.Convert(source, "052_NullableTypes.cs");
+        // The restored 0.29 Nullable<T> contract makes HasValue/Value pure, so 052 no
+        // longer fails Calor0410 and is delivered natively (scorecard: 052 now native).
         Assert.True(conversion.Success, FormatIssues(conversion));
-        Assert.Equal("whole-file-preservation", Assert.Single(conversion.Losses).Feature);
-        Assert.Equal(1, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        Assert.Equal(0, conversion.InteropPreservationCount);
         Assert.Equal(0, conversion.LossySubstitutionCount);
         Assert.Equal(0, conversion.DropCount);
-        Assert.Equal(ConversionRoundTrip.Verified, conversion.Context.RoundTrip);
-        Assert.Contains(conversion.Issues, issue => issue.Feature == "roundtrip-calor-validation"
-            && issue.Message.Contains("Calor0410", StringComparison.Ordinal)
-            && issue.Message.Contains("'unknown'", StringComparison.Ordinal));
+        Assert.DoesNotContain(conversion.Issues, issue => issue.Feature == "roundtrip-calor-validation");
         foreach (var typing in new[] { false, true })
         {
-            var compiled = Program.Compile(conversion.CalorSource!, "preserved-052.calr", new CompilationOptions
+            var compiled = Program.Compile(conversion.CalorSource!, "native-052.calr", new CompilationOptions
             {
                 EnableTypeChecking = typing, StrictEffects = true,
                 UnknownCallPolicy = Effects.UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null
             });
             Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
-            Assert.Equal(source, compiled.GeneratedCode);
+            Assert.NotEqual(source, compiled.GeneratedCode);
             Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
         }
     }
@@ -1521,12 +1522,20 @@ public sealed class Issue1401NullableContextConversionTests
             Fidelity = ConversionFidelity.Lossy, Mode = ConversionMode.Interop
         }).Convert(source, "Object.cs");
         Assert.True(converted.Success, FormatIssues(converted));
-        var compiled = Program.Compile(converted.CalorSource!, "object.calr", new CompilationOptions
+        // 0.30: the receiver dispatch stays Unknown, so the converter declares ! unknown on
+        // Probe instead of a pure row. The output compiles, and the same body with a pure
+        // row is still rejected for 'unknown'.
+        Assert.Contains("    ! unknown\n", converted.CalorSource!.Replace("\r\n", "\n", StringComparison.Ordinal));
+        var options = new CompilationOptions
         {
             StrictEffects = true, UnknownCallPolicy = Effects.UnknownCallPolicy.Strict,
             StatusWriter = TextWriter.Null
-        });
-        Assert.Contains(compiled.Diagnostics.Errors, diagnostic =>
+        };
+        var compiled = Program.Compile(converted.CalorSource!, "object.calr", options);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var pure = Program.Compile(converted.CalorSource!.Replace("! unknown", "!", StringComparison.Ordinal),
+            "object.calr", options);
+        Assert.Contains(pure.Diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.ForbiddenEffect
                 && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
     }

@@ -156,7 +156,8 @@ public class Foo
         var key = Calor.Compiler.Effects.EffectResolverKey.FromBoundReceiver(
             Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToBoundType(nullable),
             property.MetadataName, null, Calor.Compiler.Effects.EffectMemberKind.Getter);
-        Assert.Equal(Calor.Compiler.Effects.EffectResolutionStatus.Unknown,
+        // The restored 0.29 Nullable<T> default contract makes the selected getter pure.
+        Assert.Equal(Calor.Compiler.Effects.EffectResolutionStatus.PureExplicit,
             new Calor.Compiler.Effects.EffectResolver().Resolve(key).Status);
 
         var source = $$"""
@@ -168,11 +169,8 @@ public class Foo
         foreach (var typed in new[] { false, true })
         {
             var result = Program.Compile(source, null, NullableLoweringOptions(typed));
-            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                && diagnostic.Message.Contains("get_Value", StringComparison.Ordinal));
-            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("'Unwrap'", StringComparison.Ordinal)
-                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
         }
     }
 
@@ -200,12 +198,14 @@ public class Foo
         }
     }
 
+    // Unwrapping charges the Nullable<T>.Value getter, which the restored 0.29 contract
+    // makes pure, so every row is charged exactly the operand's 'cw'.
     [Theory]
-    [InlineData("(int)Next(value)", "int", true)]
-    [InlineData("(long?)Next(value)", "long?", false)]
-    [InlineData("(int?)Next(value)", "int?", false)]
+    [InlineData("(int)Next(value)", "int")]
+    [InlineData("(long?)Next(value)", "long?")]
+    [InlineData("(int?)Next(value)", "int?")]
     public void NullableLowering_RetainsOperandEvaluationEffects(
-        string expression, string targetType, bool unwraps)
+        string expression, string targetType)
     {
         var source = $$"""
             module NullableEvaluation
@@ -223,13 +223,10 @@ public class Foo
             var result = Program.Compile(source, null, NullableLoweringOptions(typed));
             Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
                 && diagnostic.Message.Contains("'Read'", StringComparison.Ordinal)
-                && diagnostic.Message.Contains(unwraps ? "'unknown'" : "'cw'", StringComparison.Ordinal));
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
             var declared = Program.Compile(source.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal),
                 null, NullableLoweringOptions(typed));
-            Assert.Equal(unwraps, declared.HasErrors);
-            Assert.Equal(unwraps, declared.Diagnostics.Errors.Any(diagnostic =>
-                diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                && diagnostic.Message.Contains("get_Value", StringComparison.Ordinal)));
+            Assert.False(declared.HasErrors, string.Join("\n", declared.Diagnostics));
         }
     }
 
@@ -251,12 +248,11 @@ public class Foo
             """;
         foreach (var typed in new[] { false, true })
         {
+            // The initializer's Nullable<T>.Value read resolves to the restored 0.29
+            // Nullable<T> contract (pure), so `! alloc` on Make suffices.
             var result = Program.Compile(source, null, NullableLoweringOptions(typed));
-            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                && diagnostic.Message.Contains("Value", StringComparison.Ordinal));
-            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("'Make'", StringComparison.Ordinal)
-                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
         }
     }
 

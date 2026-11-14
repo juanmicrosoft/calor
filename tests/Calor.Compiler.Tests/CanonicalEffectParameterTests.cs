@@ -190,10 +190,29 @@ public sealed class CanonicalEffectParameterTests
             }
             """);
         Assert.True(converted.Success);
+        // 0.30: the uncontracted ReverseEndianness call makes Run's strict effects Unknown, so
+        // the converter declares ! unknown on Run (not the callback relation alone) and the
+        // module compiles. The relation still does not authorize the callee: a caller that
+        // declares a known row is charged unknown and rejected.
+        var run = Parse(converted.CalorSource!).Classes.Single().Methods.Single(method => method.Name == "Run");
+        Assert.True(EffectEnforcementPass.GetDeclaredEffects(run.Effects).IsUnknown, converted.CalorSource);
+        Assert.Single(run.EffectParameters);
         var compiled = Program.Compile(converted.CalorSource!);
-        Assert.True(compiled.HasErrors, converted.CalorSource);
-        Assert.Contains(compiled.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
-            && error.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + converted.CalorSource);
+        foreach (var (row, rejected) in new[] { ("!", true), ("! unknown", false) })
+        {
+            var native = AppendMethods(converted.CalorSource!, $"""
+                func Caller () → int
+                  {row}
+                  return Run((int:value) => value)
+                """);
+            var caller = Program.Compile(native);
+            Assert.True(rejected == caller.HasErrors, string.Join("\n", caller.Diagnostics) + "\n" + native);
+            if (rejected)
+                Assert.Contains(caller.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+                    && error.Message.Contains("'Caller'", StringComparison.Ordinal)
+                    && error.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+        }
     }
 
     [Theory]

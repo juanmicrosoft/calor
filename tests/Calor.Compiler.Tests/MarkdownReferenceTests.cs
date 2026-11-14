@@ -26,10 +26,10 @@ public class MarkdownReferenceTests
             "GlobalModule.Main()" },
         new[] { "33", "4", "31", "55", "5", "FizzBuzz:Fizz:Buzz:7", "3", "120",
             "Not Found:A:large positive", "two", "3" })]
-    [InlineData("effects", 3, 0,
+    [InlineData("effects", 4, 0,
         new[] { "GlobalModule.Apply(x => x + 1, 41)", "GlobalModule.Use(x => x + 1, 41)(1)",
-            "GlobalModule.Twice(x => x + 1, 40)" },
-        new[] { "42", "2", "42" })]
+            "GlobalModule.Twice(x => x + 1, 40)", "GlobalModule.Encode(\"a b&c\")" },
+        new[] { "42", "2", "42", "a+b%26c" })]
     [InlineData("expressions", 6, 0,
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()", "GlobalModule.Main()" },

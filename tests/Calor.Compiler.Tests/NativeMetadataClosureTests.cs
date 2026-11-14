@@ -3683,7 +3683,10 @@ public sealed class NativeMetadataClosureTests
                 Assert.Empty(Assert.IsType<BoundStructuralExpression>(length.Target).Children);
             else
                 Assert.IsType<BoundVariableExpression>(length.Target);
-            Assert.Equal(EffectResolutionStatus.Unknown, new EffectResolver().Resolve(
+            // The restored 0.29 System.Int32 contract makes every Int32.ToString overload
+            // pure, so the selected method resolves on its own; the nonnegative-length
+            // proof is no longer the only thing admitting it.
+            Assert.Equal(EffectResolutionStatus.PureExplicit, new EffectResolver().Resolve(
                 EffectResolverKey.FromBoundReceiver(length.Type, method.Name, call.ResolvedParameterTypes)).Status);
 
             var compiled = Program.Compile(native, "length-formatting.calr", new CompilationOptions
@@ -3735,17 +3738,13 @@ public sealed class NativeMetadataClosureTests
         }
     }
 
+    // Object.ToString and IFormattable.ToString dispatch still have no effect contract.
+    // The Int32.ToString and System.Convert rows that used to live here pinned contracts
+    // withdrawn on 2026-11-11 and restored on 2026-11-14; they moved to
+    // NonnegativeLengthFormatting_NeighboringBuiltInFormattingUsesTheRestoredContracts.
     [Theory]
-    [InlineData("number.ToString()")]
-    [InlineData("(-1).ToString()")]
-    [InlineData("(1).ToString()")]
-    [InlineData("values.Length.ToString()")]
-    [InlineData("(value.Length + 0).ToString()")]
     [InlineData("((object)value.Length).ToString()")]
     [InlineData("((System.IFormattable)value.Length).ToString(null, null)")]
-    [InlineData("value.Length.ToString(\"D\")")]
-    [InlineData("value.Length.ToString(provider)")]
-    [InlineData("System.Convert.ToString(value.Length)")]
     public void NonnegativeLengthFormatting_DoesNotGrantUnsafeNeighboringCalls(string expression)
     {
         var source = $$"""
@@ -3764,6 +3763,38 @@ public sealed class NativeMetadataClosureTests
         }
     }
 
+    // The restored System.Int32 and System.Convert contracts (0.29) make these neighbors
+    // pure whatever the receiver's range. Formatting a negative value or with a caller
+    // provider can read ambient culture state; that gap is accepted by the 2026-11-14
+    // maintainer decision and tracked separately.
+    [Theory]
+    [InlineData("number.ToString()")]
+    [InlineData("(-1).ToString()")]
+    [InlineData("(1).ToString()")]
+    [InlineData("values.Length.ToString()")]
+    [InlineData("(value.Length + 0).ToString()")]
+    [InlineData("value.Length.ToString(\"D\")")]
+    [InlineData("value.Length.ToString(provider)")]
+    [InlineData("System.Convert.ToString(value.Length)")]
+    public void NonnegativeLengthFormatting_NeighboringBuiltInFormattingUsesTheRestoredContracts(string expression)
+    {
+        var source = $$"""
+            module LengthBoundary
+              func Read (string:value, int:number, int[]:values, int?:nullable, System.IFormatProvider:provider) → string?
+                !
+                return {{expression}}
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    // Int32.ToString is pure again (restored 0.29 contract), so neither a local copy nor a
+    // source result needs the nonnegative-length proof; both functions compile as pure.
     [Fact]
     public void NonnegativeLengthFormatting_DoesNotTransferTheRangeThroughLocalsOrSourceResults()
     {
@@ -3783,11 +3814,9 @@ public sealed class NativeMetadataClosureTests
         foreach (var typed in new[] { false, true })
         {
             var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
-            foreach (var function in new[] { "Local", "Result" })
-                Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                    && diagnostic.Message.Contains($"Function '{function}'", StringComparison.Ordinal)
-                    && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
-            Assert.Empty(result.GeneratedCode);
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.NotEmpty(result.GeneratedCode);
         }
     }
 
@@ -3808,13 +3837,14 @@ public sealed class NativeMetadataClosureTests
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>());
         var length = Assert.IsType<BoundFieldAccessExpression>(call.Receiver);
         Assert.Null(length.ResolvedMetadataMember);
+        // The source member still gets no metadata identity (above). The program now
+        // compiles because the restored 0.29 contract makes every Int32.ToString pure,
+        // not because the lookalike is trusted as a nonnegative String.Length.
         foreach (var typed in new[] { false, true })
         {
             var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
-            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
-            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
-            Assert.Empty(result.GeneratedCode);
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
         }
     }
 

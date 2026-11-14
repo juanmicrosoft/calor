@@ -1026,7 +1026,7 @@
           "surfaceError": false
         },
         "cli-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -1071,7 +1071,7 @@
           "surfaceError": false
         },
         "mcp-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -1086,7 +1086,7 @@
           "surfaceError": false
         },
         "mcp-batch": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -1136,7 +1136,7 @@
           "surfaceError": false
         },
         "cli-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -1181,7 +1181,7 @@
           "surfaceError": false
         },
         "mcp-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -1196,7 +1196,7 @@
           "surfaceError": false
         },
         "mcp-batch": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -1246,7 +1246,7 @@
           "surfaceError": false
         },
         "cli-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "native",
           "paths": {
             "outcome": "native",
@@ -1291,7 +1291,7 @@
           "surfaceError": false
         },
         "mcp-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "native",
           "paths": {
             "outcome": "native",
@@ -1306,7 +1306,7 @@
           "surfaceError": false
         },
         "mcp-batch": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "native",
           "paths": {
             "outcome": "native",
@@ -1576,7 +1576,7 @@
           "surfaceError": false
         },
         "cli-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -1621,7 +1621,7 @@
           "surfaceError": false
         },
         "mcp-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -1636,7 +1636,7 @@
           "surfaceError": false
         },
         "mcp-batch": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -2016,7 +2016,7 @@
           "surfaceError": false
         },
         "cli-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -2061,7 +2061,7 @@
           "surfaceError": false
         },
         "mcp-migrate": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",
@@ -2076,7 +2076,7 @@
           "surfaceError": false
         },
         "mcp-batch": {
-          "compile": "permissive-effects:Calor0410",
+          "compile": "default",
           "outcome": "preserved",
           "paths": {
             "outcome": "preserved",

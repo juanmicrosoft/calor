@@ -949,9 +949,10 @@ public sealed class CanonicalNamespaceTests
         }
     }
 
+    // The former Calor0410 row (object.Equals) pinned the withdrawn Object.Equals contract;
+    // it is native again and moved to ScopedImport_ObjectEqualsCandidateIsNative.
     [Theory]
     [InlineData("public static int Read(string text) => text.Length;", "Calor0274")]
-    [InlineData("public static bool Equal(object left, object right) => object.Equals(left, right);", "Calor0410")]
     public void ScopedImportFallbackRetainsTheActualNativeCandidateRefusal(string member, string code)
     {
         var source = $$"""
@@ -975,6 +976,29 @@ public sealed class CanonicalNamespaceTests
         Assert.Contains(conversion.Ast!.InteropBlocks, block => block.CSharpCode == source);
         var compiled = Program.Compile(conversion.CalorSource!);
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    [Fact]
+    public void ScopedImport_ObjectEqualsCandidateIsNative()
+    {
+        const string source = """
+            namespace Witness
+            {
+                using System;
+                public static class Probe { public static bool Equal(object left, object right) => object.Equals(left, right); }
+            }
+            """;
+        var project = new CSharpToCalorConverter().ConvertProject(source, "Probe.cs");
+        Assert.True(project.Success);
+        Assert.False(project.IsSplit);
+        var conversion = Assert.Single(project.Outputs).Conversion;
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        Assert.DoesNotContain(conversion.Issues, issue => issue.Feature == "roundtrip-calor-validation");
+        Assert.Empty(conversion.Ast!.InteropBlocks);
+        var compiled = Program.Compile(conversion.CalorSource!);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("object.Equals(left, right)", compiled.GeneratedCode);
     }
 
     private static string QualifiedValueWitness(string expression, bool shadow, string member) => $$"""

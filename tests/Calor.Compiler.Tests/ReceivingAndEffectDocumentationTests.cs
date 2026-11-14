@@ -19,7 +19,7 @@ public sealed class ReceivingAndEffectDocumentationTests
     [Theory]
     [InlineData(Nullability, 10, 3, 10)]
     [InlineData(CrossModule, 3, 1, 6)]
-    [InlineData(Effects, 3, 0, 18)]
+    [InlineData(Effects, 4, 0, 19)]
     public void CompleteExamples_PreserveCoverageAndExactNegativeContracts(string page, int programs, int negatives,
         int fences)
     {

@@ -771,17 +771,28 @@ public class RefOutImplementationTests
     [MemberData(nameof(DefaultSurfaceRows))]
     public async Task DefaultSurfaces_DoNotCertifyOpenObjectDispatch(Surface surface)
     {
-        const string source = "public static class Probe { public static bool Compare(object a, object b) => object.Equals(a, b); }";
+        // Object.Equals is pure again under the restored 0.29 contract, so this probes
+        // Object.ToString, which still has no contract. 0.30: instead of preserving the file,
+        // every surface converts natively and declares ! unknown (never a pure row); a pure
+        // row over the same body is still rejected with Calor0411.
+        const string source = "public static class Probe { public static string Text(object a) => a.ToString(); "
+            + "public static string Run() => Text(42); }";
         var (calor, losses) = await ConvertAsync(source, surface);
-        Assert.NotEmpty(losses);
-        RawFrameAssertions.AssertFramed(calor, Compiler.Parsing.TokenKind.CSharpInterop);
-        var candidate = ConvertValueCandidate(source);
-        Assert.True(candidate.Success, string.Join("; ", candidate.Issues.Select(issue => issue.Message)));
-        Assert.Empty(candidate.Losses);
-        var strict = Program.Compile(candidate.CalorSource!, "uncertified-object.calr",
-            new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
-        Assert.True(strict.HasErrors);
-        Assert.Contains(strict.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0411");
+        Assert.Empty(losses);
+        RawFrameAssertions.AssertFramed(calor, Compiler.Parsing.TokenKind.CSharpInterop, present: false);
+        RawFrameAssertions.AssertFramed(calor, Compiler.Parsing.TokenKind.RawCSharp, present: false);
+        foreach (var native in new[] { calor, ConvertValueCandidate(source).CalorSource! })
+        {
+            Assert.Contains("! unknown", native);
+            var strict = Program.Compile(native, "uncertified-object.calr",
+                new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
+            Assert.False(strict.HasErrors, string.Join("; ", strict.Diagnostics.Errors));
+            Assert.Equal("42", Run(strict.GeneratedCode));
+            var pure = Program.Compile(native.Replace("! unknown", "!", StringComparison.Ordinal),
+                "uncertified-object.calr", new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
+            Assert.True(pure.HasErrors);
+            Assert.Contains(pure.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0411");
+        }
     }
 
     [Fact]

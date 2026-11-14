@@ -466,12 +466,22 @@ public class LocalFunctionConversionTests
             && loss.Kind == ConversionLossKind.InteropPreserved);
         var parsed = ParseCalor(converted.CalorSource!);
         AssertPreservedMembers(parsed, 1, 0);
+        // 0.30: the call to the preserved member M is Unknown, so the converter declares
+        // ! unknown on Probe.Run (never a pure row) and the output compiles with default
+        // settings; with a pure row the same call is still rejected as Unknown.
+        Assert.Contains("    func Run () → string\n      ! unknown\n",
+            converted.CalorSource!.Replace("\r\n", "\n", StringComparison.Ordinal));
         var strict = Program.Compile(converted.CalorSource!, "strict-preserved-recursion.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.True(strict.HasErrors);
-        Assert.Contains(strict.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+        Assert.False(strict.HasErrors, string.Join("\n", strict.Diagnostics) + "\n" + converted.CalorSource);
+        var pure = Program.Compile(converted.CalorSource!.Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace("    func Run () → string\n      ! unknown\n", "    func Run () → string\n      !\n",
+                    StringComparison.Ordinal),
+            "strict-preserved-recursion.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(pure.HasErrors);
+        Assert.Contains(pure.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
             && diagnostic.Message.Contains("M", StringComparison.Ordinal));
-        Assert.DoesNotContain(strict.Diagnostics, diagnostic =>
+        Assert.DoesNotContain(pure.Diagnostics, diagnostic =>
             diagnostic.Message.Contains("no Calor expression origin", StringComparison.Ordinal));
         var compiled = Program.Compile(converted.CalorSource!, "preserved-recursion.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, UnknownCallPolicy = UnknownCallPolicy.Permissive });

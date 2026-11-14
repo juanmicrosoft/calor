@@ -127,6 +127,9 @@ public class Issue1173ConverterEffectRowTests
             "Run",
             "alloc"
         },
+        // 0.30: strict inference finds an uncontracted call in the next two bodies
+        // (MemoryStream.Dispose; the System.Object constructor key 'object..ctor()'),
+        // so the converter declares ! unknown, which admits the alloc they perform.
         {
             "a §USE resource expression",
             """
@@ -137,7 +140,7 @@ public class Issue1173ConverterEffectRowTests
             }
             """,
             "Run",
-            "alloc"
+            "unknown"
         },
         {
             "a lambda body",
@@ -149,7 +152,7 @@ public class Issue1173ConverterEffectRowTests
             }
             """,
             "Run",
-            "alloc"
+            "unknown"
         },
         {
             "a mutating call on a collection parameter",
@@ -564,13 +567,26 @@ public class Issue1173ConverterEffectRowTests
             #nullable enable
             public class Probe
             {
-                private static bool Equal(object left, object right) => object.Equals(left, right);
-                public static bool Run(object left, object right) => Equal(left, right);
+                private static int Swap(int value) => System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(value);
+                public static int Run(int value) => Swap(value);
             }
             """);
+        // 0.30: neither the uncontracted call (Object.Equals is contracted again, so the
+        // non-virtual case now calls BinaryPrimitives.ReverseEndianness) nor the open virtual
+        // slot is certified. The converter declares ! unknown on the public caller and on a
+        // non-public body that itself calls the uncontracted API, and the output compiles.
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
-        Assert.Null(Assert.Single(conversion.Ast!.Classes.Single().Methods
-            .Where(method => method.Visibility is Visibility.Private or Visibility.Internal)).Effects);
+        foreach (var module in new[] { conversion.Ast!, Parse(conversion.CalorSource!) })
+        {
+            var methods = module.Classes.Single().Methods;
+            var helper = Assert.Single(methods.Where(method => method.Visibility is Visibility.Private or Visibility.Internal));
+            if (virtualSlot)
+                Assert.Null(helper.Effects);
+            else
+                Assert.True(EffectEnforcementPass.GetDeclaredEffects(helper.Effects).IsUnknown, conversion.CalorSource);
+            Assert.True(EffectEnforcementPass.GetDeclaredEffects(
+                Assert.Single(methods.Where(method => method.Name == "Run")).Effects).IsUnknown, conversion.CalorSource);
+        }
         foreach (var typing in new[] { false, true })
         {
             var compiled = Program.Compile(conversion.CalorSource!, null, new CompilationOptions
@@ -578,10 +594,7 @@ public class Issue1173ConverterEffectRowTests
                 EnableTypeChecking = typing, StrictEffects = true,
                 UnknownCallPolicy = UnknownCallPolicy.Strict, VerifyContracts = false
             });
-            Assert.Contains(compiled.Diagnostics.Errors, diagnostic =>
-                diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
-            Assert.Empty(compiled.GeneratedCode);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics) + "\n" + conversion.CalorSource);
         }
     }
 

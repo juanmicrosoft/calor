@@ -68,25 +68,30 @@ public sealed class ComputedCallExpressionTests
                 Assert.Contains(diagnostics, diagnostic => diagnostic.Code == receivingError
                     && diagnostic.IsError && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
 
+            // The effect row comes from the restored 0.29 System.Linq namespace contract
+            // (pure), not from the nullability selection above: ToList charges nothing.
             var effects = new DiagnosticBag();
             new EffectEnforcementPass(effects, resolver: new EffectResolver(
                 new ManifestLoader(loadUserLevelManifests: false))).Enforce(ast);
-            Assert.Contains(effects, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
-            Assert.Contains(effects, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            Assert.DoesNotContain(effects, diagnostic => diagnostic.Code is
+                DiagnosticCode.UnknownExternalCall or DiagnosticCode.ForbiddenEffect);
             foreach (var typing in new[] { false, true })
             {
                 var compiled = Program.Compile(candidate, "contextual-source.calr",
                     new CompilationOptions { EnableTypeChecking = typing });
-                Assert.True(compiled.HasErrors);
+                Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code is
+                    DiagnosticCode.UnknownExternalCall or DiagnosticCode.ForbiddenEffect);
                 if (receivingError is not null)
+                {
+                    Assert.True(compiled.HasErrors);
                     Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == receivingError
                         && diagnostic.IsError && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+                }
                 else
                 {
+                    Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
                     Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code is
                         DiagnosticCode.NullableReturnFromNonNullable or DiagnosticCode.NullableArgumentToNonNullableParameter);
-                    Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
                 }
             }
         }
@@ -207,8 +212,13 @@ public sealed class ComputedCallExpressionTests
         Assert.Equal(new[] { "Argument", "Loud", "Receiver" }, calls
             .Where(call => call.ResolvedSymbol is not null).Select(call => call.ResolvedSymbol!.Name)
             .Order(StringComparer.Ordinal));
+        // Concat, Select and ToList resolve to the restored 0.29 System.Linq contract
+        // (pure), so the default compile charges exactly the receiver, argument and
+        // callback 'cw' effects, and declaring 'cw' is enough.
         var compiled = Program.Compile(source);
-        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
         var permissive = Program.Compile(source, null, new CompilationOptions
         {
             UnknownCallPolicy = UnknownCallPolicy.Permissive,
@@ -216,6 +226,9 @@ public sealed class ComputedCallExpressionTests
         });
         Assert.Contains(permissive.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
             && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
+        var declared = Program.Compile(source.Replace("    !\n    return Receiver", "    ! cw\n    return Receiver",
+            StringComparison.Ordinal));
+        Assert.False(declared.HasErrors, string.Join("\n", declared.Diagnostics));
     }
 
     [Theory]
@@ -963,10 +976,13 @@ public sealed class ComputedCallExpressionTests
             && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
     }
 
+    // A lambda argument lets Select bind to System.Linq.Enumerable, whose restored 0.29
+    // contract is pure, so the callback's 'cw' is what fails. A method group leaves the
+    // call unselected, so it stays Unknown.
     [Theory]
-    [InlineData("Loud")]
-    [InlineData("(int:value) ! cw => Loud(value)")]
-    public void MetadataExtension_CallbackEffectsRemainChargedEvenWithoutMetadataSelection(string callback)
+    [InlineData("Loud", "unknown")]
+    [InlineData("(int:value) ! cw => Loud(value)", "cw")]
+    public void MetadataExtension_CallbackEffectsRemainChargedEvenWithoutMetadataSelection(string callback, string charged)
     {
         var source = $$"""
             module ExtensionCallbacks
@@ -982,7 +998,10 @@ public sealed class ComputedCallExpressionTests
             """;
         var compiled = Program.Compile(source);
         Assert.True(compiled.HasErrors);
-        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Equal(charged == "unknown",
+            compiled.Diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall));
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains($"'{charged}'", StringComparison.Ordinal));
         var permissive = Program.Compile(source, null, new CompilationOptions
         {
             UnknownCallPolicy = UnknownCallPolicy.Permissive,

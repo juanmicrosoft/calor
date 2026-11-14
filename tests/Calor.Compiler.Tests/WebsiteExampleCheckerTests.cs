@@ -489,9 +489,11 @@ public sealed class WebsiteExampleCheckerTests
         var findings = WebsiteExampleChecker.CheckLanding(source, components, coverage);
         Assert.True(findings.Count == 0, string.Join(Environment.NewLine, findings));
         Assert.Equal(5, coverage.LandingComponents);
-        Assert.Equal(6, coverage.LandingPrograms);
-        Assert.Equal(4, coverage.LandingFragments);
-        Assert.Equal(1, coverage.LandingNegativePrograms);
+        // #1722 removed the comparison, firstProgram and missingEffect landing snippets; the
+        // three FeatureGrid fragments (contracts, effects, stableId) remain.
+        Assert.Equal(3, coverage.LandingPrograms);
+        Assert.Equal(3, coverage.LandingFragments);
+        Assert.Equal(0, coverage.LandingNegativePrograms);
     }
 
     [Fact]

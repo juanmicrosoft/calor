@@ -1,3 +1,4 @@
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
@@ -956,7 +957,7 @@ public static class NumberFormat
                 public static string Render{{(generic ? "<T>" : "")}}({{(generic ? "T" : "Loud")}} value) => $"{value:X4}";
             }
             """;
-        AssertHexFormattingRejected(source);
+        AssertHexFormattingDeclaredUnknown(source);
     }
 
     [Fact]
@@ -978,20 +979,31 @@ public static class NumberFormat
         }
     }
 
-    private static void AssertHexFormattingRejected(string source)
+    // 0.30: the converter declares ! unknown on a callable whose strict effects are Unknown.
+    // The hex proof does not cover generic or custom IFormattable formatting, so Render is
+    // declared ! unknown (never pure), compiles under strict settings, and the same body
+    // with a pure row is still rejected for the unresolved interpolation formatting.
+    private static void AssertHexFormattingDeclaredUnknown(string source)
     {
         var conversion = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy })
             .Convert(source);
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        var render = Assert.Single(CallGraphAnalysis.EnumerateClasses(conversion.Ast!)
+            .SelectMany(CallGraphAnalysis.EnumerateMethods), method => method.Name == "Render");
+        Assert.True(EffectEnforcementPass.GetDeclaredEffects(render.Effects).IsUnknown, conversion.CalorSource);
         foreach (var native in HexEmissions(conversion.CalorSource!))
         foreach (var typing in new[] { false, true })
         {
             var result = Program.Compile(native, "unproved-hex-context.calr", HexOptions(typing));
-            Assert.True(result.Diagnostics.Errors.Any(diagnostic =>
+            Assert.False(result.HasErrors, native + "\n" + string.Join("\n", result.Diagnostics));
+            var pure = native.Replace("! unknown\n", "!\n", StringComparison.Ordinal);
+            Assert.NotEqual(native, pure);
+            var rejected = Program.Compile(pure, "unproved-hex-context.calr", HexOptions(typing));
+            Assert.True(rejected.Diagnostics.Errors.Any(diagnostic =>
                 diagnostic.Code == DiagnosticCode.UnknownExternalCall
                 && diagnostic.Message.Contains("interpolation formatting", StringComparison.Ordinal)),
-                native + "\n" + string.Join("\n", result.Diagnostics));
-            Assert.Empty(result.GeneratedCode);
+                pure + "\n" + string.Join("\n", rejected.Diagnostics));
+            Assert.Empty(rejected.GeneratedCode);
         }
     }
 

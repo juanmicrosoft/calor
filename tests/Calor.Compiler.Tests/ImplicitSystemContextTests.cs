@@ -256,6 +256,13 @@ public sealed class ImplicitSystemContextTests(ITestOutputHelper output)
             Assert.Equal(implicitSystem ? 0 : 2, conversion.ExitCode);
             using var json = JsonDocument.Parse(conversion.StdOut);
             Assert.Equal(implicitSystem, json.RootElement.GetProperty("data").GetProperty("implicitSystem").GetBoolean());
+            if (implicitSystem)
+            {
+                // 0.30: a file that is exactly one named namespace with local usings converts
+                // through the native scoped-import projection by default, so nothing is preserved.
+                Assert.Equal(0, json.RootElement.GetProperty("data").GetProperty("interopPreservationCount").GetInt32());
+                Assert.Equal(0, json.RootElement.GetProperty("data").GetProperty("lossCount").GetInt32());
+            }
             var reverse = CliTestHarness.RunCli(directory,
                 ["convert", converted, "-o", Path.Combine(directory, "reverse.cs"), "--format", "json", .. options]);
             Assert.Equal(implicitSystem ? 0 : 1, reverse.ExitCode);
@@ -271,12 +278,18 @@ public sealed class ImplicitSystemContextTests(ITestOutputHelper output)
             }
             if (implicitSystem)
             {
-                Assert.Equal(Case081, File.ReadAllText(Path.ChangeExtension(converted, ".g.cs")));
+                // The native output names System.Console explicitly, so it no longer depends on
+                // the implicit System import: the standalone profile recompiles it (no cached
+                // hit from the other profile) and succeeds instead of failing with CS0103.
+                var generated = File.ReadAllText(Path.ChangeExtension(converted, ".g.cs"));
+                Assert.NotEqual(Case081, generated);
+                Assert.Contains("System.Console.WriteLine(\"Work done\")", generated);
                 var changedProfile = CliTestHarness.RunCli(directory,
                     "-i", converted, "--cache", "--no-implicit-system", "--format", "json");
-                Assert.Equal(1, changedProfile.ExitCode);
-                Assert.Contains("CS0103", changedProfile.StdOut);
-                Assert.False(File.Exists(Path.ChangeExtension(converted, ".g.cs")));
+                Assert.Equal(0, changedProfile.ExitCode);
+                Assert.DoesNotContain("CS0103", changedProfile.StdOut);
+                Assert.Contains("1 compiled, 0 cached", changedProfile.StdOut + changedProfile.StdErr);
+                Assert.True(File.Exists(Path.ChangeExtension(converted, ".g.cs")));
             }
         }
         finally { Directory.Delete(directory, recursive: true); }
