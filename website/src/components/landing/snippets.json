@@ -1,39 +1,4 @@
 {
-  "comparison": {
-    "component": "CodeComparison",
-    "code": "module Math\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x",
-    "before": "",
-    "after": "",
-    "indent": 0,
-    "inputs": [],
-    "expectedDiagnostics": []
-  },
-  "firstProgram": {
-    "component": "FirstProgram",
-    "code": "module HelloApp\n  func Main () → void\n    ! cw\n    Console.WriteLine(\"Hello from Calor!\")",
-    "before": "",
-    "after": "",
-    "indent": 0,
-    "inputs": [],
-    "expectedDiagnostics": []
-  },
-  "missingEffect": {
-    "component": "CatchBugs",
-    "code": "func ProcessOrder (Order:order) → void\n  ! db:rw\n  SaveOrder(order)\n  NotifyCustomer(order)",
-    "before": "module OrderService\n  class Order\n",
-    "after": "",
-    "indent": 2,
-    "inputs": [
-      "module OrderDependencies\n  func SaveOrder (object:order) → void\n    ! db:rw\n  func NotifyCustomer (object:order) → void\n    ! net:rw\n"
-    ],
-    "expectedDiagnostics": [
-      {
-        "code": "Calor0410",
-        "severity": "Error",
-        "message": "Function 'ProcessOrder' uses effect 'net:rw' via cross-module call to 'NotifyCustomer' (in module 'OrderDependencies') but does not declare it."
-      }
-    ]
-  },
   "contracts": {
     "component": "FeatureGrid",
     "code": "requires x >= 0\n=> result >= 0",

@@ -1,14 +1,18 @@
 ---
 layout: default
-title: "Syntax Reference"
+title: "Language Reference"
 nav_order: 4
 has_children: true
 permalink: /syntax-reference/
 ---
 
-# Syntax Reference
+# Language Reference
 
 <!-- Generated from website/content/syntax-reference/index.mdx by calor self-check docs --fix. Edit the source, not this file. -->
+
+This page explains the symbols and rules used in Calor files. It is a detailed
+reference for developers and coding agents, not a required first step for
+someone who is learning what Calor does.
 
 Calor uses lowercase declaration headers, indentation and ordinary C# expression
 operators. The [generated current-language reference](https://calor.dev/docs/syntax-reference/current-language/)

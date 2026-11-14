@@ -1170,11 +1170,6 @@ public static class WebsiteExampleChecker
     private static readonly IReadOnlyDictionary<string, string[]> LandingProse =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["CodeComparison"] =
-            [
-                "'requires and => declare the input and normal-return obligations.'",
-                "'An empty ! row declares no effects; enforcement depends on resolved calls and documented coverage.'",
-            ],
             ["CompetitivePositioning"] =
             [
                 "'First-class requires and => contracts'",
@@ -1188,9 +1183,10 @@ public static class WebsiteExampleChecker
     private static readonly IReadOnlyDictionary<string, string[]> LandingCodeDisplays =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["CodeComparison"] = ["{activeTab === 'calor' ? calorCode : csharpCode}"],
-            ["FirstProgram"] = ["{landingSnippets.firstProgram.code}", "calor run Program.calr", "Hello from Calor!"],
-            ["CatchBugs"] = ["{calorCode}", "{errorOutput}"],
+            // #1722 removed the code samples from these three; the inline-Calor guard still applies.
+            ["CodeComparison"] = [],
+            ["FirstProgram"] = [],
+            ["CatchBugs"] = [],
             ["FeatureGrid"] = ["{feature.code}"],
             ["CompetitivePositioning"] = [],
         };
@@ -1257,17 +1253,6 @@ public static class WebsiteExampleChecker
                 || Regex.IsMatch(proseOnly,
                     """['"`](?:\s|\\[nr])*(?:(?:module|func|class|let|var|requires|return|set)\s|=>|!\s)"""))
                 Invalid("Inline Calor source bypasses landing snippet validation; render landingSnippets.<id>.code instead",
-                    component.Path);
-
-            var aliasSource = name switch
-            {
-                "CodeComparison" => "comparison",
-                "CatchBugs" => "missingEffect",
-                _ => null,
-            };
-            if (aliasSource != null && Regex.Matches(component.Content,
-                    $@"\bconst\s+calorCode\s*=\s*landingSnippets\.{aliasSource}\.code\s*;").Count != 1)
-                Invalid("Landing calorCode must be initialized directly from its registered shared snippet",
                     component.Path);
 
             var displays = Regex.Matches(component.Content, @"<code\b[^>]*>(?<body>[\s\S]*?)</code>")

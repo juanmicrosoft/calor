@@ -510,13 +510,9 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Theory]
-    [InlineData("comparison", "return x * x", "return missing * x")]
-    [InlineData("firstProgram", "Console.WriteLine(\"Hello from Calor!\")", "return (1 + )")]
     [InlineData("contracts", "x >= 0", "missing >= 0")]
     [InlineData("effects", "! db:rw,net:rw", "! db:rw,net:rw\nMissingType.Save()")]
     [InlineData("stableId", "func Process () → void\n  !", "func Process (MissingType:x) → void\n  !")]
-    [InlineData("missingEffect", "! db:rw", "! db:rw,net:rw")]
-    [InlineData("missingEffect", "NotifyCustomer", "MissingCustomer")]
     public void Landing_MutatedDisplayedCodeFails(string id, string original, string replacement)
     {
         var (source, components) = LandingInputs();
@@ -545,17 +541,16 @@ public sealed class WebsiteExampleCheckerTests
             "",
             "{}",
             "{\"snippet\": {\"code\": \"§P 1\"}}",
-            MutateLanding(source, json => json["comparison"]!["Code"] = json["comparison"]!["code"]!.GetValue<string>()).Content,
+            MutateLanding(source, json => json["contracts"]!["Code"] = json["contracts"]!["code"]!.GetValue<string>()).Content,
             MutateLanding(source, json => json["contracts"]!["before"] = "").Content,
-            MutateLanding(source, json => json["missingEffect"]!["inputs"] = new JsonArray()).Content,
-            MutateLanding(source, json => json.Remove("comparison")).Content,
-            MutateLanding(source, json => json["extra"] = json["comparison"]!.DeepClone()).Content,
+            MutateLanding(source, json => json.Remove("contracts")).Content,
+            MutateLanding(source, json => json["extra"] = json["contracts"]!.DeepClone()).Content,
         })
             Assert.NotEmpty(WebsiteExampleChecker.CheckLanding(source with { Content = broken }, components));
 
         var changed = components.Select(c => c with
         {
-            Content = c.Content.Replace("landingSnippets.comparison.code", "'not checked'")
+            Content = c.Content.Replace("landingSnippets.contracts.code", "'not checked'")
         }).ToList();
         Assert.Contains(WebsiteExampleChecker.CheckLanding(source, changed),
             d => d.Message.Contains("exactly one registered consumer"));
@@ -591,24 +586,6 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Fact]
-    public void Landing_UnusedSharedReferenceCannotHideAReplacedDisplayedAlias()
-    {
-        var (source, components) = LandingInputs();
-        foreach (var id in new[] { "comparison", "missingEffect" })
-        {
-            var changed = components.Select(component => component with
-            {
-                Content = component.Content.Replace(
-                    $"const calorCode = landingSnippets.{id}.code;",
-                    $"const unused = landingSnippets.{id}.code;\nconst calorCode = 'unknown + 1';")
-            }).ToList();
-            Assert.Contains(WebsiteExampleChecker.CheckLanding(source, changed),
-                diagnostic => diagnostic.Code == DiagnosticCode.DocDriftWebsiteAnnotation
-                    && diagnostic.Message.Contains("initialized directly"));
-        }
-    }
-
-    [Fact]
     public void Landing_GeneratedCSharpValidationAndNegativeRepairAreReal()
     {
         var (source, components) = LandingInputs();
@@ -617,21 +594,15 @@ public sealed class WebsiteExampleCheckerTests
         Assert.Contains(WebsiteExampleChecker.CheckLanding(brokenType, components),
             d => d.Message.Contains("Calor1002") && d.Message.Contains("CS0246") && d.Message.Contains("MissingType"));
 
-        var repaired = MutateLanding(source, json =>
-        {
-            json["missingEffect"]!["code"] = json["missingEffect"]!["code"]!.GetValue<string>()
-                .Replace("! db:rw", "! db:rw,net:rw");
-            json["missingEffect"]!["expectedDiagnostics"] = new JsonArray();
-        });
-        Assert.Empty(WebsiteExampleChecker.CheckLanding(repaired, components));
-        foreach (var field in new[] { "code", "severity", "message" })
-        {
-            var wrongExpectation = MutateLanding(source, json =>
-                json["missingEffect"]!["expectedDiagnostics"]![0]![field] =
-                    field == "code" ? "Calor0200" : field == "severity" ? "Warning" : "Wrong message");
-            Assert.Contains(WebsiteExampleChecker.CheckLanding(wrongExpectation, components),
-                d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
-        }
+        // A clean snippet that claims a diagnostic it does not produce is a mismatch.
+        // (#1722 removed the landing negative example this test used to repair.)
+        var wrongExpectation = MutateLanding(source, json =>
+            json["effects"]!["expectedDiagnostics"] = new JsonArray(new JsonObject
+            {
+                ["code"] = "Calor0200", ["severity"] = "Error", ["message"] = "Wrong message"
+            }));
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(wrongExpectation, components),
+            d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
     }
 
     [Fact]
@@ -662,7 +633,7 @@ public sealed class WebsiteExampleCheckerTests
     {
         var (source, components) = LandingInputs();
         var broken = MutateLanding(source, json =>
-            json["comparison"]!["code"] = json["comparison"]!["code"]!.GetValue<string>().Replace("x * x", "missing * x"));
+            json["contracts"]!["code"] = json["contracts"]!["code"]!.GetValue<string>().Replace("x >= 0", "missing >= 0"));
         var inputs = new DocDriftInputs
         {
             Version = "0.0.0",
@@ -674,7 +645,7 @@ public sealed class WebsiteExampleCheckerTests
             LandingComponents = components,
         };
         Assert.Contains(DocDriftChecker.Check(inputs),
-            d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch && d.Message.Contains("comparison"));
+            d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch && d.Message.Contains("contracts"));
     }
 
     [Fact]

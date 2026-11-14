@@ -63,12 +63,11 @@ The overloads without a comparison argument do not all behave alike.
 `EndsWith(string)` and `IndexOf(string)` use the current culture.
 `ToUpperInvariant` and `ToLowerInvariant` also avoid the current culture.
 
-The following is a checked negative example. The comparison arguments select
-ordinal runtime behavior, but the current effect catalog does not admit these
-overloads as pure. `Calor0411` identifies the calls and `Calor0410` rejects the
-pure function:
+The comparison arguments select ordinal runtime behavior. The built-in effect
+manifest records every `System.String` method as pure, so the function can
+declare `!`:
 
-```calor expect=Calor0410,Calor0411
+```calor
 module StringComparisons
   func Main () → string
     !
@@ -76,8 +75,7 @@ module StringComparisons
     return "${text.Contains("WORLD", System.StringComparison.OrdinalIgnoreCase)}:${text.StartsWith("hello", System.StringComparison.Ordinal)}:${text.IndexOf("world", System.StringComparison.Ordinal)}:${System.String.Equals("I", "i", System.StringComparison.OrdinalIgnoreCase)}"
 ```
 
-The corresponding CLR operations produce `True:True:6:True`. The native pure
-function above is rejected; that runtime result is not an admission claim.
+`Main()` returns `True:True:6:True`.
 
 Choosing `Ordinal` defines runtime behavior; it does not by itself establish a
 verification proof. Read the verifier's actual outcome. Only an assumption-free,
@@ -164,12 +162,13 @@ module StringHoles
 `Main()` returns `hello Calor:${x}`. String-valued holes do not require numeric
 formatting.
 
-Numeric formatting is a separate effect boundary. The current checker does not
-admit arbitrary `double` formatting as pure, including explicit format strings.
-It reports `Calor0411` for the formatting and `Calor0410` for its callers.
-This checked negative example shows the syntax without claiming acceptance:
+A numeric hole is charged the effects of its type's `ToString` contract. The
+built-in manifest records `double.ToString` as pure, so `Line` can declare `!`.
+That is an approximation: formatting reads the current culture, and the effect
+system does not track culture. A type whose `ToString` has no contract is charged
+`unknown`.
 
-```calor expect=Calor0410,Calor0411
+```calor
 module Receipt
   func Line (string:item, double:amount) → string
     !
@@ -185,8 +184,7 @@ interpolation produces
 `coffee  |      3.50|7.0:${x}`. Under `de-DE`, it returns
 `coffee  |      3,50|7,0:${x}`. For culture-independent numeric text, pass
 `System.Globalization.CultureInfo.InvariantCulture` to an appropriate numeric
-`ToString` overload. That selects formatting behavior; it does not supply a
-missing effect contract.
+`ToString` overload.
 
 Escape the dollar sign to write a literal hole: `"\${x}"` contains the four
 characters `${x}` and does not read a variable named `x`.

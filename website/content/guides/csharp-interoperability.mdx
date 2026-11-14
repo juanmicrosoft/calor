@@ -126,13 +126,12 @@ report records `nullable-oblivious-nested-shape` for `Dictionary<string, int>`
 and `nullable-module-fidelity` when the replacement cannot be certified.
 That is successful preservation, not native conversion.
 
-The earlier native-form listing below is retained as a checked negative example,
-not current CLI output. Independently of the conversion fallback, `int.TryParse`
-has unknown effects: `Calor0411` identifies the call and `Calor0410` rejects its
-use in these functions.
+The native form below is a hand-written equivalent, not current CLI output. It
+compiles: `int.TryParse` and `Dictionary.TryGetValue` have pure effect contracts
+in the built-in manifests, so these functions can declare `!`.
 
 {/* w1-transcript: W1-F1-refout */}
-```calor expect=Calor0410,Calor0411
+```calor
 module Inventory overflow unchecked
   using System.Collections.Generic
 
