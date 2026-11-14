@@ -64,20 +64,42 @@ public static partial class Rewriter
     }
 
     /// <summary>
-    /// Textual variants of the printed native text. The printer spells a legacy print
+    /// Textual variants of the printed native text, each with runs of blank lines collapsed
+    /// first. The printer spells a legacy print
     /// statement (§P) as System.Console.WriteLine(...), which today's emitter keeps
     /// qualified, while the legacy C# was Console.WriteLine(...) under `using System;`.
     /// The unqualified variant is tried second; the oracle decides.
     /// </summary>
     private static IEnumerable<string> Candidates(string native)
     {
-        yield return native;
         var unqualified = native
             .Replace("System.Console.WriteLine(", "Console.WriteLine(", StringComparison.Ordinal)
             .Replace("System.Console.Write(", "Console.Write(", StringComparison.Ordinal)
             .Replace("new System.Collections.Generic.", "new ", StringComparison.Ordinal);
-        if (unqualified != native)
-            yield return unqualified;
+        foreach (var text in unqualified == native ? [native] : new[] { native, unqualified })
+        {
+            var collapsed = CollapseBlankLines(text);
+            if (collapsed != text)
+                yield return collapsed;
+            yield return text;
+        }
+    }
+
+    /// <summary>Cosmetic: the printer leaves runs of blank lines where legacy closers were.</summary>
+    internal static string CollapseBlankLines(string text)
+    {
+        var lines = text.Replace("\r\n", "\n").Split('\n');
+        var output = new List<string>();
+        foreach (var line in lines)
+        {
+            var blank = line.Trim().Length == 0;
+            if (blank && (output.Count == 0 || output[^1].Length == 0))
+                continue;
+            output.Add(blank ? "" : line);
+        }
+        while (output.Count > 0 && output[^1].Length == 0)
+            output.RemoveAt(output.Count - 1);
+        return string.Join("\n", output) + "\n";
     }
 
     /// <summary>

@@ -5,7 +5,6 @@ module Holder Holder block
       !
       return (this . count + count)
 
-
   func Run () → int
     ! alloc
     let Box:box = new Box()
