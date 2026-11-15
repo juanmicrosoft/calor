@@ -9,9 +9,10 @@ public class CodeActionHandlerTests
     public void ValidSource_NoFixes()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub} () -> i32
-                §R 0
+            module TestModule TestModule block
+              func Test () → int
+                !
+                return 0
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -40,11 +41,11 @@ public class CodeActionHandlerTests
     public void UndefinedReference_WithSimilarName_GeneratesFix()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{counter} 0
-                §R couner
+            module TestModule TestModule block
+              func Test () → int
+                !
+                let counter = 0
+                return couner
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -61,11 +62,11 @@ public class CodeActionHandlerTests
     public void UndefinedReference_NoSimilarName_NoFix()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{counter} 0
-                §R xyz
+            module TestModule TestModule block
+              func Test () → int
+                !
+                let counter = 0
+                return xyz
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -84,11 +85,10 @@ public class CodeActionHandlerTests
     public void UndefinedReference_SimilarParameter_GeneratesFix()
     {
         var source = """
-            §M{TestModule}
-              §F{Add:pub}
-                §I{i32:value}
-                §O{i32}
-                §R valeu
+            module TestModule TestModule block
+              func Add (int:value) → int
+                !
+                return valeu
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -104,14 +104,15 @@ public class CodeActionHandlerTests
     public void FunctionUsedAsVariable_GeneratesFix()
     {
         var source = """
-            §M{TestModule}
-              §F{Helper:pub}
-                §O{i32}
-                §R 42
-              §F{Main:pub}
-                §O{i32}
-                §B{x} Helper
-                §R x
+            module TestModule TestModule block
+              func Helper () → int
+                !
+                return 42
+
+              func Main () → int
+                !
+                let x = Helper
+                return x
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -127,12 +128,10 @@ public class CodeActionHandlerTests
     public void DuplicateParameter_GeneratesFix()
     {
         var source = """
-            §M{TestModule}
-              §F{Add:pub}
-                §I{i32:x}
-                §I{i32:x}
-                §O{i32}
-                §R x
+            module TestModule TestModule block
+              func Add (int:x, int:x) → int
+                !
+                return x
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -148,12 +147,12 @@ public class CodeActionHandlerTests
     public void MultipleFixes_AllHaveCorrectEdits()
     {
         var source = """
-            §M{TestModule}
-              §F{Calc:pub}
-                §O{i32}
-                §B{counter} 0
-                §B{result} couner
-                §R reslt
+            module TestModule TestModule block
+              func Calc () → int
+                !
+                let counter = 0
+                let result = couner
+                return reslt
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -173,11 +172,11 @@ public class CodeActionHandlerTests
     {
         // Test that applying a typo fix results in valid code
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §B{counter} 0
-                §R couner
+            module TestModule TestModule block
+              func Test () → int
+                !
+                let counter = 0
+                return couner
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -238,10 +237,10 @@ public class CodeActionHandlerTests
     public void NameofOperator_CompilesWithNoErrors()
     {
         var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{str}
-                §R (nameof x)
+            module TestModule TestModule block
+              func Test () → string
+                !
+                return nameof(x)
             """;
 
         var diagnostics = LspTestHarness.GetDiagnostics(source);

@@ -14,13 +14,11 @@ namespace Calor.Evaluation.Tests;
 public class SafetyBenchmarkTests
 {
     private const string SafeDivideCalor = @"
-§M{Test}
-  §F{SafeDivide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)
+module Test Test block
+  func SafeDivide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)
 ";
 
     [Fact]

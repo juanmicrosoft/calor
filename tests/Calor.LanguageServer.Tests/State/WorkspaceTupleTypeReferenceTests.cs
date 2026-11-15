@@ -29,9 +29,10 @@ public class WorkspaceTupleTypeReferenceTests
                 §R §NEW{Dictionary<str,(i32,i32)>} §/NEW
             """;
         const string malformedSource = """
-            §M{MalformedTupleNew}
-              §F{Make:pub} () -> object
-                §R §NEW{(i32,i32)} §/NEW
+            module MalformedTupleNew MalformedTupleNew block
+              func Make () → object
+                !
+                return new (int, int)()
             """;
         var validUri = DocumentUri.From("file:///valid-tuple-containers.calr");
         var malformedUri = DocumentUri.From("file:///malformed-tuple-new.calr");

@@ -120,11 +120,9 @@ public class SpanDebugTests
     [Fact]
     public void Span_Contains_Position()
     {
-        var source = @"§M{TestModule}
-  §F{Add}
-    §I{i32:a}
-    §O{i32}
-    §R a";
+        var source = @"module TestModule TestModule block
+  func Add private (int:a) → int
+    return a";
 
         var ast = LspTestHarness.GetAst(source);
         Assert.NotNull(ast);

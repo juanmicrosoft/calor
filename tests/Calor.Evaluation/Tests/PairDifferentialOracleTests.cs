@@ -21,9 +21,9 @@ namespace Calor.Evaluation.Tests;
 [Collection(ProcessGlobalStateCollection.Name)]
 public class PairDifferentialOracleTests
 {
-    private const string CalorIsEven = "§M{Ctl}\n  §F{IsEven:pub} (i32:n) -> bool\n    §R (== (% n 2) 0)\n";
-    private const string CalorHello = "§M{Ctl}\n  §F{Main:pub} () -> void\n    §E{cw}\n    §P \"Hello\"\n";
-    private const string CalorDivide = "§M{Ctl}\n  §F{Divide:pub} (i32:a, i32:b) -> i32\n    §R (/ a b)\n";
+    private const string CalorIsEven = "module Ctl Ctl block\n  func IsEven (int:n) → bool\n    !\n    return ((n % 2) == 0)\n";
+    private const string CalorHello = "module Ctl Ctl block\n  func Main () → void\n    ! cw\n    Console.WriteLine(\"Hello\")\n";
+    private const string CalorDivide = "module Ctl Ctl block\n  func Divide (int:a, int:b) → int\n    !\n    return (a / b)\n";
 
     private static string CSharp(string body) => $"namespace Control {{ public static class ControlModule {{ {body} }} }}";
 
@@ -171,7 +171,7 @@ public class PairDifferentialOracleTests
     public void CsvParserShapedSurfaceMismatchIsNotEquivalent()
     {
         // The #1276 witness shape: same member name, different input type, plus a member only one arm has.
-        const string calor = "§M{Ctl}\n  §F{FieldCount:pub} (i32:commaCount) -> i32\n    §R (+ commaCount 1)\n";
+        const string calor = "module Ctl Ctl block\n  func FieldCount (int:commaCount) → int\n    !\n    return (commaCount + 1)\n";
         var verdict = Run(calor, CSharp("public static int FieldCount(string line) => line.Split(',').Length;"
             + " public static string[] Parse(string csv) => csv.Split('\\n');"));
         Assert.Equal(("NOT-EQUIVALENT", "SURFACE_MISMATCH"), (verdict.Disposition, verdict.Reason));
@@ -201,7 +201,7 @@ public class PairDifferentialOracleTests
     [Fact]
     public void EmptySurfaceIsUnclassifiedAndUnsupportedTypesAreRejected()
     {
-        const string calor = "§M{Ctl}\n  §F{Helper:priv} () -> i32\n    §R 0\n";
+        const string calor = "module Ctl Ctl block\n  func Helper private () → int\n    return 0\n";
         Assert.Equal(("UNCLASSIFIED", "SURFACE_EMPTY"), Reason(Run(calor, "internal static class Hidden { public static int Helper() => 0; }")));
         Assert.False(InputGenerator.Supports(typeof(TimeSpan).GetMethod("FromTicks", [typeof(long)])!));
         Assert.True(InputGenerator.Supports(typeof(string).GetMethod("Concat", [typeof(string), typeof(string)])!));

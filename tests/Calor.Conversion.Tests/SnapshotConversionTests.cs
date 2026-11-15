@@ -948,7 +948,7 @@ public class SnapshotConversionTests
         var exception = Record.Exception(() => VerifySnapshot(
             "missing.approved.calr",
             approved: null,
-            actual: "§M{Missing}",
+            actual: "module Missing Missing block",
             updateMode: false,
             (_, _) => writeAttempted = true));
 

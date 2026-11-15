@@ -20,7 +20,7 @@ public sealed class FormattingHandlerTests
     {
         var source = string.Join(
             newline,
-            "§M{Formatting}   ",
+            "module Formatting Formatting block",
             "    §F{Main:pub} () -> void",
             "        §E{cw}",
             "        §B{user001} STR:\"secret\"",
@@ -63,9 +63,10 @@ public sealed class FormattingHandlerTests
     public async Task CompilerErrors_ReturnNoEditsAndLogReasonAsync()
     {
         const string source =
-            "§M{Formatting}\n" +
-            "  §F{Main:pub} () -> void\n" +
-            "    §P \"missing effect\"\n";
+            "module Formatting Formatting block\n" +
+            "  func Main () → void\n" +
+            "    !\n" +
+            "    Console.WriteLine(\"missing effect\")\n";
         var uri = DocumentUri.From("file:///formatting-errors.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
@@ -94,8 +95,10 @@ public sealed class FormattingHandlerTests
     public void CapturedSnapshot_UsesOriginalSourceAfterWorkspaceUpdate()
     {
         const string original =
-            "§M{Original}   \r\n" +
-            "    §F{Main:pub} () -> void   \r\n";
+            "module Original Original block\r\n" +
+            "  func Main () → void\r\n" +
+            "    !\r\n" +
+            "    return\r\n";
         const string updated =
             "§M{Updated}\n" +
             "    §F{Different:pub} () -> void\n" +

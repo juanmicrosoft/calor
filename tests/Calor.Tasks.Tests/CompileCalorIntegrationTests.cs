@@ -65,13 +65,10 @@ public class CompileCalorIntegrationTests : IDisposable
 
     // A minimal valid Calor module
     private const string ValidCalorSource = """
-        §M{TestModule}
-
-          §F{Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
+        module TestModule TestModule block
+          func Add (int:a, int:b) → int
+            !
+            return (a + b)
 
         """;
 
@@ -154,10 +151,13 @@ public class CompileCalorIntegrationTests : IDisposable
             """;
         var basePath = CreateSourceFile("Base.calr", baseSource);
         var derivedPath = CreateSourceFile("Derived.calr", """
-            §M{Shared}
-              §CL{Derived:Base:pub}
-                §MT{Render:pub:over} () -> void
-                  §E{cw}
+            module Shared Shared block
+              class Derived internal
+                extends Base
+
+                func Render override () → void
+                  ! cw
+                  return
             """);
         Assert.True(CreateTask(basePath, derivedPath).Execute());
         var warm = CreateTask(basePath, derivedPath);
@@ -181,11 +181,14 @@ public class CompileCalorIntegrationTests : IDisposable
         var source = CreateSourceFile("Routing.calr", ValidCalorSource);
         Assert.True(CreateTask(source).Execute());
         File.WriteAllText(source, """
-            §M{Routing}
-              §F{Probe:pub} () -> i32
-                §R 1
-              §F{Probe:pub} () -> i32
-                §R 2
+            module Routing Routing block
+              func Probe () → int
+                !
+                return 1
+
+              func Probe () → int
+                !
+                return 2
             """);
         var task = CreateTask(source);
         task.TypeCheck = !typeOff;
@@ -399,9 +402,10 @@ public class CompileCalorIntegrationTests : IDisposable
         var src = CreateSourceFile(
             "GeneratedError.calr",
             """
-            §M{GeneratedError}
-              §F{Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module GeneratedError GeneratedError block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
         var task = CreateTask(src);
         task.TypeCheck = false;
@@ -428,9 +432,10 @@ public class CompileCalorIntegrationTests : IDisposable
         File.WriteAllText(
             src,
             """
-            §M{GeneratedError}
-              §F{Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module GeneratedError GeneratedError block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
         var failingTask = CreateTask(src);
         failingTask.TypeCheck = false;
@@ -514,9 +519,10 @@ public class CompileCalorIntegrationTests : IDisposable
         var src = CreateSourceFile(
             "Unsafe.calr",
             """
-            §M{Unsafe}
-              §F{Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module Unsafe Unsafe block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
         var task = CreateTask(src);
         task.TranspileOnly = true;
@@ -706,17 +712,16 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_CallerMissingEffect_Errors()
     {
         var callee = """
-            §M{OrderService}
-              §F{SaveOrder:pub}
-                  §O{void}
-                  §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """;
         var caller = """
-            §M{Handler}
-              §F{HandleRequest:pub}
-                  §O{void}
-                  §C{SaveOrder}
-                  §/C
+            module Handler Handler block
+              func HandleRequest () → void
+                !
+                SaveOrder()
             """;
 
         var src1 = CreateSourceFile("Callee.calr", callee);
@@ -737,18 +742,16 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_CallerDeclaresEffect_Succeeds()
     {
         var callee = """
-            §M{OrderService}
-              §F{SaveOrder:pub}
-                  §O{void}
-                  §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """;
         var caller = """
-            §M{Handler}
-              §F{HandleRequest:pub}
-                  §O{void}
-                  §E{db:w}
-                  §C{SaveOrder}
-                  §/C
+            module Handler Handler block
+              func HandleRequest () → void
+                ! db:w
+                SaveOrder()
             """;
 
         var src1 = CreateSourceFile("Callee.calr", callee);
@@ -775,12 +778,10 @@ public class CompileCalorIntegrationTests : IDisposable
                   §E{db:w}
             """;
         var caller = """
-            §M{App}
-              §F{Run:pub}
-                  §O{void}
-                  §E{db:w}
-                  §C{Save}
-                  §/C
+            module App App block
+              func Run () → void
+                ! db:w
+                Save()
             """;
 
         var src1 = CreateSourceFile("Repo.calr", calleeOriginal);
@@ -810,18 +811,16 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_WarmBuild_NoChanges_RunsFromCachedSummariesAndStaysClean()
     {
         var callee = """
-            §M{Repo}
-              §F{Save:pub}
-                  §O{void}
-                  §E{db:w}
+            module Repo Repo block
+              func Save () → void
+                ! db:w
+                return
             """;
         var caller = """
-            §M{App}
-              §F{Run:pub}
-                  §O{void}
-                  §E{db:w}
-                  §C{Save}
-                  §/C
+            module App App block
+              func Run () → void
+                ! db:w
+                Save()
             """;
 
         var src1 = CreateSourceFile("Repo.calr", callee);
@@ -1022,15 +1021,14 @@ public class CompileCalorIntegrationTests : IDisposable
     public void ElideProvenGuards_OptOutAfterDefaultBuild_RecompilesAndKeepsGuard()
     {
         var src = CreateSourceFile("ElideOptOut.calr", """
-            §M{ElideOptOut}
-              §CL{Calc:pub}
-                §MT{Square:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q (>= x 0)
-                  §Q (<= x 46340)
-                  §S (>= result 0)
-                  §R (* x x)
+            module ElideOptOut ElideOptOut block
+              class Calc
+                func Square (int:x) → int
+                  !
+                  requires (x >= 0)
+                  requires (x <= 46340)
+                  => (result >= 0)
+                  return (x * x)
             """);
         var output = Path.Combine(_outputDir, "ElideOptOut.g.cs");
 
@@ -1413,16 +1411,16 @@ public class CompileCalorIntegrationTests : IDisposable
         // #823 review M2 pin: MSBuild is the surface where csc consumes the
         // outputs — the task itself must produce qualified cross-module calls.
         var src1 = CreateSourceFile("Store.calr", """
-            §M{Store}
-              §F{SaveSnapshot:pub} (str:path) -> void
-                §E{fs:w}
-                §C{File.WriteAllText} §A path §A "x" §/C
+            module Store Store block
+              func SaveSnapshot (string:path) → void
+                ! fs:w
+                File.WriteAllText(path, "x")
             """);
         var src2 = CreateSourceFile("Catalog.calr", """
-            §M{Catalog}
-              §F{Ping:pub} (str:path) -> void
-                §E{fs:w}
-                §C{SaveSnapshot} §A path §/C
+            module Catalog Catalog block
+              func Ping (string:path) → void
+                ! fs:w
+                SaveSnapshot(path)
             """);
 
         var task = CreateTask(src1, src2);
@@ -1436,13 +1434,14 @@ public class CompileCalorIntegrationTests : IDisposable
     // A refutable postcondition: total can exceed cap because the guard's
     // threshold is (cap + 10) — the W5-B defective shape from the outcome corpus.
     private const string RefutedContractSource = """
-        §M{Quotes}
-          §F{QuoteWithSurchargeDefective:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
-            §S (<= result cap)
-            §B{total:i32} (+ baseAmount surcharge)
-            §IF (> total (+ cap 10))
-              §R cap
-            §R total
+        module Quotes Quotes block
+          func QuoteWithSurchargeDefective (int:baseAmount, int:surcharge, int:cap) → int
+            !
+            => (result <= cap)
+            let int:total = (baseAmount + surcharge)
+            if (total > (cap + 10))
+              return cap
+            return total
         """;
 
     // G5 instrumentation (A-1.3 item 1): the Verify task property must run Z3
@@ -1540,17 +1539,17 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CascadeSuppression_MsBuildTaskAgreesWithTheDriver()
     {
         const string CalleeSource = """
-            §M{Lib}
-              §F{Ping:pub} () -> i32
-                §E{}
-                §P "ping"
-                §R INT:1
+            module Lib Lib block
+              func Ping () → int
+                !
+                Console.WriteLine("ping")
+                return 1
             """;
         const string CallerSource = """
-            §M{App}
-              §F{Main:pub} () -> i32
-                §E{}
-                §R §C{Ping} §/C
+            module App App block
+              func Main () → int
+                !
+                return Ping()
             """;
 
         var callee = CreateSourceFile("Callee.calr", CalleeSource);
@@ -1609,10 +1608,10 @@ public class CompileCalorIntegrationTests : IDisposable
                 §P "unterminated
             """;
         const string CleanSource = """
-            §M{Interop}
-              §F{Use:pub} () -> i32
-                §E{}
-                §R INT:1
+            module Interop Interop block
+              func Use () → int
+                !
+                return 1
             """;
 
         var broken = CreateSourceFile("Broken.calr", UnlexableSource);
@@ -1646,10 +1645,10 @@ public class CompileCalorIntegrationTests : IDisposable
                 §P "unterminated
             """;
         const string CleanSource = """
-            §M{Good}
-              §F{One:pub} () -> i32
-                §E{}
-                §R INT:1
+            module Good Good block
+              func One () → int
+                !
+                return 1
             """;
 
         var broken = CreateSourceFile("Broken.calr", UnlexableSource);

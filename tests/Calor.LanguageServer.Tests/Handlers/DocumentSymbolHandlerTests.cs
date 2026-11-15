@@ -9,8 +9,8 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_NativeRecordHasRecordDetailAndNoSyntheticCopyDeclaration()
     {
         const string source = """
-            §M{Records}
-              record P:pub (int:X, int:Y)
+            module Records Records block
+              record P (int:X, int:Y)
             """;
         var ast = LspTestHarness.GetAst(source);
         Assert.NotNull(ast);
@@ -31,11 +31,12 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_FunctionsListed()
     {
         var source = """
-            §M{TestModule}
-              §F{Add}
-                §R 0
-              §F{Subtract}
-                §R 0
+            module TestModule TestModule block
+              func Add private ()
+                return 0
+
+              func Subtract private ()
+                return 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -50,11 +51,12 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_ClassesListed()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:name}
-              §CL{Employee}
-                §FLD{i32:id}
+            module TestModule TestModule block
+              class Person internal
+                field string:name private
+
+              class Employee internal
+                field int:id private
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -69,17 +71,14 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_ClassWithMembersListed()
     {
         var source = """
-            §M{TestModule}
-              §CL{Calculator}
-                §FLD{i32:value}
-                §MT{Add}
-                  §I{i32:x}
-                  §O{i32}
-                  §R x
-                §MT{Subtract}
-                  §I{i32:x}
-                  §O{i32}
-                  §R x
+            module TestModule TestModule block
+              class Calculator internal
+                field int:value private
+                func Add private (int:x) → int
+                  return x
+
+                func Subtract private (int:x) → int
+                  return x
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -219,13 +218,9 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_FunctionParameters_Counted()
     {
         var source = """
-            §M{TestModule}
-              §F{Calculate}
-                §I{i32:a}
-                §I{i32:b}
-                §I{str:label}
-                §O{i32}
-                §R a + b
+            module TestModule TestModule block
+              func Calculate private (int:a, int:b, string:label) → int
+                return (a + b)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -240,20 +235,15 @@ public class DocumentSymbolHandlerTests
     public void DocumentSymbols_ClassProperties_Listed()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §PROP{Name:str:pub}
-                §GET
-                §R ""
-                §/GET
-                §/PROP
-                §PROP{Age:i32:pub}
-                §GET
-                §R 0
-                §/GET
-                §SET
-                §/SET
-                §/PROP
+            module TestModule TestModule block
+              class Person internal
+                property string:Name
+                  get
+                    return ""
+                property int:Age
+                  get
+                    return 0
+                  set
             """;
 
         var ast = LspTestHarness.GetAst(source);

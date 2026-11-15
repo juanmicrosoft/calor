@@ -46,12 +46,9 @@ public class SignatureHelpHandlerTests
     public void FindFunction_WithParameters_ReturnsFunction()
     {
         var source = """
-            §M{TestModule}
-              §F{Add}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R a + b
+            module TestModule TestModule block
+              func Add private (int:a, int:b) → int
+                return (a + b)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -72,10 +69,9 @@ public class SignatureHelpHandlerTests
     public void FindFunction_NoParameters_ReturnsFunction()
     {
         var source = """
-            §M{TestModule}
-              §F{GetValue}
-                §O{i32}
-                §R 42
+            module TestModule TestModule block
+              func GetValue private () → int
+                return 42
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -92,10 +88,9 @@ public class SignatureHelpHandlerTests
     public void FindFunction_WithOutput_HasOutputType()
     {
         var source = """
-            §M{TestModule}
-              §F{GetString}
-                §O{str}
-                §R "hello"
+            module TestModule TestModule block
+              func GetString private () → string
+                return "hello"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -112,9 +107,9 @@ public class SignatureHelpHandlerTests
     public void FindFunction_VoidOutput_HasNullOutput()
     {
         var source = """
-            §M{TestModule}
-              §F{DoSomething}
-                §P "done"
+            module TestModule TestModule block
+              func DoSomething private ()
+                Console.WriteLine("done")
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -130,13 +125,10 @@ public class SignatureHelpHandlerTests
     public void FindMethod_InClass_ReturnsMethod()
     {
         var source = """
-            §M{TestModule}
-              §CL{Calculator}
-                §MT{Add}
-                  §I{i32:x}
-                  §I{i32:y}
-                  §O{i32}
-                  §R x + y
+            module TestModule TestModule block
+              class Calculator internal
+                func Add private (int:x, int:y) → int
+                  return (x + y)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -156,10 +148,11 @@ public class SignatureHelpHandlerTests
     public void FindMethod_VirtualMethod_HasVirtualFlag()
     {
         var source = """
-            §M{TestModule}
-              §CL{Base:pub}
-                §MT{Process:pub:virt}
-                  §O{void}
+            module TestModule TestModule block
+              class Base
+                func Process virtual () → void
+                  !
+                  return
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -178,14 +171,18 @@ public class SignatureHelpHandlerTests
     public void FindMethod_OverrideMethod_HasOverrideFlag()
     {
         var source = """
-            §M{TestModule}
-              §CL{Base:pub}
-                §MT{Process:pub:virt}
-                  §O{void}
-              §CL{Derived:pub}
-                §EXT{Base}
-                §MT{Process:pub:over}
-                  §O{void}
+            module TestModule TestModule block
+              class Base
+                func Process virtual () → void
+                  !
+                  return
+
+              class Derived
+                extends Base
+
+                func Process override () → void
+                  !
+                  return
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -204,13 +201,10 @@ public class SignatureHelpHandlerTests
     public void Function_WithPreconditions_HasPreconditions()
     {
         var source = """
-            §M{TestModule}
-              §F{Divide}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §Q b != 0
-                §R a / b
+            module TestModule TestModule block
+              func Divide private (int:a, int:b) → int
+                requires (b != 0)
+                return (a / b)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -226,15 +220,13 @@ public class SignatureHelpHandlerTests
     public void Function_WithPostconditions_HasPostconditions()
     {
         var source = """
-            §M{TestModule}
-              §F{Abs}
-                §I{i32:x}
-                §O{i32}
-                §S result >= 0
-                §IF x >= 0
-                  §R x
-                §EL
-                  §R -x
+            module TestModule TestModule block
+              func Abs private (int:x) → int
+                => (result >= 0)
+                if (x >= 0)
+                  return x
+                else
+                  return (-x)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -250,13 +242,9 @@ public class SignatureHelpHandlerTests
     public void Function_MixedParameterTypes_AllTypesPreserved()
     {
         var source = """
-            §M{TestModule}
-              §F{Process}
-                §I{i32:count}
-                §I{str:name}
-                §I{bool:enabled}
-                §I{f64:ratio}
-                §O{void}
+            module TestModule TestModule block
+              func Process private (int:count, string:name, bool:enabled, double:ratio) → void
+                return
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -276,11 +264,11 @@ public class SignatureHelpHandlerTests
     public void Method_StaticMethod_HasStaticFlag()
     {
         var source = """
-            §M{TestModule}
-              §CL{Utils:pub}
-                §MT{Helper:pub:static}
-                  §O{i32}
-                  §R 0
+            module TestModule TestModule block
+              class Utils
+                func Helper static () → int
+                  !
+                  return 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -299,12 +287,10 @@ public class SignatureHelpHandlerTests
     public void Method_AsyncMethod_HasAsyncFlag()
     {
         var source = """
-            §M{TestModule}
-              §CL{Service}
-                §AMT{FetchData}
-                §O{str}
-                §R "data"
-                §/AMT
+            module TestModule TestModule block
+              class Service internal
+                func FetchData private async () → string
+                  return "data"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -323,10 +309,9 @@ public class SignatureHelpHandlerTests
     public void Function_AsyncFunction_HasAsyncFlag()
     {
         var source = """
-            §M{TestModule}
-              §AF{LoadData}
-                §O{str}
-                §R "loaded"
+            module TestModule TestModule block
+              func LoadData private async () → string
+                return "loaded"
             """;
 
         var ast = LspTestHarness.GetAst(source);

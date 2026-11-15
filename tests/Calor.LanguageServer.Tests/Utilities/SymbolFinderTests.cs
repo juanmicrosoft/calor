@@ -223,15 +223,20 @@ public class SymbolFinderTests
     public void CallReceiverAndCallee_ResolveAndReferenceExactIdentifierSpans()
     {
         const string source = """
-            §M{TestModule}
-              §CL{Worker:pub}
-                §MT{Pick:pub} (i32:value) -> i32
-                  §R value
-                §MT{Ping:pub} () -> void
-                  §P STR:"ping"
-              §F{Use:pub} (Worker:worker) -> i32
-                §C{worker.Ping}
-                §R §C{worker.Pick} §A INT:1 §/C
+            module TestModule TestModule block
+              class Worker
+                func Pick (int:value) → int
+                  !
+                  return value
+
+                func Ping () → void
+                  !
+                  Console.WriteLine("ping")
+
+              func Use (Worker:worker) → int
+                !
+                worker.Ping()
+                return worker.Pick(1)
             """;
         var workspace = new Calor.LanguageServer.State.WorkspaceState();
         var state = workspace.GetOrCreate(
@@ -442,9 +447,9 @@ public class SymbolFinderTests
     public void FindDefinition_Function_ReturnsFunction()
     {
         var source = """
-            §M{TestModule}
-              §F{Add}
-                §R 0
+            module TestModule TestModule block
+              func Add private ()
+                return 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -460,8 +465,8 @@ public class SymbolFinderTests
     public void FindDefinition_Class_ReturnsClass()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
+            module TestModule TestModule block
+              class Person internal
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -477,8 +482,8 @@ public class SymbolFinderTests
     public void FindDefinition_Interface_ReturnsInterface()
     {
         var source = """
-            §M{TestModule}
-              §IFACE{IShape}
+            module TestModule TestModule block
+              interface IShape
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -533,9 +538,9 @@ public class SymbolFinderTests
     public void FindDefinition_Nonexistent_ReturnsNull()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §R 0
+            module TestModule TestModule block
+              func Test private ()
+                return 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -550,11 +555,9 @@ public class SymbolFinderTests
     public void FindFunction_ExistingFunction_ReturnsFunction()
     {
         var source = """
-            §M{TestModule}
-              §F{Calculate}
-                §I{i32:x}
-                §O{i32}
-                §R x
+            module TestModule TestModule block
+              func Calculate private (int:x) → int
+                return x
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -571,9 +574,9 @@ public class SymbolFinderTests
     public void FindFunction_NonExistent_ReturnsNull()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §R 0
+            module TestModule TestModule block
+              func Test private ()
+                return 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -588,13 +591,10 @@ public class SymbolFinderTests
     public void FindMethod_ExistingMethod_ReturnsMethod()
     {
         var source = """
-            §M{TestModule}
-              §CL{Calculator}
-                §MT{Add}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R a + b
+            module TestModule TestModule block
+              class Calculator internal
+                func Add private (int:a, int:b) → int
+                  return (a + b)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -614,8 +614,8 @@ public class SymbolFinderTests
     public void FindMethod_NonExistent_ReturnsNull()
     {
         var source = """
-            §M{TestModule}
-              §CL{Calculator}
+            module TestModule TestModule block
+              class Calculator internal
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -824,9 +824,9 @@ public class SymbolFinderTests
     public void FindSymbol_OutsideModule_ReturnsNull()
     {
         var source = """
-            §M{TestModule}
-              §F{Test}
-                §R 0
+            module TestModule TestModule block
+              func Test private ()
+                return 0
             """;
 
         // Position outside the module - far past the end
@@ -859,11 +859,12 @@ public class SymbolFinderTests
     public void Ast_ContainsMultipleFunctions()
     {
         var source = """
-            §M{TestModule}
-              §F{First}
-                §R 1
-              §F{Second}
-                §R 2
+            module TestModule TestModule block
+              func First private ()
+                return 1
+
+              func Second private ()
+                return 2
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -878,11 +879,12 @@ public class SymbolFinderTests
     public void Ast_ContainsMultipleClasses()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:name}
-              §CL{Employee}
-                §FLD{i32:id}
+            module TestModule TestModule block
+              class Person internal
+                field string:name private
+
+              class Employee internal
+                field int:id private
             """;
 
         var ast = LspTestHarness.GetAst(source);

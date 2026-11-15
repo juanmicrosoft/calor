@@ -40,10 +40,10 @@ public sealed class PermissiveEffectsTests : IDisposable
     // three-line program as its pre-rows canary before any paid run
     // (bench/phase0-agent-native/, W1 branch).
     private const string LaunderingSource = """
-        §M{PermissiveCanary}
-          §F{Quiet:pub} () -> void
-            §E{}
-            §P "laundered"
+        module PermissiveCanary PermissiveCanary block
+          func Quiet () → void
+            !
+            Console.WriteLine("laundered")
 
         """;
 
@@ -55,27 +55,25 @@ public sealed class PermissiveEffectsTests : IDisposable
     // NonConvergenceTests.Permissive_StillWaives_UnknownChargedCalor0410, the compiler-side
     // pin for the same half.
     private const string UnknownChargeSource = """
-        §M{UnknownCharge}
-          §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
-            §E{e}
-            §R (+ §C{stage} §/C §C{stage} §/C)
+        module UnknownCharge UnknownCharge block
+          func RunTwice <! e> (Func<int>:stage ! e) → int
+            ! e
+            return (stage() + stage())
 
-          §CL{Holder:pub}
-            §FLD{Func<i32>:stage:priv} §E{cw}
-            §MT{Twice:pub} () -> i32
-              §E{}
-              §R §C{RunTwice} §A this.stage §/C
+          class Holder
+            field Func<int>:stage private ! cw
+            func Twice () → int
+              !
+              return RunTwice(this.stage)
 
         """;
 
     // Declares what it does: compiles clean under BOTH policies.
     private const string CleanSource = """
-        §M{CleanModule}
-          §F{Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
+        module CleanModule CleanModule block
+          func Add (int:a, int:b) → int
+            !
+            return (a + b)
 
         """;
 
@@ -83,30 +81,28 @@ public sealed class PermissiveEffectsTests : IDisposable
     // (EffectRowLambdaTests.LambdaOmittedRow_InferredRowIsCheckedAtTheBindingSite).
     // "An effect row that does not fit is never waived" — not by this property either.
     private const string RowMismatchSource = """
-        §M{M}
-          §F{Run:pub} () -> void
-            §E{cw}
-            §B{f:Func<i32,i32>} §E{} §LAM{x:i32}
-              §P x
-              §R x
-            §/LAM
-            §P INT:1
+        module M M block
+          func Run () → void
+            ! cw
+            let Func<int, int>:f ! = (int:x) =>
+              Console.WriteLine(x)
+              return x
+            Console.WriteLine(1)
 
         """;
 
     private const string CalleeSource = """
-        §M{OrderService}
-          §F{SaveOrder:pub}
-              §O{void}
-              §E{db:w}
+        module OrderService OrderService block
+          func SaveOrder () → void
+            ! db:w
+            return
         """;
 
     private const string CallerSource = """
-        §M{Handler}
-          §F{HandleRequest:pub}
-              §O{void}
-              §C{SaveOrder}
-              §/C
+        module Handler Handler block
+          func HandleRequest () → void
+            !
+            SaveOrder()
         """;
 
     public PermissiveEffectsTests()

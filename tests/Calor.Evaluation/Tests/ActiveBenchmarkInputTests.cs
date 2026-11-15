@@ -79,7 +79,7 @@ public class ActiveBenchmarkInputTests
         try
         {
             if (!missingCalor)
-                await File.WriteAllTextAsync(Path.Combine(benchmarks, "Required.calr"), "§M{Required}\n");
+                await File.WriteAllTextAsync(Path.Combine(benchmarks, "Required.calr"), "module Required Required block\n");
             else
                 await File.WriteAllTextAsync(Path.Combine(benchmarks, "Required.cs"), "public class Required {}");
             var entry = new BenchmarkEntry
@@ -107,7 +107,7 @@ public class ActiveBenchmarkInputTests
         var testData = Path.Combine(root, "tests/TestData");
         var benchmarks = Path.Combine(testData, "Benchmarks");
         Directory.CreateDirectory(benchmarks);
-        const string calor = "§M{Fallback}\n";
+        const string calor = "module Fallback Fallback block\n";
         const string csharp = "public class Fallback {}";
         try
         {
@@ -240,7 +240,7 @@ public class ActiveBenchmarkInputTests
         Directory.CreateDirectory(benchmarks);
         try
         {
-            await File.WriteAllTextAsync(Path.Combine(benchmarks, "Unregistered.calr"), "§M{Unregistered}\n");
+            await File.WriteAllTextAsync(Path.Combine(benchmarks, "Unregistered.calr"), "module Unregistered Unregistered block\n");
             await File.WriteAllTextAsync(Path.Combine(benchmarks, "Unregistered.cs"), "public class Unregistered {}");
             const string registered = "DesignPatterns/Visitor.calr";
             var bug = new BugEntry
@@ -285,7 +285,7 @@ public class ActiveBenchmarkInputTests
                     if (role + extension == missing)
                         continue;
                     await File.WriteAllTextAsync(Path.Combine(benchmarks, role + extension),
-                        extension == ".calr" ? "§M{Input}\n" : "public class Input {}");
+                        extension == ".calr" ? "module Input Input block\n" : "public class Input {}");
                 }
             var bug = new BugEntry
             {

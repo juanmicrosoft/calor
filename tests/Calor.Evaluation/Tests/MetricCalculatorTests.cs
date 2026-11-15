@@ -85,11 +85,10 @@ namespace Calculator
         // Arrange
         var calculator = new GenerationAccuracyCalculator();
         var context = CreateContext(
-            calor: @"§M{Test}
-  §F{Add:pub}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §R (+ a b)",
+            calor: @"module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)",
             csharp: @"namespace Test { public static class TestModule { public static int Add(int a, int b) { return a + b; } } }");
 
         // Act
@@ -156,11 +155,14 @@ namespace Calculator
         // Arrange
         var calculator = new EditPrecisionCalculator();
         var context = CreateContext(
-            calor: @"§M{App}
-  §F{Method1:pub}
-      §O{void}
-  §F{Method2:pub}
-      §O{void}",
+            calor: @"module App App block
+  func Method1 () → void
+    !
+    return
+
+  func Method2 () → void
+    !
+    return",
             csharp: @"namespace App { public class AppModule { public void Method1() { } public void Method2() { } } }");
 
         // Act

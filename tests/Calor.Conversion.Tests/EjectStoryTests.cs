@@ -33,13 +33,14 @@ public class EjectStoryTests
     §R §C{Math.Min} §A amount §A cap §/C
 ";
 
-    private const string EarlyReturnContractsModule = @"§M{Pricing}
-  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32
-    §Q (>= cap 0)
-    §S (<= result cap)
-    §IF (> amount cap)
-      §R cap
-    §R amount
+    private const string EarlyReturnContractsModule = @"module Pricing Pricing block
+  func ClampToCap (int:amount, int:cap) → int
+    !
+    requires (cap >= 0)
+    => (result <= cap)
+    if (amount > cap)
+      return cap
+    return amount
 ";
 
     private const string EffectsModule = @"§M{Greeter}

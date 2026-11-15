@@ -89,12 +89,12 @@ public sealed class IdentityEquivalenceTests
     public void StreamingFingerprintIsExactlyTheParentFingerprint(string shape)
     {
         var module = shape == "synthetic" ? Parse(SyntheticCodeGenerator.Generate(10, 50)) : Parse("""
-            §M{Demo}
-              §F{Run:pub}<eff e, eff f> (i32:value) -> i32
-                §E{cw,e,f}
-                §B{offset:i32} 1
-                §B{callback:System.Func<i32,i32>} §LAM{x:i32} (+ x value)
-                §R value
+            module Demo Demo block
+              func Run <! e,! f> (int:value) → int
+                ! cw, e, f
+                let int:offset = 1
+                let System.Func<int, int>:callback = (int:x) => (x + value)
+                return value
             """);
         if (shape == "metadata")
         {
@@ -151,7 +151,7 @@ public sealed class IdentityEquivalenceTests
     [Fact]
     public void SnapshotScratchDoesNotRetainAstsOrSurviveAnUnsupportedMetadataFailure()
     {
-        var source = Parse("§M{Demo}\n  §F{Run:pub} () -> void\n");
+        var source = Parse("module Demo Demo block\n  func Run () → void\n    !\n    return\n");
         var function = new FunctionNode(TextSpan.Empty, "bad", "Bad", Visibility.Private,
             [], null, null, [new UnsupportedSnapshotNode()], new AttributeCollection());
         var invalid = new ModuleNode(TextSpan.Empty, "bad", "Bad", [], [function], new AttributeCollection());
@@ -168,7 +168,7 @@ public sealed class IdentityEquivalenceTests
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static WeakReference FingerprintAndRelease()
     {
-        var module = Parse("§M{Demo}\n  §F{Run:pub} () -> void\n");
+        var module = Parse("module Demo Demo block\n  func Run () → void\n    !\n    return\n");
         _ = Snapshot(module);
         return new WeakReference(module);
     }

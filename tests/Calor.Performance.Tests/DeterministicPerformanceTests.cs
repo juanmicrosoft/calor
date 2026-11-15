@@ -61,14 +61,17 @@ public sealed class DeterministicPerformanceTests(ITestOutputHelper output)
     {
         var diagnostics = new DiagnosticBag();
         var source = """
-            §M{TaintCounters}
-              §F{Identity:pub} (i32:value) -> i32
-                §R value
-              §F{Caller:pub} (i32:value) -> i32
-                §WH (> value INT:0)
-                  §B{copy:i32} §C{Identity} §A value §/C
-                  §R copy
-                §R INT:0
+            module TaintCounters TaintCounters block
+              func Identity (int:value) → int
+                !
+                return value
+
+              func Caller (int:value) → int
+                !
+                while (value > 0)
+                  let int:copy = Identity(value)
+                  return copy
+                return 0
             """;
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
         var module = new Binder(diagnostics).Bind(new Parser(tokens, diagnostics).Parse());

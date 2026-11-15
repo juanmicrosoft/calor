@@ -241,9 +241,10 @@ public class MultiDocumentLspE2ETests
 
     private static string BuildTargetSource(string symbolName) =>
         $$"""
-        §M{TargetModule}
-          §F{ {{symbolName}}:pub} () -> i32
-            §R INT:42
+        module TargetModule TargetModule block
+          func {{symbolName}} () → int
+            !
+            return 42
         """;
 
     // Note (adversarial review): `§U{TargetModule}` was previously included on the

@@ -76,11 +76,14 @@ public class LspE2ETests
     {
         const string uri = "file:///calor-lsp-e2e/main.calr";
         const string source = """
-            §M{TestModule}
-              §F{Compute:pub} () -> i32
-                §R 42
-              §F{Use:pub} () -> i32
-                §R §C{Compute} §/C
+            module TestModule TestModule block
+              func Compute () → int
+                !
+                return 42
+
+              func Use () → int
+                !
+                return Compute()
             """;
         await using var client = await LspClient.StartAsync(_output);
         await client.InitializeAsync();
@@ -136,11 +139,14 @@ public class LspE2ETests
                 .GetArrayLength());
 
         const string changedSource = """
-            §M{TestModule}
-              §F{Calculate:pub} () -> i32
-                §R 42
-              §F{Use:pub} () -> i32
-                §R §C{Calculate} §/C
+            module TestModule TestModule block
+              func Calculate () → int
+                !
+                return 42
+
+              func Use () → int
+                !
+                return Calculate()
             """;
         await client.ChangeAsync(uri, changedSource, version: 2);
         var changedDiagnostics = await client.WaitForDiagnosticsAsync(uri, version: 2);
@@ -173,7 +179,7 @@ public class LspE2ETests
             diagnostic.GetProperty("severity").GetInt32() == 1);
         await client.ChangeAsync(
             diagnosticUri,
-            "§M{Fixed}\n",
+            "module Fixed Fixed block\n",
             version: 2);
         var cleared = await client.WaitForDiagnosticsAsync(diagnosticUri, version: 2);
         Assert.Equal(0, cleared.GetArrayLength());

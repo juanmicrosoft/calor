@@ -208,8 +208,8 @@ public class LlmTaskTests
             "Write a factorial function", "calor");
 
         Assert.True(result.Success);
-        Assert.Contains("§M{", result.GeneratedCode);
-        Assert.Contains("§F{", result.GeneratedCode);
+        Assert.Contains("module ", result.GeneratedCode);
+        Assert.Contains("func ", result.GeneratedCode);
         Assert.Contains("Factorial", result.GeneratedCode);
     }
 
@@ -379,12 +379,10 @@ public static class Test
     public void CodeExecutor_CompileCalor_SimpleFunction_Succeeds()
     {
         using var executor = new CodeExecutor();
-        var result = executor.CompileCalor(@"§M{Math}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)");
+        var result = executor.CompileCalor(@"module Math Math block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)");
 
         Assert.True(result.Success);
         Assert.NotNull(result.GeneratedCSharp);
@@ -405,12 +403,10 @@ public static class Test
     public void CodeExecutor_CompileAndExecuteCalor_Works()
     {
         using var executor = new CodeExecutor();
-        var result = executor.CompileAndExecuteCalor(@"§M{Math}
-  §F{Multiply:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (* a b)",
+        var result = executor.CompileAndExecuteCalor(@"module Math Math block
+  func Multiply (int:a, int:b) → int
+    !
+    return (a * b)",
             "Multiply",
             new object[] { 6, 7 });
 

@@ -24,7 +24,7 @@ public static class SyntheticCodeGenerator
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("§M{PerformanceTestModule}");
+        sb.AppendLine("module PerformanceTestModule PerformanceTestModule block");
         sb.AppendLine();
 
         for (var f = 1; f <= functions; f++)
@@ -43,7 +43,7 @@ public static class SyntheticCodeGenerator
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("§M{TaintTestModule}");
+        sb.AppendLine("module TaintTestModule TaintTestModule block");
         sb.AppendLine();
 
         for (var f = 1; f <= functions; f++)
@@ -91,7 +91,7 @@ public static class SyntheticCodeGenerator
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("§M{LoopTestModule}");
+        sb.AppendLine("module LoopTestModule LoopTestModule block");
         sb.AppendLine();
 
         for (var f = 1; f <= functions; f++)
@@ -120,7 +120,7 @@ public static class SyntheticCodeGenerator
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("§M{ControlFlowTestModule}");
+        sb.AppendLine("module ControlFlowTestModule ControlFlowTestModule block");
         sb.AppendLine();
 
         for (var f = 1; f <= functions; f++)

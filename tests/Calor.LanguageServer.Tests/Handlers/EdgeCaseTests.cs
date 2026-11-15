@@ -32,12 +32,10 @@ public class EdgeCaseTests
     public void Generic_Method_WithTypeParameter()
     {
         var source = """
-            §M{TestModule}
-              §CL{Utils}
-                §MT{Identity<T>}
-                  §I{T:value}
-                  §O{T}
-                  §R value
+            module TestModule TestModule block
+              class Utils internal
+                func Identity<T> private (T:value) → T
+                  return value
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -79,10 +77,10 @@ public class EdgeCaseTests
     public void Inheritance_BaseClass_HasFields()
     {
         var source = """
-            §M{TestModule}
-              §CL{Animal:pub}
-                §FLD{str:name:pub}
-                §FLD{i32:age:pub}
+            module TestModule TestModule block
+              class Animal
+                field string:name
+                field int:age
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -97,12 +95,14 @@ public class EdgeCaseTests
     public void Inheritance_DerivedClass_ExtendsBase()
     {
         var source = """
-            §M{TestModule}
-              §CL{Animal:pub}
-                §FLD{str:name:pub}
-              §CL{Dog:pub}
-                §EXT{Animal}
-                §FLD{str:breed:pub}
+            module TestModule TestModule block
+              class Animal
+                field string:name
+
+              class Dog
+                extends Animal
+
+                field string:breed
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -169,10 +169,10 @@ public class EdgeCaseTests
     public void Inheritance_AbstractClass()
     {
         var source = """
-            §M{TestModule}
-              §CL{Shape:pub:abs}
-                §MT{GetArea:pub:abs}
-                  §O{f64}
+            module TestModule TestModule block
+              class Shape abstract
+                func GetArea abstract () → double
+                  !
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -189,9 +189,9 @@ public class EdgeCaseTests
     public void Inheritance_SealedClass()
     {
         var source = """
-            §M{TestModule}
-              §CL{FinalClass:pub:sealed}
-                §FLD{i32:value}
+            module TestModule TestModule block
+              class FinalClass sealed
+                field int:value private
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -211,10 +211,9 @@ public class EdgeCaseTests
     public void Async_Function_HasAsyncFlag()
     {
         var source = """
-            §M{TestModule}
-              §AF{FetchData}
-                §O{str}
-                §R "data"
+            module TestModule TestModule block
+              func FetchData private async () → string
+                return "data"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -229,12 +228,10 @@ public class EdgeCaseTests
     public void Async_Method_HasAsyncFlag()
     {
         var source = """
-            §M{TestModule}
-              §CL{Service}
-                §AMT{LoadAsync}
-                §O{str}
-                §R "loaded"
-                §/AMT
+            module TestModule TestModule block
+              class Service internal
+                func LoadAsync private async () → string
+                  return "loaded"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -252,12 +249,9 @@ public class EdgeCaseTests
     public void Async_FunctionWithParameters()
     {
         var source = """
-            §M{TestModule}
-              §AF{DownloadFile}
-                §I{str:url}
-                §I{str:path}
-                §O{bool}
-                §R true
+            module TestModule TestModule block
+              func DownloadFile private async (string:url, string:path) → bool
+                return true
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -344,14 +338,12 @@ public class EdgeCaseTests
     public void ComplexExpression_WhileLoop()
     {
         var source = """
-            §M{TestModule}
-              §F{Countdown}
-                §I{i32:n}
-                §O{void}
-                §B{~count:i32} n
-                §WH count > 0
-                  §P count
-                  §B{~count} count - 1
+            module TestModule TestModule block
+              func Countdown private (int:n) → void
+                var int:count = n
+                while (count > 0)
+                  Console.WriteLine(count)
+                  var count = (count - 1)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -404,9 +396,9 @@ public class EdgeCaseTests
     {
         // Events may not be fully supported yet, test that class parses
         var source = """
-            §M{TestModule}
-              §CL{Button}
-                §FLD{i32:clickCount}
+            module TestModule TestModule block
+              class Button internal
+                field int:clickCount private
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -426,13 +418,11 @@ public class EdgeCaseTests
     public void Property_GetterOnly()
     {
         var source = """
-            §M{TestModule}
-              §CL{Person}
-                §PROP{Name:str:pub}
-                §GET
-                §R ""
-                §/GET
-                §/PROP
+            module TestModule TestModule block
+              class Person internal
+                property string:Name
+                  get
+                    return ""
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -448,15 +438,12 @@ public class EdgeCaseTests
     public void Property_GetterAndSetter()
     {
         var source = """
-            §M{TestModule}
-              §CL{Counter}
-                §PROP{Value:i32:pub}
-                §GET
-                §R 0
-                §/GET
-                §SET
-                §/SET
-                §/PROP
+            module TestModule TestModule block
+              class Counter internal
+                property int:Value
+                  get
+                    return 0
+                  set
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -475,16 +462,14 @@ public class EdgeCaseTests
     public void Static_Method()
     {
         var source = """
-            §M{TestModule}
-              §CL{Math}
-                §MT{Max:pub:static}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §IF a > b
-                    §R a
-                  §EL
-                    §R b
+            module TestModule TestModule block
+              class Math internal
+                func Max static (int:a, int:b) → int
+                  !
+                  if (a > b)
+                    return a
+                  else
+                    return b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -502,9 +487,9 @@ public class EdgeCaseTests
     public void Static_Field()
     {
         var source = """
-            §M{TestModule}
-              §CL{Config}
-                §FLD{str:Version:pub}
+            module TestModule TestModule block
+              class Config internal
+                field string:Version
             """;
 
         var ast = LspTestHarness.GetAst(source);

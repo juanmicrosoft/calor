@@ -272,7 +272,7 @@ public class LlmEvaluationCalculator : IMetricCalculator
         };
 
         // Add contract-specific questions if contracts are present
-        if (context.CalorSource.Contains("§Q ") || context.CalorSource.Contains("§S "))
+        if (System.Text.RegularExpressions.Regex.IsMatch(context.CalorSource, @"^\s*(requires|=>)\s", System.Text.RegularExpressions.RegexOptions.Multiline))
         {
             questions.Add(new LlmComprehensionQuestion
             {
@@ -284,7 +284,7 @@ public class LlmEvaluationCalculator : IMetricCalculator
         }
 
         // Add effect-specific questions if effects are present
-        if (context.CalorSource.Contains("§E{"))
+        if (System.Text.RegularExpressions.Regex.IsMatch(context.CalorSource, @"^\s*!(\s|$)", System.Text.RegularExpressions.RegexOptions.Multiline))
         {
             questions.Add(new LlmComprehensionQuestion
             {

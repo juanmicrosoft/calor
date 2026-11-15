@@ -20,13 +20,14 @@ public class NullableReferenceTypingTests
         string value, string referenceType)
     {
         var source = $$"""
-            §M{LocalMemberAnnotations}
-              §CL{Foo:pub}
-                §FLD{?{{referenceType}}:Value:pub}
-                §MT{Probe:pub} (?{{referenceType}}:input) -> {{referenceType}}
-                  §B{first} {{value}}
-                  §B{second} first
-                  §R second
+            module LocalMemberAnnotations LocalMemberAnnotations block
+              class Foo
+                field {{referenceType}}?:Value
+                func Probe ({{referenceType}}?:input) → {{referenceType}}
+                  !
+                  let first = {{value}}
+                  let second = first
+                  return second
             """;
         var path = Path.Combine(Path.GetTempPath(), "local-member-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
@@ -56,12 +57,15 @@ public class NullableReferenceTypingTests
     public async Task NominalReturnDiagnostic_IsActiveAndClearsOnSafeEditAsync()
     {
         const string source = """
-            §M{NominalIdentity}
-              §CL{Foo:pub}
-                §MT{Get:pub:static} (?Foo:input) -> ?Foo
-                  §R input
-                §MT{Probe:pub:static} (?Foo:input) -> Foo
-                  §R §C{Foo.Get} §A input §/C
+            module NominalIdentity NominalIdentity block
+              class Foo
+                func Get static (Foo?:input) → Foo?
+                  !
+                  return input
+
+                func Probe static (Foo?:input) → Foo
+                  !
+                  return Foo.Get(input)
             """;
         var path = Path.Combine(Path.GetTempPath(), "nominal-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
@@ -86,11 +90,11 @@ public class NullableReferenceTypingTests
     public async Task SupportedNullableReferences_HaveNoSpuriousTypingDiagnosticsAsync(string type, string value)
     {
         var source = $$"""
-            §M{NullableTyping}
-              §F{Probe:pub} ({{type}}:input) -> {{type}}
-                §E{env}
-                §B{value:{{type}}} {{value}}
-                §R value
+            module NullableTyping NullableTyping block
+              func Probe ({{type}}:input) → {{type}}
+                ! env
+                let {{type}}:value = {{value}}
+                return value
             """;
         var path = Path.Combine(Path.GetTempPath(), "typing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
@@ -133,7 +137,7 @@ public class NullableReferenceTypingTests
                 && compiler.Severity == editor.Severity);
         }
         var update = await document.UpdateAsync(
-            "§M{NullableTyping}\n  §F{Probe:pub} (?str:input) -> ?str\n    §R input\n", 1);
+            "module NullableTyping NullableTyping block\n  func Probe (string?:input) → string?\n    !\n    return input\n", 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }

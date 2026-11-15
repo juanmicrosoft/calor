@@ -101,13 +101,10 @@ public class EffectDisciplineTests
     public void ScoreCalorBugPrevention_CompiledWithEffectAnnotations_ScoresWell()
     {
         var code = @"
-§M{Test}
-  §F{Calculate:pub}
-      §E{}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)";
+module Test Test block
+  func Calculate (int:a, int:b) → int
+    !
+    return (a + b)";
 
         var score = EffectDisciplineScorer.ScoreCalorBugPrevention(
             code: code,
@@ -336,13 +333,10 @@ public static int Add(int a, int b)
     public void ScoreMaintainability_CalorWithEffects_ScoresReasonably()
     {
         var code = @"
-§M{Calculator}
-  §F{CalculateTotal:pub}
-      §E{}
-      §I{i32:price}
-      §I{i32:quantity}
-      §O{i32}
-      §R (* price quantity)";
+module Calculator Calculator block
+  func CalculateTotal (int:price, int:quantity) → int
+    !
+    return (price * quantity)";
 
         var score = EffectDisciplineScorer.ScoreMaintainability(code, "calor");
 
@@ -420,12 +414,10 @@ public static class Solution
     public void CodeExecutor_PureCalorFunction_ExecutesCorrectly()
     {
         var calorCode = @"
-§M{Solution}
-  §F{Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)";
+module Solution Solution block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)";
 
         using var executor = new CodeExecutor(timeoutMs: 5000, contractMode: EmitContractMode.Release);
         var calorResult = executor.CompileCalor(calorCode);
@@ -695,7 +687,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{Solution}\n§F{Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\n",
+                "calor" => "module Solution Solution block\n  func Add (int:a, int:b) → int\n    !\n    return (a + b)\n",
                 _ => "public static class Solution { public static int Add(int a, int b) => a + b; }"
             };
 
@@ -730,7 +722,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{Solution}\n§F{Add:pub}\n  §E{}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\n",
+                "calor" => "module Solution Solution block\n  func Add (int:a, int:b) → int\n    !\n    return (a + b)\n",
                 _ => @"
 public static class Solution
 {
@@ -773,7 +765,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{Solution}\n§F{GetTime:pub}\n  §O{str}\n  §R \"now\"\n\n",
+                "calor" => "module Solution Solution block\n  func GetTime () → string\n    !\n    return \"now\"\n",
                 _ => @"
 public static class Solution
 {

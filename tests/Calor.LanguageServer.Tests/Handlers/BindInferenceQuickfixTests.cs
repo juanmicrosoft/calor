@@ -30,10 +30,10 @@ public class BindInferenceQuickfixTests
     public void Calor0252_VecEmpty_SurfacesVecFix()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                §O{void}
-                §B{xs} §C{Vec.empty}
+            module Test Test block
+              func Foo () → void
+                !
+                let xs = Vec.empty()
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -46,10 +46,10 @@ public class BindInferenceQuickfixTests
     public void Calor0253_AmbiguousNumeric_SurfacesF64Fix()
     {
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                §O{void}
-                §B{x} (+ INT:0 FLOAT:0.0)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (0 + 0.0)
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -64,10 +64,10 @@ public class BindInferenceQuickfixTests
         // Explicit type annotation bypasses strict-inference checks; the LSP
         // should not surface any Calor0251-0253 quick-fixes.
         var source = """
-            §M{Test}
-              §F{Foo:pub}
-                §O{void}
-                §B{x:?i32} null
+            module Test Test block
+              func Foo () → void
+                !
+                let int?:x = null
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
