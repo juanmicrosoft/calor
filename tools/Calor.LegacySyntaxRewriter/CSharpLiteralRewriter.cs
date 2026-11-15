@@ -75,8 +75,28 @@ internal sealed class CSharpLiteralRewriter
 
         foreach (var interpolated in root.DescendantNodes().OfType<InterpolatedStringExpressionSyntax>())
         {
-            if (interpolated.ToString().Contains('§'))
-                _log.Skip(path, Line(interpolated), "interpolated-string", null);
+            if (!interpolated.ToString().Contains('§'))
+                continue;
+            if (interpolated.Ancestors().Any(a => a is InterpolatedStringExpressionSyntax))
+                continue; // part of an outer template
+            var iline = Line(interpolated);
+            var refusal = TemplateRefusal(path, relative, iline, interpolated, keys: null);
+            if (refusal != null)
+            {
+                _log.Skip(path, iline, refusal.Value.Reason, refusal.Value.Detail);
+                continue;
+            }
+            if (ChainRoot(interpolated) != null)
+            {
+                _log.Skip(path, iline, "interpolated-string", "piece of a concatenation");
+                continue;
+            }
+            var edit = RewriteInterpolated(path, iline, interpolated, out var isFragment);
+            if (edit == null)
+                continue;
+            if (isFragment)
+                fragmentEdits.Add(interpolated.Span);
+            edits.Add((interpolated.Span, edit, iline, "interpolated"));
         }
 
         foreach (var token in root.DescendantTokens())
@@ -141,7 +161,12 @@ internal sealed class CSharpLiteralRewriter
                 var pieces = ChainLeaves(chain);
                 if (pieces.Any(piece => piece is not LiteralExpressionSyntax { Token.RawKind: (int)SyntaxKind.StringLiteralToken }))
                 {
-                    _log.Skip(path, line, "concatenation-nonliteral", null);
+                    var chainEdit = RewriteTemplateChain(path, line, chain, pieces, file.Text, out var chainFragment);
+                    if (chainEdit == null)
+                        continue;
+                    if (chainFragment)
+                        fragmentEdits.Add(chain.Span);
+                    edits.Add((chain.Span, chainEdit, line, "template-concatenation"));
                     continue;
                 }
                 var value = string.Concat(pieces.Select(piece => ((LiteralExpressionSyntax)piece).Token.ValueText));
@@ -246,6 +271,18 @@ internal sealed class CSharpLiteralRewriter
         file.Write(result);
     }
 
+    private RewriteResult TryRewriteValue(string value, out bool isFragment)
+    {
+        var trimmed = value.TrimStart();
+        isFragment = !(trimmed.StartsWith("§M{", StringComparison.Ordinal) || trimmed.StartsWith("§M ", StringComparison.Ordinal)
+            || trimmed.StartsWith("///", StringComparison.Ordinal));
+        if (isFragment)
+            return _fragments.Rewrite(value);
+        if (!_cache.TryGetValue(value, out var result))
+            _cache[value] = result = Rewriter.Rewrite(value);
+        return result;
+    }
+
     private string? RewriteValue(string path, int line, string value, out bool isFragment)
     {
         var trimmed = value.TrimStart();
@@ -269,6 +306,308 @@ internal sealed class CSharpLiteralRewriter
         }
         return result.Native;
     }
+
+    /// <summary>The same exclusions a plain literal gets, applied to a whole template expression.</summary>
+    private (string Reason, string? Detail)? TemplateRefusal(string path, string relative, int line, ExpressionSyntax node,
+        HashSet<string>? keys)
+    {
+        if (_skipList.Contains($"{relative}:{line}"))
+            return ("skip-list", null);
+        var marker = RejectionMarker(node);
+        if (marker != null)
+            return ("legacy-rejection-test", marker);
+        var patternUse = LegacyPatternUse(node);
+        if (patternUse != null)
+            return ("legacy-pattern-use", patternUse);
+        var inspection = InspectionUse((ExpressionSyntax?)ChainRoot(node) ?? node);
+        if (inspection != null)
+            return ("string-inspection-argument", inspection);
+        return null;
+    }
+
+    /// <summary>
+    /// Runs a template through <see cref="TemplateRewriter"/>, shaping each candidate's native
+    /// text like the legacy text it replaces (newline convention, trailing newline, leading
+    /// blank lines). Logs the failure, if any.
+    /// </summary>
+    private List<TemplatePart>? RewriteTemplate(string path, int line, List<TemplatePart> parts, List<string> holeTexts,
+        out bool isFragment)
+    {
+        isFragment = false;
+        if (holeTexts.Any(h => h.Contains('§')))
+        {
+            _log.Skip(path, line, "template-hole-legacy", holeTexts.First(h => h.Contains('§')));
+            return null;
+        }
+        if (holeTexts.Any(h => h.Contains('\n')))
+        {
+            _log.Skip(path, line, "template-hole-multiline", null);
+            return null;
+        }
+        var text = string.Concat(parts.OfType<TextPart>().Select(p => p.Text));
+        var newline = TextFile.UniformNewline(text) ?? "\n";
+        var fragment = false;
+        var (native, reason, detail) = TemplateRewriter.Rewrite(parts, legacy =>
+        {
+            var result = TryRewriteValue(legacy, out fragment);
+            return result.Ok ? result with { Native = Preserve(legacy, TextFile.Shape(result.Native!, legacy, newline)) } : result;
+        });
+        if (native == null)
+        {
+            _log.Skip(path, line, reason!, detail);
+            return null;
+        }
+        isFragment = fragment;
+        return native;
+    }
+
+    private string? RewriteInterpolated(string path, int line, InterpolatedStringExpressionSyntax node, out bool isFragment)
+    {
+        isFragment = false;
+        var start = node.StringStartToken.Text;
+        var raw = start.Contains("\"\"\"", StringComparison.Ordinal);
+        if (raw && !node.StringStartToken.IsKind(SyntaxKind.InterpolatedMultiLineRawStringStartToken))
+        {
+            _log.Skip(path, line, "interpolated-string", "single-line raw");
+            return null;
+        }
+        var (parts, holeTexts) = ReadInterpolated(node);
+        var native = RewriteTemplate(path, line, parts, holeTexts, out isFragment);
+        if (native == null)
+            return null;
+        var encoded = EncodeInterpolated(node, native, holeTexts);
+        if (encoded == null)
+        {
+            _log.Skip(path, line, "interpolated-encoding", null);
+            return null;
+        }
+        var reparsed = SyntaxFactory.ParseExpression(encoded, options: new CSharpParseOptions(LanguageVersion.Preview));
+        if (reparsed is not InterpolatedStringExpressionSyntax again || reparsed.GetDiagnostics().Any()
+            || reparsed.FullSpan.Length != encoded.Length || !SameParts(ReadInterpolated(again), native, holeTexts))
+        {
+            _log.Skip(path, line, "encoding-check-failed", "interpolated");
+            return null;
+        }
+        return encoded;
+    }
+
+    private static (List<TemplatePart> Parts, List<string> Holes) ReadInterpolated(InterpolatedStringExpressionSyntax node)
+    {
+        var parts = new List<TemplatePart>();
+        var holes = new List<string>();
+        foreach (var content in node.Contents)
+        {
+            if (content is InterpolatedStringTextSyntax text)
+            {
+                if (parts.Count > 0 && parts[^1] is TextPart previous)
+                    parts[^1] = new TextPart(previous.Text + text.TextToken.ValueText);
+                else
+                    parts.Add(new TextPart(text.TextToken.ValueText));
+            }
+            else
+            {
+                parts.Add(new HolePart(holes.Count));
+                holes.Add(content.ToString());
+            }
+        }
+        return (parts, holes);
+    }
+
+    private static bool SameParts((List<TemplatePart> Parts, List<string> Holes) actual, List<TemplatePart> intended,
+        List<string> holeTexts)
+    {
+        static List<TemplatePart> Merge(List<TemplatePart> parts)
+        {
+            var merged = new List<TemplatePart>();
+            foreach (var p in parts)
+            {
+                if (p is TextPart { Text.Length: 0 })
+                    continue;
+                if (p is TextPart t && merged.Count > 0 && merged[^1] is TextPart prev)
+                    merged[^1] = new TextPart(prev.Text + t.Text);
+                else
+                    merged.Add(p);
+            }
+            return merged;
+        }
+        static string Flat(List<TemplatePart> parts, Func<int, string> hole) =>
+            string.Concat(parts.Select(p => p is TextPart t ? "T:" + t.Text + "\u0001" : "H:" + hole(((HolePart)p).Index) + "\u0001"));
+        return Flat(Merge(actual.Parts), i => actual.Holes[i]) == Flat(Merge(intended), i => holeTexts[i]);
+    }
+
+    private static string? EncodeInterpolated(InterpolatedStringExpressionSyntax node, List<TemplatePart> parts, List<string> holeTexts)
+    {
+        var start = node.StringStartToken.Text;
+        if (start.Contains("\"\"\"", StringComparison.Ordinal))
+        {
+            var dollars = start.TakeWhile(c => c == '$').Count();
+            var original = node.ToString();
+            var newline = original.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+            var content = new StringBuilder();
+            foreach (var part in parts)
+            {
+                if (part is TextPart t)
+                {
+                    if (LongestRun(t.Text, '{') >= dollars || LongestRun(t.Text, '}') >= dollars)
+                        return null;
+                    content.Append(t.Text);
+                }
+                else
+                    content.Append(holeTexts[((HolePart)part).Index]);
+            }
+            var value = content.ToString().Replace("\r\n", "\n");
+            if (value.EndsWith('\n'))
+                return null; // a raw literal cannot end with a line break
+            var lastBreak = original.LastIndexOf('\n');
+            var indent = new string(original[(lastBreak + 1)..].TakeWhile(c => c is ' ' or '\t').ToArray());
+            var quotes = Math.Max(start.Count(c => c == '"'), LongestQuoteRun(value) + 1);
+            var delimiter = new string('"', quotes);
+            var sb = new StringBuilder(new string('$', dollars)).Append(delimiter).Append(newline);
+            foreach (var l in value.Split('\n'))
+            {
+                if (l.Length > 0)
+                    sb.Append(indent).Append(l);
+                sb.Append(newline);
+            }
+            return sb.Append(indent).Append(delimiter).ToString();
+        }
+
+        var verbatim = start.Contains('@');
+        var body = new StringBuilder();
+        foreach (var part in parts)
+        {
+            if (part is TextPart t)
+            {
+                var escaped = verbatim ? t.Text.Replace("\"", "\"\"") : EncodeRegular(t.Text)[1..^1];
+                body.Append(escaped.Replace("{", "{{").Replace("}", "}}"));
+            }
+            else
+                body.Append(holeTexts[((HolePart)part).Index]);
+        }
+        return start + body + "\"";
+    }
+
+    private static int LongestRun(string value, char c)
+    {
+        var best = 0;
+        var run = 0;
+        foreach (var x in value)
+        {
+            run = x == c ? run + 1 : 0;
+            best = Math.Max(best, run);
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// A + chain mixing string literals with other operands: the literals are template
+    /// text, the other operands are holes. Re-emitted as a chain with the same operands in
+    /// the same order; the first operand keeps its kind (C# + is left-associative).
+    /// </summary>
+    private string? RewriteTemplateChain(string path, int line, BinaryExpressionSyntax chain, List<ExpressionSyntax> pieces,
+        string fileText, out bool isFragment)
+    {
+        isFragment = false;
+        var parts = new List<TemplatePart>();
+        var holeTexts = new List<string>();
+        var verbatim = false;
+        foreach (var piece in pieces)
+        {
+            if (piece is LiteralExpressionSyntax { Token.RawKind: (int)SyntaxKind.StringLiteralToken } literal)
+            {
+                verbatim |= literal.Token.Text.StartsWith('@');
+                if (parts.Count > 0 && parts[^1] is TextPart previous)
+                    parts[^1] = new TextPart(previous.Text + literal.Token.ValueText);
+                else
+                    parts.Add(new TextPart(literal.Token.ValueText));
+                continue;
+            }
+            if (piece.ToString().Contains('§'))
+            {
+                _log.Skip(path, line, "concatenation-nonliteral", "operand holds legacy text: " + Clip(piece.ToString()));
+                return null;
+            }
+            parts.Add(new HolePart(holeTexts.Count));
+            holeTexts.Add(piece.ToString());
+        }
+        var native = RewriteTemplate(path, line, parts, holeTexts, out isFragment);
+        if (native == null)
+            return null;
+
+        // Elements: holes verbatim; text split one literal per line (verbatim: one literal).
+        var elements = new List<(string Code, bool EndsLine, bool IsText)>();
+        foreach (var part in native)
+        {
+            if (part is HolePart h)
+            {
+                elements.Add((holeTexts[h.Index], false, false));
+                continue;
+            }
+            var text = ((TextPart)part).Text;
+            if (text.Length == 0)
+                continue;
+            if (verbatim)
+                elements.Add((EncodeVerbatim(text), text.EndsWith('\n'), true));
+            else
+                foreach (var l in SplitKeepingNewlines(text, "\n"))
+                    elements.Add((EncodeRegular(l), l.EndsWith('\n'), true));
+        }
+        if (elements.Count == 0 || elements[0].IsText != pieces[0] is LiteralExpressionSyntax
+            || !elements[0].IsText && elements.Count > 1 && !elements[1].IsText)
+        {
+            _log.Skip(path, line, "encoding-check-failed", "template chain head");
+            return null;
+        }
+        var multiLine = chain.ToString().Contains('\n');
+        var leading = chain.DescendantTokens().Any(t => t.IsKind(SyntaxKind.PlusToken)
+            && t.GetPreviousToken().TrailingTrivia.Any(tr => tr.IsKind(SyntaxKind.EndOfLineTrivia)));
+        var second = pieces[1];
+        var lineStart = fileText.LastIndexOf('\n', Math.Max(0, second.SpanStart - 1)) + 1;
+        var indent = new string(fileText.AsSpan(lineStart, second.SpanStart - lineStart).ToString()
+            .TakeWhile(char.IsWhiteSpace).ToArray());
+        var fileNewline = fileText.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        var sb = new StringBuilder();
+        for (var i = 0; i < elements.Count; i++)
+        {
+            if (i == 0)
+                sb.Append(elements[i].Code);
+            else if (!multiLine || !elements[i - 1].EndsLine)
+                sb.Append(" + ").Append(elements[i].Code);
+            else if (leading)
+                sb.Append(fileNewline).Append(indent).Append("+ ").Append(elements[i].Code);
+            else
+                sb.Append(" +").Append(fileNewline).Append(indent).Append(elements[i].Code);
+        }
+        var encoded = sb.ToString();
+
+        // Check: same operands in order, literal text equal to the native template text.
+        var reparsed = SyntaxFactory.ParseExpression(encoded, options: new CSharpParseOptions(LanguageVersion.Preview));
+        if (reparsed.GetDiagnostics().Any() || reparsed.FullSpan.Length != encoded.Length)
+        {
+            _log.Skip(path, line, "encoding-check-failed", "template chain parse");
+            return null;
+        }
+        var readParts = new List<TemplatePart>();
+        var readHoles = new List<string>();
+        foreach (var leaf in ChainLeaves(reparsed))
+        {
+            if (leaf is LiteralExpressionSyntax { Token.RawKind: (int)SyntaxKind.StringLiteralToken } lit)
+                readParts.Add(new TextPart(lit.Token.ValueText));
+            else
+            {
+                readParts.Add(new HolePart(readHoles.Count));
+                readHoles.Add(leaf.ToString());
+            }
+        }
+        if (!SameParts((readParts, readHoles), native, holeTexts))
+        {
+            _log.Skip(path, line, "encoding-check-failed", "template chain");
+            return null;
+        }
+        return encoded;
+    }
+
+    private static string Clip(string s) => s.Length > 80 ? s[..80] : s;
 
     /// <summary>Keeps any leading blank lines the original value had.</summary>
     private static string Preserve(string original, string shaped)
@@ -360,7 +699,7 @@ internal sealed class CSharpLiteralRewriter
     /// edits with legacy patterns (`Source.Replace("§F{C:pub}...", ...)`): the patterns stay
     /// legacy, so the stored text must too.
     /// </summary>
-    private static string? LegacyPatternUse(LiteralExpressionSyntax literal)
+    private static string? LegacyPatternUse(SyntaxNode literal)
     {
         string? name = null;
         SyntaxNode? scope = null;

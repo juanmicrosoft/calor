@@ -230,7 +230,9 @@ public class MultilineCallExpressionTests
     }
 
     private static string ProgramSource(string body) =>
-        "§M{Calls}\n  §F{Probe:pub} () -> i32\n    §E{}\n"
+        "module Calls Calls block\n"
+        + "  func Probe () → int\n"
+        + "    !\n"
         + string.Join("\n", body.Split('\n').Select(line => "    " + line)) + "\n";
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)

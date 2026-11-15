@@ -105,6 +105,15 @@ Fragments are only rewritten in files that keep no other legacy program after th
 their consumer is still a legacy template, and a native fragment in a legacy template helps
 nobody.
 
+Templates with holes (interpolated strings, and `+` chains with non-literal operands) go
+through `TemplateRewriter`: each hole becomes a placeholder the legacy parser accepts (the
+call statement `§C{zqhNq} §/C` when the hole fills a whole line, otherwise the identifier
+`zqhNq`), the text goes through the full oracle, and the placeholders are turned back into
+the original hole expressions. Each placeholder must appear exactly once, in the same role
+(and, for a hole that carries its own indentation, at the column that was tried). The
+re-encoded expression is parsed again and must hold the same holes in the same order with
+the intended text between them. Holes whose expression contains `§` are refused.
+
 `skip-list.txt` (`--skip-list`) names literals (`path:line` of the legacy original) that the
 oracle accepts but a test run rejects. Rewriting a test project is only kept when its failing
 test names after the rewrite are a subset of those before it.

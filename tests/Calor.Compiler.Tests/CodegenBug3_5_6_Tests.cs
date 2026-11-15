@@ -480,12 +480,12 @@ module Test Test block
     public void Bug5_ArithmeticExpression(int left, int right, string expected)
     {
         var source = $$"""
-            §M{Test}
-              §F{Get:pub} () -> string
-                §E{}
-                §B{a} {{left}}
-                §B{b} {{right}}
-                §R "${a + b}"
+            module Test Test block
+              func Get () → string
+                !
+                let a = {{left}}
+                let b = {{right}}
+                return "${(a + b)}"
             """;
 
         var result = ParseAndEmit(source);
@@ -560,10 +560,10 @@ module Test Test block
     public void Bug5_RuntimeAndEscapedLiteralHoles_CompileAndRun(string literal, string expected, string value)
     {
         var source = $$"""
-            §M{Test}
-              §F{Get:pub} () -> string
-                §E{}
-                §R {{literal}}
+            module Test Test block
+              func Get () → string
+                !
+                return {{literal}}
             """;
         var result = Program.Compile(source, "holes.calr");
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));

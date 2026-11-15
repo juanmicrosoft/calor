@@ -68,9 +68,10 @@ public sealed class StageBReceivingSurfaceTests
     public void UnrelatedTypeMismatchesAreNotDelegatedToNullability(string sourceType, string targetType)
     {
         var source = NativeCounterpart($$"""
-            §M{UnsupportedPayload}
-              §F{Probe:pub} ({{sourceType}}:value) -> void
-                §B{required:{{targetType}}} value
+            module UnsupportedPayload UnsupportedPayload block
+              func Probe ({{sourceType}}:value) → void
+                !
+                let {{targetType}}:required = value
             """, NativeMismatchSource(sourceType, targetType));
         var result = Program.Compile(source, "unsupported-payload.calr", new CompilationOptions
         {

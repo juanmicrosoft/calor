@@ -397,11 +397,10 @@ public class TypeSystemTests
     public void RemovedResultShorthand_DoesNotExpandOrCompile(string typeName)
     {
         var source = $$"""
-            §M{Test}
-              §F{TryParse:pub}
-                  §I{str:input}
-                  §O{{{typeName}}}
-                  §R INT:42
+            module Test Test block
+              func TryParse (string:input) → {{typeName}}
+                !
+                return 42
             """;
 
         var module = Parse(source, out _);

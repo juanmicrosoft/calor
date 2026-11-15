@@ -22,10 +22,11 @@ public sealed class ValidationLoopTests : IDisposable
     private void WriteFixture(bool failing = false, string? contract = null, string? testBody = null)
     {
         File.WriteAllText(SourcePath, $$"""
-            §M{MathUtil}
-              §F{Add:pub} (i32:a, i32:b) -> i32
+            module MathUtil MathUtil block
+              func Add (int:a, int:b) → int
+                !
                 {{contract ?? ""}}
-                §R (+ a {{(failing ? "(+ b 1)" : "b")}})
+                return (a + {{(failing ? "(+ b 1)" : "b")}})
             """);
         Directory.CreateDirectory(Path.Combine(_directory, "tests"));
         File.WriteAllText(Path.Combine(_directory, "tests", "MathTests.cs"), $$"""

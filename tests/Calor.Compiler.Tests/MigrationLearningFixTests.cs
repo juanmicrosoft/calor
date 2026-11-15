@@ -153,13 +153,16 @@ public class MigrationLearningFixTests
     {
         var result = Program.Compile(
             $$"""
-            §M{Keywords}
-              §F{Local:pub} (i32:input) -> i32
-                §B{~{{keyword}}:i32} input
-                §B{~{{keyword}}:i32} (+ {{keyword}} 1)
-                §R {{keyword}}
-              §F{Parameter:pub} (i32:{{keyword}}) -> i32
-                §R {{keyword}}
+            module Keywords Keywords block
+              func Local (int:input) → int
+                !
+                var int:{{keyword}} = input
+                var int:{{keyword}} = ({{keyword}} + 1)
+                return {{keyword}}
+
+              func Parameter (int:{{keyword}}) → int
+                !
+                return {{keyword}}
             """);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));

@@ -21,11 +21,10 @@ public class StringBuilderOperationTests
     private static string WrapInFunction(string body)
     {
         return $$"""
-            §M{Test}
-              §F{Main:pub}
-                  §I{object:sb}
-                  §O{object}
-                  {{body}}
+            module Test Test block
+              func Main (object:sb) → object
+                !
+                {{body}}
             """;
     }
 

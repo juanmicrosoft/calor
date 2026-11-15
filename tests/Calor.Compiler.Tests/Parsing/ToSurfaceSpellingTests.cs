@@ -285,11 +285,14 @@ public class ToSurfaceSpellingTests
     public void MeasuredTypes_ParserFormatterAndCSharpAgree(string type)
     {
         var source = $$"""
-            §M{Types}
-              §CL{OtherType:pub}
-              §CL{MyType<T>:pub}
-              §F{Echo:pub} ({{type}}:value) -> {{type}}
-                §R value
+            module Types Types block
+              class OtherType
+
+              class MyType<T>
+
+              func Echo ({{type}}:value) → {{type}}
+                !
+                return value
             """;
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();

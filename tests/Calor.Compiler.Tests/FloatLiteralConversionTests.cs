@@ -30,11 +30,11 @@ public sealed class FloatLiteralConversionTests
     public void BareSingleLiterals_PreserveRuntimeWidthAndValue(string literal)
     {
         var source = $$"""
-            §M{Singles}
-              §M{Migrated:pub}
-                §MT{Probe:pub:stat} () -> object
-                  §E{}
-                  §R {{literal}}
+            module Singles Singles block
+              module Migrated
+                func Probe () → object
+                  !
+                  return {{literal}}
             """;
         var compiled = Program.Compile(source, "single.calr",
             new CompilationOptions { EnableTypeChecking = true, EnforceEffects = false, StatusWriter = TextWriter.Null });

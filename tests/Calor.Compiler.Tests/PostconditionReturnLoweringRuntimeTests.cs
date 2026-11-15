@@ -446,9 +446,10 @@ public class PostconditionReturnLoweringRuntimeTests
         string nestedBody)
     {
         var source = $$"""
-            §M{NestedYield}
-              §F{Values:pub} (i32:value, Dictionary<str,i32>:items, [i32]:array, object:gate) -> i32
-                §S (>= result 0)
+            module NestedYield NestedYield block
+              func Values (int:value, Dictionary<string, int>:items, int[]:array, object:gate) → int
+                !
+                => (result >= 0)
             {{Indent(nestedBody, 4)}}
             """;
 

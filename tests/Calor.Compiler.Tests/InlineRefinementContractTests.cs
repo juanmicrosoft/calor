@@ -89,11 +89,14 @@ public sealed class InlineRefinementContractTests
     public void CallerObligations_SubstituteArgumentsSimultaneously(string call, ObligationStatus expected)
     {
         var source = $$"""
-            §M{Refined}
-              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
-                §R hi
-              §F{Caller:pub} (i32:lo | (> # hi), i32:hi) -> i32
-                §R {{call}}
+            module Refined Refined block
+              func Upper (int:lo, int:hi | (# > lo)) → int
+                !
+                return hi
+
+              func Caller (int:lo | (# > hi), int:hi) → int
+                !
+                return {{call}}
             """;
         var module = Parse(source);
         var tracker = Solve(module);
@@ -179,9 +182,10 @@ public sealed class InlineRefinementContractTests
     public void InvalidRefinement_UsesPredicateSourceSpan(string predicate, string code)
     {
         var source = $$"""
-            §M{Refined}
-              §F{Upper:pub} (i32:x | {{predicate}}) -> i32
-                §R x
+            module Refined Refined block
+              func Upper (int:x | {{predicate}}) → int
+                !
+                return x
             """;
         var result = Program.Compile(source, "invalid.calr");
         Assert.True(result.HasErrors);

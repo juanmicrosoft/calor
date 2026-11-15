@@ -735,9 +735,10 @@ module Test Test block
         Assert.Equal("§C{Identity} 1", emitted);
 
         var source = $$"""
-§M{Test}
-  §F{Bar:pub}
-      §B{x} {{emitted}}
+module Test Test block
+  func Bar ()
+    !
+    let x = {{emitted}}
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -762,9 +763,10 @@ module Test Test block
 
         // Wrap in a binding so we can re-parse it.
         var source = $$"""
-§M{Test}
-  §F{Bar:pub}
-      §B{x} {{emitted}}
+module Test Test block
+  func Bar ()
+    !
+    let x = {{emitted}}
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -810,9 +812,10 @@ module Test Test block
 
         // Wrap in a binding context to round-trip through the parser.
         var source = $$"""
-§M{Test}
-  §F{Foo:pub}
-      §B{x:i32} {{emitted}}
+module Test Test block
+  func Foo ()
+    !
+    let int:x = {{emitted}}
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -846,9 +849,10 @@ module Test Test block
         Assert.Contains("§C{A} §/C", emitted);
 
         var source = $$"""
-§M{Test}
-  §F{Foo:pub}
-      §B{x:T} {{emitted}}
+module Test Test block
+  func Foo ()
+    !
+    let T:x = {{emitted}}
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,

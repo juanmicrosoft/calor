@@ -293,9 +293,10 @@ public class RunTestCommandTests : IDisposable
         Directory.CreateDirectory(Path.Combine(dir, "tests"));
 
         File.WriteAllText(Path.Combine(dir, "mathutil.calr"), $$"""
-            §M{MathUtil}
-              §F{Add:pub} (i32:a, i32:b) -> i32
-                §R (+ a {{(withBug ? "(+ b INT:1)" : "b")}})
+            module MathUtil MathUtil block
+              func Add (int:a, int:b) → int
+                !
+                return (a + {{(withBug ? "(+ b INT:1)" : "b")}})
             """);
 
         File.WriteAllText(Path.Combine(dir, "tests", "MathUtilTests.cs"), """

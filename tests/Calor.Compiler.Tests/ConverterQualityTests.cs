@@ -41,8 +41,10 @@ public class ConverterQualityTests
         var expression = fallback.Accept(new CalorEmitter());
         Assert.Equal($"§CS{{{original}}}", expression);
         Assert.DoesNotContain("§ERR", expression);
-        var source = "§M{FallbackRoundTrip}\n"
-            + "  §F{Probe:pub} () -> str\n    §R " + expression;
+        var source = "module FallbackRoundTrip FallbackRoundTrip block\n"
+            + "  func Probe () → string\n"
+            + "    !\n"
+            + "    return " + expression;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));

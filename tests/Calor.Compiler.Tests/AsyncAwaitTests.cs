@@ -1169,13 +1169,16 @@ public class AsyncAwaitTests
     {
         var binding = typed ? $"pending:{bindingType}" : "pending";
         var assembly = CompileAndLoad($$"""
-            §M{AsyncNative}
-              §AF{Produce:pub} () -> {{output}}
-                §R 42
-              §AF{Consume:pub} () -> i32
-                §B{ {{binding}} } §C{Produce} §/C
-                §B{value:i32} §AWAIT pending
-                §R value
+            module AsyncNative AsyncNative block
+              func Produce async () → {{output}}
+                !
+                return 42
+
+              func Consume async () → int
+                !
+                let {{binding}} = Produce()
+                let int:value = await pending
+                return value
             """);
         var module = assembly.GetType("AsyncNative.AsyncNativeModule", throwOnError: true)!;
         Assert.Equal(bindingType.StartsWith("ValueTask", StringComparison.Ordinal)
@@ -1190,11 +1193,14 @@ public class AsyncAwaitTests
     public async Task Compile_AsyncVoidBody_UsesVoidAwaitResult(string output)
     {
         var assembly = CompileAndLoad($$"""
-            §M{AsyncVoidNative}
-              §AF{Produce:pub} () -> {{output}}
-                §R
-              §AF{Consume:pub} () -> void
-                §AWAIT §C{Produce} §/C
+            module AsyncVoidNative AsyncVoidNative block
+              func Produce async () → {{output}}
+                !
+                return
+
+              func Consume async () → void
+                !
+                await Produce()
             """);
         var module = assembly.GetType("AsyncVoidNative.AsyncVoidNativeModule", throwOnError: true)!;
         Assert.Equal(output == "ValueTask" ? typeof(ValueTask) : typeof(Task),
@@ -1211,12 +1217,15 @@ public class AsyncAwaitTests
     public void Compile_AsyncWrongResult_IsRejected(string statement)
     {
         var result = Program.Compile($$"""
-            §M{AsyncRejected}
-              §AF{Produce:pub} () -> i32
-                §R 42
-              §AF{Consume:pub} () -> i32
+            module AsyncRejected AsyncRejected block
+              func Produce async () → int
+                !
+                return 42
+
+              func Consume async () → int
+                !
                 {{statement}}
-                §R 42
+                return 42
             """, "async-rejected.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -1341,14 +1350,18 @@ public class AsyncAwaitTests
     public async Task Compile_CustomTaskNames_AreBodyValuesNotBclCarriers(string name)
     {
         var assembly = CompileAndLoad($$"""
-            §M{AsyncCustom}
-              §CL{ {{name}}:pub}<T>
-              §AF{Produce:pub} ({{name}}<i32>:value) -> {{name}}<i32>
-                §S (== result value)
-                §R value
-              §AF{Consume:pub} ({{name}}<i32>:value) -> {{name}}<i32>
-                §B{pending:global::System.Threading.Tasks.Task<{{name}}<i32>>} §C{Produce} §A value §/C
-                §R §AWAIT pending
+            module AsyncCustom AsyncCustom block
+              class {{name}}<T>
+
+              func Produce async ({{name}}<int>:value) → {{name}}<int>
+                !
+                => (result == value)
+                return value
+
+              func Consume async ({{name}}<int>:value) → {{name}}<int>
+                !
+                let global::System.Threading.Tasks.Task<{{name}}<int>>:pending = Produce(value)
+                return await pending
             """);
         var module = assembly.GetType("AsyncCustom.AsyncCustomModule", throwOnError: true)!;
         var custom = assembly.GetType($"AsyncCustom.{name}`1", throwOnError: true)!.MakeGenericType(typeof(int));
@@ -1404,10 +1417,11 @@ public class AsyncAwaitTests
     public async Task Compile_AsyncLambda_UsesDelegateBodyResult(string carrier)
     {
         var assembly = CompileAndLoad($$"""
-            §M{AsyncLambda}
-              §AF{Consume:pub} () -> i32
-                §B{factory:Func<{{carrier}}>} §LAM{async} 42 §/LAM
-                §R §AWAIT §C{factory} §/C
+            module AsyncLambda AsyncLambda block
+              func Consume async () → int
+                !
+                let Func<{{carrier}}>:factory = async () => 42
+                return await factory()
             """);
         var module = assembly.GetType("AsyncLambda.AsyncLambdaModule", throwOnError: true)!;
         Assert.Equal(42, await (Task<int>)module.GetMethod("Consume")!.Invoke(null, null)!);
@@ -1419,10 +1433,11 @@ public class AsyncAwaitTests
     public void Compile_VoidAwaitCannotInitializeValue(string carrier)
     {
         var result = Program.Compile($$"""
-            §M{AsyncVoidRejected}
-              §AF{Consume:pub} ({{carrier}}:pending) -> i32
-                §B{value:i32} §AWAIT pending
-                §R value
+            module AsyncVoidRejected AsyncVoidRejected block
+              func Consume async ({{carrier}}:pending) → int
+                !
+                let int:value = await pending
+                return value
             """, "async-void-rejected.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -1434,10 +1449,12 @@ public class AsyncAwaitTests
     public void Compile_CustomTaskCannotBeAwaitedAsBclCarrier(string name)
     {
         var result = Program.Compile($$"""
-            §M{AsyncCustomRejected}
-              §CL{ {{name}}:pub}<T>
-              §AF{Consume:pub} ({{name}}<i32>:pending) -> i32
-                §R §AWAIT pending
+            module AsyncCustomRejected AsyncCustomRejected block
+              class {{name}}<T>
+
+              func Consume async ({{name}}<int>:pending) → int
+                !
+                return await pending
             """, "async-custom-rejected.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -1450,12 +1467,15 @@ public class AsyncAwaitTests
     public async Task Compile_AsyncPostcondition_DescribesBodyResult(string output)
     {
         var assembly = CompileAndLoad($$"""
-            §M{AsyncContracts}
-              §AF{Produce:pub} () -> {{output}}
-                §S (> result 0)
-                §R 42
-              §AF{Consume:pub} () -> i32
-                §R §AWAIT §C{Produce} §/C
+            module AsyncContracts AsyncContracts block
+              func Produce async () → {{output}}
+                !
+                => (result > 0)
+                return 42
+
+              func Consume async () → int
+                !
+                return await Produce()
             """);
         var module = assembly.GetType("AsyncContracts.AsyncContractsModule", throwOnError: true)!;
         Assert.Equal(42, await (Task<int>)module.GetMethod("Consume")!.Invoke(null, null)!);
@@ -1482,9 +1502,10 @@ public class AsyncAwaitTests
     public void Compile_AsyncLambdaWrongTargetOrBody_IsRejected(string target)
     {
         var result = Program.Compile($$"""
-            §M{AsyncLambdaRejected}
-              §F{Probe:pub} () -> void
-                §B{factory:{{target}}} §LAM{async} 42 §/LAM
+            module AsyncLambdaRejected AsyncLambdaRejected block
+              func Probe () → void
+                !
+                let {{target}}:factory = async () => 42
             """, "async-lambda-rejected.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -1560,9 +1581,10 @@ public class AsyncAwaitTests
     public void Compile_BoundAsyncLambda_PreservesContextualCarrier(string carrier)
     {
         var result = Program.Compile($$"""
-            §M{AsyncLambdaBound}
-              §F{Probe:pub} () -> void
-                §B{factory:Func<{{carrier}}<i32>>} §LAM{async} 42 §/LAM
+            module AsyncLambdaBound AsyncLambdaBound block
+              func Probe () → void
+                !
+                let Func<{{carrier}}<int>>:factory = async () => 42
             """, "async-lambda-bound.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
         var diagnostics = new DiagnosticBag();
@@ -1601,12 +1623,13 @@ public class AsyncAwaitTests
     public async Task Compile_OuterClassCarrierTypeParameter_IsAValueReturn(string parameter)
     {
         var assembly = CompileAndLoad($$"""
-            §M{AsyncNestedClass}
-              §CL{Outer:pub}<{{parameter}}>
-                §CL{Inner:pub}
-                  §AMT{Produce:pub} ({{parameter}}:value) -> {{parameter}}
-                    §S true
-                    §R value
+            module AsyncNestedClass AsyncNestedClass block
+              class Outer<{{parameter}}>
+                class Inner
+                  func Produce async ({{parameter}}:value) → {{parameter}}
+                    !
+                    => true
+                    return value
             """);
         var type = assembly.GetType("AsyncNestedClass.Outer`1+Inner", throwOnError: true)!.MakeGenericType(typeof(int));
         var method = type.GetMethod("Produce")!;
@@ -1647,12 +1670,13 @@ public class AsyncAwaitTests
     public void Compile_ContractAdapter_PreservesAsyncAndEnclosingClassParameters(string parameter)
     {
         var compilation = Program.Compile($$"""
-            §M{AsyncContractContext}
-              §CL{Outer:pub}<{{parameter}}>
-                §CL{Inner:pub}<T>
-                  §AMT{Produce:pub}<U> ({{parameter}}:value) -> {{parameter}}
-                    §S true
-                    §R value
+            module AsyncContractContext AsyncContractContext block
+              class Outer<{{parameter}}>
+                class Inner<T>
+                  func Produce<U> async ({{parameter}}:value) → {{parameter}}
+                    !
+                    => true
+                    return value
             """, "async-contract-context.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.NotNull(compilation.Ast);
         var enumerate = typeof(Verification.Z3.ContractVerificationPass).GetMethod("EnumerateContractBearers",
@@ -1686,11 +1710,12 @@ public class AsyncAwaitTests
             VerificationCacheOptions = Verification.Z3.Cache.VerificationCacheOptions.Disabled
         };
         var compilation = Program.Compile($$"""
-            §M{AsyncMethodProof}
-              §CL{Box:pub}<Task>
-                §AMT{Produce:pub} () -> {{output}}
-                  §S (== result 42)
-                  §R 42
+            module AsyncMethodProof AsyncMethodProof block
+              class Box<Task>
+                func Produce async () → {{output}}
+                  !
+                  => (result == 42)
+                  return 42
             """, "async-method-proof.calr", options);
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
         Assert.NotNull(options.VerificationResults);

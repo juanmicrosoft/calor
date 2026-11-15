@@ -102,8 +102,9 @@ public sealed class TaintAnalysisCfgTests
               §F{Run:pub} ({{parameters}}) -> void
                 {{(expression ? "§B{result} " : "")}}§C{Wrapper} {{wrapperArguments}} §/C
             """ : $$"""
-            §M{NamedDirect}
-              §F{Run:pub} ({{parameters}}) -> void
+            module NamedDirect NamedDirect block
+              func Run ({{parameters}}:) → void
+                !
                 {{bcl}}
             """;
         var parsing = new DiagnosticBag();

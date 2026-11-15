@@ -21,10 +21,10 @@ public class ConditionalEvaluationMigrationTests
     public void NamedStaticPrimitiveProducer_RetainsExactMetadataForItsReceivingCall(string receiver)
     {
         var source = $$"""
-            §M{Probe}
-              §F{Read:pub} () -> int
-                §E{}
-                §R §C{ {{receiver}}.Max} §A §C{ {{receiver}}.Min} §A 8 §A 3 §/C §A 7 §/C
+            module Probe Probe block
+              func Read () → int
+                !
+                return {{receiver}}.Max({{receiver}}.Min(8, 3), 7)
             """;
         var diagnostics = new DiagnosticBag();
         var ast = new Parsing.Parser(new Parsing.Lexer(source, diagnostics)
@@ -151,10 +151,11 @@ public class ConditionalEvaluationMigrationTests
     {
         var diagnostics = new DiagnosticBag();
         var ast = new Parsing.Parser(new Parsing.Lexer($$"""
-            §M{Probe}
-              §F{Read:pub} (object:value, object:other) -> bool
-                §B{missing} §C{Missing} §/C
-                §R §C{value.Equals} §A {{argument}} §/C
+            module Probe Probe block
+              func Read (object:value, object:other) → bool
+                !
+                let missing = Missing()
+                return value.Equals({{argument}})
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
         var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
@@ -860,8 +861,9 @@ public class ConditionalEvaluationMigrationTests
     public void UnsupportedArgumentModifiers_AreDiagnosed(string statement)
     {
         var source = $$"""
-            §M{Probe}
-              §F{Run:pub} () -> void
+            module Probe Probe block
+              func Run () → void
+                !
                 {{statement}}
             """;
         var diagnostics = new DiagnosticBag();
@@ -878,13 +880,16 @@ public class ConditionalEvaluationMigrationTests
     public void NativeConditionalArraySizes_SurvivePrettyRoundTrip(string gate, string size, int expected)
     {
         var source = $$"""
-            §M{Probe}
-              §F{Size:pub} () -> i32
-                §R 3
-              §F{Run:pub} () -> i32
-                §B{n:i32} 2
-                §B{values} (? {{gate}} §ARR{i32:"{{size}}"} §ARR{i32:0})
-                §R (len values)
+            module Probe Probe block
+              func Size () → int
+                !
+                return 3
+
+              func Run () → int
+                !
+                let int:n = 2
+                let values = ({{gate}} ? new int[{{size}}] : new int[0])
+                return values.Length
             """;
         var options = new Calor.Compiler.CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null };
         var first = Program.Compile(source, "native-array.calr", options);

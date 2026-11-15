@@ -18,11 +18,11 @@ public class ContractSimplificationRuntimeTests
     public void QuantifierDiscovery_PreservesShortCircuitAndEndpointOrder(bool verify)
     {
         string Guarded(string predicate) => $$"""
-            §M{TypedContracts}
-              §F{Check:pub} (bool:guard, i32:x) -> i32
-                §E{}
-                §Q {{predicate}}
-                §R INT:7
+            module TypedContracts TypedContracts block
+              func Check (bool:guard, int:x) → int
+                !
+                requires {{predicate}}
+                return 7
             """;
         var all = Compile(Guarded(
             "(forall ((i i32)) (-> (&& guard (&& (>= i (/ INT:1 x)) (< i INT:2))) true))"), verify);
@@ -81,17 +81,17 @@ public class ContractSimplificationRuntimeTests
         })
         {
             var source = $$"""
-                §M{ContractEffects}
-                  §CL{Counter:pub}
-                    §FLD{i32:Value:pub}
-                    §PROP{Tick:i32:pub}
-                      §GET
-                        §ASSIGN Value (+ Value INT:1)
-                        §R Value
-                    §MT{Check:pub} () -> i32
-                      §E{}
-                      §Q {{predicate}}
-                      §R INT:7
+                module ContractEffects ContractEffects block
+                  class Counter
+                    field int:Value
+                    property int:Tick
+                      get
+                        set Value (Value + 1)
+                        return Value
+                    func Check () → int
+                      !
+                      requires {{predicate}}
+                      return 7
                 """;
             var result = Program.Compile(source, "uncertified-quantifier.calr", Options(verify));
             Assert.Contains(result.Diagnostics.Errors,
@@ -191,16 +191,16 @@ public class ContractSimplificationRuntimeTests
                 $"(-> (&& (>= {variable} INT:0) (< {variable} {endpoint})) (&& (cast bool §C{{Invoke}} §A grow §/C) (== {variable} INT:0)))";
             var quantifier = $"(forall ((i i32)) {Body("i")})";
             var captured = $$"""
-                §M{TypedContracts}
-                  §F{Invoke:pub} (Func<bool>:action §E{}) -> bool
-                    §E{}
-                    §R §C{action} §/C
-                  §F{Check:pub} () -> Func<i32,bool> §E{}
-                    §E{}
-                    §R §LAM{n:i32} §E{}
-                      §B{grow:Func<bool>} §E{} §LAM{} §E{} {{mutation}} §R true §/LAM
-                      §R {{quantifier}}
-                    §/LAM
+                module TypedContracts TypedContracts block
+                  func Invoke (Func<bool>:action !) → bool
+                    !
+                    return action()
+
+                  func Check () → Func<int, bool> !
+                    !
+                    return (int:n) ! =>
+                      let Func<bool>:grow ! = () ! => {{mutation}}
+                      return {{quantifier}}
                 """;
             var result = Program.Compile(captured, "captured-endpoint.calr", Options(verify));
             Assert.Contains(result.Diagnostics.Errors,
@@ -253,16 +253,16 @@ public class ContractSimplificationRuntimeTests
             {
                 var wrappedQuantifier = quantifier.Replace("§A grow", "§A box.Grow");
                 var wrapped = $$"""
-                    §M{TypedContracts}
-                      §F{Invoke:pub} (Func<bool>:action §E{}) -> bool
-                        §E{}
-                        §R §C{action} §/C
-                      §F{Check:pub} () -> Func<i32,bool> §E{alloc}
-                        §E{alloc}
-                        §R §LAM{n:i32} §E{alloc}
-                          §B{box} {{initializer}}
-                          §R {{wrappedQuantifier}}
-                        §/LAM
+                    module TypedContracts TypedContracts block
+                      func Invoke (Func<bool>:action !) → bool
+                        !
+                        return action()
+
+                      func Check () → Func<int, bool> ! alloc
+                        ! alloc
+                        return (int:n) ! alloc =>
+                          let box = {{initializer}}
+                          return {{wrappedQuantifier}}
                     """;
                 var rejected = Program.Compile(wrapped, "wrapped-capture.calr", Options(verify));
                 Assert.True(rejected.Diagnostics.Errors.Any(
@@ -425,10 +425,10 @@ public class ContractSimplificationRuntimeTests
         })
         {
             var source = $$"""
-                §M{TypedContracts}
-                  §F{Check:pub} (i32:x) -> ?i64
-                    §E{}
-                    §S true
+                module TypedContracts TypedContracts block
+                  func Check (int:x) → long?
+                    !
+                    => true
                     {{body}}
                 """;
             var assembly = Compile(source, verify);
@@ -472,11 +472,11 @@ public class ContractSimplificationRuntimeTests
         foreach (var wrapper in wrappers)
         {
             var source = $$"""
-                §M{TypedContracts}
-                  §F{Check:pub} (object:x) -> object
-                    §E{}
-                    §S (&& {{wrapper}} (> result INT:0))
-                    §R x
+                module TypedContracts TypedContracts block
+                  func Check (object:x) → object
+                    !
+                    => ({{wrapper}} && (result > 0))
+                    return x
                 """;
             var assembly = Compile(source, verify);
             Assert.Equal(5, Invoke(assembly, 5));
@@ -741,11 +741,11 @@ public class ContractSimplificationRuntimeTests
     private static double Identity(double value) => value;
 
     private static string Function(string type, string predicate) => $$"""
-        §M{TypedContracts}
-          §F{Check:pub} ({{type}}:x) -> i32
-            §E{}
-            §Q {{predicate}}
-            §R INT:7
+        module TypedContracts TypedContracts block
+          func Check ({{type}}:x) → int
+            !
+            requires {{predicate}}
+            return 7
         """;
 
     private static Assembly Compile(string source, bool verify, string? harness = null, bool rejectNullableWarnings = false)

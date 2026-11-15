@@ -387,12 +387,12 @@ public sealed class SafeConsumptionRuntimeTests
     public void Conjunction_PreservesTheSuccessfulPatternInRhsAndBody(string condition)
     {
         var source = $$"""
-            §M{Consumption}
-              §F{Probe:pub} (?str:input) -> str
-                §E{}
-                §IF {{condition}}
-                  §R text
-                §R "fallback"
+            module Consumption Consumption block
+              func Probe (string?:input) → string
+                !
+                if {{condition}}
+                  return text
+                return "fallback"
             """;
         var (_, diagnostics) = Bind(source);
         Assert.Empty(diagnostics.Errors);
@@ -457,12 +457,12 @@ public sealed class SafeConsumptionRuntimeTests
         foreach (var condition in new[] { "(is input str text)", "(! (is input str text))", "(|| (is input str text) true)" })
         {
             var source = $$"""
-                §M{Consumption}
-                  §F{Probe:pub} (?object:input) -> str
-                    §E{}
-                    §WH {{condition}}
-                      §R text
-                    §R text
+                module Consumption Consumption block
+                  func Probe (object?:input) → string
+                    !
+                    while {{condition}}
+                      return text
+                    return text
                 """;
             var (_, diagnostics) = Bind(source);
             Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
@@ -493,12 +493,13 @@ public sealed class SafeConsumptionRuntimeTests
                     §R "fallback"
             """;
         var source = $$"""
-            §M{Consumption}
-              §F{Take:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{Probe:pub} (?object:input) -> str
-                §E{}
+            module Consumption Consumption block
+              func Take (string:value) → string
+                !
+                return value
+
+              func Probe (object?:input) → string
+                !
                 {{match}}
             """;
         foreach (var text in RoundTrip(source))
@@ -557,12 +558,12 @@ public sealed class SafeConsumptionRuntimeTests
         foreach (var pattern in new[] { "(not §VAR{text})", "(or §VAR{text} _)" })
         {
             var source = $$"""
-                §M{Consumption}
-                  §F{Probe:pub} (?str:input) -> str
-                    §E{}
-                    §R §W input
-                      §K {{pattern}} → text
-                      §K _ → "fallback"
+                module Consumption Consumption block
+                  func Probe (string?:input) → string
+                    !
+                    return match input
+                      case var {{pattern}} → text
+                      case _ → "fallback"
                 """;
             var (_, diagnostics) = Bind(source);
             Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
@@ -630,14 +631,15 @@ public sealed class SafeConsumptionRuntimeTests
         foreach (var rightType in new[] { "Foo", "?Foo" })
         {
             var source = $$"""
-                §M{Consumption}
-                  §CL{Foo:pub}
-                    §FLD{i32:value:pub}
-                  §F{Probe:pub} (bool:choose, Foo:left, {{rightType}}:right) -> {{rightType}}
-                    §E{}
-                    §B{first} (? choose left right)
-                    §B{second} first
-                    §R second
+                module Consumption Consumption block
+                  class Foo
+                    field int:value
+
+                  func Probe (bool:choose, Foo:left, {{rightType}}:right) → {{rightType}}
+                    !
+                    let first = (choose ? left : right)
+                    let second = first
+                    return second
                 """;
             var result = Program.Compile(source, "conditional-local-consumption.calr");
             Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));

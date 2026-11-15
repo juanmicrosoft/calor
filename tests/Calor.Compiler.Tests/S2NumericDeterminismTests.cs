@@ -21,11 +21,11 @@ public sealed class S2NumericDeterminismTests
         string leftType, string rightType, string arithmetic)
     {
         var source = $$"""
-            §M{R1Case}
-              §F{Probe:pub} ({{leftType}}:x, {{rightType}}:y) -> i32
-                §E{}
-                §S (== {{arithmetic}} {{arithmetic}})
-                §R INT:0
+            module R1Case R1Case block
+              func Probe ({{leftType}}:x, {{rightType}}:y) → int
+                !
+                => ({{arithmetic}} == {{arithmetic}})
+                return 0
             """;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -83,13 +83,13 @@ public sealed class S2NumericDeterminismTests
     {
         Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
         var source = $$"""
-            §M{Test}
-              §F{Probe:pub}
-                §O{i32}
-                §B{~i:i64} INT:0
-                §WH {{condition}}
-                  §ASSIGN i (+ i INT:1)
-                §R INT:0
+            module Test Test block
+              func Probe () → int
+                !
+                var long:i = 0
+                while {{condition}}
+                  set i (i + 1)
+                return 0
             """;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();

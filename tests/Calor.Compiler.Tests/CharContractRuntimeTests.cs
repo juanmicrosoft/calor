@@ -49,11 +49,11 @@ public class CharContractRuntimeTests
     public void CharacterContracts_StillRejectNonBooleanAndUnknownReferences(string expression, string code)
     {
         var result = Program.Compile($$"""
-            §M{CharContracts}
-              §F{Probe:pub} (char:input) -> char
-                §E{}
-                §Q {{expression}}
-                §R input
+            module CharContracts CharContracts block
+              func Probe (char:input) → char
+                !
+                requires {{expression}}
+                return input
             """, "char-contracts.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == code);

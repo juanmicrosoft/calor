@@ -21,11 +21,10 @@ public class TypeOperationTests
     private static string WrapInFunction(string body, string inputType = "object", string outputType = "object")
     {
         return $$"""
-            §M{Test}
-              §F{Main:pub}
-                  §I{{{inputType}}:x}
-                  §O{{{outputType}}}
-                  {{body}}
+            module Test Test block
+              func Main ({{inputType}}:x) → {{outputType}}
+                !
+                {{body}}
             """;
     }
 

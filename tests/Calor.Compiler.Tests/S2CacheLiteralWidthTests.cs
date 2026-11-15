@@ -235,11 +235,11 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
     private static ExpressionNode ParsePostcondition(string literal)
     {
         var source = $$"""
-            §M{M}
-              §F{P:pub} (i64:x) -> i32
-                §E{}
-                §S (> x {{literal}})
-                §R INT:0
+            module M M block
+              func P (long:x) → int
+                !
+                => (x > {{literal}})
+                return 0
             """;
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();

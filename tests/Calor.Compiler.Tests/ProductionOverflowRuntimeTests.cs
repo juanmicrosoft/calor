@@ -435,12 +435,12 @@ public class ProductionOverflowRuntimeTests
         })
         {
             var source = $$"""
-                §M{Overflow}
-                  §F{Probe:pub} (u32:value) -> i32
-                    §E{}
-                    §S (&& (== result 0) (!= value 4294967295))
+                module Overflow Overflow block
+                  func Probe (uint:value) → int
+                    !
+                    => ((result == 0) && (value != 4294967295L))
                     {{binding}}
-                    §R 0
+                    return 0
                 """;
             foreach (var elide in new[] { false, true })
             {
@@ -462,11 +462,11 @@ public class ProductionOverflowRuntimeTests
     public void Verification_CannotElideOverflowingIdentityGuard(string predicate, int boundary)
     {
         var source = $$"""
-            §M{Overflow}
-              §F{Probe:pub} (i32:value) -> i32
-                §E{}
-                §S {{predicate}}
-                §R value
+            module Overflow Overflow block
+              func Probe (int:value) → int
+                !
+                => {{predicate}}
+                return value
             """;
         var options = VerifiedOptions();
         var compiled = Program.Compile(source, "overflow.calr", options);
@@ -507,11 +507,11 @@ public class ProductionOverflowRuntimeTests
     public void QuantifiedIdentity_KeepsOverflowingRuntimePredicate(string predicate)
     {
         var source = $$"""
-            §M{Overflow}
-              §F{Probe:pub} (i32:value) -> i32
-                §E{}
-                §S {{predicate}}
-                §R value
+            module Overflow Overflow block
+              func Probe (int:value) → int
+                !
+                => {{predicate}}
+                return value
             """;
         var options = VerifiedOptions();
         Assert.IsType<OverflowException>(TestHarness.Execute(source, "Probe", [int.MaxValue], options).Exception);
@@ -532,11 +532,11 @@ public class ProductionOverflowRuntimeTests
     public void GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow(string predicate)
     {
         var source = $$"""
-            §M{Overflow}
-              §F{Probe:pub} (i32:value) -> i32
-                §E{}
-                §S {{predicate}}
-                §R value
+            module Overflow Overflow block
+              func Probe (int:value) → int
+                !
+                => {{predicate}}
+                return value
             """;
         var options = VerifiedOptions();
         var compiled = Program.Compile(source, "overflow.calr", options);
@@ -599,10 +599,10 @@ public class ProductionOverflowRuntimeTests
         string inputType, string outputType, object overflow, object safeInput, object expected)
     {
         var source = $$"""
-            §M{Overflow}
-              §F{Probe:pub} ({{inputType}}:value) -> {{outputType}}
-                §E{}
-                §R (cast {{outputType}} value)
+            module Overflow Overflow block
+              func Probe ({{inputType}}:value) → {{outputType}}
+                !
+                return (({{outputType}})value)
             """;
         AssertOverflow(source, [overflow]);
         var safe = TestHarness.Execute(source, "Probe", [safeInput], Options());

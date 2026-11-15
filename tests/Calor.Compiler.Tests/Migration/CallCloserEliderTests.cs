@@ -30,7 +30,7 @@ public class CallCloserEliderTests
     [InlineData("  §C{Doit} §A x §/C\n  §C{Another} §/C\n")]
     public void CurrentCompiler_RejectsArchivedCallsWithoutChangingSource(string body)
     {
-        var source = "§M{Calc}\n§F{run:pub}\n" + body;
+        var source = "module Calc Calc block\n" + "  func run ()\n" + "    !\n" + body;
         var result = new CallCloserElider().Process(source, "archive.calr");
 
         Assert.True(result.Skipped);

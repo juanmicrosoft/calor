@@ -103,8 +103,9 @@ public class MalformedNewExpressionTests
 
     private static string Wrap(string expression) =>
         $$"""
-        §M{MalformedNew}
-          §F{Make:pub} () -> object
-            §R {{expression}}
+        module MalformedNew MalformedNew block
+          func Make () → object
+            !
+            return {{expression}}
         """;
 }

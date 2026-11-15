@@ -21,11 +21,10 @@ public class RegexOperationTests
     private static string WrapInFunction(string body)
     {
         return $$"""
-            §M{Test}
-              §F{Main:pub}
-                  §I{string:s}
-                  §O{object}
-                  {{body}}
+            module Test Test block
+              func Main (string:s) → object
+                !
+                {{body}}
             """;
     }
 

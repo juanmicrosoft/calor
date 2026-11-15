@@ -255,10 +255,11 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     public void LongShifts_UseSixBitCountMask(string value, string count, bool overflow)
     {
         var source = $$"""
-            §M{LongShiftControl}
-              §F{Run:pub} (i32:n) -> i64
-                §B{value:i64} {{value}}
-                §R (<< value {{count}})
+            module LongShiftControl LongShiftControl block
+              func Run (int:n) → long
+                !
+                let long:value = {{value}}
+                return (value << {{count}})
             """;
         Assert.Equal(overflow, AnalyzeSource(source).Any(d => d.Code == DiagnosticCode.IntegerOverflow));
     }

@@ -75,13 +75,14 @@ public class V017Round4FindingsTests
     public void DecoratedBuiltinArgument_StillReportsNoMatchingOverload(string calorType)
     {
         var result = Compile($$"""
-            §M{Probe}
-              §F{Take:pub} (str:s) -> i32
-                §E{}
-                §R INT:1
-              §F{Go:pub} ({{calorType}}:x) -> i32
-                §E{}
-                §R §C{Take} §A x §/C
+            module Probe Probe block
+              func Take (string:s) → int
+                !
+                return 1
+
+              func Go ({{calorType}}:x) → int
+                !
+                return Take(x)
             """);
 
         Assert.Contains(

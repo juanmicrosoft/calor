@@ -281,7 +281,7 @@ public sealed class TolerantParseTests : IDisposable
         var nested = string.Concat(Enumerable.Repeat("(+ ", 50_000))
                      + "INT:1 INT:2"
                      + new string(')', 50_000);
-        var source = "§M{Deep}\n  §F{deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
+        var source = "module Deep Deep block\n" + "  func deep () → int\n" + "    !\n" + "    return " + nested + "\n";
 
         var result = CalorSourceHelper.ParseTolerant(source, "deep.calr");
 
@@ -295,7 +295,7 @@ public sealed class TolerantParseTests : IDisposable
         var nested = string.Concat(Enumerable.Repeat("(+ ", 50_000))
                      + "INT:1 INT:2"
                      + new string(')', 50_000);
-        var source = "§M{Deep}\n  §F{deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
+        var source = "module Deep Deep block\n" + "  func deep () → int\n" + "    !\n" + "    return " + nested + "\n";
 
         var result = CalorSourceHelper.Parse(source, "deep-strict.calr");
 
