@@ -155,6 +155,11 @@ public sealed class Binder
     private readonly Dictionary<SymbolId, IReadOnlyList<VariableSymbol>> _enumMembers = new();
     private readonly Dictionary<string, DelegateDefinitionNode> _delegateDefinitions = new(StringComparer.Ordinal);
     private readonly Dictionary<VariableSymbol, VariableSymbol> _flowNarrowingSources = new();
+    // 0.30: storage in a `nullable oblivious` module that may hold a null the module itself
+    // introduced (a null or ?T initializer, any reassignment, a ref/out write, a lost
+    // non-null proof). Such storage is no longer merely oblivious, so it keeps the
+    // conservative Calor0274 checks. Flow-insensitive within a module by design.
+    private readonly HashSet<VariableSymbol> _obliviousNullTaintedStorage = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<(VariableSymbol? Receiver, VariableSymbol Member), VariableSymbol>
         _memberFlowStorages = new();
     private readonly Dictionary<VariableSymbol, CallableMutationSummary> _callableState =
@@ -931,6 +936,8 @@ public sealed class Binder
         bool replacesNativeOverloadError = false,
         bool isInstanceReceiver = false)
     {
+        if (IsObliviousFlowInObliviousModule(argument))
+            return;
         var arrayMismatch = NullabilityChecker.ArrayMismatch.None;
         if (isInstanceReceiver
             ? !argument.HasUnknownInferredType
@@ -1199,6 +1206,7 @@ public sealed class Binder
         _contractInheritance = contractInheritance;
         _declaredReferenceAnnotation = module.HasObliviousNullability()
             ? BoundTypes.NullableAnnotation.Oblivious : BoundTypes.NullableAnnotation.NotAnnotated;
+        _obliviousNullTaintedStorage.Clear();
         using var diagnosticContext = _diagnostics.EnterBindingContext();
         _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
         _metadataUsings = module.Usings;
@@ -2890,6 +2898,7 @@ public sealed class Binder
         if (expr != null
             && _currentFunctionReturnType != null
             && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
+            && !IsObliviousFlowInObliviousModule(expr)
             && NullabilityChecker.IsPossiblyNullAssignedTo(expr, stringTarget!))
         {
             var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget!);
@@ -3223,7 +3232,8 @@ public sealed class Binder
         var rebindTarget = bind.IsMutable ? FindRebindTarget(bind.Name) : null;
         if (rebindTarget != null)
         {
-            rebindTarget = InvalidateMutableFlowNarrowing(rebindTarget);
+            rebindTarget = InvalidateMutableFlowNarrowing(rebindTarget,
+                mayWriteNull: initializer == null || MayIntroduceNullInObliviousModule(initializer));
             if (rebindTarget.StorageIdentity.IsLoopVariable)
                 ReportWriteToReadOnlyLocal(rebindTarget, bind.IdentifierSpan, "rebind {0}");
             if (!CanRebind(rebindTarget))
@@ -3356,6 +3366,7 @@ public sealed class Binder
         if (initializer != null
             && bind.TypeName != null
             && TryBuildStringTarget(bind.TypeName, out var stringTarget)
+            && !IsObliviousFlowInObliviousModule(initializer)
             && NullabilityChecker.IsPossiblyNullAssignedTo(initializer, stringTarget!))
         {
             var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget!);
@@ -3370,6 +3381,8 @@ public sealed class Binder
                 BindingDiagnosticContext.For(BindingReceivingBoundary.Initializer, stringTarget!));
         }
 
+        if (initializer != null && MayIntroduceNullInObliviousModule(initializer))
+            _obliviousNullTaintedStorage.Add(variable.StorageIdentity);
         return new BoundBindStatement(bind.Span, variable, initializer);
     }
 
@@ -4263,6 +4276,44 @@ public sealed class Binder
             ? target
             : null;
     }
+
+    /// <summary>
+    /// 0.30: a module declared <c>nullable oblivious</c> mirrors C#'s disabled nullable
+    /// context, where an oblivious value may flow into a non-null parameter, return,
+    /// binding or receiver without a diagnostic. Only a wholly oblivious source is
+    /// exempt: an explicit <c>?T</c> anywhere in its type, a null literal, a
+    /// null-containing conditional, or storage the module may have set to null (see
+    /// <see cref="_obliviousNullTaintedStorage"/>) is still reported. Modules without the policy keep
+    /// the conservative Oblivious-is-possibly-null default (D3).
+    /// </summary>
+    private bool IsObliviousFlowInObliviousModule(BoundExpression source)
+        => _declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+           && !MayIntroduceNullInObliviousModule(source)
+           && !(source is BoundVariableExpression variable
+               && (_obliviousNullTaintedStorage.Contains(variable.Variable.StorageIdentity)
+                   || variable.ResolvedSymbols.Any(symbol =>
+                       _obliviousNullTaintedStorage.Contains(symbol.StorageIdentity))));
+
+    private bool MayIntroduceNullInObliviousModule(BoundExpression source)
+        => _declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+           && (source is BoundNullLiteral
+               || NullabilityChecker.IsNullContainingScalarStringSource(source)
+               || HasAnnotatedComponent(source.Type)
+               || NullabilityChecker.GetMethodInputArrayType(source) is { } inputArray
+                  && HasAnnotatedComponent(inputArray));
+
+    private static bool HasAnnotatedComponent(BoundTypes.BoundType type) => type switch
+    {
+        BoundTypes.NominalBoundType nominal
+            => nominal.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated,
+        BoundTypes.GenericInstantiationBoundType generic
+            => generic.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated
+               || generic.TypeArguments.Any(HasAnnotatedComponent),
+        BoundTypes.ArrayBoundType array
+            => array.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated
+               || HasAnnotatedComponent(array.ElementType),
+        _ => false
+    };
 
     private static string DescribeAnnotation(BoundExpression source) => source.Type switch
     {
@@ -5529,8 +5580,11 @@ public sealed class Binder
 
     private VariableSymbol InvalidateMutableFlowNarrowing(
         VariableSymbol variable,
-        bool requireRebindable = true)
+        bool requireRebindable = true,
+        bool mayWriteNull = true)
     {
+        if (mayWriteNull && _declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious)
+            _obliviousNullTaintedStorage.Add(variable.StorageIdentity);
         InvalidateMemberFlowNarrowing(variable);
         variable.StorageIdentity.MetadataArrayResultType = null;
         variable.MetadataArrayResultType = null;
@@ -10386,7 +10440,8 @@ public sealed class Binder
         InvalidateMemberFlowNarrowing(target);
         if (target is BoundVariableExpression variable)
         {
-            var restored = InvalidateMutableFlowNarrowing(variable.Variable);
+            var restored = InvalidateMutableFlowNarrowing(variable.Variable,
+                mayWriteNull: MayIntroduceNullInObliviousModule(value));
             if (!ReferenceEquals(restored, variable.Variable))
                 target = new BoundVariableExpression(assign.Target.Span, restored);
             SetCallableState(restored, value);
@@ -10535,6 +10590,7 @@ public sealed class Binder
         {
             if (usingStmt.VariableType is not null
                 && TryBuildStringTarget(usingStmt.VariableType, out var target)
+                && !IsObliviousFlowInObliviousModule(resourceExpr)
                 && NullabilityChecker.IsPossiblyNullAssignedTo(resourceExpr, target!))
             {
                 var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(target!);

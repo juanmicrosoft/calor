@@ -98,8 +98,11 @@ public sealed class Issue1401NullableContextConversionTests
             DeclaredMetadata(reparsed.GeneratedCode));
     }
 
+    // 2026-11-14 maintainer decision: a `nullable oblivious` module mirrors C#'s disabled
+    // nullable context. An oblivious argument is accepted at a non-null parameter; an explicit
+    // `?T` argument and modules without the policy keep the receiving check.
     [Fact]
-    public void NativeObliviousModule_DoesNotChangeDefaultOrReceivingChecks()
+    public void NativeObliviousModule_AcceptsObliviousArgumentsButKeepsExplicitNullableChecks()
     {
         var normal = Program.Compile("""
             module Checked
@@ -109,20 +112,24 @@ public sealed class Issue1401NullableContextConversionTests
             """);
         Assert.Contains(normal.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+        foreach (var type in new[] { "string", "string?" })
         foreach (var guard in new[] { "", "if value != null\n      " })
         {
             var result = Program.Compile($$"""
                 module Oblivious nullable oblivious
-                  func Probe (string:value) → void
+                  func Probe ({{type}}:value) → void
                     !
                     {{guard}}System.Int32.Parse(value)
                 """);
-            Assert.Equal(guard.Length == 0, result.HasErrors);
-            Assert.Equal(guard.Length == 0, result.Diagnostics.Errors.Any(
+            var rejected = type == "string?" && guard.Length == 0;
+            Assert.Equal(rejected, result.HasErrors);
+            Assert.Equal(rejected, result.Diagnostics.Errors.Any(
                 diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
         }
     }
 
+    // 2026-11-14: oblivious nested reads are accepted in a `nullable oblivious` module; an
+    // explicit `?` leaf is still rejected.
     [Theory]
     [InlineData("string[]", "value[0]", "Oblivious")]
     [InlineData("System.Collections.Generic.List<string>", "value[0]", "Oblivious")]
@@ -136,6 +143,11 @@ public sealed class Issue1401NullableContextConversionTests
                 return System.Int32.Parse({{expression}})
             """;
         var result = Program.Compile(source);
+        if (annotation == "Oblivious")
+        {
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+            return;
+        }
         Assert.True(result.HasErrors);
         var diagnostic = Assert.Single(result.Diagnostics.Errors.Where(
             item => item.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
@@ -332,16 +344,16 @@ public sealed class Issue1401NullableContextConversionTests
         Assert.Equal(source, compiled.GeneratedCode);
     }
 
+    // 062 and 075 convert natively since the 2026-11-14 oblivious-module decision (see
+    // ObliviousReceiverInputs_NowConvertNatively); 061_TupleTypes still takes the fallback.
     [Theory]
-    [InlineData("062_OptionalParameters.cs", false)]
-    [InlineData("062_OptionalParameters.cs", true)]
-    [InlineData("075_ExtensionMethods.cs", false)]
-    [InlineData("075_ExtensionMethods.cs", true)]
+    [InlineData("Level3_Types", "061_TupleTypes.cs", false)]
+    [InlineData("Level3_Types", "061_TupleTypes.cs", true)]
     public void PostValidationFallback_RetainsOriginalObliviousDeclarations(
-        string fileName, bool evaluated)
+        string level, string fileName, bool evaluated)
     {
         var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
-            "tests", "TestData", "CSharpImport", "Level4_Methods", fileName));
+            "tests", "TestData", "CSharpImport", level, fileName));
         var project = new CSharpToCalorConverter(PreservationOptions(evaluated))
             .ConvertProject(source, fileName);
         var converted = Assert.Single(project.Outputs).Conversion;
@@ -359,6 +371,34 @@ public sealed class Issue1401NullableContextConversionTests
         Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
         Assert.Equal(source, compiled.GeneratedCode);
         Assert.Contains(converted.Losses, loss => loss.Feature == "whole-file-preservation");
+    }
+
+    // Before the 2026-11-14 decision these preserved the whole file: an oblivious `string`
+    // receiver (`text.Trim()`, `str.Length`) failed Calor0274 inside the oblivious module.
+    [Theory]
+    [InlineData("062_OptionalParameters.cs", false)]
+    [InlineData("062_OptionalParameters.cs", true)]
+    [InlineData("075_ExtensionMethods.cs", false)]
+    [InlineData("075_ExtensionMethods.cs", true)]
+    public void ObliviousReceiverInputs_NowConvertNatively(string fileName, bool evaluated)
+    {
+        var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+            "tests", "TestData", "CSharpImport", "Level4_Methods", fileName));
+        var project = new CSharpToCalorConverter(PreservationOptions(evaluated))
+            .ConvertProject(source, fileName);
+        var converted = Assert.Single(project.Outputs).Conversion;
+        Assert.True(converted.Success, FormatIssues(converted));
+        Assert.Equal(0, converted.InteropPreservationCount);
+        Assert.Empty(converted.Losses);
+        Assert.Contains("nullable oblivious", converted.CalorSource!);
+        var compiled = Program.Compile(converted.CalorSource!, "native.calr",
+            new CompilationOptions
+            {
+                StrictEffects = true,
+                UnknownCallPolicy = Effects.UnknownCallPolicy.Strict
+            });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
     }
 
     [Theory]
@@ -1488,8 +1528,10 @@ public sealed class Issue1401NullableContextConversionTests
         Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
     }
 
+    // 2026-11-14: the converted module is `nullable oblivious`, so an oblivious receiver with
+    // arguments is accepted, as C#'s disabled nullable context accepts it.
     [Fact]
-    public void ObliviousCallWithArguments_RetainsTheReceivingRefusal()
+    public void ObliviousCallWithArguments_IsAcceptedInAnObliviousModule()
     {
         const string source = """
             public static class Fixture
@@ -1502,10 +1544,10 @@ public sealed class Issue1401NullableContextConversionTests
             Fidelity = ConversionFidelity.Lossy, Mode = ConversionMode.Interop
         }).Convert(source, "Arguments.cs");
         Assert.True(converted.Success, FormatIssues(converted));
+        Assert.Contains("nullable oblivious", converted.CalorSource!);
         var compiled = Program.Compile(converted.CalorSource!, "arguments.calr");
-        Assert.Contains(compiled.Diagnostics.Errors, diagnostic =>
-            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
-                && diagnostic.Message.StartsWith("Instance receiver", StringComparison.Ordinal));
+        Assert.DoesNotContain(compiled.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
     [Fact]

@@ -194,7 +194,9 @@ nullable elements cannot enter a non-null element contract, and a nullable
 container must be guarded before non-null receiving. A container guard does not
 validate its elements. Invariant containers also reject nullable-writer aliases
 such as `List<Node>` to `List<Node?>`; covariant read-only targets can accept
-nullable elements. Oblivious annotations do not prove non-nullness.
+nullable elements. Oblivious annotations do not prove non-nullness, except that a
+`nullable oblivious` module accepts them as C# does (see
+[Oblivious nullability](/docs/syntax-reference/structure-tags/#oblivious-nullability)).
 
 Selected metadata extension calls retain these annotations when the complete
 C# image resolves the actual source-defined payload. For example, `ToList()`

@@ -57,14 +57,16 @@ In this module, an unannotated reference declaration makes no non-null promise:
 its C# metadata has `NullableAnnotation.None`. Explicit `string?` still has
 `Annotated` metadata. The policy also applies inside arrays and generic arguments;
 it does not change CLR types or turn an unknown value into a non-null value.
-Passing an oblivious value to a non-null receiving parameter still requires
-a genuine non-null proof, such as an explicit check. An array initializer can
-establish that proof for the container through a selected non-null return or
-array creation. It does not strengthen element annotations or change declared
-metadata. Reassignment or a call that may rebind the array invalidates the proof.
-A deferred body cannot rely on its creation-time proof for a captured mutable binding.
-This is a file-wide annotation context, not a way to disable
-Calor's receiving, type, or effect checks.
+As in C# with nullable annotations disabled, an oblivious value may be passed to
+a non-null parameter, used as a receiver, returned or bound without a `Calor0274`
+diagnostic. The module's own nulls are still checked. A value whose type carries an
+explicit `?` (anywhere, including array elements and generic arguments), a `null`
+literal, and a local the module may have set to null keep the ordinary receiving
+check. That last case covers a local initialized or assigned from `null` or a `?T`
+value, and a local whose non-null proof was lost: a `ref`/`out` write, or a deferred
+body that captured and rebound it. Outside a `nullable oblivious` module, oblivious
+metadata values are still treated as possibly null. This is a file-wide annotation
+context, not a way to disable Calor's type or effect checks.
 
 Generated C# disables only nullable **annotations**, while enabling nullable
 warnings. It suppresses `CS8669`, the generated-code warning for explicit `?`

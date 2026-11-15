@@ -109,7 +109,9 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         Assert.Same(inner, innerRead.Type);
         Assert.Same(leaf, argument.Type);
 
-        var rejected = nullableElement || oblivious;
+        // 2026-11-14: an oblivious leaf in a `nullable oblivious` module is accepted at a
+        // non-null boundary, as in C#'s disabled context; an explicit `?` leaf is not.
+        var rejected = nullableElement;
         var findings = diagnostics.Where(diagnostic => BindingDiagnosticPolicy.IsCompilationError(diagnostic)).ToArray();
         Assert.Equal(rejected ? 1 : 0, findings.Length);
         if (rejected)
@@ -336,13 +338,15 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         Assert.True(generated.Emit(image).Success);
     }
 
+    // 2026-11-14: inside a `nullable oblivious` module an oblivious producer is accepted at a
+    // non-null boundary; a `?T` producer still taints the local and is rejected.
     [Theory]
-    [InlineData("nullable", false)]
-    [InlineData("legacy", false)]
-    [InlineData("NullableProducer(nullable)", false)]
-    [InlineData("LegacyProducer()", false)]
-    [InlineData("unknown.ToCharArray()", true)]
-    public void ObliviousArrayInitializerRequiresActualNonNullProducer(string initializer, bool unselected)
+    [InlineData("nullable", false, true)]
+    [InlineData("legacy", false, false)]
+    [InlineData("NullableProducer(nullable)", false, true)]
+    [InlineData("LegacyProducer()", false, false)]
+    [InlineData("unknown.ToCharArray()", true, false)]
+    public void ObliviousArrayInitializerRequiresActualNonNullProducer(string initializer, bool unselected, bool rejected)
     {
         var source = $$"""
             module UnprovenArray nullable oblivious
@@ -366,10 +370,11 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             Assert.Null(call.ResolvedMetadataMethod);
             Assert.Empty(call.SelectedOverloadMatches);
         }
-        Assert.Contains(diagnostics, diagnostic =>
+        Assert.Equal(rejected, diagnostics.Any(diagnostic =>
             diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
-            && diagnostic.Message.Contains("container", StringComparison.Ordinal));
-        Assert.True(Program.Compile(source, "unproven-array.calr").HasErrors);
+            && diagnostic.Message.Contains("container", StringComparison.Ordinal)));
+        Assert.Equal(rejected, Program.Compile(source, "unproven-array.calr").Diagnostics.Errors.Any(
+            diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
     }
 
     [Theory]
@@ -393,6 +398,15 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             NullabilityChecker.GetMethodInputArrayType(call.Arguments[1]));
         Assert.Equal(NullableAnnotation.NotAnnotated, array.NullableAnnotation);
         Assert.Equal(annotation, Assert.IsType<NominalBoundType>(array.ElementType).NullableAnnotation);
+        if (annotation == NullableAnnotation.Oblivious)
+        {
+            // 2026-11-14: oblivious elements are accepted inside a `nullable oblivious` module.
+            Assert.DoesNotContain(diagnostics, diagnostic =>
+                diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+            Assert.DoesNotContain(Program.Compile(source, "array-elements.calr").Diagnostics.Errors,
+                diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+            return;
+        }
         var mismatch = Assert.Single(diagnostics.Where(diagnostic =>
             diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
         Assert.Contains("element", mismatch.Message);
@@ -402,7 +416,8 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
 
     [Theory]
     [InlineData("set values null", true)]
-    [InlineData("var char[]:values = other", true)]
+    // A rebind from an oblivious parameter writes no null the module introduced (2026-11-14).
+    [InlineData("var char[]:values = other", false)]
     [InlineData("Change(ref values)", true)]
     [InlineData("Replace(out values)", true)]
     [InlineData("if flag\n  set values null", true)]

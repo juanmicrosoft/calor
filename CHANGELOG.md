@@ -44,6 +44,17 @@ All notable changes to this project will be documented in this file.
   on the 100-file conversion scorecard, one more file converts natively, and all
   84 native outputs compile with default settings.
 
+- **`nullable oblivious` modules accept oblivious values at non-null boundaries.**
+  An oblivious value is one with no nullability information, like C# code compiled
+  with nullable annotations disabled. Inside a module that declares
+  `nullable oblivious`, such a value can now be passed to a non-null parameter
+  (`dict.ContainsKey(name)`), used as a receiver (`text.Length`) or returned without
+  `Calor0274`, as C# allows. Explicit `?T` values, `null` literals and locals the
+  module may have set to null are still rejected. Other modules are unchanged.
+  `calor convert` emits this header for nullable-disabled C#, so 8 more of the 106
+  scorecard inputs now convert natively: 101 in total, all compiling with default
+  settings (0.29.0: 100 native, 91 of them compiling with default settings).
+
 - **`calor check` builds, tests and verifies one snapshot.** The matching MCP
   call is `calor_check` with `action: "loop"`. Both return only failures, keeping
   diagnostic fixes, proof assumptions and counterexamples. Missing tests,

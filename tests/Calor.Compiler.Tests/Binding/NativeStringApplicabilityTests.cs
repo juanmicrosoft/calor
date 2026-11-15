@@ -138,10 +138,13 @@ public sealed class NativeStringApplicabilityTests
         Assert.Contains("value.ToUpperInvariant()", source);
     }
 
+    // 2026-11-14 maintainer decision: a `nullable oblivious` module mirrors C#'s disabled
+    // nullable context, so an oblivious receiver is accepted. Storage the module itself may
+    // have set to null keeps the receiver check.
     [Theory]
     [InlineData("ToUpperInvariant()")]
     [InlineData("Length")]
-    public void StringInstanceReceiver_ObliviousDeclarationsAreNotNonNullProof(string member)
+    public void StringInstanceReceiver_ObliviousModuleAcceptsAnObliviousReceiver(string member)
     {
         var source = $$"""
             module ObliviousStringReceiver nullable oblivious
@@ -150,9 +153,26 @@ public sealed class NativeStringApplicabilityTests
                 return value.{{member}}
             """;
         var (_, diagnostics) = Bind(source);
-        var diagnostic = Assert.Single(diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
-        Assert.Contains("Oblivious", diagnostic.Message);
+        Assert.Empty(diagnostics.Errors);
+        Assert.False(Program.Compile(source).HasErrors);
+    }
+
+    [Theory]
+    [InlineData("ToUpperInvariant()", "set value null")]
+    [InlineData("Length", "set value null")]
+    [InlineData("Length", "var string:value = maybe")]
+    public void StringInstanceReceiver_ObliviousStorageThatMayHoldNullIsNotNonNullProof(string member, string write)
+    {
+        var source = $$"""
+            module ObliviousStringReceiver nullable oblivious
+              func Use (string:value, string?:maybe) → object
+                ! mut
+                {{(write.StartsWith("var", StringComparison.Ordinal) ? write : "var string:copy = value")}}
+                {{(write.StartsWith("var", StringComparison.Ordinal) ? "" : write.Replace("value", "copy", StringComparison.Ordinal))}}
+                return {{(write.StartsWith("var", StringComparison.Ordinal) ? "value" : "copy")}}.{{member}}
+            """;
+        var (_, diagnostics) = Bind(source);
+        var diagnostic = Assert.Single(diagnostics.Errors, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
         Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         Assert.True(Program.Compile(source).HasErrors);
     }

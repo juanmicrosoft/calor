@@ -3848,9 +3848,11 @@ public sealed class NativeMetadataClosureTests
         }
     }
 
+    // The oblivious row moved to NonnegativeLengthFormatting_ObliviousModuleAcceptsAnObliviousReceiver:
+    // a `nullable oblivious` module accepts oblivious values at non-null boundaries (2026-11-14).
     [Theory]
     [InlineData("", "string?")]
-    [InlineData(" nullable oblivious", "string")]
+    [InlineData(" nullable oblivious", "string?")]
     public void NonnegativeLengthFormatting_DoesNotRelaxTheStringReceiverBoundary(string context, string type)
     {
         var source = $$"""
@@ -3865,6 +3867,23 @@ public sealed class NativeMetadataClosureTests
             Assert.Contains(result.Diagnostics.Errors, diagnostic =>
                 diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
             Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Fact]
+    public void NonnegativeLengthFormatting_ObliviousModuleAcceptsAnObliviousReceiver()
+    {
+        const string source = """
+            module LengthNullability nullable oblivious
+              func Read (string:value) → string
+                !
+                return value.Length.ToString()
+            """;
+        foreach (var typed in new[] { false, true })
+        {
+            var result = Program.Compile(source, null, new CompilationOptions { EnableTypeChecking = typed });
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.Contains("value.Length.ToString()", result.GeneratedCode);
         }
     }
 
