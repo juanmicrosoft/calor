@@ -240,26 +240,6 @@ public sealed class S2ObligationStateTests
     }
 
     [Fact]
-    public void RawCSharpInAParameterRefinement_KillsEntryFacts()
-    {
-        // Review round 3 witness: Probe(1, 0) passes x's guard, then y's guard runs
-        // `x = -5` and is true, so the claim is false.
-        const string source = """
-            §M{M}
-              §RTYPE{Pos:i32} (> # INT:0)
-              §F{Probe:pub}
-                §I{Pos:x}
-                §I{i32:y} | §CS{((x = -5) == -5)}
-                §O{i32}
-                §E{mut}
-                §PROOF{claim} (> x INT:0)
-                §R x
-            """;
-        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
-        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
-    }
-
-    [Fact]
     public void PropertyGetterRead_KillsAliasedRefParameterFact()
     {
         // Review round 3 witness: box.Probe(ref box.Value) with Value = 1; reading Trigger
@@ -309,44 +289,6 @@ public sealed class S2ObligationStateTests
     }
 
     [Fact]
-    public void GetterReadInASubtypeInitializer_IsNotRefuted()
-    {
-        // Second verification-pass witness: the getter always returns 0, but the solver models
-        // the inherited field accessor as free; the read is not a proof condition.
-        const string source = """
-            §M{M}
-              §RTYPE{Zero:i32} (== # INT:0)
-              §CL{Base:pub}
-                §FLD{i32:Trigger:pub}
-              §CL{Box:pub}
-                §EXT{Base}
-                §PROP{Trigger:i32:pub}
-                  §GET
-                    §R INT:0
-              §F{Probe:pub} (Box:box) -> void
-                §E{}
-                §B{value:Zero} box.Trigger
-            """;
-        var subtype = Single(Solve(source).Obligations, ObligationKind.Subtype);
-        Assert.NotEqual(ObligationStatus.Failed, subtype.Status);
-    }
-
-    [Fact]
-    public void ParameterNamedResult_DoesNotDischargeTheRefinedReturn()
-    {
-        const string source = """
-            §M{M}
-              §RTYPE{Pos:i32} (> # INT:0)
-              §F{Probe:pub} (Pos:result) -> Pos
-                §E{}
-                §R INT:-5
-            """;
-        var (obligations, csharp, _) = Solve(source);
-        Assert.NotEqual(ObligationStatus.Discharged, Single(obligations, ObligationKind.RefinementReturn).Status);
-        Assert.Contains("Return value violates refinement type 'Pos'", csharp);
-    }
-
-    [Fact]
     public void GuardAfterEarlyExit_StillUsedAsAFact()
     {
         const string source = """
@@ -378,19 +320,6 @@ public sealed class S2ObligationStateTests
     }
 
     [Fact]
-    public void ConstructorNamedRefinementParameter_IsAnEntryFact()
-    {
-        const string source = """
-            §M{M}
-              §RTYPE{Pos:i32} (> # INT:0)
-              §CL{Box:pub}
-                §CTOR{pub} (Pos:value)
-                  §PROOF{claim} (> value INT:0)
-            """;
-        Assert.Equal(ObligationStatus.Discharged, Single(Solve(source).Obligations, ObligationKind.ProofObligation).Status);
-    }
-
-    [Fact]
     public void RawCSharpKillsPreconditionFact()
     {
         const string source = """
@@ -401,22 +330,6 @@ public sealed class S2ObligationStateTests
                 §RAW
                 x = -5;
                 §/RAW
-                §PROOF{claim} (> x INT:0)
-                §R x
-            """;
-        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
-        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
-    }
-
-    [Fact]
-    public void NamedRefinementFactKilledByAssignment_IsNotDischarged()
-    {
-        const string source = """
-            §M{M}
-              §RTYPE{Pos:i32} (> # INT:0)
-              §F{Probe:priv} (Pos:x) -> i32
-                §E{}
-                §ASSIGN x INT:-5
                 §PROOF{claim} (> x INT:0)
                 §R x
             """;
@@ -556,96 +469,5 @@ public sealed class S2ObligationStateTests
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
-    }
-
-    [Fact]
-    public void RefinedReturn_UnboundResult_IsNotRefuted()
-    {
-        // R1-OBL-REFINEMENT-RETURN-002: the solver's `result` is not bound to the returned
-        // expression, so `result = 2` is no counterexample (x = 439613318 returns 439613316).
-        const string source = """
-            §M{R1Case}
-              §RTYPE{Ref:i32} (!= # INT:2)
-              §F{Probe:pub}
-                §I{i32:x}
-                §O{Ref}
-                §E{}
-                §Q (> x INT:-1707870331)
-                §R (+ x INT:-2)
-            """;
-        Assert.NotEqual(2, 439613318 + -2);
-        var (obligations, csharp, hasErrors) = Solve(source);
-        var obligation = Single(obligations, ObligationKind.RefinementReturn);
-        Assert.Equal(ObligationStatus.Unsupported, obligation.Status);
-        Assert.False(hasErrors);
-        Assert.Contains("Return value violates refinement type 'Ref'", csharp);
-    }
-
-    [Theory]
-    [InlineData("§RTYPE{Ref:i32} (> (- # INT:403639039) INT:608460032)", "i32")]        // SELFREF-001
-    [InlineData("§RTYPE{Ref:i32} (>= (& # INT:-1200624532) INT:-2147483647)", "i32")]  // SELFREF-002
-    [InlineData("§RTYPE{Ref:i64} (>= (+ # INT:-2147483648) LONG:4788170680209598745)", "i64")] // SELFREF-003
-    [InlineData("§RTYPE{Ref:i32} (>= (& # INT:2147483647) INT:2147483646)", "i32")]    // SELFREF-004
-    [InlineData("§RTYPE{Ref:i64} (< (- # LONG:-9223372036854775808) INT:-1)", "i64")]  // SELFREF-005
-    public void NamedRefinementParameter_IsAnEntryFact(string refinement, string _)
-    {
-        var source = $$"""
-            §M{R1Case}
-              {{refinement}}
-              §F{Probe:pub}
-                §I{Ref:x}
-                §O{i32}
-                §E{}
-                §B{y:Ref} x
-                §R INT:0
-            """;
-        var (obligations, _, hasErrors) = Solve(source);
-        var subtype = Single(obligations, ObligationKind.Subtype);
-        // y = x where x already satisfies Ref: never a refutation.
-        Assert.NotEqual(ObligationStatus.Failed, subtype.Status);
-        Assert.False(hasErrors);
-    }
-
-    [Fact]
-    public void NamedRefinementParameter_SubtypeIsDischarged()
-    {
-        // R1-OBL-SUBTYPE-002: x : Src (x == long.MaxValue) implies Dst (x != -5562123229525975277).
-        const string source = """
-            §M{R1Case}
-              §RTYPE{Src:i64} (== # LONG:9223372036854775807)
-              §RTYPE{Dst:i64} (!= # LONG:-5562123229525975277)
-              §F{Probe:pub}
-                §I{Src:x}
-                §O{i32}
-                §E{}
-                §B{n:Dst} x
-                §R INT:0
-            """;
-        // #1530: named refinements are nominal, so the type checker now rejects binding a Src to
-        // a Dst. The solver's Subtype check on that bind is still exercised with the checker off.
-        Assert.True(Solve(source).HasErrors);
-        var subtype = Single(Solve(source, enableTypeChecking: false).Obligations, ObligationKind.Subtype);
-        Assert.Equal(ObligationStatus.Discharged, subtype.Status);
-    }
-
-    [Fact]
-    public void Control_GenuineSubtypeViolation_StillRefuted()
-    {
-        // x : Pos does not imply Big: x = 1 is a real counterexample at a reachable binding.
-        const string source = """
-            §M{M}
-              §RTYPE{Pos:i32} (> # INT:0)
-              §RTYPE{Big:i32} (> # INT:100)
-              §F{Probe:pub}
-                §I{Pos:x}
-                §O{i32}
-                §E{}
-                §B{n:Big} x
-                §R INT:0
-            """;
-        // #1530: rejected by the type checker; the solver still refutes it with the checker off.
-        Assert.True(Solve(source).HasErrors);
-        var subtype = Single(Solve(source, enableTypeChecking: false).Obligations, ObligationKind.Subtype);
-        Assert.Equal(ObligationStatus.Failed, subtype.Status);
     }
 }

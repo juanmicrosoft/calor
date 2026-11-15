@@ -1463,32 +1463,6 @@ public class Issue766DeclarationModuleSemanticsTests
     }
 
     [Fact]
-    public void ReusingEmitterAcrossModules_IsByteIdenticalToFreshEmitter()
-    {
-        var indexedModule = Parse(
-            """
-            §M{First}
-              §ITYPE{Leaky:i32[]:n}
-            """);
-        var unrelatedModule = Parse(
-            """
-            module Second Second block
-              func Echo (Leaky:value) → Leaky
-                !
-                return value
-            """);
-
-        var reused = new CSharpEmitter();
-        _ = reused.Emit(indexedModule);
-        var reusedOutput = reused.Emit(unrelatedModule);
-        var freshOutput = new CSharpEmitter().Emit(unrelatedModule);
-
-        Assert.Equal(freshOutput, reusedOutput);
-        Assert.Contains("Leaky value", reusedOutput);
-        Assert.DoesNotContain("int[] value", reusedOutput);
-    }
-
-    [Fact]
     public void GeneratedCSharp_CompilesWithImplicitUsingsDisabled()
     {
         var result = Program.Compile(

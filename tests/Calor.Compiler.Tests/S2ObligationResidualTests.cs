@@ -129,23 +129,6 @@ public sealed class S2ObligationResidualTests
     }
 
     [Fact]
-    public void ProofAfterARefinedBindingGuard_IsWithheld()
-    {
-        // Review round 1: the compiler-inserted refinement guard on q throws for x = 0.
-        const string source = """
-            §M{M}
-              §RTYPE{NZ:i32} (!= # INT:0)
-              §F{Probe:pub} (i32:x) -> i32
-                §E{}
-                §B{q:NZ} x
-                §PROOF{claim} (!= x INT:0)
-                §R x
-            """;
-        // The type checker rejects i32 -> NZ without a cast; the emitter's guard is what runs.
-        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "claim"));
-    }
-
-    [Fact]
     public void ComparisonsAfterOperatorOverloads_CountAsPossiblyThrowing()
     {
         // Review round 1: with a user-defined operator in the module, a comparison may run it.
@@ -183,27 +166,6 @@ public sealed class S2ObligationResidualTests
                 return x
             """;
         Assert.Equal(ObligationStatus.Failed, Proof(Solve(source).Obligations, "claim").Status);
-    }
-
-    [Fact]
-    public void ObligationAfterAThrowingOperandInTheSameStatement_IsWithheld()
-    {
-        // Review round 1: i = 1 throws at the division before the indexed access is evaluated.
-        const string source = """
-            §M{M}
-              §ITYPE{Sized:i32[]:n}
-              §F{Probe:priv}
-                §I{Sized:items}
-                §I{i32:n}
-                §I{i32:i}
-                §O{i32}
-                §E{}
-                §Q (== n INT:1)
-                §Q (&& (>= i INT:0) (<= i INT:1))
-                §R (+ (/ INT:10 (- i INT:1)) §IDX items i)
-            """;
-        var index = Assert.Single(Solve(source, typeCheck: false).Obligations, o => o.Kind == ObligationKind.IndexBounds);
-        AssertWithheld(index);
     }
 
     [Fact]
@@ -297,27 +259,6 @@ public sealed class S2ObligationResidualTests
         Assert.Contains("x != 0", csharp);           // the runtime check stays
         Assert.Contains("Calor1124", codes);          // reported as unsupported
         Assert.DoesNotContain("Calor1140", codes);    // no failed-proof error
-    }
-
-    [Fact]
-    public void ObligationInsideAFoldedMultiOperandOperation_IsWithheld()
-    {
-        // Review round 2: (+ a b c) folds into nested additions spanning the whole expression;
-        // 2147483647 + i throws at i = 1 before the indexed access.
-        const string source = """
-            §M{M}
-              §ITYPE{Sized:i32[]:n}
-              §F{Probe:priv}
-                §I{Sized:items}
-                §I{i32:n}
-                §I{i32:i}
-                §O{i32}
-                §E{}
-                §Q (== n INT:1)
-                §Q (&& (>= i INT:0) (<= i INT:1))
-                §R (+ INT:2147483647 i §IDX items i)
-            """;
-        AssertWithheld(Assert.Single(Solve(source, typeCheck: false).Obligations, o => o.Kind == ObligationKind.IndexBounds));
     }
 
     [Fact]

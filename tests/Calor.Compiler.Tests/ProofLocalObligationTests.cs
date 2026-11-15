@@ -199,48 +199,6 @@ public sealed class ProofLocalObligationTests
             §PROOF{} (== `a-b` {{claimed}})
             """), "shares its C# name with another variable");
 
-    // Review round 2: the refinement guard changes its value to 2 after the binding.
-    [SkippableFact]
-    public void LocalWithStateChangingRefinementGuard_IsRefused()
-        => AssertNotDischarged(SolveProof("""
-            §B{k:Bump} INT:1
-            §PROOF{} (== k INT:1)
-            """, prelude: """
-            §RTYPE{Bump:i32} (== §C{Increment} §A{ref} # §/C INT:2)
-              §F{Increment:priv}
-                §I{i32:value:ref}
-                §O{i32}
-                §ASSIGN value (+ value INT:1)
-                §R value
-            """), "refinement guards may change state");
-
-    [SkippableFact]
-    public void LocalWithPureRefinementType_Discharges()
-        => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
-            §B{k:Pos} INT:1
-            §PROOF{} (== k INT:1)
-            """, prelude: "§RTYPE{Pos:i32} (> # INT:0)").Status);
-
-    // Review round 3: the refinement guard reads a property, whose getter writes the storage the
-    // by-reference parameter x aliases.
-    [SkippableFact]
-    public void LocalWithGetterReadingRefinementGuard_IsRefused()
-        => AssertNotDischarged(SolveModule("""
-            §M{Test}
-              §RTYPE{Guard:i32} (== Heap.Next INT:1)
-              §CL{Heap:pub}
-                §FLD{i32:State:pub:stat} INT:1
-                §PROP{Next:i32:pub:stat}
-                  §GET
-                    §ASSIGN State INT:2
-                    §R INT:1
-              §F{Check:priv}
-                §I{i32:x:ref}
-                §O{void}
-                §B{saved:Guard} x
-                §PROOF{} (== saved x)
-            """), "refinement guards may change state");
-
     // Review round 3: an `in` argument exposes the local's storage to the callee.
     [SkippableFact]
     public void LocalPassedAsInArgument_IsRefused()

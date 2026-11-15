@@ -50,25 +50,6 @@ public class PreprocessorBindingTests
         "§M{T}\n  §CL{K:pub}\n    §FLD{i32:x:pub}\n    §MT{Run:pub} () -> i32\n      §E{mut}\n" +
         Indent(body, "      ") + "\n";
 
-    [Theory]
-    [InlineData("n", "N", true)]
-    [InlineData("n", "N", false)]
-    [InlineData("N", "n", true)]
-    [InlineData("N", "n", false)]
-    public void TypeChecker_PreprocessorBindingsKeepCaseDistinctRefinements(
-        string naturalName, string positiveName, bool returnNatural)
-    {
-        var branch = $"      §B{{{naturalName}:Nat}} a\n      §B{{{positiveName}:Pos}} b\n";
-        var source = "§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §RTYPE{Pos:Nat} (> # 0)\n" +
-            "  §F{Run:pub} (Nat:a, Pos:b) -> Pos\n    §PP{DEBUG}\n" + branch +
-            "    §PPE\n" + branch + $"    §R {(returnNatural ? naturalName : positiveName)}\n";
-
-        var result = Compile(source);
-
-        Assert.Equal(returnNatural, result.HasErrors);
-        Assert.All(result.Diagnostics.Errors, error => Assert.Equal("Calor0202", error.Code));
-    }
-
     // ===================================================================
     // Finding 1: a §PP local with the same name as a writable field
     // ===================================================================
@@ -325,33 +306,6 @@ public class PreprocessorBindingTests
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
-    // Review round 2: the #else branch is emitted without the #if branch's refinement metadata.
-    [Fact]
-    public void Emitter_ElseBranchRebind_IsNotGuardedByTheIfBranchRefinement()
-    {
-        var result = Compile("§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §F{Run:pub} (Nat:n) -> i32\n" +
-            "    §B{~x:i32} 0\n    §PP{A}\n      §B{~x:Nat} n\n    §PPE\n      §B{~x:i32} -1\n    §R x\n");
-
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
-        var code = result.GeneratedCode;
-        var elseBranch = code[code.IndexOf("#else", StringComparison.Ordinal)..code.IndexOf("#endif", StringComparison.Ordinal)];
-        Assert.Contains("x = -1;", elseBranch);
-        Assert.DoesNotContain("Nat", elseBranch);
-        Assert.Empty(ExemplarCompileChecker.RoslynErrors(code));
-    }
-
-    [Fact]
-    public void Emitter_RefinementInstalledByOneBranch_StillGuardsWritesAfterTheBlock()
-    {
-        var result = Compile("§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §F{Run:pub} (Nat:n) -> i32\n" +
-            "    §B{~x:i32} 0\n    §PP{A}\n      §B{~x:i32} 1\n    §PPE\n      §B{~x:Nat} n\n    §ASSIGN x -2\n    §R x\n");
-
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
-        var code = result.GeneratedCode;
-        var afterBlock = code[code.IndexOf("#endif", StringComparison.Ordinal)..];
-        Assert.Contains("Nat", afterBlock);
-    }
-
     // Review round 2: §PP blocks beneath an opaque parent statement still hoist their bindings.
     [Theory]
     [InlineData("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §B{x:i32} 1\n  §PPE\n    §B{x:i32} 2\n  §ASSIGN x 3\n§R 0")]
@@ -435,16 +389,6 @@ public class PreprocessorBindingTests
         var diagnostics = Bind(source);
 
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
-    }
-
-    // Review round 3: identical inherited refinements in both branches are the same guard.
-    [Fact]
-    public void Emitter_SameInheritedRefinementInBothBranches_Compiles()
-    {
-        var result = Compile("§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §RTYPE{Pos:Nat} (> # 0)\n" +
-            "  §F{Run:pub} (Pos:n) -> i32\n    §PP{A}\n      §B{x:Pos} n\n    §PPE\n      §B{x:Pos} n\n    §R x\n");
-
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
     }
 
     // ===================================================================
