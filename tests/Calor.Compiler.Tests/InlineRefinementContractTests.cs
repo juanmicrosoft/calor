@@ -24,12 +24,12 @@ public sealed class InlineRefinementContractTests
     public void EntryAndReassignmentGuards_SurviveProofAndElision(bool verify, bool reassign)
     {
         var source = $$"""
-            §M{Refined}
-              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
-                §E{}
-                §S (> result lo)
-                {{(reassign ? "§ASSIGN hi lo" : "")}}
-                §R hi
+            module Refined Refined block
+              func Upper (int:lo, int:hi | (# > lo)) → int
+                !
+                => (result > lo)
+                {{(reassign ? "set hi lo" : "")}}
+                return hi
             """;
         var assembly = Compile(source, verify);
         var method = assembly.GetType("Refined.RefinedModule")!.GetMethod("Upper")!;
@@ -46,14 +46,15 @@ public sealed class InlineRefinementContractTests
     public void InheritedRefinement_RenamesBothParametersAndKeepsRuntimeGuard(bool verify)
     {
         var assembly = Compile("""
-            §M{Refined}
-              §IFACE{IRange}
-                §MT{Upper} (i32:lo, i32:hi | (> # lo)) -> i32
-              §CL{Range:pub}
-                §IMPL{IRange}
-                §MT{Upper:pub} (i32:a, i32:b) -> i32
-                  §E{}
-                  §R b
+            module Refined Refined block
+              interface IRange
+                func Upper (int:lo, int:hi | (# > lo)) → int
+                  !
+              class Range
+                implements IRange
+                func Upper (int:a, int:b) → int
+                  !
+                  return b
             """, verify);
         var type = assembly.GetType("Refined.Range")!;
         var instance = Activator.CreateInstance(type);
@@ -82,10 +83,10 @@ public sealed class InlineRefinementContractTests
     }
 
     [Theory]
-    [InlineData("§C{Upper} §A 1 §A 2 §/C", ObligationStatus.Discharged)]
-    [InlineData("§C{Upper} §A 2 §A 1 §/C", ObligationStatus.Failed)]
-    [InlineData("§C{Upper} §A hi §A lo §/C", ObligationStatus.Discharged)]
-    [InlineData("§C{Upper} §A lo §A hi §/C", ObligationStatus.Failed)]
+    [InlineData("Upper(1, 2)", ObligationStatus.Discharged)]
+    [InlineData("Upper(2, 1)", ObligationStatus.Failed)]
+    [InlineData("Upper(hi, lo)", ObligationStatus.Discharged)]
+    [InlineData("Upper(lo, hi)", ObligationStatus.Failed)]
     public void CallerObligations_SubstituteArgumentsSimultaneously(string call, ObligationStatus expected)
     {
         var source = $$"""
@@ -166,19 +167,20 @@ public sealed class InlineRefinementContractTests
     public void InlinePredicate_RoundTripsOnSignatureWithoutLegacyParameterTag()
     {
         var module = Parse("""
-            §M{Refined}
-              §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
-                §R hi
+            module Refined Refined block
+              func Upper (int:lo, int:hi | (# > lo)) → int
+                !
+                return hi
             """);
         var emitted = new CalorEmitter().Emit(module);
         Assert.DoesNotContain("§I{", emitted);
-        Assert.Contains("| (> # lo)", emitted);
+        Assert.Contains("| (# > lo)", emitted);
         Assert.NotNull(Parse(emitted).Functions[0].Parameters[1].InlineRefinement);
     }
 
     [Theory]
-    [InlineData("(> # missing)", DiagnosticCode.UndefinedReference)]
-    [InlineData("(+ # 1)", DiagnosticCode.TypeMismatch)]
+    [InlineData("(# > missing)", DiagnosticCode.UndefinedReference)]
+    [InlineData("(# + 1)", DiagnosticCode.TypeMismatch)]
     public void InvalidRefinement_UsesPredicateSourceSpan(string predicate, string code)
     {
         var source = $$"""

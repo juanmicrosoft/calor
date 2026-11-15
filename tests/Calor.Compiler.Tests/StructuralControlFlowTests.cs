@@ -115,42 +115,46 @@ public class StructuralControlFlowTests
     {
         var assembly = Compile(
             """
-            §M{StructuralLoops}
-              §F{Encode:pub} (i32 from, i32 to, i32 step) -> i32
-                §B{~value:i32} INT:0
-                §L{i:from:to:step}
-                  §B{~value:i32} (+ (* value INT:10) i)
-                §R value
+            module StructuralLoops StructuralLoops block
+              func Encode (int:first, int:last, int:increment) → int
+                !
+                var int:value = 0
+                for i from first to last step increment
+                  set value ((value * 10) + i)
+                return value
 
-              §F{ExpressionStep:pub} () -> i32
-                §B{one:i32} INT:1
-                §B{~value:i32} INT:0
-                §L{i:1:5:(+ one one)}
-                  §B{~value:i32} (+ (* value INT:10) i)
-                §R value
+              func ExpressionStep () → int
+                !
+                let int:one = 1
+                var int:value = 0
+                for i from 1 to 5 step (one + one)
+                  set value ((value * 10) + i)
+                return value
 
-              §F{ExactOnce:pub} () -> i32
-                §B{fromCounter:Counter} §NEW{Counter} §/NEW
-                §B{toCounter:Counter} §NEW{Counter} §/NEW
-                §B{stepCounter:Counter} §NEW{Counter} §/NEW
-                §B{~value:i32} INT:0
-                §L{i:fromCounter.Next:(+ toCounter.Next INT:2):stepCounter.Next}
-                  §B{~value:i32} (+ (* value INT:10) i)
-                §R (+ (* value INT:1000) (+ (* fromCounter.Calls INT:100) (+ (* toCounter.Calls INT:10) stepCounter.Calls)))
+              func ExactOnce () → int
+                ! alloc, mut
+                let Counter:fromCounter = new Counter()
+                let Counter:toCounter = new Counter()
+                let Counter:stepCounter = new Counter()
+                var int:value = 0
+                for i from fromCounter.Next to (toCounter.Next + 2) step stepCounter.Next
+                  set value ((value * 10) + i)
+                return ((value * 1000) + ((fromCounter.Calls * 100) + ((toCounter.Calls * 10) + stepCounter.Calls)))
 
-              §CL{Counter:pub}
-                §FLD{i32:Calls:pub}
-                §PROP{Next:i32:pub}
-                  §GET
-                    §ASSIGN Calls (+ Calls INT:1)
-                    §R Calls
+              class Counter
+                field int:Calls
+                property int:Next
+                  get
+                    set Calls (Calls + 1)
+                    return Calls
 
-              §F{Collision:pub} () -> i32
-                §B{__calorForFrom:i32} INT:7
-                §B{~value:i32} INT:0
-                §L{i:1:1:1}
-                  §B{~value:i32} (+ value i)
-                §R (+ value __calorForFrom)
+              func Collision () → int
+                !
+                let int:__calorForFrom = 7
+                var int:value = 0
+                for i from 1 to 1 step 1
+                  set value (value + i)
+                return (value + __calorForFrom)
             """,
             out var generated);
 
@@ -675,11 +679,10 @@ public class StructuralControlFlowTests
     {
         var result = Program.Compile(
             $$"""
-            §M{IteratorParameters}
-              §F{Values:pub}
-                §I{i32:value:{{modifier}}}
-                §O{i32}
-                §YIELD value
+            module IteratorParameters IteratorParameters block
+              func Values ({{modifier}} int:value) → int
+                !
+                yield value
             """);
 
         Assert.Contains(

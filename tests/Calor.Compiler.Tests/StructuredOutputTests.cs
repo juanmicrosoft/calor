@@ -296,7 +296,7 @@ public class StructuredOutputTests : IDisposable
         var file = Path.Combine(_tempDir, "style.calr");
         // Trailing whitespace on the module line is a lint style issue.
         File.WriteAllText(file,
-            "module Style Style block\n" +
+            "module Style Style block   \n" +
             "  func Main () → void\n" +
             "    ! cw\n" +
             "    Console.WriteLine(\"hi\")\n");
@@ -370,7 +370,7 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "check.calr");
         File.WriteAllText(file,
-            "module Check Check block\n" +
+            "module Check Check block   \n" +
             "  func Main () → void\n" +
             "    ! cw\n" +
             "    Console.WriteLine(\"hi\")\n");
@@ -517,10 +517,11 @@ public class StructuredOutputTests : IDisposable
         // unknown/unsupported but never to a name outside the closed vocabulary.
         var file = Path.Combine(_tempDir, "contract.calr");
         File.WriteAllText(file, """
-            §M{Contract}
-              §F{Add:pub} (i32:a, i32:b) -> i32
-                §S (== result 0)
-                §R (+ a b)
+            module Contract Contract block
+              func Add (int:a, int:b) → int
+                !
+                => (result == 0)
+                return (a + b)
             """);
 
         var (_, stdOut, _) = RunCli("verify", file, "--format", "json");
@@ -559,10 +560,11 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "identity" + extension);
         const string source = """
-            §M{Identity}
-              §F{Answer:pub} (i32:value) -> i32
-                §S (== result value)
-                §R value
+            module Identity Identity block
+              func Answer (int:value) → int
+                !
+                => (result == value)
+                return value
             """;
         File.WriteAllText(file, source);
         var first = RunCli("verify", file, "--format", "json");
@@ -570,10 +572,10 @@ public class StructuredOutputTests : IDisposable
         var store = Ids.DeclarationIdentityStore.Find(file)!;
         var id = Assert.Single(store.Sync().Declarations, declaration => declaration.Name == "Answer").Id;
 
-        File.WriteAllText(file, source.Replace("  §F{Answer", """
-              §F{Earlier:priv} () -> void
-                §E{}
-              §F{Answer
+        File.WriteAllText(file, source.Replace("  func Answer", """
+              func Earlier private () → void
+                return
+              func Answer
             """, StringComparison.Ordinal));
         var second = RunCli("verify", file, "--format", "json");
         Assert.Equal(0, second.ExitCode);
@@ -620,10 +622,11 @@ public class StructuredOutputTests : IDisposable
             Directory.CreateDirectory(directory);
             var file = Path.Combine(directory, "input.calr");
             File.WriteAllText(file, $$"""
-                §M{{{name}}}
-                  §F{Answer:pub} (i32:value) -> i32
-                    §S (== result value)
-                    §R value
+                module {{name}} {{name}} block
+                  func Answer (int:value) → int
+                    !
+                    => (result == value)
+                    return value
                 """);
             return file;
         }).ToArray();

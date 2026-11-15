@@ -247,7 +247,7 @@ public class OptionResultConversionTests
         Assert.Contains("readonly", calor);
 
         // Operators emitted
-        Assert.Contains("§OP", calor); // operator declarations present
+        Assert.Contains("op ==", calor); // operator declarations present
     }
 
     [Fact]

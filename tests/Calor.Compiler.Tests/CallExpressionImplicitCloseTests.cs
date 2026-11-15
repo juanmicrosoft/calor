@@ -485,7 +485,7 @@ module Test Test block
         var call = new CallExpressionNode(default, "Foo", new List<ExpressionNode>());
         var emitter = new Migration.CalorEmitter();
         var output = call.Accept<string>(emitter);
-        Assert.Equal("§C{Foo}", output);
+        Assert.Equal("Foo()", output);
     }
 
     [Fact]
@@ -497,7 +497,7 @@ module Test Test block
         var ctx = new Migration.ConversionContext { UseImplicitCallCloser = false };
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
-        Assert.Equal("§C{Foo} §/C", output);
+        Assert.Equal("Foo()", output);
     }
 
     [Fact]
@@ -509,13 +509,14 @@ module Test Test block
         // is valid). Without the same-line guard in ParseCallExpression, the
         // parser would treat the §IF as the call's inline argument and emit
         // Calor0104. RFC v0.6 §3.2 / v0.6.1.
-        var source = @"§M{Demo}
-  §F{bool:pub}
-    §B{x} §C{items.Any}
-    §IF x
-      §R x
-    §EL
-      §R false
+        var source = @"module Demo Demo block
+  func bool ()
+    !
+    let x = items.Any()
+    if x
+      return x
+    else
+      return false
 ";
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -577,8 +578,8 @@ module Test Test block
         var emitter = new Migration.CalorEmitter();
         var output = outer.Accept<string>(emitter);
         // Inner zero-arg A() must keep its §/C inside the §A chain.
-        Assert.Contains("§C{A} §/C", output);
-        Assert.EndsWith("§/C", output);
+        Assert.Contains("A()", output);
+        Assert.EndsWith(")", output);
     }
 
     [Fact]
@@ -604,8 +605,8 @@ module Test Test block
         var emitter = new Migration.CalorEmitter();
         var output = arr.Accept<string>(emitter);
         // Both inner calls must keep §/C inside §ARR initializer.
-        Assert.Contains("§C{A} §/C", output);
-        Assert.Contains("§C{B} §/C", output);
+        Assert.Contains("A()", output);
+        Assert.Contains("B()", output);
     }
 
     [Fact]
@@ -619,7 +620,7 @@ module Test Test block
         var emitter = new Migration.CalorEmitter();
         var output = call.Accept<string>(emitter);
         // Leaf-position call: §/C elided by v0.6.1 default.
-        Assert.Equal("§C{Foo}", output);
+        Assert.Equal("Foo()", output);
     }
 
     [Fact]
@@ -630,7 +631,7 @@ module Test Test block
         var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
-        Assert.Equal("§C{Foo}", output);
+        Assert.Equal("Foo()", output);
     }
 
     [Fact]
@@ -647,7 +648,7 @@ module Test Test block
         var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
-        Assert.EndsWith("§/C", output);
+        Assert.EndsWith(")", output);
     }
 
     [Fact]
@@ -666,7 +667,7 @@ module Test Test block
         var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
-        Assert.Equal("§C{Identity} 42", output);
+        Assert.Equal("Identity(42)", output);
     }
 
     [Fact]
@@ -683,7 +684,7 @@ module Test Test block
         var ctx = new Migration.ConversionContext { UseImplicitCallCloser = false };
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
-        Assert.Equal("§C{Identity} §A 42 §/C", output);
+        Assert.Equal("Identity(42)", output);
     }
 
     [Fact]
@@ -697,7 +698,7 @@ module Test Test block
         var call = new CallExpressionNode(default, "Configure", args, argNames);
         var emitter = new Migration.CalorEmitter();
         var output = call.Accept<string>(emitter);
-        Assert.Equal("§C{Configure} §A[value] 42 §/C", output);
+        Assert.Equal("Configure(value: 42)", output);
     }
 
     [Fact]
@@ -719,8 +720,8 @@ module Test Test block
         var emitter = new Migration.CalorEmitter();
         var output = outer.Accept<string>(emitter);
         // Inner one-arg A(x) must keep its §/C inside the outer §A chain.
-        Assert.Contains("§C{A} §A x §/C", output);
-        Assert.EndsWith("§/C", output);
+        Assert.Contains("A(x)", output);
+        Assert.EndsWith(")", output);
     }
 
     [Fact]
@@ -732,7 +733,7 @@ module Test Test block
             new IntLiteralNode(default, 1),
         });
         var emitted = EmitWithImplicitCloser(call);
-        Assert.Equal("§C{Identity} 1", emitted);
+        Assert.Equal("Identity(1)", emitted);
 
         var source = $$"""
 module Test Test block
@@ -759,7 +760,7 @@ module Test Test block
         var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
         var emitter = new Migration.CalorEmitter(ctx);
         var emitted = call.Accept<string>(emitter);
-        Assert.Equal("§C{Foo}", emitted);
+        Assert.Equal("Foo()", emitted);
 
         // Wrap in a binding so we can re-parse it.
         var source = $$"""
@@ -808,7 +809,7 @@ module Test Test block
             new IntLiteralNode(default, 2),
         });
         var emitted = EmitWithImplicitCloser(outer);
-        Assert.Contains("§C{A} §/C", emitted);
+        Assert.Contains("A()", emitted);
 
         // Wrap in a binding context to round-trip through the parser.
         var source = $$"""
@@ -846,7 +847,7 @@ module Test Test block
                 new IntLiteralNode(default, 2),
             });
         var emitted = EmitWithImplicitCloser(newExpr);
-        Assert.Contains("§C{A} §/C", emitted);
+        Assert.Contains("A()", emitted);
 
         var source = $$"""
 module Test Test block
@@ -877,7 +878,7 @@ module Test Test block
             array: new ReferenceNode(default, "arr"),
             index: new CallExpressionNode(default, "GetIdx", new List<ExpressionNode>()));
         var emitted = EmitWithImplicitCloser(idx);
-        Assert.Contains("§C{GetIdx} §/C", emitted);
+        Assert.Contains("GetIdx()", emitted);
     }
 
     [Fact]
@@ -890,7 +891,7 @@ module Test Test block
             left: new CallExpressionNode(default, "A", new List<ExpressionNode>()),
             right: new ReferenceNode(default, "fallback"));
         var emitted = EmitWithImplicitCloser(nc);
-        Assert.Contains("§C{A} §/C", emitted);
+        Assert.Contains("A()", emitted);
     }
 
     [Fact]
@@ -915,8 +916,8 @@ module Test Test block
         var emitter = new Migration.CalorEmitter(
             new Migration.ConversionContext { UseImplicitCallCloser = true });
         var emitted = emitter.Emit(module);
-        Assert.Contains("§C{K} §/C", emitted);
-        Assert.Contains("§C{V} §/C", emitted);
+        Assert.Contains("K()", emitted);
+        Assert.Contains("V()", emitted);
     }
 
     [Fact]
@@ -929,10 +930,11 @@ module Test Test block
         // parser's zero-arg implicit-close path at Parser.cs:1409-1413
         // handles the next-line sibling unambiguously.
         var source = """
-§M{Test}
-  §F{Foo:pub}
-      §C{Bar} §/C
-      §C{Baz} §/C
+module Test Test block
+  func Foo ()
+    !
+    Bar()
+    Baz()
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -943,8 +945,8 @@ module Test Test block
         var fullEmitted = module.Accept<string>(fullEmitter);
 
         // v0.6.2: both stmt-context zero-arg calls drop their §/C.
-        Assert.Contains("§C{Bar}", fullEmitted);
-        Assert.Contains("§C{Baz}", fullEmitted);
+        Assert.Contains("Bar()", fullEmitted);
+        Assert.Contains("Baz()", fullEmitted);
         Assert.DoesNotContain("§C{Bar} §/C", fullEmitted);
         Assert.DoesNotContain("§C{Baz} §/C", fullEmitted);
 
@@ -964,8 +966,8 @@ module Test Test block
         var legacyEmitter = new Migration.CalorEmitter(
             new Migration.ConversionContext { UseImplicitCallCloser = false });
         var legacyEmitted = module.Accept<string>(legacyEmitter);
-        Assert.Contains("§C{Bar} §/C", legacyEmitted);
-        Assert.Contains("§C{Baz} §/C", legacyEmitted);
+        Assert.Contains("Bar()", legacyEmitted);
+        Assert.Contains("Baz()", legacyEmitted);
     }
 
     [Fact]
@@ -982,7 +984,7 @@ module Test Test block
             new CallExpressionNode(default, "Foo", new List<ExpressionNode>()),
             "str");
         var emitted = EmitWithImplicitCloser(typeOp);
-        Assert.Equal("(is §C{Foo} §/C string)", emitted);
+        Assert.Equal("(Foo() is string)", emitted);
 
         var typeOpAs = new TypeOperationNode(
             default,
@@ -990,7 +992,7 @@ module Test Test block
             new CallExpressionNode(default, "Foo", new List<ExpressionNode>()),
             "str");
         var emittedAs = EmitWithImplicitCloser(typeOpAs);
-        Assert.Equal("(as §C{Foo} §/C string)", emittedAs);
+        Assert.Equal("(Foo() as string)", emittedAs);
     }
 
     [Fact]
@@ -1161,7 +1163,7 @@ module Test Test block
             new Migration.ConversionContext { UseImplicitCallCloser = true });
         var emitted = module.Accept<string>(fullEmitter);
         // Emitted form must still close the operand call.
-        Assert.Contains("(is §C{Foo} §/C string)", emitted);
+        Assert.Contains("(Foo() is string)", emitted);
 
         // The call and canonical type must survive re-parsing.
         var module2 = Parse(emitted, out var diags2);
@@ -1197,7 +1199,7 @@ module Test Test block
         Assert.DoesNotContain("§C{Lo} INT", emitted);
         // Sanity: result starts with §RANGE and contains both operands' names
         // somewhere (either as hoisted temps or as inline §C{...} §/C).
-        Assert.Contains("§RANGE", emitted);
+        Assert.Contains("Lo()..Hi()", emitted);
     }
 
     [Fact]
@@ -1242,8 +1244,8 @@ module Test Test block
 
         // Both inner calls must keep §/C — otherwise §C{A} absorbs §C{B}
         // as inline arg.
-        Assert.Contains("§C{A} §/C", emitted);
-        Assert.Contains("§C{B} §/C", emitted);
+        Assert.Contains("A()", emitted);
+        Assert.Contains("B()", emitted);
     }
 
     [Fact]
@@ -1269,7 +1271,7 @@ module Test Test block
         var emitted = module.Accept<string>(fullEmitter);
         // Emitted form must keep §/C on the call target — otherwise the
         // member name string literal would be absorbed as inline arg.
-        Assert.Contains("(?. §C{Get} §/C \"Length\")", emitted);
+        Assert.Contains("(Get())?.Length", emitted);
 
         // Re-parse to confirm the round-trip is structurally stable.
         var module2 = Parse(emitted, out var diags2);

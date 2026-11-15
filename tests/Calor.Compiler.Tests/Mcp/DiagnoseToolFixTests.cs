@@ -69,7 +69,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{Test} §F{Fn} (i32:x) -> str §R (nameof x)"
+                "source": "module Test Test block\n  func Fn (int:x) → string\n    !\n    return nameof(x)"
             }
             """).RootElement;
 
@@ -87,7 +87,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{Test} §F{Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
+                "source": "module Test Test block\n  func Add (int:a, int:b) → int\n    !\n    return (a + b)"
             }
             """).RootElement;
 

@@ -231,12 +231,11 @@ module Test Test block
         Assert.True(convResult.Success, GetErrorMessage(convResult));
 
         var calor = convResult.CalorSource!;
-        // Should contain §EXT{Parent} as a child tag
-        Assert.Contains("§EXT{Parent}", calor);
-        // The §CL line should NOT have Parent as a positional
-        // (it should be §CL{...:Child} or §CL{...:Child:modifiers}, not §CL{...:Child:Parent:...})
-        var clLine = calor.Split('\n').First(l => l.Contains("§CL{"));
-        Assert.DoesNotContain(":Parent", clLine);
+        // Should contain `extends Parent` as a child clause
+        Assert.Contains("extends Parent", calor);
+        // The class header line should NOT carry Parent
+        var clLine = calor.Split('\n').First(l => l.TrimStart().StartsWith("class ", StringComparison.Ordinal));
+        Assert.DoesNotContain("Parent", clLine);
     }
 
     [Fact]
@@ -332,8 +331,8 @@ module Test Test block
         // This only affects legacy Calor files; the new CalorEmitter uses §EXT tags,
         // and old files with base classes always used 4 positionals.
         var source = @"
-§M{Test}
-  §CL{Foo:partial}
+module Test Test block
+  class Foo partial
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -526,10 +525,10 @@ module Test Test block
     public void Bug5_NestedBraces()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${dict.GetOrAdd(key, () => new V { P = 1 })}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${dict.GetOrAdd(key, () => new V { P = 1 })}"
             """;
 
         var result = ParseAndEmit(source);
@@ -540,10 +539,10 @@ module Test Test block
     public void Bug5_UnmatchedDollarBrace()
     {
         var source = """
-            §M{Test}
-              §F{Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${incomplete"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${incomplete"
             """;
 
         var result = Program.Compile(source, "unterminated-hole.calr");

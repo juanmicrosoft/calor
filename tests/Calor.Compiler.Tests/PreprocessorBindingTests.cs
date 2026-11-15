@@ -42,12 +42,20 @@ public class PreprocessorBindingTests
     private static string Indent(string body, string prefix) =>
         string.Join("\n", body.Split('\n').Select(line => prefix + line));
 
-    private static string Fn(string body, string signature = "() -> i32") =>
+    private static string Fn(string body, string signature = "() → int") =>
+        "module T T block\n  func Run " + signature + "\n" +
+        (body.StartsWith('!') ? "" : "    !\n") + Indent(body, "    ") + "\n";
+
+    /// <summary>
+    /// Legacy prefix-operator source for the Calor0110 arity tests below. Short-arity prefix
+    /// operators have no native spelling (native infix operators report Calor0100 instead).
+    /// </summary>
+    private static string LegacyFn(string body, string signature) =>
         "§M{T}\n  §F{Run:pub} " + signature + "\n" + Indent(body, "    ") + "\n";
 
     /// <summary>A method on a class with a writable field <c>x</c>.</summary>
     private static string MethodWithField(string body) =>
-        "§M{T}\n  §CL{K:pub}\n    §FLD{i32:x:pub}\n    §MT{Run:pub} () -> i32\n      §E{mut}\n" +
+        "module T T block\n  class K\n    field int:x\n    func Run () → int\n      ! mut\n" +
         Indent(body, "      ") + "\n";
 
     // ===================================================================
@@ -55,9 +63,9 @@ public class PreprocessorBindingTests
     // ===================================================================
 
     [Theory]
-    [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§ASSIGN x 2\n§R x")]
-    [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§B{y} x\n§ASSIGN x (+ x 1)\n§R y")]
-    [InlineData("§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §B{x:i32} 1\n§ASSIGN x 2\n§R x")]
+    [InlineData("pp DEBUG\n  let int:x = 1\nset x 2\nreturn x")]
+    [InlineData("pp DEBUG\n  let int:x = 1\nlet y = x\nset x (x + 1)\nreturn y")]
+    [InlineData("pp DEBUG\n  let int:a = 0\npp else\n  let int:x = 1\nset x 2\nreturn x")]
     public void Binder_WriteToPreprocessorLocalShadowingAWritableField_IsCalor0213(string body)
     {
         var diagnostics = Bind(MethodWithField(body));
@@ -66,9 +74,9 @@ public class PreprocessorBindingTests
     }
 
     [Theory]
-    [InlineData("§ASSIGN x 2\n§R x")]
-    [InlineData("§PP{DEBUG}\n  §B{~x:i32} 1\n§PPE\n  §B{~x:i32} 3\n§ASSIGN x 2\n§R x")]
-    [InlineData("§PP{DEBUG}\n  §ASSIGN x 1\n§ASSIGN x 2\n§R x")]
+    [InlineData("set x 2\nreturn x")]
+    [InlineData("pp DEBUG\n  var int:x = 1\npp else\n  var int:x = 3\nset x 2\nreturn x")]
+    [InlineData("pp DEBUG\n  set x 1\nset x 2\nreturn x")]
     public void Binder_WriteToWritableFieldOrMutablePreprocessorLocal_IsAccepted(string body)
     {
         var diagnostics = Bind(MethodWithField(body));
@@ -81,10 +89,10 @@ public class PreprocessorBindingTests
     // ===================================================================
 
     [Theory]
-    [InlineData("§PP{A}\n  §PP{B}\n    §B{x:i32} 1\n  §ASSIGN x 2\n§R 0")]
-    [InlineData("§PP{A}\n  §PP{B}\n    §B{x:i32} 1\n§ASSIGN x 2\n§R 0")]
-    [InlineData("§PP{A}\n  §B{a:i32} 0\n§PPE\n  §PP{B}\n    §B{x:i32} 1\n  §PPE\n    §B{x:i32} 2\n§ASSIGN x 3\n§R 0")]
-    [InlineData("§PP{A}\n  §PP{B}\n    §PP{C}\n      §B{x:i32} 1\n    §ASSIGN x 2\n§R 0")]
+    [InlineData("pp A\n  pp B\n    let int:x = 1\n  set x 2\nreturn 0")]
+    [InlineData("pp A\n  pp B\n    let int:x = 1\nset x 2\nreturn 0")]
+    [InlineData("pp A\n  let int:a = 0\npp else\n  pp B\n    let int:x = 1\n  pp else\n    let int:x = 2\nset x 3\nreturn 0")]
+    [InlineData("pp A\n  pp B\n    pp C\n      let int:x = 1\n    set x 2\nreturn 0")]
     public void Binder_WriteToNestedPreprocessorImmutableBinding_IsCalor0213(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -93,9 +101,9 @@ public class PreprocessorBindingTests
     }
 
     [Theory]
-    [InlineData("§PP{A}\n  §PP{B}\n    §B{x:i32} 1\n  §B{y} (+ x 1)\n§R 0")]
-    [InlineData("§PP{A}\n  §PP{B}\n    §B{~x:i32} 1\n  §ASSIGN x 2\n§R 0")]
-    [InlineData("§PP{A}\n  §PP{B}\n    §B{~x:i32} 1\n§ASSIGN x 2\n§R x")]
+    [InlineData("pp A\n  pp B\n    let int:x = 1\n  let y = (x + 1)\nreturn 0")]
+    [InlineData("pp A\n  pp B\n    var int:x = 1\n  set x 2\nreturn 0")]
+    [InlineData("pp A\n  pp B\n    var int:x = 1\nset x 2\nreturn x")]
     public void Binder_NestedPreprocessorBindings_AreVisibleAfterward(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -109,10 +117,10 @@ public class PreprocessorBindingTests
     // ===================================================================
 
     [Theory]
-    [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§B{~x} 2\n§R x")]
-    [InlineData("§PP{DEBUG}\n  §B{~x:i32} 1\n§PPE\n  §B{x:i32} 2\n§B{~x} 3\n§R x")]
-    [InlineData("§PP{A}\n  §PP{B}\n    §B{x:i32} 1\n§B{~x} 2\n§R x")]
-    [InlineData("§B{x:i32} 1\n§PP{DEBUG}\n  §B{~x} 2\n§R x")]
+    [InlineData("pp DEBUG\n  let int:x = 1\nvar x = 2\nreturn x")]
+    [InlineData("pp DEBUG\n  var int:x = 1\npp else\n  let int:x = 2\nvar x = 3\nreturn x")]
+    [InlineData("pp A\n  pp B\n    let int:x = 1\nvar x = 2\nreturn x")]
+    [InlineData("let int:x = 1\npp DEBUG\n  var x = 2\nreturn x")]
     public void Binder_MutableRebindOfPreprocessorImmutableBinding_IsCalor0260(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -121,9 +129,9 @@ public class PreprocessorBindingTests
     }
 
     [Theory]
-    [InlineData("§PP{DEBUG}\n  §B{~x:i32} 1\n§B{~x} 2\n§R x")]
-    [InlineData("§PP{DEBUG}\n  §B{~x:i32} 1\n§PPE\n  §B{~x:i32} 2\n§B{~x} 3\n§R x")]
-    [InlineData("§B{~x:i32} 1\n§PP{DEBUG}\n  §B{~x} 2\n§B{~x} 3\n§R x")]
+    [InlineData("pp DEBUG\n  var int:x = 1\nvar x = 2\nreturn x")]
+    [InlineData("pp DEBUG\n  var int:x = 1\npp else\n  var int:x = 2\nvar x = 3\nreturn x")]
+    [InlineData("var int:x = 1\npp DEBUG\n  var x = 2\nvar x = 3\nreturn x")]
     public void Binder_MutableRebindOfPreprocessorMutableBinding_IsAccepted(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -137,11 +145,11 @@ public class PreprocessorBindingTests
     // ===================================================================
 
     [Theory]
-    [InlineData("§B{y:i32} 1\n§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §ASSIGN y 2\n§R y")]
-    [InlineData("§B{y:i32} 1\n§PP{DEBUG}\n  §ASSIGN y 2\n§PPE\n  §B{a:i32} 0\n§R y")]
-    [InlineData("§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §B{z:i32} 1\n  §ASSIGN z 2\n§R 0")]
-    [InlineData("§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §L{j:0:3:1}\n    §ASSIGN j 2\n§R 0")]
-    [InlineData("§B{y:i32} 1\n§PP{A}\n  §B{a:i32} 0\n§PPE\n  §PP{B}\n    §B{b:i32} 0\n  §PPE\n    §ASSIGN y 2\n§R y")]
+    [InlineData("let int:y = 1\npp DEBUG\n  let int:a = 0\npp else\n  set y 2\nreturn y")]
+    [InlineData("let int:y = 1\npp DEBUG\n  set y 2\npp else\n  let int:a = 0\nreturn y")]
+    [InlineData("pp DEBUG\n  let int:a = 0\npp else\n  let int:z = 1\n  set z 2\nreturn 0")]
+    [InlineData("pp DEBUG\n  let int:a = 0\npp else\n  for j from 0 to 3 step 1\n    set j 2\nreturn 0")]
+    [InlineData("let int:y = 1\npp A\n  let int:a = 0\npp else\n  pp B\n    let int:b = 0\n  pp else\n    set y 2\nreturn y")]
     public void Binder_WriteToReadOnlyLocalInEitherBranch_IsCalor0213(string body)
     {
         var diagnostics = Bind(Fn(body));
@@ -153,7 +161,7 @@ public class PreprocessorBindingTests
     public void Binder_ElseBranchDoesNotSeeTheIfBranchBinding()
     {
         // The #else branch's §B{~x} is a fresh declaration, not a rebind of the #if branch's x.
-        var diagnostics = Bind(Fn("§PP{DEBUG}\n  §B{x:i32} 1\n§PPE\n  §B{~x:i32} 2\n§R 0"));
+        var diagnostics = Bind(Fn("pp DEBUG\n  let int:x = 1\npp else\n  var int:x = 2\nreturn 0"));
 
         Assert.DoesNotContain(DiagnosticCode.BindReassignsImmutable, ErrorCodes(diagnostics));
         Assert.DoesNotContain(DiagnosticCode.DuplicateDefinition, ErrorCodes(diagnostics));
@@ -163,7 +171,7 @@ public class PreprocessorBindingTests
     public void Binder_BranchReadOfAnUndefinedName_IsReported()
     {
         // The branch is bound now, so a typo inside it is no longer silently accepted.
-        var diagnostics = Bind(Fn("§PP{DEBUG}\n  §B{y} (+ nope 1)\n§R 0"));
+        var diagnostics = Bind(Fn("pp DEBUG\n  let y = (nope + 1)\nreturn 0"));
 
         Assert.Contains(DiagnosticCode.UndefinedReference, ErrorCodes(diagnostics));
     }
@@ -172,15 +180,15 @@ public class PreprocessorBindingTests
     public void Compile_BranchBindingThatRedeclaresAnEnclosingLocal_IsRejected()
     {
         // `int x = 0; #if A int x = 1; #endif` is CS0128 whenever A is defined.
-        var result = Compile(Fn("§B{x:i32} 0\n§PP{A}\n  §B{x:i32} 1\n§R x"));
+        var result = Compile(Fn("let int:x = 0\npp A\n  let int:x = 1\nreturn x"));
 
         Assert.Contains(result.Diagnostics.Errors, e => e.Code == DiagnosticCode.BindDuplicateInScope);
     }
 
     // Review round 1: an immutable §B wins over a collection statement declaring the same name.
     [Theory]
-    [InlineData("§E{alloc}\n§PP{A}\n  §LIST{x:i32}\n    1\n§PPE\n  §B{x:List<i32>} §NEW{List<i32>}\n§ASSIGN x x\n§R 0")]
-    [InlineData("§E{alloc}\n§PP{A}\n  §B{x:List<i32>} §NEW{List<i32>}\n§PPE\n  §LIST{x:i32}\n    1\n§ASSIGN x x\n§R 0")]
+    [InlineData("! alloc\npp A\n  let List<int>:x = new System.Collections.Generic.List<int>() { 1 }\npp else\n  let List<int>:x = new List<int>()\nset x x\nreturn 0")]
+    [InlineData("! alloc\npp A\n  let List<int>:x = new List<int>()\npp else\n  let List<int>:x = new System.Collections.Generic.List<int>() { 1 }\nset x x\nreturn 0")]
     public void Compile_WriteAfterBranchesMixingCollectionAndImmutableBinding_IsRejected(string body)
     {
         var result = Compile(Fn(body));
@@ -193,12 +201,12 @@ public class PreprocessorBindingTests
     // Review round 1: the code after the block has one variable, so its type cannot depend on
     // the active branch (a refinement guard would be emitted for only one of them).
     [Theory]
-    [InlineData("§PP{A}\n  §B{~x:Nat} n\n§PPE\n  §B{~x:i32} 2\n§ASSIGN x -1\n§R x")]
-    [InlineData("§PP{A}\n  §B{~x:i32} 2\n§PPE\n  §B{~x:Nat} n\n§ASSIGN x -1\n§R x")]
-    [InlineData("§PP{A}\n  §B{x:str} \"a\"\n§PPE\n  §B{x:i32} 2\n§R 0")]
+    [InlineData("pp A\n  var Nat:x = n\npp else\n  var int:x = 2\nset x -1\nreturn x")]
+    [InlineData("pp A\n  var int:x = 2\npp else\n  var Nat:x = n\nset x -1\nreturn x")]
+    [InlineData("pp A\n  let string:x = \"a\"\npp else\n  let int:x = 2\nreturn 0")]
     public void Binder_BranchesDeclaringOneNameWithDifferentTypes_AreCalor0201(string body)
     {
-        var source = "§M{T}\n  §RTYPE{Nat:i32} (>= # 0)\n  §F{Run:pub} (Nat:n) -> i32\n" +
+        var source = "module T T block\n  func Run (Nat:n) → int\n    !\n" +
             Indent(body, "    ") + "\n";
         var diagnostics = Bind(source);
 
@@ -237,26 +245,30 @@ public class PreprocessorBindingTests
 
     // Review round 1: a call through a binding hoisted from §PP may run either branch's value.
     [Theory]
-    [InlineData("§B{later:Action} Noop", "§B{later:Action} §LAM{mut} §C{Mutate} §A{ref} value §/C §/LAM")]
-    [InlineData("§B{later:Action} §LAM{mut} §C{Mutate} §A{ref} value §/C §/LAM", "§B{later:Action} Noop")]
+    [InlineData("let Action:later = Noop", "let Action:later = (mut) => Mutate(ref value)")]
+    [InlineData("let Action:later = (mut) => Mutate(ref value)", "let Action:later = Noop")]
     public void Binder_CallThroughHoistedCallable_SeesEveryBranchMutation(string first, string second)
     {
         var source = $$"""
-            §M{PpCallable}
-              §F{Noop:pub} () -> void
-                §E{}
-              §F{Mutate:pub} (?str:value:ref) -> void
-                §ASSIGN value null
-              §F{Take:pub} (str:value) -> void
-                §E{}
-              §F{Probe:pub} (?str:value) -> void
-                §IF (!= value null)
-                  §PP{A}
+            module PpCallable PpCallable block
+              func Noop () → void
+                !
+                return
+              func Mutate (ref string?:value) → void
+                !
+                set value null
+              func Take (string:value) → void
+                !
+                return
+              func Probe (string?:value) → void
+                !
+                if (value != null)
+                  pp A
                     {{first}}
-                  §PPE
+                  pp else
                     {{second}}
-                  §C{later} §/C
-                  §C{Take} §A value §/C
+                  later()
+                  Take(value)
             """;
         var module = Parse(source, out var diagnostics);
         new Binder(diagnostics).Bind(module);
@@ -269,15 +281,15 @@ public class PreprocessorBindingTests
     public void Binder_BranchNarrowingOfAHoistedBinding_SurvivesWhenEveryBranchEstablishesIt()
     {
         var diagnostics = Bind(NarrowingProbe(
-            "§PP{A}\n  §B{x:?str} input\n  §IF (isempty x)\n    §R\n§PPE\n  §B{x:?str} input\n  §IF (isempty x)\n    §R"));
+            "pp A\n  let string?:x = input\n  if string.IsNullOrEmpty(x)\n    return\npp else\n  let string?:x = input\n  if string.IsNullOrEmpty(x)\n    return"));
 
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
     [Theory]
-    [InlineData("§PP{A}\n  §B{x:?str} input\n  §IF (isempty x)\n    §R\n§PPE\n  §B{x:?str} input")]
-    [InlineData("§PP{A}\n  §B{x:?str} input\n§PPE\n  §B{x:?str} input\n  §IF (isempty x)\n    §R")]
-    [InlineData("§PP{A}\n  §B{~x:?str} input\n  §IF (isempty x)\n    §R\n§PPE\n  §B{~x:?str} input\n  §IF (isempty x)\n    §R\n§ASSIGN x null")]
+    [InlineData("pp A\n  let string?:x = input\n  if string.IsNullOrEmpty(x)\n    return\npp else\n  let string?:x = input")]
+    [InlineData("pp A\n  let string?:x = input\npp else\n  let string?:x = input\n  if string.IsNullOrEmpty(x)\n    return")]
+    [InlineData("pp A\n  var string?:x = input\n  if string.IsNullOrEmpty(x)\n    return\npp else\n  var string?:x = input\n  if string.IsNullOrEmpty(x)\n    return\nset x null")]
     public void Binder_BranchNarrowingNotEstablishedEverywhereOrInvalidated_IsCalor0274(string body)
     {
         var diagnostics = Bind(NarrowingProbe(body));
@@ -286,20 +298,20 @@ public class PreprocessorBindingTests
     }
 
     private static string NarrowingProbe(string body) =>
-        "§M{P}\n  §F{Take:pub} (str:value) -> void\n    §E{}\n  §F{Probe:pub} (?str:input) -> void\n" +
-        Indent(body + "\n§C{Take} §A x §/C", "    ") + "\n";
+        "module P P block\n  func Take (string:value) → void\n    !\n    return\n  func Probe (string?:input) → void\n    !\n" +
+        Indent(body + "\nTake(x)", "    ") + "\n";
 
     // Review round 2: a write inside a §PP inside a deferred callable is part of its summary.
     [Theory]
-    [InlineData("§PP{A}\n  §ASSIGN value null\n§PPE\n  §ASSIGN value null")]
-    [InlineData("§PP{A}\n  §ASSIGN value null")]
-    [InlineData("§PP{A}\n  §B{k:i32} 0\n§PPE\n  §PP{B}\n    §ASSIGN value null")]
+    [InlineData("pp A\n  set value null\npp else\n  set value null")]
+    [InlineData("pp A\n  set value null")]
+    [InlineData("pp A\n  let int:k = 0\npp else\n  pp B\n    set value null")]
     public void Binder_WriteInsidePreprocessorInsideLambda_ReachesTheCallSite(string lambdaBody)
     {
-        var source = "§M{P}\n  §F{Take:pub} (str:value) -> i32\n    §R (len value)\n" +
-            "  §F{Probe:pub} (?str:input) -> void\n    §B{~value:?str} input\n" +
-            "    §IF (!= value null)\n      §B{later:Action} §LAM{mut}\n" +
-            Indent(lambdaBody, "        ") + "\n      §/LAM\n      §C{later} §/C\n      §C{Take} §A value §/C\n";
+        var source = "module P P block\n  func Take (string:value) → int\n    !\n    return value.Length\n" +
+            "  func Probe (string?:input) → void\n    !\n    var string?:value = input\n" +
+            "    if (value != null)\n      let Action:later = (mut) =>\n" +
+            Indent(lambdaBody, "        ") + "\n      later()\n      Take(value)\n";
         var module = Parse(source, out var diagnostics);
         new Binder(diagnostics).Bind(module);
 
@@ -308,9 +320,9 @@ public class PreprocessorBindingTests
 
     // Review round 2: §PP blocks beneath an opaque parent statement still hoist their bindings.
     [Theory]
-    [InlineData("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §B{x:i32} 1\n  §PPE\n    §B{x:i32} 2\n  §ASSIGN x 3\n§R 0")]
-    [InlineData("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §PP{B}\n      §B{x:i32} 1\n  §ASSIGN x 3\n§R 0")]
-    [InlineData("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §B{~x:i32} 1\n  §PPE\n    §B{x:i32} 2\n  §ASSIGN x 3\n§R 0")]
+    [InlineData("! unsafe\nunsafe\n  pp A\n    let int:x = 1\n  pp else\n    let int:x = 2\n  set x 3\nreturn 0")]
+    [InlineData("! unsafe\nunsafe\n  pp A\n    pp B\n      let int:x = 1\n  set x 3\nreturn 0")]
+    [InlineData("! unsafe\nunsafe\n  pp A\n    var int:x = 1\n  pp else\n    let int:x = 2\n  set x 3\nreturn 0")]
     public void Compile_WriteAfterPreprocessorBeneathOpaqueParent_IsCalor0213(string body)
     {
         var result = Compile(Fn(body));
@@ -321,7 +333,7 @@ public class PreprocessorBindingTests
     [Fact]
     public void Compile_WriteAfterPreprocessorBeneathOpaqueParentToMutableBinding_IsAccepted()
     {
-        var result = Compile(Fn("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §B{~x:i32} 1\n  §PPE\n    §B{~x:i32} 2\n  §ASSIGN x 3\n§R 0"));
+        var result = Compile(Fn("! unsafe\nunsafe\n  pp A\n    var int:x = 1\n  pp else\n    var int:x = 2\n  set x 3\nreturn 0"));
 
         Assert.DoesNotContain(result.Diagnostics.Errors, e => e.Code == DiagnosticCode.WriteToReadOnlyLocal);
     }
@@ -329,13 +341,13 @@ public class PreprocessorBindingTests
     // Review round 3: a branch binding that hides an outer name must be declared on every path,
     // or after the block the name means the outer variable on the other path.
     [Theory]
-    [InlineData("§PP{A}\n  §B{x:str} \"safe\"\n§R §C{Take} §A x §/C")]
-    [InlineData("§PP{A}\n  §B{~x:str} \"safe\"\n§R 0")]
-    [InlineData("§PP{A}\n  §B{k:i32} 0\n§PPE\n  §B{x:str} \"safe\"\n§R 0")]
+    [InlineData("pp A\n  let string:x = \"safe\"\nreturn Take(x)")]
+    [InlineData("pp A\n  var string:x = \"safe\"\nreturn 0")]
+    [InlineData("pp A\n  let int:k = 0\npp else\n  let string:x = \"safe\"\nreturn 0")]
     public void Binder_BranchBindingHidingAMemberOnSomePaths_IsCalor0201(string body)
     {
-        var source = "§M{T}\n  §CL{K:pub}\n    §FLD{?str:x:pub}\n    §MT{Take:pub} (str:value) -> i32\n      §R (len value)\n" +
-            "    §MT{Run:pub} () -> i32\n" + Indent(body, "      ") + "\n";
+        var source = "module T T block\n  class K\n    field string?:x\n    func Take (string:value) → int\n      !\n      return value.Length\n" +
+            "    func Run () → int\n      !\n" + Indent(body, "      ") + "\n";
         var diagnostics = Bind(source);
 
         Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.DuplicateDefinition && e.Message.Contains("not every branch"));
@@ -344,7 +356,7 @@ public class PreprocessorBindingTests
     [Fact]
     public void Binder_BranchBindingRedeclaringAParameter_IsCalor0201()
     {
-        var diagnostics = Bind(Fn("§PP{A}\n  §B{n:i32} 1\n§R n", "(i32:n) -> i32"));
+        var diagnostics = Bind(Fn("pp A\n  let int:n = 1\nreturn n", "(int:n) → int"));
 
         Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.DuplicateDefinition);
     }
@@ -379,13 +391,13 @@ public class PreprocessorBindingTests
     [InlineData(false)]
     public void Binder_CallableCapturedInEitherBranch_InvalidatesTheHoistedNarrowing(bool captureInElse)
     {
-        var capture = "§ASSIGN later §LAM{mut}\n  §ASSIGN x null\n§/LAM";
-        var ifBranch = "§B{~x:?str} input\n§IF (isempty x)\n  §R 0" + (captureInElse ? "" : "\n" + capture);
-        var elseBranch = "§B{~x:?str} input\n§IF (isempty x)\n  §R 0" + (captureInElse ? "\n" + capture : "");
-        var source = "§M{T}\n  §F{Take:pub} (str:value) -> i32\n    §E{}\n    §R (len value)\n" +
-            "  §F{Probe:pub} (?str:input) -> i32\n    §B{~later:Action} §LAM{nop}\n      §B{k:i32} 0\n    §/LAM\n" +
-            "    §PP{A}\n" + Indent(ifBranch, "      ") + "\n    §PPE\n" + Indent(elseBranch, "      ") + "\n" +
-            "    §C{later} §/C\n    §R §C{Take} §A x §/C\n";
+        var capture = "set later (mut) =>\n  set x null";
+        var ifBranch = "var string?:x = input\nif string.IsNullOrEmpty(x)\n  return 0" + (captureInElse ? "" : "\n" + capture);
+        var elseBranch = "var string?:x = input\nif string.IsNullOrEmpty(x)\n  return 0" + (captureInElse ? "\n" + capture : "");
+        var source = "module T T block\n  func Take (string:value) → int\n    !\n    return value.Length\n" +
+            "  func Probe (string?:input) → int\n    !\n    var Action:later = (nop) =>\n      let int:k = 0\n" +
+            "    pp A\n" + Indent(ifBranch, "      ") + "\n    pp else\n" + Indent(elseBranch, "      ") + "\n" +
+            "    later()\n    return Take(x)\n";
         var diagnostics = Bind(source);
 
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
@@ -396,11 +408,11 @@ public class PreprocessorBindingTests
     // ===================================================================
 
     [Theory]
-    [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§PPE\n  §B{x:i32} 2\n§B{y} (+ x 1)\n§R y", "int x = 2;")]
-    [InlineData("§PP{DEBUG}\n  §B{~x:i32} 1\n§PPE\n  §B{~x:i32} 2\n§ASSIGN x 3\n§R x", "int x = 2;")]
-    [InlineData("§PP{A}\n  §B{~x:i32} 1\n§PPE\n  §PP{B}\n    §B{~x:i32} 2\n  §PPE\n    §B{~x:i32} 3\n§ASSIGN x 4\n§B{~x} 5\n§R x", "int x = 3;")]
-    [InlineData("§B{~n:i32} 0\n§PP{DEBUG}\n  §ASSIGN n 1\n§PPE\n  §B{~n} 2\n§R n", "n = 2;")]
-    [InlineData("§L{i:0:3:1}\n  §PP{DEBUG}\n    §B{k:i32} i\n  §PPE\n    §B{k:i32} 0\n§R 0", "int k = 0;")]
+    [InlineData("pp DEBUG\n  let int:x = 1\npp else\n  let int:x = 2\nlet y = (x + 1)\nreturn y", "int x = 2;")]
+    [InlineData("pp DEBUG\n  var int:x = 1\npp else\n  var int:x = 2\nset x 3\nreturn x", "int x = 2;")]
+    [InlineData("pp A\n  var int:x = 1\npp else\n  pp B\n    var int:x = 2\n  pp else\n    var int:x = 3\nset x 4\nvar x = 5\nreturn x", "int x = 3;")]
+    [InlineData("var int:n = 0\npp DEBUG\n  set n 1\npp else\n  var n = 2\nreturn n", "n = 2;")]
+    [InlineData("for i from 0 to 3 step 1\n  pp DEBUG\n    let int:k = i\n  pp else\n    let int:k = 0\nreturn 0", "int k = 0;")]
     public void Compile_ValidPreprocessorCode_CompilesWithBothBranches(string body, string elseBranchCode)
     {
         var result = Compile(Fn(body));
@@ -415,7 +427,7 @@ public class PreprocessorBindingTests
     [Fact]
     public void Emitter_ElseBranchMutableBinding_IsADeclarationNotAnAssignment()
     {
-        var result = Compile(Fn("§PP{DEBUG}\n  §B{~x:i32} 1\n§PPE\n  §B{~x:i32} 2\n§R x"));
+        var result = Compile(Fn("pp DEBUG\n  var int:x = 1\npp else\n  var int:x = 2\nreturn x"));
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
         Assert.Contains("int x = 1;", result.GeneratedCode);
@@ -426,7 +438,7 @@ public class PreprocessorBindingTests
     [Fact]
     public void Compile_WriteToFieldAfterPreprocessorWithoutLocal_Compiles()
     {
-        var result = Compile(MethodWithField("§PP{DEBUG}\n  §ASSIGN x 1\n§ASSIGN x 2\n§R x"));
+        var result = Compile(MethodWithField("pp DEBUG\n  set x 1\nset x 2\nreturn x"));
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
     }
@@ -444,19 +456,19 @@ public class PreprocessorBindingTests
     [InlineData("(!= s)", "(str?:s) -> bool")]
     public void Parser_TooFewOperands_AreCalor0110(string expression, string signature)
     {
-        Parse(Fn($"§R {expression}", signature), out var diagnostics);
+        Parse(LegacyFn($"§R {expression}", signature), out var diagnostics);
 
         Assert.Contains(DiagnosticCode.OperatorArgumentCount, ErrorCodes(diagnostics));
     }
 
     [Theory]
-    [InlineData("(?? s \"d\")", "(str?:s) -> str", "s ?? \"d\"")]
-    [InlineData("(? b 1 2)", "(bool:b) -> i32", "b ? 1 : 2")]
-    [InlineData("(== s null)", "(str?:s) -> bool", "s == null")]
-    [InlineData("(!= s null)", "(str?:s) -> bool", "s != null")]
+    [InlineData("s ?? \"d\"", "(string?:s) → string", "s ?? \"d\"")]
+    [InlineData("b ? 1 : 2", "(bool:b) → int", "b ? 1 : 2")]
+    [InlineData("s == null", "(string?:s) → bool", "s == null")]
+    [InlineData("s != null", "(string?:s) → bool", "s != null")]
     public void Parser_FullOperandCounts_AreAccepted(string expression, string signature, string expected)
     {
-        var result = Compile(Fn($"§R {expression}", signature));
+        var result = Compile(Fn($"return {expression}", signature));
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
         Assert.Contains(expected, result.GeneratedCode);
@@ -465,7 +477,7 @@ public class PreprocessorBindingTests
     [Fact]
     public void Parser_EqualsWithOneOperand_SuggestsComparingWithNull()
     {
-        Parse(Fn("§R (== s)", "(str?:s) -> bool"), out var diagnostics);
+        Parse(LegacyFn("§R (== s)", "(str?:s) -> bool"), out var diagnostics);
 
         var error = Assert.Single(diagnostics.Errors, e => e.Code == DiagnosticCode.OperatorArgumentCount);
         Assert.Contains("(== x null)", error.Message);
@@ -477,13 +489,13 @@ public class PreprocessorBindingTests
 
     public static IEnumerable<object[]> CliCases() => new[]
     {
-        new object[] { "pp-shadows-field", MethodWithField("§PP{DEBUG}\n  §B{x:i32} 1\n§ASSIGN x 2\n§R x"), "Calor0213" },
-        new object[] { "pp-nested", Fn("§PP{A}\n  §PP{B}\n    §B{x:i32} 1\n  §ASSIGN x 2\n§R 0"), "Calor0213" },
-        new object[] { "pp-rebind-immutable", Fn("§PP{DEBUG}\n  §B{x:i32} 1\n§B{~x} 2\n§R x"), "Calor0260" },
-        new object[] { "pp-else-branch-write", Fn("§B{y:i32} 1\n§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §ASSIGN y 2\n§R y"), "Calor0213" },
-        new object[] { "coalesce-one-operand", Fn("§R (?? s)", "(str?:s) -> str?"), "Calor0110" },
-        new object[] { "ternary-two-operands", Fn("§R (? b 1)", "(bool:b) -> i32"), "Calor0110" },
-        new object[] { "equals-one-operand", Fn("§R (== s)", "(str?:s) -> bool"), "Calor0110" },
+        new object[] { "pp-shadows-field", MethodWithField("pp DEBUG\n  let int:x = 1\nset x 2\nreturn x"), "Calor0213" },
+        new object[] { "pp-nested", Fn("pp A\n  pp B\n    let int:x = 1\n  set x 2\nreturn 0"), "Calor0213" },
+        new object[] { "pp-rebind-immutable", Fn("pp DEBUG\n  let int:x = 1\nvar x = 2\nreturn x"), "Calor0260" },
+        new object[] { "pp-else-branch-write", Fn("let int:y = 1\npp DEBUG\n  let int:a = 0\npp else\n  set y 2\nreturn y"), "Calor0213" },
+        new object[] { "coalesce-one-operand", LegacyFn("§R (?? s)", "(str?:s) -> str?"), "Calor0110" },
+        new object[] { "ternary-two-operands", LegacyFn("§R (? b 1)", "(bool:b) -> i32"), "Calor0110" },
+        new object[] { "equals-one-operand", LegacyFn("§R (== s)", "(str?:s) -> bool"), "Calor0110" },
     };
 
     [Theory]
@@ -510,9 +522,9 @@ public class PreprocessorBindingTests
 
     public static IEnumerable<object[]> CliPositiveCases() => new[]
     {
-        new object[] { "pp-both-branches", Fn("§PP{DEBUG}\n  §B{~x:i32} 1\n§PPE\n  §B{~x:i32} 2\n§ASSIGN x 3\n§R x"), "int x = 2;" },
-        new object[] { "pp-field-write", MethodWithField("§PP{DEBUG}\n  §ASSIGN x 1\n§ASSIGN x 2\n§R x"), "x = 2;" },
-        new object[] { "pp-elif-chain", Fn("§PP{A}\n  §B{x:i32} 1\n§PPE\n  §PP{B}\n    §B{x:i32} 2\n  §PPE\n    §B{x:i32} 3\n§R x"), "int x = 3;" },
+        new object[] { "pp-both-branches", Fn("pp DEBUG\n  var int:x = 1\npp else\n  var int:x = 2\nset x 3\nreturn x"), "int x = 2;" },
+        new object[] { "pp-field-write", MethodWithField("pp DEBUG\n  set x 1\nset x 2\nreturn x"), "x = 2;" },
+        new object[] { "pp-elif-chain", Fn("pp A\n  let int:x = 1\npp else\n  pp B\n    let int:x = 2\n  pp else\n    let int:x = 3\nreturn x"), "int x = 3;" },
     };
 
     [Theory]

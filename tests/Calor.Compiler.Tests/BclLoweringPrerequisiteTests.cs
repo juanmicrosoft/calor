@@ -434,7 +434,7 @@ public class BclLoweringPrerequisiteTests
         Assert.True(converted.Success, string.Join("\n", converted.Issues.Select(issue => issue.Message)));
         Assert.Equal(0, converted.InteropPreservationCount);
         Assert.DoesNotContain("sb-append", converted.CalorSource);
-        Assert.Contains("§C{sb.Append}", converted.CalorSource);
+        Assert.Contains("sb.Append(5)", converted.CalorSource);
         var runtime = TestHarness.Execute(converted.CalorSource!, "Run",
             options: new CompilationOptions { EnforceEffects = false });
         Assert.Null(runtime.Exception);

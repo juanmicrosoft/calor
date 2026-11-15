@@ -183,7 +183,7 @@ public class ConverterRobustnessTests
         Assert.True(success, $"Should not crash. Error: {error}");
         // Should contain §SYNC or equivalent, NOT strip the lock
         Assert.True(
-            calor.Contains("§SYNC") || calor.Contains("CSHARP"),
+            calor.Contains("lock _lock") || calor.Contains("CSHARP"),
             "Lock should be preserved as §SYNC or §CSHARP, not stripped");
     }
 

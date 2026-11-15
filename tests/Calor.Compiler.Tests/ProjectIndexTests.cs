@@ -224,7 +224,7 @@ public sealed class ProjectIndexTests : IDisposable
     [Fact]
     public void EffectsFacet_RecordsTheAssumedStateWithItsReasons()
     {
-        var dir = NewProject(("assumed.calr", "\n§M{Interop}\n  §F{UsesInterop:pub}\n      §O{void}\n      §RAW\nvar x = System.Environment.TickCount;\n§/RAW\n"));
+        var dir = NewProject(("assumed.calr", "\nmodule Interop Interop block\n  func UsesInterop () → void\n    ! unknown\n    raw member:conversion-error:Other:interop%20statement 37\nvar x = System.Environment.TickCount;\n"));
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
         var row = Assert.Single(index.EffectRows, row => row.Name == "UsesInterop");
@@ -320,14 +320,14 @@ public sealed class ProjectIndexTests : IDisposable
         var sb = new System.Text.StringBuilder("module M M block\n");
         for (var i = 1; i <= n; i++)
         {
-            sb.Append($"  §F{{A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
+            sb.Append($"  func A{i} (int:n) → int\n    ! cw\n");
             if (i == 1)
-                sb.Append("    §C{Console.WriteLine} §A \"x\" §/C\n");
-            sb.Append("    §IF (> n 0)\n");
+                sb.Append("    Console.WriteLine(\"x\")\n");
+            sb.Append("    if (n > 0)\n");
             if (i < n)
-                sb.Append($"      §B{{u{i}:i32}} §C{{A{i + 1}}} §A (- n 1) §/C\n");
-            sb.Append(i > 1 ? $"      §R §C{{A{i - 1}}} §A (- n 1) §/C\n" : "      §R 0\n");
-            sb.Append("    §R n\n");
+                sb.Append($"      let int:u{i} = A{i + 1}(n - 1)\n");
+            sb.Append(i > 1 ? $"      return A{i - 1}(n - 1)\n" : "      return 0\n");
+            sb.Append("    return n\n");
         }
         return sb.ToString();
     }

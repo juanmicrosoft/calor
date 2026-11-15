@@ -12,23 +12,23 @@ namespace Calor.Compiler.Tests;
 public class ResultContextRuntimeTests
 {
     [Theory]
-    [InlineData("§R value")]
-    [InlineData("§IF (> value 0)\n      §R value\n    §EL\n      §TH §NEW{InvalidOperationException} §A error §/NEW")]
-    [InlineData("§L{i:0:1:1}\n      §IF (> value 0)\n        §R value\n    §TH §NEW{InvalidOperationException} §A error §/NEW")]
+    [InlineData("return value")]
+    [InlineData("if (value > 0)\n      return value\n    else\n      throw new InvalidOperationException(error)")]
+    [InlineData("for i from 0 to 1 step 1\n      if (value > 0)\n        return value\n    throw new InvalidOperationException(error)")]
     public void ReturnContexts_PreserveValueAndThrowMessage(string body)
     {
         var source = """
-            §M{ResultContext}
-              §U{System}
-              §F{Probe:pub} (i32:value, str:error) -> i64
-                §E{alloc,throw}
+            module ResultContext ResultContext block
+              using System
+              func Probe (int:value, string:error) → long
+                ! alloc,throw
             """ + "\n    " + body;
         foreach (var text in RoundTrip(source))
         {
             var type = Compile(text);
             var method = type.GetMethod("Probe")!;
             Assert.Equal(7L, Assert.IsType<long>(method.Invoke(null, [7, "failed"])));
-            if (body != "§R value")
+            if (body != "return value")
             {
                 var exception = Assert.Throws<TargetInvocationException>(
                     () => method.Invoke(null, [0, "failed"]));
@@ -41,14 +41,14 @@ public class ResultContextRuntimeTests
     public void NestedFailure_PreservesEvaluationOrderAndStopsAfterThrow()
     {
         const string source = """
-            §M{ResultContext}
-              §U{System}
-              §F{Probe:pub} (Func<i32>:first §E{throw}, Func<i32>:second §E{throw}, bool:fail) -> i64
-                §E{alloc,throw}
-                §B{left:i32} §C{first} §/C
-                §IF fail
-                  §TH §NEW{InvalidOperationException} §A "failed" §/NEW
-                §R (+ left §C{second} §/C)
+            module ResultContext ResultContext block
+              using System
+              func Probe (Func<int>:first ! throw, Func<int>:second ! throw, bool:fail) → long
+                ! alloc,throw
+                let int:left = first()
+                if fail
+                  throw new InvalidOperationException("failed")
+                return (left + second())
             """;
         foreach (var text in RoundTrip(source))
         {

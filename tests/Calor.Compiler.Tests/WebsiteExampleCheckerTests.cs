@@ -738,10 +738,10 @@ public sealed class WebsiteExampleCheckerTests
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]
     [InlineData("guides/cross-module-effect-propagation.mdx", "expect=Calor0410,Calor0417", "expect=Calor0410")]
-    [InlineData("guides/dependent-types-tutorial.mdx", "    §I{i32:amount} | (> # INT:0)\n    §O{i32}\n    §Q", "    §I{i32:amount} | (> # INT:0)\n    §O{str}\n    §Q")]
-    [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\n§M{Name}    // Module requires tag + ID + name\n```",
-        "```calor\n§M{Name}    // Module requires tag + ID + name\nnamespace Name\n```")]
-    [InlineData("syntax-reference/structure-tags.mdx", "      §IF (> i 5)", "      §IF (> missing 5)")]
+    [InlineData("guides/dependent-types-tutorial.mdx", "(int:balance, int:amount) → int\n    !\n    requires balance >= 0\n    requires amount > 0\n    requires balance >= amount", "(int:balance, int:amount) → string\n    !\n    requires balance >= 0\n    requires amount > 0\n    requires balance >= amount")]
+    [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\nmodule TokenHello\n",
+        "```calor\nmodule TokenHello\nnamespace Name\n")]
+    [InlineData("syntax-reference/structure-tags.mdx", "      if i > 1\n", "      if missing > 1\n")]
     [InlineData("cli/compile.mdx", "error Calor0200: Undefined variable 'x'", "error Calor0200: Undefined variable 'y'")]
     [InlineData("guides/cross-module-effect-propagation.mdx", "warning Calor0417: Public function 'HandleRequest'", "warning Calor0417: Public function 'HandleRequests'")]
     public void PublishedWebsite_MutatedExampleIsCaught(string page, string original, string mutated)

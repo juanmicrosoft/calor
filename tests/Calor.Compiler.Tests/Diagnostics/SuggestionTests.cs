@@ -586,7 +586,7 @@ public class SuggestionTests
     public void Parser_NestedNativeCalls_AreNotUnknownPrefixOperators(string expression)
     {
         var diagnostics = new DiagnosticBag();
-        var source = $"§M{{Test}} §F{{Fn}} §O{{i32}} §B{{x}} {expression} §R x";
+        var source = $"module Test Test block\n  func Fn private () → int\n    let x = {expression}\n    return x";
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
@@ -676,7 +676,7 @@ public class SuggestionTests
     public void Parser_ShortOperators_HandleCorrectly(string op, bool shouldError)
     {
         var left = op == "??" ? "x" : "5";
-        var source = $"§M{{Test}} §F{{Fn}} §I{{?i32:x}} §O{{i32}} §R ({op} {left} 3)";
+        var source = $"module Test Test block\n  func Fn private (int?:x) → int\n    return ({left} {op} 3)";
         var result = Program.Compile(
             source,
             "test.calr",

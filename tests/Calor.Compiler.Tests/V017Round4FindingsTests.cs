@@ -67,11 +67,11 @@ public class V017Round4FindingsTests
     /// for every call carrying an i8/u8/i16/u16/f32 argument.
     /// </summary>
     [Theory]
-    [InlineData("f32")]
-    [InlineData("i8")]
-    [InlineData("u8")]
-    [InlineData("i16")]
-    [InlineData("u16")]
+    [InlineData("float")]
+    [InlineData("sbyte")]
+    [InlineData("byte")]
+    [InlineData("short")]
+    [InlineData("ushort")]
     public void DecoratedBuiltinArgument_StillReportsNoMatchingOverload(string calorType)
     {
         var result = Compile($$"""
@@ -129,15 +129,15 @@ public class V017Round4FindingsTests
     public void ModuleLevelGenericFunction_ResolvesThroughItsOwnConstraint()
     {
         var result = Compile("""
-            §M{Reach}
-              §IFACE{INote:pub}
-              §F{Accept:pub} (INote:n) -> i32
-                §E{}
-                §R INT:1
-              §F{Publish:pub}<TNote> (TNote:n) -> i32
-                §WHERE TNote : INote
-                §E{}
-                §R §C{Accept} §A n §/C
+            module Reach Reach block
+              func Accept (INote:n) → int
+                !
+                return 1
+              func Publish<TNote> (TNote:n) → int
+                where TNote : INote
+                !
+                return Accept(n)
+              interface INote
             """);
 
         Assert.DoesNotContain(
@@ -192,19 +192,19 @@ public class V017Round4FindingsTests
     /// and without the parse error that used to make it visible.
     /// </summary>
     [Theory]
-    [InlineData("§PROP{Name:str:pub:get,set} §E{cw}")]
-    [InlineData("§PROP{Name:str:pub} §E{cw}")]
+    [InlineData("property string:Name ! cw\n      get\n      set")]
+    [InlineData("property string:Name ! cw")]
     public void PropertyRow_SurvivesACalorToCalorReEmit(string propertyLine)
     {
         var source = """
-            §M{Holder}
-              §CL{Box:pub}
+            module Holder Holder block
+              class Box
 
             """ + "    " + propertyLine + "\n";
 
         var reemitted = ReEmit(source);
 
-        Assert.Contains("§E{cw}", reemitted);
+        Assert.Contains("property string:Name ! cw", reemitted);
     }
 
     /// <summary>
@@ -214,12 +214,14 @@ public class V017Round4FindingsTests
     public void PropertyWithoutRow_GainsNoneOnReEmit()
     {
         var reemitted = ReEmit("""
-            §M{Holder}
-              §CL{Box:pub}
-                §PROP{Name:str:pub:get,set}
+            module Holder Holder block
+              class Box
+                property string:Name
+                  get
+                  set
             """);
 
-        Assert.DoesNotContain("§E{", reemitted);
+        Assert.DoesNotContain("!", reemitted);
     }
 
     // =================================================================
@@ -257,7 +259,7 @@ public class V017Round4FindingsTests
             }
             """);
 
-        Assert.Contains($"§B{{{name}}}", calor);
+        Assert.Contains($"let {name} = ", calor);
         Assert.DoesNotContain("anonymous", calor);
     }
 
@@ -284,7 +286,7 @@ public class V017Round4FindingsTests
             }
             """);
 
-        Assert.Contains("§B{Seq<int>:evens}", calor);
+        Assert.Contains("let IEnumerable<int>:evens = ", calor);
     }
 
     // ---------------------------------------------------------------------

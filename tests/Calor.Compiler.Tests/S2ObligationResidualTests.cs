@@ -78,18 +78,19 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 1: the property check applies to entry obligations too.
         const string source = """
-            §M{M}
-              §CL{Base:pub}
-                §FLD{i32:Trigger:pub}
-              §CL{Box:pub}
-                §EXT{Base}
-                §PROP{Trigger:i32:pub}
-                  §GET
-                    §R INT:0
-              §F{Probe:priv}
-                §I{Box:box} | (== box.Trigger INT:0)
-                §O{void}
-                §E{}
+            module M M block
+              class Base
+                field int:Trigger
+
+              class Box
+                extends Base
+
+                property int:Trigger
+                  get
+                    return 0
+
+              func Probe private (Box:box | (box.Trigger == 0)) → void
+                return
             """;
         var entry = Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry);
         Assert.Equal(ObligationStatus.Boundary, entry.Status);
@@ -133,19 +134,19 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 1: with a user-defined operator in the module, a comparison may run it.
         const string source = """
-            §M{M}
-              §CL{Box:pub}
-                §FLD{i32:Value:pub}
-                §OP{+:pub}
-                  §I{Box:left}
-                  §I{Box:right}
-                  §O{Box}
-                  §R left
-              §F{Probe:pub} (i32:x) -> i32
-                §E{}
-                §B{q:bool} (< x INT:3)
-                §PROOF{claim} (!= x INT:0)
-                §R x
+            module M M block
+              class Box
+                field int:Value
+                op + (Box:left, Box:right) → Box
+                  !
+                  return left
+
+
+              func Probe (int:x) → int
+                !
+                let bool:q = (x < 3)
+                proof{"claim"} (x != 0)
+                return x
             """;
         AssertWithheld(Proof(Solve(source).Obligations, "claim"));
     }
@@ -212,18 +213,19 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 2: with a conversion operator declared, a plain binding may run it.
         const string source = """
-            §M{M}
-              §CL{Box:pub}
-                §FLD{i32:Value:pub}
-                §OP{implicit:pub}
-                  §I{Box:value}
-                  §O{i32}
-                  §R (/ INT:10 value.Value)
-              §F{Probe:pub} (Box:box, i32:x) -> i32
-                §E{}
-                §B{q:i32} box
-                §PROOF{claim} (!= box.Value INT:0)
-                §R q
+            module M M block
+              class Box
+                field int:Value
+                op implicit (Box:value) → int
+                  !
+                  return (10 / value.Value)
+
+
+              func Probe (Box:box, int:x) → int
+                !
+                let int:q = box
+                proof{"claim"} (box.Value != 0)
+                return q
             """;
         var (obligations, csharp, codes) = Solve(source, typeCheck: false);
         AssertWithheld(Proof(obligations, "claim"));
@@ -282,12 +284,10 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 3: the precondition runs before the parameter guard; only x = 0 completes it.
         const string source = """
-            §M{M}
-              §F{Probe:priv}
-                §I{i32:x} | (< # INT:2147483647)
-                §O{void}
-                §E{}
-                §Q (|| (== x INT:0) (== (+ x INT:1) INT:-2147483648))
+            module M M block
+              func Probe private (int:x | (# < 2147483647)) → void
+                requires ((x == 0) || ((x + 1) == -2147483648))
+                return
             """;
         var entry = Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry);
         Assert.Equal(ObligationStatus.Boundary, entry.Status);
@@ -334,15 +334,20 @@ public sealed class S2ObligationResidualTests
     {
         // Review round 3: a raw C# property hiding the inherited field is invisible to the scan.
         const string source = """
-            §M{M}
-              §CL{Base:pub}
-                §FLD{i32:Trigger:pub}
-              §CL{Box:pub}
-                §EXT{Base}
-                §CSHARP{public new int Trigger => 0;}§/CSHARP
-              §F{Probe:pub} (Box:box) -> void
-                §E{}
-                §PROOF{claim} (== box.Trigger INT:0)
+            module M M block
+              class Base
+                field int:Trigger
+
+              class Box
+                extends Base
+
+                raw member:unsafe:Other:test 28
+            public new int Trigger => 0;
+
+
+              func Probe (Box:box) → void
+                !
+                proof{"claim"} (box.Trigger == 0)
             """;
         var proof = Proof(Solve(source, typeCheck: false).Obligations, "claim");
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);

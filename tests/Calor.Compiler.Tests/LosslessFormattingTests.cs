@@ -40,22 +40,22 @@ public sealed class LosslessFormattingTests : IDisposable
     public void User001Reproduction_PreservesDeclarationReferenceAndComment()
     {
         const string source = """
-            §M{Test}
-                §F{Main:pub} () -> void
-                    §E{cw}
-                    §B{user001} STR:"secret"
+            module Test Test block
+                func Main () → void
+                    ! cw
+                    let user001 = "secret"
                     // This comment must survive.
-                    §P user001
+                    Console.WriteLine(user001)
             """;
 
         var result = new CalorFormatter().FormatSource(source, "user001.calr");
 
         Assert.True(result.Success, string.Join("\n", result.Errors));
         Assert.False(result.UsedConservativeFallback, result.ConservativeFallbackReason);
-        Assert.Contains("§B{user001}", result.Formatted);
-        Assert.Contains("§P user001", result.Formatted);
+        Assert.Contains("let user001 =", result.Formatted);
+        Assert.Contains("Console.WriteLine(user001)", result.Formatted);
         Assert.Contains("// This comment must survive.", result.Formatted);
-        Assert.DoesNotContain("§B{user1}", result.Formatted);
+        Assert.DoesNotContain("let user1 ", result.Formatted);
         Assert.NotEqual(source, result.Formatted);
     }
 
@@ -63,20 +63,20 @@ public sealed class LosslessFormattingTests : IDisposable
     public void ZeroPaddedSemanticText_IsPreservedInEveryContext()
     {
         const string source = """
-            §M{Test001}
-              §CL{Type001:pub}
-                §FLD{str:field001:priv}
-                §CTOR{pub}
-                §MT{method001:pub} (Type001:arg001) -> str
-                  §R field001
-              §F{call001:pub} () -> void
-                §E{cw,alloc}
-                §B{user001:Type001} §NEW{Type001} §/NEW
-                §C{user001.method001} user001
-                §P "user001 Type001 field001 method001 ctor001"
-                §RAW
+            module Test001 Test001 block
+              class Type001
+                field string:field001 private
+                ctor ()
+                func method001 (Type001:arg001) → string
+                  !
+                  return field001
+              func call001 () → void
+                ! cw,alloc
+                let Type001:user001 = new Type001()
+                user001.method001(user001)
+                Console.WriteLine("user001 Type001 field001 method001 ctor001")
+                raw member:unsafe:Other:test 50
             var raw001 = "user001 Type001.field001.method001";
-                §/RAW
             """;
 
         var result = new CalorFormatter().FormatSource(source, "identifiers.calr");
@@ -100,24 +100,24 @@ public sealed class LosslessFormattingTests : IDisposable
     {
         const string source = """
             // before module
-            §M{Comments}
+            module Comments Comments block
                 /// function docs
-                §F{Main:pub} () -> void
-                    §E{cw}
+                func Main () → void
+                    ! cw
                     // before if
-                    §IF true
+                    if true
                         // inside if
-                        §P "if"
+                        Console.WriteLine("if")
                     // between blocks
 
-                    §L{i:0:1:1}
+                    for i from 0 to 1 step 1
                         // inside loop
-                        §P i
+                        Console.WriteLine(i)
                     // after loop
                 // after function
-                §CL{Holder:pub}
+                class Holder
                     // inside class
-                    §FLD{str:value001:priv}
+                    field string:value001 private
                 // after class
             // after module
             """;
@@ -160,78 +160,80 @@ public sealed class LosslessFormattingTests : IDisposable
         [
             "while",
             """
-            §M{WhileComments}
-                §F{Main:pub} () -> void
-                    §E{cw}
+            module WhileComments WhileComments block
+                func Main () → void
+                    ! cw
                     // before while
-                    §WH false
+                    while false
                         // inside while
-                        §P "inside"
+                        Console.WriteLine("inside")
                     // after while
-                    §P "after"
+                    Console.WriteLine("after")
             """
         ];
         yield return
         [
             "foreach",
             """
-            §M{ForeachComments}
-                §F{Main:pub} (i32[]:items001) -> void
-                    §E{cw}
+            module ForeachComments ForeachComments block
+                func Main (int[]:items001) → void
+                    ! cw
                     // before foreach
-                    §EACH{item001:i32} items001
+                    each int:item001 in items001
                         // inside foreach
-                        §P item001
+                        Console.WriteLine(item001)
                     // after foreach
-                    §P "after"
+                    Console.WriteLine("after")
             """
         ];
         yield return
         [
             "try",
             """
-            §M{TryComments}
-                §F{Main:pub} () -> void
-                    §E{cw}
+            module TryComments TryComments block
+                func Main () → void
+                    ! cw
                     // before try
-                    §TR
+                    try
                         // inside try
-                        §P "inside"
-                    §FI
-                        §P "finally"
+                        Console.WriteLine("inside")
+                    finally
+                        Console.WriteLine("finally")
                     // after try
-                    §P "after"
+                    Console.WriteLine("after")
             """
         ];
         yield return
         [
             "match",
             """
-            §M{MatchComments}
-                §F{Main:pub} (i32:value001) -> void
-                    §E{cw}
+            module MatchComments MatchComments block
+                func Main (int:value001) → void
+                    ! cw
                     // before match
-                    §W value001
-                        §K 1
+                    match value001
+                        case 1
                             // inside match
-                            §P "one"
-                        §K _
-                            §P "other"
+                            Console.WriteLine("one")
+                        case _
+                            Console.WriteLine("other")
                     // after match
-                    §P "after"
+                    Console.WriteLine("after")
             """
         ];
         yield return
         [
             "interface",
             """
-            §M{InterfaceComments}
+            module InterfaceComments InterfaceComments block
                 // before interface
-                §IFACE{IThing001}
+                interface IThing001
                     // inside interface
-                    §MT{Run001} () -> void
+                    func Run001 () → void
+                        !
                 // after interface
-                §F{Main:pub} () -> void
+                func Main () → void
+                    !
             """
         ];
     }
@@ -240,23 +242,22 @@ public sealed class LosslessFormattingTests : IDisposable
     public void StringsInlineCommentsAndRawCSharp_AreByteForBytePreserved()
     {
         const string rawLine = "  var user001 = \"// not a Calor comment\";   ";
+        const string rawPayload = rawLine + "\n\tConsole.WriteLine(user001);";
         var source = string.Join(
             "\n",
             "module Raw Raw block",
-            "    §F{Main:pub} () -> void",
-            "        §E{cw}",
-            "        §P \"user001 // literal\"   // inline comment   ",
-            "        §RAW",
-            rawLine,
-            "\tConsole.WriteLine(user001);",
-            "        §/RAW",
+            "    func Main () → void",
+            "        ! cw",
+            "        Console.WriteLine(\"user001 // literal\")   // inline comment   ",
+            $"        raw member:unsafe:Other:test {Encoding.UTF8.GetByteCount(rawPayload)}",
+            rawPayload,
             "");
 
         var result = new CalorFormatter().FormatSource(source, "raw.calr");
 
         Assert.True(result.Success, string.Join("\n", result.Errors));
         Assert.False(result.UsedConservativeFallback, result.ConservativeFallbackReason);
-        Assert.Contains("\"user001 // literal\"   // inline comment   ", result.Formatted);
+        Assert.Contains("\"user001 // literal\")   // inline comment   ", result.Formatted);
         Assert.Contains($"\n{rawLine}\n", result.Formatted, StringComparison.Ordinal);
         Assert.Contains("\n\tConsole.WriteLine(user001);\n", result.Formatted, StringComparison.Ordinal);
     }
@@ -284,14 +285,14 @@ public sealed class LosslessFormattingTests : IDisposable
         yield return
         [
             "multiline-string",
-            "§M{MultilineString}   \n" +
-            "  §F{Main:pub} () -> void\n" +
-            "    §E{cw}\n" +
-            "    §P \"\"\"\n" +
+            "module MultilineString MultilineString block   \n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"\"\"\n" +
             "      first line   \n" +
             "        // string content   \n" +
             "      last line\t\n" +
-            "    \"\"\"\n",
+            "    \"\"\")\n",
             "      first line   \n        // string content   \n      last line\t"
         ];
         yield return
@@ -308,25 +309,23 @@ public sealed class LosslessFormattingTests : IDisposable
         yield return
         [
             "multiline-raw-block",
-            "§M{MultilineRaw}   \n" +
-                        "  §F{Main:pub} () -> void\n" +
-                        "    §E{cw}\n" +
-                        "    §RAW\n" +
+            "module MultilineRaw MultilineRaw block   \n" +
+                        "  func Main () → void\n" +
+                        "    ! cw\n" +
+                        "    raw member:unsafe:Other:test 52\n" +
                         "var rawKeep = \"keep\";   \n" +
-                        "Console.WriteLine(rawKeep);\n" +
-                        "    §/RAW\n",
+                        "Console.WriteLine(rawKeep);\n",
                         "var rawKeep = \"keep\";   \nConsole.WriteLine(rawKeep);"
         ];
         yield return
         [
             "multiline-interop-block",
-            "§M{MultilineInterop}   \n" +
-            "  §CSHARP{\n" +
+            "module MultilineInterop MultilineInterop block   \n" +
+            "  raw member:unsafe:Other:test 79\n" +
             "public static class InteropKeep\n" +
             "{\n" +
             "    public static string Value = \"keep\";   \n" +
-            "}\n" +
-            "}§/CSHARP\n",
+            "}\n",
             "public static class InteropKeep\n{\n    public static string Value = \"keep\";   \n}"
         ];
     }
@@ -335,20 +334,20 @@ public sealed class LosslessFormattingTests : IDisposable
     public void CrOnlyInput_FormatsWithoutLineDesynchronization()
     {
         const string source =
-            "module CrOnly CrOnly block\n" +
-            "  func Main () → void\n" +
-            "    ! cw\n" +
-            "    Console.WriteLine(\"ok\")";
+            "module CrOnly CrOnly block\r" +
+            "    func Main () → void   \r" +
+            "        ! cw\r" +
+            "        Console.WriteLine(\"ok\")   \r";
 
         var result = new CalorFormatter().FormatSource(source, "cr-only.calr");
 
         Assert.True(result.Success, string.Join("\n", result.Errors));
         Assert.False(result.UsedConservativeFallback, result.ConservativeFallbackReason);
         Assert.Equal(
-            "§M{CrOnly}\r" +
-            "  §F{Main:pub} () -> void\r" +
-            "    §E{cw}\r" +
-            "    §P \"ok\"\r",
+            "module CrOnly CrOnly block\r" +
+            "  func Main () → void\r" +
+            "    ! cw\r" +
+            "    Console.WriteLine(\"ok\")\r",
             result.Formatted);
     }
 
@@ -356,10 +355,10 @@ public sealed class LosslessFormattingTests : IDisposable
     public void MixedLoneCrInput_PreservesEveryTerminatorAndRemainsIdempotent()
     {
         const string source =
-            "module MixedCr MixedCr block\n" +
-            "  func Main () → void\n" +
-            "    ! cw\n" +
-            "    Console.WriteLine(\"ok\")\n";
+            "module MixedCr MixedCr block\r\n" +
+            "    func Main () → void   \r" +
+            "        ! cw\n" +
+            "        Console.WriteLine(\"ok\")   \r\n";
         var formatter = new CalorFormatter();
 
         var once = formatter.FormatSource(source, "mixed-cr.calr");
@@ -383,11 +382,10 @@ public sealed class LosslessFormattingTests : IDisposable
     {
         var source = string.Join(
             "\n",
-            "module Trivia Trivia block",
+            "module Trivia Trivia block   ",
             "  // comment whitespace is content   ",
-            "  §RAW",
+            "  raw member:unsafe:Other:test 20",
             "var value001 = 1;   ",
-            "  §/RAW",
             "");
 
         var lines = LosslessSourceDocument.GetTrimmableTrailingWhitespaceLines(source);
@@ -404,10 +402,10 @@ public sealed class LosslessFormattingTests : IDisposable
     {
         var path = Path.Combine(_testDirectory, $"{encodingName}.calr");
         const string source =
-            "module Encoding Encoding block\n" +
-            "  func Main () → void\n" +
-            "    ! cw\n" +
-            "    Console.WriteLine(\"é\")\n";
+            "module Encoding Encoding block\r\n" +
+            "    func Main () → void   \n" +
+            "        ! cw\r\n" +
+            "        Console.WriteLine(\"é\") \r\n";
         var encoding = encodingName == "utf8-bom"
             ? (Encoding)new UTF8Encoding(encoderShouldEmitUTF8Identifier: true)
             : new UnicodeEncoding(bigEndian: false, byteOrderMark: true);
@@ -429,8 +427,8 @@ public sealed class LosslessFormattingTests : IDisposable
         Assert.Contains("\r\n", rewritten.Text, StringComparison.Ordinal);
         Assert.Contains("void\n", rewritten.Text, StringComparison.Ordinal);
         Assert.EndsWith("\r\n", rewritten.Text, StringComparison.Ordinal);
-        Assert.Contains("§F{Main:pub}", rewritten.Text, StringComparison.Ordinal);
-        Assert.Contains("§P \"é\"", rewritten.Text, StringComparison.Ordinal);
+        Assert.Contains("func Main () → void", rewritten.Text, StringComparison.Ordinal);
+        Assert.Contains("Console.WriteLine(\"é\")", rewritten.Text, StringComparison.Ordinal);
     }
 
     [Fact]

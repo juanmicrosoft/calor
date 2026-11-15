@@ -23,10 +23,10 @@ public class CodegenBatchFixTests
     {
         // §B{var:myList} should produce "var myList = ..." not "myList var = ..."
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{var:myList} §NEW{List<i32>} §/NEW
+module Test Test block
+  func Main () → void
+    !
+    var myList = new List<int>()
 ";
 
         var result = ParseAndEmit(source);
@@ -261,7 +261,7 @@ module Test Test block
         var calorEmitter = new Migration.CalorEmitter();
         var result = calorEmitter.Emit(module);
 
-        Assert.Contains("§ARR{", result);
+        Assert.Contains("new int[] { 1, 2, 3 }", result);
         Assert.Contains("1", result);
         Assert.Contains("2", result);
         Assert.Contains("3", result);
@@ -341,7 +341,7 @@ module Test Test block
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§ARR{", result.CalorSource);
+        Assert.Contains("new int[] { 1, 2, 3 }", result.CalorSource);
         Assert.DoesNotContain("{1, 2, 3}", result.CalorSource);
     }
 
@@ -451,10 +451,10 @@ module Test Test block
     public void Gap_DecimalNegativeValue_RoundtripsCorrectly()
     {
         var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~x} DEC:-42.5
+module Test Test block
+  func Main () → void
+    !
+    var x = -42.5m
 ";
 
         var result = ParseAndEmit(source);

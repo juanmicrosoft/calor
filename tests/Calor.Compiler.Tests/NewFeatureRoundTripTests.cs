@@ -56,7 +56,7 @@ module Test Test block
     return ((int)x)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("cast", formatted);
+        Assert.Contains("(int)x", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -98,7 +98,7 @@ module Test Test block
     return ((int)((double)x))
 ";
         var (_, formatted, _) = FormatAndReparse(source);
-        Assert.Contains("cast", formatted);
+        Assert.Contains("((int)((double)x))", formatted);
     }
 
     #endregion
@@ -139,8 +139,8 @@ module Test Test block
         return ""other""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§W ", formatted);
-        Assert.Contains("§K", formatted);
+        Assert.Contains("match ", formatted);
+        Assert.Contains("case ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -159,7 +159,7 @@ module Test Test block
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("null", formatted);
-        Assert.Contains("§K _", formatted);
+        Assert.Contains("case _", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -179,8 +179,8 @@ module Test Test block
     return (a / b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§Q", formatted);
-        Assert.Contains("§S", formatted);
+        Assert.Contains("requires ", formatted);
+        Assert.Contains("=> ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -199,7 +199,7 @@ module Test Test block
       Console.WriteLine(i)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§L{", formatted);
+        Assert.Contains("for i from ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -214,7 +214,7 @@ module Test Test block
       Console.WriteLine(""working"")
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§WH", formatted);
+        Assert.Contains("while ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -250,7 +250,7 @@ module Test Test block
       return 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§IF ", formatted);
+        Assert.Contains("if ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -268,7 +268,7 @@ module Test Test block
     Console.WriteLine(msg)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§E{", formatted);
+        Assert.Contains("! cw", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -310,7 +310,7 @@ module Test Test block
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("42", formatted);
-        Assert.Contains("§TH", formatted);
+        Assert.Contains("throw ", formatted);
         Assert.Equal(2, reparsed.Functions.Count);
     }
 
@@ -390,9 +390,9 @@ module ComplexTest ComplexTest block
       return input
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§Q", formatted);
-        Assert.Contains("§S", formatted);
-        Assert.Contains("§IF ", formatted);
+        Assert.Contains("requires ", formatted);
+        Assert.Contains("=> ", formatted);
+        Assert.Contains("if ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -411,7 +411,7 @@ module Test Test block
     return sum
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§B{", formatted);
+        Assert.Contains("let sum", formatted);
         Assert.DoesNotContain("§LET{", formatted);
         Assert.DoesNotContain("§MUT{", formatted);
         Assert.Single(reparsed.Functions);
@@ -432,9 +432,9 @@ module Test Test block
         var (original, formatted, reparsed) = FormatAndReparse(source);
 
         // Immutable typed bind should format as {type:name}
-        Assert.Contains("§B{int:count}", formatted);
+        Assert.Contains("let int:count", formatted);
         // Mutable typed bind should format as {~name:type}
-        Assert.Contains("§B{~total:int}", formatted);
+        Assert.Contains("var int:total", formatted);
 
         // Round-trip preserves semantics
         var func = Assert.Single(reparsed.Functions);
@@ -456,11 +456,11 @@ module Test Test block
     {
         // Legacy CalorEmitter format: {name:const} should parse as immutable, no type
         var source = @"
-§M{Test}
-  §F{LegacyTest:pub}
-    §O{i32}
-    §B{count:const} 42
-    §R count
+module Test Test block
+  func LegacyTest () → int
+    !
+    let count = 42
+    return count
 ";
         var parsed = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -478,11 +478,11 @@ module Test Test block
     {
         // Legacy format: {type:name:const} should parse as immutable with type
         var source = @"
-§M{Test}
-  §F{LegacyTypedTest:pub}
-    §O{i32}
-    §B{i32:count:const} 42
-    §R count
+module Test Test block
+  func LegacyTypedTest () → int
+    !
+    let int:count = 42
+    return count
 ";
         var parsed = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -509,7 +509,7 @@ module Test Test block
     let int[]:nums = new int[] { 1, 2, 3 }
 ";
         var (_, formatted, _) = FormatAndReparse(source);
-        Assert.Contains("§ARR", formatted);
+        Assert.Contains("new int[] { 1, 2, 3 }", formatted);
         // Phase 4b: indent form — array literal blocks end by dedent, not §/ARR.
     }
 
@@ -523,7 +523,7 @@ module Test Test block
     let int[]:arr1 = new arr1[10]
 ";
         var (_, formatted, _) = FormatAndReparse(source);
-        Assert.Contains("§ARR", formatted);
+        Assert.Contains("new arr1[10]", formatted);
     }
 
     #endregion
@@ -566,47 +566,44 @@ module Test Test block
     [Theory]
     // position 1 — the declaration's own row
     [InlineData("""
-        §M{R}
-          §F{F:pub} () -> void
-            §E{cw}
-            §P "x"
-        """, "\n    §E{cw}\n")]
+        module R R block
+          func F () → void
+            ! cw
+            Console.WriteLine("x")
+        """, "\n    ! cw\n")]
     // position 2 — lambda literal. The emitter did not write this tag back before
     // this slice, so the row was silently dropped on every round trip.
     [InlineData("""
-        §M{R}
-          §F{Main:pub} () -> void
-            §E{}
-            §B{f} §LAM{x:i32} §E{cw} (+ x INT:1) §/LAM
-        """, "§LAM{x:int} §E{cw}")]
+        module R R block
+          func Main () → void
+            !
+            let f = (int:x) ! cw => (x + 1)
+        """, "(int:x) ! cw =>")]
     // position 3 — delegate declaration. Emitted as `§E{[console, write]}` before
     // this slice: a stringified KeyValuePair that did not re-parse.
     [InlineData("""
-        §M{R}
-          §DEL{Handler}
-            §I{i32:x}
-            §O{void}
-            §E{cw}
-          §F{Main:pub} () -> void
-            §E{}
-        """, "\n    §E{cw}\n")]
+        module R R block
+          delegate Handler (int:x) → void
+            ! cw
+
+          func Main () → void
+            !
+            return
+        """, "\n    ! cw\n")]
     // position 4 — parameter, tag form
     [InlineData("""
-        §M{R}
-          §F{Apply:pub}
-            §I{Func<i32,i32>:transform} §E{cw}
-            §I{i32:value} = INT:1
-            §O{i32}
-            §E{cw}
-            §R INT:0
-        """, "§I{Func<int, int>:transform} §E{cw}")]
+        module R R block
+          func Apply (Func<int, int>:transform ! cw, int:value = 1) → int
+            ! cw
+            return 0
+        """, "Func<int, int>:transform ! cw")]
     // position 5 — parameter, inline form
     [InlineData("""
-        §M{R}
-          §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-            §E{cw}
-            §R INT:0
-        """, "Func<int, int>:transform §E{cw}")]
+        module R R block
+          func Apply (Func<int, int>:transform ! cw, int:value) → int
+            ! cw
+            return 0
+        """, "Func<int, int>:transform ! cw")]
     // position 6 — return, §O spelling
     [InlineData("""
         §M{R}
@@ -617,47 +614,48 @@ module Test Test block
         """, "-> Func<int> §E{cw}")]
     // position 6 — return, arrow spelling
     [InlineData("""
-        §M{R}
-          §F{Make:pub} () -> Func<i32> §E{cw}
-            §E{cw}
-            §R §LAM{} INT:0 §/LAM
-        """, "-> Func<int> §E{cw}")]
+        module R R block
+          func Make () → Func<int> ! cw
+            ! cw
+            return () => 0
+        """, "→ Func<int> ! cw")]
     // position 7 — binding
     [InlineData("""
-        §M{R}
-          §F{Main:pub} () -> void
-            §E{}
-            §B{f:Func<i32,i32>} §E{cw} §LAM{x:i32} (+ x INT:1) §/LAM
-        """, "§B{Func<int, int>:f} §E{cw}")]
+        module R R block
+          func Main () → void
+            !
+            let Func<int, int>:f ! cw = (int:x) => (x + 1)
+        """, "let Func<int, int>:f ! cw")]
     // position 8 — field
     [InlineData("""
-        §M{R}
-          §CL{C:pub}
-            §FLD{Action<i32>:onChange:priv} §E{cw}
-            §MT{M:pub} () -> void
-              §E{}
-        """, "§FLD{Action<int>:onChange:priv} §E{cw}")]
+        module R R block
+          class C
+            field Action<int>:onChange private ! cw
+            func M () → void
+              !
+              return
+        """, "field Action<int>:onChange private ! cw")]
     // an empty row is not the same as no row (§3.5) and must survive
     [InlineData("""
-        §M{R}
-          §F{Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
-            §E{}
-            §R INT:0
-        """, "Func<int, int>:a §E{}")]
+        module R R block
+          func Apply (Func<int, int>:a !, Func<int, int>:b) → int
+            !
+            return 0
+        """, "Func<int, int>:a !,")]
     // the `eff` binder, written last in the type-parameter list
     [InlineData("""
-        §M{R}
-          §F{Map:pub}<T, eff e> (Func<i32,i32>:f §E{e}) -> i32
-            §E{e}
-            §R INT:0
-        """, "<T,eff e>")]
+        module R R block
+          func Map <T,! e> (Func<int, int>:f ! e) → int
+            ! e
+            return 0
+        """, "<T,! e>")]
     // …and written FIRST, which is why EffectParameterInfo carries an Ordinal
     [InlineData("""
-        §M{R}
-          §F{Map:pub}<eff e, T> (Func<i32,i32>:f §E{e}) -> i32
-            §E{e}
-            §R INT:0
-        """, "<eff e,T>")]
+        module R R block
+          func Map <! e,T> (Func<int, int>:f ! e) → int
+            ! e
+            return 0
+        """, "<! e,T>")]
     public void RowRoundTrips_ParseEmitParse(string source, string expectedInEmitted)
     {
         var module = Parse(source, out var diagnostics);

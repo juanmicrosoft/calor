@@ -251,7 +251,7 @@ public class TernaryThrowTests
         var calrText = calrEmitter.Emit(convertResult.Ast!);
 
         // Calor text should contain §TH (throw) not §ERR
-        Assert.Contains("§TH", calrText);
+        Assert.Contains("throw ", calrText);
         Assert.DoesNotContain("§ERR", calrText);
 
         // Calor text → parse → compile to C#
@@ -284,7 +284,7 @@ public class TernaryThrowTests
         var calrEmitter = new CalorEmitter();
         var calrText = calrEmitter.Emit(convertResult.Ast!);
 
-        Assert.Contains("§TH", calrText);
+        Assert.Contains("throw ", calrText);
 
         var compileResult = Program.Compile(calrText, "round-trip.calr", new CompilationOptions
         {

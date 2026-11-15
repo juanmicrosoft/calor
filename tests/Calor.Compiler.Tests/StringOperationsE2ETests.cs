@@ -125,12 +125,10 @@ public class StringOperationsE2ETests
     public void E2E_StringContainsIgnoreCase_ReturnsCorrectResult(string input, string search, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{ContainsIgnoreCase:pub}
-                  §I{string:s}
-                  §I{string:search}
-                  §O{bool}
-                  §R (contains s search :ignore-case)
+            module Test Test block
+              func ContainsIgnoreCase (string:s, string:search) → bool
+                !
+                return (s).Contains(search, StringComparison.OrdinalIgnoreCase)
             """;
 
         var result = Execute(source, "ContainsIgnoreCase", new object[] { input, search });
@@ -146,12 +144,10 @@ public class StringOperationsE2ETests
     public void E2E_StringEqualsIgnoreCase_ReturnsCorrectResult(string a, string b, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{EqualsIgnoreCase:pub}
-                  §I{string:a}
-                  §I{string:b}
-                  §O{bool}
-                  §R (equals a b :ignore-case)
+            module Test Test block
+              func EqualsIgnoreCase (string:a, string:b) → bool
+                !
+                return (a).Equals(b, StringComparison.OrdinalIgnoreCase)
             """;
 
         var result = Execute(source, "EqualsIgnoreCase", new object[] { a, b });
@@ -185,12 +181,10 @@ public class StringOperationsE2ETests
     public void E2E_StringContainsInvariantIgnoreCase_ReturnsCorrectResult(string input, string search, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{ContainsInvariant:pub}
-                  §I{string:s}
-                  §I{string:search}
-                  §O{bool}
-                  §R (contains s search :invariant-ignore-case)
+            module Test Test block
+              func ContainsInvariant (string:s, string:search) → bool
+                !
+                return (s).Contains(search, StringComparison.InvariantCultureIgnoreCase)
             """;
 
         var result = Execute(source, "ContainsInvariant", new object[] { input, search });
@@ -223,12 +217,10 @@ public class StringOperationsE2ETests
     public void E2E_StringEndsWithIgnoreCase_ReturnsCorrectResult(string input, string suffix, bool expected)
     {
         var source = """
-            §M{Test}
-              §F{EndsIgnoreCase:pub}
-                  §I{string:s}
-                  §I{string:suffix}
-                  §O{bool}
-                  §R (ends s suffix :ignore-case)
+            module Test Test block
+              func EndsIgnoreCase (string:s, string:suffix) → bool
+                !
+                return (s).EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
             """;
 
         var result = Execute(source, "EndsIgnoreCase", new object[] { input, suffix });
@@ -243,12 +235,10 @@ public class StringOperationsE2ETests
     public void E2E_StringIndexOfIgnoreCase_ReturnsCorrectResult(string input, string search, int expected)
     {
         var source = """
-            §M{Test}
-              §F{IndexOfIgnoreCase:pub}
-                  §I{string:s}
-                  §I{string:search}
-                  §O{i32}
-                  §R (indexof s search :ignore-case)
+            module Test Test block
+              func IndexOfIgnoreCase (string:s, string:search) → int
+                !
+                return (s).IndexOf(search, StringComparison.OrdinalIgnoreCase)
             """;
 
         var result = Execute(source, "IndexOfIgnoreCase", new object[] { input, search });
@@ -270,11 +260,10 @@ public class StringOperationsE2ETests
         // Escape backslashes for Calor string literal (Calor needs \\ for a literal \)
         var escapedPattern = pattern.Replace("\\", "\\\\");
         var source = """
-            §M{Test}
-              §F{TestRegex:pub}
-                  §I{string:s}
-                  §O{bool}
-                  §R (regex-test s "PATTERN")
+            module Test Test block
+              func TestRegex (string:s) → bool
+                !
+                return System.Text.RegularExpressions.Regex.IsMatch(s, "PATTERN")
             """.Replace("PATTERN", escapedPattern);
 
         var result = Execute(source, "TestRegex", new object[] { input });
@@ -291,11 +280,10 @@ public class StringOperationsE2ETests
         // Escape backslashes for Calor string literal (Calor needs \\ for a literal \)
         var escapedPattern = pattern.Replace("\\", "\\\\");
         var source = """
-            §M{Test}
-              §F{ReplaceRegex:pub}
-                  §I{string:s}
-                  §O{string}
-                  §R (regex-replace s "PATTERN" "REPLACEMENT")
+            module Test Test block
+              func ReplaceRegex (string:s) → string
+                !
+                return System.Text.RegularExpressions.Regex.Replace(s, "PATTERN", "REPLACEMENT")
             """.Replace("PATTERN", escapedPattern).Replace("REPLACEMENT", replacement);
 
         var result = Execute(source, "ReplaceRegex", new object[] { input });
@@ -312,11 +300,10 @@ public class StringOperationsE2ETests
         // regex-match returns a Match object; test via Match.Success property
         var escapedPattern = pattern.Replace("\\", "\\\\");
         var source = """
-            §M{Test}
-              §F{MatchRegex:pub}
-                  §I{string:s}
-                  §O{object}
-                  §R (regex-match s "PATTERN")
+            module Test Test block
+              func MatchRegex (string:s) → object
+                !
+                return System.Text.RegularExpressions.Regex.Match(s, "PATTERN")
             """.Replace("PATTERN", escapedPattern);
 
         var result = Execute(source, "MatchRegex", new object[] { input });
@@ -432,11 +419,10 @@ public class StringOperationsE2ETests
     public void E2E_CharCode_ReturnsAsciiCode(char input, int expected)
     {
         var source = """
-            §M{Test}
-              §F{GetCharCode:pub}
-                  §I{char:c}
-                  §O{i32}
-                  §R (char-code c)
+            module Test Test block
+              func GetCharCode (char:c) → int
+                !
+                return (int)c
             """;
 
         var result = Execute(source, "GetCharCode", new object[] { input });
@@ -452,11 +438,10 @@ public class StringOperationsE2ETests
     public void E2E_CharFromCode_ReturnsChar(int input, char expected)
     {
         var source = """
-            §M{Test}
-              §F{CharFromCode:pub}
-                  §I{i32:code}
-                  §O{char}
-                  §R (char-from-code code)
+            module Test Test block
+              func CharFromCode (int:code) → char
+                !
+                return (char)code
             """;
 
         var result = Execute(source, "CharFromCode", new object[] { input });
@@ -553,10 +538,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderNew_CreatesEmptyBuilder()
     {
         var source = """
-            §M{Test}
-              §F{CreateBuilder:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-new))
+            module Test Test block
+              func CreateBuilder () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder().ToString()
             """;
 
         var result = Execute(source, "CreateBuilder");
@@ -569,10 +554,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderAppend_AppendsText()
     {
         var source = """
-            §M{Test}
-              §F{BuildString:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-append (sb-append (sb-new) "Hello") " World"))
+            module Test Test block
+              func BuildString () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder().Append("Hello").Append(" World").ToString()
             """;
 
         var result = Execute(source, "BuildString");
@@ -585,10 +570,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderWithInit_InitializesWithValue()
     {
         var source = """
-            §M{Test}
-              §F{BuildWithInit:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-append (sb-new "Start: ") "End"))
+            module Test Test block
+              func BuildWithInit () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder("Start: ").Append("End").ToString()
             """;
 
         var result = Execute(source, "BuildWithInit");
@@ -601,10 +586,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderLength_ReturnsLength()
     {
         var source = """
-            §M{Test}
-              §F{GetLength:pub}
-                  §O{i32}
-                  §R (sb-length (sb-append (sb-new) "Hello"))
+            module Test Test block
+              func GetLength () → int
+                ! alloc, mut
+                return new System.Text.StringBuilder().Append("Hello").Length
             """;
 
         var result = Execute(source, "GetLength");
@@ -617,10 +602,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderClear_ClearsContent()
     {
         var source = """
-            §M{Test}
-              §F{ClearBuilder:pub}
-                  §O{i32}
-                  §R (sb-length (sb-clear (sb-append (sb-new) "Hello")))
+            module Test Test block
+              func ClearBuilder () → int
+                ! alloc, mut
+                return new System.Text.StringBuilder().Append("Hello").Clear().Length
             """;
 
         var result = Execute(source, "ClearBuilder");
@@ -633,10 +618,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderAppendLine_AppendsWithNewline()
     {
         var source = """
-            §M{Test}
-              §F{BuildWithLines:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-appendline (sb-appendline (sb-new) "Line1") "Line2"))
+            module Test Test block
+              func BuildWithLines () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder().AppendLine("Line1").AppendLine("Line2").ToString()
             """;
 
         var result = Execute(source, "BuildWithLines");
@@ -651,10 +636,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderInsert_InsertsAtPosition()
     {
         var source = """
-            §M{Test}
-              §F{InsertText:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-insert (sb-append (sb-new) "HelloWorld") 5 " "))
+            module Test Test block
+              func InsertText () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder().Append("HelloWorld").Insert(5, " ").ToString()
             """;
 
         var result = Execute(source, "InsertText");
@@ -667,10 +652,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderRemove_RemovesCharacters()
     {
         var source = """
-            §M{Test}
-              §F{RemoveText:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-remove (sb-append (sb-new) "Hello World") 5 6))
+            module Test Test block
+              func RemoveText () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder().Append("Hello World").Remove(5, 6).ToString()
             """;
 
         var result = Execute(source, "RemoveText");
@@ -725,14 +710,13 @@ public class StringOperationsE2ETests
         // This tests multiple operations working together
         // Use unique names for each binding since Calor generates new 'var' for each
         var source = """
-            §M{Test}
-              §F{Capitalize:pub}
-                  §I{string:s}
-                  §O{string}
-                  §B{sb1} (sb-new)
-                  §B{sb2} (sb-append sb1 (str (char-upper (char-at s 0))))
-                  §B{sb3} (sb-append sb2 (lower (substr s 1)))
-                  §R (sb-tostring sb3)
+            module Test Test block
+              func Capitalize (string:s) → string
+                ! alloc, mut
+                let System.Text.StringBuilder:sb1 = new System.Text.StringBuilder()
+                let System.Text.StringBuilder:sb2 = sb1.Append(char.ToUpper((s)[0]).ToString())
+                let System.Text.StringBuilder:sb3 = sb2.Append((s).Substring(1).ToLower())
+                return sb3.ToString()
             """;
 
         var result = Execute(source, "Capitalize", new object[] { "hELLO" });
@@ -797,10 +781,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderRemove_InvalidRange_ThrowsException()
     {
         var source = """
-            §M{Test}
-              §F{RemoveText:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-remove (sb-append (sb-new) "Hi") 0 100))
+            module Test Test block
+              func RemoveText () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder().Append("Hi").Remove(0, 100).ToString()
             """;
 
         var result = Execute(source, "RemoveText");
@@ -813,10 +797,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderInsert_NegativeIndex_ThrowsException()
     {
         var source = """
-            §M{Test}
-              §F{InsertText:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-insert (sb-new) (- 0 1) "x"))
+            module Test Test block
+              func InsertText () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder().Insert((0 - 1), "x").ToString()
             """;
 
         var result = Execute(source, "InsertText");
@@ -846,11 +830,10 @@ public class StringOperationsE2ETests
     public void E2E_CharFromCode_NegativeCode_Traps()
     {
         var source = """
-            §M{Test}
-              §F{CharFromCode:pub}
-                  §I{i32:code}
-                  §O{char}
-                  §R (char-from-code code)
+            module Test Test block
+              func CharFromCode (int:code) → char
+                !
+                return (char)code
             """;
 
         var result = Execute(source, "CharFromCode", new object[] { -1 });
@@ -930,10 +913,10 @@ public class StringOperationsE2ETests
     public void E2E_StringBuilderNew_EmptyToString_ReturnsEmpty()
     {
         var source = """
-            §M{Test}
-              §F{EmptyBuilder:pub}
-                  §O{string}
-                  §R (sb-tostring (sb-new))
+            module Test Test block
+              func EmptyBuilder () → string
+                ! alloc, mut
+                return new System.Text.StringBuilder().ToString()
             """;
 
         var result = Execute(source, "EmptyBuilder");

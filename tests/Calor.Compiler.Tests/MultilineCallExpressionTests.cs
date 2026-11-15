@@ -14,17 +14,17 @@ namespace Calor.Compiler.Tests;
 public class MultilineCallExpressionTests
 {
     [Theory]
-    [InlineData("§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7\n§/C\n§R value", 7)]
-    [InlineData("§R §C{Math.Max}\n  §A 3\n  §A 7\n§/C", 7)]
-    [InlineData("§R (+ 1 §C{Math.Max}\n  §A 3\n  §A 7\n§/C)", 8)]
-    [InlineData("§R §C{Math.Clamp}\n  §A[value] 7\n  §A[min] 0\n  §A[max] 5\n§/C", 5)]
-    [InlineData("§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7\n§R value", 7)]
-    [InlineData("§R §C{Math.Max}\n  §A 3\n  §A 7", 7)]
-    [InlineData("§B{value:i32} §C{Math.Max} §A 3\n  §A 7\n§/C\n§R value", 7)]
-    [InlineData("§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7 §/C\n§R value", 7)]
-    [InlineData("§B{value:i32} §C{Math.Max}\n§A 3\n§A 7\n§/C\n§R value", 7)]
-    [InlineData("§R §C{Math.Max}\n  §A §C{Math.Min}\n    §A 8\n    §A 3\n  §/C\n  §A 7\n§/C", 7)]
-    [InlineData("§R §C{Math.Max}\n  §A (+ 1 §C{Math.Min}\n    §A 8\n    §A 3\n  §/C)\n  §A 7\n§/C", 7)]
+    [InlineData("let int:value = Math.Max(\n  3,\n  7)\nreturn value", 7)]
+    [InlineData("return Math.Max(\n  3,\n  7)", 7)]
+    [InlineData("return (1 + Math.Max(\n  3,\n  7))", 8)]
+    [InlineData("return Math.Clamp(\n  value: 7,\n  min: 0,\n  max: 5)", 5)]
+    [InlineData("let int:value = Math.Max(\n  3,\n  7\n)\nreturn value", 7)]
+    [InlineData("return Math.Max(\n  3,\n  7\n)", 7)]
+    [InlineData("let int:value = Math.Max(3,\n  7)\nreturn value", 7)]
+    [InlineData("let int:value = Math.Max(\n  3, 7)\nreturn value", 7)]
+    [InlineData("let int:value = Math.Max(\n3,\n7)\nreturn value", 7)]
+    [InlineData("return Math.Max(\n  Math.Min(\n    8,\n    3),\n  7)", 7)]
+    [InlineData("return Math.Max(\n  (1 + Math.Min(\n    8,\n    3)),\n  7)", 7)]
     public void Arguments_CompileExecuteAndRoundTrip(string body, int expected)
     {
         var source = ProgramSource(body);
@@ -164,15 +164,15 @@ public class MultilineCallExpressionTests
     [Fact]
     public void ManyCallsOnOneLine_DoNotRepeatedlyScanTheirContainingLine()
     {
-        var source = ProgramSource("§R (+ " + string.Join(" ",
-            Enumerable.Repeat("§C{One} §/C", 20_000)) + ")");
+        var source = ProgramSource("return (" + string.Join(" + ",
+            Enumerable.Repeat("One()", 20_000)) + ")");
         var stopwatch = Stopwatch.StartNew();
         var module = Parse(source, out var diagnostics);
         stopwatch.Stop();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
         Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions.Single().Body));
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5),
-            $"Parsing a 280 KB call expression took {stopwatch.Elapsed}; containing-line lookup must be amortized linear.");
+            $"Parsing a 200 KB call expression took {stopwatch.Elapsed}; containing-line lookup must be amortized linear.");
     }
 
     [Fact]

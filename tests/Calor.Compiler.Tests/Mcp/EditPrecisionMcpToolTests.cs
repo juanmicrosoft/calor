@@ -13,22 +13,19 @@ namespace Calor.Compiler.Tests.Mcp;
 public class EditPrecisionMcpToolTests
 {
     private static readonly string SampleSource = @"
-§M{MathModule}
-  §F{add:pub}
-      §I{i32:x, i32:y}
-      §O{i32}
-      §Q (>= x INT:0)
-      §S (>= result INT:0)
-      §R (+ x y)
-  §F{multiply:pub}
-      §I{i32:a, i32:b}
-      §O{i32}
-      §R (* a b)
-  §F{computeTotal:pub}
-      §I{i32:x, i32:y, i32:z}
-      §O{i32}
-      §B{partial:i32} §C{add} §A x §A y §/C
-      §R (* partial z)
+module MathModule MathModule block
+  func add (int:x, int:y) → int
+    !
+    requires (x >= 0)
+    => (result >= 0)
+    return (x + y)
+  func multiply (int:a, int:b) → int
+    !
+    return (a * b)
+  func computeTotal (int:x, int:y, int:z) → int
+    !
+    let int:partial = add(x, y)
+    return (partial * z)
 ";
 
     private static readonly string SampleSourceWithEffects = @"
@@ -68,8 +65,8 @@ module IoModule IoModule block
     public async Task ImpactAnalysis_WithPosition_ResolvesSymbol()
     {
         var tool = new StructureTool();
-        // The source has a leading newline; "add" starts at line 3, column 6.
-        var args = CreateImpactArgsWithPosition(SampleSource, 3, 6);
+        // The source has a leading newline; "add" starts at line 3, column 8.
+        var args = CreateImpactArgsWithPosition(SampleSource, 3, 8);
 
         var result = await tool.ExecuteAsync(args);
 
@@ -238,7 +235,7 @@ module IoModule IoModule block
     {
         var tool = new EditPreviewTool();
         // Introduce a syntax error
-        var modified = "§M{MathModule}\n  §F{f001:add:pub\n  invalid syntax here";
+        var modified = "module MathModule MathModule block\n  func add (int:x\n  invalid syntax here";
 
         var args = CreateEditPreviewArgs(SampleSource, modified);
         var result = await tool.ExecuteAsync(args);
@@ -252,7 +249,7 @@ module IoModule IoModule block
     public async Task EditPreview_EditSummary_ShowsChanges()
     {
         var tool = new EditPreviewTool();
-        var modified = SampleSource.Replace("§R (+ x y)", "§R (+ x (+ y INT:1))");
+        var modified = SampleSource.Replace("return (x + y)", "return (x + (y + 1))");
 
         var args = CreateEditPreviewArgs(SampleSource, modified);
         var result = await tool.ExecuteAsync(args);
@@ -268,7 +265,7 @@ module IoModule IoModule block
     {
         var tool = new EditPreviewTool();
         // Remove a contract line
-        var modified = SampleSource.Replace("  §Q (>= x INT:0)\n", "");
+        var modified = SampleSource.Replace("    requires (x >= 0)\n", "");
 
         var args = CreateEditPreviewArgs(SampleSource, modified);
         var result = await tool.ExecuteAsync(args);
@@ -312,7 +309,7 @@ module IoModule IoModule block
     public async Task ScopeInfo_FindsEnclosingFunction()
     {
         var tool = new NavigateTool();
-        // Line 7 is §R (+ x y) — inside the "add" function body
+        // Line 7 is return (x + y) — inside the "add" function body
         var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
@@ -390,7 +387,7 @@ module IoModule IoModule block
     public async Task ScopeInfo_IncludesActiveContracts()
     {
         var tool = new NavigateTool();
-        // Inside add function which has §Q and §S
+        // Inside add function which has requires and =>
         var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
@@ -452,8 +449,8 @@ module IoModule IoModule block
     public async Task FindReferences_ByPosition_StillWorks()
     {
         var tool = new NavigateTool();
-        // "add" on function definition line 2: §F{add:pub}
-        var args = CreateArgs(SampleSource, 3, 6, "references");
+        // "add" on function definition line 3: func add
+        var args = CreateArgs(SampleSource, 3, 8, "references");
 
         var result = await tool.ExecuteAsync(args);
 

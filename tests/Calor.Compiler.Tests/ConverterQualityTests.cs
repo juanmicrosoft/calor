@@ -314,8 +314,8 @@ public class ConverterQualityTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Named args should appear as §A[name] syntax
-        Assert.Contains("§A[name]", result.CalorSource);
-        Assert.Contains("§A[flag]", result.CalorSource);
+        Assert.Contains("name: ", result.CalorSource);
+        Assert.Contains("flag: ", result.CalorSource);
     }
 
     [Fact]
@@ -364,7 +364,7 @@ public class ConverterQualityTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Second arg should be named, first should not
-        Assert.Contains("§A[flag]", result.CalorSource);
+        Assert.Contains("flag: ", result.CalorSource);
     }
 
     [Fact]
@@ -488,7 +488,7 @@ public class ConverterQualityTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("(? flag 1 0)", result.CalorSource);
+        Assert.Contains("(flag ? 1 : 0)", result.CalorSource);
 
         // Should parse and compile
         var compileResult = Program.Compile(result.CalorSource);
@@ -518,8 +518,8 @@ public class ConverterQualityTests
         // Should NOT contain (? ... §C ...) inline
         Assert.DoesNotContain("(? flag §C", result.CalorSource);
         // Should contain the decomposed form
-        Assert.Contains("§IF ", result.CalorSource);
-        Assert.Contains("§EL", result.CalorSource);
+        Assert.Contains("if ", result.CalorSource);
+        Assert.Contains("else", result.CalorSource);
 
         // Should parse and compile
         var compileResult = Program.Compile(result.CalorSource);
@@ -688,7 +688,8 @@ public class ConverterQualityTests
             var trimmed = line.Trim();
             if (string.IsNullOrWhiteSpace(trimmed)) continue;
             // Should NOT have bare text like "cs" without // prefix
-            if (!trimmed.StartsWith("§") && !trimmed.StartsWith("//")
+            if (!System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^(module|using|enum|class|interface|func|field|property) ")
+                && !trimmed.StartsWith("//")
                 && !trimmed.Contains("=") && !trimmed.StartsWith("["))
             {
                 Assert.Fail($"Orphaned text found: '{trimmed}' in line: '{line}'");
@@ -1000,8 +1001,8 @@ public class ConverterQualityTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.DoesNotContain("§NEW{object}", result.CalorSource);
-        Assert.Contains("§NEW{KeyValuePair<string, int>}", result.CalorSource);
+        Assert.DoesNotContain("new object(", result.CalorSource);
+        Assert.Contains("new KeyValuePair<string, int>(", result.CalorSource);
     }
 
     [Fact]
@@ -1136,8 +1137,8 @@ public class Foo
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Should contain cast without ? annotation
-        Assert.Contains("cast byte[]", result.CalorSource);
-        Assert.DoesNotContain("cast byte[]?", result.CalorSource);
+        Assert.Contains("(byte[])value", result.CalorSource);
+        Assert.DoesNotContain("(byte[]?)value", result.CalorSource);
     }
 
     [Fact]
@@ -1156,8 +1157,8 @@ public class Foo
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("cast string[][]", result.CalorSource);
-        Assert.DoesNotContain("cast string[]?[]", result.CalorSource);
+        Assert.Contains("(string[][])value", result.CalorSource);
+        Assert.DoesNotContain("(string[]?[])value", result.CalorSource);
     }
 
     #endregion

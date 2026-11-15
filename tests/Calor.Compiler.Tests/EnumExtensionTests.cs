@@ -30,7 +30,7 @@ public class EnumExtensionTests
     [Fact]
     public void Lexer_RecognizesEnumKeyword()
     {
-        var tokens = Tokenize("§EN", out var diagnostics);
+        var tokens = Tokenize("enum", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
@@ -159,7 +159,7 @@ public class EnumExtensionTests
         Assert.False(diagnostics.HasErrors);
         Assert.Single(module.Enums);
         var enumDef = module.Enums[0];
-        Assert.Equal("u8", enumDef.UnderlyingType);
+        Assert.Equal("byte", enumDef.UnderlyingType);
     }
 
     [Fact]
@@ -260,13 +260,11 @@ public class EnumExtensionTests
     public void Emit_EnumExtension_GeneratesStaticExtensionClass()
     {
         var source = """
-            §M{Test}
-              §EEXT{Color}
-                §F{ToHex:pub}
-                    §I{Color:self}
-                    §O{str}
-                    §R "#FF0000"
-              §/EEXT
+            module Test Test block
+              module ColorExtensions
+                func ToHex (this Color:self) → string
+                  !
+                  return "#FF0000"
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -298,7 +296,7 @@ public class EnumExtensionTests
         var emitter = new CalorEmitter();
         var code = emitter.Emit(module);
 
-        Assert.Contains("§EN{Color:pub}", code);
+        Assert.Contains("enum Color", code);
         Assert.DoesNotContain("§/EN", code);
         // Should NOT contain old ENUM syntax
         Assert.DoesNotContain("§ENUM", code);
@@ -308,13 +306,11 @@ public class EnumExtensionTests
     public void CalorEmitter_EnumExtension_RoundTrips()
     {
         var source = """
-            §M{Test}
-              §EEXT{Color}
-                §F{ToHex:pub}
-                    §I{Color:self}
-                    §O{str}
-                    §R "hex"
-              §/EEXT
+            module Test Test block
+              module ColorExtensions
+                func ToHex (this Color:self) → string
+                  !
+                  return "hex"
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
@@ -322,7 +318,7 @@ public class EnumExtensionTests
         var emitter = new CalorEmitter();
         var code = emitter.Emit(module);
 
-        Assert.Contains("§EEXT{Color}", code);
+        Assert.Contains("module ColorExtensions", code);
         Assert.DoesNotContain("§/EEXT", code);
     }
 

@@ -135,9 +135,10 @@ public class ConditionalEvaluationMigrationTests
     public void NamedObjectToString_DoesNotProveANonnullableResult(bool assign, string diagnosticCode)
     {
         var compiled = Program.Compile($$"""
-            §M{Probe}
-              §F{Read:pub} (object:value) -> string
-                {{(assign ? "§B{rendered:string} §C{value.ToString} §/C\n    §R rendered" : "§R §C{value.ToString} §/C")}}
+            module Probe Probe block
+              func Read (object:value) → string
+                !
+                {{(assign ? "let string:rendered = value.ToString()\n    return rendered" : "return value.ToString()")}}
             """, "to-string-nullable.calr", new CompilationOptions
             { EnforceEffects = false, StatusWriter = TextWriter.Null });
         Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == diagnosticCode);
@@ -875,8 +876,8 @@ public class ConditionalEvaluationMigrationTests
     [Theory]
     [InlineData("true", "(+ n 1)", 3)]
     [InlineData("false", "(+ n 1)", 0)]
-    [InlineData("true", "§C{Size} §/C", 3)]
-    [InlineData("false", "§C{Size} §/C", 0)]
+    [InlineData("true", "Size()", 3)]
+    [InlineData("false", "Size()", 0)]
     public void NativeConditionalArraySizes_SurvivePrettyRoundTrip(string gate, string size, int expected)
     {
         var source = $$"""

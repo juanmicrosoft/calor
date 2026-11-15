@@ -469,7 +469,7 @@ public class CliMultiFileTests : IDisposable
         var bPath = Path.Combine(_tempDir, "lib.calr");
         File.WriteAllText(aPath, """
             module CallerMod CallerMod block
-              func Run (Func<int, int>:Notify) → void
+              func Run (Func<int, int>:Notify ! unknown) → void
                 ! cw
                 Notify(42)
             """);
@@ -504,10 +504,9 @@ public class CliMultiFileTests : IDisposable
         var storePath = Path.Combine(_tempDir, "istore.calr");
         var catalogPath = Path.Combine(_tempDir, "icatalog.calr");
         File.WriteAllText(storePath, """
-            §M{IStore}
-              §F{Stash:int} (str:path) -> void
-                §E{fs:w}
-                §C{File.WriteAllText} §A path §A "x" §/C
+            module IStore IStore block
+              func Stash internal (string:path) → void
+                File.WriteAllText(path, "x")
             """);
         File.WriteAllText(catalogPath, """
             module ICatalog ICatalog block

@@ -201,7 +201,7 @@ public class ConverterImprovementTests
             Assert.Equal("object", identity.TargetType);
             Assert.IsType<ReferenceNode>(identity.Operand);
         }
-        Assert.Contains("§TH", result.CalorSource);
+        Assert.Contains("throw ", result.CalorSource);
         Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
@@ -380,7 +380,7 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = newExpr.Accept(emitter);
 
-        Assert.Contains("§/NEW", output);
+        Assert.Contains("new List<int>()", output);
     }
 
     [Fact]
@@ -727,8 +727,8 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = newExpr.Accept(emitter);
 
-        Assert.Contains("§NEW{List}", output);
-        Assert.Contains("§/NEW", output);
+        Assert.Contains("new List(", output);
+        Assert.Contains("new List()", output);
     }
 
     #endregion
@@ -752,10 +752,10 @@ public class ConverterImprovementTests
             }
             """;
 
-        // C# → Calor (emitter produces §/NEW)
+        // C# → Calor (emitter produces a native new expression)
         var conversionResult = _converter.Convert(csharp);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
-        Assert.Contains("§/NEW", conversionResult.CalorSource!);
+        Assert.Contains("new MyException(\"test error\")", conversionResult.CalorSource!);
 
         // Calor → C# (parser consumes §/NEW)
         var compilationResult = Program.Compile(conversionResult.CalorSource!);
@@ -1206,9 +1206,9 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        Assert.Contains("§M{Helper:pub}", output);
-        Assert.DoesNotContain(":stat}", output);
-        Assert.DoesNotContain(":static}", output);
+        Assert.Contains("module Helper", output);
+        Assert.DoesNotContain("static", output);
+        Assert.DoesNotContain("module Helper static", output);
     }
 
     [Fact]
@@ -1223,7 +1223,7 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        Assert.Contains(":seal}", output);
+        Assert.Contains("class Final sealed", output);
         Assert.DoesNotContain(":sealed}", output);
     }
 
@@ -1254,7 +1254,7 @@ public class ConverterImprovementTests
     public void CalorEmitter_SealedMethod_EmitsSealAbbreviation()
     {
         // Use C# converter to get a sealed override method in the AST,
-        // then verify CalorEmitter emits "seal" not "sealed"
+        // then verify CalorEmitter emits the canonical "override sealed" modifiers
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var csharp = """
             public class Base
@@ -1274,7 +1274,7 @@ public class ConverterImprovementTests
         var output = emitter.Emit(result.Ast!);
 
         Assert.Contains("seal", output);
-        Assert.DoesNotContain("sealed", output);
+        Assert.Contains("override sealed", output);
     }
 
     [Fact]
@@ -1290,7 +1290,7 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        Assert.Contains(":stat}", output);
+        Assert.Contains("field int:Count static", output);
         Assert.DoesNotContain(":static}", output);
     }
 
@@ -1311,8 +1311,8 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        // Property tag should include stat modifier (compact form may have accessor suffix)
-        Assert.Contains(":stat:", output);
+        // Property tag should include stat modifier (accessors follow on indented lines)
+        Assert.Contains("property int:Count static", output);
         Assert.DoesNotContain(":static:", output);
     }
 
@@ -1495,7 +1495,9 @@ public class ConverterImprovementTests
         // First param (value) should have no default
         // Second param (prefix) should have default "["
         // Third param (suffix) should have default "]"
-        var lines = output.Split('\n').Where(l => l.TrimStart().StartsWith("§I{")).ToList();
+        // Parameters are inline in the native function header: (type:name = default, ...)
+        var header = output.Split('\n').Single(l => l.TrimStart().StartsWith("func Format "));
+        var lines = header[(header.IndexOf('(') + 1)..header.IndexOf(')')].Split(", ").ToList();
         Assert.Equal(3, lines.Count);
         Assert.DoesNotContain("=", lines[0]);
         Assert.Contains("= \"[\"", lines[1]);
@@ -1684,8 +1686,8 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(result.Ast!);
 
-        // Negative literal emits as unary negate: (- 1)
-        Assert.Contains("= (- 1)", output);
+        // Negative literal emits as parenthesized negation: (-1)
+        Assert.Contains("= (-1)", output);
     }
 
     [Fact]
@@ -1765,7 +1767,9 @@ public class ConverterImprovementTests
         var output = emitter.Emit(result.Ast!);
 
         // Constructor parameter should have default value
-        var lines = output.Split('\n').Where(l => l.TrimStart().StartsWith("§I{")).ToList();
+        // Parameters are inline in the native constructor header: ctor (type:name = default)
+        var header = output.Split('\n').Single(l => l.TrimStart().StartsWith("ctor "));
+        var lines = header[(header.IndexOf('(') + 1)..header.IndexOf(')')].Split(", ").ToList();
         Assert.Single(lines);
         Assert.Contains("= 30", lines[0]);
     }
@@ -1964,8 +1968,8 @@ public class ConverterImprovementTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var emitted = new CalorFormatter().Format(result.Ast!);
-        Assert.DoesNotContain("NEW{object}", emitted);
-        Assert.Contains("NEW{Exception}", emitted);
+        Assert.DoesNotContain("new object(", emitted);
+        Assert.Contains("new Exception(", emitted);
     }
 
     [Fact]
@@ -2006,8 +2010,8 @@ public class ConverterImprovementTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var emitted = new CalorFormatter().Format(result.Ast!);
-        Assert.DoesNotContain("NEW{object}", emitted);
-        Assert.Contains("NEW{ArgumentException}", emitted);
+        Assert.DoesNotContain("new object(", emitted);
+        Assert.Contains("new ArgumentException(", emitted);
     }
 
     [Fact]
@@ -2026,7 +2030,7 @@ public class ConverterImprovementTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var emitted = new CalorFormatter().Format(result.Ast!);
-        Assert.DoesNotContain("NEW{object}", emitted);
+        Assert.DoesNotContain("new object(", emitted);
     }
 
     #endregion

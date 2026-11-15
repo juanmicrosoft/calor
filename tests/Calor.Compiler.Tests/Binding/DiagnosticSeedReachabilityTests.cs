@@ -26,16 +26,16 @@ public class DiagnosticSeedReachabilityTests
     public static IEnumerable<object[]> Wrappers()
     {
         yield return new object[] { "binary-operand", "§R (+ 1 (/ 10 0))" };
-        yield return new object[] { "coalesce-fallback", "§R (?? x (/ 10 0))" };
+        yield return new object[] { "coalesce-fallback", "return x ?? (10 / 0)" };
         yield return new object[] { "implication-consequent", "§R (-> (> x 0) (== (/ 10 0) 1))" };
         yield return new object[] { "forall-body", "§R (forall ((i i32)) (> (/ 10 0) i))" };
         yield return new object[] { "exists-body", "§R (exists ((i i32)) (> (/ 10 0) i))" };
-        yield return new object[] { "conditional-value", "§R (? (> x 0) (/ 10 0) null)" };
-        yield return new object[] { "throw-argument", "§R §TH §NEW{Exception} §A (/ 10 0) §/NEW" };
-        yield return new object[] { "conversion-operand", "§R (as (/ 10 0) i64)" };
-        yield return new object[] { "await-operand", "§R §AWAIT §C{System.Threading.Tasks.Task.FromResult} §A (/ 10 0) §/C" };
-        yield return new object[] { "lambda-expression-body", "§R §LAM{y:i32} (/ 10 0) §/LAM" };
-        yield return new object[] { "bind-initializer", "§B{y:i32} (/ 10 0)\n    §R y" };
+        yield return new object[] { "conditional-value", "return x > 0 ? (10 / 0) : null" };
+        yield return new object[] { "throw-argument", "return throw new Exception(10 / 0)" };
+        yield return new object[] { "conversion-operand", "return (10 / 0) as long" };
+        yield return new object[] { "await-operand", "return await System.Threading.Tasks.Task.FromResult(10 / 0)" };
+        yield return new object[] { "lambda-expression-body", "return (int:y) => (10 / 0)" };
+        yield return new object[] { "bind-initializer", "let int:y = 10 / 0\n    return y" };
         // Unsafe wrappers are structurally bound on the PR branch; their operands must
         // remain visible to every shared traversal.
         yield return new object[] { "addressof-operand", "§R §ADDR (/ 10 0)" };
@@ -69,11 +69,11 @@ public class DiagnosticSeedReachabilityTests
     [MemberData(nameof(Wrappers))]
     public void SeedInsideWrapper_ReachesTheDivisionChecker(string wrapper, string statement)
     {
-        var inputType = wrapper == "coalesce-fallback" ? "?i32" : "i32";
+        var inputType = wrapper == "coalesce-fallback" ? "int?" : "int";
         var source = $$"""
-            §M{Test}
-              §F{Probe:pub} ({{inputType}}:x) -> OBJECT
-                §E{alloc,throw}
+            module Test Test block
+              func Probe ({{inputType}}:x) → object
+                ! alloc,throw
                 {{statement}}
             """;
 

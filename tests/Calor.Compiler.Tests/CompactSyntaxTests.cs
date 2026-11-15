@@ -52,9 +52,10 @@ public class CompactSyntaxTests
     public void CompactProp_GetOnly_ParsesSingleLine()
     {
         var source = """
-            §M{Test}
-              §CL{Person}
-                §PROP{Name:str:pub:get}
+            module Test Test block
+              class Person internal
+                property string:Name
+                  get
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -63,7 +64,7 @@ public class CompactSyntaxTests
         var cls = Assert.Single(module.Classes);
         var prop = Assert.Single(cls.Properties);
         Assert.Equal("Name", prop.Name);
-        Assert.Equal("str", prop.TypeName);
+        Assert.Equal("string", prop.TypeName);
         Assert.NotNull(prop.Getter);
         Assert.Null(prop.Setter);
         Assert.Null(prop.Initer);
@@ -74,9 +75,11 @@ public class CompactSyntaxTests
     public void CompactProp_GetSet_ParsesSingleLine()
     {
         var source = """
-            §M{Test}
-              §CL{Person}
-                §PROP{Age:i32:pub:get,set}
+            module Test Test block
+              class Person internal
+                property int:Age
+                  get
+                  set
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -95,9 +98,11 @@ public class CompactSyntaxTests
     public void CompactProp_GetInit_ParsesSingleLine()
     {
         var source = """
-            §M{Test}
-              §CL{Record}
-                §PROP{Id:i32:pub:get,init}
+            module Test Test block
+              class Record internal
+                property int:Id
+                  get
+                  init
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -116,9 +121,11 @@ public class CompactSyntaxTests
     public void CompactProp_GetPrivateSet_ParsesSingleLine()
     {
         var source = """
-            §M{Test}
-              §CL{Item}
-                §PROP{Count:i32:pub:get,priset}
+            module Test Test block
+              class Item internal
+                property int:Count
+                  get
+                  set private
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -137,9 +144,11 @@ public class CompactSyntaxTests
     public void CompactProp_WithDefaultValue_ParsesValueExpression()
     {
         var source = """
-            §M{Test}
-              §CL{Config}
-                §PROP{MaxRetries:i32:pub:get,set} = 3
+            module Test Test block
+              class Config internal
+                property int:MaxRetries = 3
+                  get
+                  set
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -158,10 +167,13 @@ public class CompactSyntaxTests
     {
         // Compact accessor shorthand means no §/PROP closing tag is required
         var source = """
-            §M{Test}
-              §CL{Data}
-                §PROP{Value:str:pub:get,set}
-                §PROP{Label:str:pub:get}
+            module Test Test block
+              class Data internal
+                property string:Value
+                  get
+                  set
+                property string:Label
+                  get
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -188,10 +200,10 @@ public class CompactSyntaxTests
         var (original, formatted, reparsed) = FormatAndReparse(source);
 
         // Formatter should produce compact auto-property shorthand
-        Assert.Contains("§PROP{", formatted);
+        Assert.Contains("property string:Name", formatted);
         // The compact format should contain get and priset accessors
         Assert.Contains("get", formatted);
-        Assert.Contains("priset", formatted);
+        Assert.Contains("set private", formatted);
         // Should NOT contain multi-line §GET/§SET tags
         Assert.DoesNotContain("§/GET", formatted);
         Assert.DoesNotContain("§/SET", formatted);
@@ -208,9 +220,11 @@ public class CompactSyntaxTests
     public void CompactProp_Static_ParsesWithModifier()
     {
         var source = """
-            §M{Test}
-              §CL{Counter}
-                §PROP{Count:i32:pub:static:get,set}
+            module Test Test block
+              class Counter internal
+                property int:Count static
+                  get
+                  set
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -311,10 +325,10 @@ public class CompactSyntaxTests
     {
         // §IFACE{IShape} instead of §IFACE{IShape}
         var source = """
-            §M{Test}
-              §IFACE{IShape}
-                §MT{Area}
-                  §O{f64}
+            module Test Test block
+              interface IShape
+                func Area () → double
+                  !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -330,10 +344,11 @@ public class CompactSyntaxTests
     {
         // §IFACE{IChild:IParent} — no explicit ID, with base interface
         var source = """
-            §M{Test}
-              §IFACE{IChild:IParent}
-                §MT{DoWork}
-                  §O{void}
+            module Test Test block
+              interface IChild
+                extends IParent
+                func DoWork () → void
+                  !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -354,10 +369,11 @@ public class CompactSyntaxTests
     public void Interface_BaseInterface_FromThirdAttribute()
     {
         var source = """
-            §M{Test}
-              §IFACE{IChild:IParent}
-                §MT{DoWork}
-                  §O{void}
+            module Test Test block
+              interface IChild
+                extends IParent
+                func DoWork () → void
+                  !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -378,10 +394,12 @@ public class CompactSyntaxTests
     public void Interface_MultipleBaseInterfaces_FromThirdAttribute()
     {
         var source = """
-            §M{Test}
-              §IFACE{IChild:IParent,IDisposable}
-                §MT{DoWork}
-                  §O{void}
+            module Test Test block
+              interface IChild
+                extends IParent
+                extends IDisposable
+                func DoWork () → void
+                  !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -402,10 +420,11 @@ public class CompactSyntaxTests
     public void Interface_BaseInterface_RoundTrip()
     {
         var source = """
-            §M{Test}
-              §IFACE{IChild:IParent}
-                §MT{DoWork}
-                  §O{void}
+            module Test Test block
+              interface IChild
+                extends IParent
+                func DoWork () → void
+                  !
             """;
 
         // Parse → Calor emit → Re-parse → verify base interface preserved
@@ -526,10 +545,10 @@ public class CompactSyntaxTests
         var func = Assert.Single(module.Functions);
         Assert.Equal("Square", func.Name);
         Assert.Single(func.Parameters);
-        Assert.Equal("i32", func.Parameters[0].TypeName);
+        Assert.Equal("int", func.Parameters[0].TypeName);
         Assert.Equal("x", func.Parameters[0].Name);
         Assert.NotNull(func.Output);
-        Assert.Equal("i32", func.Output!.TypeName);
+        Assert.Equal("int", func.Output!.TypeName);
     }
 
     [Fact]
@@ -550,7 +569,7 @@ public class CompactSyntaxTests
         Assert.Equal("a", func.Parameters[0].Name);
         Assert.Equal("b", func.Parameters[1].Name);
         Assert.NotNull(func.Output);
-        Assert.Equal("i32", func.Output!.TypeName);
+        Assert.Equal("int", func.Output!.TypeName);
     }
 
     [Fact]
@@ -568,7 +587,7 @@ public class CompactSyntaxTests
 
         var func = Assert.Single(module.Functions);
         Assert.Single(func.Parameters);
-        Assert.Equal("List<i32>", func.Parameters[0].TypeName);
+        Assert.Equal("List<int>", func.Parameters[0].TypeName);
         Assert.Equal("items", func.Parameters[0].Name);
     }
 
@@ -589,8 +608,8 @@ public class CompactSyntaxTests
         Assert.Single(func.Parameters);
         // Parser may represent nullable as "?i32" or "i32?" depending on parsing order
         var paramType = func.Parameters[0].TypeName;
-        Assert.True(paramType.Contains("i32") && paramType.Contains("?"),
-            $"Expected nullable i32 type, got: {paramType}");
+        Assert.True(paramType.Contains("int") && paramType.Contains("?"),
+            $"Expected nullable int type, got: {paramType}");
     }
 
     [Fact]
@@ -608,7 +627,7 @@ public class CompactSyntaxTests
 
         var func = Assert.Single(module.Functions);
         Assert.Single(func.Parameters);
-        Assert.Contains("i32", func.Parameters[0].TypeName);
+        Assert.Contains("int", func.Parameters[0].TypeName);
     }
 
     [Fact]
@@ -650,7 +669,7 @@ public class CompactSyntaxTests
         Assert.Equal("Add", method.Name);
         Assert.Equal(2, method.Parameters.Count);
         Assert.NotNull(method.Output);
-        Assert.Equal("i32", method.Output!.TypeName);
+        Assert.Equal("int", method.Output!.TypeName);
     }
 
     [Fact]
@@ -670,7 +689,7 @@ public class CompactSyntaxTests
         var cls = Assert.Single(module.Classes);
         var ctor = Assert.Single(cls.Constructors);
         Assert.Single(ctor.Parameters);
-        Assert.Equal("str", ctor.Parameters[0].TypeName);
+        Assert.Equal("string", ctor.Parameters[0].TypeName);
         Assert.Equal("name", ctor.Parameters[0].Name);
     }
 
@@ -690,7 +709,7 @@ public class CompactSyntaxTests
         var func = Assert.Single(module.Functions);
         Assert.Empty(func.Parameters);
         Assert.NotNull(func.Output);
-        Assert.Equal("i32", func.Output!.TypeName);
+        Assert.Equal("int", func.Output!.TypeName);
     }
 
     [Fact]
@@ -730,7 +749,7 @@ public class CompactSyntaxTests
 
         // Formatter should produce inline signature
         Assert.Contains("(", formatted);
-        Assert.Contains("->", formatted);
+        Assert.Contains("→", formatted);
         // Should NOT contain §I or §O tags
         Assert.DoesNotContain("§I{", formatted);
         Assert.DoesNotContain("§O{", formatted);
@@ -760,7 +779,7 @@ public class CompactSyntaxTests
         var (original, formatted, reparsed) = FormatAndReparse(source);
 
         // Formatter should produce inline constructor signature
-        Assert.Contains("§CTOR{", formatted);
+        Assert.Contains("ctor (", formatted);
         Assert.Contains("(", formatted);
 
         // Reparsed constructor should have same parameters
@@ -778,14 +797,19 @@ public class CompactSyntaxTests
     {
         // Combines: optional ID, inline signature, compact auto-property
         var source = """
-            §M{Test}
-              §CL{MyClass}
-                §PROP{Name:str:pub:get,priset}
-                §PROP{Count:i32:pub:get,set} = 0
-                §CTOR{pub} (str:name, i32:count)
-                  §C{Console.WriteLine} name
-                §MT{GetInfo:pub} () -> str
-                  §R "info"
+            module Test Test block
+              class MyClass internal
+                property string:Name
+                  get
+                  set private
+                property int:Count = 0
+                  get
+                  set
+                ctor (string:name, int:count)
+                  Console.WriteLine(name)
+                func GetInfo () → string
+                  !
+                  return "info"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -815,7 +839,7 @@ public class CompactSyntaxTests
         Assert.Equal("GetInfo", method.Name);
         Assert.Contains("_auto", method.Id);
         Assert.NotNull(method.Output);
-        Assert.Equal("str", method.Output!.TypeName);
+        Assert.Equal("string", method.Output!.TypeName);
     }
 
     [Fact]

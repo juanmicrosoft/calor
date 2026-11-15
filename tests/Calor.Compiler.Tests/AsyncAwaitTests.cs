@@ -347,7 +347,7 @@ public class AsyncAwaitTests
         var emitter = new CalorEmitter();
         var calor = emitter.Emit(result.Ast!);
 
-        Assert.Contains("§AMT{", calor);
+        Assert.Contains("func GetDataAsync async", calor);
         Assert.DoesNotContain("§/AMT{", calor);
     }
 
@@ -370,9 +370,9 @@ public class AsyncAwaitTests
         var emitter = new CalorEmitter();
         var calor = emitter.Emit(result.Ast!);
 
-        Assert.Contains("§MT{", calor);
+        Assert.Contains("func GetData (", calor);
         Assert.DoesNotContain("§/MT{", calor);
-        Assert.DoesNotContain("§AMT{", calor);
+        Assert.DoesNotContain("func GetData async", calor);
     }
 
     #endregion
@@ -804,12 +804,11 @@ public class AsyncAwaitTests
     public void Emit_AsyncMethodWithNestedGeneric_WrapsCorrectly()
     {
         var calorSource = """
-            §M{NestedGenericTests}
-                §CL{Service:pub}
-                    §AMT{GetListAsync:pub}
-                      §O{List<i32>}
-                      §R §C{new List<int>}§/C
-                    §/AMT
+            module NestedGenericTests NestedGenericTests block
+              class Service
+                func GetListAsync async () → List<int>
+                  ! alloc
+                  return new List<int>()
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -861,12 +860,11 @@ public class AsyncAwaitTests
     {
         // Correct syntax: §Q{"message"} (s-expression)
         var calorSource = """
-            §M{ContractTests}
-                §AF{GetUserAsync:pub}
-                    §I{i32:userId}
-                    §O{str}
-                    §Q{"userId must be positive"} (> userId 0)
-                    §R "user"
+            module ContractTests ContractTests block
+              func GetUserAsync async (int:userId) → string
+                !
+                requires userId > 0
+                return "user"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -884,12 +882,11 @@ public class AsyncAwaitTests
     public void Parse_AsyncFunctionWithPostcondition_PreservesBoth()
     {
         var calorSource = """
-            §M{ContractTests}
-                §AF{ComputeAsync:pub}
-                    §I{i32:x}
-                    §O{i32}
-                    §S{"result is non-negative"} (>= result 0)
-                    §R 42
+            module ContractTests ContractTests block
+              func ComputeAsync async (int:x) → int
+                !
+                => result >= 0
+                return 42
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -907,12 +904,11 @@ public class AsyncAwaitTests
     public void Emit_AsyncFunctionWithContracts_EmitsContractsAndAsync()
     {
         var calorSource = """
-            §M{ContractEmitTests}
-                §AF{ValidateAsync:pub}
-                    §I{i32:value}
-                    §O{bool}
-                    §Q{"value must be non-negative"} (>= value 0)
-                    §R true
+            module ContractEmitTests ContractEmitTests block
+              func ValidateAsync async (int:value) → bool
+                !
+                requires value >= 0
+                return true
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -933,14 +929,12 @@ public class AsyncAwaitTests
     public void Parse_AsyncMethodWithPrecondition_PreservesBoth()
     {
         var calorSource = """
-            §M{MethodContractTests}
-                §CL{Service:pub}
-                    §AMT{ProcessAsync:pub}
-                      §I{str:input}
-                      §O{str}
-                      §Q{"input must not be null"} (!= input null)
-                      §R "processed"
-                    §/AMT
+            module MethodContractTests MethodContractTests block
+              class Service
+                func ProcessAsync async (string:input) → string
+                  !
+                  requires input != null
+                  return "processed"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1158,16 +1152,16 @@ public class AsyncAwaitTests
     #endregion
 
     [Theory]
-    [InlineData("i32", "Task<i32>", true)]
-    [InlineData("i32", "Task<i32>", false)]
-    [InlineData("Task<i32>", "Task<i32>", true)]
-    [InlineData("ValueTask<i32>", "ValueTask<i32>", true)]
-    [InlineData("System.Threading.Tasks.Task<i32>", "Task<i32>", true)]
-    [InlineData("System.Threading.Tasks.ValueTask<i32>", "ValueTask<i32>", false)]
+    [InlineData("int", "Task<int>", true)]
+    [InlineData("int", "Task<int>", false)]
+    [InlineData("Task<int>", "Task<int>", true)]
+    [InlineData("ValueTask<int>", "ValueTask<int>", true)]
+    [InlineData("System.Threading.Tasks.Task<int>", "Task<int>", true)]
+    [InlineData("System.Threading.Tasks.ValueTask<int>", "ValueTask<int>", false)]
     public async Task Compile_AsyncCallableAndAwait_UseDifferentResultTypes(
         string output, string bindingType, bool typed)
     {
-        var binding = typed ? $"pending:{bindingType}" : "pending";
+        var binding = typed ? $"{bindingType}:pending" : "pending";
         var assembly = CompileAndLoad($$"""
             module AsyncNative AsyncNative block
               func Produce async () → {{output}}
@@ -1209,11 +1203,11 @@ public class AsyncAwaitTests
     }
 
     [Theory]
-    [InlineData("§B{pending:Task<i32>} 42")]
-    [InlineData("§B{value:str} §AWAIT §C{Produce} §/C")]
-    [InlineData("§B{value:i32} §AWAIT 42")]
-    [InlineData("§B{value:i32} §C{Produce} §/C")]
-    [InlineData("§R \"wrong\"")]
+    [InlineData("let Task<int>:pending = 42")]
+    [InlineData("let string:value = await Produce()")]
+    [InlineData("let int:value = await 42")]
+    [InlineData("let int:value = Produce()")]
+    [InlineData("return \"wrong\"")]
     public void Compile_AsyncWrongResult_IsRejected(string statement)
     {
         var result = Program.Compile($$"""
@@ -1393,18 +1387,21 @@ public class AsyncAwaitTests
     }
 
     [Theory]
-    [InlineData("§U{Pending:System.Threading.Tasks.Task<i32>}", "Pending")]
-    [InlineData("§U{Tasks:System.Threading.Tasks}", "Tasks.Task<i32>")]
+    [InlineData("using Pending = System.Threading.Tasks.Task<int>", "Pending")]
+    [InlineData("using Tasks = System.Threading.Tasks", "Tasks.Task<int>")]
     public async Task Compile_AsyncAlias_PreservesCarrier(string import, string output)
     {
         var assembly = CompileAndLoad($$"""
-            §M{AsyncAlias}
+            module AsyncAlias AsyncAlias block
               {{import}}
-              §AF{Produce:pub} () -> {{output}}
-                §R 42
-              §AF{Consume:pub} () -> i32
-                §B{pending:Task<i32>} §C{Produce} §/C
-                §R §AWAIT pending
+              func Produce async () → {{output}}
+                !
+                return 42
+
+              func Consume async () → int
+                !
+                let Task<int>:pending = Produce()
+                return await pending
             """);
         var module = assembly.GetType("AsyncAlias.AsyncAliasModule", throwOnError: true)!;
         Assert.Equal(typeof(Task<int>), module.GetMethod("Produce")!.ReturnType);
@@ -1412,8 +1409,8 @@ public class AsyncAwaitTests
     }
 
     [Theory]
-    [InlineData("Task<i32>")]
-    [InlineData("ValueTask<i32>")]
+    [InlineData("Task<int>")]
+    [InlineData("ValueTask<int>")]
     public async Task Compile_AsyncLambda_UsesDelegateBodyResult(string carrier)
     {
         var assembly = CompileAndLoad($$"""
@@ -1461,9 +1458,9 @@ public class AsyncAwaitTests
     }
 
     [Theory]
-    [InlineData("i32")]
-    [InlineData("Task<i32>")]
-    [InlineData("ValueTask<i32>")]
+    [InlineData("int")]
+    [InlineData("Task<int>")]
+    [InlineData("ValueTask<int>")]
     public async Task Compile_AsyncPostcondition_DescribesBodyResult(string output)
     {
         var assembly = CompileAndLoad($$"""
@@ -1497,8 +1494,8 @@ public class AsyncAwaitTests
     }
 
     [Theory]
-    [InlineData("Func<i32>")]
-    [InlineData("Func<Task<str>>")]
+    [InlineData("Func<int>")]
+    [InlineData("Func<Task<string>>")]
     public void Compile_AsyncLambdaWrongTargetOrBody_IsRejected(string target)
     {
         var result = Program.Compile($$"""
@@ -1530,8 +1527,8 @@ public class AsyncAwaitTests
         var bound = new Binding.Binder(diagnostics).Bind(result.Ast!);
         Assert.Empty(diagnostics.Errors);
         var producer = bound.Functions.Single(function => function.Symbol.Name == "Produce");
-        Assert.Equal("global::System.Threading.Tasks.Task<i32>", producer.Symbol.ReturnType);
-        Assert.Equal("i32", producer.Symbol.BodyReturnType);
+        Assert.Equal("global::System.Threading.Tasks.Task<int>", producer.Symbol.ReturnType);
+        Assert.Equal("int", producer.Symbol.BodyReturnType);
         var consumer = bound.Functions.Single(function => function.Symbol.Name == "Consume");
         var pending = Assert.IsType<Binding.BoundBindStatement>(consumer.Body[0]);
         Assert.Contains("Task<", pending.Initializer!.Type.DisplayString);
@@ -1604,12 +1601,13 @@ public class AsyncAwaitTests
     public async Task Compile_ClassCarrierTypeParameter_IsAValueReturn(string parameter, bool hasRefinement)
     {
         var assembly = CompileAndLoad($$"""
-            §M{AsyncClassParameter}
+            module AsyncClassParameter AsyncClassParameter block
               {{(hasRefinement ? "§RTYPE{Positive:i32} (> # 0)" : "")}}
-              §CL{Box:pub}<{{parameter}}>
-                §AMT{Produce:pub} ({{parameter}}:value) -> {{parameter}}
-                  §S true
-                  §R value
+              class Box<{{parameter}}>
+                func Produce async ({{parameter}}:value) → {{parameter}}
+                  !
+                  => true
+                  return value
             """);
         var type = assembly.GetType("AsyncClassParameter.Box`1", throwOnError: true)!.MakeGenericType(typeof(int));
         var method = type.GetMethod("Produce")!;
@@ -1698,9 +1696,9 @@ public class AsyncAwaitTests
     }
 
     [Theory]
-    [InlineData("i32")]
-    [InlineData("global::System.Threading.Tasks.Task<i32>")]
-    [InlineData("global::System.Threading.Tasks.ValueTask<i32>")]
+    [InlineData("int")]
+    [InlineData("global::System.Threading.Tasks.Task<int>")]
+    [InlineData("global::System.Threading.Tasks.ValueTask<int>")]
     public void Compile_AsyncMethodContract_VerifiesTheBodyResult(string output)
     {
         var options = new CompilationOptions

@@ -216,15 +216,15 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("?string:value", "§R §C{value.GetHashCode} §/C", "Warning")]
-    [InlineData("?string:value", "§IF (!= value null)\n      §R §C{value.GetHashCode} §/C\n    §R INT:0", null)]
-    [InlineData("?string:value", "§IF (== null value)\n      §R INT:0\n    §R §C{value.GetHashCode} §/C", null)]
-    [InlineData("", "§B{value:?string} null\n    §R §C{value.GetHashCode} §/C", "Error")]
-    [InlineData("", "§B{value:?string} STR:\"present\"\n    §R §C{value.GetHashCode} §/C", null)]
-    [InlineData("", "§B{~value:?string} STR:\"present\"\n    §ASSIGN value null\n    §R §C{value.GetHashCode} §/C", "Error")]
+    [InlineData("string?:value", "return value.GetHashCode()", "Warning")]
+    [InlineData("string?:value", "if (value != null)\n      return value.GetHashCode()\n    return 0", null)]
+    [InlineData("string?:value", "if (null == value)\n      return 0\n    return value.GetHashCode()", null)]
+    [InlineData("", "let string?:value = null\n    return value.GetHashCode()", "Error")]
+    [InlineData("", "let string?:value = \"present\"\n    return value.GetHashCode()", null)]
+    [InlineData("", "var string?:value = \"present\"\n    set value null\n    return value.GetHashCode()", "Error")]
     public void NullableReferences_PreserveCertaintyAndSafeControls(string parameters, string body, string? severity)
     {
-        var diagnostics = AnalyzeSource($"§M{{NullControl}}\n  §F{{Run:pub}} ({parameters}) -> i32\n    {body}");
+        var diagnostics = AnalyzeSource($"module NullControl NullControl block\n  func Run ({parameters}) → int\n    !\n    {body}");
         var findings = diagnostics.Where(d => d.Code == DiagnosticCode.NullDereference).ToArray();
         if (severity == null)
             Assert.Empty(findings);
@@ -233,25 +233,25 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("§R (<< x n)", true)]
-    [InlineData("§R (<< INT:0 n)", false)]
-    [InlineData("§R (<< INT:1 n)", true)]
-    [InlineData("§R (<< INT:-1 n)", false)]
-    [InlineData("§R (<< INT:1 INT:32)", false)]
-    [InlineData("§R (<< INT:1 INT:-1)", true)]
-    [InlineData("§IF (&& (>= x INT:-1000) (<= x INT:1000))\n      §IF (&& (>= n INT:0) (<= n INT:2))\n        §R (<< x n)\n    §R INT:0", false)]
-    [InlineData("§IF (&& (>= x INT:-1000) (<= x INT:1000))\n      §IF (&& (>= n INT:-32) (<= n INT:-30))\n        §R (<< x n)\n    §R INT:0", false)]
+    [InlineData("return (x << n)", true)]
+    [InlineData("return (0 << n)", false)]
+    [InlineData("return (1 << n)", true)]
+    [InlineData("return (-1 << n)", false)]
+    [InlineData("return (1 << 32)", false)]
+    [InlineData("return (1 << -1)", true)]
+    [InlineData("if ((x >= -1000) && (x <= 1000))\n      if ((n >= 0) && (n <= 2))\n        return (x << n)\n    return 0", false)]
+    [InlineData("if ((x >= -1000) && (x <= 1000))\n      if ((n >= -32) && (n <= -30))\n        return (x << n)\n    return 0", false)]
     public void VariableShifts_RespectMaskedCountsAndBoundedControls(string body, bool overflow)
     {
-        var diagnostics = AnalyzeSource($"§M{{ShiftControl}}\n  §F{{Run:pub}} (i32:x, i32:n) -> i32\n    {body}");
+        var diagnostics = AnalyzeSource($"module ShiftControl ShiftControl block\n  func Run (int:x, int:n) → int\n    !\n    {body}");
         Assert.Equal(overflow, diagnostics.Any(d => d.Code == DiagnosticCode.IntegerOverflow));
     }
 
     [Theory]
-    [InlineData("INT:1", "n", true)]
-    [InlineData("INT:0", "n", false)]
-    [InlineData("INT:1", "INT:64", false)]
-    [InlineData("INT:1", "INT:-1", true)]
+    [InlineData("1", "n", true)]
+    [InlineData("0", "n", false)]
+    [InlineData("1", "64", false)]
+    [InlineData("1", "-1", true)]
     public void LongShifts_UseSixBitCountMask(string value, string count, bool overflow)
     {
         var source = $$"""
@@ -265,17 +265,18 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("user_input", "STR:\"replacement\"", true)]
-    [InlineData("STR:\"constant\"", "user_input", true)]
-    [InlineData("STR:\"constant\"", "STR:\"replacement\"", false)]
+    [InlineData("user_input", "\"replacement\"", true)]
+    [InlineData("\"constant\"", "user_input", true)]
+    [InlineData("\"constant\"", "\"replacement\"", false)]
     public void Taint_StringTransformPreservesReceiverAndArgumentFlows(string receiver, string replacement, bool tainted)
     {
         var source = $$"""
-            §M{ReceiverTaint}
-              §F{Run:pub} (string:user_input) -> void
-                §B{value:string} {{receiver}}
-                §B{path:string} §C{value.Replace} §A STR:"x" §A {{replacement}} §/C
-                §C{System.IO.File.Delete} §A path §/C
+            module ReceiverTaint ReceiverTaint block
+              func Run (string:user_input) → void
+                ! fs:w
+                let string:value = {{receiver}}
+                let string:path = value.Replace("x", {{replacement}})
+                System.IO.File.Delete(path)
             """;
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();

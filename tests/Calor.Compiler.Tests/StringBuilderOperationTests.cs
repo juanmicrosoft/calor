@@ -153,18 +153,18 @@ public class StringBuilderOperationTests
     #region C# Emission Tests
 
     [Theory]
-    [InlineData("(sb-new)", "new System.Text.StringBuilder()")]
-    [InlineData("(sb-new \"init\")", "new System.Text.StringBuilder(\"init\")")]
-    [InlineData("(sb-append sb \"text\")", "sb.Append(\"text\")")]
-    [InlineData("(sb-appendline sb \"text\")", "sb.AppendLine(\"text\")")]
-    [InlineData("(sb-insert sb 0 \"text\")", "sb.Insert(0, \"text\")")]
-    [InlineData("(sb-remove sb 0 5)", "sb.Remove(0, 5)")]
-    [InlineData("(sb-clear sb)", "sb.Clear()")]
-    [InlineData("(sb-tostring sb)", "sb.ToString()")]
-    [InlineData("(sb-length sb)", "sb.Length")]
+    [InlineData("new System.Text.StringBuilder()", "new System.Text.StringBuilder()")]
+    [InlineData("new System.Text.StringBuilder(\"init\")", "new System.Text.StringBuilder(\"init\")")]
+    [InlineData("sb.Append(\"text\")", "sb.Append(\"text\")")]
+    [InlineData("sb.AppendLine(\"text\")", "sb.AppendLine(\"text\")")]
+    [InlineData("sb.Insert(0, \"text\")", "sb.Insert(0, \"text\")")]
+    [InlineData("sb.Remove(0, 5)", "sb.Remove(0, 5)")]
+    [InlineData("sb.Clear()", "sb.Clear()")]
+    [InlineData("sb.ToString()", "sb.ToString()")]
+    [InlineData("sb.Length", "sb.Length")]
     public void Emit_StringBuilderOperation_ProducesCorrectCSharp(string calor, string expectedCSharp)
     {
-        var source = WrapInFunction($"§R {calor}");
+        var source = WrapInFunction($"return {calor}");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -411,7 +411,7 @@ public class Test { public StringBuilder M() { return new StringBuilder(); } }";
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("sb-new", calor);
+        Assert.Contains("new System.Text.StringBuilder()", calor);
     }
 
     [Fact]
@@ -429,14 +429,14 @@ public class Test { public StringBuilder M() { return new StringBuilder(""init""
         // Check via round-trip - the emitted Calor should contain sb-new
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("sb-new", calor);
+        Assert.Contains("new System.Text.StringBuilder(\"init\")", calor);
     }
 
     [Theory]
-    [InlineData("sb.Append(\"text\")", "sb-append")]
-    [InlineData("sb.AppendLine(\"text\")", "sb-appendline")]
-    [InlineData("sb.Clear()", "sb-clear")]
-    [InlineData("sb.ToString()", "sb-tostring")]
+    [InlineData("sb.Append(\"text\")", "(sb).Append(\"text\")")]
+    [InlineData("sb.AppendLine(\"text\")", "(sb).AppendLine(\"text\")")]
+    [InlineData("sb.Clear()", "(sb).Clear()")]
+    [InlineData("sb.ToString()", "(sb).ToString()")]
     public void Migration_StringBuilderInstanceMethod_ConvertsToSbOp(string csharpExpr, string expectedCalorOp)
     {
         var csharp = $@"
@@ -468,7 +468,7 @@ public class Test { public StringBuilder M(StringBuilder sb) { return sb.Insert(
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("sb-insert", calor);
+        Assert.Contains("(sb).Insert(0, \"text\")", calor);
     }
 
     [Fact]
@@ -486,7 +486,7 @@ public class Test { public StringBuilder M(StringBuilder sb) { return sb.Remove(
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("sb-remove", calor);
+        Assert.Contains("(sb).Remove(0, 5)", calor);
     }
 
     [Fact]
@@ -509,8 +509,8 @@ public class Test { public int M(StringBuilder sb) { return sb.Length; } }";
     }
 
     [Theory]
-    [InlineData("new StringBuilder()", "sb-new")]
-    [InlineData("new StringBuilder(\"init\")", "sb-new")]
+    [InlineData("new StringBuilder()", "new System.Text.StringBuilder()")]
+    [InlineData("new StringBuilder(\"init\")", "new System.Text.StringBuilder(\"init\")")]
     public void Migration_NewStringBuilder_RoundTripsToCalor(string csharpExpr, string expectedCalorOp)
     {
         var csharp = $@"
@@ -528,12 +528,12 @@ public class Test {{ public StringBuilder M() => {csharpExpr}; }}";
     }
 
     [Theory]
-    [InlineData("sb.Append(\"text\")", "sb-append")]
-    [InlineData("sb.AppendLine(\"text\")", "sb-appendline")]
-    [InlineData("sb.Insert(0, \"text\")", "sb-insert")]
-    [InlineData("sb.Remove(0, 5)", "sb-remove")]
-    [InlineData("sb.Clear()", "sb-clear")]
-    [InlineData("sb.ToString()", "sb-tostring")]
+    [InlineData("sb.Append(\"text\")", "(sb).Append(\"text\")")]
+    [InlineData("sb.AppendLine(\"text\")", "(sb).AppendLine(\"text\")")]
+    [InlineData("sb.Insert(0, \"text\")", "(sb).Insert(0, \"text\")")]
+    [InlineData("sb.Remove(0, 5)", "(sb).Remove(0, 5)")]
+    [InlineData("sb.Clear()", "(sb).Clear()")]
+    [InlineData("sb.ToString()", "(sb).ToString()")]
     public void Migration_StringBuilderMethod_RoundTripsToCalor(string csharpExpr, string expectedCalorOp)
     {
         var csharp = $@"
@@ -566,9 +566,9 @@ public class Test { public string M() { return new StringBuilder().Append(""a"")
         var calor = calorEmitter.Emit(result.Ast!);
 
         // Should contain all the operations
-        Assert.Contains("sb-new", calor);
-        Assert.Contains("sb-append", calor);
-        Assert.Contains("sb-tostring", calor);
+        Assert.Contains("new System.Text.StringBuilder()", calor);
+        Assert.Contains(".Append(\"a\")", calor);
+        Assert.Contains(".ToString()", calor);
     }
 
     [Fact]

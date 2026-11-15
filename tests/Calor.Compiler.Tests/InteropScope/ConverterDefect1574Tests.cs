@@ -130,8 +130,8 @@ public class ConverterDefect1574Tests
     public void ChainedAssignment_BindsTheRightHandSideOnce()
     {
         var calor = Convert(Rows().Single(r => r.Id == "CH-locals").Source);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"§C\{G\}"));
-        Assert.Matches(@"§B\{~(_asg\d+):int\} §C\{G\}\s+§ASSIGN y \1\s+§ASSIGN x \1", calor);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"\bG\(\)"));
+        Assert.Matches(@"var int:(_asg\d+) = G\(\)\s+set y \1\s+set x \1", calor);
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class ConverterDefect1574Tests
         Assert.DoesNotContain(CSharpDiagnostics(compiled.GeneratedCode), id => id == "CS8600");
         // Control: the same program with `default` raises CS8600.
         Assert.Contains(CSharpDiagnostics(compiled.GeneratedCode.Replace("default!;", "default;")), id => id == "CS8600");
-        var ints = Program.Compile("§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n    §B{~n:i32} `default`\n    §R n\n",
+        var ints = Program.Compile("module P P block\n  func Run () → int\n    !\n    var int:n = default\n    return n\n",
             "i.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains("int n = default;", ints.GeneratedCode);
     }
@@ -177,7 +177,7 @@ public class ConverterDefect1574Tests
     public void ObliviousTarget_TempIsNullable_AndCompilesWithoutCS8600()
     {
         var calor = Convert(Rows().Single(r => r.Id == "R2-oblivious-target").Source);
-        Assert.Matches(@"§B\{~_asg\d+:string\?\} null", calor);
+        Assert.Matches(@"var string\?:_asg\d+ = null", calor);
         var compiled = Program.Compile(calor, "oblivious.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
         Assert.DoesNotContain(CSharpDiagnostics(compiled.GeneratedCode), id => id == "CS8600");
@@ -188,10 +188,14 @@ public class ConverterDefect1574Tests
     [Theory]
     [InlineData("    §B{~n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n", true)]   // the pitfall: same indent
     [InlineData("    §B{n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n", true)]
-    [InlineData("    §B{~n:i32} §C{System.Math.Abs} §A -7 §/C\n", false)]   // control: same line
+    [InlineData("    var int:n = System.Math.Abs(-7)\n", false)]   // control: same line
     public void BareBindingNextLineInitializer_WarnsWithoutChangingMeaning(string binding, bool warns)
     {
-        var result = Program.Compile("§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n" + binding + "    §R n\n",
+        // The two legacy pitfall rows have no native form: a native bare binding is `default`.
+        var header = binding.TrimStart().StartsWith('§')
+            ? "§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n"
+            : "module P P block\n  func Run () → int\n    !\n";
+        var result = Program.Compile(header + binding + (binding.TrimStart().StartsWith('§') ? "    §R n\n" : "    return n\n"),
             "next.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         Assert.Equal(warns, result.Diagnostics.Any(d => d.Code == DiagnosticCode.BareBindingNextLineInitializer && !d.IsError));
@@ -201,7 +205,7 @@ public class ConverterDefect1574Tests
     [Fact]
     public void ExplicitDefaultInitializer_DoesNotWarn()
     {
-        var result = Program.Compile("§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n    §B{~n:i32} `default`\n    §ASSIGN n 7\n    §R n\n",
+        var result = Program.Compile("module P P block\n  func Run () → int\n    !\n    var int:n = default\n    set n 7\n    return n\n",
             "default.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.BareBindingNextLineInitializer);

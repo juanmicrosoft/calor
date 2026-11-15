@@ -163,11 +163,10 @@ public class ExtensionMethodTests
     {
         // §I{string:input:this} — third position is semantic/modifier
         var source = """
-            §M{TestModule}
-                §F{Reverse:pub}
-                    §I{string:input:this}
-                    §O{string}
-                    §R input
+            module TestModule TestModule block
+              func Reverse (this string:input) → string
+                !
+                return input
             """;
 
         var module = Parse(source, out var diagnostics);

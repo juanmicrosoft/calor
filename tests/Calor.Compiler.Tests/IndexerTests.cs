@@ -75,9 +75,11 @@ public class IndexerTests
     public void Parser_CompactAutoIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §IXER{int:pub:get,set} (int:index)
+            module Test Test block
+              class MyClass
+                this[int:index] → int
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -104,9 +106,11 @@ public class IndexerTests
     public void Parser_MultiParameterIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §IXER{int:pub:get,set} (int:row, int:col)
+            module Test Test block
+              class MyClass
+                this[int:row, int:col] → int
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -127,9 +131,11 @@ public class IndexerTests
     public void Parser_InterfaceIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §IFACE{IMyCollection}
-                §IXER{int:pub:get,set} (int:index)
+            module Test Test block
+              interface IMyCollection
+                this[int:index] → int
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -150,9 +156,11 @@ public class IndexerTests
     public void Parser_VirtualIndexer_ParsesModifiers()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §IXER{int:pub:virt:get,set} (int:index)
+            module Test Test block
+              class MyClass
+                this[int:index] → int virtual
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -170,9 +178,11 @@ public class IndexerTests
     public void Parser_CompactGenericTypeParam_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §CL{MyDict:pub}
-                §IXER{List<str>:pub:get,set} (Dictionary<str,i32>:lookup)
+            module Test Test block
+              class MyDict
+                this[Dictionary<string,int>:lookup] → List<string>
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -183,7 +193,7 @@ public class IndexerTests
 
         Assert.Empty(diag);
         var indexer = Assert.Single(module.Classes[0].Indexers);
-        Assert.Equal("List<str>", indexer.TypeName);
+        Assert.Equal("List<string>", indexer.TypeName);
         Assert.Single(indexer.Parameters);
         Assert.Equal("lookup", indexer.Parameters[0].Name);
         Assert.Contains("Dictionary", indexer.Parameters[0].TypeName);
@@ -501,9 +511,11 @@ public class IndexerTests
     public void RoundTrip_CalorParseEmitReparse_PreservesIndexer()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §IXER{int:pub:get,set} (int:index)
+            module Test Test block
+              class MyClass
+                this[int:index] → int
+                  get
+                  set
             """;
 
         // Parse

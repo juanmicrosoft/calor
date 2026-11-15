@@ -141,13 +141,11 @@ public class EventAccessorTests
     public void Parser_EventWithAddOnly_ParsesCorrectly()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}
-                §EVT{Click:pub:EventHandler}
-                §EADD
-                §R INT:0
-                §/EADD
-                §/EVT
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
+                  add
+                    return 0
             """;
 
         var diag = new DiagnosticBag();
@@ -348,9 +346,9 @@ public class EventAccessorTests
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
 
         var calor = result.CalorSource;
-        Assert.Contains("§EADD", calor);
+        Assert.Contains("\n      add\n", calor);
         Assert.DoesNotContain("§/EADD", calor);
-        Assert.Contains("§EREM", calor);
+        Assert.Contains("\n      remove\n", calor);
         Assert.DoesNotContain("§/EREM", calor);
         Assert.DoesNotContain("§/EVT", calor);
     }

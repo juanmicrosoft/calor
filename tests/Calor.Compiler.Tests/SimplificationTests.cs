@@ -702,12 +702,11 @@ module Test Test block
     public void Integration_SimplifyTautology()
     {
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:x}
-      §O{bool}
-      §Q (-> (>= x INT:0) (>= x INT:0))
-      §R true
+module Test Test block
+  func TestFunc (int:x) → bool
+    !
+    requires (!(x >= 0) || (x >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);

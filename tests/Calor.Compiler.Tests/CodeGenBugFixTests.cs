@@ -546,11 +546,12 @@ module Transliterator Transliterator block
     public void ArrayCreation_SeparatesBindingNameAndElementType(
         string name, string elementType, string expectedCSharpType)
     {
+        var nativeElementType = elementType switch { "i32" => "int", "str" => "string", _ => elementType };
         var source = $@"
-§M{{Test}}
-  §F{{Main:pub}}
-    §O{{void}}
-    §B{{~{name}}} §ARR{{{elementType}:10}}
+module Test Test block
+  func Main () → void
+    ! alloc
+    var {name} = new {nativeElementType}[10]
 ";
 
         var result = ParseAndEmit(source);
@@ -590,10 +591,10 @@ module Transliterator Transliterator block
     public void CharLiteral_VariousChars_ProducesCorrectOutput(string ch, string expected)
     {
         var source = $@"
-§M{{Test}}
-  §F{{Main:pub}}
-    §O{{void}}
-    §B{{~c:char}} (char-lit ""{ch}"")
+module Test Test block
+  func Main () → void
+    !
+    var char:c = '{ch}'
 ";
 
         var result = ParseAndEmit(source);
@@ -610,16 +611,22 @@ module Transliterator Transliterator block
     [InlineData("stat", "public static int")]
     public void PropertyModifiers_VariousValues_EmitCorrectKeywords(string modifier, string expectedPrefix)
     {
-        var classModifier = modifier == "abs" ? "abs" : "pub";
+        var classModifier = modifier == "abs" ? " abstract" : "";
+        var propertyModifier = modifier switch
+        {
+            "over" => " override",
+            "virt" => " virtual",
+            "abs" => " abstract",
+            "stat" => " static",
+            _ => "",
+        };
         var source = $@"
-§M{{Test}}
-  §CL{{MyClass:{classModifier}}}
-    {(modifier == "over" ? "§EXT{BaseClass}" : "")}
-    §PROP{{Count:i32:pub:{modifier}}}
-      §GET
-      §/GET
-      §SET
-      §/SET
+module Test Test block
+  class MyClass{classModifier}
+    {(modifier == "over" ? "extends BaseClass\n" : "")}
+    property int:Count{propertyModifier}
+      get
+      set
 ";
 
         var result = ParseAndEmit(source);
@@ -747,7 +754,7 @@ module Test Test block
         var emitter = new CalorEmitter();
         var output = emitter.Emit(module);
 
-        Assert.Contains("§B{count} 42", output);
+        Assert.Contains("let count = 42", output);
         Assert.DoesNotContain(":const", output);
     }
 
@@ -761,7 +768,7 @@ module Test Test block
         var emitter = new CalorEmitter();
         var output = emitter.Emit(module);
 
-        Assert.Contains("§B{~counter} 0", output);
+        Assert.Contains("var counter = 0", output);
     }
 
     [Fact]
@@ -776,7 +783,7 @@ module Test Test block
         var output = emitter.Emit(module);
 
         // Immutable typed: {type:name} format
-        Assert.Contains("§B{int:count} 42", output);
+        Assert.Contains("let int:count = 42", output);
         Assert.DoesNotContain(":const", output);
     }
 
@@ -791,7 +798,7 @@ module Test Test block
         var output = emitter.Emit(module);
 
         // Mutable typed: {~name:type} format
-        Assert.Contains("§B{~total:int} 0", output);
+        Assert.Contains("var int:total = 0", output);
     }
 
     [Fact]
@@ -972,8 +979,8 @@ module Test Test block
         var result = calorEmitter.Emit(module);
 
         // The §R and §ARR should be on the same line (inline), not split
-        Assert.Contains("§R §ARR{", result);
-        Assert.Contains("§/ARR", result);
+        Assert.Contains("return new int[] {", result);
+        Assert.Contains("1, 2, 3 }", result);
     }
 
     [Fact]

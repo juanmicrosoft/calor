@@ -272,8 +272,8 @@ public sealed class IdsCommandTests : IDisposable
         var store = new DeclarationIdentityStore(_directory);
         store.Sync([file]);
         var sidecar = File.ReadAllText(store.SidecarPath);
-        var changed = source.Replace("{A:", "{C:", StringComparison.Ordinal)
-            .Replace("{B:", "{D:", StringComparison.Ordinal);
+        var changed = source.Replace("func A (", "func C (", StringComparison.Ordinal)
+            .Replace("func B (", "func D (", StringComparison.Ordinal);
         File.WriteAllText(file, changed);
 
         var (exit, stdout, _) = CliTestHarness.RunCli(_directory, "ids", "check", file, "--format", "json");

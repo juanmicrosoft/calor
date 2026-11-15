@@ -79,10 +79,11 @@ module T T block
     [Fact]
     public void ValueOperator_ClassifiesAsValue()
         => Assert.Equal(ReturnShape.Kind.Value, ClassifyFirst<OperatorOverloadNode>(@"
-§M{T}
-  §CL{Vector:pub}
-    §OP{+:pub} (Vector:a, Vector:b) -> Vector
-      §R a
+module T T block
+  class Vector
+    op + (Vector:a, Vector:b) → Vector
+      !
+      return a
 "));
 
     [Fact]
@@ -97,13 +98,12 @@ module T T block
     [Fact]
     public void Event_ClassifiesAsEventAccessor()
         => Assert.Equal(ReturnShape.Kind.EventAccessor, ClassifyFirst<EventDefinitionNode>(@"
-§M{T}
-  §CL{C:pub}
-    §EVT{Click:pub:EventHandler}
-    §EADD
-    §P ""x""
-    §/EADD
-    §/EVT
+module T T block
+  class C
+    event EventHandler:Click
+      add
+        Console.WriteLine(""x"")
+      remove
 "));
 
     [Fact]

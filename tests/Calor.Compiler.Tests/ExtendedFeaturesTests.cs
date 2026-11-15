@@ -151,7 +151,7 @@ public class ExtendedFeaturesTests
     [Fact]
     public void Lexer_RecognizesAssumeKeyword()
     {
-        var tokens = Tokenize("§AS", out var diagnostics);
+        var tokens = Tokenize("assume", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.Assume, tokens[0].Kind);
@@ -161,12 +161,12 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesAssumeDeclaration()
     {
         var source = @"
-§M{Test}
-  §AS{env} ""Database connection pool initialized""
-  §F{GetOrder:pub}
-      §AS{data} ""orderId exists in database""
-      §O{i32}
-      §R 42
+module Test Test block
+  assume{env} ""Database connection pool initialized""
+  func GetOrder () → int
+    !
+    assume{data} ""orderId exists in database""
+    return 42
 ";
 
         var module = Parse(source, out var diagnostics);

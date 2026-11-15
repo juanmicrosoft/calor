@@ -99,8 +99,8 @@ public class LintRegressionTests
         Assert.Equal("j", inner.VariableName);
         Assert.Equal(2, outer.Body.Count);
         Assert.Single(inner.Body);
-        Assert.Contains("§L{i:1:10:1}", formatted);
-        Assert.Contains("§L{j:1:5:1}", formatted);
+        Assert.Contains("for i from 1 to 10 step 1", formatted);
+        Assert.Contains("for j from 1 to 5 step 1", formatted);
     }
 
     [Theory]
@@ -297,7 +297,7 @@ public class LintRegressionTests
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess);
-        Assert.Contains("§R", formatted);
+        Assert.Contains("return", formatted);
     }
 
     [Fact]
@@ -308,7 +308,7 @@ public class LintRegressionTests
 
         Assert.True(parseSuccess);
         // Phase 4b: indent form — only the opener is emitted; block end is dedentation.
-        Assert.Contains("§WH", formatted);
+        Assert.Contains("while", formatted);
     }
 
     [Fact]
@@ -323,8 +323,8 @@ public class LintRegressionTests
         // Phase 4b: the formatter now delegates to Migration/CalorEmitter, which uses
         // the canonical `priv` spelling (matches samples/ and is accepted by the parser
         // side-by-side with `pri`).
-        Assert.Contains(":pub}", formatted);
-        Assert.Contains(":priv}", formatted);
+        Assert.Contains("func PublicFunc (", formatted);
+        Assert.Contains("func PrivateFunc private (", formatted);
     }
 
     #endregion
@@ -355,9 +355,9 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Should use prefix notation: (+ a b) not (a + b)
-        Assert.Contains("(+ a b)", formatted);
-        Assert.Contains("(- a b)", formatted);
-        Assert.Contains("(* a b)", formatted);
+        Assert.Contains("a + b", formatted);
+        Assert.Contains("a - b", formatted);
+        Assert.Contains("a * b", formatted);
     }
 
     [Fact]
@@ -372,7 +372,7 @@ public class LintRegressionTests
         Assert.DoesNotContain("§REF{", formatted);
 
         // Return statements should contain variable names
-        Assert.Contains("§R", formatted);
+        Assert.Contains("return", formatted);
     }
 
     #endregion
@@ -452,7 +452,7 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Print statements should use §P
-        Assert.Contains("§P", formatted);
+        Assert.Contains("Console.WriteLine(", formatted);
     }
 
     [Fact]
@@ -464,8 +464,8 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Formatter outputs §B{name} for immutable and §B{~name} for mutable bindings
-        Assert.Contains("§B{", formatted);
-        Assert.Contains("§B{~", formatted); // mutable binds use ~ prefix
+        Assert.Contains("let ", formatted);
+        Assert.Contains("var ", formatted); // mutable binds use ~ prefix
     }
 
     #endregion
@@ -525,8 +525,8 @@ public class LintRegressionTests
         }
         else if (file.Contains("contracts"))
         {
-            Assert.Contains("§Q", formatted); // Precondition
-            Assert.Contains("§S", formatted); // Postcondition
+            Assert.Contains("requires", formatted); // Precondition
+            Assert.Contains("=>", formatted); // Postcondition
         }
     }
 
@@ -595,7 +595,7 @@ public class LintRegressionTests
 
         Assert.True(parseSuccess);
         // Phase 4b: indent form has no closer; the opener alone proves the empty module.
-        Assert.Contains("§M{Empty}", formatted);
+        Assert.Contains("module Empty", formatted);
     }
 
     [Fact]
@@ -607,9 +607,9 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Should have multiple levels of nesting
-        Assert.Contains("§IF", formatted);
-        Assert.Contains("§IF", formatted);
-        Assert.Contains("§IF", formatted);
+        Assert.Contains("if ", formatted);
+        Assert.Contains("if ", formatted);
+        Assert.Contains("if ", formatted);
     }
 
     #endregion

@@ -871,12 +871,14 @@ public sealed class CrossModuleVarianceTests : IDisposable
                 func Render () → void
                   !
             """);
-        Write("implementation", """
-            §M{Shared}
-              §CL{Writer:pub}
-                §MT{Render:pub} () -> void
-                  §E{cw}
-            """ + (inherited ? "" : "\n    §IMPL{IQuiet}\n"));
+        Write("implementation", $$"""
+            module Shared Shared block
+              class Writer
+            {{(inherited ? "" : "    implements IQuiet\n")}}
+                func Render () → void
+                  ! cw
+                  return
+            """);
         if (inherited)
         {
             Write("derived", """
@@ -918,16 +920,16 @@ public sealed class CrossModuleVarianceTests : IDisposable
     [Theory]
     [InlineData("Contracts.Base", "")]
     [InlineData("global::Contracts.Base", "")]
-    [InlineData("Base", "  §U{Contracts}\n")]
-    [InlineData("Chosen.Base", "  §U{Chosen:Contracts}\n")]
+    [InlineData("Base", "  using Contracts\n")]
+    [InlineData("Chosen.Base", "  using Chosen = Contracts\n")]
     public void QualifiedImportedAndAliasedBasesDoNotUseUnrelatedNames(
         string reference, string imports)
     {
         Write("base", Base("").Replace("Shared", "Contracts"));
         Write("decoy", Base("cw").Replace("Shared", "Unrelated"));
-        var derived = Derived.Replace("§M{Shared}\n", "§M{Consumer}\n" + imports)
-            .Replace("§CL{Derived:Base:pub}", "§CL{Derived:" + reference + ":pub}");
-        Assert.Contains("§CL{Derived:" + reference + ":pub}", derived);
+        var derived = Derived.Replace("module Shared Shared block\n", "module Consumer Consumer block\n" + imports)
+            .Replace("    extends Base\n", "    extends " + reference + "\n");
+        Assert.Contains("    extends " + reference + "\n", derived);
         Write("derived", derived);
 
         var (_, diagnostics) = Compile();
@@ -944,8 +946,8 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Write("base", Base(""));
         Write("other", duplicateIdentity ? Base("cw") : Base("cw").Replace("Shared", "Other"));
         Write("derived", duplicateIdentity ? Derived
-            : Derived.Replace("§M{Shared}\n",
-                "§M{Consumer}\n  §U{Shared}\n  §U{Other}\n"));
+            : Derived.Replace("module Shared Shared block\n",
+                "module Consumer Consumer block\n  using Shared\n  using Other\n"));
 
         var (_, diagnostics) = Compile();
 
@@ -982,8 +984,8 @@ public sealed class CrossModuleVarianceTests : IDisposable
     [Fact]
     public void PartialBaseDeclarationsShareTheirMethods()
     {
-        var firstPart = Base("").Replace("§CL{Base:pub}", "§CL{Base:pub:partial}");
-        Assert.Contains("§CL{Base:pub:partial}", firstPart);
+        var firstPart = Base("").Replace("  class Base\n", "  class Base partial\n");
+        Assert.Contains("  class Base partial\n", firstPart);
         Write("base", firstPart);
         Write("other", """
             module Shared Shared block
@@ -1069,11 +1071,14 @@ public sealed class CrossModuleVarianceTests : IDisposable
                   return
             """);
         Write("derived", """
-            §M{Consumer}
-              §U{Chosen:Shared.Base<i32>}
-              §CL{Derived:Chosen:pub}
-                §MT{Render:pub:over} (i32:value) -> void
-                  §E{cw}
+            module Consumer Consumer block
+              using Chosen = Shared.Base<int>
+              class Derived
+                extends Chosen
+
+                func Render override (int:value) → void
+                  ! cw
+                  return
             """);
 
         var (_, diagnostics) = Compile();
@@ -1102,10 +1107,11 @@ public sealed class CrossModuleVarianceTests : IDisposable
     public void CrossFileEffectVariablesAreComparedByOrdinal(string baseRow, bool violation)
     {
         Write("base", $$"""
-            §M{Shared}
-              §CL{Base:pub}
-                §MT{Render:pub:virt}<eff e> () -> void
-                  §E{ {{baseRow}} }
+            module Shared Shared block
+              class Base
+                func Render <! e> virtual () → void
+                  !{{(baseRow.Length == 0 ? "" : " " + baseRow)}}
+                  return
             """);
         Write("derived", """
             module Shared Shared block
@@ -1155,11 +1161,11 @@ public sealed class CrossModuleVarianceTests : IDisposable
     [Fact]
     public void NominalParameterTypesAreNotMatchedByTheirBareNames()
     {
-        Write("base", Base("").Replace("() ->", "(Thing:value) ->")
-            + "\n  §CL{Thing:pub}\n");
-        Write("derived", Derived.Replace("§M{Shared}", "§M{Other}")
-            .Replace(":Derived:Base:pub", ":Derived:Shared.Base:pub")
-            .Replace("() ->", "(Thing:value) ->") + "\n  §CL{Thing:pub}\n");
+        Write("base", Base("").Replace("() →", "(Thing:value) →")
+            + "\n  class Thing\n");
+        Write("derived", Derived.Replace("module Shared Shared block", "module Other Other block")
+            .Replace("    extends Base\n", "    extends Shared.Base\n")
+            .Replace("() →", "(Thing:value) →") + "\n  class Thing\n");
 
         var (_, diagnostics) = Compile();
 
@@ -1173,7 +1179,7 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Write("base", Base("cw"));
         Write("derived", Derived);
         Assert.False(Compile(cache: true).Diagnostics.HasErrors);
-        Write("base", Base("cw") + "\n      §P \"body only\"\n");
+        Write("base", Base("cw").Replace("      return", "      System.Console.WriteLine(\"body only\")\n      return"));
 
         var (result, diagnostics) = Compile(cache: true);
 
@@ -1183,17 +1189,21 @@ public sealed class CrossModuleVarianceTests : IDisposable
     }
 
     private static string Base(string effects) => $$"""
-        §M{Shared}
-          §CL{Base:pub}
-            §MT{Render:pub:virt} () -> void
-              §E{ {{effects}} }
+        module Shared Shared block
+          class Base
+            func Render virtual () → void
+              !{{(effects.Length == 0 ? "" : " " + effects)}}
+              return
         """;
 
     private const string Derived = """
-        §M{Shared}
-          §CL{Derived:Base:pub}
-            §MT{Render:pub:over} () -> void
-              §E{cw}
+        module Shared Shared block
+          class Derived
+            extends Base
+
+            func Render override () → void
+              ! cw
+              return
         """;
 
     private void Write(string name, string source) =>

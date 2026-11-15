@@ -59,10 +59,10 @@ public class CliTypeCheckDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "nullable-reference.calr");
         const string safe = """
-            §M{NullableTyping}
-              §F{Probe:pub} () -> ?str
-                §E{alloc}
-                §R "safe"
+            module NullableTyping NullableTyping block
+              func Probe () → string?
+                ! alloc
+                return "safe"
             """;
         File.WriteAllText(path, safe);
         var args = new List<string> { "--input", path, "--cache" };
@@ -72,7 +72,7 @@ public class CliTypeCheckDefaultTests : IDisposable
         var accepted = CliTestHarness.RunCli(_tempDir, environment, args.ToArray());
         Assert.True(accepted.ExitCode == 0, accepted.StdOut + accepted.StdErr);
         Assert.DoesNotContain("Calor0200", accepted.StdOut + accepted.StdErr);
-        File.WriteAllText(path, safe.Replace("§R \"safe\"", "§R §SM \"safe\"", StringComparison.Ordinal));
+        File.WriteAllText(path, safe.Replace("return \"safe\"", "return §SM \"safe\"", StringComparison.Ordinal));
         var rejected = CliTestHarness.RunCli(_tempDir, environment, args.ToArray());
         Assert.NotEqual(0, rejected.ExitCode);
         Assert.Contains(DiagnosticCode.UnknownSectionMarker, rejected.StdOut + rejected.StdErr);

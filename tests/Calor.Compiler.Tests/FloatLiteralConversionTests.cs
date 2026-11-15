@@ -155,7 +155,7 @@ public sealed class FloatLiteralConversionTests
     {
         var emitted = new CalorEmitter().Visit(new FloatLiteralNode(new TextSpan(0, 0, 1, 1), value));
         var diagnostics = new DiagnosticBag();
-        var expression = new Parser(new Lexer($"§M{{R}}\n  §F{{V:pub}} () -> f64\n    §R {emitted}", diagnostics)
+        var expression = new Parser(new Lexer($"module R R block\n  func V () → double\n    !\n    return {emitted}", diagnostics)
             .TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, emitted + ": " + string.Join(Environment.NewLine, diagnostics.Errors));
         var returned = Assert.IsType<ReturnStatementNode>(Assert.Single(expression.Functions).Body[0]).Expression;

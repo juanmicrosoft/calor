@@ -47,7 +47,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
             "module Demo Demo block\n" +
             "  func Main () → void\n" +
             "    ! cw\n" +
-            "    Console.WriteLine(\"hi\")\n");
+            "    Console.WriteLine(\"hi\")   \n");
 
     private static JsonElement ParseAndValidate(string stdOut, string expectedCommand)
     {
@@ -79,7 +79,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.True(entry.GetProperty("changed").GetBoolean());
         Assert.Equal("formatted", entry.GetProperty("status").GetString());
         // Preview mode (neither --write nor --check) embeds the formatted source
-        Assert.Contains("§M{Demo}", entry.GetProperty("formatted").GetString());
+        Assert.Contains("module Demo Demo block", entry.GetProperty("formatted").GetString());
         Assert.False(entry.TryGetProperty("conservativeFallbackReason", out _));
 
         var totals = root.GetProperty("data").GetProperty("totals");
@@ -170,7 +170,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         var (exitCode, stdOut, _) = RunCli("format", file);
 
         Assert.Equal(0, exitCode);
-        Assert.Contains("§M{Demo}", stdOut);
+        Assert.Contains("module Demo Demo block", stdOut);
         Assert.DoesNotContain("\"diagnostics\"", stdOut);
     }
 
@@ -181,7 +181,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
             "module LintReadOnly LintReadOnly block\n" +
             "  func Main () → void\n" +
             "    !\n" +
-            "    Console.WriteLine(\"missing effect\")\n";
+            "    Console.WriteLine(\"missing effect\")   \n";
         var file = WriteFile("lint-read-only.calr", source);
 
         var (exitCode, stdOut, stdErr) =
@@ -210,7 +210,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
             "module LintFix LintFix block\n" +
             "  func Main () → void\n" +
             "    !\n" +
-            "    Console.WriteLine(\"missing effect\")\n";
+            "    Console.WriteLine(\"missing effect\")   \n";
         var file = WriteFile("lint-fix.calr", source);
 
         var (exitCode, stdOut, stdErr) =

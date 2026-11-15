@@ -140,13 +140,13 @@ module T T block
     public void EventAddAccessor_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{T}
-  §CL{C:pub}
-    §EVT{Click:pub:EventHandler}
-    §EADD
-    §R INT:0
-    §/EADD
-    §/EVT
+module T T block
+  class C
+    event EventHandler:Click
+      add
+        return 0
+      remove
+        return
 ");
     }
 
@@ -154,12 +154,11 @@ module T T block
     public void EnumExtensionVoidMethod_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{T}
-  §EEXT{Color}
-    §F{Describe:pub}
-      §I{Color:self}
-      §R INT:0
-  §/EEXT
+module T T block
+  module ColorExtensions
+    func Describe (this Color:self) → void
+      !
+      return 0
 ");
     }
 
@@ -214,17 +213,18 @@ module T T block
     }
 
     [Theory]
-    [InlineData("INT:0")]
-    [InlineData("BOOL:true")]
-    [InlineData("STR:\"hello\"")]
-    [InlineData("(* INT:2 INT:3)")]
-    [InlineData("(> INT:1 INT:0)")]
+    [InlineData("0")]
+    [InlineData("true")]
+    [InlineData("\"hello\"")]
+    [InlineData("2 * 3")]
+    [InlineData("1 > 0")]
     public void VoidFunction_DefiniteValueForms_Fire(string valueExpr)
     {
         AssertFires($@"
-§M{{T}}
-  §F{{Do:pub}} () -> void
-    §R {valueExpr}
+module T T block
+  func Do () → void
+    !
+    return {valueExpr}
 ");
     }
 

@@ -16,11 +16,13 @@ public class ArrowConditionalRuntimeTests
     public void InlineConditionalReturn_DoesNotConsumeMethodDedentBeforeInteropSibling()
     {
         const string source = """
-            §M{Arrow}
-              §CL{C:pub}
-                §MT{Native:pub:stat} (bool:b) -> i32
-                  §R §IF b → 1 §EL → 2
-                §CSHARP{public static int Other() => 3;}§/CSHARP
+            module Arrow Arrow block
+              class C
+                func Native static (bool:b) → int
+                  !
+                  return (b ? 1 : 2)
+                raw member:unsafe:Other:test 31
+            public static int Other() => 3;
             """;
         var module = Parse(source);
         var type = Assert.Single(module.Classes);
@@ -107,16 +109,16 @@ public class ArrowConditionalRuntimeTests
     }
 
     [Theory]
-    [InlineData("§IF true → §IF true →\n        §C{trace.Add} §A i §/C")]
-    [InlineData("§IF false → §R §EL →\n        §C{trace.Add} §A i §/C")]
+    [InlineData("if true → if true →\n        trace.Add(i)")]
+    [InlineData("if false → return else →\n        trace.Add(i)")]
     public void MidLineStatementClauses_AreRejected(string branch)
     {
         var source = """
-            §M{Arrow}
-              §F{Probe:pub} (List<i32>:trace) -> void
-                §E{mut}
-                §L{i:0:2:1}
-            """ + "\n      " + branch + "\n      §C{trace.Add} §A 99 §/C\n";
+            module Arrow Arrow block
+              func Probe (List<int>:trace) → void
+                ! mut
+                for i from 0 to 2 step 1
+            """ + "\n      " + branch + "\n      trace.Add(99)\n";
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);

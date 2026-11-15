@@ -26,14 +26,14 @@ public sealed class RetiredUpdateLocalSyntaxTests
     public void LocalFunctionIsRejectedWithLambdaBindingReplacement()
     {
         const string source = """
-            §M{Demo}
-              §F{Run:pub} () -> void
-                §F{Local:priv} () -> void
-                  §E{}
+            module Demo Demo block
+              func Run () → void
+                func Local private () → void
+                  !
             """;
         var diagnostics = new DiagnosticBag();
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.Contains(diagnostics, d => d.Severity == DiagnosticSeverity.Error
-            && d.Message.Contains("§B") && d.Message.Contains("§LAM"));
+            && d.Message.Contains("let binding") && d.Message.Contains("lambda"));
     }
 }

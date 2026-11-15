@@ -12,17 +12,17 @@ namespace Calor.Compiler.Tests;
 public class OptionContextRuntimeTests
 {
     [Theory]
-    [InlineData("§IF (> value 0)\n      §R value\n    §EL\n      §R null")]
-    [InlineData("§L{i:0:1:1}\n      §IF (> value 0)\n        §R value\n    §R null")]
-    [InlineData("§R §IF (> value 0) → value §EL → null")]
-    [InlineData("§S true\n    §IF (> value 0)\n      §R value\n    §R null")]
-    [InlineData("§W value\n      §K 7\n        §R value\n      §K _\n        §R null")]
+    [InlineData("if (value > 0)\n      return value\n    else\n      return null")]
+    [InlineData("for i from 0 to 1 step 1\n      if (value > 0)\n        return value\n    return null")]
+    [InlineData("return ((value > 0) ? value : null)")]
+    [InlineData("=> true\n    if (value > 0)\n      return value\n    return null")]
+    [InlineData("match value\n      case 7\n        return value\n      case _\n        return null")]
     public void NestedReturns_UseDeclaredNullableElementType(string body)
     {
         var source = """
-            §M{OptionContext}
-              §F{Probe:pub} (i32:value) -> ?i64
-                §E{alloc}
+            module OptionContext OptionContext block
+              func Probe (int:value) → long?
+                ! alloc
             """ + "\n    " + body;
         foreach (var text in RoundTrip(source))
         {
@@ -37,10 +37,10 @@ public class OptionContextRuntimeTests
     public void NullableCoalesce_EvaluatesProducerOnceAndFallbackOnlyForNull()
     {
         const string source = """
-            §M{OptionContext}
-              §F{Probe:pub} (Func<i32?>:produce §E{throw}, Func<i32>:fallback §E{throw}) -> i64
-                §E{throw}
-                §R (?? §C{produce} §/C §C{fallback} §/C)
+            module OptionContext OptionContext block
+              func Probe (Func<int?>:produce ! throw, Func<int>:fallback ! throw) → long
+                ! throw
+                return (produce() ?? fallback())
             """;
         foreach (var text in RoundTrip(source))
         {

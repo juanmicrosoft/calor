@@ -92,7 +92,7 @@ public sealed class RefinementTypeParserTests
     [Fact]
     public void Tokenize_Proof_ReturnsCorrectTokenKind()
     {
-        var tokens = Tokenize("§PROOF", out var diagnostics);
+        var tokens = Tokenize("proof", out var diagnostics);
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.Proof, tokens[0].Kind);
     }
@@ -100,7 +100,7 @@ public sealed class RefinementTypeParserTests
     [Fact]
     public void Tokenize_Proof_IsKeyword()
     {
-        var tokens = Tokenize("§PROOF", out _);
+        var tokens = Tokenize("proof", out _);
         Assert.True(tokens[0].IsKeyword);
     }
 
@@ -108,10 +108,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_SelfRefOutsidePredicate_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §R #
+            module Test Test block
+              func Main () → void
+                !
+                return #
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -257,7 +257,7 @@ public sealed class RefinementTypeParserTests
 
         var calor = ParseAndEmitCalor(source);
 
-        Assert.Contains("§PROOF{\"positive\"}", calor);
+        Assert.Contains("proof{\"positive\"}", calor);
     }
 
     [Fact]
@@ -350,10 +350,10 @@ public sealed class RefinementTypeParserTests
         // This tests that the error is reported even if it somehow appears
         // in a context where it can be parsed (e.g., inside a function return)
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{i32}
-                  §R #
+            module Test Test block
+              func Main () → int
+                !
+                return #
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -366,12 +366,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_HashInCallArgument_ReportsError()
     {
         var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §C{Console.WriteLine}
-                    §A #
-                  §/C
+            module Test Test block
+              func Main () → void
+                ! cw
+                Console.WriteLine(#)
             """;
 
         var module = Parse(source, out var diagnostics);

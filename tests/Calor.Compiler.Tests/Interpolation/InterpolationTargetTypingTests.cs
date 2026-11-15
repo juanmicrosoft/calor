@@ -235,13 +235,13 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     {
         var (calor, _) = await Convert(Source("F2-INTERP-02"), surface);
         output.WriteLine(calor);
-        Assert.Contains("§B{FormattableString:f} (cast global::System.FormattableString \"x=${x}\")", calor);
-        Assert.Contains("§B{IFormattable:g} (cast global::System.IFormattable \"y=${x:D3}\")", calor);
-        Assert.Contains("§C{FormattableString.Invariant} (cast global::System.FormattableString \"${1.5}\")", calor);
-        Assert.Contains("(cast global::System.FormattableString \"k=${x}\")", calor);
+        Assert.Contains("let FormattableString:f = ((global::System.FormattableString)\"x=${x}\")", calor);
+        Assert.Contains("let IFormattable:g = ((global::System.IFormattable)\"y=${x:D3}\")", calor);
+        Assert.Contains("FormattableString.Invariant(((global::System.FormattableString)\"${1.5}\"))", calor);
+        Assert.Contains("((global::System.FormattableString)\"k=${x}\")", calor);
 
         (calor, _) = await Convert(Source("F2-INTERP-01"), surface);
-        Assert.DoesNotContain("(cast", calor);
+        Assert.DoesNotContain("(global::System.FormattableString)", calor);
     }
 
     [Theory]
@@ -465,9 +465,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void NativeHole_StringArgumentWithDollarBrace_StaysLiteral()
     {
         const string calor = """
-            §M{InterpLiteralArg}
-              §F{Show:pub} (i32:x) -> str
-                §R "${String.Concat("${x}")}"
+            module InterpLiteralArg InterpLiteralArg block
+              func Show (int:x) → string
+                !
+                return "${String.Concat("\${x}")}"
             """;
         var result = Program.Compile(calor, "f2-literal-arg.calr",
             new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
@@ -592,9 +593,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void NameofHole_IsNotTreatedAsACall()
     {
         const string calor = """
-            §M{InterpNameof}
-              §F{Show:pub} (i32:n) -> str
-                §R "${nameof(n)}=${n}"
+            module InterpNameof InterpNameof block
+              func Show (int:n) → string
+                !
+                return "${nameof(n)}=${n}"
             """;
         var result = Program.Compile(calor, "f2-interp-nameof.calr");
         Assert.DoesNotContain(result.Diagnostics, d => d.Code is "Calor0411" or "Calor0410");

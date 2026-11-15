@@ -2042,6 +2042,7 @@ public sealed class NativeMetadataClosureTests
             module InitializerConversion
               class Item
                 op implicit (int:value) → Item
+                  ! cw
                   System.Console.WriteLine(value)
                   return new Item()
               class Holder

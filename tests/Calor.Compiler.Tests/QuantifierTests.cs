@@ -47,12 +47,11 @@ public class QuantifierTests
     public void Parser_ParsesSimpleForall()
     {
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:x}
-      §O{bool}
-      §Q (forall ((i i32)) (>= i INT:0))
-      §R true
+module Test Test block
+  func TestFunc (int:x) → bool
+    !
+    requires (forall int:i where true : (i >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -69,19 +68,18 @@ public class QuantifierTests
         var forall = (ForallExpressionNode)requires.Condition;
         Assert.Single(forall.BoundVariables);
         Assert.Equal("i", forall.BoundVariables[0].Name);
-        Assert.Equal("i32", forall.BoundVariables[0].TypeName);
+        Assert.Equal("int", forall.BoundVariables[0].TypeName);
     }
 
     [Fact]
     public void Parser_ParsesSimpleExists()
     {
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:x}
-      §O{bool}
-      §Q (exists ((i i32)) (== i x))
-      §R true
+module Test Test block
+  func TestFunc (int:x) → bool
+    !
+    requires (exists int:i where true : (i == x))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -101,12 +99,11 @@ public class QuantifierTests
     public void Parser_ParsesMultipleBoundVariables()
     {
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((i i32) (j i32)) (== i j))
-      §R true
+module Test Test block
+  func TestFunc (int:n) → bool
+    !
+    requires (forall int:i, int:j where true : (i == j))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -691,12 +688,11 @@ module Test Test block
     public void Integration_ParseAndEmitImplication()
     {
         var source = @"
-§M{Test}
-  §F{CheckImplication:pub}
-      §I{i32:x}
-      §O{bool}
-      §Q (-> (> x INT:0) (>= x INT:0))
-      §R true
+module Test Test block
+  func CheckImplication (int:x) → bool
+    !
+    requires (!(x > 0) || (x >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -787,8 +783,8 @@ module Test Test block
         var result = forall.Accept(emitter);
 
         // Should emit valid Calor syntax
-        Assert.Contains("(forall ((i int))", result);
-        Assert.Contains("(>= i", result);
+        Assert.Contains("(forall int:i where true :", result);
+        Assert.Contains("(i >=", result);
     }
 
     [Fact]
@@ -805,8 +801,8 @@ module Test Test block
         var result = exists.Accept(emitter);
 
         // Should emit valid Calor syntax
-        Assert.Contains("(exists ((k int))", result);
-        Assert.Contains("(== k", result);
+        Assert.Contains("(exists int:k where true :", result);
+        Assert.Contains("(k ==", result);
     }
 
     [Fact]
@@ -824,9 +820,9 @@ module Test Test block
         var result = impl.Accept(emitter);
 
         // Should emit valid Calor syntax
-        Assert.Contains("(->", result);
-        Assert.Contains("(> x", result);
-        Assert.Contains("(>= x", result);
+        Assert.Contains("(!((x > 0)) ||", result);
+        Assert.Contains("(x >", result);
+        Assert.Contains("(x >=", result);
     }
 
     [Fact]
@@ -842,7 +838,7 @@ module Test Test block
         var result = forall.Accept(emitter);
 
         // Should emit both bound variables
-        Assert.Contains("(forall ((i int) (j int))", result);
+        Assert.Contains("(forall int:i, int:j where true :", result);
     }
 
     [Fact]
@@ -867,8 +863,8 @@ module Test Test block
 
         // Verify the emitted string contains expected elements
         Assert.Contains("forall", emittedContract);
-        Assert.Contains("->", emittedContract);
-        Assert.Contains("(i int)", emittedContract);
+        Assert.Contains("in 0..n", emittedContract);
+        Assert.Contains("int:i", emittedContract);
     }
 
     #endregion
@@ -900,12 +896,11 @@ module Test Test block
     {
         // Test that float types generate a warning
         var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((x f32)) (>= x INT:0))
-      §R true
+module Test Test block
+  func TestFunc (int:n) → bool
+    !
+    requires (forall float:x where true : (x >= 0))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1056,14 +1051,12 @@ module Test Test block
     public void RealWorld_SortedArrayInvariant()
     {
         var source = @"
-§M{Sorting}
-  §F{IsSorted:pub}
-      §I{i32:arr}
-      §I{i32:n}
-      §O{bool}
-      §Q (> n INT:0)
-      §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
-      §R true
+module Sorting Sorting block
+  func IsSorted (int:arr, int:n) → bool
+    !
+    requires (n > 0)
+    => (forall int:i where ((i >= 0) && (i < (n - 1))) : (arr[i] <= arr[(i + 1)]))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1085,16 +1078,13 @@ module Test Test block
     public void RealWorld_BinarySearchContract()
     {
         var source = @"
-§M{Search}
-  §F{BinarySearch:pub}
-      §I{i32:arr}
-      §I{i32:n}
-      §I{i32:target}
-      §O{i32}
-      §Q (> n INT:0)
-      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
-      §S (-> (>= result INT:0) (== arr{result} target))
-      §R INT:0
+module Search Search block
+  func BinarySearch (int:arr, int:n, int:target) → int
+    !
+    requires (n > 0)
+    requires (forall int:i where ((i >= 0) && (i < (n - 1))) : (arr[i] <= arr[(i + 1)]))
+    => (!(result >= 0) || (arr[result] == target))
+    return 0
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1115,17 +1105,13 @@ module Test Test block
     public void RealWorld_PartitionContract()
     {
         var source = @"
-§M{QuickSort}
-  §F{Partition:pub}
-      §I{i32:arr}
-      §I{i32:low}
-      §I{i32:high}
-      §I{i32:pivot}
-      §O{i32}
-      §Q (<= low high)
-      §S (forall ((i i32)) (-> (&& (>= i low) (< i result)) (<= arr{i} pivot)))
-      §S (forall ((j i32)) (-> (&& (> j result) (<= j high)) (> arr{j} pivot)))
-      §R low
+module QuickSort QuickSort block
+  func Partition (int:arr, int:low, int:high, int:pivot) → int
+    !
+    requires (low <= high)
+    => (forall int:i where ((i >= low) && (i < result)) : (arr[i] <= pivot))
+    => (forall int:j where ((j > result) && (j <= high)) : (arr[j] > pivot))
+    return low
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1150,14 +1136,12 @@ module Test Test block
     public void RealWorld_ArrayBoundsContract()
     {
         var source = @"
-§M{Validation}
-  §F{ValidateGrades:pub}
-      §I{i32:grades}
-      §I{i32:n}
-      §O{bool}
-      §Q (> n INT:0)
-      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (&& (>= grades{i} INT:0) (<= grades{i} INT:100))))
-      §R true
+module Validation Validation block
+  func ValidateGrades (int:grades, int:n) → bool
+    !
+    requires (n > 0)
+    requires (forall int:i where ((i >= 0) && (i < n)) : ((grades[i] >= 0) && (grades[i] <= 100)))
+    return true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1273,14 +1257,12 @@ module Matrix Matrix block
     public void RealWorld_MaxHeapPropertyContract()
     {
         var source = @"
-§M{Heap}
-  §F{IsMaxHeap:pub}
-      §I{i32:heap}
-      §I{i32:n}
-      §O{bool}
-      §Q (> n INT:0)
-      §S (-> (== result true) (forall ((i i32)) (-> (&& (>= i INT:0) (< (* INT:2 (+ i INT:1)) n)) (>= heap{i} heap{(* INT:2 (+ i INT:1))}))))
-      §R false
+module Heap Heap block
+  func IsMaxHeap (int:heap, int:n) → bool
+    !
+    requires (n > 0)
+    => (!(result == true) || (forall int:i where ((i >= 0) && ((2 * (i + 1)) < n)) : (heap[i] >= heap[(2 * (i + 1))])))
+    return false
 ";
 
         var module = Parse(source, out var diagnostics);

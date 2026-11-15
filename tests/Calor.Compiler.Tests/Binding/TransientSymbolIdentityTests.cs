@@ -26,8 +26,8 @@ public sealed class TransientSymbolIdentityTests
         var changed = edit switch
         {
             "effects" => source.Replace("cw", "cr"),
-            "effect-variable" => source.Replace("eff e", "eff g").Replace("cw,e,f", "cw,g,f"),
-            "effect-order" => source.Replace("cw,e,f", "cw,f,e"),
+            "effect-variable" => source.Replace("<! e,", "<! g,").Replace("cw, e, f", "cw, g, f"),
+            "effect-order" => source.Replace("cw, e, f", "cw, f, e"),
             _ => source
         };
         BoundModule Read(string text, string attribute)
@@ -52,17 +52,17 @@ public sealed class TransientSymbolIdentityTests
     {
         const string source = "module Demo Demo block\n  func Run () → int\n    ! cw, mut:col\n    let int:value = 1\n    return value\n";
         var first = Bind(source);
-        var second = Bind(source.Replace("cw,mut:col", "mut:col,cw"));
+        var second = Bind(source.Replace("cw, mut:col", "mut:col, cw"));
         Assert.Equal(first.SymbolsById.Keys.OrderBy(id => id.Value), second.SymbolsById.Keys.OrderBy(id => id.Value));
     }
 
     [Theory]
-    [InlineData("§CTOR{pub} ()", "§B{value:i32} 1", "§B{value:i32} 2", BoundMemberKind.Constructor)]
-    [InlineData("§OP{+:pub} (Box:a, Box:b) -> Box", "§R a", "§R b", BoundMemberKind.OperatorOverload)]
+    [InlineData("ctor ()", "let int:value = 1", "let int:value = 2", BoundMemberKind.Constructor)]
+    [InlineData("op + (Box:a, Box:b) → Box\n      !", "return a", "return b", BoundMemberKind.OperatorOverload)]
     public void AmbiguousConstructorAndOperatorSnapshotsNeverRedirectStaleHandles(
         string header, string firstBody, string secondBody, BoundMemberKind kind)
     {
-        string Source(params string[] bodies) => "§M{Demo}\n  §CL{Box:pub}\n"
+        string Source(params string[] bodies) => "module Demo Demo block\n  class Box\n"
             + string.Concat(bodies.Select(body => $"    {header}\n      {body}\n"));
         BoundModule Read(string source)
         {
@@ -89,14 +89,15 @@ public sealed class TransientSymbolIdentityTests
     public void IdenticalCompilationsKeepPublicArtifactsAndSidecarIdentitiesDeterministic(bool invalidAssignment)
     {
         var source = """
-            §M{Demo}
-              §F{Run:pub} (i32:value) -> i32
-                §B{offset:i32} 1
-                §B{callback:System.Func<i32,i32>} §LAM{x:i32} (+ x value)
-                §R §C{callback} §A offset §/C
+            module Demo Demo block
+              func Run (int:value) → int
+                !
+                let int:offset = 1
+                let System.Func<int, int>:callback = (int:x) => (x + value)
+                return callback(offset)
             """ + "\n";
         if (invalidAssignment)
-            source = source.Replace("    §R ", "    §ASSIGN offset 2\n    §R ");
+            source = source.Replace("    return ", "    set offset 2\n    return ");
         var root = Path.Combine(Path.GetTempPath(), "calor-transient-determinism-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
@@ -135,7 +136,7 @@ public sealed class TransientSymbolIdentityTests
         const string original = "module Demo Demo block\n  func Pick () → int\n    !\n    return 1\n";
         var old = Assert.Single(Bind(original).Functions).Symbol.Id;
         var diagnostics = new DiagnosticBag();
-        var source = original + "  §F{Pick:pub} () -> i32\n    §R 2\n";
+        var source = original + "  func Pick () → int\n    !\n    return 2\n";
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         var current = new Binder(diagnostics, "memory:transient-tests").Bind(module);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.DuplicateFunctionSignature);
@@ -211,21 +212,22 @@ public sealed class TransientSymbolIdentityTests
     public void SameNamedLocalsInNestedAndSiblingScopesAreSnapshotScopedNotStaleHandles()
     {
         const string source = """
-            §M{Demo}
-              §F{Run:pub} (bool:condition) -> i32
-                §IF condition
-                  §B{value:i32} 1
-                  §IF condition
-                    §B{value:i32} 2
-                    §P value
-                  §P value
-                §EL
-                  §B{value:i32} 3
-                  §P value
-                §R 0
+            module Demo Demo block
+              func Run (bool:condition) → int
+                ! cw
+                if condition
+                  let int:value = 1
+                  if condition
+                    let int:value = 2
+                    Console.WriteLine(value)
+                  Console.WriteLine(value)
+                else
+                  let int:value = 3
+                  Console.WriteLine(value)
+                return 0
             """;
         var old = Bind(source);
-        var current = Bind(source.Replace("§B{value:i32} 1", "§B{other:i32} 0\n      §B{value:i32} 1"));
+        var current = Bind(source.Replace("let int:value = 1", "let int:other = 0\n      let int:value = 1"));
         var oldLocals = old.SymbolsById.Values.OfType<VariableSymbol>()
             .Where(s => s.Name == "value").ToArray();
         var currentLocals = current.SymbolsById.Values.OfType<VariableSymbol>()

@@ -24,7 +24,7 @@ public class ConverterEvaluationOrderResidualTests
             DefinedSymbols = Array.Empty<string>(),
             GracefulFallback = true
         }).Convert(source);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.DoesNotMatch(@"(?m)^\s*raw ", result.CalorSource);
         Assert.Contains("MissingCache<object>.Use", result.CalorSource);
         Assert.Empty(result.Losses);
     }
@@ -185,8 +185,8 @@ public class ConverterEvaluationOrderResidualTests
         var (_, source, allowed) = Rows().Single(row => row.Id == id);
         var original = RefOutImplementationTests.Run(source);
         var (calor, losses) = await RefOutImplementationTests.ConvertAsync(source, surface);
-        var interop = calor.Contains("§CSHARP{", StringComparison.Ordinal) || calor.Contains("§CS{", StringComparison.Ordinal)
-            || calor.Contains("§RAW", StringComparison.Ordinal) || losses.Count > 0;
+        var interop = System.Text.RegularExpressions.Regex.IsMatch(calor, @"^\s*raw ", System.Text.RegularExpressions.RegexOptions.Multiline)
+            || losses.Count > 0;
         var strict = Program.Compile(calor, id + ".calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         // As in ConverterCompoundAssignmentTests: an effects-only refusal is compiled without
         // enforcement, since the comparison is about values.
@@ -242,7 +242,7 @@ public class ConverterEvaluationOrderResidualTests
     public void IndexWithANestedConversion_IsBoundOnce()
     {
         var calor = Convert(Rows().Single(r => r.Id == "C-index-arithmetic-conversion").Source);
-        Assert.Matches(@"§B\{(_asg\d+)\} \(\+ k 0\)\s+§ASSIGN §IDX\{[^}]+\} \1 \(\+ §IDX\{[^}]+\} \1 5\)", calor);
+        Assert.Matches(@"let (_asg\d+) = \(k \+ 0\)\s+set \w+\[\1\] \(\w+\[\1\] \+ 5\)", calor);
     }
 
     // #1677: `Point.Log += "x"` in an expression lambda keeps its operator and its target.
@@ -250,7 +250,7 @@ public class ConverterEvaluationOrderResidualTests
     public void ExpressionLambda_StaticMemberCompound_KeepsTheOperator()
     {
         var calor = Convert(Rows().Single(r => r.Id == "X-lambda-static-field").Source);
-        Assert.Contains("§ASSIGN Point.Log (+ Point.Log \"x\")", calor);
+        Assert.Contains("set Point . Log (Point . Log + \"x\")", calor);
     }
 
     private static string Convert(string source)

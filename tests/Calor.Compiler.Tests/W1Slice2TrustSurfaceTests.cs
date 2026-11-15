@@ -152,7 +152,7 @@ public class W1Slice2TrustSurfaceTests
             var exit = await command.InvokeAsync(["--write", file]);
 
             Assert.Equal(0, exit);
-            Assert.Equal("§M{T}\n", await File.ReadAllTextAsync(file));
+            Assert.Equal("module T T block\n", await File.ReadAllTextAsync(file));
         }
         finally
         {
@@ -193,7 +193,7 @@ public class W1Slice2TrustSurfaceTests
             var exit = await command.InvokeAsync(["--fix", file]);
 
             Assert.Equal(0, exit);
-            Assert.Equal("§M{T}\n", await File.ReadAllTextAsync(file));
+            Assert.Equal("module T T block\n", await File.ReadAllTextAsync(file));
         }
         finally
         {

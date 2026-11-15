@@ -65,7 +65,7 @@ public class Test
         var calor = ConvertToCalor(csharp);
 
         // Mutable binding should use ~ prefix
-        Assert.Contains("~name", calor);
+        Assert.Contains("var name", calor);
         // Should not contain :const
         Assert.DoesNotContain(":const", calor);
     }
@@ -87,7 +87,7 @@ public class Test
         var calor = ConvertToCalor(csharp);
 
         // Should have tilde prefix for mutable, with type
-        Assert.Contains("~name", calor);
+        Assert.Contains("var string:name", calor);
         Assert.DoesNotContain(":const", calor);
     }
 
@@ -109,7 +109,7 @@ public class Test
         var calor = ConvertToCalor(csharp);
 
         Assert.DoesNotContain("_chain", calor);
-        Assert.Contains("(lower obj)", calor);
+        Assert.Contains("(obj).ToLower()", calor);
         Assert.Contains("GetHashCode", calor);
         // Should NOT contain the broken CalorEmitter serialization pattern
         Assert.DoesNotContain("§C{(§C{", calor);
@@ -460,8 +460,8 @@ module Test Test block
     public void Parser_StaticStructDeclaration_IsRejected()
     {
         var source = @"
-§M{Test}
-  §CL{Point:st struct}";
+module Test Test block
+  class Point internal static struct";
         var result = Program.Compile(source, "static-struct.calr");
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.InvalidModifier
@@ -636,7 +636,7 @@ public class Test
         // Must NOT fall back to interop
         RawFrameAssertions.AssertFramed(calor, present: false);
         // Must contain native Calor base call with interpolation
-        Assert.Contains("§BASE", calor);
+        Assert.Contains("base(", calor);
         Assert.Contains("${kind}", calor);
         Assert.Contains("${functionId}", calor);
     }
@@ -849,14 +849,13 @@ public class Test
     {
         // §K Status.OK in Calor source should parse correctly and emit Status.OK in C#
         var source = @"
-§M{Test}
-  §F{Describe:pub}
-      §I{i32:status}
-      §O{str}
-      §R §W status
-          §K Status.OK → ""ok""
-          §K Status.Error → ""error""
-          §K _ → ""unknown""
+module Test Test block
+  func Describe (int:status) → string
+    !
+    return match status
+      case Status.OK → ""ok""
+      case Status.Error → ""error""
+      case _ → ""unknown""
 ";
         var result = ParseAndEmit(source);
 
@@ -920,7 +919,7 @@ module Test Test block
         var calorEmitter = new CalorEmitter();
         var calorOutput = arrayAccess.Accept(calorEmitter);
 
-        Assert.Equal("§IDX{words} 0", calorOutput);
+        Assert.Equal("words[0]", calorOutput);
     }
 
     [Fact]
@@ -1059,8 +1058,8 @@ public class Test
         Assert.True(result.Success, GetErrorMessage(result));
         var emitter = new CalorEmitter();
         var calor = emitter.Emit(result.Ast!);
-        Assert.Contains(">= score 90", calor);
-        Assert.Contains("§IF", calor);
+        Assert.Contains("score >= 90", calor);
+        Assert.Contains("if ", calor);
         Assert.Contains("_ternResult", calor);
     }
 
@@ -1162,8 +1161,8 @@ public class Test
         var calor = ConvertToCalor(csharp);
 
         // Lock is now converted to §SYNC block with body inside
-        var syncIdx = calor.IndexOf("§SYNC ");
-        var bindIdx = calor.IndexOf("§B{", syncIdx > 0 ? syncIdx : 0);
+        var syncIdx = calor.IndexOf("lock ");
+        var bindIdx = calor.IndexOf("let ", syncIdx > 0 ? syncIdx : 0);
         Assert.True(syncIdx >= 0, "§SYNC block not found");
         Assert.True(bindIdx > syncIdx, "Body statement should appear inside §SYNC block");
         Assert.DoesNotContain("§/SYNC{", calor);
@@ -1188,7 +1187,7 @@ public class Test
 
         // The checked comment should appear before the body
         var commentIdx = calor.IndexOf("checked");
-        var bindIdx = calor.IndexOf("§B{", commentIdx > 0 ? commentIdx : 0);
+        var bindIdx = calor.IndexOf("let ", commentIdx > 0 ? commentIdx : 0);
         Assert.True(commentIdx >= 0, "Checked comment not found");
         Assert.True(bindIdx > commentIdx, "Checked comment should appear before body statements");
     }
@@ -1210,8 +1209,8 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        Assert.True(calor.IndexOf("§B{", StringComparison.Ordinal) < calor.IndexOf("§WH ", StringComparison.Ordinal));
-        Assert.Contains("§WH ", calor);
+        Assert.True(calor.IndexOf("var int:i = 0", StringComparison.Ordinal) < calor.IndexOf("while ", StringComparison.Ordinal));
+        Assert.Contains("while ", calor);
         RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
     }
 
@@ -1233,8 +1232,8 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        Assert.True(calor.IndexOf("§ASSIGN", StringComparison.Ordinal) < calor.IndexOf("§WH ", StringComparison.Ordinal));
-        Assert.Contains("§WH ", calor);
+        Assert.True(calor.IndexOf("set x 0", StringComparison.Ordinal) < calor.IndexOf("while ", StringComparison.Ordinal));
+        Assert.Contains("while ", calor);
         RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
     }
 

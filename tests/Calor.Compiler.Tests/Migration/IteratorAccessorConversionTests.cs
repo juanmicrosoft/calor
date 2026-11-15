@@ -272,9 +272,9 @@ public class IteratorAccessorConversionTests
     }
 
     [Theory]
-    [InlineData("public IEnumerable<int> Gen() { yield return 1; yield break; }", "§YIELD")]
-    [InlineData("public IEnumerable<int> Seq => Gen(); private IEnumerable<int> Gen() { yield return 1; }", "§PROP")]
-    [InlineData("public IEnumerable<int> Seq { get { return new List<int> { 1 }; } }", "§PROP")]
+    [InlineData("public IEnumerable<int> Gen() { yield return 1; yield break; }", "yield 1")]
+    [InlineData("public IEnumerable<int> Seq => Gen(); private IEnumerable<int> Gen() { yield return 1; }", "property ")]
+    [InlineData("public IEnumerable<int> Seq { get { return new List<int> { 1 }; } }", "property ")]
     public void NonIteratorAccessors_StayNative(string members, string marker)
     {
         // Negative controls: iterator methods and accessors that merely return a

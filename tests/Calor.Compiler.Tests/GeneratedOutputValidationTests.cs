@@ -442,10 +442,9 @@ public class GeneratedOutputValidationTests
     {
         var module = Program.Compile(
             $$"""
-            §M{Lib}
-              §CSHARP{
-                {{interopDeclaration}}
-              }§/CSHARP
+            module Lib Lib block
+              raw member:csharp-interop:Other:handwritten%20fixture {{System.Text.Encoding.UTF8.GetByteCount(interopDeclaration)}}
+            {{interopDeclaration}}
             """,
             "lib.calr",
             new CompilationOptions { UnsafeTranspileOnly = true }).Ast;
@@ -588,13 +587,12 @@ public class GeneratedOutputValidationTests
     public void Compile_UnsafeBlock_UsesConfiguredUnsafeSetting()
     {
         const string source = """
-            §M{UnsafeBlock}
-              §CL{Worker:pub}
-                §MT{Run:pub} () -> void
-                  §E{unsafe}
-                  §UNSAFE
-                    §B{~x:i32} INT:42
-                  §/UNSAFE
+            module UnsafeBlock UnsafeBlock block
+              class Worker
+                func Run () → void
+                  ! unsafe
+                  unsafe
+                    var int:x = 42
             """;
 
         var accepted = Program.Compile(source, "unsafe.calr");
@@ -797,11 +795,10 @@ public class GeneratedOutputValidationTests
             File.WriteAllText(
                 sourcePath,
                 """
-                §M{Consumer}
-                  §CL{Reader:pub}
-                    §CSHARP{
-                      public int Read() => External.Library.Api.Value;
-                    }§/CSHARP
+                module Consumer Consumer block
+                  class Reader
+                    raw member:method:Method:Unsupported%20Method 48
+                public int Read() => External.Library.Api.Value;
                 """);
 
             var (exitCode, stdout, stderr) = CliTestHarness.RunCli(

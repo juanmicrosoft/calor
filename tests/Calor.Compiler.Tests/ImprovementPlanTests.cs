@@ -400,12 +400,11 @@ module Test Test block
         // A program that uses LINQ methods (via quantifier/contract expansion) should have `using System.Linq;`
         // We can trigger this by including code that generates .Any(), .All(), .Select(), etc.
         var source = @"
-§M{Test}
-  §CL{Svc:pub}
-    §MT{HasPositive:pub}
-      §I{List<i32>:items}
-      §O{bool}
-      §R §CS{items.Any(x => x > 0)}
+module Test Test block
+  class Svc
+    func HasPositive (List<int>:items) → bool
+      ! unknown
+      return items.Any((int:x) => (x > 0))
 ";
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -422,12 +421,13 @@ module Test Test block
     [Fact]
     public void InlineCSharp_ParseAndRoundTrip()
     {
-        // Parse §CS{DateTime.Now.Ticks} and verify it round-trips correctly
+        // Parse raw C# `DateTime.Now.Ticks` and verify it round-trips correctly
         var source = @"
-§M{Test}
-  §F{GetTicks:pub}
-    §O{i64}
-    §R §CS{DateTime.Now.Ticks}
+module Test Test block
+  func GetTicks () → long
+    ! time
+    raw statement 26
+return DateTime.Now.Ticks;
 ";
         var module = ParseCalor(source);
         var func = Assert.Single(module.Functions);
@@ -439,10 +439,11 @@ module Test Test block
     {
         // Verify codegen emits `DateTime.Now.Ticks` verbatim
         var source = @"
-§M{Test}
-  §F{GetTicks:pub}
-    §O{i64}
-    §R §CS{DateTime.Now.Ticks}
+module Test Test block
+  func GetTicks () → long
+    ! time
+    raw statement 26
+return DateTime.Now.Ticks;
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("DateTime.Now.Ticks", csharp);
@@ -452,10 +453,11 @@ module Test Test block
     public void InlineCSharp_ComplexExpression_EmitsVerbatim()
     {
         var source = @"
-§M{Test}
-  §F{GetEnv:pub}
-    §O{str}
-    §R §CS{Environment.GetEnvironmentVariable(""HOME"") ?? ""/tmp""}
+module Test Test block
+  func GetEnv () → string
+    ! env:r
+    raw statement 60
+return Environment.GetEnvironmentVariable(""HOME"") ?? ""/tmp"";
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("Environment.GetEnvironmentVariable", csharp);
@@ -628,10 +630,12 @@ module Test Test block
     {
         // Inline method with default params and inline C# expression
         var source = @"
-§M{Test}
-  §CL{TimeHelper:pub}
-    §MT{GetTime:pub} (i32:offset = 0) -> i64
-      §R §CS{DateTimeOffset.UtcNow.ToUnixTimeSeconds() + offset}
+module Test Test block
+  class TimeHelper
+    func GetTime (int:offset = 0) → long
+      ! time
+      raw statement 58
+return DateTimeOffset.UtcNow.ToUnixTimeSeconds() + offset;
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("int offset = 0", csharp);
@@ -643,10 +647,11 @@ module Test Test block
     {
         // Compile a program with several features and verify the generated C# is syntactically valid
         var source = @"
-§M{Test}
-  §CL{Utility:pub}
-    §MT{Greet:pub} (str:name, str:greeting = ""Hello"") -> str
-      §R §CS{$""{greeting}, {name}!""}
+module Test Test block
+  class Utility
+    func Greet (string:name, string:greeting = ""Hello"") → string
+      !
+      return ""${greeting}, ${name}!""
 ";
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {

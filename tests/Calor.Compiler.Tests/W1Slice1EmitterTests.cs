@@ -89,17 +89,14 @@ public class W1Slice1EmitterTests
     public void OperatorOverload_NestedReturn_UsesSharedLowering()
     {
         var source = """
-            §M{T}
-              §CL{MyType}
-                §OP{+:pub}
-                  §I{MyType:left}
-                  §I{MyType:right}
-                  §O{MyType}
-                  §S (!= result null)
-                  §IF (!= left null)
-                    §R left
-                  §R right
-                §/OP
+            module T T block
+              class MyType
+                op + (MyType:left, MyType:right) → MyType
+                  !
+                  => (result != null)
+                  if (left != null)
+                    return left
+                  return right
             """;
 
         var (code, diagnostics) = EmitWithDiagnostics(source);
@@ -115,15 +112,12 @@ public class W1Slice1EmitterTests
     public void OperatorOverload_FinalReturn_BindsExactResultReference()
     {
         var source = """
-            §M{T}
-              §CL{MyType}
-                §OP{+:pub}
-                  §I{MyType:left}
-                  §I{MyType:right}
-                  §O{MyType}
-                  §S (!= result null)
-                  §R left
-                §/OP
+            module T T block
+              class MyType
+                op + (MyType:left, MyType:right) → MyType
+                  !
+                  => (result != null)
+                  return left
             """;
 
         var (code, diagnostics) = EmitWithDiagnostics(source);

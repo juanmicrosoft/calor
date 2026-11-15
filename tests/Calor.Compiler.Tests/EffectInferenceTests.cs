@@ -212,7 +212,7 @@ public class EffectInferenceTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(module);
 
-        Assert.Contains("§E{cw}", output);
+        Assert.Contains("! cw", output);
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public class EffectInferenceTests
         // C# → Calor
         var conversionResult = _converter.Convert(csharp);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
-        Assert.Contains("§E{cw}", conversionResult.CalorSource!);
+        Assert.Contains("! cw", conversionResult.CalorSource!);
 
         // Calor → parse → check AST
         var compilationResult = Program.Compile(conversionResult.CalorSource!);

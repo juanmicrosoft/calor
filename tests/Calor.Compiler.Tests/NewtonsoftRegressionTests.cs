@@ -68,7 +68,7 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("`operator`", calor);
+        Assert.Contains("@operator", calor);
 
         // Round-trip should produce valid C#
         var generated = RoundTrip(csharp);
@@ -91,7 +91,7 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("`class`", calor);
+        Assert.Contains("@class", calor);
 
         var generated = RoundTrip(csharp);
         Assert.Contains("@class", generated);
@@ -130,7 +130,7 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("`event`", calor);
+        Assert.Contains("@event", calor);
 
         var generated = RoundTrip(csharp);
         Assert.Contains("@event", generated);
@@ -148,7 +148,7 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("`class`", calor);
+        Assert.Contains("@class", calor);
 
         var generated = RoundTrip(csharp);
         Assert.Contains("@class", generated);
@@ -169,9 +169,9 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        // Both the parameter declaration and the reference in the return should use backticks
-        var backtickCount = calor.Split("`operator`").Length - 1;
-        Assert.True(backtickCount >= 2, $"Expected at least 2 backtick-wrapped 'operator' (param + reference), found {backtickCount}");
+        // Both the parameter declaration and the reference in the return should use the verbatim @ prefix
+        var backtickCount = calor.Split("@operator").Length - 1;
+        Assert.True(backtickCount >= 2, $"Expected at least 2 verbatim '@operator' (param + reference), found {backtickCount}");
 
         var generated = RoundTrip(csharp);
         Assert.Contains("@operator", generated);
@@ -198,7 +198,7 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§SYNC", calor);
+        Assert.Contains(" lock ", calor);
         Assert.DoesNotContain("§/SYNC", calor);
 
         var generated = RoundTrip(csharp);
@@ -228,7 +228,7 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Equal(2, calor.Split("§SYNC").Length - 1);
+        Assert.Equal(2, calor.Split(" lock ").Length - 1);
         Assert.DoesNotContain("§SYNC{", calor);
 
         var generated = RoundTrip(csharp);
@@ -254,7 +254,7 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§SYNC", calor);
+        Assert.Contains(" lock ", calor);
 
         var generated = RoundTrip(csharp);
         Assert.Contains("lock", generated);
@@ -281,7 +281,7 @@ namespace Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§SYNC", calor);
+        Assert.Contains(" lock ", calor);
 
         var generated = RoundTrip(csharp);
         Assert.Contains("lock", generated);
@@ -336,7 +336,7 @@ namespace Test
 }";
         var calor = ConvertToCalor(csharp);
         // The conditional using should appear inside a §PP block
-        Assert.Contains("§PP", calor);
+        Assert.Contains("pp NET6_0_OR_GREATER", calor);
 
         var generated = RoundTrip(csharp);
         // The #if and using should be in the output
@@ -377,14 +377,13 @@ module Test Test block
     {
         // Parse Calor with both §U and type declarations inside §PP
         var calorSource = @"
-§M{Test}
-    §PP{NET6_0_OR_GREATER}
-    §U{System.Text.Json}
-    §CL{JsonHelper:pub}
-        §MT{GetValue:pub}
-            §O{i32}
-            §R INT:42
-    §/PP{NET6_0_OR_GREATER}
+module Test Test block
+  pp NET6_0_OR_GREATER
+    using System.Text.Json
+    class JsonHelper
+      func GetValue () → int
+        !
+        return 42
 ";
         var compileResult = Program.Compile(calorSource, "mixed-pp.calr", new CompilationOptions
         {

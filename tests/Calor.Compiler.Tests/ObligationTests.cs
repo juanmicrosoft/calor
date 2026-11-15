@@ -818,11 +818,10 @@ public sealed class ObligationTests
     public void CSharpEmit_RefinedOutParameter_GuardsAfterAssignment()
     {
         var csharp = Emit("""
-            §M{Test}
-              §F{SetBad:pub}
-                  §I{i32:value:out} | (> # INT:0)
-                  §O{void}
-                  §ASSIGN value INT:-1
+            module Test Test block
+              func SetBad (out int:value | (# > 0)) → void
+                !
+                set value -1
             """);
 
         var exception = InvokeGenerated(csharp, "SetBad", (object?)null);

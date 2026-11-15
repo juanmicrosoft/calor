@@ -1022,13 +1022,23 @@ public sealed class SpikeVerdictTests
         Assert.Equal(1, CountOccurrences(File.ReadAllText(original), anchor));
         var path = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(), original);
         var source = File.ReadAllText(path);
-        // The archived catalogue keeps its exact original bytes. Only this active
-        // mutation's field visibility differs after the explicit syntax migration.
-        var (activeAnchor, activeReplacement) = cell == "L7-CB"
-            ? ("§FLD{Action<i32>:onChange:priv} §E{cw}", "§FLD{Action<i32>:onChange:priv}")
-            : (anchor, replacement);
+        // The archived catalogue keeps its exact original bytes. The active semantic
+        // copy is native syntax, so each cell's anchor, replacement and invocation
+        // line are translated explicitly to that copy; the registered values above
+        // still apply to the frozen original.
+        var (activeAnchor, activeReplacement, activeLine) = cell switch
+        {
+            "L7-A2" => ("next ! e, CancellationToken:cancellationToken) → TResponse",
+                "next, CancellationToken:cancellationToken) → TResponse", 25),
+            "L7-MAP" => ("Func<int, int>:f ! e", "Func<int, int>:f", 8),
+            "L7-MATCH" => ("Func<int, int>:onSome ! e", "Func<int, int>:onSome", 6),
+            "L7-MID" => ("(Func<int>:g ! e)", "(Func<int>:g)", 17),
+            "L7-CB" => ("field Action<int>:onChange private ! cw", "field Action<int>:onChange private", 6),
+            _ => throw new InvalidOperationException($"{cell}: no active-copy translation registered.")
+        };
         Assert.True(CountOccurrences(source, activeAnchor) == 1,
-            $"{cell}: the registered anchor must also occur exactly once in active input {path}");
+            $"{cell}: the translation of the registered diff '{anchor}' → '{replacement}' must occur "
+            + $"exactly once in active input {path}");
 
         var mutant = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{cell}-{Guid.NewGuid():N}.calr");
         try
@@ -1038,13 +1048,14 @@ public sealed class SpikeVerdictTests
             var (_, baseline) = CompileControlFixture(fixture);
             var (_, mutated) = CompileControlSource(mutant);
 
-            var registeredPrefix = $"Calor0425@{invocationLine},";
+            var registeredPrefix = $"Calor0425@{activeLine},";
             var baselineCount = baseline.Count(d => d.Contains(registeredPrefix, StringComparison.Ordinal));
             var mutantCount = mutated.Count(d => d.Contains(registeredPrefix, StringComparison.Ordinal));
 
             Assert.Equal(0, baselineCount);
             Assert.True(mutantCount > baselineCount,
-                $"{cell}: expected Calor0425 at line {invocationLine} to RISE above the unmutated "
+                $"{cell}: expected Calor0425 at line {activeLine} (registered line {invocationLine} "
+                + $"in the frozen original) to RISE above the unmutated "
                 + $"fixture's {baselineCount}; mutant drew [{string.Join(", ", mutated)}]");
             Assert.DoesNotContain(mutated, d => d.Contains("Calor0418", StringComparison.Ordinal));
         }

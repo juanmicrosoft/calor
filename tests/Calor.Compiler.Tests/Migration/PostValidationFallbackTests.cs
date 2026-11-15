@@ -66,7 +66,7 @@ public class PostValidationFallbackTests
 
         // The other member still converted to a real Calor class (not wrapped).
         Assert.Contains("Keepme", result.CalorSource);
-        Assert.Contains("§CL", result.CalorSource);
+        Assert.Contains("class Keepme", result.CalorSource);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class PostValidationFallbackTests
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
         Assert.Equal(2, result.Ast!.Classes.Count);
-        Assert.Contains("§CL", result.CalorSource!);
+        Assert.Contains("class Foo", result.CalorSource!);
         var compiled = Program.Compile(result.CalorSource!);
         Assert.False(
             compiled.HasErrors,

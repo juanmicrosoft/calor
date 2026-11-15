@@ -18,39 +18,35 @@ namespace Calor.Compiler.Tests;
 public sealed class S2ImplicationDefinednessTests
 {
     private const string StringSourceTemplate = """
-        §M{R1Case}
-          §IFACE{IProbe}
-            §MT{Run}
-              §I{i32:x}
-              §I{str:s}
-              §O{i32}
-              §Q (>= x INT:0)
-          §CL{Impl:pub}
-            §IMPL{IProbe}
-            §MT{Run:pub}
-              §I{i32:x}
-              §I{str:s}
-              §O{i32}
-              §Q IMPLPRE
-              §R INT:0
+        module R1Case R1Case block
+          interface IProbe
+            func Run (int:x, string:s) → int
+              !
+              requires (x >= 0)
+
+          class Impl
+            implements IProbe
+
+            func Run (int:x, string:s) → int
+              !
+              requires IMPLPRE
+              return 0
         """;
 
     private const string DivisionSource = """
-        §M{R1Case}
-          §IFACE{IProbe}
-            §MT{Run}
-              §I{i32:x}
-              §O{i32}
-              §I{i32:y}
-              §Q (== x INT:3)
-          §CL{Impl:pub}
-            §IMPL{IProbe}
-            §MT{Run:pub}
-              §I{i32:x}
-              §I{i32:y}
-              §O{i32}
-              §Q (> (% x y) INT:-2)
-              §R INT:0
+        module R1Case R1Case block
+          interface IProbe
+            func Run (int:x, int:y) → int
+              !
+              requires (x == 3)
+
+          class Impl
+            implements IProbe
+
+            func Run (int:x, int:y) → int
+              !
+              requires ((x % y) > -2)
+              return 0
         """;
 
     private static List<Diagnostic> Compile(string source)
@@ -75,8 +71,8 @@ public sealed class S2ImplicationDefinednessTests
     }
 
     [Theory]
-    [InlineData("(>= (len s) INT:0)")]                    // R1-IMPL-ASSUMPTION-FORMS-001 and -005
-    [InlineData("(|| (! (isempty s)) (== s STR:\"\"))")]   // R1-IMPL-ASSUMPTION-FORMS-003
+    [InlineData("(>= (len s) INT:0)")]                 // R1-IMPL-ASSUMPTION-FORMS-001 and -005
+    [InlineData("((!string.IsNullOrEmpty(s)) || (s == \"\"))")]   // R1-IMPL-ASSUMPTION-FORMS-003
     public void NullableStringPrecondition_IsAssumedNotProven(string implementerPrecondition)
     {
         // Oracle witness (x = 0, s = null): the interface accepts it; the implementer's
@@ -113,35 +109,33 @@ public sealed class S2ImplicationDefinednessTests
     }
 
     private const string IntegerTemplate = """
-        §M{M}
-          §IFACE{IProbe}
-            §MT{Run}
-              §I{i32:x}
-              §I{i32:y}
-              §O{i32}
-              §Q IFACEPRE
-          §CL{Impl:pub}
-            §IMPL{IProbe}
-            §MT{Run:pub}
-              §I{i32:x}
-              §I{i32:y}
-              §O{i32}
-              §Q IMPLPRE
-              §R INT:0
+        module M M block
+          interface IProbe
+            func Run (int:x, int:y) → int
+              !
+              requires IFACEPRE
+
+          class Impl
+            implements IProbe
+
+            func Run (int:x, int:y) → int
+              !
+              requires IMPLPRE
+              return 0
         """;
 
     private static List<Diagnostic> CompileInteger(string ifacePre, string implPre, string? overflow = null)
     {
         var source = IntegerTemplate.Replace("IFACEPRE", ifacePre).Replace("IMPLPRE", implPre);
         if (overflow != null)
-            source = source.Replace("§M{M}", $"§M{{M:overflow={overflow}}}");
+            source = source.Replace("module M M block", $"module M M block overflow {overflow}");
         return Compile(source);
     }
 
     [Fact]
     public void Control_IntegerWeakening_StillProven()
     {
-        var diagnostics = CompileInteger("(>= x INT:1)", "(>= x INT:0)");
+        var diagnostics = CompileInteger("(x >= 1)", "(x >= 0)");
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
             && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
@@ -153,7 +147,7 @@ public sealed class S2ImplicationDefinednessTests
     public void Control_DivisionWhoseDivisorTheInterfaceRulesOut_StillProven()
     {
         // The interface admits only y > 0 and x >= 0: x % y cannot throw, and is >= 0.
-        var diagnostics = CompileInteger("(&& (> y INT:0) (>= x INT:0))", "(>= (% x y) INT:0)");
+        var diagnostics = CompileInteger("((y > 0) && (x >= 0))", "((x % y) >= 0)");
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
             && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
@@ -169,7 +163,7 @@ public sealed class S2ImplicationDefinednessTests
         int x = int.MaxValue;
         Assert.Throws<OverflowException>(() => checked(x * 2) != 1);
 
-        AssertPreconditionWeakeningRefuted(CompileInteger("(> x INT:0)", "(!= (* x INT:2) INT:1)"), "x=");
+        AssertPreconditionWeakeningRefuted(CompileInteger("(x > 0)", "((x * 2) != 1)"), "x=");
     }
 
     [Fact]
@@ -178,7 +172,7 @@ public sealed class S2ImplicationDefinednessTests
         // Review round 1 witness: x + 1 < 0 completes true only for x < -1, where x < 0 holds.
         // At x = int.MaxValue the wrapped sum is negative, but the checked contract throws, so
         // that input is not one the interface accepts.
-        var diagnostics = CompileInteger("(< (+ x INT:1) INT:0)", "(< x INT:0)");
+        var diagnostics = CompileInteger("((x + 1) < 0)", "(x < 0)");
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
             && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
@@ -191,8 +185,8 @@ public sealed class S2ImplicationDefinednessTests
         // it. The divisor is conditionally evaluated, so no solver verdict is established, and
         // a syntactic heuristic must not turn that into "contract inheritance valid".
         var diagnostics = CompileInteger(
-            "(== (|| (== x INT:0) (== (% x y) INT:0)) BOOL:true)",
-            "(!= (|| (== x INT:0) (== (% x y) INT:0)) BOOL:true)");
+            "(((x == 0) || ((x % y) == 0)) == true)",
+            "(((x == 0) || ((x % y) == 0)) != true)");
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
             && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
@@ -208,8 +202,8 @@ public sealed class S2ImplicationDefinednessTests
         // interface accepts, and the implementer rejects. The universal overflow safety of the
         // quantifier must not exclude that input and "prove" the weakening.
         var diagnostics = CompileInteger(
-            "(exists ((i i32)) (&& (>= i INT:0) (&& (< i INT:2) (>= (+ x i) INT:0))))",
-            "(< x INT:2147483647)");
+            "(exists int:i where (i >= 0) : ((i < 2) && ((x + i) >= 0)))",
+            "(x < 2147483647)");
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
             && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
@@ -221,21 +215,21 @@ public sealed class S2ImplicationDefinednessTests
         // Review round 2 witness: the interface precondition throws at x = int.MaxValue; that
         // input is never accepted, so it creates no postcondition obligation.
         const string source = """
-            §M{M}
-              §IFACE{IProbe}
-                §MT{Run}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q (> (+ x INT:1) INT:0)
-                  §S (== result INT:0)
-              §CL{Impl:pub}
-                §IMPL{IProbe}
-                §MT{Run:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q (> (+ x INT:1) INT:0)
-                  §S (== result INT:0)
-                  §R INT:0
+            module M M block
+              interface IProbe
+                func Run (int:x) → int
+                  !
+                  requires ((x + 1) > 0)
+                  => (result == 0)
+
+              class Impl
+                implements IProbe
+
+                func Run (int:x) → int
+                  !
+                  requires ((x + 1) > 0)
+                  => (result == 0)
+                  return 0
             """;
         var diagnostics = Compile(source);
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.WeakerPostcondition);
@@ -250,24 +244,24 @@ public sealed class S2ImplicationDefinednessTests
         string? result = null;
         Assert.True(string.IsNullOrEmpty(result) && result != "");
         const string source = """
-            §M{M}
-              §IFACE{IA}
-                §MT{Run}
-                  §I{i32:x}
-                  §O{str}
-                  §S (isempty result)
-              §IFACE{IB}
-                §MT{Run}
-                  §I{i32:x}
-                  §O{str}
-                  §S (!= result STR:"")
-              §CL{Impl:pub}
-                §IMPL{IA}
-                §IMPL{IB}
-                §MT{Run:pub}
-                  §I{i32:x}
-                  §O{str}
-                  §R STR:""
+            module M M block
+              interface IA
+                func Run (int:x) → string
+                  !
+                  => string.IsNullOrEmpty(result)
+
+              interface IB
+                func Run (int:x) → string
+                  !
+                  => (result != "")
+
+              class Impl
+                implements IA
+                implements IB
+
+                func Run (int:x) → string
+                  !
+                  return ""
             """;
         var diagnostics = Compile(source);
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.IncompatibleInheritedContracts);
@@ -278,7 +272,7 @@ public sealed class S2ImplicationDefinednessTests
     public void WithoutTheSolver_HeuristicNeverClaimsValidityAndInequalityIsNotWeaker()
     {
         // Review round 2 witness: (!= x 0) is not a weakening of (== x 0).
-        var source = IntegerTemplate.Replace("IFACEPRE", "(== x INT:0)").Replace("IMPLPRE", "(!= x INT:0)");
+        var source = IntegerTemplate.Replace("IFACEPRE", "(x == 0)").Replace("IMPLPRE", "(x != 0)");
         var diagnostics = new DiagnosticBag();
         var module = new Calor.Compiler.Parsing.Parser(
             new Calor.Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -292,21 +286,19 @@ public sealed class S2ImplicationDefinednessTests
     public void UnusedStringParameter_DoesNotDemoteAnIntegerImplication()
     {
         const string source = """
-            §M{M}
-              §IFACE{IProbe}
-                §MT{Run}
-                  §I{i32:x}
-                  §I{str:s}
-                  §O{i32}
-                  §Q (>= x INT:1)
-              §CL{Impl:pub}
-                §IMPL{IProbe}
-                §MT{Run:pub}
-                  §I{i32:x}
-                  §I{str:s}
-                  §O{i32}
-                  §Q (>= x INT:0)
-                  §R INT:0
+            module M M block
+              interface IProbe
+                func Run (int:x, string:s) → int
+                  !
+                  requires (x >= 1)
+
+              class Impl
+                implements IProbe
+
+                func Run (int:x, string:s) → int
+                  !
+                  requires (x >= 0)
+                  return 0
             """;
         var diagnostics = Compile(source);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
@@ -318,30 +310,30 @@ public sealed class S2ImplicationDefinednessTests
     public void IncompatibleInheritedGuarantees_StillReportedWithAStringParameter()
     {
         const string source = """
-            §M{M}
-              §IFACE{IA}
-                §MT{Run}
-                  §I{str:s}
-                  §O{i32}
-                  §S (== result INT:0)
-              §IFACE{IB}
-                §MT{Run}
-                  §I{str:s}
-                  §O{i32}
-                  §S (== result INT:1)
-              §CL{Impl:pub}
-                §IMPL{IA}
-                §IMPL{IB}
-                §MT{Run:pub}
-                  §I{str:s}
-                  §O{i32}
-                  §R INT:0
+            module M M block
+              interface IA
+                func Run (string:s) → int
+                  !
+                  => (result == 0)
+
+              interface IB
+                func Run (string:s) → int
+                  !
+                  => (result == 1)
+
+              class Impl
+                implements IA
+                implements IB
+
+                func Run (string:s) → int
+                  !
+                  return 0
             """;
         Assert.Contains(Compile(source), d => d.Code == DiagnosticCode.IncompatibleInheritedContracts);
     }
 
     private const string QuantifiedPredicate =
-        "(exists ((i i32)) (&& (>= i INT:0) (&& (< i INT:2) (>= (+ VAR i) INT:0))))";
+        "(exists int:i where (i >= 0) : ((i < 2) && ((VAR + i) >= 0)))";
 
     [Fact]
     public void IdenticalQuantifiedContracts_AreValid()
@@ -352,21 +344,21 @@ public sealed class S2ImplicationDefinednessTests
         var pre = QuantifiedPredicate.Replace("VAR", "x");
         var post = QuantifiedPredicate.Replace("VAR", "result");
         var source = $$"""
-            §M{M}
-              §IFACE{IProbe}
-                §MT{Run}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q {{pre}}
-                  §S {{post}}
-              §CL{Impl:pub}
-                §IMPL{IProbe}
-                §MT{Run:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q {{pre}}
-                  §S {{post}}
-                  §R INT:0
+            module M M block
+              interface IProbe
+                func Run (int:x) → int
+                  !
+                  requires {{pre}}
+                  => {{post}}
+
+              class Impl
+                implements IProbe
+
+                func Run (int:x) → int
+                  !
+                  requires {{pre}}
+                  => {{post}}
+                  return 0
             """;
         var diagnostics = Compile(source);
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
@@ -381,24 +373,24 @@ public sealed class S2ImplicationDefinednessTests
         // both. The conditional divisor is not modeled: the check must say it could not decide.
         Assert.Throws<DivideByZeroException>(() => { var y = 0; return 100 / y == -1; });
         const string source = """
-            §M{M}
-              §IFACE{IA}
-                §MT{Run}
-                  §I{i32:y}
-                  §O{i32}
-                  §S (== y INT:0)
-              §IFACE{IB}
-                §MT{Run}
-                  §I{i32:y}
-                  §O{i32}
-                  §S (== (/ INT:100 y) INT:-1)
-              §CL{Impl:pub}
-                §IMPL{IA}
-                §IMPL{IB}
-                §MT{Run:pub}
-                  §I{i32:y}
-                  §O{i32}
-                  §R INT:0
+            module M M block
+              interface IA
+                func Run (int:y) → int
+                  !
+                  => (y == 0)
+
+              interface IB
+                func Run (int:y) → int
+                  !
+                  => ((100 / y) == -1)
+
+              class Impl
+                implements IA
+                implements IB
+
+                func Run (int:y) → int
+                  !
+                  return 0
             """;
         var diagnostics = Compile(source);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationUnknown
@@ -410,10 +402,11 @@ public sealed class S2ImplicationDefinednessTests
     public void WeakeningCheck_DifferentOverflowPolicies_AreIndeterminate()
     {
         const string frozen = """
-            §M{M}
-              §F{Run:pub} (i32:x) -> i32
-                §Q (> (* x INT:2) INT:0)
-                §R x
+            module M M block
+              func Run (int:x) → int
+                !
+                requires ((x * 2) > 0)
+                return x
             """;
         var dir = Path.Combine(Path.GetTempPath(), "calor-s2-overflow-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
@@ -426,7 +419,7 @@ public sealed class S2ImplicationDefinednessTests
             var frozenPath = Path.Combine(frozenRoot, "input.calr");
             var finalPath = Path.Combine(finalRoot, "input.calr");
             File.WriteAllText(frozenPath, frozen);
-            File.WriteAllText(finalPath, frozen.Replace("§M{M}", "§M{M:overflow=unchecked}"));
+            File.WriteAllText(finalPath, frozen.Replace("module M M block", "module M M block overflow unchecked"));
             var identities = new Calor.Compiler.Ids.DeclarationIdentityStore(frozenRoot);
             var state = identities.Sync([frozenPath]);
             var id = Assert.Single(state.Declarations, declaration =>
@@ -450,7 +443,7 @@ public sealed class S2ImplicationDefinednessTests
     public void UncheckedModule_WrappingArithmetic_StillProven()
     {
         // Under overflow=unchecked the same contract wraps and never throws: proven.
-        var diagnostics = CompileInteger("(> x INT:0)", "(!= (* x INT:2) INT:1)", overflow: "unchecked");
+        var diagnostics = CompileInteger("(x > 0)", "((x * 2) != 1)", overflow: "unchecked");
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
             && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));

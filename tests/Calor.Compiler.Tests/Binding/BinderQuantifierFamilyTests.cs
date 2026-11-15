@@ -159,9 +159,9 @@ public class BinderQuantifierFamilyTests
         // This is the bug-pattern Z3 path consuming a BOUND quantifier body — the one
         // Z3-involving verdict B7 deliberately changes (contract Z3 is untouched).
         const string source = """
-            §M{Test}
-              §F{Trap:pub} (i32:x) -> bool
-                §R (forall ((i i32)) (> (/ 10 0) i))
+            module Test Test block
+              func Trap private (int:x) → bool
+                return (forall int:i in 0..x : ((10 / 0) > i))
             """;
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions

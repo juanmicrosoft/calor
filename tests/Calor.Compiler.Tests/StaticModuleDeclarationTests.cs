@@ -105,11 +105,11 @@ public class StaticModuleDeclarationTests
         Assert.Equal("Library", declaration.NamespaceIdentity);
         Assert.True(declaration.NestedClasses.Single(type => type.Name == "Nested").IsModule);
         Assert.False(declaration.NestedClasses.Single(type => type.Name == "Item").IsModule);
-        Assert.Contains("§F{", result.CalorSource);
-        Assert.DoesNotContain(":stat}", result.CalorSource!.Split('\n')
-            .First(line => line.Contains("§M{Utilities:", StringComparison.Ordinal)));
-        Assert.DoesNotContain("§CL", result.CalorSource.Split('\n')
-            .First(line => line.Contains("§M{Nested:", StringComparison.Ordinal)));
+        Assert.Contains("func ", result.CalorSource);
+        Assert.DoesNotContain("static", result.CalorSource!.Split('\n')
+            .First(line => line.Contains("module Utilities", StringComparison.Ordinal)));
+        Assert.DoesNotContain("class", result.CalorSource.Split('\n')
+            .First(line => line.Contains("module Nested", StringComparison.Ordinal)));
         Assert.Contains("public static partial class Utilities", generated);
         Assert.Contains("Obsolete(\"kept\")]", generated);
         Assert.Contains("Obsolete(\"method\")]", generated);
@@ -255,37 +255,44 @@ public class StaticModuleDeclarationTests
         var declarations = shape switch
         {
             "unrelated" => """
-                  §M{Outer:pub}
-                    §FLD{i32:Value:priv:stat} = 3
-                  §M{Caller:pub}
-                    §F{Read:pub} () -> i32
-                      §R Outer.Value
+                  module Outer
+                    field int:Value private static = 3
+
+                  module Caller
+                    func Read () → int
+                      !
+                      return Outer.Value
                 """,
             "outer-to-inner" => """
-                  §M{Outer:pub}
-                    §CL{Inner:pub}
-                      §FLD{i32:Value:priv:stat} = 3
-                    §F{Read:pub} () -> i32
-                      §R Inner.Value
+                  module Outer
+                    class Inner
+                      field int:Value private static = 3
+
+                    func Read () → int
+                      !
+                      return Inner.Value
                 """,
             "sibling" => """
-                  §M{Outer:pub}
-                    §CL{Sibling:pub}
-                      §MT{Secret:priv:stat} () -> i32
-                        §R 3
-                    §CL{Caller:pub}
-                      §MT{Read:pub:stat} () -> i32
-                        §R §C{Sibling.Secret} §/C
+                  module Outer
+                    class Sibling
+                      func Secret private static () → int
+                        return 3
+
+                    class Caller
+                      func Read static () → int
+                        !
+                        return Sibling.Secret()
                 """,
             _ => """
-                  §M{Outer:pub}
-                    §FLD{i32:Value:priv:stat} = 3
-                    §CL{Inner:pub}
-                      §MT{Read:pub:stat} () -> i32
-                        §R Inner.Value
+                  module Outer
+                    field int:Value private static = 3
+                    class Inner
+                      func Read static () → int
+                        !
+                        return Inner.Value
                 """
         };
-        var source = "§M{Access}\n" + declarations;
+        var source = "module Access Access block\n" + declarations;
         var module = Parse(source);
         var generated = new CSharpEmitter().Emit(module);
         Assert.Contains(Compilation(generated).GetDiagnostics(), diagnostic => diagnostic.Id == expectedCSharpCode);
@@ -357,7 +364,7 @@ public class StaticModuleDeclarationTests
             }
             """;
         var (result, module, generated) = RoundTrip(source);
-        Assert.Contains("§AF{", result.CalorSource);
+        Assert.Contains("func Run async", result.CalorSource);
         Assert.True(Assert.Single(Assert.Single(module.Classes).Methods).IsAsync);
         var task = (System.Threading.Tasks.Task<int>)Compile(generated)
             .GetType("Library.AsyncHelpers")!.GetMethod("Run")!.Invoke(null, [3])!;
@@ -368,14 +375,19 @@ public class StaticModuleDeclarationTests
     public void ModuleMembers_AreImplicitlyStatic_AndEmptySiblingsRemainSiblings()
     {
         var module = Parse("""
-            §M{Library}
-              §M{Empty:pub}
-              §M{Helpers:pub}
-                §FLD{i32:Count:pub} = 3
-                §PROP{Value:i32:pub} = 4
-                §F{Get:pub} () -> i32
-                  §R (+ Count Value)
-              §CL{Sibling:pub}
+            module Library Library block
+              module Empty
+
+              module Helpers
+                field int:Count = 3
+                property int:Value = 4
+                  get
+                  set
+                func Get () → int
+                  !
+                  return (Count + Value)
+
+              class Sibling
             """);
         Assert.Equal(3, module.Classes.Count);
         var helpers = module.Classes[1];
@@ -393,9 +405,9 @@ public class StaticModuleDeclarationTests
     public void ModuleClassCollision_IsDiagnosedInEitherOrder(bool moduleFirst)
     {
         var declarations = moduleFirst
-            ? "  §M{Helpers:pub}\n  §CL{Helpers:pub}"
-            : "  §CL{Helpers:pub}\n  §M{Helpers:pub}";
-        var module = Parse("§M{Library}\n" + declarations);
+            ? "  module Helpers\n\n  class Helpers"
+            : "  class Helpers\n\n  module Helpers";
+        var module = Parse("module Library Library block\n" + declarations);
         Assert.Contains(Bind(module), diagnostic => diagnostic.Code == DiagnosticCode.DuplicateDefinition);
     }
 
@@ -433,33 +445,35 @@ public class StaticModuleDeclarationTests
     public void LegacyFunctionContainerCollision_IsDiagnosed()
     {
         var module = Parse("""
-            §M{Library}
-              §F{Get:pub} () -> i32
-                §R 1
-              §CL{LibraryModule:pub}
+            module Library Library block
+              func Get () → int
+                !
+                return 1
+
+              class LibraryModule
             """);
         Assert.Contains(Bind(module), diagnostic => diagnostic.Code == DiagnosticCode.DuplicateDefinition);
     }
 
     [Theory]
-    [InlineData("  §M{Helpers<T>:pub}\n    §F{Run:pub} (T:value:this) -> T\n      §R value")]
-    [InlineData("  §CL{Outer:pub}\n    §M{Helpers:pub}\n      §F{Run:pub} (i32:value:this) -> i32\n        §R value")]
-    [InlineData("  §M{Helpers:pub}\n    §F{Run:pub} (i32:first, i32:second:this) -> i32\n      §R first")]
+    [InlineData("  module Helpers<T>\n    func Run (this T:value) → T\n      !\n      return value")]
+    [InlineData("  class Outer\n    module Helpers\n      func Run (this int:value) → int\n        !\n        return value")]
+    [InlineData("  module Helpers\n    func Run (int:first, this int:second) → int\n      !\n      return first")]
     public void InvalidExtensionContainersOrReceiverPositions_AreDiagnosed(string declarations)
     {
-        var module = Parse("§M{Library}\n" + declarations);
+        var module = Parse("module Library Library block\n" + declarations);
         Assert.Contains(Bind(module), diagnostic =>
             diagnostic.Code == DiagnosticCode.InvalidReference && diagnostic.Message.Contains("Extension"));
-        Assert.True(Program.Compile("§M{Library}\n" + declarations, "invalid-extension.calr").HasErrors);
+        Assert.True(Program.Compile("module Library Library block\n" + declarations, "invalid-extension.calr").HasErrors);
     }
 
     [Theory]
-    [InlineData("  §M{Helpers:pub:abs}")]
-    [InlineData("  §M{Helpers:pub:seal}")]
-    [InlineData("  §M{Helpers:pub}\n    §CTOR{pub} ()")]
+    [InlineData("  module Helpers abstract")]
+    [InlineData("  module Helpers sealed")]
+    [InlineData("  module Helpers\n    ctor ()")]
     public void InvalidModuleInstanceShapes_StopCompilation(string declaration)
     {
-        var source = "§M{Library}\n" + declaration;
+        var source = "module Library Library block\n" + declaration;
         Parse(source);
         var compilation = Program.Compile(source, "invalid-module.calr");
         Assert.True(compilation.HasErrors);
@@ -517,16 +531,27 @@ public class StaticModuleDeclarationTests
     [InlineData("pub,st")]
     public void LegacyStaticClasses_AreRejectedWithNamedModuleReplacement(string modifiers)
     {
+        // The legacy modifier spellings map onto the native class header modifiers;
+        // public is the native default, so 'pub' contributes nothing.
+        var nativeModifiers = string.Join(" ", modifiers.Split(',')
+            .Select(modifier => modifier switch
+            {
+                "st" or "stat" or "static" => "static",
+                "pub" => "",
+                _ => modifier
+            })
+            .Where(modifier => modifier.Length > 0));
         var source = $$"""
-            §M{Library}
-              §CL{Helpers:{{modifiers}}}
-                §MT{Get:pub:stat} () -> i32
-                  §R 1
+            module Library Library block
+              class Helpers {{nativeModifiers}}
+                func Get static () → int
+                  !
+                  return 1
             """;
         var result = Program.Compile(source, "legacy-static.calr");
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.InvalidModifier
-            && diagnostic.Message == "Static class declarations are removed. Replace '§CL{Helpers:...}' with a named module '§M{Helpers:...}'; use §F for its functions. Static members of non-static classes remain supported.");
+            && diagnostic.Message == "Static class declarations are removed. Use a named 'module Helpers' inside the compilation-unit wrapper, with 'func' members. Static members of non-static classes remain supported.");
         Assert.True(result.HasErrors);
     }
 

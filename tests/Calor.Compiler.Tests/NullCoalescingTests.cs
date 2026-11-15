@@ -96,6 +96,7 @@ public class NullCoalescingTests
         var result = Program.Compile($$"""
             module Conditional
               func Probe (string?:value) → {{resultType}}
+                !
                 return {{expression}}
             """);
         Assert.True(result.HasErrors);
@@ -646,11 +647,10 @@ public class NullCoalescingTests
     private static string WrapInFunction(string body, string parameters = "", string returnType = "object")
     {
         return $$"""
-            §M{Test}
-              §F{Main:pub}
-                  {{parameters}}
-                  §O{{{returnType}}}
-                  {{body}}
+            module Test Test block
+              func Main ({{parameters}}) → {{returnType}}
+                !
+                {{body}}
             """;
     }
 
@@ -658,8 +658,8 @@ public class NullCoalescingTests
     public void Parse_NullCoalescing_CreatesNullCoalesceNode()
     {
         var source = WrapInFunction(
-            "§R (?? a b)",
-            "§I{object:a}\n      §I{object:b}");
+            "return a ?? b",
+            "object:a, object:b");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -678,8 +678,8 @@ public class NullCoalescingTests
     public void Emit_NullCoalescing_ProducesCSharpOperator()
     {
         var source = WrapInFunction(
-            "§R (?? a b)",
-            "§I{object:a}\n      §I{object:b}");
+            "return a ?? b",
+            "object:a, object:b");
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join(", ", result.Diagnostics.Select(d => d.Message)));
@@ -690,8 +690,8 @@ public class NullCoalescingTests
     public void Parse_ChainedNullCoalescing_CreatesNestedNodes()
     {
         var source = WrapInFunction(
-            "§R (?? a (?? b c))",
-            "§I{object:a}\n      §I{object:b}\n      §I{object:c}");
+            "return a ?? b ?? c",
+            "object:a, object:b, object:c");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -711,8 +711,8 @@ public class NullCoalescingTests
     public void Emit_ChainedNullCoalescing_ProducesChainedCSharp()
     {
         var source = WrapInFunction(
-            "§R (?? a (?? b c))",
-            "§I{object:a}\n      §I{object:b}\n      §I{object:c}");
+            "return a ?? b ?? c",
+            "object:a, object:b, object:c");
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join(", ", result.Diagnostics.Select(d => d.Message)));
@@ -764,9 +764,9 @@ public static class NullHandling
     public void NullableParameterType_ParsesCorrectly()
     {
         var source = WrapInFunction(
-            "§R (?? value 0)",
-            "§I{?i32:value}",
-            "i32");
+            "return value ?? 0",
+            "int?:value",
+            "int");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));

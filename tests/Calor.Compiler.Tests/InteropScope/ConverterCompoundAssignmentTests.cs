@@ -199,7 +199,7 @@ public class ConverterCompoundAssignmentTests
     public void HoistedRightHandSide_ReadsTheTargetFirst()
     {
         var calor = Convert(Rows().Single(r => r.Id == "O-issue-repro").Source);
-        Assert.Matches(@"§B\{(_asg\d+)\} x\s+§B\{(_chain\w*)\} §C\{F\}\s+§ASSIGN x \(\+ \1 §C\{\2\.N\}", calor);
+        Assert.Matches(@"let (_asg\d+) = x\s+let (_chain\w*) = F\(\)\s+set x \(\1 \+ \2\.N\(\)\)", calor);
     }
 
     // #1633: an index with an effect runs once, bound before the statement.
@@ -207,8 +207,8 @@ public class ConverterCompoundAssignmentTests
     public void IndexWithAnEffect_IsBoundOnce()
     {
         var calor = Convert(Rows().Single(r => r.Id == "O-add-indexer-args").Source);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"§C\{I\}"));
-        Assert.Matches(@"§B\{(_asg\d+)\} §C\{I\}\s+§ASSIGN §IDX\{[^}]+\} \1 \(\+ §IDX\{[^}]+\} \1 §C\{G\}", calor);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"\bI\(\)"));
+        Assert.Matches(@"let (_asg\d+) = I\(\)\s+set (\w+)\[\1\] \(\2\[\1\] \+ G\(\)\)", calor);
     }
 
     // #1634: every compound operator and ++/-- on a small integral type casts back to the target type.
@@ -221,10 +221,10 @@ public class ConverterCompoundAssignmentTests
     public void SmallIntegralTarget_CastsBack(string type)
     {
         foreach (var (name, _) in Operators)
-            Assert.Contains($"(cast {type} (", Convert(Rows().Single(r => r.Id == $"N-{type}-{name}").Source));
+            Assert.Contains($"(({type})(", Convert(Rows().Single(r => r.Id == $"N-{type}-{name}").Source));
         // Eight statement updates plus k++, ++k and k-- as values all narrow explicitly.
         var increments = Convert(Rows().Single(r => r.Id == $"N-{type}-increment").Source);
-        Assert.Equal(11, System.Text.RegularExpressions.Regex.Matches(increments, $@"\(cast {type} \(").Count);
+        Assert.Equal(11, System.Text.RegularExpressions.Regex.Matches(increments, $@"\(\({type}\)\(").Count);
     }
 
     // Controls: an int target, and a right-hand side that hoists nothing, convert exactly as before.
@@ -232,9 +232,9 @@ public class ConverterCompoundAssignmentTests
     public void Controls_KeepTheirShape()
     {
         var calor = Convert(Rows().Single(r => r.Id == "O-control-plain").Source);
-        Assert.Contains("§ASSIGN x (+ x §C{G})", calor);
+        Assert.Contains("set x (x + G())", calor);
         Assert.DoesNotContain("_asg", calor);
-        Assert.DoesNotContain("cast", Convert(Rows().Single(r => r.Id == "N-control-int").Source));
+        Assert.DoesNotMatch(@"\(\(\w+\)\(", Convert(Rows().Single(r => r.Id == "N-control-int").Source));
     }
 
     // #1632: the hoisted statements of an unbraced loop body are inside the loop.
@@ -242,7 +242,7 @@ public class ConverterCompoundAssignmentTests
     public void UnbracedBody_KeepsItsHoistedStatements()
     {
         var calor = Convert(Rows().Single(r => r.Id == "P-for").Source);
-        Assert.Matches(@"§L\{[^}]+\}\n\s+§B\{(_pre\d+)\} y\n\s+§ASSIGN y \(\+ \1 1\)\n\s+§ASSIGN y §C\{Use\} \1", calor);
+        Assert.Matches(@"for [^\n]+\n\s+let (_pre\d+) = y\n\s+set y \(@?\1 \+ 1\)\n\s+set y Use\(@?\1\)", calor);
     }
 
     [Theory]

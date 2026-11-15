@@ -70,19 +70,18 @@ public class NamedRefinementArithmeticTests
     public void DecimalWithUnmodeledOperand_DefersToUserDefinedOperator()
     {
         AssertNoErrors("""
-            §M{R}
-              §CL{Box:pub}
-                §PROP{Value:Box:pub}
-                  §GET
-                    §R this
-                §OP{+:pub}
-                  §I{decimal:d}
-                  §I{Box:b}
-                  §O{f64}
-                  §R FLOAT:2.0
-              §F{Good:pub} (decimal:d,Box:b) -> f64
-                §B{x:f64} (+ (+ d b.Value) FLOAT:1.0)
-                §R x
+            module R R block
+              class Box
+                property Box:Value
+                  get
+                    return this
+                op + (decimal:d, Box:b) → double
+                  !
+                  return 2.0
+              func Good (decimal:d, Box:b) → double
+                !
+                let double:x = ((d + b.Value) + 1.0)
+                return x
             """);
     }
 

@@ -31,6 +31,28 @@ public class TypeCheckerDefectTests
             string.Join("\n", result.Diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
     }
 
+    /// <summary>
+    /// The native C# spelling of a documented Calor type name. The theories keep the documented
+    /// names because the checker echoes them in its diagnostics; the source uses the native type.
+    /// </summary>
+    private static string Native(string type) => type switch
+    {
+        "i8" => "sbyte",
+        "i16" => "short",
+        "i32" => "int",
+        "i64" => "long",
+        "u8" => "byte",
+        "u16" => "ushort",
+        "u32" => "uint",
+        "u64" => "ulong",
+        "f32" => "float",
+        "f64" or "FLOAT" => "double",
+        "str" => "string",
+        ['[', .. var element, ']'] => Native(element) + "[]",
+        [.. var element, '[', ']'] => Native(element) + "[]",
+        _ => type,
+    };
+
     // ---- Types the checker did not know ----
 
     [Theory]
@@ -49,7 +71,7 @@ public class TypeCheckerDefectTests
     {
         // Every one of these is in docs/syntax-reference/types.md. `Unknown type 'u32'` for a
         // documented type is the checker contradicting the language reference.
-        AssertNoErrors($"§M{{S}}\n  §F{{Do:pub}} ({type}:x) -> void\n    §E{{}}\n    §R\n");
+        AssertNoErrors($"module S S block\n  func Do ({Native(type)}:x) → void\n    !\n    return\n");
     }
 
     /// <summary>
@@ -72,7 +94,7 @@ public class TypeCheckerDefectTests
     [InlineData("f32")]
     public void DocumentedPrimitiveTypes_AreCheckedNotJustAccepted(string type)
     {
-        var result = Check($"§M{{S}}\n  §F{{Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} BOOL:true\n    §R\n");
+        var result = Check($"module S S block\n  func Do () → void\n    !\n    let {Native(type)}:x = true\n    return\n");
 
         var error = Assert.Single(result.Diagnostics.Errors);
         Assert.Contains(type, error.Message);
@@ -85,7 +107,7 @@ public class TypeCheckerDefectTests
     public void FloatingTypeSpellings_PreserveDiagnosticWidth(string spelling, string surface)
     {
         Assert.Equal(surface, TypeChecking.PrimitiveType.FromName(spelling)!.SurfaceName);
-        var result = Check($"§M{{S}}\n  §F{{Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{spelling}}} true\n");
+        var result = Check($"module S S block\n  func Do () → void\n    !\n    let {Native(spelling)}:x = true\n");
         Assert.Contains(surface, Assert.Single(result.Diagnostics.Errors).Message);
     }
 
@@ -129,7 +151,7 @@ public class TypeCheckerDefectTests
     [InlineData("str[]")]
     public void ArrayTypes_Resolve(string type)
     {
-        AssertNoErrors($"§M{{S}}\n  §F{{Do:pub}} ({type}:xs) -> void\n    §E{{}}\n    §R\n");
+        AssertNoErrors($"module S S block\n  func Do ({Native(type)}:xs) → void\n    !\n    return\n");
     }
 
     /// <summary>
@@ -143,7 +165,7 @@ public class TypeCheckerDefectTests
     public void ArrayTypes_RejectMismatchedElements(string paramType, string bindType)
     {
         var result = Check(
-            $"§M{{S}}\n  §F{{Do:pub}} ({paramType}:xs) -> void\n    §E{{}}\n    §B{{a:{bindType}}} xs\n    §R\n");
+            $"module S S block\n  func Do ({Native(paramType)}:xs) → void\n    !\n    let {Native(bindType)}:a = xs\n    return\n");
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("Cannot assign"));
     }
@@ -163,7 +185,7 @@ public class TypeCheckerDefectTests
     [InlineData("Strng")]   // ...and one that looks external, which a case heuristic would miss
     public void UnresolvedType_IsWarnedAboutNotSilentlyAccepted(string type)
     {
-        var result = Check($"§M{{S}}\n  §F{{Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} STR:\"a\"\n    §R\n");
+        var result = Check($"module S S block\n  func Do () → void\n    !\n    let {type}:x = \"a\"\n    return\n");
 
         Assert.False(result.HasErrors);
         Assert.Contains(result.Diagnostics.Warnings, d => d.Message.Contains($"'{type}' is not known"));
@@ -249,7 +271,7 @@ public class TypeCheckerDefectTests
     {
         // These are member accesses the emitter passes through to C# verbatim. Reporting them as
         // undefined VARIABLES rejected code that compiles and runs.
-        var result = Check($"§M{{S}}\n  §F{{Do:pub}} () -> void\n    §E{{}}\n    §B{{v:object}} {member}\n    §R\n");
+        var result = Check($"module S S block\n  func Do () → void\n    !\n    let object:v = {member}\n    return\n");
         Assert.DoesNotContain(result.Diagnostics.Errors,
             d => d.Message.Contains("Undefined variable"));
     }

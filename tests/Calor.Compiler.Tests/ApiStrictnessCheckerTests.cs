@@ -18,15 +18,18 @@ public class ApiStrictnessCheckerTests
             "module Docs Docs block",
             "  /// Function documentation.",
             "  /// A second line.",
-            "  §F{Run:pub} () -> void",
+            "  func Run () → void",
+            "    !",
             "  /// Class documentation.",
-            "  §CL{Widget:pub}",
+            "  class Widget",
             "    /// Method documentation.",
-            "    §MT{Work:pub} () -> void",
+            "    func Work () → void",
+            "      !",
             "    /// Property documentation.",
-            "    §PROP{Value:i32:pub:get}",
+            "    property int:Value",
+            "      get",
             "  /// Interface documentation.",
-            "  §IFACE{IWidget}");
+            "  interface IWidget");
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         Assert.Equal("Module documentation.", module.DocComment);
@@ -52,7 +55,7 @@ public class ApiStrictnessCheckerTests
     [InlineData("/// detached documentation\n// ordinary comment\n")]
     public void DocumentationComments_DoNotAcceptEmptyOrdinaryOrDetachedComments(string comment)
     {
-        var module = Parse(comment + "§M{Docs}", out var diagnostics);
+        var module = Parse(comment + "module Docs Docs block", out var diagnostics);
         new ApiStrictnessChecker(diagnostics, new ApiStrictnessOptions { RequireDocs = true }).Check(module);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.MissingDocComment);
     }

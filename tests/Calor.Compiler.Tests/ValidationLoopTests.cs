@@ -26,7 +26,7 @@ public sealed class ValidationLoopTests : IDisposable
               func Add (int:a, int:b) → int
                 !
                 {{contract ?? ""}}
-                return (a + {{(failing ? "(+ b 1)" : "b")}})
+                return (a + {{(failing ? "(b + 1)" : "b")}})
             """);
         Directory.CreateDirectory(Path.Combine(_directory, "tests"));
         File.WriteAllText(Path.Combine(_directory, "tests", "MathTests.cs"), $$"""
@@ -79,9 +79,10 @@ public sealed class ValidationLoopTests : IDisposable
         WriteFixture();
         File.AppendAllText(SourcePath, """
 
-              §F{Identity:pub} (i32:x) -> i32
-                §S (== result x)
-                §R x
+              func Identity (int:x) → int
+                !
+                => (result == x)
+                return x
             """);
         var before = File.ReadAllBytes(SourcePath);
         var result = await RunAsync(mcp);
@@ -213,7 +214,7 @@ public sealed class ValidationLoopTests : IDisposable
     [InlineData(true)]
     public async Task RefutedContract_ReportsCounterexampleEvenWhenTestsPass(bool mcp)
     {
-        WriteFixture(contract: "§S (> result a)");
+        WriteFixture(contract: "=> (result > a)");
         var result = await RunAsync(mcp);
         Assert.False(result.GetProperty("success").GetBoolean());
         Assert.Equal("failed", Stage(result, "verify").GetProperty("status").GetString());
@@ -229,7 +230,7 @@ public sealed class ValidationLoopTests : IDisposable
     [InlineData(true)]
     public async Task AssumedContract_RemainsNonProvenWithAssumptions(bool mcp)
     {
-        WriteFixture(contract: "§S (== result (+ a b))");
+        WriteFixture(contract: "=> (result == (a + b))");
         var result = await RunAsync(mcp);
         Assert.False(result.GetProperty("success").GetBoolean());
         var proof = result.GetProperty("failures").EnumerateArray()
@@ -246,14 +247,17 @@ public sealed class ValidationLoopTests : IDisposable
         WriteFixture();
         File.AppendAllText(SourcePath, """
 
-              §F{FloatIdentity:pub} (f64:x) -> f64
-                §S (>= result FLOAT:0.0)
-                §R x
-              §F{Vacuous:pub} (i32:x) -> i32
-                §Q (> x 0)
-                §Q (< x 0)
-                §S (== result x)
-                §R x
+              func FloatIdentity (double:x) → double
+                !
+                => (result >= 0.0)
+                return x
+
+              func Vacuous (int:x) → int
+                !
+                requires (x > 0)
+                requires (x < 0)
+                => (result == x)
+                return x
             """);
         var result = await RunAsync(mcp);
         Assert.False(result.GetProperty("success").GetBoolean());
@@ -269,7 +273,7 @@ public sealed class ValidationLoopTests : IDisposable
     [Fact]
     public async Task MissingZ3_InIsolatedDistribution_IsUnavailableNotSuccess()
     {
-        WriteFixture(contract: "§S (== result (+ a b))");
+        WriteFixture(contract: "=> (result == (a + b))");
         var distribution = Path.Combine(_directory, "distribution");
         Directory.CreateDirectory(distribution);
         var originalAssembly = typeof(Program).Assembly.Location;

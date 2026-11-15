@@ -11,9 +11,36 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ArrayMemberEffectParityTests
 {
-    // An extension named like a System.Array member, and a §CSHARP helper that writes.
-    private const string Extensions =
-        "§CSHARP{public static class Ext { public static int GetLength(this int[] xs, long d) { System.Console.WriteLine(d); return xs.Length; } public static int Touch(this int[] xs) { System.Console.WriteLine(1); return xs.Length; } }}§/CSHARP";
+    // An extension named like a System.Array member, and a raw C# helper that writes.
+    private const string ExtensionsPayload =
+        "public static class Ext { public static int GetLength(this int[] xs, long d) { System.Console.WriteLine(d); return xs.Length; } public static int Touch(this int[] xs) { System.Console.WriteLine(1); return xs.Length; } }";
+
+    private static readonly string Extensions =
+        $"raw member:class:Other:test%20helper {System.Text.Encoding.UTF8.GetByteCount(ExtensionsPayload)}\n{ExtensionsPayload}";
+
+    // The rows keep their recorded legacy spellings as stable theory names; each maps to the
+    // native statement it is compiled as.
+    private static readonly Dictionary<string, string> NativeStatements = new(StringComparer.Ordinal)
+    {
+        ["§B{x} §C{g.GetLength} §A 0 §/C"] = "let x = g.GetLength(0)",
+        ["§B{x} §C{g.GetLongLength} §A 0 §/C"] = "let x = g.GetLongLength(0)",
+        ["§B{x} §C{g.GetLowerBound} §A 0 §/C"] = "let x = g.GetLowerBound(0)",
+        ["§B{x} §C{g.GetUpperBound} §A 0 §/C"] = "let x = g.GetUpperBound(0)",
+        ["§B{x} g.Rank"] = "let x = g.Rank",
+        ["§B{x} g.LongLength"] = "let x = g.LongLength",
+        ["§B{x} §C{g.GetValue} §A 0 §A 0 §/C"] = "let x = g.GetValue(0, 0)",
+        ["§C{g.SetValue} §A 1 §A 0 §A 0 §/C"] = "g.SetValue(1, 0, 0)",
+        ["§B{x} §C{g.Clone} §/C"] = "let x = g.Clone()",
+        ["§B{x} §C{g.GetEnumerator} §/C"] = "let x = g.GetEnumerator()",
+        ["§B{x} §C{g.ToString} §/C"] = "let x = g.ToString()",
+        ["§B{x} §C{g.GetHashCode} §/C"] = "let x = g.GetHashCode()",
+        ["§B{x} §C{g.Equals} §A g §/C"] = "let x = g.Equals(g)",
+        ["§C{g.Initialize} §/C"] = "g.Initialize()",
+        ["§C{g.CopyTo} §A g §A 0 §/C"] = "g.CopyTo(g, 0)",
+        ["§B{x} §C{g.GetLength} §A (cast i64 0) §/C"] = "let x = g.GetLength((long)0)",
+        ["§B{x} §C{g.GetValue} §A g §/C"] = "let x = g.GetValue(g)",
+        ["§B{x} §C{g.Touch} §/C"] = "let x = g.Touch()",
+    };
 
     [Theory]
     [InlineData("i32[,]", "§B{x} §C{g.GetLength} §A 0 §/C", true)]
@@ -41,7 +68,8 @@ public class ArrayMemberEffectParityTests
     [InlineData("System.Threading.Tasks.ValueTask[]", "§C{g.Initialize} §/C", false)]
     public void ArrayInstanceMembers_HaveMainsEffectResult(string receiver, string statement, bool unknown)
     {
-        var calor = $"§M{{T}}\n  {Extensions}\n  §M{{G:pub}}\n    §MT{{Go:pub:stat}} ({receiver}:g) -> void\n      §E{{}}\n      {statement}\n";
+        var nativeReceiver = receiver.Replace("i32", "int", StringComparison.Ordinal);
+        var calor = $"module T T block\n  {Extensions}\n  module G\n    func Go ({nativeReceiver}:g) → void\n      !\n      {NativeStatements[statement]}\n";
         var compilation = Program.Compile(calor, "parity.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         var effects = compilation.Diagnostics
             .Where(d => d.Code.StartsWith("Calor04", StringComparison.Ordinal))

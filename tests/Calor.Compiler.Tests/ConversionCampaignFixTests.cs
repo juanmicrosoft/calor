@@ -240,13 +240,12 @@ module Test Test block
     public void Emit_InterfaceWithPropertyAndMethod_EmitsBoth()
     {
         var source = @"
-§M{Test}
-  §IFACE{IOrder}
-    §PROP{Cost:f64:pub}
-    §GET §/GET
-    §/PROP
-    §MT{GetDescription}
-      §O{str}
+module Test Test block
+  interface IOrder
+    property double:Cost
+      get
+    func GetDescription () → string
+      !
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("interface IOrder", csharp);
@@ -324,7 +323,7 @@ public class Test
     }
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Contains("(nameof name)", result.CalorSource);
+        Assert.Contains("nameof(name)", result.CalorSource);
     }
 
     [Fact]
@@ -355,7 +354,7 @@ public interface IAnimal
     string Speak();
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Contains("§MT{", result.CalorSource);
+        Assert.Contains("func Speak ()", result.CalorSource);
         Assert.DoesNotContain("§/MT{", result.CalorSource);
         Assert.DoesNotContain("§SIG", result.CalorSource);
     }
@@ -369,9 +368,9 @@ public interface ICalculator
     int Add(int a, int b);
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Contains("§MT{", result.CalorSource);
+        Assert.Contains("func Add (", result.CalorSource);
         Assert.Contains("int:a", result.CalorSource);
-        Assert.Contains("-> int", result.CalorSource);
+        Assert.Contains("→ int", result.CalorSource);
         Assert.DoesNotContain("§SIG", result.CalorSource);
     }
 
@@ -388,7 +387,7 @@ public class Cache
     private Dictionary<string, int> _lookup = new();
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Contains("§FLD{", result.CalorSource);
+        Assert.Contains("field Dictionary<string, int>:_lookup", result.CalorSource);
         Assert.DoesNotContain("§DICT{", result.CalorSource);
         Assert.DoesNotContain("§/DICT{", result.CalorSource);
     }
@@ -402,7 +401,7 @@ public class Service
     private List<string> _items = new();
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Contains("§FLD{", result.CalorSource);
+        Assert.Contains("field List<string>:_items", result.CalorSource);
         Assert.DoesNotContain("§LIST{", result.CalorSource);
         Assert.DoesNotContain("§/LIST{", result.CalorSource);
     }
@@ -416,7 +415,7 @@ public class Cache
     private readonly Dictionary<string, List<int>> _cache = new Dictionary<string, List<int>>();
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Contains("§FLD{", result.CalorSource);
+        Assert.Contains("field Dictionary<string, List<int>>:_cache", result.CalorSource);
         Assert.DoesNotContain("§DICT{", result.CalorSource);
         Assert.DoesNotContain("§/DICT{", result.CalorSource);
     }
@@ -442,7 +441,7 @@ public class Example
         Assert.True(result.Success, string.Join("\n", result.Issues));
         var source = result.CalorSource ?? "";
         Assert.DoesNotContain("§ERR", source);
-        Assert.Contains("§ASSIGN", source);
+        Assert.Contains("set ", source);
     }
 
     [Fact]
@@ -593,7 +592,7 @@ public class Example
     [Fact]
     public void Lexer_LineComment_SkipsContent()
     {
-        var source = "§M{Test}\n// This is a comment with apostrophe: it's fine\n";
+        var source = "module Test Test block\n// This is a comment with apostrophe: it's fine\n";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var tokens = lexer.TokenizeAllForParser();
@@ -603,7 +602,7 @@ public class Example
     [Fact]
     public void Lexer_LineCommentAtEndOfFile_SkipsContent()
     {
-        var source = "§M{Test}\n\n// trailing comment";
+        var source = "module Test Test block\n\n// trailing comment";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
         var tokens = lexer.TokenizeAllForParser();
@@ -639,15 +638,13 @@ public class Example
     public void LinqMethods_DoNotTriggerCalor0411_Errors()
     {
         var source = @"
-§M{TestModule}
-  §F{process}
-      §E{cw}
-      §I{List<i32>:items}
-      §O{i32}
-      §B{filtered} §C{items.Where} §A §LAM{x:i32} (> x 5) §/LAM §/C
-      §B{count} §C{filtered.Count} §/C
-      §P count
-      §R count";
+module TestModule TestModule block
+  func process (List<int>:items) → int
+    ! cw
+    let filtered = items.Where((int:x) => (x > 5))
+    let count = filtered.Count()
+    Console.WriteLine(count)
+    return count";
 
         var ast = ParseCalor(source);
 
@@ -664,12 +661,11 @@ public class Example
     public void LinqToList_DoesNotTriggerCalor0411_Errors()
     {
         var source = @"
-§M{TestModule}
-  §F{sortItems}
-      §I{List<i32>:items}
-      §O{List<i32>}
-      §B{sorted} §C{items.OrderBy} §A §LAM{x:i32} x §/LAM §/C
-      §R §C{sorted.ToList} §/C";
+module TestModule TestModule block
+  func sortItems (List<int>:items) → List<int>
+    !
+    let sorted = items.OrderBy((int:x) => x)
+    return sorted.ToList()";
 
         var ast = ParseCalor(source);
 
@@ -748,10 +744,10 @@ class Test
         var calor = result.CalorSource;
 
         // Should contain a null-coalescing assignment, not arithmetic
-        Assert.DoesNotContain("(+ items", calor);
+        Assert.DoesNotContain("items +", calor);
         // Should have the ??= pattern as compound assignment
-        Assert.Contains("§ASSIGN", calor);
-        Assert.Contains("?? items", calor);
+        Assert.Contains("set items", calor);
+        Assert.Contains("(items ??", calor);
     }
 
     #endregion
@@ -771,7 +767,7 @@ class Test
         var calor = result.CalorSource;
 
         Assert.DoesNotContain("§ERR", calor);
-        Assert.Contains("(typeof", calor);
+        Assert.Contains("typeof(", calor);
     }
 
     #endregion
@@ -822,7 +818,7 @@ class Test
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        Assert.Contains("§ASSIGN", calor);
+        Assert.Contains("set _value x", calor);
     }
 
     #endregion
@@ -842,8 +838,8 @@ class Test
         var calor = result.CalorSource;
 
         Assert.NotNull(calor);
-        Assert.Contains("§ASSIGN", calor);
-        Assert.DoesNotContain("§R", calor!.Split('\n').Where(l => l.Contains("_name")).FirstOrDefault() ?? "");
+        Assert.Contains("set _name name", calor);
+        Assert.DoesNotContain("return", calor!.Split('\n').Where(l => l.Contains("_name")).FirstOrDefault() ?? "");
     }
 
     [Fact]
@@ -858,7 +854,7 @@ class Test
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        Assert.Contains("§ASSIGN", calor);
+        Assert.Contains("set _name name", calor);
     }
 
     #endregion
@@ -878,8 +874,8 @@ class Test
         var calor = result.CalorSource;
 
         // Should NOT downgrade ValueTask to Task
-        Assert.Contains("-> ValueTask<int>", calor);
-        Assert.DoesNotContain("-> Task<", calor);
+        Assert.Contains("→ ValueTask<int>", calor);
+        Assert.DoesNotContain("→ Task<", calor);
     }
 
     #endregion
@@ -994,7 +990,7 @@ class Config
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        Assert.Contains(":stat", calor);
+        Assert.Contains("DefaultName static", calor);
     }
 
     [Fact]
@@ -1035,8 +1031,8 @@ class Test
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        Assert.Contains("(is value string s)", calor);
-        Assert.DoesNotContain("(cast", calor);
+        Assert.Contains("(value is string s)", calor);
+        Assert.DoesNotContain("(string)value", calor);
     }
 
     [Fact]
@@ -1057,8 +1053,8 @@ class Test
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        Assert.Contains("(is value string text)", calor);
-        Assert.DoesNotContain("(cast", calor);
+        Assert.Contains("(value is string text)", calor);
+        Assert.DoesNotContain("(string)value", calor);
     }
 
     #endregion
@@ -1156,7 +1152,7 @@ public class Service(string name, int retries)
         Assert.Contains("name", calor);
         Assert.Contains("retries", calor);
         // Should contain field declarations
-        Assert.Contains("§FLD", calor);
+        Assert.Contains("field string:name", calor);
     }
 
     [Fact]
@@ -1176,7 +1172,7 @@ public class DerivedService(string connectionString) : BaseService
         var calor = result.CalorSource!;
 
         Assert.Contains("connectionString", calor);
-        Assert.Contains("§FLD", calor);
+        Assert.Contains("field string:connectionString", calor);
     }
 
     #endregion
@@ -1227,7 +1223,7 @@ public class MathHelper
 
         // Body should be preserved
         Assert.Contains("result", calor);
-        Assert.Contains("§R", calor);
+        Assert.Contains("return", calor);
     }
 
     [Fact]
@@ -1281,7 +1277,8 @@ public class Example
         // Should not contain ERR — the chained assignment should convert
         Assert.DoesNotContain("ERR", calor);
         // Should contain assignment for both a and b
-        Assert.Contains("§ASSIGN", calor);
+        Assert.Contains("set b", calor);
+        Assert.Contains("set a", calor);
     }
 
     [Fact]
@@ -1302,7 +1299,7 @@ public class Calculator
         Assert.NotNull(result.CalorSource);
         var calor = result.CalorSource!;
 
-        Assert.Contains("§R", calor);
+        Assert.Contains("return", calor);
     }
 
     [Fact]
@@ -1379,7 +1376,7 @@ public class Example
         // Should not contain ERR
         Assert.DoesNotContain("ERR", calor);
         // Should have both i and x
-        Assert.Contains("§B", calor);
+        Assert.Contains("let ", calor);
     }
 
     [Fact]
@@ -1400,7 +1397,7 @@ public class Example
         var calor = result.CalorSource!;
 
         // Should infer List type, not emit "default"
-        Assert.Contains("§NEW", calor);
+        Assert.Contains("new List<string>()", calor);
         Assert.DoesNotContain("default", calor);
     }
 
@@ -1483,7 +1480,7 @@ public class Example
         Assert.NotNull(result.CalorSource);
         var calor = result.CalorSource!;
 
-        Assert.Contains("§ASSIGN (a, b)", calor);
+        Assert.Contains("set (@a, @b)", calor);
         Assert.DoesNotContain("_tup", calor);
         Assert.DoesNotContain("Item1", calor);
         Assert.DoesNotContain("Item2", calor);
@@ -1844,7 +1841,7 @@ public delegate bool Predicate<T>(T item);";
         Assert.Equal("MyHandler", result.Ast.Delegates[0].Name);
 
         var calor = result.CalorSource!;
-        Assert.Contains("§DEL", calor);
+        Assert.Contains("delegate MyHandler (int:x)", calor);
         RawFrameAssertions.AssertFramed(calor);
         Assert.Contains("Predicate<T>(T item)", calor);
 
@@ -2060,8 +2057,8 @@ public class Demo
         // The chain binding should be on its own line BEFORE the §IF
         // and the §IF condition should reference the bound variable
         var lines = calor.Split('\n');
-        var chainLine = lines.FirstOrDefault(l => l.Contains("_chain") && (l.TrimStart().StartsWith("§B") || l.Contains("Where")));
-        var ifLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("§IF"));
+        var chainLine = lines.FirstOrDefault(l => l.Contains("_chain") && (l.TrimStart().StartsWith("let ") || l.Contains("Where")));
+        var ifLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("if "));
 
         // Both should exist — if chain decomposition worked, there's a §B{_chainXXX} line
         Assert.True(chainLine != null, $"Expected chain binding before §IF. Output:\n{calor}");
@@ -2124,7 +2121,7 @@ public class Demo
 
         // The §NEW should be hoisted to a temp binding, not inlined in §C
         Assert.Contains("_new", calor);
-        Assert.Contains("§NEW", calor);
+        Assert.Contains("new Args(ctx)", calor);
 
         // Compile round-trip
         var compiled = Compile(calor);
@@ -2211,7 +2208,7 @@ public class Demo
         Assert.DoesNotContain("new Builder()", calor);
         Assert.DoesNotContain("_new", calor);
         Assert.DoesNotContain("_chain", calor);
-        Assert.Contains("§NEW{Builder}", calor);
+        Assert.Contains("(new Builder()).WithName", calor);
     }
 
     [Fact]
@@ -2250,12 +2247,10 @@ public class Demo
     public void Has_InsideNegation_Compiles()
     {
         var calor = @"
-§M{HasTest}
-    §F{Check:pub}
-        §I{Dict<str,i32>:cache}
-        §I{str:key}
-        §O{bool}
-        §R (! §HAS{cache} §KEY key)
+module HasTest HasTest block
+  func Check (Dictionary<string, int>:cache, string:key) → bool
+    !
+    return (!cache.ContainsKey(key))
 ";
         var compiled = ParseAndEmit(calor);
         Assert.Contains("ContainsKey", compiled);
@@ -2464,7 +2459,8 @@ module TestModule TestModule block
         // A named effect is not waived by any flag.
         var source = @"
 module TestModule TestModule block
-  func greet private () → void
+  func greet () → void
+    !
     Console.WriteLine(""hello"")";
 
         var ast = ParseCalor(source);
@@ -2495,7 +2491,8 @@ module TestModule TestModule block
     {
         var source = @"
 module TestModule TestModule block
-  func doIO private () → void
+  func doIO () → void
+    !
     Console.WriteLine(""writing to console"")
     SomeExternal.DoNetworkCall()";
 
@@ -2757,21 +2754,20 @@ public class Foo {
     {
         // Build a deeply nested (or (or (or ... A B) C) D) pattern with 500+ alternatives
         // This previously caused a stack overflow in ParsePattern due to recursive descent.
-        var alternatives = Enumerable.Range(1, 500).Select(i => $"INT:{i}").ToList();
+        var alternatives = Enumerable.Range(1, 500).Select(i => $"{i}").ToList();
         var pattern = alternatives[0];
         for (int i = 1; i < alternatives.Count; i++)
             pattern = $"(or {pattern} {alternatives[i]})";
 
         var source = $@"
-§M{{Test}}
-  §F{{Big:pub}}
-    §I{{i32:x}}
-    §O{{i32}}
-    §W x
-    §K {pattern}
-      §R INT:1
-    §K _
-      §R INT:0
+module Test Test block
+  func Big (int:x) → int
+    !
+    match x
+      case {pattern}
+        return 1
+      case _
+        return 0
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("switch", csharp);
@@ -2822,8 +2818,8 @@ public class Foo {
 }";
         var result = _converter.Convert(csharp);
         Assert.True(result.Success);
-        Assert.Contains("`true`", result.CalorSource);
-        Assert.Contains("`false`", result.CalorSource);
+        Assert.Contains("string:@true", result.CalorSource);
+        Assert.Contains("string:@false", result.CalorSource);
         var compiled = Compile(result.CalorSource!);
         Assert.NotNull(compiled);
     }

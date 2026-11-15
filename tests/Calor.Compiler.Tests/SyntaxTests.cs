@@ -26,7 +26,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterModule()
     {
-        var tokens = Tokenize("§M");
+        var tokens = Tokenize("module");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Module, tokens[0].Kind);
@@ -36,7 +36,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterFunc()
     {
-        var tokens = Tokenize("§F");
+        var tokens = Tokenize("func");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Func, tokens[0].Kind);
@@ -63,7 +63,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterReturn()
     {
-        var tokens = Tokenize("§R");
+        var tokens = Tokenize("return");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Return, tokens[0].Kind);
@@ -108,7 +108,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterLoop()
     {
-        var tokens = Tokenize("§L");
+        var tokens = Tokenize("for");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.For, tokens[0].Kind);
@@ -117,7 +117,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterMatch()
     {
-        var tokens = Tokenize("§W");
+        var tokens = Tokenize("match");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Match, tokens[0].Kind);
@@ -126,7 +126,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterCase()
     {
-        var tokens = Tokenize("§K");
+        var tokens = Tokenize("case");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Case, tokens[0].Kind);
@@ -135,7 +135,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterRequires()
     {
-        var tokens = Tokenize("§Q");
+        var tokens = Tokenize("requires");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Requires, tokens[0].Kind);
@@ -211,7 +211,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesDoKeyword()
     {
-        var tokens = Tokenize("§DO");
+        var tokens = Tokenize("do");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Do, tokens[0].Kind);
@@ -435,7 +435,7 @@ module Test Test block
         var module = parser.Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        Assert.Equal("INT", module.Functions[0].Output?.TypeName);
+        Assert.Equal("int", module.Functions[0].Output?.TypeName);
     }
 
     [Fact]
@@ -456,7 +456,7 @@ module Test Test block
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         Assert.Equal(2, module.Functions[0].Parameters.Count);
         Assert.Equal("a", module.Functions[0].Parameters[0].Name);
-        Assert.Equal("INT", module.Functions[0].Parameters[0].TypeName);
+        Assert.Equal("int", module.Functions[0].Parameters[0].TypeName);
     }
 
     [Fact]
@@ -697,7 +697,7 @@ module Test Test block
     [Fact]
     public void Lexer_RecognizesArrow()
     {
-        var tokens = Tokenize("->");
+        var tokens = Tokenize("→");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Arrow, tokens[0].Kind);
@@ -1128,7 +1128,7 @@ module Test Test block
     [Fact]
     public void Lexer_RecognizesElseShortcut()
     {
-        var tokens = Tokenize("§EL");
+        var tokens = Tokenize("else");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Else, tokens[0].Kind);
@@ -1137,7 +1137,7 @@ module Test Test block
     [Fact]
     public void Lexer_RecognizesWhileShortcut()
     {
-        var tokens = Tokenize("§WH");
+        var tokens = Tokenize("while");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.While, tokens[0].Kind);

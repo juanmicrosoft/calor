@@ -376,7 +376,7 @@ public sealed class IdentityFreeSyntaxTests
     [InlineData("module Demo\n  class Value\n    event Action:Changed")]
     [InlineData("§M{Demo}\n  §RTYPE{Positive:i32} (> # 0)\n  §ITYPE{Vector:i32:n}")]
     [InlineData("module Demo\n  func Run () → void\n    !\n    proof{\"positive\"} 1 > 0")]
-    [InlineData("module Demo\n  class Value\n    op + (Value:a, Value:b) → Value\n      return a")]
+    [InlineData("module Demo\n  class Value\n    op + (Value:a, Value:b) → Value\n      !\n      return a")]
     [InlineData("module Demo\n  func Run () → void\n    !\n    for i from 0 to 2 step 1\n      if i > 0\n        Console.WriteLine(i)")]
     [InlineData("module Demo\n  func Run () → void\n    !\n    while false\n      break\n    do\n      break\n    while false")]
     [InlineData("module Demo\n  func Run () → void\n    !\n    each int:value in values\n      Console.WriteLine(value)\n    each key, value in map\n      Console.WriteLine(value)")]

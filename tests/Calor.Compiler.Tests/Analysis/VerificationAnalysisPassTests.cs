@@ -448,21 +448,20 @@ module Test Test block
     }
 
     [Theory]
-    [InlineData("(>= divisor INT:0)", true)]
-    [InlineData("(!= divisor INT:0)", false)]
-    [InlineData("(> divisor INT:0)", false)]
-    [InlineData("(< divisor INT:0)", false)]
+    [InlineData("(divisor >= 0)", true)]
+    [InlineData("(divisor != 0)", false)]
+    [InlineData("(divisor > 0)", false)]
+    [InlineData("(divisor < 0)", false)]
     public void PreconditionGuardMap_SeedsOnlyProvenNonZero(
         string precondition,
         bool expectedDivisionWarning)
     {
         var source = $@"
-§M{{Test}}
-  §F{{Divide:pub}}
-      §I{{i32:divisor}}
-      §O{{i32}}
-      §Q {precondition}
-      §R (/ INT:10 divisor)";
+module Test Test block
+  func Divide (int:divisor) → int
+    !
+    requires {precondition}
+    return (10 / divisor)";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(

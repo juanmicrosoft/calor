@@ -31,7 +31,7 @@ module Test Test block
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("§M{Test}", result);
+        Assert.Contains("module Test Test block", result);
         Assert.Contains("Test", result);
     }
 
@@ -75,7 +75,7 @@ module Test Test block
         var result = formatter.Format(module);
 
         Assert.Contains("Add", result);
-        Assert.Contains("pub", result);
+        Assert.Contains("func Add (int:a, int:b) → int", result);
     }
 
     [Fact]
@@ -149,7 +149,10 @@ module Test Test block
 module Test Test block
   func Test (bool:cond) → int
     !
-    return (cond ? 1 : 0)
+    if cond
+      return 1
+    else
+      return 0
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -157,7 +160,8 @@ module Test Test block
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("IF", result);
+        // The formatter canonicalizes an if/else that only returns into a conditional return.
+        Assert.Contains("(cond ? 1 : 0)", result);
     }
 
     [Fact]
@@ -176,8 +180,8 @@ module Test Test block
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        // Formatter uses compact §L for loops instead of §FOR
-        Assert.Contains("§L{", result);
+        // Formatter uses the native for/from/to/step header
+        Assert.Contains("for i from 0 to 10 step 1", result);
     }
 
     [Fact]
@@ -196,8 +200,8 @@ module Test Test block
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        // Formatter uses compact §WH for while loops instead of §WHILE
-        Assert.Contains("§WH", result);
+        // Formatter uses the native while header
+        Assert.Contains("while running", result);
     }
 
     [Fact]
@@ -219,8 +223,8 @@ module Test Test block
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("§W ", result);
-        Assert.Contains("§K", result);
+        Assert.Contains("match x", result);
+        Assert.Contains("case _", result);
     }
 
     #endregion
@@ -311,7 +315,7 @@ module Test Test block
         var result = formatter.Format(module);
 
         Assert.Contains("42", result);
-        Assert.Contains("§TH", result);
+        Assert.Contains("throw new Exception", result);
     }
 
     #endregion
@@ -326,7 +330,10 @@ module Test Test block
   func Test (bool:a, bool:b) → int
     !
     if a
-      return (b ? 2 : 1)
+      if b
+        return 2
+      else
+        return 1
     else
       return 0
 ";
@@ -338,7 +345,7 @@ module Test Test block
 
         // Check that nested IF is indented more than outer IF
         var lines = result.Split('\n');
-        var ifLines = lines.Where(l => l.TrimStart().StartsWith("§IF")).ToArray();
+        var ifLines = lines.Where(l => l.TrimStart().StartsWith("if ")).ToArray();
         Assert.True(ifLines.Length >= 2, "Should have at least 2 IF statements");
     }
 
@@ -363,11 +370,11 @@ module Test Test block
         var formatted = formatter.Format(module);
 
         // Verify the formatted output contains key elements
-        Assert.Contains("§M{Test}", formatted);
-        Assert.Contains("§F{Add:pub}", formatted);
+        Assert.Contains("module Test Test block", formatted);
+        Assert.Contains("func Add", formatted);
         Assert.Contains("Test", formatted);
         Assert.Contains("Add", formatted);
-        Assert.Contains("pub", formatted);
+        Assert.Contains("func Add (int:a, int:b) → int", formatted);
     }
 
     #endregion
@@ -412,10 +419,10 @@ module Test Test block
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("§EACH{", result);
-        Assert.Contains("item:int", result);
+        Assert.Contains("each int:item in items", result);
+        Assert.Contains("int:item", result);
         // Variable should have no trailing index slot.
-        Assert.DoesNotContain("item:int:", result);
+        Assert.DoesNotContain("int:item,", result);
     }
 
     #endregion

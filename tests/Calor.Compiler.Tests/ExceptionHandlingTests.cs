@@ -416,13 +416,11 @@ module Test Test block
     {
         // Try without catch or finally - syntactically allowed
         var source = @"
-§M{Test}
-  §F{NoHandler:pub}
-    §O{void}
-    §E{cw}
-    §TR
-    §P ""try only""
-    §/TR
+module Test Test block
+  func NoHandler () → void
+    ! cw
+    try
+      Console.WriteLine(""try only"")
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -544,7 +542,7 @@ module Test Test block
         var formatted = formatter.Format(module);
 
         // Verify when filter is preserved
-        Assert.Contains("§WHEN", formatted);
+        Assert.Contains("when (code == 42)", formatted);
 
         // Re-parse formatted output
         var module2 = Parse(formatted, out var diagnostics2);
@@ -574,7 +572,7 @@ module Test Test block
         var formatted = formatter.Format(module);
 
         // Verify rethrow is preserved
-        Assert.Contains("§RT", formatted);
+        Assert.Contains("throw", formatted.Split('\n').Select(line => line.Trim()));
 
         // Re-parse formatted output
         var module2 = Parse(formatted, out var diagnostics2);

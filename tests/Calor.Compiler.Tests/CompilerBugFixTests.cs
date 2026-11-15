@@ -343,7 +343,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_NullEscapeSequence_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"null\\0char\"", out var diagnostics);
+        var tokens = Tokenize("\"null\\0char\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
@@ -353,7 +353,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_TabEscapeSequence_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"col1\\tcol2\"", out var diagnostics);
+        var tokens = Tokenize("\"col1\\tcol2\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
@@ -363,7 +363,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_CarriageReturnEscape_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"line\\rend\"", out var diagnostics);
+        var tokens = Tokenize("\"line\\rend\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
@@ -373,7 +373,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_InvalidEscapeSequence_ToleratesAndEmitsLiteral()
     {
-        var tokens = Tokenize("STR:\"bad\\xescape\"", out var diagnostics);
+        var tokens = Tokenize("\"bad\\xescape\"", out var diagnostics);
 
         // Unknown escapes are now tolerated — the literal character is emitted
         Assert.False(diagnostics.HasErrors);
@@ -383,7 +383,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_EscapedQuote_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"she said \\\"hi\\\"\"", out var diagnostics);
+        var tokens = Tokenize("\"she said \\\"hi\\\"\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal("she said \"hi\"", tokens[0].Value);
@@ -392,7 +392,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_EscapedBackslash_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"path\\\\file\"", out var diagnostics);
+        var tokens = Tokenize("\"path\\\\file\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal("path\\file", tokens[0].Value);

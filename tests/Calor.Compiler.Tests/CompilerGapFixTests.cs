@@ -113,8 +113,8 @@ module TestMod TestMod block
     public void Struct_AbstractStruct_ReportsDiagnostic()
     {
         var source = @"
-§M{TestMod}
-  §CL{Bad:struct abs}
+module TestMod TestMod block
+  class Bad struct abstract
 ";
 
         var diagnostics = ParseWithDiagnostics(source);

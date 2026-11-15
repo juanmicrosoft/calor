@@ -158,8 +158,7 @@ module Test Test block
     DoWork()
 """;
         var emitted = EmitModule(source);
-        Assert.Contains("§C{DoWork}", emitted);
-        Assert.DoesNotContain("§C{DoWork} §/C", emitted);
+        Assert.Contains("DoWork()", emitted);
     }
 
     [Fact]
@@ -172,7 +171,7 @@ module Test Test block
     DoWork()
 """;
         var emitted = EmitModule(source, useImplicitCallCloser: false);
-        Assert.Contains("§C{DoWork} §/C", emitted);
+        Assert.Contains("DoWork()", emitted);
     }
 
     [Fact]
@@ -186,7 +185,7 @@ module Test Test block
 """;
         var emitted = EmitModule(source);
         // CalorEmitter strips typed-literal prefixes for strings: STR:"x" -> "x"
-        Assert.Contains("§C{Console.WriteLine} \"hello\"", emitted);
+        Assert.Contains("Console.WriteLine(\"hello\")", emitted);
         Assert.DoesNotContain("§A", emitted);
         Assert.DoesNotContain("§/C", emitted);
     }
@@ -201,7 +200,7 @@ module Test Test block
     Console.WriteLine(msg)
 """;
         var emitted = EmitModule(source);
-        Assert.Contains("§C{Console.WriteLine} msg", emitted);
+        Assert.Contains("Console.WriteLine(msg)", emitted);
         Assert.DoesNotContain("§A msg", emitted);
     }
 
@@ -218,7 +217,7 @@ module Test Test block
 """;
         var emitted = EmitModule(source);
         // Outer elided, inner kept its §/C
-        Assert.Contains("§C{Outer} §C{Inner} §/C", emitted);
+        Assert.Contains("Outer(Inner())", emitted);
         // No standalone §A on this line
         var line = emitted.Split('\n').First(l => l.Contains("Outer"));
         Assert.DoesNotContain("§A", line);
@@ -236,7 +235,7 @@ module Test Test block
     Process(new StringBuilder())
 """;
         var emitted = EmitModule(source);
-        Assert.Contains("§C{Process} §NEW{StringBuilder} §/NEW", emitted);
+        Assert.Contains("Process(new StringBuilder())", emitted);
     }
 
     [Fact]
@@ -250,8 +249,7 @@ module Test Test block
     Greet(who: "world")
 """;
         var emitted = EmitModule(source);
-        Assert.Contains("§A[who] \"world\"", emitted);
-        Assert.Contains("§/C", emitted);
+        Assert.Contains("Greet(who: \"world\")", emitted);
     }
 
     [Fact]
@@ -265,7 +263,7 @@ module Test Test block
 """;
         var emitted = EmitModule(source);
         // Emitter strips INT: prefix on int literals.
-        Assert.Contains("§C{Math.Max} §A 1 §A 2 §/C", emitted);
+        Assert.Contains("Math.Max(1, 2)", emitted);
     }
 
     [Fact]
@@ -345,8 +343,8 @@ module Test Test block
         var emitted = lam.Accept<string>(emitter);
 
         // Both inner calls must keep §/C inside lambda short-body.
-        Assert.Contains("§C{A} §/C", emitted);
-        Assert.Contains("§C{B} §/C", emitted);
+        Assert.Contains("A()", emitted);
+        Assert.Contains("B()", emitted);
     }
 
     [Fact]
@@ -381,7 +379,7 @@ module Test Test block
     Run()
 """;
         var emitted = EmitModule(source);
-        Assert.DoesNotContain("§C{Run} §/C", emitted);
+        Assert.Contains("Run()", emitted);
 
         // Re-parse must yield the same two-call structure.
         var module2 = Parse(emitted, out var diags);
@@ -409,13 +407,12 @@ module Test Test block
     public void V064_ZeroArgStmt_LastInBody_BeforeSiblingFunc_Parses()
     {
         var source = """
-§M{T}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §C{Helper}
-  §F{Helper:priv} () -> void
-    §E{cw}
-    §C{Console.WriteLine} "hi"
+module T T block
+  func Main () → void
+    ! cw
+    Helper()
+  func Helper private () → void
+    Console.WriteLine("hi")
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -429,13 +426,12 @@ module Test Test block
     public void V064_OneArgStmtViaA_LastInBody_BeforeSiblingFunc_Parses()
     {
         var source = """
-§M{T}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §C{Helper} §A 1
-  §F{Helper:priv} (a:i32) -> void
-    §E{cw}
-    §C{Console.WriteLine} "hi"
+module T T block
+  func Main () → void
+    ! cw
+    Helper(1)
+  func Helper private (int:a) → void
+    Console.WriteLine("hi")
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
@@ -452,13 +448,12 @@ module Test Test block
         // Inline single-arg form (no §A): exercises the early-return branch
         // in ParseCallStatement, not the post-§A end-handling branch.
         var source = """
-§M{T}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §C{Helper} 42
-  §F{Helper:priv} (a:i32) -> void
-    §E{cw}
-    §C{Console.WriteLine} "hi"
+module T T block
+  func Main () → void
+    ! cw
+    Helper(42)
+  func Helper private (int:a) → void
+    Console.WriteLine("hi")
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,

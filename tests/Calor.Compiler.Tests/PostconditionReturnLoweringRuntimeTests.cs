@@ -74,10 +74,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ResultPseudoVariable_DoesNotAlterIdentifiersOrStrings()
     {
         const string source = """
-            §M{ResultSafety}
-              §F{Echo:pub} (i32:resultCode, str:myresult) -> i32
-                §S{"result stays literal"} (&& (== result resultCode) (== myresult STR:"result"))
-                §R resultCode
+            module ResultSafety ResultSafety block
+              func Echo (int:resultCode, string:myresult) → int
+                !
+                => ((result == resultCode) && (myresult == "result")) && ("result stays literal".Length > 0)
+                return resultCode
             """;
         var assembly = Compile(source, out var generatedCode);
 
@@ -151,10 +152,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void IteratorPostcondition_IsRejectedExplicitly()
     {
         const string source = """
-            §M{IteratorContracts}
-              §F{Values:pub} () -> i32
-                §S (>= result 0)
-                §YIELD INT:1
+            module IteratorContracts IteratorContracts block
+              func Values () → int
+                !
+                => (result >= 0)
+                yield 1
             """;
 
         var result = Program.Compile(
@@ -173,18 +175,21 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ClassMethodAndOperatorMethod_ShareReturnLowering()
     {
         const string source = """
-            §M{MethodOwners}
-              §CL{Legacy:pub}
-                §MT{Pick:pub} (bool:first) -> i32
-                  §S (>= result 0)
-                  §IF first
-                    §R INT:4
-                  §R INT:5
-                §MT{op_Implicit:pub:stat} (Legacy:value) -> i32
-                  §S (>= result 0)
-                  §IF (!= value null)
-                    §R INT:8
-                  §R INT:9
+            module MethodOwners MethodOwners block
+              class Legacy
+                func Pick (bool:first) → int
+                  !
+                  => (result >= 0)
+                  if first
+                    return 4
+                  return 5
+
+                func op_Implicit static (Legacy:value) → int
+                  !
+                  => (result >= 0)
+                  if (value != null)
+                    return 8
+                  return 9
             """;
         var assembly = Compile(source, out _);
         var type = GetType(assembly, "Legacy");
@@ -201,17 +206,14 @@ public class PostconditionReturnLoweringRuntimeTests
     public void OperatorOverload_UsesSharedReturnLowering()
     {
         const string source = """
-            §M{OperatorOwner}
-              §CL{Box:pub}
-                §OP{+:pub}
-                  §I{Box:left}
-                  §I{Box:right}
-                  §O{Box}
-                  §S (!= result null)
-                  §IF (!= left null)
-                    §R left
-                  §R right
-                §/OP
+            module OperatorOwner OperatorOwner block
+              class Box
+                op + (Box:left, Box:right) → Box
+                  !
+                  => (result != null)
+                  if (left != null)
+                    return left
+                  return right
             """;
         var assembly = Compile(source, out _);
         var type = GetType(assembly, "Box");
@@ -227,18 +229,18 @@ public class PostconditionReturnLoweringRuntimeTests
     public void EnumExtension_UsesSharedReturnLowering()
     {
         const string source = """
-            §M{EnumOwner}
-              §EN{Color}
-              Red
-              Blue
-              §/EN
-              §EEXT{Color}
-                §F{Code:pub} (Color:self, bool:primary) -> i32
-                  §S (>= result 0)
-                  §IF primary
-                    §R INT:1
-                  §R INT:2
-              §/EEXT
+            module EnumOwner EnumOwner block
+              enum Color
+                Red
+                Blue
+
+              module ColorExtensions
+                func Code (this Color:self, bool:primary) → int
+                  !
+                  => (result >= 0)
+                  if primary
+                    return 1
+                  return 2
             """;
         var assembly = Compile(source, out _);
         var enumType = GetType(assembly, "Color");
@@ -257,7 +259,7 @@ public class PostconditionReturnLoweringRuntimeTests
     {
         const string source = """
             module LambdaOwner LambdaOwner block
-              func Make () → Func<int>
+              func Make () → Func<int> !
                 !
                 => (result == result)
                 return () =>
@@ -348,93 +350,87 @@ public class PostconditionReturnLoweringRuntimeTests
         {
             "using",
             """
-            §USE{stream:MemoryStream} §NEW{MemoryStream} §/NEW
-              §YIELD INT:1
+            using MemoryStream:stream = new MemoryStream()
+              yield 1
             """
         },
         {
             "preprocessor-body",
             """
-            §PP{DEBUG}
-              §YIELD INT:1
-            §/PP{DEBUG}
+            pp DEBUG
+              yield 1
             """
         },
         {
             "preprocessor-else",
             """
-            §PP{DEBUG}
-              §P INT:0
-            §PPE
-              §YIELD INT:1
-            §/PP{DEBUG}
+            pp DEBUG
+              Console.WriteLine(0)
+            pp else
+              yield 1
             """
         },
         {
             "match",
             """
-            §W value
-              §K _
-                §YIELD INT:1
+            match value
+              case _
+                yield 1
             """
         },
         {
             "dictionary-foreach",
             """
-            §EACHKV{key:item} items
-              §YIELD item
+            each key, item in items
+              yield item
             """
         },
         {
             "try",
             """
-            §TR
-              §YIELD INT:1
-            §/TR
+            try
+              yield 1
+            finally
+              Console.WriteLine(0)
             """
         },
         {
             "catch",
             """
-            §TR
-              §P INT:0
-            §CA{Exception:ex}
-              §YIELD INT:1
-            §/TR
+            try
+              Console.WriteLine(0)
+            catch Exception:ex
+              yield 1
             """
         },
         {
             "finally",
             """
-            §TR
-              §P INT:0
-            §FI
-              §YIELD INT:1
-            §/TR
+            try
+              Console.WriteLine(0)
+            finally
+              yield 1
             """
         },
         {
             "unsafe",
             """
-            §UNSAFE
-              §YIELD INT:1
-            §/UNSAFE
+            unsafe
+              yield 1
             """
         },
         {
             "fixed",
             """
-            §FIXED{pointer:i32*:array}
-              §YIELD INT:1
-            §/FIXED
+            fixed int*:pointer = array
+              yield 1
             """
         },
         {
             "sync",
             """
-            §SYNC (gate)
-              §YIELD INT:1
-            §/SYNC
+            lock gate
+              yield 1
             """
         },
     };
@@ -469,13 +465,14 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ResultPseudoVariable_RespectsLexicalBinders()
     {
         const string source = """
-            §M{QuantifiedResult}
-              §F{Zero:pub} () -> i32
-                §S (forall ((result i32)) (-> (&& (>= result INT:0) (< result INT:1)) (== result INT:0)))
-                §S (exists ((result i32)) (&& (>= result INT:0) (< result INT:1) (== result INT:0)))
-                §S (-> (is result i32 result) (>= result INT:0))
-                §S (== result INT:0)
-                §R INT:0
+            module QuantifiedResult QuantifiedResult block
+              func Zero () → int
+                !
+                => (forall int:result in 0..1 : (result == 0))
+                => (exists int:result in 0..1 : (result == 0))
+                => (!((result is int result)) || (result >= 0))
+                => (result == 0)
+                return 0
             """;
 
         var assembly = Compile(source, out var generatedCode);
@@ -654,10 +651,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void SynthesizedReturnNames_AvoidPostconditionBinders()
     {
         const string source = """
-            §M{PostconditionHygiene}
-              §F{Value:pub} () -> object
-                §S (-> (is result i32 __calorPostconditionResult0) (is result object))
-                §R INT:1
+            module PostconditionHygiene PostconditionHygiene block
+              func Value () → object
+                !
+                => (!((result is int __calorPostconditionResult0)) || (result is object))
+                return 1
             """;
 
         var assembly = Compile(source, out var generatedCode);

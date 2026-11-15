@@ -98,7 +98,7 @@ public class Foo
         var converter = CreateConverter();
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
-        Assert.Contains("§GOTO{CASE:2}", result.CalorSource!);
+        Assert.Contains("goto case 2", result.CalorSource!);
         Assert.DoesNotContain("§CSHARP", result.CalorSource!);
     }
 
@@ -122,7 +122,7 @@ public class Foo
         var converter = CreateConverter();
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
-        Assert.Contains("§GOTO{DEFAULT}", result.CalorSource!);
+        Assert.Contains("goto default", result.CalorSource!);
         Assert.DoesNotContain("§CSHARP", result.CalorSource!);
     }
 
@@ -227,7 +227,7 @@ public class Foo
         var converter = CreateConverter();
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
-        Assert.Contains("§GOTO{CASE:", result.CalorSource!);
+        Assert.Contains("goto case ", result.CalorSource!);
         Assert.DoesNotContain("§CSHARP", result.CalorSource!);
     }
 

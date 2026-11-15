@@ -232,14 +232,12 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_FixedStatement_EmitsFixedBlock()
     {
         var calorSource = """
-            §M{FixedTest}
-                §CL{Test:pub}
-                    §MT{DoFixed:pub:unsafe}
-                        §I{arr:[i32]}
-                        §O{void}
-                        §FIXED{ptr:i32*:arr}
-                          §B{val:i32} §DEREF ptr
-                        §/FIXED
+            module FixedTest FixedTest block
+              class Test
+                func DoFixed unsafe (int[]:arr) → void
+                  !
+                  fixed int*:ptr = arr
+                    let int:val = ptr[0]
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -312,7 +310,7 @@ public class UnsafeLowLevelRoundtripTests
                     return sizeof(int);
                 }
             }
-            """, "§SIZEOF");
+            """, "sizeof(int)");
 
         Assert.Contains("sizeof(int)", csharp);
     }
@@ -331,7 +329,7 @@ public class UnsafeLowLevelRoundtripTests
                     }
                 }
             }
-            """, "§UNSAFE");
+            """, "\n      unsafe");
 
         Assert.Contains("unsafe", csharp);
     }
@@ -367,7 +365,7 @@ public class UnsafeLowLevelRoundtripTests
                     }
                 }
             }
-            """, "§FIXED");
+            """, "fixed int*:ptr = arr");
 
         Assert.Contains("fixed", csharp);
     }
@@ -417,7 +415,7 @@ public class UnsafeLowLevelRoundtripTests
                     return grid;
                 }
             }
-            """, "§ARR2D");
+            """, "new int[rows, cols]");
 
         Assert.Contains("new int[", csharp);
     }
@@ -433,7 +431,7 @@ public class UnsafeLowLevelRoundtripTests
                     return grid[row, col];
                 }
             }
-            """, "§IDX2D");
+            """, "grid[row, col]");
 
         Assert.Contains("grid[", csharp);
     }
@@ -483,7 +481,7 @@ public class UnsafeLowLevelRoundtripTests
             """;
 
         var (calor, csharpOutput) = ConvertAndEmit(csharpInput);
-        Assert.Contains("§ARR2D", calor);
+        Assert.Contains("new int[,] { { 1, 2, 3 }, { 4, 5, 6 } }", calor);
         Assert.Contains("new int[,]", csharpOutput);
         Assert.Contains("1, 2, 3", csharpOutput);
         Assert.Contains("4, 5, 6", csharpOutput);
@@ -516,10 +514,10 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_UnsafeMethodModifier_FromCalor()
     {
         var calorSource = """
-            §M{UnsafeMethodTest}
-                §CL{Test:pub}
-                    §MT{DoStuff:pub:stat,unsafe}
-                        §O{void}
+            module UnsafeMethodTest UnsafeMethodTest block
+              class Test
+                func DoStuff static unsafe () → void
+                  !
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -662,7 +660,7 @@ public class UnsafeLowLevelRoundtripTests
                     return cube;
                 }
             }
-            """, "§ARR2D");
+            """, "new int[x, y, z]");
 
         Assert.Contains("int[,,]", csharp);
         Assert.Contains("new int[", csharp);
@@ -673,11 +671,11 @@ public class UnsafeLowLevelRoundtripTests
     {
         // Verifies that (cast i32* expr) parses correctly with pointer type
         var calorSource = """
-            §M{CastTest}
-                §CL{Test:pub}
-                    §MT{CastPtr:pub:unsafe}
-                        §O{i32*}
-                        §R (cast i32* 0)
+            module CastTest CastTest block
+              class Test
+                func CastPtr unsafe () → int*
+                  !
+                  return (int*)0
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -699,7 +697,7 @@ public class UnsafeLowLevelRoundtripTests
             """;
 
         var (calor, csharpOutput) = ConvertAndEmit(csharpInput);
-        Assert.Contains("(cast int*", calor);
+        Assert.Contains("(int*)0", calor);
         Assert.Contains("(int*)", csharpOutput);
     }
 

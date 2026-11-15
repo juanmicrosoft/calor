@@ -24,21 +24,21 @@ public sealed class SafeConsumptionRuntimeTests
         // Reduced from MediatR/Internal/ObjectDetails.Compare: early-return
         // guards are not a supported non-null transfer to the later call.
         const string source = """
-            §M{NominalMigration}
-              §CL{Widget:pub}
-                §MT{Id:pub} () -> i32
-                  §E{}
-                  §R 0
-              §F{Take:pub} (Widget:x, Widget:y) -> i32
-                §E{}
-                §R 0
-              §F{Compare:pub} (?Widget:x, ?Widget:y) -> i32
-                §E{throw}
-                §IF (== x null)
-                  §R 1
-                §IF (== y null)
-                  §R -1
-                §R §C{Take} §A x §A y §/C
+            module NominalMigration NominalMigration block
+              class Widget
+                func Id () → int
+                  !
+                  return 0
+              func Take (Widget:x, Widget:y) → int
+                !
+                return 0
+              func Compare (Widget?:x, Widget?:y) → int
+                ! throw
+                if (x == null)
+                  return 1
+                if (y == null)
+                  return -1
+                return Take(x, y)
             """;
         var rejected = Program.Compile(source, "nominal-early-return.calr");
         Assert.True(rejected.HasErrors);
@@ -47,11 +47,11 @@ public sealed class SafeConsumptionRuntimeTests
         Assert.Empty(rejected.GeneratedCode);
 
         var migrated = source.Replace(
-            "§R §C{Take} §A x §A y §/C",
+            "return Take(x, y)",
             """
-            §B{safeX} (?? x §TH "unreachable")
-                §B{safeY} (?? y §TH "unreachable")
-                §R §C{Take} §A safeX §A safeY §/C
+            let safeX = (x ?? throw "unreachable")
+                let safeY = (y ?? throw "unreachable")
+                return Take(safeX, safeY)
             """, StringComparison.Ordinal);
         var result = Program.Compile(migrated, "nominal-early-return-migrated.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
@@ -136,7 +136,7 @@ public sealed class SafeConsumptionRuntimeTests
     [InlineData("argument", true)]
     public void Coalesce_AllConsumersAgreeWithActualRuntimeAndCli(string consumer, bool throwing)
     {
-        var expression = throwing ? "(?? input §TH \"missing\")" : "(?? input \"fallback\")";
+        var expression = throwing ? "(input ?? throw \"missing\")" : "(input ?? \"fallback\")";
         var source = Source(consumer, expression);
         foreach (var text in RoundTrip(source))
         {
@@ -165,16 +165,16 @@ public sealed class SafeConsumptionRuntimeTests
     [InlineData(true, true)]
     public void Coalesce_SelectedNamedArgumentsAgreeAcrossBothCallForms(bool statement, bool throwing)
     {
-        var expression = throwing ? "(?? input §TH \"missing\")" : "(?? input \"fallback\")";
-        var call = $"§C{{Take}} §A[number] INT:7 §A[value] {expression} §/C";
+        var expression = throwing ? "(input ?? throw \"missing\")" : "(input ?? \"fallback\")";
+        var call = $"Take(number: 7, value: {expression})";
         var source = $$"""
-            §M{Consumption}
-              §F{Take:pub} (str:value, i32:number) -> str
-                §E{}
-                §R value
-              §F{Probe:pub} (?str:input) -> str
-                §E{throw}
-                {{(statement ? call + "\n    §R \"done\"" : "§R " + call)}}
+            module Consumption Consumption block
+              func Take (string:value, int:number) → string
+                !
+                return value
+              func Probe (string?:input) → string
+                ! throw
+                {{(statement ? call + "\n    return \"done\"" : "return " + call)}}
             """;
         var (bound, diagnostics) = Bind(source);
         Assert.Empty(diagnostics.Errors);
@@ -211,7 +211,7 @@ public sealed class SafeConsumptionRuntimeTests
     [InlineData("argument")]
     public void NullableFallback_IsRejectedAtScalarReceivingBoundary(string consumer)
     {
-        var source = Source(consumer, "(?? input fallback)", "?str:fallback");
+        var source = Source(consumer, "(input ?? fallback)", "string?:fallback");
         var (_, diagnostics) = Bind(source);
         Assert.Contains(diagnostics, diagnostic => IsNullableDiagnostic(diagnostic)
             || diagnostic.Code == DiagnosticCode.NoMatchingOverload);
@@ -239,7 +239,7 @@ public sealed class SafeConsumptionRuntimeTests
         var method = Emit(result.GeneratedCode).GetTypes().Single(type => type.Name == "DefaultFallback").GetMethod("Probe")!;
         Assert.Null(method.Invoke(null, [null]));
         Assert.Equal("value", method.Invoke(null, ["value"]));
-        var (_, diagnostics) = Bind(Source("return", "(?? input null)"));
+        var (_, diagnostics) = Bind(Source("return", "(input ?? null)"));
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
     }
 
@@ -249,20 +249,20 @@ public sealed class SafeConsumptionRuntimeTests
     public void SuccessfulTypedPattern_IsNonNullAndDoesNotNarrowTheInput(bool match)
     {
         var source = match ? """
-            §M{Consumption}
-              §F{Probe:pub} (?str:input) -> str
-                §E{}
-                §R §W input
-                  §K §PTYPE{str:text} → text
-                  §K _ → "fallback"
+            module Consumption Consumption block
+              func Probe (string?:input) → string
+                !
+                return match input
+                  case string text → text
+                  case _ → "fallback"
             """ : """
-            §M{Consumption}
-              §F{Probe:pub} (?str:input) -> str
-                §E{}
-                §IF (is input str text)
-                  §B{value:str} text
-                  §R value
-                §R "fallback"
+            module Consumption Consumption block
+              func Probe (string?:input) → string
+                !
+                if (input is string text)
+                  let string:value = text
+                  return value
+                return "fallback"
             """;
         foreach (var text in RoundTrip(source))
         {
@@ -274,22 +274,22 @@ public sealed class SafeConsumptionRuntimeTests
             Assert.Equal("value", method.Invoke(null, ["value"]));
             Assert.Equal("fallback", method.Invoke(null, [null]));
         }
-        var (_, unsafeDiagnostics) = Bind(source.Replace("§R \"fallback\"", "§R input", StringComparison.Ordinal)
-            .Replace("§K _ → \"fallback\"", "§K _ → input", StringComparison.Ordinal));
+        var (_, unsafeDiagnostics) = Bind(source.Replace("return \"fallback\"", "return input", StringComparison.Ordinal)
+            .Replace("case _ → \"fallback\"", "case _ → input", StringComparison.Ordinal));
         Assert.Contains(unsafeDiagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
     }
 
     [Theory]
-    [InlineData("§EL\n      §R text")]
-    [InlineData("§R text")]
+    [InlineData("else\n      return text")]
+    [InlineData("return text")]
     public void PatternBinding_DoesNotEscapeSuccessfulBranch(string tail)
     {
         var source = """
-            §M{Consumption}
-              §F{Probe:pub} (?str:input) -> str
-                §E{}
-                §IF (is input str text)
-                  §R text
+            module Consumption Consumption block
+              func Probe (string?:input) → string
+                !
+                if (input is string text)
+                  return text
             """ + "\n    " + tail;
         var (_, diagnostics) = Bind(source);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
@@ -302,11 +302,11 @@ public sealed class SafeConsumptionRuntimeTests
     public void BothThrowingArms_AreNeverAndExecuteTheSelectedException()
     {
         const string source = """
-            §M{Consumption}
-              §F{Probe:pub} (bool:flag) -> str
-                §E{throw}
-                §B{value:str} (? flag §TH "left" §TH "right")
-                §R value
+            module Consumption Consumption block
+              func Probe (bool:flag) → string
+                ! throw
+                let string:value = (flag ? throw "left" : throw "right")
+                return value
             """;
         var (bound, diagnostics) = Bind(source);
         Assert.DoesNotContain(diagnostics, IsNullableDiagnostic);
@@ -358,16 +358,16 @@ public sealed class SafeConsumptionRuntimeTests
     public void NominalCoalesce_PreservesIdentityAndNullableFallbackEvidence()
     {
         const string source = """
-            §M{Consumption}
-              §CL{Foo:pub}
-                §FLD{i32:value:pub}
-              §F{Probe:pub} (?Foo:input, ?Foo:fallback) -> Foo
-                §E{throw}
-                §R (?? input fallback)
+            module Consumption Consumption block
+              class Foo
+                field int:value
+              func Probe (Foo?:input, Foo?:fallback) → Foo
+                ! throw
+                return (input ?? fallback)
             """;
         var (_, unsafeDiagnostics) = Bind(source);
         Assert.Contains(unsafeDiagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
-        var safeSource = source.Replace("(?? input fallback)", "(?? input §TH \"missing\")", StringComparison.Ordinal);
+        var safeSource = source.Replace("(input ?? fallback)", "(input ?? throw \"missing\")", StringComparison.Ordinal);
         var (_, safeDiagnostics) = Bind(safeSource);
         Assert.DoesNotContain(safeDiagnostics, IsNullableDiagnostic);
         var result = Program.Compile(safeSource, "nominal-consumption.calr");
@@ -381,9 +381,9 @@ public sealed class SafeConsumptionRuntimeTests
     }
 
     [Theory]
-    [InlineData("(&& (is input str text) (== text \"value\"))")]
-    [InlineData("(&& true (is input str text))")]
-    [InlineData("(&& (&& true (is input str text)) (== text \"value\"))")]
+    [InlineData("((input is string text) && (text == \"value\"))")]
+    [InlineData("(true && (input is string text))")]
+    [InlineData("((true && (input is string text)) && (text == \"value\"))")]
     public void Conjunction_PreservesTheSuccessfulPatternInRhsAndBody(string condition)
     {
         var source = $$"""
@@ -417,28 +417,28 @@ public sealed class SafeConsumptionRuntimeTests
     {
         var body = consumer switch
         {
-            "bind" => "§B{value:str} text\n      §R value",
-            "return" => "§R text",
-            "argument" => "§R §C{Take} §A text §/C",
+            "bind" => "let string:value = text\n      return value",
+            "return" => "return text",
+            "argument" => "return Take(text)",
             _ => throw new ArgumentOutOfRangeException(nameof(consumer))
         };
         var condition = branch switch
         {
-            "if" => "§IF (is input str text)",
-            "while" => "§WH (is input str text)",
-            "while-conjunction" => "§WH (&& (is input str text) (== text \"value\"))",
+            "if" => "if (input is string text)",
+            "while" => "while (input is string text)",
+            "while-conjunction" => "while ((input is string text) && (text == \"value\"))",
             _ => throw new ArgumentOutOfRangeException(nameof(branch))
         };
         var source = $$"""
-            §M{Consumption}
-              §F{Take:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{Probe:pub} (?object:input) -> str
-                §E{}
+            module Consumption Consumption block
+              func Take (string:value) → string
+                !
+                return value
+              func Probe (object?:input) → string
+                !
                 {{condition}}
                   {{body}}
-                §R "fallback"
+                return "fallback"
             """;
         var (_, diagnostics) = Bind(source);
         Assert.Empty(diagnostics.Errors);
@@ -454,7 +454,7 @@ public sealed class SafeConsumptionRuntimeTests
     [Fact]
     public void WhilePattern_DoesNotSupplyBindingsAfterTheLoopOrWithoutGuaranteedSuccess()
     {
-        foreach (var condition in new[] { "(is input str text)", "(! (is input str text))", "(|| (is input str text) true)" })
+        foreach (var condition in new[] { "(input is string text)", "(!(input is string text))", "((input is string text) || true)" })
         {
             var source = $$"""
                 module Consumption Consumption block
@@ -467,7 +467,7 @@ public sealed class SafeConsumptionRuntimeTests
             var (_, diagnostics) = Bind(source);
             Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
                 && diagnostic.Span.Line == 6 && diagnostic.Message.Contains("text", StringComparison.Ordinal));
-            if (condition != "(is input str text)")
+            if (condition != "(input is string text)")
                 Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
                     && diagnostic.Span.Line == 5 && diagnostic.Message.Contains("text", StringComparison.Ordinal));
             Assert.True(Program.Compile(source, "while-pattern-leak.calr").HasErrors);
@@ -481,16 +481,16 @@ public sealed class SafeConsumptionRuntimeTests
     public void MatchGuardPattern_IsAvailableOnlyInItsSuccessfulCase(bool expression)
     {
         var match = expression ? """
-            §R §W input
-                  §K _ §WHEN (is input str text) → §C{Take} §A text §/C
-                  §K _ → "fallback"
+            return match input
+                  case _ when (input is string text) → Take(text)
+                  case _ → "fallback"
             """ : """
-            §W input
-                  §K §VAR{candidate} §WHEN (is input str text)
-                    §B{value:str} text
-                    §R §C{Take} §A value §/C
-                  §K _
-                    §R "fallback"
+            match input
+                  case var candidate when (input is string text)
+                    let string:value = text
+                    return Take(value)
+                  case _
+                    return "fallback"
             """;
         var source = $$"""
             module Consumption Consumption block
@@ -517,8 +517,8 @@ public sealed class SafeConsumptionRuntimeTests
         foreach (var unsafeSource in new[]
         {
             source.Replace("\"fallback\"", "text", StringComparison.Ordinal),
-            source.Replace("(is input str text)", "(! (is input str text))", StringComparison.Ordinal),
-            source.Replace("(is input str text)", "(|| (is input str text) true)", StringComparison.Ordinal)
+            source.Replace("(input is string text)", "(!(input is string text))", StringComparison.Ordinal),
+            source.Replace("(input is string text)", "((input is string text) || true)", StringComparison.Ordinal)
         })
         {
             var (_, diagnostics) = Bind(unsafeSource);
@@ -532,11 +532,11 @@ public sealed class SafeConsumptionRuntimeTests
     public void ExplicitNullableFailure_ThrowsTheDeclaredException()
     {
         const string source = """
-            §M{Consumption}
-              §F{Probe:pub} (bool:present) -> str
-                §E{alloc,throw}
-                §B{value:?str} (? present "value" null)
-                §R (?? value §TH §NEW{InvalidOperationException} §A "missing" §/NEW)
+            module Consumption Consumption block
+              func Probe (bool:present) → string
+                ! alloc,throw
+                let string?:value = (present ? "value" : null)
+                return (value ?? throw new InvalidOperationException("missing"))
             """;
         foreach (var text in RoundTrip(source))
         {
@@ -555,14 +555,14 @@ public sealed class SafeConsumptionRuntimeTests
     [Fact]
     public void NegatedAndDisjunctiveVarPatterns_DoNotSupplySuccessfulBindings()
     {
-        foreach (var pattern in new[] { "(not §VAR{text})", "(or §VAR{text} _)" })
+        foreach (var pattern in new[] { "(not var text)", "(or var text _)" })
         {
             var source = $$"""
                 module Consumption Consumption block
                   func Probe (string?:input) → string
                     !
                     return match input
-                      case var {{pattern}} → text
+                      case {{pattern}} → text
                       case _ → "fallback"
                 """;
             var (_, diagnostics) = Bind(source);
@@ -592,7 +592,7 @@ public sealed class SafeConsumptionRuntimeTests
     [Fact]
     public void ThrowNull_RetainsItsNonReturningRuntimeSemantics()
     {
-        var source = Source("return", "(?? input §TH null)");
+        var source = Source("return", "(input ?? throw null)");
         var result = Program.Compile(source, "throw-null.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
         var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
@@ -605,17 +605,17 @@ public sealed class SafeConsumptionRuntimeTests
     public void OverloadedExceptionFactory_DoesNotUseAnUnselectedReturnType()
     {
         const string source = """
-            §M{Consumption}
-              §F{Make:pub} (i32:value) -> System.Exception
-                §E{alloc}
-                §B{exception:System.Exception} §NEW{System.Exception}
-                §R exception
-              §F{Make:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{Probe:pub} (?str:input) -> str
-                §E{alloc,throw}
-                §R (?? input §TH §C{Make} §A INT:1 §/C)
+            module Consumption Consumption block
+              func Make (int:value) → System.Exception
+                ! alloc
+                let System.Exception:exception = new System.Exception()
+                return exception
+              func Make (string:value) → string
+                !
+                return value
+              func Probe (string?:input) → string
+                ! alloc,throw
+                return (input ?? throw Make(1))
             """;
         var result = Program.Compile(source, "overloaded-exception.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
@@ -628,7 +628,7 @@ public sealed class SafeConsumptionRuntimeTests
     [Fact]
     public void NominalConditional_ThroughInferredLocalsRetainsTheActualSelectedValue()
     {
-        foreach (var rightType in new[] { "Foo", "?Foo" })
+        foreach (var rightType in new[] { "Foo", "Foo?" })
         {
             var source = $$"""
                 module Consumption Consumption block
@@ -645,7 +645,7 @@ public sealed class SafeConsumptionRuntimeTests
             Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
             var assembly = Emit(result.GeneratedCode);
             var value = Activator.CreateInstance(assembly.GetType("Consumption.Foo")!);
-            var right = rightType == "?Foo" ? null : value;
+            var right = rightType == "Foo?" ? null : value;
             var method = assembly.GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
             Assert.Same(value, method.Invoke(null, [true, value, right]));
             Assert.Same(right, method.Invoke(null, [false, value, right]));
@@ -679,18 +679,18 @@ public sealed class SafeConsumptionRuntimeTests
     {
         var body = consumer switch
         {
-            "bind" => $"§B{{value:str}} {expression}\n    §R value",
-            "return" => $"§R {expression}",
-            "argument" => $"§R §C{{Take}} §A {expression} §/C",
+            "bind" => $"let string:value = {expression}\n    return value",
+            "return" => $"return {expression}",
+            "argument" => $"return Take({expression})",
             _ => throw new ArgumentOutOfRangeException(nameof(consumer))
         };
         return $$"""
-            §M{Consumption}
-              §F{Take:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{Probe:pub} (?str:input{{(extraParameter == null ? "" : ", " + extraParameter)}}) -> str
-                §E{throw}
+            module Consumption Consumption block
+              func Take (string:value) → string
+                !
+                return value
+              func Probe (string?:input{{(extraParameter == null ? "" : ", " + extraParameter)}}) → string
+                ! throw
                 {{body}}
             """;
     }

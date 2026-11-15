@@ -53,7 +53,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_CharAt_ReturnsCharOperationNode()
     {
-        var source = WrapInFunction("§R (char-at s 0)");
+        var source = WrapInFunction("return s[0]");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -65,7 +65,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_CharCode_ReturnsCharOperationNode()
     {
-        var source = WrapCharFunction("§R (char-code c)");
+        var source = WrapCharFunction("return (int)c");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -77,7 +77,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_CharFromCode_ReturnsCharOperationNode()
     {
-        var source = WrapInFunction("§R (char-from-code 65)", "i32", "char");
+        var source = WrapInFunction("return (char)65", "int", "char");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -89,7 +89,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_IsLetter_ReturnsCharOperationNode()
     {
-        var source = WrapCharFunction("§R (is-letter c)");
+        var source = WrapCharFunction("return char.IsLetter(c)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -101,7 +101,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_IsDigit_ReturnsCharOperationNode()
     {
-        var source = WrapCharFunction("§R (is-digit c)");
+        var source = WrapCharFunction("return char.IsDigit(c)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -113,7 +113,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_IsWhitespace_ReturnsCharOperationNode()
     {
-        var source = WrapCharFunction("§R (is-whitespace c)");
+        var source = WrapCharFunction("return char.IsWhiteSpace(c)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -125,7 +125,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_IsUpper_ReturnsCharOperationNode()
     {
-        var source = WrapCharFunction("§R (is-upper c)");
+        var source = WrapCharFunction("return char.IsUpper(c)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -137,7 +137,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_IsLower_ReturnsCharOperationNode()
     {
-        var source = WrapCharFunction("§R (is-lower c)");
+        var source = WrapCharFunction("return char.IsLower(c)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -149,7 +149,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_CharUpper_ReturnsCharOperationNode()
     {
-        var source = WrapCharFunction("§R (char-upper c)");
+        var source = WrapCharFunction("return char.ToUpper(c)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -161,7 +161,7 @@ public class CharOperationTests
     [Fact]
     public void Parse_CharLower_ReturnsCharOperationNode()
     {
-        var source = WrapCharFunction("§R (char-lower c)");
+        var source = WrapCharFunction("return char.ToLower(c)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -175,16 +175,16 @@ public class CharOperationTests
     #region C# Emission Tests
 
     [Theory]
-    [InlineData("(char-at s 0)", "s[0]")]
-    [InlineData("(char-code c)", "(int)c")]
-    [InlineData("(char-from-code 65)", "(char)65")]
-    [InlineData("(is-letter c)", "char.IsLetter(c)")]
-    [InlineData("(is-digit c)", "char.IsDigit(c)")]
-    [InlineData("(is-whitespace c)", "char.IsWhiteSpace(c)")]
-    [InlineData("(is-upper c)", "char.IsUpper(c)")]
-    [InlineData("(is-lower c)", "char.IsLower(c)")]
-    [InlineData("(char-upper c)", "char.ToUpper(c)")]
-    [InlineData("(char-lower c)", "char.ToLower(c)")]
+    [InlineData("s[0]", "s[0]")]
+    [InlineData("(int)c", "(int)c")]
+    [InlineData("(char)65", "(char)65")]
+    [InlineData("char.IsLetter(c)", "char.IsLetter(c)")]
+    [InlineData("char.IsDigit(c)", "char.IsDigit(c)")]
+    [InlineData("char.IsWhiteSpace(c)", "char.IsWhiteSpace(c)")]
+    [InlineData("char.IsUpper(c)", "char.IsUpper(c)")]
+    [InlineData("char.IsLower(c)", "char.IsLower(c)")]
+    [InlineData("char.ToUpper(c)", "char.ToUpper(c)")]
+    [InlineData("char.ToLower(c)", "char.ToLower(c)")]
     public void Emit_CharOperation_ProducesCorrectCSharp(string calor, string expectedCSharp)
     {
         var source = $$"""
@@ -208,16 +208,16 @@ public class CharOperationTests
     #region Round-Trip Tests
 
     [Theory]
-    [InlineData("(char-at s 0)")]
-    [InlineData("(char-code c)")]
-    [InlineData("(char-from-code 65)")]
-    [InlineData("(is-letter c)")]
-    [InlineData("(is-digit c)")]
-    [InlineData("(is-whitespace c)")]
-    [InlineData("(is-upper c)")]
-    [InlineData("(is-lower c)")]
-    [InlineData("(char-upper c)")]
-    [InlineData("(char-lower c)")]
+    [InlineData("s[0]")]
+    [InlineData("(int)c")]
+    [InlineData("(char)65")]
+    [InlineData("char.IsLetter(c)")]
+    [InlineData("char.IsDigit(c)")]
+    [InlineData("char.IsWhiteSpace(c)")]
+    [InlineData("char.IsUpper(c)")]
+    [InlineData("char.IsLower(c)")]
+    [InlineData("char.ToUpper(c)")]
+    [InlineData("char.ToLower(c)")]
     public void RoundTrip_CharOp_ProducesValidCalor(string op)
     {
         var source = $$"""
@@ -350,7 +350,7 @@ public class CharOperationTests
     public void Parse_CharAtWithStringOp_Works()
     {
         // Check first char of uppercased string
-        var source = WrapInFunction("§R (char-at (upper s) 0)");
+        var source = WrapInFunction("return s.ToUpper()[0]");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -366,7 +366,7 @@ public class CharOperationTests
     public void Parse_IsLetterWithCharAt_Works()
     {
         // Check if first char is a letter
-        var source = WrapInFunction("§R (is-letter (char-at s 0))");
+        var source = WrapInFunction("return char.IsLetter(s[0])");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -382,7 +382,7 @@ public class CharOperationTests
     public void Parse_CharUpperWithCharAt_Works()
     {
         // Convert first char to uppercase
-        var source = WrapInFunction("§R (char-upper (char-at s 0))");
+        var source = WrapInFunction("return char.ToUpper(s[0])");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -464,13 +464,13 @@ public class CharOperationTests
     }
 
     [Theory]
-    [InlineData("char.IsLetter(c)", "is-letter")]
-    [InlineData("char.IsDigit(c)", "is-digit")]
-    [InlineData("char.IsWhiteSpace(c)", "is-whitespace")]
-    [InlineData("char.IsUpper(c)", "is-upper")]
-    [InlineData("char.IsLower(c)", "is-lower")]
-    [InlineData("char.ToUpper(c)", "char-upper")]
-    [InlineData("char.ToLower(c)", "char-lower")]
+    [InlineData("char.IsLetter(c)", "char.IsLetter(c)")]
+    [InlineData("char.IsDigit(c)", "char.IsDigit(c)")]
+    [InlineData("char.IsWhiteSpace(c)", "char.IsWhiteSpace(c)")]
+    [InlineData("char.IsUpper(c)", "char.IsUpper(c)")]
+    [InlineData("char.IsLower(c)", "char.IsLower(c)")]
+    [InlineData("char.ToUpper(c)", "char.ToUpper(c)")]
+    [InlineData("char.ToLower(c)", "char.ToLower(c)")]
     public void Migration_CharStaticMethod_ConvertsToCharOp(string csharpExpr, string expectedCalorOp)
     {
         // The C# to Calor converter converts char static methods to char operations
@@ -500,7 +500,7 @@ public class CharOperationTests
         // Check via round-trip - the emitted Calor should contain char-code
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("char-code", calor);
+        Assert.Contains("((int)c)", calor);
     }
 
     [Fact]
@@ -516,7 +516,7 @@ public class CharOperationTests
         // Check via round-trip - the emitted Calor should contain char-from-code
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("char-from-code", calor);
+        Assert.Contains("((char)n)", calor);
     }
 
     [Fact]
@@ -532,7 +532,7 @@ public class CharOperationTests
 
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("§IDX", calor);
+        Assert.Contains("s[0]", calor);
     }
 
     [Fact]
@@ -547,17 +547,17 @@ public class CharOperationTests
 
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("§IDX", calor);
+        Assert.Contains("s[i]", calor);
     }
 
     [Theory]
-    [InlineData("char.IsLetter(c)", "is-letter")]
-    [InlineData("char.IsDigit(c)", "is-digit")]
-    [InlineData("char.IsWhiteSpace(c)", "is-whitespace")]
-    [InlineData("char.IsUpper(c)", "is-upper")]
-    [InlineData("char.IsLower(c)", "is-lower")]
-    [InlineData("char.ToUpper(c)", "char-upper")]
-    [InlineData("char.ToLower(c)", "char-lower")]
+    [InlineData("char.IsLetter(c)", "char.IsLetter(c)")]
+    [InlineData("char.IsDigit(c)", "char.IsDigit(c)")]
+    [InlineData("char.IsWhiteSpace(c)", "char.IsWhiteSpace(c)")]
+    [InlineData("char.IsUpper(c)", "char.IsUpper(c)")]
+    [InlineData("char.IsLower(c)", "char.IsLower(c)")]
+    [InlineData("char.ToUpper(c)", "char.ToUpper(c)")]
+    [InlineData("char.ToLower(c)", "char.ToLower(c)")]
     public void Migration_CharOperation_RoundTripsToCalor(string csharpExpr, string expectedCalorOp)
     {
         var csharp = $"public class Test {{ public object M(char c) => {csharpExpr}; }}";
@@ -585,7 +585,7 @@ public class CharOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("char-at", calor);
+        Assert.Contains("(\"hello\")[0]", calor);
     }
 
     [Fact]
@@ -600,7 +600,7 @@ public class CharOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("char-code", calor);
+        Assert.Contains("((int)c)", calor);
     }
 
     [Fact]
@@ -615,7 +615,7 @@ public class CharOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("char-from-code", calor);
+        Assert.Contains("((char)n)", calor);
     }
 
     [Fact]
@@ -633,9 +633,9 @@ public class CharOperationTests
 
         // Should contain char and string operations; indexing uses §IDX (not char-at)
         // because the converter cannot determine the type of s.ToUpper() without semantic model
-        Assert.Contains("is-letter", calor);
-        Assert.Contains("upper", calor);
-        Assert.Contains("§IDX", calor);
+        Assert.Contains("char.IsLetter(", calor);
+        Assert.Contains(".ToUpper()", calor);
+        Assert.Contains("[0]", calor);
     }
 
     [Fact]

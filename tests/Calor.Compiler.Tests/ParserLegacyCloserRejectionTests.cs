@@ -36,12 +36,10 @@ public class ParserLegacyCloserRejectionTests
     public void IndentFormSource_NoLegacyDiagnostic()
     {
         const string src = """
-            §M{Calc}
-              §F{Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R (+ a b)
+            module Calc Calc block
+              func Add (int:a, int:b) → int
+                !
+                return a + b
             """;
         var (diags, hasErrors) = Parse(src);
         Assert.False(hasErrors, "Indent-form source must parse cleanly");

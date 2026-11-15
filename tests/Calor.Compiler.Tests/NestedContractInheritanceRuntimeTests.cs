@@ -102,14 +102,14 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void ExplicitNestedInterfaceNames_ResolveWithoutLosingGuards(string method)
     {
         var source = """
-            §M{NestedContracts}
-              §CL{Outer:pub}
-            """ + "\n" + Indent(Indent(PositiveInterface)) + "\n" + Indent(Indent($$"""
-            §CL{Inner:pub}
-              §IMPL{IPositive}
-              §MT{{{method}}:pub} (i32:value) -> i32
-                §E{}
-                §R value
+            module NestedContracts NestedContracts block
+              class Outer
+            """ + "\n" + Indent(Indent(NativePositiveInterface)) + "\n" + Indent(Indent($$"""
+            class Inner
+              implements IPositive
+              func {{method}} (int:value) → int
+                !
+                return value
             """));
         AssertGuards(Compile(source, false).GetType("NestedContracts.Outer+Inner")!, 1, -1);
     }
@@ -1015,12 +1015,5 @@ public sealed class NestedContractInheritanceRuntimeTests
             !
             requires x > 0
             => result > 0
-        """;
-
-    private const string PositiveInterface = """
-        §IFACE{IPositive}
-          §MT{Get} (i32:x) -> i32
-            §Q (> x INT:0)
-            §S (> result INT:0)
         """;
 }

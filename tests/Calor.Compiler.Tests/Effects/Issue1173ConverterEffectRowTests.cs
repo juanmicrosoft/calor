@@ -43,7 +43,7 @@ public class Issue1173ConverterEffectRowTests
             }
             """);
         var reparsed = Parse(conversion.CalorSource!);
-        Assert.Contains("§MT{Work:pub}", conversion.CalorSource);
+        Assert.Contains("func Work (", conversion.CalorSource);
         foreach (var module in new[] { conversion.Ast!, reparsed })
         {
             var left = Assert.Single(module.Classes.Where(cls => cls.Name == "Left"));
@@ -64,7 +64,8 @@ public class Issue1173ConverterEffectRowTests
         Assert.NotEqual(conversion.Ast!.Classes[0].Methods[0].Id, reparsed.Classes[0].Methods[0].Id);
         Assert.Empty(EffectErrors(conversion.CalorSource!));
         var stripped = string.Join("\n", conversion.CalorSource!.Split('\n')
-            .Where(line => !line.TrimStart().StartsWith("§E{", StringComparison.Ordinal)));
+            .Select(line => line.TrimStart().StartsWith("! ", StringComparison.Ordinal)
+                ? line[..(line.Length - line.TrimStart().Length)] + "!" : line));
         Assert.NotEmpty(EffectErrors(stripped));
     }
 
@@ -245,7 +246,7 @@ public class Issue1173ConverterEffectRowTests
             }
             """);
 
-        Assert.DoesNotContain("§B{_chain", conversion.CalorSource!);
+        Assert.DoesNotContain("let _chain", conversion.CalorSource!);
         Assert.Contains(".Set", conversion.CalorSource!);
         Assert.Empty(EffectErrors(conversion.CalorSource!).Select(d => d.Message));
     }
@@ -310,7 +311,7 @@ public class Issue1173ConverterEffectRowTests
             }
             """);
 
-        Assert.DoesNotContain("§E{", conversion.CalorSource!);
+        Assert.DoesNotMatch(@"(?m)^\s*! \S", conversion.CalorSource!);
     }
 
     /// <summary>
@@ -394,11 +395,12 @@ public class Issue1173ConverterEffectRowTests
             }
             """);
 
-        Assert.Contains("§E{", conversion.CalorSource!);
+        Assert.Matches(@"(?m)^\s*! \S", conversion.CalorSource!);
         var stripped = string.Join(
             "\n",
             conversion.CalorSource!.Split('\n')
-                .Where(line => !line.TrimStart().StartsWith("§E{", StringComparison.Ordinal)));
+                .Select(line => line.TrimStart().StartsWith("! ", StringComparison.Ordinal)
+                    ? line[..(line.Length - line.TrimStart().Length)] + "!" : line));
 
         // Enforcement OFF on both sides: the question here is what the rows do to
         // CODEGEN, and leaving it on would compare "the C# for the stripped module"

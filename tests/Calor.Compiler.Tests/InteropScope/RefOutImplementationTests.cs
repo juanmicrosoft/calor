@@ -567,8 +567,8 @@ public class RefOutImplementationTests
     public void OutVar_IsLoweredBeforeItsStatement()
     {
         var calor = new CSharpToCalorConverter().Convert(R0Fixture("F1-REFOUT-02")).CalorSource!;
-        Assert.Contains("§B{~n:int} `default`\n        §R (? §C{int.TryParse} §A text §A{out} n §/C n (- 1))", calor.Replace("\r\n", "\n"));
-        Assert.Contains("§A{out} _ §/C", calor);
+        Assert.Contains("var int:n = default(int)\n      return (int.TryParse(text, out @n) ? n : (-1))", calor.Replace("\r\n", "\n"));
+        Assert.Contains("int.TryParse(text, out _)", calor);
     }
 
     [Theory]
@@ -602,8 +602,8 @@ public class RefOutImplementationTests
                 public static string Run() { int v = 4; return Twice(ref v).ToString(); }
             }
             """).CalorSource!;
-        Assert.Contains("§A{in} v", calor);
-        Assert.DoesNotContain("§A{ref}", calor);
+        Assert.Contains("Twice(in v)", calor);
+        Assert.DoesNotContain("ref v", calor);
     }
 
     private static IEnumerable<(string Id, string Source, string Allowed)> Rows()

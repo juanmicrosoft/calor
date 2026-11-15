@@ -43,13 +43,13 @@ public class TypeOperationTests
     [Fact]
     public void Parse_Cast_ReturnsTypeOperationNode()
     {
-        var source = WrapInFunction("§R (cast i32 x)");
+        var source = WrapInFunction("return (int)x");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var typeOp = GetReturnTypeExpression(module);
         Assert.Equal(TypeOp.Cast, typeOp.Operation);
-        Assert.Equal("i32", typeOp.TargetType);
+        Assert.Equal("int", typeOp.TargetType);
         Assert.IsType<ReferenceNode>(typeOp.Operand);
         Assert.Equal("x", ((ReferenceNode)typeOp.Operand).Name);
     }
@@ -57,7 +57,7 @@ public class TypeOperationTests
     [Fact]
     public void Parse_Is_ReturnsIsPatternNode()
     {
-        var source = WrapInFunction("§R (is x str)");
+        var source = WrapInFunction("return x is string");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -66,7 +66,7 @@ public class TypeOperationTests
         Assert.NotNull(returnStmt);
         var isPattern = returnStmt!.Expression as IsPatternNode;
         Assert.NotNull(isPattern);
-        Assert.Equal("str", isPattern!.TargetType);
+        Assert.Equal("string", isPattern!.TargetType);
         Assert.Null(isPattern.VariableName);
         Assert.IsType<ReferenceNode>(isPattern.Operand);
         Assert.Equal("x", ((ReferenceNode)isPattern.Operand).Name);
@@ -75,13 +75,13 @@ public class TypeOperationTests
     [Fact]
     public void Parse_As_ReturnsTypeOperationNode()
     {
-        var source = WrapInFunction("§R (as x str)");
+        var source = WrapInFunction("return x as string");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var typeOp = GetReturnTypeExpression(module);
         Assert.Equal(TypeOp.As, typeOp.Operation);
-        Assert.Equal("str", typeOp.TargetType);
+        Assert.Equal("string", typeOp.TargetType);
         Assert.IsType<ReferenceNode>(typeOp.Operand);
         Assert.Equal("x", ((ReferenceNode)typeOp.Operand).Name);
     }
@@ -89,7 +89,7 @@ public class TypeOperationTests
     [Fact]
     public void Parse_Cast_WithCustomType_ReturnsTypeOperationNode()
     {
-        var source = WrapInFunction("§R (cast MyClass x)");
+        var source = WrapInFunction("return (MyClass)x");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -103,16 +103,16 @@ public class TypeOperationTests
     #region C# Emission Tests
 
     [Theory]
-    [InlineData("(cast i32 x)", "(int)x")]
-    [InlineData("(cast f64 x)", "(double)x")]
-    [InlineData("(cast str x)", "(string)x")]
-    [InlineData("(is x str)", "x is string")]
-    [InlineData("(is x i32)", "x is int")]
-    [InlineData("(as x str)", "x as string")]
-    [InlineData("(as x MyClass)", "x as MyClass")]
+    [InlineData("(int)x", "(int)x")]
+    [InlineData("(double)x", "(double)x")]
+    [InlineData("(string)x", "(string)x")]
+    [InlineData("x is string", "x is string")]
+    [InlineData("x is int", "x is int")]
+    [InlineData("x as string", "x as string")]
+    [InlineData("x as MyClass", "x as MyClass")]
     public void Emit_TypeOperation_ProducesCorrectCSharp(string calor, string expectedCSharp)
     {
-        var source = WrapInFunction($"§R {calor}");
+        var source = WrapInFunction($"return {calor}");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -128,17 +128,17 @@ public class TypeOperationTests
     #region Round-Trip Tests
 
     [Theory]
-    [InlineData("(cast int x)")]
-    [InlineData("(cast double x)")]
-    [InlineData("(cast string x)")]
-    [InlineData("(is x string)")]
-    [InlineData("(is x int)")]
-    [InlineData("(is x MyClass)")]
-    [InlineData("(as x string)")]
-    [InlineData("(as x MyClass)")]
+    [InlineData("(int)x")]
+    [InlineData("(double)x")]
+    [InlineData("(string)x")]
+    [InlineData("x is string")]
+    [InlineData("x is int")]
+    [InlineData("x is MyClass")]
+    [InlineData("x as string")]
+    [InlineData("x as MyClass")]
     public void RoundTrip_TypeOp_ProducesValidCalor(string op)
     {
-        var source = WrapInFunction($"§R {op}");
+        var source = WrapInFunction($"return {op}");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -156,7 +156,7 @@ public class TypeOperationTests
     [Fact]
     public void Parse_GroupedCastName_ReturnsReference()
     {
-        var source = WrapInFunction("§R (cast)");
+        var source = WrapInFunction("return (cast)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -177,7 +177,7 @@ public class TypeOperationTests
     [Fact]
     public void Parse_Cast_ThreeArgs_ReportsError()
     {
-        var source = WrapInFunction("§R (cast i32 x y)");
+        var source = WrapInFunction("return ((int)x y)");
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
@@ -188,7 +188,7 @@ public class TypeOperationTests
     [Fact]
     public void Parse_GroupedIsName_ReturnsReference()
     {
-        var source = WrapInFunction("§R (is)");
+        var source = WrapInFunction("return (is)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -199,7 +199,7 @@ public class TypeOperationTests
     [Fact]
     public void Parse_As_OneArg_ReportsError()
     {
-        var source = WrapInFunction("§R (as x)");
+        var source = WrapInFunction("return x as");
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
@@ -372,7 +372,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(cast int x)", calor);
+        Assert.Contains("((int)x)", calor);
     }
 
     [Fact]
@@ -387,7 +387,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(as x string)", calor);
+        Assert.Contains("(x as string)", calor);
     }
 
     [Fact]
@@ -402,7 +402,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(is x string)", calor);
+        Assert.Contains("(x is string)", calor);
     }
 
     [Fact]
@@ -418,7 +418,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(is x string s)", calor);
+        Assert.Contains("(x is string s)", calor);
     }
 
     #endregion
@@ -428,7 +428,7 @@ public class TypeOperationTests
     [Fact]
     public void Parse_CastWithBinaryOp_Works()
     {
-        var source = WrapInFunction("§R (cast i32 (+ x 1))");
+        var source = WrapInFunction("return (int)(x + 1)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -444,7 +444,7 @@ public class TypeOperationTests
     [Fact]
     public void Parse_AsInReturnExpression_Works()
     {
-        var source = WrapInFunction("§R (as x str)");
+        var source = WrapInFunction("return x as string");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -458,17 +458,17 @@ public class TypeOperationTests
     public void Parse_NestedCast_Works()
     {
         // (cast i32 (cast f64 x)) — cast to f64 then to i32
-        var source = WrapInFunction("§R (cast i32 (cast f64 x))");
+        var source = WrapInFunction("return (int)(double)x");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var outer = GetReturnTypeExpression(module);
         Assert.Equal(TypeOp.Cast, outer.Operation);
-        Assert.Equal("i32", outer.TargetType);
+        Assert.Equal("int", outer.TargetType);
 
         var inner = Assert.IsType<TypeOperationNode>(outer.Operand);
         Assert.Equal(TypeOp.Cast, inner.Operation);
-        Assert.Equal("f64", inner.TargetType);
+        Assert.Equal("double", inner.TargetType);
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
@@ -479,16 +479,16 @@ public class TypeOperationTests
     public void Parse_IsNestedInCast_Works()
     {
         // Parsing preserves this composition; C# validation rejects bool-to-int casts.
-        var source = WrapInFunction("§R (cast i32 (is x str))");
+        var source = WrapInFunction("return (int)(x is string)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var outer = GetReturnTypeExpression(module);
         Assert.Equal(TypeOp.Cast, outer.Operation);
-        Assert.Equal("i32", outer.TargetType);
+        Assert.Equal("int", outer.TargetType);
 
         var inner = Assert.IsType<IsPatternNode>(outer.Operand);
-        Assert.Equal("str", inner.TargetType);
+        Assert.Equal("string", inner.TargetType);
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
@@ -498,7 +498,7 @@ public class TypeOperationTests
     [Fact]
     public void RoundTrip_NestedCast_PreservesStructure()
     {
-        var source = WrapInFunction("§R (cast i32 (cast f64 x))");
+        var source = WrapInFunction("return (int)(double)x");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -506,7 +506,7 @@ public class TypeOperationTests
         var calorEmitter = new CalorEmitter();
         var roundTripped = calorEmitter.Emit(module);
 
-        Assert.Contains("(cast int (cast double x))", roundTripped);
+        Assert.Contains("((int)((double)x))", roundTripped);
     }
 
     #endregion
@@ -516,7 +516,7 @@ public class TypeOperationTests
     [Fact]
     public void TypeChecker_AsWithValueType_ReportsWarning()
     {
-        var source = WrapInFunction("§R (as x i32)");
+        var source = WrapInFunction("return x as int");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -526,13 +526,13 @@ public class TypeOperationTests
 
         Assert.Contains(diagnostics, d =>
             d.Message.Contains("'as' operator cannot be used with value type") &&
-            d.Message.Contains("i32"));
+            d.Message.Contains("int"));
     }
 
     [Fact]
     public void TypeChecker_AsWithReferenceType_NoWarning()
     {
-        var source = WrapInFunction("§R (as x str)");
+        var source = WrapInFunction("return x as string");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -547,7 +547,7 @@ public class TypeOperationTests
     [Fact]
     public void TypeChecker_AsWithBool_ReportsWarning()
     {
-        var source = WrapInFunction("§R (as x bool)");
+        var source = WrapInFunction("return x as bool");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -562,7 +562,7 @@ public class TypeOperationTests
     [Fact]
     public void TypeChecker_AsWithFloat_ReportsWarning()
     {
-        var source = WrapInFunction("§R (as x f64)");
+        var source = WrapInFunction("return x as double");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));

@@ -1541,7 +1541,7 @@ public class CollectionOperationsTests
         var calorOutput = emitter.Emit(module);
 
         // Should contain §IDX syntax (brace format for simple references)
-        Assert.Contains("§IDX{", calorOutput);
+        Assert.Contains("myList[0]", calorOutput);
 
         // Re-parse the emitted Calor
         var reparsed = Parse(calorOutput, out var rediagnostics);
@@ -2218,7 +2218,7 @@ public class CollectionOperationsTests
         var emitter = new CalorEmitter();
         var output = accessNode.Accept(emitter);
 
-        Assert.Equal("§IDX{arr} 0", output);
+        Assert.Equal("arr[0]", output);
     }
 
     [Fact]
@@ -2259,7 +2259,7 @@ public class CollectionOperationsTests
         // Emit → reparse roundtrip
         var emitter = new CalorEmitter();
         var calorOutput = emitter.Emit(module);
-        Assert.Contains("§IDX{", calorOutput);
+        Assert.Contains("myList[0]", calorOutput);
 
         var reparsed = Parse(calorOutput, out var rediagnostics);
         Assert.False(rediagnostics.HasErrors, $"Round-trip failed: {string.Join(", ", rediagnostics.Select(d => d.Message))}");

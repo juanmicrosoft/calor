@@ -622,7 +622,7 @@ public class LanguageFeatureTests
     {
         // Use actual triple-quote multiline syntax in a full compilation
         // Note: The triple-quote must be in the Calor source, not the C# raw string
-        var calorSource = "§M{Test}\n§F{Run:pub}\n§O{string}\n§R \"\"\"hello\nworld\"\"\"\n\n";
+        var calorSource = "module Test Test block\n  func Run () → string\n    !\n    return \"\"\"hello\nworld\"\"\"\n\n";
         var result = Program.Compile(calorSource, null, new CompilationOptions { EnforceEffects = false });
         Assert.False(result.HasErrors, $"Errors: {string.Join("; ", result.Diagnostics)}");
         // Multiline string should emit as C# verbatim string

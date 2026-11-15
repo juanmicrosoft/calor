@@ -248,10 +248,10 @@ public class DiagnosticCodeClassificationTests
     public void WhereClause_UnknownTypeParam_ProducesCalor0115()
     {
         var source = """
-            §M{Test}
-              §CL{MyClass:pub}<T>
-                  §WHERE U : class
-                  §FLD{T:_item:priv}
+            module Test Test block
+              class MyClass<T>
+                where U : class
+                field T:_item private
             """;
         Parse(source, out var diagnostics);
 

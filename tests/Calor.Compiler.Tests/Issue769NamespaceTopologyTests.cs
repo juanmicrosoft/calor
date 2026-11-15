@@ -703,19 +703,20 @@ public class Issue769NamespaceTopologyTests
     {
         var module = ParseCalor(
             """
-            §M{Test}
-              §NS{Alpha}
-                §F{Compute:pub} () -> i32
-                  §Q (> INT:2 INT:1)
-                  §R INT:42
-                §CL{Worker:pub}
-                  §MT{Run:pub} () -> i32
-                    §Q (> INT:2 INT:1)
-                    §R INT:42
-                §IFACE{IWorker}
-                  §MT{Run}
-                    §O{i32}
-                    §Q (> INT:2 INT:1)
+            module Test Alpha block
+              func Compute () → int
+                !
+                requires 2 > 1
+                return 42
+              class Worker
+                func Run () → int
+                  !
+                  requires 2 > 1
+                  return 42
+              interface IWorker
+                func Run () → int
+                  !
+                  requires 2 > 1
             """);
         module.NamespaceIdentity = "module-metadata";
         module.NamespaceScopeId = "module-scope";
@@ -1773,7 +1774,7 @@ public class Issue769NamespaceTopologyTests
         var type = Assert.Single(result.Ast.Classes);
         Assert.Equal("_global", type.NamespaceIdentity);
         Assert.Equal("global::_global.Thing", type.FullyQualifiedSymbolIdentity);
-        Assert.Contains("§NS{_global:named}", result.CalorSource);
+        Assert.Contains("module _global _global block", result.CalorSource);
 
         var generated = CompileConverted(result);
         var compilation = CreateCompilation(generated);

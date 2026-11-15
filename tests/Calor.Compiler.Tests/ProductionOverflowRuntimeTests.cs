@@ -75,9 +75,10 @@ public class ProductionOverflowRuntimeTests
     public void UnknownOverflowPolicy_IsRejectedRatherThanSilentlyChanged(string policy)
     {
         var result = Program.Compile($$"""
-            §M{Overflow:overflow={{policy}}}
-              §F{Probe:pub} (i32:value) -> i32
-                §R (+ value 1)
+            module Overflow overflow {{policy}}
+              func Probe (int:value) → int
+                !
+                return (value + 1)
             """, "overflow.calr", Options());
         Assert.True(result.HasErrors);
         Assert.Empty(result.GeneratedCode);
@@ -188,7 +189,6 @@ public class ProductionOverflowRuntimeTests
                   using System.Collections.Generic
                   module Migrated
                     func Record private (List<int>:trace, int:value) → int
-                       mut
                       trace.Add(value)
                       return value
                     func Probe (List<int>:trace) → int
@@ -262,7 +262,6 @@ public class ProductionOverflowRuntimeTests
         string Source(string expression) => $$"""
             module OverflowAnalysis
               func Effectful private () → int
-                 cw
                 Console.WriteLine("effect")
                 return 1
               func Probe (int:value) → int
@@ -299,6 +298,33 @@ public class ProductionOverflowRuntimeTests
             Assert.Null(InvokeCSharp(compiled.GeneratedCode, 0).Error);
         }
     }
+
+    // These theory rows are registered cases of the #1421 determinism protocol
+    // (tests/TestData/DeterminismProtocol/cases.json), whose names embed the row data, so the
+    // rows keep their original (legacy) spelling and the native source text is looked up here.
+    private static readonly Dictionary<string, string> NativeRowTexts = new(StringComparer.Ordinal)
+    {
+        ["(== (- (+ value 1) 1) value)"] = "(((value + 1) - 1) == value)",
+        ["(== (- (- value 1) -1) value)"] = "(((value - 1) - -1) == value)",
+        ["(== (* value 2) (* 2 value))"] = "((value * 2) == (2 * value))",
+        ["(== (- (- value)) value)"] = "((-(-value)) == value)",
+        ["(forall ((i i32)) (-> (&& (>= i 0) (< i 1)) (== (- (+ value 1) 1) value)))"] =
+            "(forall int:i in 0..1 : (((value + 1) - 1) == value))",
+        ["(exists ((i i32)) (&& (&& (>= i 0) (< i 1)) (== (- (+ value 1) 1) value)))"] =
+            "(exists int:i in 0..1 : (((value + 1) - 1) == value))",
+        ["(-> (< value 2147483647) (== (- (+ value 1) 1) value))"] =
+            "(!(value < 2147483647) || (((value + 1) - 1) == value))",
+        ["(|| (== value 2147483647) (== (- (+ value 1) 1) value))"] =
+            "((value == 2147483647) || (((value + 1) - 1) == value))",
+        ["(== (? (< value 2147483647) (== (- (+ value 1) 1) value) true) true)"] =
+            "(((value < 2147483647) ? (((value + 1) - 1) == value) : true) == true)",
+        ["i64"] = "long",
+        ["i32"] = "int",
+        ["u8"] = "byte",
+        ["f64"] = "double",
+    };
+
+    private static string NativeRowText(string row) => NativeRowTexts[row];
 
     private static string ConvertNativeOverflowSource(string source, bool checkOverflow)
     {
@@ -353,9 +379,9 @@ public class ProductionOverflowRuntimeTests
             Assert.False(uncheckedCompile.HasErrors, string.Join("; ", uncheckedCompile.Diagnostics.Errors));
             Assert.Contains(uncheckedCompile.Diagnostics, diagnostic =>
                 diagnostic.Verification is { Status: ProofStatus.Proven, IsVacuous: false });
-            Assert.Contains("overflow=unchecked", new CalorEmitter().Emit(uncheckedCompile.Ast!));
+            Assert.Contains("overflow unchecked", new CalorEmitter().Emit(uncheckedCompile.Ast!));
             Assert.Null(TestHarness.Execute(source, "Probe", [int.MaxValue], OptionsWithCache()).Exception);
-            var checkedSource = source.Replace(":overflow=unchecked", "");
+            var checkedSource = source.Replace(" overflow unchecked", "");
             Assert.IsType<OverflowException>(
                 TestHarness.Execute(checkedSource, "Probe", [int.MaxValue], OptionsWithCache()).Exception);
         }
@@ -428,10 +454,10 @@ public class ProductionOverflowRuntimeTests
     {
         foreach (var binding in new[]
         {
-            "§B{one:i32} 1\n    §B{unused} (+ value one)",
-            "§B{one} 1\n    §B{unused} (+ value one)",
-            "§B{one:i32} 1\n    §B{alias:i32} one\n    §B{unused} (+ value alias)",
-            "§B{one:i32} 1\n    §IF (> value 0)\n      §B{unused} (+ value one)"
+            "let int:one = 1\n    let unused = (value + one)",
+            "let one = 1\n    let unused = (value + one)",
+            "let int:one = 1\n    let int:alias = one\n    let unused = (value + alias)",
+            "let int:one = 1\n    if (value > 0)\n      let unused = (value + one)"
         })
         {
             var source = $$"""
@@ -465,7 +491,7 @@ public class ProductionOverflowRuntimeTests
             module Overflow Overflow block
               func Probe (int:value) → int
                 !
-                => {{predicate}}
+                => {{NativeRowText(predicate)}}
                 return value
             """;
         var options = VerifiedOptions();
@@ -510,7 +536,7 @@ public class ProductionOverflowRuntimeTests
             module Overflow Overflow block
               func Probe (int:value) → int
                 !
-                => {{predicate}}
+                => {{NativeRowText(predicate)}}
                 return value
             """;
         var options = VerifiedOptions();
@@ -535,7 +561,7 @@ public class ProductionOverflowRuntimeTests
             module Overflow Overflow block
               func Probe (int:value) → int
                 !
-                => {{predicate}}
+                => {{NativeRowText(predicate)}}
                 return value
             """;
         var options = VerifiedOptions();
@@ -579,10 +605,10 @@ public class ProductionOverflowRuntimeTests
         string operation, int overflowLeft, int overflowRight, int safeLeft, int safeRight, int expected)
     {
         var source = $$"""
-            §M{Overflow}
-              §F{Probe:pub} (i32:left, i32:right) -> i32
-                §E{}
-                §R ({{operation}} left right)
+            module Overflow Overflow block
+              func Probe (int:left, int:right) → int
+                !
+                return (left {{operation}} right)
             """;
         AssertOverflow(source, [overflowLeft, overflowRight]);
         var safe = TestHarness.Execute(source, "Probe", [safeLeft, safeRight], Options());
@@ -600,9 +626,9 @@ public class ProductionOverflowRuntimeTests
     {
         var source = $$"""
             module Overflow Overflow block
-              func Probe ({{inputType}}:value) → {{outputType}}
+              func Probe ({{NativeRowText(inputType)}}:value) → {{NativeRowText(outputType)}}
                 !
-                return (({{outputType}})value)
+                return (({{NativeRowText(outputType)}})value)
             """;
         AssertOverflow(source, [overflow]);
         var safe = TestHarness.Execute(source, "Probe", [safeInput], Options());
@@ -620,10 +646,10 @@ public class ProductionOverflowRuntimeTests
                 return (-value)
             """, [int.MinValue]);
         AssertOverflow("""
-            §M{Overflow}
-              §F{Probe:pub} (i32:value) -> char
-                §E{}
-                §R (char-from-code value)
+            module Overflow Overflow block
+              func Probe (int:value) → char
+                !
+                return ((char)value)
             """, [65536]);
     }
 
@@ -633,12 +659,12 @@ public class ProductionOverflowRuntimeTests
     public void ExplicitIncrementAndDecrement_Trap(string operation, int input)
     {
         AssertOverflow($$"""
-            §M{Overflow}
-              §F{Probe:pub} (i32:input) -> i32
-                §E{mut}
-                §B{~value:i32} input
-                §ASSIGN value ({{operation}} value 1)
-                §R value
+            module Overflow Overflow block
+              func Probe (int:input) → int
+                ! mut
+                var int:value = input
+                set value (value {{operation}} 1)
+                return value
             """, [input]);
     }
 

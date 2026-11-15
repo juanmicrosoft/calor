@@ -67,10 +67,11 @@ public sealed class TaintAnalysisCfgTests
     }
 
     private static string N3TaintSource(string method, bool expression, bool tainted) => $$"""
-        §M{TaintIdentity}
-          §F{Run:pub} () -> void
-            §B{path:string} {{(tainted ? "(?? §C{System.Environment.GetEnvironmentVariable} §A STR:\"N3_INPUT\" §/C STR:\"missing.txt\")" : "STR:\"constant.txt\"")}}
-            {{(expression ? "§B{ignored} " : "")}}§C{System.IO.File.{{method}}} §A path {{(method == "WriteAllText" ? "§A STR:\"content\"" : "")}} §/C
+        module TaintIdentity TaintIdentity block
+          func Run () → void
+            ! {{(tainted ? "env:r," : "")}}{{(method == "ReadAllText" ? "fs:r" : "fs:w")}}
+            let string:path = {{(tainted ? "(System.Environment.GetEnvironmentVariable(\"N3_INPUT\") ?? \"missing.txt\")" : "\"constant.txt\"")}}
+            {{(expression ? "let ignored = " : "")}}System.IO.File.{{method}}(path{{(method == "WriteAllText" ? ", \"content\"" : "")}})
         """;
 
     [Theory]
@@ -91,20 +92,22 @@ public sealed class TaintAnalysisCfgTests
     {
         var parameters = taintedPath ? "System.Text.Encoding:encoding, string:user_input" : "System.Text.Encoding:user_input";
         var encoding = taintedPath ? "encoding" : "user_input";
-        var path = taintedPath ? "user_input" : "STR:\"safe.txt\"";
-        var bcl = $"{(expression ? "§B{ignored} " : "")}§C{{System.IO.File.ReadAllText}} §A[encoding] {(wrapper ? "encoding" : encoding)} §A[path] {(wrapper ? "path" : path)} §/C";
-        var wrapperArguments = namedWrapper ? $"§A[path] {path} §A[encoding] {encoding}" : $"§A {encoding} §A {path}";
+        var path = taintedPath ? "user_input" : "\"safe.txt\"";
+        var bcl = $"{(expression ? "let ignored = " : "")}System.IO.File.ReadAllText(encoding: {(wrapper ? "encoding" : encoding)}, path: {(wrapper ? "path" : path)})";
+        var wrapperArguments = namedWrapper ? $"path: {path}, encoding: {encoding}" : $"{encoding}, {path}";
         var source = wrapper ? $$"""
-            §M{NamedSummary}
-              §F{Wrapper:pub} (System.Text.Encoding:encoding, string:path) -> string
+            module NamedSummary NamedSummary block
+              func Wrapper (System.Text.Encoding:encoding, string:path) → string
+                ! fs:r
                 {{bcl}}
-                §R STR:"done"
-              §F{Run:pub} ({{parameters}}) -> void
-                {{(expression ? "§B{result} " : "")}}§C{Wrapper} {{wrapperArguments}} §/C
+                return "done"
+              func Run ({{parameters}}) → void
+                ! fs:r
+                {{(expression ? "let result = " : "")}}Wrapper({{wrapperArguments}})
             """ : $$"""
             module NamedDirect NamedDirect block
-              func Run ({{parameters}}:) → void
-                !
+              func Run ({{parameters}}) → void
+                ! fs:r
                 {{bcl}}
             """;
         var parsing = new DiagnosticBag();
@@ -141,16 +144,18 @@ public sealed class TaintAnalysisCfgTests
     [InlineData(true, true)]
     public void N3_NativeReturnSummary_UsesSelectedArgumentRoles(bool named, bool taintedReturn)
     {
-        var keep = taintedReturn ? "user_input" : "STR:\"safe.txt\"";
-        var drop = taintedReturn ? "STR:\"unused\"" : "user_input";
-        var arguments = named ? $"§A[keep] {keep} §A[drop] {drop}" : $"§A {drop} §A {keep}";
+        var keep = taintedReturn ? "user_input" : "\"safe.txt\"";
+        var drop = taintedReturn ? "\"unused\"" : "user_input";
+        var arguments = named ? $"keep: {keep}, drop: {drop}" : $"{drop}, {keep}";
         var source = $$"""
-            §M{NamedReturnSummary}
-              §F{Choose:pub} (string:drop, string:keep) -> string
-                §R keep
-              §F{Run:pub} (string:user_input) -> void
-                §B{result} §C{Choose} {{arguments}} §/C
-                §C{System.IO.File.Delete} §A result §/C
+            module NamedReturnSummary NamedReturnSummary block
+              func Choose (string:drop, string:keep) → string
+                !
+                return keep
+              func Run (string:user_input) → void
+                ! fs:w
+                let result = Choose({{arguments}})
+                System.IO.File.Delete(result)
             """;
         var parsing = new DiagnosticBag();
         var module = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();

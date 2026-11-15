@@ -164,7 +164,7 @@ module TestMod TestMod block
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§ARR{", result.CalorSource);
+        Assert.Contains("new double[] {", result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
 
@@ -209,7 +209,7 @@ module TestMod TestMod block
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§ARR{arr:double}", result.CalorSource);
+        Assert.Contains("let double[]:arr = new double[]", result.CalorSource);
     }
 
     [Fact]
@@ -226,7 +226,7 @@ module TestMod TestMod block
         Assert.DoesNotContain("§ERR", result.CalorSource);
         // #1132: an empty initializer is a fresh zero-length array, not the shared
         // Array.Empty<T>() (`new int[0] == new int[0]` is false in C#).
-        Assert.Contains("§ARR{int:0}", result.CalorSource);
+        Assert.Contains("new int[0]", result.CalorSource);
         Assert.DoesNotContain("Array.Empty", result.CalorSource);
     }
 
@@ -243,9 +243,9 @@ module TestMod TestMod block
         Assert.NotNull(result.CalorSource);
         // Element type should be inferred from the int[,] declaration. #1132: a bare
         // initializer of a declared int[,] is a rectangular §ARR2D, not a 1-D §ARR of rows.
-        Assert.Contains("§ARR2D{int}", result.CalorSource);
-        Assert.Contains("§ROW 1 2", result.CalorSource);
-        Assert.DoesNotContain("§ARR{matrix", result.CalorSource);
+        Assert.Contains("new int[,]", result.CalorSource);
+        Assert.Contains("{ 1, 2 }", result.CalorSource);
+        Assert.DoesNotContain("new int[] {", result.CalorSource);
     }
 
     #endregion
@@ -297,7 +297,7 @@ module TestMod TestMod block
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§NEW{Person}", result.CalorSource);
+        Assert.Contains("new Person(", result.CalorSource);
         Assert.Contains("Name =", result.CalorSource);
         Assert.Contains("Age =", result.CalorSource);
     }
@@ -310,12 +310,10 @@ module TestMod TestMod block
     public void AnonymousType_BasicSyntax_EmitsNewAnonymous()
     {
         var source = @"
-§M{TestMod}
-  §F{Test:pub}
-      §B{~obj:var} §ANON
-        Name = ""test""
-        Value = 42
-      §/ANON
+module TestMod TestMod block
+  func Test ()
+    ! alloc
+    var obj = new { Name = ""test"", Value = 42 }
 ";
 
         var result = ParseAndEmit(source);
@@ -336,7 +334,7 @@ module TestMod TestMod block
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§ANON", result.CalorSource);
+        Assert.Contains("new { Name = \"test\", Value = 42 }", result.CalorSource);
         Assert.Contains("Name =", result.CalorSource);
         Assert.Contains("Value =", result.CalorSource);
         Assert.Contains("anonymous-type", result.Context.UsedFeatures);

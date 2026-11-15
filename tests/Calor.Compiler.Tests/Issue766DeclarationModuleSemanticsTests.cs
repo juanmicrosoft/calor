@@ -83,10 +83,10 @@ public class Issue766DeclarationModuleSemanticsTests
 
         var conditional = new CSharpEmitter().Emit(Parse(
             """
-            §M{ConditionalUsing}
-              §PP{FEATURE}
-                §U{global:System.Text}
-                §U{Buffers:System.Buffers}
+            module ConditionalUsing ConditionalUsing block
+              pp FEATURE
+                global using System.Text
+                using Buffers = System.Buffers
             """));
         Assert.Contains("global using System.Text;", conditional);
         Assert.Contains("using Buffers = System.Buffers;", conditional);
@@ -141,9 +141,9 @@ public class Issue766DeclarationModuleSemanticsTests
             u => u.Namespace == "System.Collections.Generic"
                 && !u.IsGlobal
                 && u.Alias == "Collections");
-        Assert.Contains("§U{global:System}", result.CalorSource);
-        Assert.Contains("§U{global:Text:System.Text}", result.CalorSource);
-        Assert.Contains("§U{global:static:System.Math}", result.CalorSource);
+        Assert.Contains("global using System\n", result.CalorSource);
+        Assert.Contains("global using Text = System.Text", result.CalorSource);
+        Assert.Contains("global using static System.Math", result.CalorSource);
     }
 
     [Fact]
@@ -719,24 +719,22 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{ElifNestedTypes}
-              §PP{FIRST}
-                §CL{FirstSelected:pub}
-                  §FLD{i32:Value:pub}
-              §PPE
-                §PP{SECOND}
-                  §IFACE{ISecondBefore}
-                    §PROP{Value:i32:pub:get}
-                  §PP{DEEP}
-                    §CL{DeepSelected:pub}
-                      §FLD{i32:Value:pub}
-                  §/PP{DEEP}
-                  §CL{SecondAfter:pub}
-                    §FLD{i32:Value:pub}
-                §PPE
-                  §CL{FinalFallback:pub}
-                    §FLD{i32:Value:pub}
-                §/PP{SECOND}
+            module ElifNestedTypes ElifNestedTypes block
+              pp FIRST
+                class FirstSelected
+                  field int:Value
+              pp elif SECOND
+                interface ISecondBefore
+                  property int:Value
+                    get
+                pp DEEP
+                  class DeepSelected
+                    field int:Value
+                class SecondAfter
+                  field int:Value
+              pp else
+                class FinalFallback
+                  field int:Value
             """,
             null,
             new CompilationOptions { DeferGeneratedOutputValidation = true });
@@ -788,7 +786,7 @@ public class Issue766DeclarationModuleSemanticsTests
         {
             var canonical = creation.Accept(new CalorEmitter());
             var module = Parse(
-                $"§M{{RecordMigration}}\n  §F{{Create:pub}} () -> Pair\n    §R {canonical}");
+                $"module RecordMigration RecordMigration block\n  func Create () → Pair\n    !\n    return {canonical}");
             var replay = Assert.IsType<ReturnStatementNode>(module.Functions[0].Body[0]).Expression!;
             expression = replay.Accept(new CSharpEmitter());
         }
@@ -825,21 +823,22 @@ public class Issue766DeclarationModuleSemanticsTests
             ]);
 
         Assert.Equal(
-            "§NEW{Pair} §A[Right] \"r\" §A[Left] \"l\" §/NEW",
+            "new Pair(Right: \"r\", Left: \"l\")",
             creation.Accept(new CalorEmitter()));
     }
 
     [Theory]
-    [InlineData("§A[Right] \"right\" §A[Left] \"left\"", "Right", "Left")]
-    [InlineData("§A \"left\" §A[Right] \"right\"", null, "Right")]
+    [InlineData("(Right: \"right\", Left: \"left\")", "Right", "Left")]
+    [InlineData("(\"left\", Right: \"right\")", null, "Right")]
     public void NamedConstructorArguments_SurviveParserBindingAndBothEmitters(
         string arguments, string? firstName, string secondName)
     {
         var module = Parse(
             $$"""
-            §M{NamedConstruction}
-              §F{Create:pub} () -> Pair
-                §R §NEW{Pair} {{arguments}}
+            module NamedConstruction NamedConstruction block
+              func Create () → Pair
+                !
+                return new Pair{{arguments}}
             """);
         var creation = Assert.IsType<NewExpressionNode>(
             Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]).Expression);
@@ -893,8 +892,8 @@ public class Issue766DeclarationModuleSemanticsTests
                 bound.Functions.Single(function => function.Symbol.Name == "Create").Body[0]).Expression);
         Assert.NotNull(creation.ResolvedConstructor);
         Assert.Equal("Left", creation.ResolvedConstructor.Parameters[0].Name);
-        Assert.Equal("i32", creation.ResolvedConstructor.Parameters[0].TypeName);
-        Assert.Equal("str", creation.ResolvedConstructor.Parameters[1].TypeName);
+        Assert.Equal("int", creation.ResolvedConstructor.Parameters[0].TypeName);
+        Assert.Equal("string", creation.ResolvedConstructor.Parameters[1].TypeName);
         Assert.Equal(["Right", "Left"], creation.ArgumentNames);
     }
 
@@ -932,8 +931,8 @@ public class Issue766DeclarationModuleSemanticsTests
                 }
             }
             """);
-        Assert.Contains("§A[Right]", conversion.CalorSource);
-        Assert.Contains("§A[Left]", conversion.CalorSource);
+        Assert.Contains("Right: Next(", conversion.CalorSource);
+        Assert.Contains("Left: Next(", conversion.CalorSource);
         Assert.DoesNotContain("§CS", conversion.CalorSource);
         var assembly = CompileAssembly(CompileConvertedCalor(conversion));
         var harness = assembly.GetTypes().Single(type => type.Name == "ConstructorHarness");
@@ -976,9 +975,9 @@ public class Issue766DeclarationModuleSemanticsTests
                 }
             }
             """);
-        Assert.Contains("§NEW{StringBuilder}", conversion.CalorSource);
-        Assert.Contains("§A[maxCapacity]", conversion.CalorSource);
-        Assert.Contains("§A[capacity]", conversion.CalorSource);
+        Assert.Contains("new StringBuilder(", conversion.CalorSource);
+        Assert.Contains("maxCapacity: 100", conversion.CalorSource);
+        Assert.Contains("capacity: 16", conversion.CalorSource);
         Assert.DoesNotContain("§CS", conversion.CalorSource);
         var assembly = CompileAssembly(CompileConvertedCalor(conversion));
         var harness = assembly.GetTypes().Single(type => type.Name == "ConstructorHarness");
@@ -1000,13 +999,13 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{Variance}
-              §IFACE{IVariant}<out TOut, in TIn, TUnmanaged, TNotNull, TDerived>
-                §WHERE TOut : class?
-                §WHERE TIn : class, new()
-                §WHERE TUnmanaged : unmanaged
-                §WHERE TNotNull : notnull, System.IComparable<TNotNull>
-                §WHERE TDerived : ExternalBase, IMarker, new()
+            module Variance Variance block
+              interface IVariant<out TOut, in TIn, TUnmanaged, TNotNull, TDerived>
+                where TOut : class?
+                where TIn : class, new()
+                where TUnmanaged : unmanaged
+                where TNotNull : notnull, System.IComparable<TNotNull>
+                where TDerived : ExternalBase, IMarker, new()
             """);
 
         var typeParameters = Assert.Single(module.Interfaces).TypeParameters;
@@ -1039,8 +1038,8 @@ public class Issue766DeclarationModuleSemanticsTests
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(
             """
-            §M{InvalidVariance}
-              §CL{Box:pub}<out T>
+            module InvalidVariance InvalidVariance block
+              class Box<out T>
             """,
             diagnostics);
         var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
@@ -1088,10 +1087,11 @@ public class Issue766DeclarationModuleSemanticsTests
 
         var parsed = Parse(
             """
-            §M{ConstraintParsing}
-              §IFACE{IConstraintHost}
-                §MT{Apply}<T>
-                  §WHERE T : allows ref struct
+            module ConstraintParsing ConstraintParsing block
+              interface IConstraintHost
+                func Apply<T> ()
+                  where T : allows ref struct
+                  !
             """);
         Assert.Equal(
             TypeConstraintKind.AllowsRefStruct,
@@ -1153,31 +1153,34 @@ public class Issue766DeclarationModuleSemanticsTests
         string[] invalidSources =
         [
             """
-            §M{BadFunction}
-              §F{Bad:pub}<T>
-                §WHERE T : default
+            module BadFunction BadFunction block
+              func Bad<T> ()
+                where T : default
+                !
             """,
             """
-            §M{BadClass}
-              §CL{Bad:pub}<T>
-                §WHERE T : default
+            module BadClass BadClass block
+              class Bad<T>
+                where T : default
             """,
             """
-            §M{BadInterface}
-              §IFACE{IBad}<T>
-                §WHERE T : default
+            module BadInterface BadInterface block
+              interface IBad<T>
+                where T : default
             """,
             """
-            §M{BadMethod}
-              §CL{Host:pub}
-                §MT{Bad:pub}<T>
-                  §WHERE T : default
+            module BadMethod BadMethod block
+              class Host
+                func Bad<T> ()
+                  where T : default
+                  !
             """,
             """
-            §M{BadInterfaceMethod}
-              §IFACE{IHost}
-                §MT{Bad}<T>
-                  §WHERE T : default
+            module BadInterfaceMethod BadInterfaceMethod block
+              interface IHost
+                func Bad<T> ()
+                  where T : default
+                  !
             """
         ];
 
@@ -1351,12 +1354,12 @@ public class Issue766DeclarationModuleSemanticsTests
                     .TypeParameters[0]
                     .Constraints).TypeName);
 
-        Assert.Contains("§WHERE TRequest : IRequest", conversion.CalorSource);
+        Assert.Contains("where TRequest : IRequest", conversion.CalorSource);
         Assert.Contains(
-            "§WHERE TRequest : IRequest<TResponse>",
+            "where TRequest : IRequest<TResponse>",
             conversion.CalorSource);
         Assert.Contains(
-            "§WHERE TNotification : INotification",
+            "where TNotification : INotification",
             conversion.CalorSource);
 
         var compiled = Program.Compile(

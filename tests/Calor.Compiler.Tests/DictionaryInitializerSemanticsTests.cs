@@ -183,7 +183,7 @@ public class DictionaryInitializerSemanticsTests
             Assert.Contains(conversion.Losses, loss =>
                 loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == preservedFeature);
         else
-            Assert.Contains("§DICT", conversion.CalorSource);
+            Assert.Contains("new System.Collections.Generic.Dictionary<int, int>() { {", conversion.CalorSource);
         var compiled = Program.Compile(conversion.CalorSource!, "dictionary.calr", new CompilationOptions
         {
             EnableTypeChecking = true,
