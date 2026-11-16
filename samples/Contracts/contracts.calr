@@ -1,23 +1,24 @@
-§M{Contracts}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "=== Calor Contracts Demo ==="
-    §P ""
-    §P "Testing Square(5) - has REQUIRES x >= 0 and ENSURES result >= 0"
-    §P "  If precondition fails, throws ArgumentException"
-    §P "  If postcondition fails, throws InvalidOperationException"
-    §P ""
-    §P "Testing Divide(10, 2) - has REQUIRES b != 0 with custom message"
-    §P "  Custom message: divisor must not be zero"
-    §P ""
-    §P "Contracts are enforced at runtime with clear error messages."
+module Contracts Contracts
+  func Main public () → void
+    ! cw
+    Console.WriteLine("=== Calor Contracts Demo ===")
+    Console.WriteLine("")
+    Console.WriteLine("Testing Square(5) - has REQUIRES x >= 0 and ENSURES result >= 0")
+    Console.WriteLine("  If precondition fails, throws ArgumentException")
+    Console.WriteLine("  If postcondition fails, throws InvalidOperationException")
+    Console.WriteLine("")
+    Console.WriteLine("Testing Divide(10, 2) - has REQUIRES b != 0 with custom message")
+    Console.WriteLine("  Custom message: divisor must not be zero")
+    Console.WriteLine("")
+    Console.WriteLine("Contracts are enforced at runtime with clear error messages.")
 
-  §F{Square:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §S (>= result 0)
-    §R (* x x)
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x
 
-  §F{Divide:pub} (i32:a, i32:b) -> i32
-    §Q{"message= "divisor must not be zero""} (!= b 0)
-    §R (/ a b)
-
+  func Divide public (int:a, int:b) → int
+    !
+    requires b != 0
+    return a / b

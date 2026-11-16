@@ -30,22 +30,22 @@ Traditional languages make agents *infer* these answers through complex analysis
 
 | Principle | How Calor Implements It | Agent Benefit |
 |-----------|------------------------|---------------|
-| **Explicit over implicit** | Effects declared with `§E{cw, fs:r, net:rw}` | Know side effects without reading implementation |
-| **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
+| **Explicit over implicit** | Effect rows such as `! cw, fs:r, net:rw` (`!` alone means pure) | Know side effects without reading implementation |
+| **Contracts are code** | First-class `requires` preconditions and `=>` postconditions | Generate tests from specs, verify correctness |
 | **Tooling-owned identity** | `.calor/ids.json`; no declaration IDs in source | Precise references preserved by supported refactoring tools |
 | **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | Lower edit cost (~16% fewer tokens in our studies) |
-| **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
+| **Familiar expressions** | Ordinary C# operators and calls (`x * x`, `items.Count`) | No separate expression language to learn |
 
 ### Side-by-Side: What Agents See
 
 **Calor** — Everything explicit:
-```
-§F{Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
+```calor
+module Squares
+  func Square (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x
 ```
 
 **C#** — Contracts buried in implementation:
@@ -62,10 +62,9 @@ public static int Square(int x)
 ```
 
 **What Calor tells the agent directly:**
-- Optional ID slot: `§F{Square:pub}` if you need a stable handle for tooling; otherwise just `§F{Square:pub}`
-- Precondition (`§Q`): `x >= 0`
-- Postcondition (`§S`): `result >= 0`
-- No side effects (no `§E` declaration)
+- Precondition (`requires`): `x >= 0`
+- Postcondition (`=>`): `result >= 0`
+- No side effects (the `!` row is empty, which means pure)
 - Block ends at dedent — no closer tag to forget
 
 **What C# requires the agent to infer:**
@@ -75,11 +74,15 @@ public static int Square(int x)
 
 ## The Tradeoff
 
-Calor deliberately trades token efficiency for semantic explicitness:
+Calor deliberately trades token efficiency for semantic explicitness. Expressions are
+the same as in C#; the extra tokens go to declarations C# leaves implicit, such as the
+effect row every public function states:
 
-```
-C#:   return a + b;    // 4 tokens, implicit semantics
-Calor: §R (+ a b)       // Explicit Lisp-style operations
+```calor
+module Math
+  func Add (int:a, int:b) → int
+    !
+    return a + b
 ```
 
 This tradeoff pays off when:
@@ -140,12 +143,11 @@ language server itself is unaffected and remains supported.
 
 ### Your First Calor Program
 
-```
-§M{Hello}
-  §F{Main:pub}
-    §O{void}
-    §E{cw}
-    §P "Hello from Calor!"
+```calor
+module Hello Hello block
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello from Calor!")
 ```
 
 Save as `hello.calr`, then:

@@ -17,7 +17,7 @@ namespace Calor.Conversion.Tests;
 /// runtime, and (c) degrades contracts to the documented runtime checks
 /// (retained <c>ContractViolationException</c> guards in debug/release mode;
 /// stripped entirely under the contract-mode-off waiver). The degradation
-/// semantics are documented in docs/guides/adoption-playbook.md — this suite
+/// semantics are documented in website/content/guides/adoption-playbook.mdx — this suite
 /// is what makes that documentation a tested claim instead of a promise.
 /// </summary>
 public class EjectStoryTests

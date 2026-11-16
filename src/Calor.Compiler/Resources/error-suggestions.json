@@ -5,32 +5,22 @@
     {
       "id": "null-check-ordering",
       "title": "Null-Check Ordering (CRITICAL)",
-      "matchPatterns": ["NullReferenceException", "null reference", "(len arr)", "(len ", "len null"],
+      "matchPatterns": ["NullReferenceException", "null reference", ".Length"],
       "matchCodes": ["Calor0922", "Calor0921"],
       "description": "Checking array/string length without null check first causes NullReferenceException instead of ContractViolationException.",
-      "wrongExample": "§Q (> (len arr) 0)            // Crashes if arr is null!",
+      "wrongExample": "requires arr.Length > 0        // Crashes if arr is null!",
       "correctExample": "requires arr != null       // First: reject null\nrequires arr.Length > 0    // Then: check length",
       "explanation": "Contracts are evaluated in order. Reading arr.Length when arr is null throws instead of reporting the intended contract violation. Guard reference types with x != null before accessing their properties."
     },
     {
       "id": "string-operations",
       "title": "String Operation Syntax",
-      "matchPatterns": ["ToString", "§CONCAT", "§TOSTR", "§STR_LEN", "Unexpected token"],
+      "matchPatterns": ["ToString", "Unexpected token"],
       "matchCodes": ["Calor0110", "Calor0106"],
       "description": "Use ordinary .NET string members and preserve their argument counts.",
-      "wrongExample": "§R (+ type \":\" (ToString id))\n§R §CONCAT \"TOKEN-\" §TOSTR userId",
+      "wrongExample": "return type + \":\" + id         // id is an int: convert it explicitly with id.ToString()",
       "correctExample": "return type + \":\" + id.ToString()\nreturn string.Format(\"TOKEN-\\${0}-\\${1}\", userId, sequence)\nlet length = s.Length",
       "explanation": "Use ToString(), +, string.Format() and Length. Calor strings interpolate ${expression}; escape literal format placeholders as \\${0}."
-    },
-    {
-      "id": "indexof-args",
-      "title": "IndexOf Arguments",
-      "matchPatterns": ["indexof", "too many arguments", "3 arg"],
-      "matchCodes": ["Calor0110"],
-      "description": "IndexOf is an ordinary string method. Supply arguments matching an actual .NET overload.",
-      "wrongExample": "§B{next} (indexof s \"@\" 1 4 9)  // 5 operands",
-      "correctExample": "let first = s.IndexOf(\"@\", StringComparison.Ordinal)\nlet next = s.IndexOf(\"@\", first + 1, StringComparison.Ordinal)",
-      "explanation": "Preserve explicit comparison modes such as StringComparison.Ordinal. Start-index and count arguments must match an available overload; do not invent operands."
     },
     {
       "id": "variable-redeclaration",
@@ -38,7 +28,7 @@
       "matchPatterns": ["already defined", "already declared", "redeclar", "already exists"],
       "matchCodes": ["Calor0201"],
       "description": "Declare a variable once. Use var for a mutable binding and set for later updates.",
-      "wrongExample": "§B{k} (% rng n)    // First use: declares k\n§B{k} (+ k 1)      // ERROR - 'k' already defined",
+      "wrongExample": "let k = rng % n    // First use: declares k\nlet k = k + 1      // ERROR - 'k' already defined",
       "correctExample": "var k = rng % n\nset k k + 1",
       "explanation": "let and var declare bindings. A second declaration with the same name is not an update. Use set name expression to update a mutable binding."
     },
@@ -48,7 +38,7 @@
       "matchPatterns": ["Unexpected character '''", "single quote", "char literal", "'0'", "'-'"],
       "matchCodes": ["Calor0112"],
       "description": "A single-quoted character literal must contain one UTF-16 code unit or a valid C# escape sequence.",
-      "wrongExample": "§B{value:char} 'ab'   // ERROR: Two characters",
+      "wrongExample": "let char:value = 'ab'   // ERROR: Two characters",
       "correctExample": "let char:digit = '0'\nlet char:newline = '\\n'\nlet int:offset = c - '0'",
       "explanation": "Use single quotes for char and double quotes for string. Escapes such as '\\n', '\\\\', '\\'', and '\\u0041' represent one character. Empty literals, multiple characters, raw line breaks, and invalid escapes are rejected."
     },
@@ -58,17 +48,17 @@
       "matchPatterns": ["i32[]", "string[]", "wrong type syntax", "array type"],
       "matchCodes": ["Calor0113"],
       "description": "Array types use C# suffix brackets: int[], string[] or int[,].",
-      "wrongExample": "§F{f1:UseItems:pub} ([i32:items) -> i32     // ERROR - missing closing bracket",
+      "wrongExample": "func UseItems ([int:items) → int     // ERROR - array brackets go after the type",
       "correctExample": "func UseItems (int[]:items) → int\n  return items.Length\nfunc UseOtherItems (int[]:items) → int\n  return items.Length",
       "explanation": "Keep array brackets balanced and retain the element type and rank. Prefix arrays such as [int] and aliases such as i32 are retired."
     },
     {
       "id": "array-indexing",
       "title": "Array Element Access",
-      "matchPatterns": ["get arr", "at arr", "arr[", "element access", "§IDX inside", "tag inside Lisp"],
+      "matchPatterns": ["get arr", "at arr", "arr[", "element access"],
       "matchCodes": ["Calor0106", "Calor0104"],
       "description": "Use bracket indexing in expressions and set for element updates.",
-      "wrongExample": "§B{x} (get arr i)      // ERROR - 'get' doesn't exist\n§B{x} arr[i]           // ERROR - no C# indexer",
+      "wrongExample": "let x = arr.get(i)     // ERROR - arrays have no get method; index with arr[i]",
       "correctExample": "let x = arr[i]\nset arr[i] value\n\nvar sum = 0\nset sum sum + data[i]",
       "explanation": "arr[i] is an expression and can appear inside operators and contracts. A temporary binding is optional. Element updates must declare the appropriate mutation effect."
     },
@@ -78,39 +68,19 @@
       "matchPatterns": ["can't compare strings", "string comparison", "< string", "> string"],
       "matchCodes": ["Calor0202", "Calor0111"],
       "description": "Relational operators (< >) do not order strings. Use equality or an explicit .NET comparison.",
-      "wrongExample": "§IF{if1} (< a b)\n  §R (- 0 1)   // ERROR - can't compare strings with <",
+      "wrongExample": "if a < b               // ERROR - can't compare strings with <\n  return -1",
       "correctExample": "if a == b\n  return 0\nreturn string.Compare(a, b, StringComparison.Ordinal)",
       "explanation": "Use == for equality. For ordinal ordering use string.Compare with StringComparison.Ordinal; use an explicit culture when culture-sensitive ordering is intended."
     },
     {
       "id": "missing-operators",
       "title": "Missing Built-in Operators",
-      "matchPatterns": ["(abs ", "(max ", "(min ", "(sqrt ", "(pow ", "undefined function"],
+      "matchPatterns": ["abs(", "max(", "min(", "sqrt(", "pow(", "undefined function"],
       "matchCodes": ["Calor0200"],
       "description": "Bare abs, max, min, sqrt and pow names are not built-in operators. Use ordinary Math methods or explicit branches.",
-      "wrongExample": "§R (abs x)     // ERROR - abs doesn't exist\n§R (max a b)   // ERROR - max doesn't exist",
+      "wrongExample": "return abs(x)     // ERROR - abs doesn't exist\nreturn max(a, b)  // ERROR - max doesn't exist",
       "correctExample": "return Math.Abs(x)\n// Or branch explicitly:\nif a > b\n  return a\nreturn b",
       "explanation": "Use Math.Abs, Math.Max, Math.Min, Math.Sqrt or Math.Pow with compatible argument types. Ordinary .NET overflow and domain behavior still applies."
-    },
-    {
-      "id": "control-flow-arrow",
-      "title": "Removed Arrow Conditional Statements",
-      "matchPatterns": ["arrow syntax", "→ multiple", "single statement"],
-      "matchCodes": ["Calor0100", "Calor0104"],
-      "description": "Arrow conditional statements are removed. Every statement branch uses an indented body.",
-      "wrongExample": "§IF{if1} (condition) → §B{x} 1 → §R x   // ERROR",
-      "correctExample": "if condition\n  let x = 1\n  return x",
-      "explanation": "Put statement bodies on indented lines under if, else if or else. The block ends at dedent."
-    },
-    {
-      "id": "new-object-placeholder",
-      "title": "Target-Typed New Placeholder",
-      "matchPatterns": ["§NEW{object}", "§NEW{any}", "new("],
-      "matchCodes": ["Calor0106", "Calor0200"],
-      "description": "Construction needs the actual target type. An unresolved construction is not permission to substitute object.",
-      "wrongExample": "§TH §NEW{object} §A \"Invalid input\" §/NEW   // 'object' is a placeholder",
-      "correctExample": "throw new ArgumentException(\"Invalid input\")",
-      "explanation": "Check the original source and declared receiving type. A thrown value must be an exception. If conversion cannot resolve a type, retain its actual reported preservation boundary rather than inventing a substitute."
     },
     {
       "id": "integer-overflow",
@@ -118,7 +88,7 @@
       "matchPatterns": ["overflow", "integer too large", "number too large", "invalid typed literal"],
       "matchCodes": ["Calor0112", "Calor0113"],
       "description": "Retain the integer value and its C# width. Use an L suffix for long literals when needed.",
-      "wrongExample": "§C{Method} §A -1486618624   // This was 1000000000000 truncated to i32!",
+      "wrongExample": "let int:big = 1000000000000   // ERROR - too large for int",
       "correctExample": "Method(1000000000000L)",
       "explanation": "If a large positive source value became negative, inspect the original literal and conversion diagnostics. Do not repair overflow by guessing a replacement value."
     },
@@ -128,39 +98,9 @@
       "matchPatterns": ["Unexpected token '<'", "Unexpected token '>'", "Unknown operator 'T'"],
       "matchCodes": ["Calor0106", "Calor0104"],
       "description": "Use ordinary angle-bracket generic arguments in types and method calls. Keep required type arguments.",
-      "wrongExample": "§C{EnumCache<T>.GetInfo} §/C   // Parser rejects <T> in expressions",
+      "wrongExample": "let info = EnumCache.GetInfo<T>   // ERROR - missing call parentheses",
       "correctExample": "let info = EnumCache<T>.GetInfo()\nlet values = System.Linq.Enumerable.ToArray<int>(items)",
       "explanation": "Preserve the resolved generic receiver and method type arguments; removing arguments can change overload resolution. For unsupported contexts, use calor convert and retain its converter-owned fallback; do not handwrite passthrough."
-    },
-    {
-      "id": "if-id-mismatch",
-      "title": "Legacy IF Closing Tag",
-      "matchPatterns": ["does not match IF id", "END_IF id", "mismatch"],
-      "matchCodes": ["Calor0100", "Calor0102"],
-      "description": "Current Calor IF blocks are indentation-delimited. Do not add legacy IF closing tags or try to match IF IDs.",
-      "wrongExample": "§IF{if016} (condition)\n  §R 1\n§/I{if017}   // ERROR: legacy structural closing tag",
-      "correctExample": "if condition\n  return 1",
-      "explanation": "Indent the body under if. The block ends at dedent, so there is no closing tag or closing ID to match."
-    },
-    {
-      "id": "invalid-lisp-expression",
-      "title": "Removed Prefix Expression Syntax",
-      "matchPatterns": ["Unexpected token in expression", "invalid expression argument", "invalid lisp"],
-      "matchCodes": ["Calor0114"],
-      "description": "Native expressions use infix operators with C# precedence, not parenthesized prefix notation.",
-      "wrongExample": "(unknown-op a b)         // Unsupported operator",
-      "correctExample": "a + b",
-      "explanation": "Write operands around a binary operator, for example a + b. Parentheses group expressions. Use ordinary calls such as Math.Abs(x), nullable types and null without wrapper constructors."
-    },
-    {
-      "id": "mismatched-id",
-      "title": "Legacy Block Closing ID",
-      "matchPatterns": ["mismatched id", "does not match", "closing tag id", "opening id"],
-      "matchCodes": ["Calor0101"],
-      "description": "Current Calor blocks are indentation-delimited; legacy closing-tag IDs for IF, LOOP, TRY, or MATCH are obsolete. Similar parser errors usually mean an unwanted closing tag or bad indentation.",
-      "wrongExample": "§L{loop1:i:0:n:1}\n  §IF{if1} (condition)\n    §R i\n§/L{loop2}   // ERROR: legacy structural closing tag",
-      "correctExample": "for i from 0 to n step 1\n  if condition\n    return i",
-      "explanation": "Remove legacy closing tags and indent nested bodies. Blocks end at the next dedent; there are no structural IDs to match."
     },
     {
       "id": "expected-keyword",
@@ -173,22 +113,12 @@
       "explanation": "Use module Name and func Name (type:name, ...) → ReturnType. Section markers and the ASCII signature arrow are retired."
     },
     {
-      "id": "expected-closing-tag",
-      "title": "Expected Indented Block",
-      "matchPatterns": ["expected closing tag", "unterminated block", "missing §/", "unclosed"],
-      "matchCodes": ["Calor0105"],
-      "description": "A legacy diagnostic may mention closing tags, but current Calor blocks are indentation-delimited. This usually means a block body is missing or incorrectly indented.",
-      "wrongExample": "§IF{if1} (> x 0)\n§R x   // ERROR: body must be indented under §IF",
-      "correctExample": "if x > 0\n  return x",
-      "explanation": "Do not add structural closing tags. Indent the block body under the opener; the block ends when indentation returns to the parent level."
-    },
-    {
       "id": "invalid-modifier",
       "title": "Invalid Modifier",
       "matchPatterns": ["invalid modifier", "unexpected modifier", "modifier not allowed"],
       "matchCodes": ["Calor0107"],
       "description": "A modifier keyword was used in an invalid position or an unrecognized modifier was applied to a declaration.",
-      "wrongExample": "static §F{f1:Helper:pub} () -> i32   // C# modifier before Calor marker\n§F{f2:Bad:public} () -> i32           // Use pub/priv, not public/private",
+      "wrongExample": "static func Helper () → int    // C# modifier before the Calor keyword",
       "correctExample": "func Helper () → int\n  return 0\nfunc Good private () → int\n  return 1",
       "explanation": "Visibility and modifiers follow the declaration name, before parameters: func Good private (...) → int. Use full spellings such as public, private and virtual; public is the default."
     },
@@ -198,7 +128,7 @@
       "matchPatterns": ["type parameter not found", "unknown type parameter", "undefined type param"],
       "matchCodes": ["Calor0115"],
       "description": "A reference to a generic type parameter (like T, K, V) was used but the parameter is not declared in the current scope.",
-      "wrongExample": "§F{f1:Identity:pub} (T:x) -> T      // T not declared as type param",
+      "wrongExample": "func Identity (T:x) → T      // T not declared as type param",
       "correctExample": "func Identity<T> (T:x) → T\n  return x",
       "explanation": "Generic type parameters must be declared in the function or type name field using angle brackets. Ensure the type parameter name matches exactly (case-sensitive)."
     },
@@ -208,7 +138,7 @@
       "matchPatterns": ["invalid reference", "cannot reference", "reference not valid"],
       "matchCodes": ["Calor0203"],
       "description": "A reference to a variable, function, or type is invalid in the current context. This may be a scope issue or an attempt to use a binding before it is defined.",
-      "wrongExample": "§R (+ a b)      // 'a' or 'b' not accessible in this scope",
+      "wrongExample": "return a + b      // 'a' or 'b' not accessible in this scope",
       "correctExample": "let a = 1\nlet b = 2\nreturn a + b",
       "explanation": "Ensure the referenced name is defined and accessible in the current scope. Local let/var bindings are visible after their declaration point and within the same block."
     },
@@ -218,29 +148,9 @@
       "matchPatterns": ["missing extension self", "extension method", "first parameter must be self"],
       "matchCodes": ["Calor0204"],
       "description": "An extension function must declare its receiver as the first parameter with the this modifier.",
-      "wrongExample": "§F{f1:ToUpper:pub} () -> str     // Missing self parameter",
+      "wrongExample": "func ToUpper () → string     // Missing this-parameter",
       "correctExample": "func ToUpper (this string:self) → string\n  return self.ToUpper()",
       "explanation": "Use this Type:name as the first parameter in a named static module. The receiver name need not be self. Preserve its type and extension-method identity."
-    },
-    {
-      "id": "new-object-autofix",
-      "title": "Unresolved Construction Target",
-      "matchPatterns": ["§NEW{object}", "NEW{object}"],
-      "matchCodes": ["Calor0106", "Calor0200"],
-      "description": "A construction must retain its actual type. Inspect conversion diagnostics and the original source instead of trusting an old object placeholder.",
-      "wrongExample": "§F{f1:Make:pub} () -> List<i32>\n  §R §NEW{object}()",
-      "correctExample": "func Make () → List<int>\n  ! alloc\n  return new List<int>()",
-      "explanation": "Use the declared concrete type when it is actually resolved. Otherwise retain converter-owned preservation or report the missing context; do not guess a type to make compilation succeed."
-    },
-    {
-      "id": "id-conflicts-autofix",
-      "title": "Legacy Source Declaration IDs",
-      "matchPatterns": ["duplicate id", "id conflict", "already defined"],
-      "matchCodes": ["Calor0301", "Calor0302"],
-      "description": "Source declarations carry no IDs. Remove legacy leading ID fields; tooling owns stable identity in .calor/ids.json.",
-      "wrongExample": "§F{f1:Foo:pub} () -> void\n  §R\n§F{f1:Bar:pub} () -> void\n  §R",
-      "correctExample": "func Foo () → void\n  return\nfunc Bar () → void\n  return",
-      "explanation": "Do not renumber or add source IDs. Keep the declaration name and current header fields; tooling maintains declaration identity separately."
     }
   ]
 }

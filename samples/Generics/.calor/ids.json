@@ -29,20 +29,20 @@
       "Signature": "1"
     },
     {
-      "Id": "f_879e8m9wc0zz",
+      "Id": "f_ygzcayzxvtv9",
       "File": "generics.calr",
       "Container": "Generics",
       "Kind": 1,
-      "Name": "GetCount\u003CT\u003E",
-      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022List\\u003CT\\u003E\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+      "Name": "GetCount",
+      "Signature": "{\u0022arity\u0022:1,\u0022parameters\u0022:[{\u0022type\u0022:\u0022List\\u003CT\\u003E\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
     },
     {
-      "Id": "f_27xrrq2zr3km",
+      "Id": "f_51b0pqa8ec0m",
       "File": "generics.calr",
       "Container": "Generics",
       "Kind": 1,
-      "Name": "Identity\u003CT\u003E",
-      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022T\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022T\u0022}"
+      "Name": "Identity",
+      "Signature": "{\u0022arity\u0022:1,\u0022parameters\u0022:[{\u0022type\u0022:\u0022T\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022T\u0022}"
     },
     {
       "Id": "f_9wcjw0p80vrt",

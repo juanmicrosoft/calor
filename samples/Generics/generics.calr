@@ -1,50 +1,47 @@
-§M{Generics}
-  §IFACE{IRepository<T>}
-    §WHERE T : class
-    §MT{Add} (T:item) -> void
-    §MT{GetAll} () -> ReadList<T>
+module Generics Generics
+  interface IRepository<T>
+    where T : class
+    func Add (T:item) → void
+      !
+    func GetAll () → IReadOnlyList<T>
+      !
 
-  §CL{Pair<T,U>:pub}
-    §FLD{T:First:pub}
-    §FLD{U:Second:pub}
+  class Pair<T,U> public
+    field T:First public
+    field U:Second public
+    ctor public (T:first, U:second)
+      set First first
+      set Second second
 
-    §CTOR{pub} (T:first, U:second)
-      §ASSIGN First first
-      §ASSIGN Second second
+  class Repository<T> public
+    where T : class
+    field List<T>:_items private
+    ctor public ()
+      set _items new List<T>()
+    func Add public (T:item) → void
+      ! mut
+      _items.Add(item)
+    func GetAll public () → IReadOnlyList<T>
+      !
+      return _items
+    func Count public () → int
+      !
+      return _items . Count
 
+  func Identity<T> public (T:value) → T
+    !
+    return value
 
-  §CL{Repository<T>:pub}
-    §WHERE T : class
+  func GetCount<T> public (List<T>:items) → int
+    !
+    return items . Count
 
-    §FLD{List<T>:_items:priv}
-
-    §CTOR{pub}
-      §ASSIGN _items §NEW{List<T>} §/NEW
-
-    §MT{Add:pub} (T:item) -> void
-      §E{mut}
-      §C{_items.Add} item
-
-    §MT{GetAll:pub} () -> ReadList<T>
-      §R _items
-
-    §MT{Count:pub} () -> i32
-      §R _items.Count
-
-
-  §F{Identity<T>:pub} (T:value) -> T
-    §R value
-
-  §F{GetCount<T>:pub} (List<T>:items) -> i32
-    §R items.Count
-
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "Generics sample - compilation test"
-    §P "Features demonstrated:"
-    §P "  - Generic functions with type parameters"
-    §P "  - Generic classes (Pair<T,U>, Repository<T>)"
-    §P "  - Generic interfaces (IRepository<T>)"
-    §P "  - WHERE constraints (T : class)"
-    §P "  - Generic type references (List<T>, IReadOnlyList<T>)"
-
+  func Main public () → void
+    ! cw
+    Console.WriteLine("Generics sample - compilation test")
+    Console.WriteLine("Features demonstrated:")
+    Console.WriteLine("  - Generic functions with type parameters")
+    Console.WriteLine("  - Generic classes (Pair<T,U>, Repository<T>)")
+    Console.WriteLine("  - Generic interfaces (IRepository<T>)")
+    Console.WriteLine("  - WHERE constraints (T : class)")
+    Console.WriteLine("  - Generic type references (List<T>, IReadOnlyList<T>)")

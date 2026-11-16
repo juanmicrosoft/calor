@@ -151,7 +151,7 @@ types. Custom-object, generic and unresolved values stay Unknown (`Calor0411`,
 and `Calor0410` in a pure function), because formatting them can run an
 arbitrary `ToString` override. Effects from evaluating every hole and operand
 are still charged. See the known gap in
-[effects and contracts enforcement](../effects-and-contracts-enforcement.md).
+[effects and contracts enforcement](/calor/philosophy/effects-contracts-enforcement/).
 Numeric addition is not string formatting. User-defined operators and operand
 conversions retain their own effect charges, as do operand evaluation,
 assignment targets, and bound source initialization. This includes bare

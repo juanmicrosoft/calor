@@ -1,24 +1,22 @@
-§M{TypeSystem}
-  §F{Main:pub} () -> void
-    §E{cw,throw,alloc}
-    §C{Console.WriteLine} "=== Calor Type System Demo ==="
-    §C{TestNullable}
-    §B{quotient:i32} §C{Divide} §A 100 §A 2 §/C
-    §C{Console.WriteLine} quotient
-    §TR
-      §C{Divide} §A 100 §A 0 §/C
-    §CA{ArgumentException}
-      §C{Console.WriteLine} "Division by zero was caught"
+module TypeSystem TypeSystem
+  func Main public () → void
+    ! cw,throw,alloc
+    Console.WriteLine("=== Calor Type System Demo ===")
+    TestNullable()
+    let int:quotient = Divide(100, 2)
+    Console.WriteLine(quotient)
+    try
+      Divide(100, 0)
+    catch ArgumentException:error
+      Console.WriteLine("Division by zero was caught")
 
-  §F{TestNullable:priv} () -> void
-    §E{cw}
-    §B{present:?str} "hello"
-    §B{missing:?str} null
-    §C{Console.WriteLine} (?? present "fallback")
-    §C{Console.WriteLine} (?? missing "fallback")
+  func TestNullable private () → void
+    let string?:present = "hello"
+    let string?:missing = null
+    Console.WriteLine(present ?? "fallback")
+    Console.WriteLine(missing ?? "fallback")
 
-  §F{Divide:priv} (i32:a, i32:b) -> i32
-    §E{throw,alloc}
-    §IF (== b 0)
-      §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
-    §R (/ a b)
+  func Divide private (int:a, int:b) → int
+    if b == 0
+      throw new ArgumentException("Division by zero")
+    return a / b
