@@ -390,16 +390,13 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
 
     /// <summary>
     /// Analyzes contracts in Calor source code.
-    /// Counts preconditions (§Q) and postconditions (§S) to give credit for contract usage.
+    /// Counts preconditions (`requires`) and postconditions (`=>`) to give credit for contract usage.
     /// </summary>
     private static ContractVerificationResults AnalyzeContracts(string calorSource)
     {
         // Count contracts using simple pattern matching
-        // §Q is precondition (requires), §S is postcondition (ensures)
-        var preconditionCount = System.Text.RegularExpressions.Regex.Matches(
-            calorSource, @"§Q\s*\(").Count;
-        var postconditionCount = System.Text.RegularExpressions.Regex.Matches(
-            calorSource, @"§S\s*\(").Count;
+        var preconditionCount = Calor.Evaluation.Metrics.CalorSyntax.Requires.Matches(calorSource).Count;
+        var postconditionCount = Calor.Evaluation.Metrics.CalorSyntax.Ensures.Matches(calorSource).Count;
 
         var totalContracts = preconditionCount + postconditionCount;
 

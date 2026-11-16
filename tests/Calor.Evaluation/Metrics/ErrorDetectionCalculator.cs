@@ -83,15 +83,12 @@ public class ErrorDetectionCalculator : IMetricCalculator
         };
     }
 
-    /// <summary>
-    /// Matches §S followed by space, paren, or newline (ensures postcondition marker).
-    /// </summary>
-    private static readonly Regex EnsuresPattern = new(@"§S[\s(]", RegexOptions.Compiled);
+    private static bool ContainsRequires(string source) => CalorSyntax.Requires.IsMatch(source);
 
     /// <summary>
-    /// Checks if source contains Calor ensures (postcondition) markers.
+    /// Checks if source contains a Calor postcondition (a line-head <c>=&gt;</c>).
     /// </summary>
-    private static bool ContainsEnsures(string source) => EnsuresPattern.IsMatch(source);
+    private static bool ContainsEnsures(string source) => CalorSyntax.Ensures.IsMatch(source);
 
     /// <summary>
     /// Calculates Calor's error detection capability based on contract presence.
@@ -102,16 +99,16 @@ public class ErrorDetectionCalculator : IMetricCalculator
         var source = context.CalorSource;
 
         // Contracts significantly improve error detection
-        if (source.Contains("§Q")) score += 0.25; // Requires preconditions
+        if (ContainsRequires(source)) score += 0.25; // Requires preconditions
         if (ContainsEnsures(source)) score += 0.20; // Ensures postconditions
-        if (source.Contains("§INV")) score += 0.15; // Invariants
+        if (CalorSyntax.Invariant.IsMatch(source)) score += 0.15; // Invariants
 
         // Effect declarations help detect side-effect bugs
-        if (source.Contains("§E{")) score += 0.10;
+        if (CalorSyntax.EffectRow.IsMatch(source)) score += 0.10;
 
         // Type annotations catch type errors
-        if (source.Contains("§I{") && source.Contains(":")) score += 0.05;
-        if (source.Contains("§O{")) score += 0.05;
+        if (CalorSyntax.HasTypedParameters(source)) score += 0.05;
+        if (CalorSyntax.TypedOutput.IsMatch(source)) score += 0.05;
 
         return Math.Min(score, 1.0);
     }
@@ -148,12 +145,12 @@ public class ErrorDetectionCalculator : IMetricCalculator
         var source = context.CalorSource;
         return new Dictionary<string, bool>
         {
-            ["hasRequires"] = source.Contains("§Q"),
+            ["hasRequires"] = ContainsRequires(source),
             ["hasEnsures"] = ContainsEnsures(source),
-            ["hasInvariants"] = source.Contains("§INV"),
-            ["hasEffects"] = source.Contains("§E{"),
-            ["hasTypedInputs"] = source.Contains("§I{") && source.Contains(":"),
-            ["hasTypedOutput"] = source.Contains("§O{")
+            ["hasInvariants"] = CalorSyntax.Invariant.IsMatch(source),
+            ["hasEffects"] = CalorSyntax.EffectRow.IsMatch(source),
+            ["hasTypedInputs"] = CalorSyntax.HasTypedParameters(source),
+            ["hasTypedOutput"] = CalorSyntax.TypedOutput.IsMatch(source)
         };
     }
 
@@ -184,14 +181,14 @@ public class ErrorDetectionCalculator : IMetricCalculator
         {
             "null_reference" =>
                 diagnostics?.Any(d => d.Code == "Calor0922" || d.Code == "Calor0925") == true ||
-                (source.Contains("§Q") && source.Contains("!= null")),
+                (ContainsRequires(source) && source.Contains("!= null")),
             "bounds_check" =>
                 diagnostics?.Any(d => d.Code == "Calor0921") == true ||
-                (source.Contains("§Q") && (source.Contains(">=") || source.Contains("<="))),
+                (ContainsRequires(source) && (source.Contains(">=") || source.Contains("<="))),
             "contract_violation" =>
                 diagnostics?.Any(d => d.Code == "Calor0920" || d.Code == "Calor0926") == true ||
-                source.Contains("§Q") || ContainsEnsures(source),
-            "invariant_violation" => source.Contains("§INV"),
+                ContainsRequires(source) || ContainsEnsures(source),
+            "invariant_violation" => CalorSyntax.Invariant.IsMatch(source),
             "overflow" => diagnostics?.Any(d => d.Code == "Calor0923") == true,
             "dead_code" => diagnostics?.Any(d => d.Code == "Calor0901") == true,
             "uninitialized" => diagnostics?.Any(d => d.Code == "Calor0900") == true,

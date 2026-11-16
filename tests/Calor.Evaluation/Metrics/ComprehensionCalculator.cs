@@ -15,21 +15,18 @@ public class ComprehensionCalculator : IMetricCalculator
 
     public string Description => "Measures semantic understanding based on code structure clarity";
 
-    // Pre-compiled regexes for Calor markers (literal patterns escaped at compile time)
-    private static readonly Regex RxModuleOpen = new(@"§M\{", RegexOptions.Compiled);
-    private static readonly Regex RxFuncOpen = new(@"§F\{", RegexOptions.Compiled);
-    private static readonly Regex RxInputOpen = new(@"§I\{", RegexOptions.Compiled);
-    private static readonly Regex RxOutputOpen = new(@"§O\{", RegexOptions.Compiled);
-    private static readonly Regex RxReturn = new(@"§R", RegexOptions.Compiled);
-    private static readonly Regex RxEffectOpen = new(@"§E\{", RegexOptions.Compiled);
-    private static readonly Regex RxRequires = new(@"§Q ", RegexOptions.Compiled);
-    private static readonly Regex RxEnsures = new(@"§S ", RegexOptions.Compiled);
-    // Indent form (Phase 4) — block boundaries are signalled by indentation
-    // alone. The previous scorer awarded a small bonus for §/F{ / §/M{
-    // closer presence; now we count any line that begins with 2+ spaces
-    // (a structural body line) as the equivalent "completed block" signal.
+    // Native Calor constructs (see CalorSyntax)
+    private static readonly Regex RxModuleOpen = CalorSyntax.Module;
+    private static readonly Regex RxFuncOpen = CalorSyntax.Function;
+    private static readonly Regex RxOutputOpen = CalorSyntax.TypedOutput;
+    private static readonly Regex RxReturn = CalorSyntax.Return;
+    private static readonly Regex RxEffectOpen = CalorSyntax.EffectRow;
+    private static readonly Regex RxRequires = CalorSyntax.Requires;
+    private static readonly Regex RxEnsures = CalorSyntax.Ensures;
+    // Block boundaries are signalled by indentation alone; any line that begins
+    // with whitespace (a structural body line) is the "completed block" signal.
     private static readonly Regex RxIndentedBodyLine = new(@"^[ \t]+\S", RegexOptions.Compiled | RegexOptions.Multiline);
-    private static readonly Regex RxEffectBody = new(@"§E\{([^}]+)\}", RegexOptions.Compiled);
+    private static readonly Regex RxEffectBody = CalorSyntax.EffectRowBody;
 
     // Pre-compiled regexes for C# patterns
     private static readonly Regex RxNamespace = new(@"namespace", RegexOptions.Compiled);
@@ -129,8 +126,10 @@ public class ComprehensionCalculator : IMetricCalculator
     /// Uses pre-compiled regex for performance at scale (250+ programs).
     /// </summary>
     private static double ProportionalScore(string source, Regex compiledPattern, double weight)
+        => ProportionalScore(compiledPattern.Matches(source).Count, weight);
+
+    private static double ProportionalScore(int count, double weight)
     {
-        var count = compiledPattern.Matches(source).Count;
         if (count == 0) return 0.0;
         return weight * Math.Min(Math.Log2(1 + count) / 3.0, 1.0);
     }
@@ -147,7 +146,7 @@ public class ComprehensionCalculator : IMetricCalculator
         // Proportional clarity indicators — count occurrences with diminishing returns
         score += ProportionalScore(source, RxModuleOpen, 0.15);   // Module declarations
         score += ProportionalScore(source, RxFuncOpen, 0.15);     // Function declarations
-        score += ProportionalScore(source, RxInputOpen, 0.10);    // Input parameters
+        score += ProportionalScore(CalorSyntax.CountTypedParameters(source), 0.10); // Input parameters
         score += ProportionalScore(source, RxOutputOpen, 0.10);   // Output types
         score += ProportionalScore(source, RxReturn, 0.10);       // Return statements
         score += ProportionalScore(source, RxEffectOpen, 0.15);   // Effect declarations
@@ -162,10 +161,10 @@ public class ComprehensionCalculator : IMetricCalculator
         // Strategy 5: Contract-depth and effect-specificity dimensions
 
         // Contract completeness: having BOTH pre and post creates a behavioral spec
-        if (source.Contains("§Q ") && source.Contains("§S "))
+        if (RxRequires.IsMatch(source) && RxEnsures.IsMatch(source))
             score += 0.10;
 
-        // Effect specificity: §E{cw,db:rw} is more informative than §E{cw}
+        // Effect specificity: `! cw,db:rw` is more informative than `! cw`
         var effectMatches = RxEffectBody.Matches(source);
         if (effectMatches.Count > 0)
         {
@@ -175,7 +174,7 @@ public class ComprehensionCalculator : IMetricCalculator
             score += Math.Min(0.02 * maxEffectCount, 0.10);
         }
 
-        // Indent-form structural completeness: every §F{ opener is
+        // Indent-form structural completeness: every `func` opener is
         // followed by at least one indented body line (the indent form
         // equivalent of "block has a body and is closed"). Reward when
         // we have functions AND we see indented body lines.
@@ -242,13 +241,13 @@ public class ComprehensionCalculator : IMetricCalculator
         {
             ["moduleCount"] = RxModuleOpen.Matches(source).Count,
             ["functionCount"] = funcOpen,
-            ["inputCount"] = RxInputOpen.Matches(source).Count,
+            ["inputCount"] = CalorSyntax.CountTypedParameters(source),
             ["outputCount"] = RxOutputOpen.Matches(source).Count,
             ["effectCount"] = RxEffectOpen.Matches(source).Count,
             ["requiresCount"] = RxRequires.Matches(source).Count,
             ["ensuresCount"] = RxEnsures.Matches(source).Count,
             ["indentedBodyLineCount"] = indentedBodyLines,
-            ["hasContractCompleteness"] = source.Contains("§Q ") && source.Contains("§S "),
+            ["hasContractCompleteness"] = RxRequires.IsMatch(source) && RxEnsures.IsMatch(source),
             ["hasIndentedFunctionBody"] = funcOpen > 0 && indentedBodyLines >= funcOpen
         };
     }

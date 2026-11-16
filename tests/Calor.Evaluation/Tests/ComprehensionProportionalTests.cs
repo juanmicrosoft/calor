@@ -152,10 +152,23 @@ public class ComprehensionProportionalTests
 
         // Maximally rich Calor program
         var richContext = CreateContext(
-            calor: @"§M{T}
-  §F{A:pub} §I{i32:x} §I{i32:y} §O{i32} §Q (> x 0) §Q (> y 0) §S (> result 0) §E{cw,db:rw} §R (+ x y) §/F
-  §F{B:pub} §I{i32:x} §O{i32} §Q (>= x 0) §S (>= result 0) §E{fs:rw} §R x §/F
-  §F{C:pub} §I{i32:a} §I{i32:b} §O{i32} §Q (!= b 0) §S (== result (/ a b)) §R (/ a b)",
+            calor: @"module T T block
+  func A public (int:x, int:y) → int
+    ! cw,db:rw
+    requires x > 0
+    requires y > 0
+    => result > 0
+    return x + y
+  func B public (int:x) → int
+    ! fs:rw
+    requires x >= 0
+    => result >= 0
+    return x
+  func C public (int:a, int:b) → int
+    !
+    requires b != 0
+    => result == a / b
+    return a / b",
             csharp: @"namespace T {
     /// <summary>A</summary>
     /// <param name=""x"">x</param>
@@ -183,9 +196,16 @@ public class ComprehensionProportionalTests
         var calculator = new ComprehensionCalculator();
 
         var context = CreateContext(
-            calor: @"§M{T}
-  §F{A:pub} §I{i32:x} §O{i32} §Q (> x 0) §S (>= result 0) §R x §/F
-  §F{B:pub} §I{i32:y} §O{i32} §Q (> y 0) §R y",
+            calor: @"module T T block
+  func A public (int:x) → int
+    !
+    requires x > 0
+    => result >= 0
+    return x
+  func B public (int:y) → int
+    !
+    requires y > 0
+    return y",
             csharp: "namespace T { public class M { public int A(int x) { return x; } public int B(int y) { return y; } } }");
 
         var result = await calculator.CalculateAsync(context);

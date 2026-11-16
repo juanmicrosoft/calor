@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Calor.Evaluation.Core;
+using Calor.Evaluation.Metrics;
 using Calor.Compiler.Tests;
 
 namespace Calor.Evaluation.Benchmarks;
@@ -250,19 +251,19 @@ public class TestDataAdapter
         var features = new List<string>();
         var content = await File.ReadAllTextAsync(calorPath);
 
-        if (content.Contains("§M{")) features.Add("module");
-        if (content.Contains("§F{")) features.Add("function");
-        if (content.Contains("§V{")) features.Add("variable");
-        if (content.Contains("§I{")) features.Add("parameters");
-        if (content.Contains("§O{")) features.Add("return_type");
-        if (content.Contains("§Q")) features.Add("requires");
-        if (Regex.IsMatch(content, @"§S[\s(]")) features.Add("ensures");
-        if (content.Contains("§INV")) features.Add("invariant");
-        if (content.Contains("§E{")) features.Add("effects");
-        if (content.Contains("§IF")) features.Add("conditional");
-        if (content.Contains("§LOOP")) features.Add("loop");
-        if (content.Contains("§MATCH")) features.Add("pattern_matching");
-        if (content.Contains("§C{")) features.Add("call");
+        if (CalorSyntax.Module.IsMatch(content)) features.Add("module");
+        if (CalorSyntax.Function.IsMatch(content)) features.Add("function");
+        if (CalorSyntax.Binding.IsMatch(content)) features.Add("variable");
+        if (CalorSyntax.HasTypedParameters(content)) features.Add("parameters");
+        if (CalorSyntax.TypedOutput.IsMatch(content)) features.Add("return_type");
+        if (CalorSyntax.Requires.IsMatch(content)) features.Add("requires");
+        if (CalorSyntax.Ensures.IsMatch(content)) features.Add("ensures");
+        if (CalorSyntax.Invariant.IsMatch(content)) features.Add("invariant");
+        if (CalorSyntax.EffectRow.IsMatch(content)) features.Add("effects");
+        if (CalorSyntax.If.IsMatch(content)) features.Add("conditional");
+        if (CalorSyntax.Loop.IsMatch(content)) features.Add("loop");
+        if (CalorSyntax.Match.IsMatch(content)) features.Add("pattern_matching");
+        if (CalorSyntax.Call.IsMatch(content)) features.Add("call");
 
         return features;
     }

@@ -10,7 +10,7 @@ namespace Calor.Evaluation.LlmTasks;
 /// - Bug prevention is measured by TEST OUTCOMES, not syntax analysis
 /// - If tests pass → BugPrevention = 1.0 for BOTH languages
 /// - If tests fail → BugPrevention = 0.0
-/// - No bonus for language-specific syntax (§E{}, [Pure], etc.)
+/// - No bonus for language-specific syntax (effect rows, [Pure], etc.)
 /// </summary>
 public static class EffectDisciplineScorer
 {

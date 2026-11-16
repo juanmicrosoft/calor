@@ -520,7 +520,7 @@ public class Test
         var calculator = new CorrectnessCalculator();
 
         // Context with validation patterns (null checks, bounds checks)
-        // The estimator looks for patterns like "§Q", "§REQ", "null", ">=", "<"
+        // The estimator looks for patterns like `requires`, "null", ">=", "<"
         var withValidation = CreateTestContext(
             calorSource: "module Test Test block\n  func test (int:x) → int\n    !\n    requires (x >= 0)\n    return x\n",
             csharpSource: "public class T { public int test(int x) { if (x == null) throw new ArgumentNullException(); if (x < 0) throw new ArgumentException(); return x; } }"

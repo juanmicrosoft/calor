@@ -127,13 +127,12 @@ namespace Calculator
         // Arrange
         var calculator = new ComprehensionCalculator();
         var context = CreateContext(
-            calor: @"§M{Math}
-  §F{Divide:pub}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §REQ (> b 0)
-      §ENS (== result (/ a b))
-      §R (/ a b)",
+            calor: @"module Math Math block
+  func Divide public (int:a, int:b) → int
+    !
+    requires b > 0
+    => result == a / b
+    return a / b",
             csharp: @"namespace Math { public class MathOps { public int Divide(int a, int b) { return a / b; } } }");
 
         // Act
@@ -207,12 +206,11 @@ namespace Calculator
         // Arrange
         var calculator = new ErrorDetectionCalculator();
         var context = CreateContext(
-            calor: @"§M{Safe}
-  §F{Divide:pub}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §REQ (!= b 0)
-      §R (/ a b)",
+            calor: @"module Safe Safe block
+  func Divide public (int:a, int:b) → int
+    !
+    requires b != 0
+    return a / b",
             csharp: @"public class Safe { public int Divide(int a, int b) { return a / b; } }");
 
         // Act
@@ -234,14 +232,12 @@ namespace Calculator
         // Arrange
         var calculator = new InformationDensityCalculator();
         var context = CreateContext(
-            calor: @"§M{Dense}
-  §F{Process:pub}
-      §I{i32:x}
-      §O{i32}
-      §E{pure}
-      §REQ (>= x 0)
-      §ENS (>= result 0)
-      §R (* x x)",
+            calor: @"module Dense Dense block
+  func Process public (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x",
             csharp: @"namespace Dense { public class DenseModule { public int Process(int x) { return x * x; } } }");
 
         // Act
@@ -259,7 +255,7 @@ namespace Calculator
         // Arrange
         var calculator = new InformationDensityCalculator();
         var context = CreateContext(
-            calor: "§M{m} §F{f} §I{i32:x} §O{i32} §REQ (> x 0) §R x §/F §/M",
+            calor: "module m m block\n  func f (int:x) → int\n    !\n    requires x > 0\n    return x\n",
             csharp: "class C { int F(int x) { return x; } }");
 
         // Act

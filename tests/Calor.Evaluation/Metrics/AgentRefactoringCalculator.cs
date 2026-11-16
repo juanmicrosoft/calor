@@ -289,15 +289,15 @@ public partial class AgentRefactoringCalculator : IMetricCalculator
 
     private static bool AreContractsPreserved(string before, string after)
     {
-        var beforeCount = CountPattern(before, @"§[QS]\s*\(");
-        var afterCount = CountPattern(after, @"§[QS]\s*\(");
+        var beforeCount = CalorSyntax.Requires.Matches(before).Count + CalorSyntax.Ensures.Matches(before).Count;
+        var afterCount = CalorSyntax.Requires.Matches(after).Count + CalorSyntax.Ensures.Matches(after).Count;
         return afterCount >= beforeCount;
     }
 
     private static bool AreEffectsPreserved(string before, string after)
     {
-        var beforeCount = CountPattern(before, @"§E\{");
-        var afterCount = CountPattern(after, @"§E\{");
+        var beforeCount = CalorSyntax.EffectRow.Matches(before).Count;
+        var afterCount = CalorSyntax.EffectRow.Matches(after).Count;
         return afterCount >= beforeCount;
     }
 

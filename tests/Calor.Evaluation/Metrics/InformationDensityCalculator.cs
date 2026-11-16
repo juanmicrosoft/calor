@@ -107,35 +107,36 @@ public class InformationDensityCalculator : IMetricCalculator
 
         var counts = new SemanticElementCounts();
 
-        // Count from source patterns (backup if compilation fails)
-        // Note: Calor uses curly brace syntax: §M{id:name}, §F{id:name:vis}, etc.
-        counts.Modules = CountPattern(source, @"§M\{");
-        counts.Functions = CountPattern(source, @"§F\{") + CountPattern(source, @"§AF\{") + CountPattern(source, @"§MT\{") + CountPattern(source, @"§AMT\{");
-        counts.Variables = CountPattern(source, @"§B\{");
+        // Count from source patterns (backup if compilation fails); see CalorSyntax.
+        counts.Modules = CalorSyntax.Module.Matches(source).Count;
+        counts.Functions = CalorSyntax.Function.Matches(source).Count;
+        counts.Variables = CalorSyntax.Binding.Matches(source).Count;
 
-        // Type annotations: count markers AND actual type names for parity with C# TypeSyntax counting
-        counts.TypeAnnotations = CountPattern(source, @"§I\{") + CountPattern(source, @"§O\{");
-        counts.TypeAnnotations += CountPattern(source, @"\b(i32|i64|f32|f64|str|bool|unit)\b");
+        // Type annotations: typed parameters and return types AND actual type names for parity
+        // with C# TypeSyntax counting
+        counts.TypeAnnotations = CalorSyntax.CountTypedParameters(source) + CalorSyntax.TypedOutput.Matches(source).Count;
+        counts.TypeAnnotations += CountPattern(source, @"\b(int|long|float|double|string|bool|void)\b");
 
         // Contracts (weight higher - unique to Calor)
-        counts.Contracts = (CountPattern(source, @"§Q\s") + CountPattern(source, @"§S\s")) * 2;
+        counts.Contracts = (CalorSyntax.Requires.Matches(source).Count + CalorSyntax.Ensures.Matches(source).Count) * 2;
 
         // Effects (weight higher - unique to Calor)
-        counts.Effects = CountPattern(source, @"§E\{") * 2;
+        counts.Effects = CalorSyntax.EffectRow.Matches(source).Count * 2;
 
         // Control flow: include return statements, else branches, else-if branches
-        counts.ControlFlow = CountPattern(source, @"§IF") + CountPattern(source, @"§L\{") + CountPattern(source, @"§WH\{") + CountPattern(source, @"§W\{");
-        counts.ControlFlow += CountPattern(source, @"§R\s");    // Return statements
-        counts.ControlFlow += CountPattern(source, @"§EL\s");   // Else branches
-        counts.ControlFlow += CountPattern(source, @"§EI\{");   // Else-if branches
+        counts.ControlFlow = CalorSyntax.If.Matches(source).Count + CalorSyntax.Loop.Matches(source).Count;
+        counts.ControlFlow += CalorSyntax.Return.Matches(source).Count;
+        counts.ControlFlow += CalorSyntax.Else.Matches(source).Count;
+        counts.ControlFlow += CalorSyntax.ElseIf.Matches(source).Count;
 
-        counts.Expressions = CountPattern(source, @"§C\{") + CountPattern(source, @"\([\+\-\*/]");
+        // Calls and binary arithmetic
+        counts.Expressions = CalorSyntax.Call.Matches(source).Count + CountPattern(source, @"\s[\+\-\*/]\s");
 
-        // Closing tags as scope markers (indicates structure)
-        counts.ClosingTags = CountPattern(source, @"§/");
+        // Native source has no closing tags: blocks end by indentation.
+        counts.ClosingTags = 0;
 
         // Mutable binding markers (unique to Calor - explicit mutability intent)
-        counts.MutabilityMarkers = CountPattern(source, @"§B\{~");
+        counts.MutabilityMarkers = CalorSyntax.MutableBinding.Matches(source).Count;
 
         // If compilation succeeded, use AST for more accurate counts
         if (compilation.Success && compilation.Module != null)
@@ -254,27 +255,13 @@ public class InformationDensityCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Counts tokens in source code using simple tokenization.
-    /// For Calor, treats section markers (§M{, §F{, etc.) as single tokens
-    /// rather than counting each character separately. In Phase 4 indent
-    /// form the bulk of source markers are openers; the regex still
-    /// matches any §/X{ closers (`§/T`, `§/NEW`, …) that remain inline.
+    /// Counts tokens in source code using simple tokenization: words, and each punctuation
+    /// or symbol character. Native Calor keywords are ordinary words, so both languages
+    /// use the same rule.
     /// </summary>
     private static int CountTokens(string source)
     {
-        // Pre-process Calor: Replace section markers with single-token placeholders
-        // This prevents §M{ from being counted as 3 tokens (§, M, {)
-        var processed = System.Text.RegularExpressions.Regex.Replace(
-            source,
-            @"§/?[A-Z]+\{",
-            " _MARKER_ ");
-
-        // Also handle markers without braces (§Q, §S, §R, §EL followed by space)
-        processed = System.Text.RegularExpressions.Regex.Replace(
-            processed,
-            @"§[A-Z]+\s",
-            " _MARKER_ ");
-
+        var processed = source;
         var tokens = 0;
         var inToken = false;
 

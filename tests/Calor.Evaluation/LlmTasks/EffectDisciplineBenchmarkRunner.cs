@@ -242,8 +242,7 @@ public sealed class EffectDisciplineBenchmarkRunner : IDisposable
                 // Check if these are effect violations (for informational purposes)
                 effectViolations = calorResult.Errors
                     .Where(e => e.Contains("effect", StringComparison.OrdinalIgnoreCase) ||
-                               e.Contains("pure", StringComparison.OrdinalIgnoreCase) ||
-                               e.Contains("§E", StringComparison.OrdinalIgnoreCase))
+                               e.Contains("pure", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
                 // Outcome-based scoring: compilation failed = 0.0

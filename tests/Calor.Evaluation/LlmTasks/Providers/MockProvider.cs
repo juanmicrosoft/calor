@@ -942,11 +942,10 @@ public sealed class MockProvider : ILlmProvider
         // Extract function name from prompt
         var functionName = ExtractFunctionName(prompt);
 
-        return $@"§M{{Module}}
-  §F{{f001:{functionName}:pub}}
-    §I{{i32:n}}
-    §O{{i32}}
-    §R 0";
+        return $@"module Module Module block
+  func {functionName} (int:n) → int
+    !
+    return 0";
     }
 
     private static string GenerateCSharpStub(string prompt)
