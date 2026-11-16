@@ -23,8 +23,9 @@ two signals:
 - source IDs that distinguished otherwise similar structural targets.
 
 The following native illustration keeps the two original loop ranges and
-conditions. Current Calor keeps declaration identity in `.calor/ids.json`; these
-historical heuristic scores have not been remeasured for the sidecar representation.
+conditions. Current Calor keeps declaration identity in `.calor/ids.json`, and the
+calculator now reads IDs from there. The 1.36x corpus result has not been
+remeasured with this calculator.
 
 ```calor
 module EditTargets
@@ -62,15 +63,15 @@ The structural Calor score starts at 0.50 and adds:
 
 | Detected factor | Points |
 |:----------------|:-------|
-| At least one explicit module ID | 0.15 |
-| At least one explicit function ID | 0.20 |
+| A module ID in the identity sidecar | 0.15 |
+| A function, method, constructor or operator ID in the sidecar | 0.20 |
 | Indented body present | 0.10 |
-| Legacy variable-tag pattern present | 0.10 |
 
-The calculator's legacy variable-marker detector is a known limitation:
-native `let` and `var` bindings do not earn that bonus. Current
-ID-free declarations also do not earn the calculator's explicit-source-ID bonus.
-Do not insert IDs into active source to change that score.
+The calculator reads declaration IDs through the compiler's identity store
+(`.calor/ids.json`). An input with no sidecar gets fresh IDs, the same ones
+`calor ids sync` would assign. Native `let`/`var` bindings and loops have no IDs,
+so the historical calculator's 0.10 variable-ID bonus no longer exists, and a loop
+edit is scored by context, with the same rule the calculator applies to C#.
 
 The C# structural score starts at 0.50, adds namespace, class, and method
 signals, subtracts for deeper brace structure, and is capped at 0.85.

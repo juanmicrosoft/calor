@@ -1455,7 +1455,7 @@ public class DocDriftCheckerTests
     }
 
     [Fact]
-    public async Task PublicErrorDetection_ReportsActualLegacyDetectorScoresInsteadOfTheHistoricalIllustration()
+    public async Task PublicErrorDetection_ReportsTheCalculatorsActualScores()
     {
         const string path = "website/content/benchmarking/metrics/error-detection.mdx";
         var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path)).Replace("\r\n", "\n");
@@ -1464,8 +1464,20 @@ public class DocDriftCheckerTests
         var csharp = System.Text.RegularExpressions.Regex.Matches(content,
             @"```csharp\n(?<body>.*?)\n```", System.Text.RegularExpressions.RegexOptions.Singleline);
         Assert.Equal(4, csharp.Count);
+        // The page states: 0.95 with requires, => and an effect row; 0.75 without a
+        // postcondition; no invariants; the SafeDivide C# fragment scores the 0.30 base.
+        var expectedCalor = new Dictionary<string, (double Score, bool HasEnsures)>
+        {
+            ["DivisionSignals"] = (0.95, true),
+            ["NullSignals"] = (0.75, false),
+            ["BoundsSignals"] = (0.75, false),
+            ["BuggyCaller"] = (0.95, true),
+            ["NullableSignals"] = (0.95, true),
+        };
         foreach (var program in programs)
         {
+            var module = program.Source.Split('\n')[0]["module ".Length..].Trim();
+            var (score, hasEnsures) = expectedCalor[module];
             var metric = await new Calor.Evaluation.Metrics.ErrorDetectionCalculator().CalculateAsync(
                 new Calor.Evaluation.Core.EvaluationContext
                 {
@@ -1473,13 +1485,20 @@ public class DocDriftCheckerTests
                     CSharpSource = csharp[3].Groups["body"].Value,
                     FileName = path
                 });
-            Assert.Equal(0.30, metric.CalorScore, 10);
+            Assert.Equal(score, metric.CalorScore, 10);
             Assert.Equal(0.30, metric.CSharpScore, 10);
-            Assert.Equal(1.0, metric.AdvantageRatio, 10);
+            Assert.Equal(score / 0.30, metric.AdvantageRatio, 10);
             var factors = Assert.IsType<Dictionary<string, bool>>(metric.Details["calorDetectionFactors"]);
             Assert.Equal(6, factors.Count);
-            Assert.All(factors, factor => Assert.False(factor.Value, factor.Key));
+            Assert.True(factors["hasRequires"], module);
+            Assert.Equal(hasEnsures, factors["hasEnsures"]);
+            Assert.False(factors["hasInvariants"], module);
+            Assert.True(factors["hasEffects"], module);
+            Assert.True(factors["hasTypedInputs"], module);
+            Assert.True(factors["hasTypedOutput"], module);
         }
+        Assert.Contains("**Total: 0.95**", content);
+        Assert.Contains("**Ratio: 0.95 / 0.30 = 3.17x.**", content);
         foreach (var (index, call, expected) in new[]
         {
             (0, "Original.Divide(9, 2)", "4"),

@@ -197,9 +197,9 @@ source-pattern heuristics; it does not execute an agent or apply the edits:
 - Cascading changes needed for renames
 
 **Scoring:** 40% structural analysis + 60% heuristic simulated-task score.
-The implementation still contains legacy variable and loop-marker detectors.
-Native bindings and counted loops do not receive those particular bonuses.
-Declaration IDs now live in `.calor/ids.json`, not authored headers. Treat this
+The calculator reads module and function IDs from the `.calor/ids.json`
+sidecar, not from authored headers. Native bindings and loops have no IDs, so
+they earn no ID bonus. The published result predates this calculator. Treat this
 as a static representation metric, not observed editing accuracy or proof of
 current tool-driven identity preservation.
 

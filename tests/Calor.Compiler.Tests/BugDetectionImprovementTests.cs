@@ -136,14 +136,12 @@ module Test Test block
     public async Task CalculateCalorDetection_WithCorrectSyntax_ScoresHigherThanBase()
     {
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §S (== result (/ a b))
-      §R (/ a b)
+module Test Test block
+  func Divide public (int:a, int:b) → int
+    !
+    requires b != 0
+    => result == a / b
+    return a / b
 ";
         var ctx = new EvaluationContext
         {
@@ -155,22 +153,20 @@ module Test Test block
         var calc = new ErrorDetectionCalculator();
         var result = await calc.CalculateAsync(ctx);
 
-        // With §Q and §S markers present, Calor score should be > 0.3 base
+        // With a precondition and a postcondition present, Calor score should be > 0.3 base
         Assert.True(result.CalorScore > 0.3, $"Calor score {result.CalorScore} should be > 0.3");
     }
 
     [Fact]
     public void DetectsBugViaContracts_UsesCorrectMarkers()
     {
-        // Source with §Q marker (the correct Calor syntax)
+        // Source with a native precondition
         var source = @"
-§M{Test}
-  §F{Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)
+module Test Test block
+  func Divide public (int:a, int:b) → int
+    !
+    requires b != 0
+    return a / b
 ";
         var ctx = new EvaluationContext
         {
@@ -189,7 +185,7 @@ module Test Test block
 
         var result = calc.EvaluateBuggyCode(source, source, "class C {}", "class C {}", bug);
 
-        // Should detect via contract since §Q is present
+        // Should detect via contract since a precondition is present
         Assert.True(result.CalorDetectedViaContract);
     }
 
@@ -914,45 +910,20 @@ module PrimeCheck PrimeCheck block
         }
     }
 
-    [Fact]
-    public void EnsuresPattern_MatchesVariousFormats()
+    [Theory]
+    [InlineData("=> result == 1", true)]
+    [InlineData("    => result == 1", true)]
+    [InlineData("\t=> (result == 1)", true)]
+    [InlineData("    return xs.Select(x => x + 1)", false)]
+    public void EnsuresPattern_MatchesLineHeadPostconditionsOnly(string line, bool detected)
     {
-        // Verify that §S matching works for various formats
+        // A native postcondition is a line that starts with `=>`. No precondition is present,
+        // so only the postcondition can make the contract check succeed; an `=>` inside an
+        // expression (a lambda) is not a postcondition.
         var calc = new ErrorDetectionCalculator();
-
-        // §S followed by space
-        var source1 = "§Q (!= b 0)\n§S (== result 1)";
-        var ctx1 = new EvaluationContext
-        {
-            CalorSource = source1,
-            CSharpSource = "class C {}",
-            FileName = "test"
-        };
         var bug = new BugDescription { Id = "test", Category = "contract_violation", Description = "test" };
-        var result1 = calc.EvaluateBuggyCode(source1, source1, "class C {}", "class C {}", bug);
-        Assert.True(result1.CalorDetectedViaContract, "Should detect §S followed by space");
-
-        // §S followed by open paren
-        var source2 = "§Q (!= b 0)\n§S(== result 1)";
-        var ctx2 = new EvaluationContext
-        {
-            CalorSource = source2,
-            CSharpSource = "class C {}",
-            FileName = "test"
-        };
-        var result2 = calc.EvaluateBuggyCode(source2, source2, "class C {}", "class C {}", bug);
-        Assert.True(result2.CalorDetectedViaContract, "Should detect §S followed by paren");
-
-        // §S followed by newline
-        var source3 = "§Q (!= b 0)\n§S\n(== result 1)";
-        var ctx3 = new EvaluationContext
-        {
-            CalorSource = source3,
-            CSharpSource = "class C {}",
-            FileName = "test"
-        };
-        var result3 = calc.EvaluateBuggyCode(source3, source3, "class C {}", "class C {}", bug);
-        Assert.True(result3.CalorDetectedViaContract, "Should detect §S followed by newline");
+        var result = calc.EvaluateBuggyCode(line, line, "class C {}", "class C {}", bug);
+        Assert.Equal(detected, result.CalorDetectedViaContract);
     }
 
     #endregion

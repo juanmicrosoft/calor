@@ -4,10 +4,10 @@ section: "benchmarking"
 order: 4
 ---
 
-> **Syntax and measurement:** The programs below use current native syntax.
-> The 1.49x result and scoring illustration are historical, not measurements of
-> these programs. The current calculator still searches for retired source
-> markers; it does not recognize the native contracts shown here.
+> **Syntax and measurement:** The programs below use current native syntax, and
+> the calculator reads it. The scores on this page come from running the current
+> calculator on these programs. The 1.49x result is historical: the benchmark
+> corpus has not been remeasured with this calculator.
 
 **Category:** Error Detection
 **Historical dashboard result:** Calor wins (1.49x across 217 programs)
@@ -43,10 +43,10 @@ correct or that a call satisfies them.
 
 ## How It's Measured
 
-### Historical Calor Detection Factors
+### Calor Detection Factors
 
-These are the existing calculator's weights. The syntax column names their
-current-language counterparts, not patterns the calculator currently recognizes.
+These are the calculator's weights. The syntax column shows the native form the
+calculator looks for.
 
 | Factor | Points | Rationale |
 |:-------|:-------|:----------|
@@ -59,10 +59,9 @@ current-language counterparts, not patterns the calculator currently recognizes.
 
 Base score: 0.30
 
-For these native programs the existing marker detector returns only the 0.30
-base score, with all six Calor factors false. Do not treat that as a native
-contract-support result. Porting the detector and remeasuring the same declared
-corpus are separate work; neither happened for this page.
+On this page's five Calor programs the calculator scores 0.95 for the three that
+have a precondition, a postcondition and an effect row, and 0.75 for the two
+without a postcondition. None has an invariant.
 
 ### C# Detection Factors
 
@@ -247,14 +246,15 @@ module NullableSignals
       return a / b
 ```
 
-**Historical illustrative score, not the current native detector's output:**
+**Score from the current calculator:**
 - Base: 0.30
 - Precondition: +0.25
 - Postcondition: +0.20
+- Effect row: +0.10
 - Typed parameters: +0.05
 - Typed return: +0.05
 
-**Total: 0.85**
+**Total: 0.95**
 
 ### C# Equivalent
 
@@ -267,24 +267,23 @@ public static int? SafeDivide(int a, int b)
 }
 ```
 
-**Historical illustrative breakdown:**
+**Score from the current calculator:**
 - Base: 0.30
-- Has type annotations: +0.10
-- Has return: +0.05
 
-**Total: 0.45**
+**Total: 0.30**
 
-**Historical illustrative ratio: 0.85 / 0.45 = 1.89x.**
+**Ratio: 0.95 / 0.30 = 3.17x.**
 
-The existing C# calculator does not award the displayed type-annotation or return
-bonuses either: this exact C# fragment scores 0.30. Both native and C# fragments
-therefore currently score 0.30, a 1.0x ratio. The historical illustration is not an
-implemented current result or evidence that Calor found more bugs.
+The C# fragment earns no bonus because none of the C# factors appear in it: its
+`if (b == 0)` guard is not one of the recognized patterns. The ratio counts
+recognized source signals. It is not evidence that Calor found more bugs.
+An earlier version of this page showed an illustrative 0.85 / 0.45 = 1.89x that
+the calculator never produced.
 
 For valid input `(6, 2)`, both implementations return `3`. For `(6, 0)`, the
 C# version returns null, but the Calor version fails `requires b != 0` when
-checks are enabled; only checks-off execution takes its null branch. Full API
-equivalence is not claimed.
+checks are enabled; only checks-off execution takes its null branch. The two
+versions do not have the same API behavior.
 
 ---
 
