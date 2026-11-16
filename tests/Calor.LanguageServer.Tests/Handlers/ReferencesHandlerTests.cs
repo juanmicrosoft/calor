@@ -10,48 +10,6 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class ReferencesHandlerTests
 {
-    [Fact]
-    public async Task NestedShadowedLocalsRemainSeparatedBySymbolIdAsync()
-    {
-        const string source = """
-            §M{TestModule}
-              §F{Test:pub} (bool:flag) -> i32
-                §B{value:i32} INT:1
-                §IF (== flag BOOL:true)
-                  §B{value:i32} INT:2
-                  §R value
-                §R value
-            """;
-        var uri = DocumentUri.From("file:///references-shadow.calr");
-        var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-
-        var outer = await FindReferencesAsync(
-            workspace,
-            uri,
-            source,
-            source.IndexOf("§B{value", StringComparison.Ordinal) + "§B{".Length);
-        var innerOffset = source.LastIndexOf("§B{value", StringComparison.Ordinal)
-            + "§B{".Length;
-        var inner = await FindReferencesAsync(
-            workspace,
-            uri,
-            source,
-            innerOffset);
-
-        Assert.Equal(2, outer.Length);
-        Assert.Equal(2, inner.Length);
-        Assert.DoesNotContain(
-            outer,
-            location => PositionConverter.ToOffset(location.Range.Start, source)
-                == innerOffset);
-        Assert.DoesNotContain(
-            inner,
-            location => PositionConverter.ToOffset(location.Range.Start, source)
-                == source.IndexOf("§B{value", StringComparison.Ordinal) + "§B{".Length);
-        Assert.All(outer.Concat(inner), location =>
-            Assert.Equal("value", TextAt(source, location.Range)));
-    }
 
     [Fact]
     public async Task SameMethodNameOnUnrelatedTypesDoesNotCollideAsync()

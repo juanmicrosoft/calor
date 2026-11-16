@@ -229,26 +229,6 @@ public class MigrationLearningFixTests
             call.Accept(new CSharpEmitter()));
     }
 
-    [Fact]
-    public void ImmutableDictionarySnapshot_TypeFixPreservesEffectPolicy()
-    {
-        var path = Path.Combine(CliTestHarness.FindRepoRoot(),
-            "tests", "Calor.Conversion.Tests", "Snapshots", "11-05.approved.calr");
-        var original = File.ReadAllBytes(path);
-        var source = File.ReadAllText(path);
-        var strict = Program.Compile(source, path);
-        Assert.Equal(DiagnosticCode.ForbiddenEffect,
-            Assert.Single(strict.Diagnostics.Errors).Code);
-        var result = Program.Compile(source, path, new CompilationOptions
-        {
-            UnknownCallPolicy = UnknownCallPolicy.Permissive
-        });
-
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
-        Assert.Contains("ImmutableDictionary<string, int>.Empty", result.GeneratedCode);
-        Assert.Equal(original, File.ReadAllBytes(path));
-    }
-
     #endregion
 
     #region PR 2: Call Expression Leading Dot

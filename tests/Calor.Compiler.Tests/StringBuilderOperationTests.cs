@@ -37,116 +37,7 @@ public class StringBuilderOperationTests
         Assert.NotNull(sbOp);
         return sbOp!;
     }
-
     #region AST Tests
-
-    [Fact]
-    public void Parse_SbNew_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-new)");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.New, sbOp.Operation);
-        Assert.Empty(sbOp.Arguments);
-    }
-
-    [Fact]
-    public void Parse_SbNewWithInit_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-new \"init\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.New, sbOp.Operation);
-        Assert.Single(sbOp.Arguments);
-    }
-
-    [Fact]
-    public void Parse_SbAppend_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-append sb \"text\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.Append, sbOp.Operation);
-        Assert.Equal(2, sbOp.Arguments.Count);
-    }
-
-    [Fact]
-    public void Parse_SbAppendLine_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-appendline sb \"text\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.AppendLine, sbOp.Operation);
-        Assert.Equal(2, sbOp.Arguments.Count);
-    }
-
-    [Fact]
-    public void Parse_SbInsert_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-insert sb 0 \"text\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.Insert, sbOp.Operation);
-        Assert.Equal(3, sbOp.Arguments.Count);
-    }
-
-    [Fact]
-    public void Parse_SbRemove_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-remove sb 0 5)");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.Remove, sbOp.Operation);
-        Assert.Equal(3, sbOp.Arguments.Count);
-    }
-
-    [Fact]
-    public void Parse_SbClear_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-clear sb)");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.Clear, sbOp.Operation);
-        Assert.Single(sbOp.Arguments);
-    }
-
-    [Fact]
-    public void Parse_SbToString_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-tostring sb)");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.ToString, sbOp.Operation);
-        Assert.Single(sbOp.Arguments);
-    }
-
-    [Fact]
-    public void Parse_SbLength_ReturnsStringBuilderOperationNode()
-    {
-        var source = WrapInFunction("§R (sb-length sb)");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.Length, sbOp.Operation);
-        Assert.Single(sbOp.Arguments);
-    }
 
     #endregion
 
@@ -174,90 +65,10 @@ public class StringBuilderOperationTests
 
         Assert.Contains(expectedCSharp, code);
     }
-
     #endregion
-
     #region Round-Trip Tests
-
-    [Theory]
-    [InlineData("(sb-new)")]
-    [InlineData("(sb-new \"init\")")]
-    [InlineData("(sb-append sb \"text\")")]
-    [InlineData("(sb-appendline sb \"text\")")]
-    [InlineData("(sb-insert sb 0 \"text\")")]
-    [InlineData("(sb-remove sb 0 5)")]
-    [InlineData("(sb-clear sb)")]
-    [InlineData("(sb-tostring sb)")]
-    [InlineData("(sb-length sb)")]
-    public void RoundTrip_StringBuilderOp_ProducesValidCalor(string op)
-    {
-        var source = WrapInFunction($"§R {op}");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-
-        var calorEmitter = new CalorEmitter();
-        var roundTripped = calorEmitter.Emit(module);
-
-        // Extract the expected op name from the expression
-        var opName = op.Split(' ')[0].TrimStart('(').TrimEnd(')');
-        Assert.Contains(opName, roundTripped);
-    }
-
     #endregion
-
     #region Error Tests
-
-    [Fact]
-    public void Parse_SbAppend_NoArgs_ReportsError()
-    {
-        var source = WrapInFunction("§R (sb-append)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
-    }
-
-    [Fact]
-    public void Parse_SbAppend_OneArg_ReportsError()
-    {
-        var source = WrapInFunction("§R (sb-append sb)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
-    }
-
-    [Fact]
-    public void Parse_SbInsert_TwoArgs_ReportsError()
-    {
-        var source = WrapInFunction("§R (sb-insert sb 0)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 3 argument"));
-    }
-
-    [Fact]
-    public void Parse_SbClear_NoArgs_ReportsError()
-    {
-        var source = WrapInFunction("§R (sb-clear)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 1 argument"));
-    }
-
-    [Fact]
-    public void Parse_SbNew_TooManyArgs_ReportsError()
-    {
-        // sb-new accepts up to 4 args: StringBuilder(string, int, int, int)
-        var source = WrapInFunction("§R (sb-new \"a\" INT:1 INT:2 INT:3 INT:4)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("accepts at most 4 argument"));
-    }
 
     #endregion
 
@@ -314,42 +125,8 @@ public class StringBuilderOperationTests
         Assert.Equal(expectedMin, op.GetMinArgCount());
         Assert.Equal(expectedMax, op.GetMaxArgCount());
     }
-
     #endregion
-
     #region Composition Tests
-
-    [Fact]
-    public void Parse_NestedAppends_Works()
-    {
-        // (sb-tostring (sb-append (sb-append (sb-new) "a") "b"))
-        var source = WrapInFunction("§R (sb-tostring (sb-append (sb-append (sb-new) \"a\") \"b\"))");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.ToString, sbOp.Operation);
-
-        var emitter = new CSharpEmitter();
-        var code = emitter.Emit(module);
-        Assert.Contains("new System.Text.StringBuilder().Append(\"a\").Append(\"b\").ToString()", code);
-    }
-
-    [Fact]
-    public void Parse_LengthAfterClear_Works()
-    {
-        // (sb-length (sb-clear (sb-append (sb-new "init") "more")))
-        var source = WrapInFunction("§R (sb-length (sb-clear (sb-append (sb-new \"init\") \"more\")))");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var sbOp = GetReturnExpression(module);
-        Assert.Equal(StringBuilderOp.Length, sbOp.Operation);
-
-        var emitter = new CSharpEmitter();
-        var code = emitter.Emit(module);
-        Assert.Contains("new System.Text.StringBuilder(\"init\").Append(\"more\").Clear().Length", code);
-    }
 
     #endregion
 

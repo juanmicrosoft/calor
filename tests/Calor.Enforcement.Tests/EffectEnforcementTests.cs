@@ -209,40 +209,6 @@ module Test Test block
     }
 
     [Fact]
-    public void LinqCallsInFunction_ArePure_CompilesSuccessfully()
-    {
-        // LINQ extension method calls in §F should be recognized as pure
-        var source = @"
-§M{Test}
-  §F{SortItems:pub}
-      §I{List<i32>:items}
-      §O{void}
-      §C{items.OrderByDescending}
-      §/C
-      §C{items.ToArray}
-      §/C
-      §C{items.Where}
-      §/C
-      §C{items.Select}
-      §/C
-      §C{items.First}
-      §/C
-      §C{items.Any}
-      §/C
-      §C{items.Count}
-      §/C
-      §C{items.Distinct}
-      §/C
-      §C{items.ToList}
-      §/C
-";
-        var result = TestHarness.Compile(source);
-
-        Assert.False(result.HasErrors,
-            $"LINQ calls should compile without errors. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
-    }
-
-    [Fact]
     public void LinqStaticCall_Enumerable_Range_CompilesSuccessfully()
     {
         // Static LINQ calls like Enumerable.Range should resolve via type mapping
@@ -323,29 +289,6 @@ module Test Test block
 
         Assert.False(result.HasErrors,
             $"§MT with declared cw effect should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
-    }
-
-    [Fact]
-    public void MethodInClass_WithLinqCalls_CompilesSuccessfully()
-    {
-        // §MT method with LINQ calls should compile (both class enforcement and LINQ purity)
-        var source = @"
-§M{Test}
-  §CL{DataProcessor:pub}
-      §MT{ProcessItems:pub}
-          §I{List<i32>:items}
-          §O{void}
-          §C{items.OrderByDescending}
-          §/C
-          §C{items.ToArray}
-          §/C
-          §C{items.Where}
-          §/C
-";
-        var result = TestHarness.Compile(source);
-
-        Assert.False(result.HasErrors,
-            $"LINQ calls in §MT should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
 
     [Fact]

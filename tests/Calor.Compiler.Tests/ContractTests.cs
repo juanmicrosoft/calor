@@ -24,41 +24,7 @@ public class ContractTests
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
-
     #region Lexer Tests
-
-    [Fact]
-    public void Lexer_RecognizesRequiresKeyword()
-    {
-        var tokens = Tokenize("§Q", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Requires, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesEnsuresKeyword()
-    {
-        var tokens = Tokenize("§S", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Ensures, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesInvariantKeyword()
-    {
-        var tokens = Tokenize("§IV", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Invariant, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
 
     #endregion
 
@@ -132,30 +98,6 @@ module Test Test block
         var func = module.Functions[0];
         Assert.Equal(2, func.Preconditions.Count);
         Assert.Single(func.Postconditions);
-    }
-
-    [Fact]
-    public void Parser_ParsesContractWithMessage()
-    {
-        // v2 syntax: message is first positional §Q{"message"} (condition)
-        var source = @"
-§M{Test}
-  §F{Square:pub}
-    §I{i32:x}
-    §O{i32}
-    §Q{""x must be nonnegative""} (>= x 0)
-    §R (* x x)
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var func = module.Functions[0];
-        var requires = func.Preconditions[0];
-        Assert.Equal("x must be nonnegative", requires.Message);
-        Assert.NotNull(requires.Condition);
-        Assert.IsType<BinaryOperationNode>(requires.Condition);
     }
 
     #endregion

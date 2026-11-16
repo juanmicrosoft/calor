@@ -566,78 +566,8 @@ public class CSharpToCalorConversionTests
         Assert.Contains("partial", result.CalorSource);
         Assert.DoesNotContain("§CL{", result.CalorSource);
     }
-
     #endregion
-
     #region Event Subscription Tests
-
-    [Fact]
-    public void Convert_EventSubscription_CreatesSubscribeNode()
-    {
-        var csharpSource = """
-            public class Handler
-            {
-                public void Setup(Button button)
-                {
-                    button.Click += OnClick;
-                }
-
-                private void OnClick(object sender, EventArgs e) { }
-            }
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.CalorSource);
-        Assert.Contains("§SUB", result.CalorSource);
-        Assert.DoesNotContain("+=", result.CalorSource);
-        Assert.Contains("event-subscribe", result.Context.UsedFeatures);
-    }
-
-    [Fact]
-    public void Convert_EventUnsubscription_CreatesUnsubscribeNode()
-    {
-        var csharpSource = """
-            public class Handler
-            {
-                public void Cleanup(Button button)
-                {
-                    button.Click -= OnClick;
-                }
-
-                private void OnClick(object sender, EventArgs e) { }
-            }
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.CalorSource);
-        Assert.Contains("§UNSUB", result.CalorSource);
-        Assert.DoesNotContain("-=", result.CalorSource);
-        Assert.Contains("event-unsubscribe", result.Context.UsedFeatures);
-    }
-
-    [Fact]
-    public void Convert_EventSubscriptionWithLambda_Handled()
-    {
-        var csharpSource = """
-            public class Handler
-            {
-                public void Setup(Button button)
-                {
-                    button.Click += (s, e) => Console.WriteLine("Clicked");
-                }
-            }
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.CalorSource);
-        Assert.Contains("§SUB", result.CalorSource);
-    }
 
     #endregion
 

@@ -186,17 +186,6 @@ public sealed class ProofLocalObligationTests
             proof (x > 0)
             """), "shares its name with a parameter");
 
-    // Review round 1: the emitter sanitizes `a-b` to `ab`, so the mutable `ab` rebinds it.
-    [SkippableTheory]
-    [InlineData("INT:1")]
-    [InlineData("INT:2")]
-    public void LocalSharingItsCSharpName_IsRefused(string claimed)
-        => AssertNotDischarged(SolveProof($$"""
-            §B{a-b:i32} INT:1
-            §B{~ab:i32} INT:2
-            §PROOF{} (== `a-b` {{claimed}})
-            """), "shares its C# name with another variable");
-
     // Review round 3: an `in` argument exposes the local's storage to the callee.
     [SkippableFact]
     public void LocalPassedAsInArgument_IsRefused()

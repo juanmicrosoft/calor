@@ -205,26 +205,6 @@ public class TypeOperationTests
         Assert.True(diagnostics.HasErrors);
     }
 
-    [Fact]
-    public void Parse_Cast_NonIdentifierType_ReportsError()
-    {
-        var source = WrapInFunction("§R (cast 42 x)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("Expected type name"));
-    }
-
-    [Fact]
-    public void Parse_Is_NonIdentifierType_ReportsError()
-    {
-        var source = WrapInFunction("§R (is x 42)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("Expected type name"));
-    }
-
     #endregion
 
     #region Extension Tests

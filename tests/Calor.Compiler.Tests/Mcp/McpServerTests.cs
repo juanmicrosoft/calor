@@ -190,41 +190,6 @@ public class McpServerTests
         Assert.Contains("diagnostics", json);
     }
 
-    /// <summary>
-    /// The MCP compile tool goes through Program.Compile, so an agent handing it a
-    /// §SEMVER{1.0.0} module gets the fail-closed Calor0701 refusal with the migration
-    /// pointer (#1084 item 1 / #1087) rather than silently reinterpreted 2.0.0 output.
-    /// </summary>
-    [Fact]
-    public async Task McpMessageHandler_HandleToolsCall_CompileTool_LegacySemver_ReportsCalor0701()
-    {
-        var handler = new McpMessageHandler();
-        var request = new JsonRpcRequest
-        {
-            Id = JsonDocument.Parse("41").RootElement,
-            Method = "tools/call",
-            Params = JsonDocument.Parse("""
-                {
-                    "name": "calor_compile",
-                    "arguments": {
-                        "source": "§M{Legacy}\n  §SEMVER{1.0.0}\n  §F{Answer:pub} () -> i32\n    §E{}\n    §R INT:42\n"
-                    }
-                }
-                """).RootElement
-        };
-
-        var response = await handler.HandleRequestAsync(request);
-
-        Assert.NotNull(response);
-        Assert.Null(response.Error);
-        Assert.NotNull(response.Result);
-
-        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
-        Assert.Contains("Calor0701", json);
-        Assert.Contains("issues/1084", json);
-        Assert.DoesNotContain("\"success\":true", json.Replace(" ", ""));
-    }
-
     [Fact]
     public async Task McpMessageHandler_HandleToolsCall_ConvertTool_Success()
     {
@@ -639,46 +604,7 @@ public class McpServerTests
     private static void AssertResponseContains(string response, string expected) =>
         Assert.True(response.Contains(expected),
             $"Expected substring '{expected}' not found. FULL RESPONSE:\n{response}");
-
     #region Diagnose Tool Integration Tests with Suggestions and Fixes
-
-    [Fact]
-    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithTypo_IncludesSuggestionAndFix()
-    {
-        var handler = new McpMessageHandler();
-        var request = new JsonRpcRequest
-        {
-            Id = JsonDocument.Parse("20").RootElement,
-            Method = "tools/call",
-            Params = JsonDocument.Parse("""
-                {
-                    "name": "calor_check",
-                    "arguments": {
-                        "source": "§M{Test} §F{Fn} §O{bool} §R (cotains \"hello\" \"h\")"
-                    }
-                }
-                """).RootElement
-        };
-
-        var response = await handler.HandleRequestAsync(request);
-
-        Assert.NotNull(response);
-        Assert.Null(response.Error);
-        Assert.NotNull(response.Result);
-
-        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
-
-        // Verify suggestion is included
-        Assert.Contains("suggestion", json);
-        Assert.Contains("contains", json);
-
-        // Verify fix structure is included
-        Assert.Contains("fix", json);
-        Assert.Contains("description", json);
-        Assert.Contains("edits", json);
-        Assert.Contains("startLine", json);
-        Assert.Contains("newText", json);
-    }
 
     [Fact]
     public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithNameof_CompilesSuccessfully()

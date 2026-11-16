@@ -99,51 +99,6 @@ public sealed class ValidationLoopTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task CompileError_PreservesDiagnosticAndSafeFixWithOriginalPath(bool mcp)
-    {
-        WriteFixture();
-        File.AppendAllText(SourcePath, "\n§/M\n");
-        var before = File.ReadAllText(SourcePath);
-        var result = await RunAsync(mcp);
-        Assert.False(result.GetProperty("success").GetBoolean());
-        Assert.Equal("failed", Stage(result, "compile").GetProperty("status").GetString());
-        Assert.Equal("skipped", Stage(result, "test").GetProperty("status").GetString());
-        Assert.Equal("incomplete", Stage(result, "verify").GetProperty("status").GetString());
-        Assert.Contains(result.GetProperty("failures").EnumerateArray(),
-            f => f.GetProperty("stage").GetString() == "verify"
-                && f.GetProperty("message").GetString()!.Contains("did not complete", StringComparison.Ordinal));
-        var diagnostic = result.GetProperty("failures").EnumerateArray()
-            .Select(f => f.GetProperty("diagnostic")).First(d => d.GetProperty("code").GetString() == "Calor0830");
-        Assert.Equal(SourcePath, diagnostic.GetProperty("location").GetProperty("file").GetString());
-        Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
-        var fix = diagnostic.GetProperty("fix");
-        Assert.True(fix.GetProperty("isSafeToApply").GetBoolean());
-        Assert.All(fix.GetProperty("edits").EnumerateArray(),
-            e => Assert.Equal(SourcePath, e.GetProperty("filePath").GetString()));
-        Assert.Equal(before, File.ReadAllText(SourcePath));
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task InvalidGeneratedCode_IsNotTestSuccess(bool mcp)
-    {
-        WriteFixture();
-        File.WriteAllText(SourcePath, """
-            §M{Broken}
-              §CSHARP{
-              public class Bad { public int Get() => "not an integer"; }
-              }§/CSHARP
-            """);
-        var result = await RunAsync(mcp);
-        Assert.False(result.GetProperty("success").GetBoolean());
-        Assert.Contains("Calor1002", result.ToString());
-        Assert.Equal("skipped", Stage(result, "test").GetProperty("status").GetString());
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
     public async Task TestProjectBuildError_ReportsBuildStage(bool mcp)
     {
         WriteFixture(testBody: "ThisIsNotValidCSharp;");

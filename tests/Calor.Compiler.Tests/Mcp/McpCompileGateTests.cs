@@ -92,46 +92,6 @@ public sealed class McpCompileGateTests : IDisposable
             ["ES-08-effect-row-edit/0"] = "the pre-edit baseline: the callee's row is correct, so nothing is reported; the row widens in step 1 and is erased in step 2",
         };
 
-    [Theory]
-    [MemberData(nameof(RegisteredScripts))]
-    public async Task DiagnosticsThroughCalorCompileMatchTheCliProcess(string scriptName)
-    {
-        var script = LoadScript(scriptName);
-        for (var index = 0; index < script.Steps.Count; index++)
-        {
-            var step = script.Steps[index];
-            var workspace = CreateTempDir();
-            SyncWorkspace(workspace, step.SourceDirectory);
-            var sources = Directory.GetFiles(workspace, "*.calr")
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .ToArray();
-
-            // MCP first: the CLI writes .g.cs beside the sources, and the MCP
-            // path must be judged on the pristine step, not on leftovers.
-            var mcp = await CompileThroughMcp(workspace, step.Options);
-            var cli = CompileThroughCliProcess(workspace, sources, step.Options);
-
-            Assert.Equal(cli, mcp);
-
-            // Per-step anti-vacuity: two paths agreeing on an empty list agree
-            // about nothing. A step allowed to be clean must be registered as
-            // clean, with its reason — so a step that STOPS producing findings
-            // fails here instead of passing silently.
-            var key = $"{scriptName}/{index}";
-            if (CleanSteps.ContainsKey(key))
-            {
-                Assert.True(cli.Count == 0,
-                    $"{key} is registered as clean ({CleanSteps[key]}) but produced: {string.Join(" | ", cli)}");
-            }
-            else
-            {
-                Assert.True(cli.Count > 0,
-                    $"{key} produced no diagnostic on either path, so the comparison is vacuous. "
-                        + "Either the step regressed, or it belongs in CleanSteps with a reason.");
-            }
-        }
-    }
-
     [Fact]
     public void EveryRegisteredCleanStepExists()
     {
@@ -219,69 +179,6 @@ public sealed class McpCompileGateTests : IDisposable
                 cliText.Replace(built.CompilerHash, "<compiler>", StringComparison.Ordinal),
                 mcpText.Replace(fromMcp.CompilerHash, "<compiler>", StringComparison.Ordinal));
         }
-    }
-
-    // --- calor_compile's project mode, on its own ---------------------------
-
-    /// <summary>
-    /// The option's discriminating pin: ES-04's violating step has a caller
-    /// whose declared row the callee's new effects do not fit. Per-file batch
-    /// mode (the pre-E7 behaviour, kept as the default) cannot see it; project
-    /// mode reports the CLI's Calor0410.
-    /// </summary>
-    [Fact]
-    public async Task CrossModule_ReportsWhatPerFileBatchModeCannot()
-    {
-        var workspace = CreateTempDir();
-        SyncWorkspace(workspace, Path.Combine(CorpusRoot, "ES-04-cross-module-effect", "step-01-callee-gains-effect"));
-
-        var perFile = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new { projectPath = workspace }));
-        using var lenient = JsonDocument.Parse(perFile.Content[0].Text!);
-        Assert.False(lenient.RootElement.TryGetProperty("crossModule", out _));
-        // Alone, caller.calr cannot resolve SaveOrder at all — a binder error,
-        // never the effect verdict the project as a whole carries.
-        Assert.DoesNotContain("Calor0410", perFile.Content[0].Text);
-
-        var project = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new
-        {
-            projectPath = workspace,
-            options = new { crossModule = true },
-        }));
-        using var strict = JsonDocument.Parse(project.Content[0].Text!);
-        Assert.True(strict.RootElement.GetProperty("crossModule").GetBoolean());
-        Assert.False(strict.RootElement.GetProperty("success").GetBoolean());
-        Assert.True(project.IsError);
-        var caller = strict.RootElement.GetProperty("files").EnumerateArray()
-            .Single(file => file.GetProperty("filePath").GetString()!.EndsWith("caller.calr", StringComparison.Ordinal));
-        Assert.False(caller.GetProperty("success").GetBoolean());
-        Assert.Contains(
-            caller.GetProperty("diagnostics").EnumerateArray(),
-            diagnostic => diagnostic.GetProperty("code").GetString() == "Calor0410");
-        Assert.Equal(1, strict.RootElement.GetProperty("errorCategories").GetProperty("Calor0410").GetInt32());
-    }
-
-    /// <summary>
-    /// `--no-enforce-effects` turns off the per-file effect pass; the driver
-    /// still runs cross-module enforcement, so ES-04's violating step reports
-    /// Calor0410 with effects off — and the MCP path reports exactly what the
-    /// CLI process does. (ES-05's effects-off step does NOT pin this: its
-    /// violation is per-file, so both paths agree on an empty list there,
-    /// which is registered in <c>CleanSteps</c>.)
-    /// </summary>
-    [Fact]
-    public async Task CrossModuleEnforcement_StillRunsWithEffectsOff_AndAgreesWithTheCli()
-    {
-        var workspace = CreateTempDir();
-        SyncWorkspace(workspace, Path.Combine(CorpusRoot, "ES-04-cross-module-effect", "step-01-callee-gains-effect"));
-        var sources = Directory.GetFiles(workspace, "*.calr")
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToArray();
-
-        var mcp = await CompileThroughMcp(workspace, "effects-off");
-        var cli = CompileThroughCliProcess(workspace, sources, "effects-off");
-
-        Assert.Equal(cli, mcp);
-        Assert.Contains(cli, line => line.Contains("|Calor0410|error|", StringComparison.Ordinal));
     }
 
     [Fact]

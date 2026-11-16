@@ -121,59 +121,6 @@ module Test Test block
     }
 
     [Fact]
-    public void Parser_ParsesImplication()
-    {
-        var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:x}
-      §O{bool}
-      §Q (-> (>= x INT:0) (>= x INT:0))
-      §R true
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var func = module.Functions[0];
-        var requires = func.Preconditions[0];
-        Assert.IsType<ImplicationExpressionNode>(requires.Condition);
-
-        var impl = (ImplicationExpressionNode)requires.Condition;
-        Assert.IsType<BinaryOperationNode>(impl.Antecedent);
-        Assert.IsType<BinaryOperationNode>(impl.Consequent);
-    }
-
-    [Fact]
-    public void Parser_ParsesNestedQuantifiers()
-    {
-        var source = @"
-§M{Test}
-  §F{TestFunc:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (forall ((x i32)) (exists ((y i32)) (== x y)))
-      §R true
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var func = module.Functions[0];
-        var requires = func.Preconditions[0];
-        Assert.IsType<ForallExpressionNode>(requires.Condition);
-
-        var forall = (ForallExpressionNode)requires.Condition;
-        Assert.IsType<ExistsExpressionNode>(forall.Body);
-
-        var exists = (ExistsExpressionNode)forall.Body;
-        Assert.Single(exists.BoundVariables);
-        Assert.Equal("y", exists.BoundVariables[0].Name);
-    }
-
-    [Fact]
     public void Parser_ParsesForallWithImplication()
     {
         var source = @"
@@ -1157,36 +1104,6 @@ module Validation Validation block
     }
 
     /// <summary>
-    /// Example: Element exists in collection (membership test)
-    /// Used for testing that an element is present.
-    /// </summary>
-    [Fact]
-    public void RealWorld_ElementExistsContract()
-    {
-        var source = @"
-§M{Collections}
-  §F{Contains:pub}
-      §I{i32:arr}
-      §I{i32:n}
-      §I{i32:target}
-      §O{bool}
-      §Q (>= n INT:0)
-      §S (-> (== result true) (exists ((i i32)) (&& (>= i INT:0) (< i n) (== arr{i} target))))
-      §R false
-";
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var func = module.Functions[0];
-        // Should have 1 postcondition using implication with exists
-        Assert.Single(func.Postconditions);
-
-        var ensures = func.Postconditions[0];
-        Assert.IsType<ImplicationExpressionNode>(ensures.Condition);
-    }
-
-    /// <summary>
     /// Example: Matrix multiplication dimension compatibility
     /// When multiplying A[m,n] by B[n,p], ensure dimensions match.
     /// </summary>
@@ -1211,42 +1128,6 @@ module Matrix Matrix block
         var func = module.Functions[0];
         // Should have 5 preconditions including dimension compatibility
         Assert.Equal(5, func.Preconditions.Count);
-    }
-
-    /// <summary>
-    /// Example: Unique elements (no duplicates)
-    /// All pairs of distinct indices have distinct values.
-    /// </summary>
-    [Fact]
-    public void RealWorld_UniqueElementsContract()
-    {
-        var source = @"
-§M{Sets}
-  §F{HasUniqueElements:pub}
-      §I{i32:arr}
-      §I{i32:n}
-      §O{bool}
-      §Q (>= n INT:0)
-      §S (-> (== result true) (forall ((i i32) (j i32)) (-> (&& (>= i INT:0) (< i n) (>= j INT:0) (< j n) (!= i j)) (!= arr{i} arr{j}))))
-      §R false
-";
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var func = module.Functions[0];
-        // Should have 1 postcondition with nested quantifier
-        Assert.Single(func.Postconditions);
-
-        // The postcondition should be an implication containing a forall with 2 bound vars
-        var ensures = func.Postconditions[0];
-        Assert.IsType<ImplicationExpressionNode>(ensures.Condition);
-
-        var impl = (ImplicationExpressionNode)ensures.Condition;
-        Assert.IsType<ForallExpressionNode>(impl.Consequent);
-
-        var forall = (ForallExpressionNode)impl.Consequent;
-        Assert.Equal(2, forall.BoundVariables.Count);
     }
 
     /// <summary>

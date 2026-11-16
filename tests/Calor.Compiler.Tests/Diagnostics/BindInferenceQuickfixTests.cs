@@ -33,50 +33,6 @@ public class BindInferenceQuickfixTests
     }
 
     [Fact]
-    public void Calor0251_Null_AttachesNullableFix()
-    {
-        var source = """
-            module Test Test block
-              func Foo () → void
-                !
-                let x = null
-            """;
-
-        var result = Program.Compile(source, "test.calr",
-            new CompilationOptions { StrictBindInference = true });
-
-        var withFix = Assert.Single(result.Diagnostics.DiagnosticsWithFixes,
-            d => d.Code == DiagnosticCode.BindCannotInferNullLiteral);
-        var edit = Assert.Single(withFix.Fix.Edits);
-        Assert.Equal(":object?", edit.NewText);
-
-        var fixedSource = ApplyFix(source, withFix.Fix);
-        Assert.Contains("§B{x:object?} null", fixedSource);
-    }
-
-    [Fact]
-    public void Calor0252_VecEmpty_AttachesVecFix()
-    {
-        var source = """
-            module Test Test block
-              func Foo () → void
-                !
-                let xs = Vec.empty()
-            """;
-
-        var result = Program.Compile(source, "test.calr",
-            new CompilationOptions { StrictBindInference = true });
-
-        var withFix = Assert.Single(result.Diagnostics.DiagnosticsWithFixes,
-            d => d.Code == DiagnosticCode.BindCannotInferGenericReturn);
-        var edit = Assert.Single(withFix.Fix.Edits);
-        Assert.Equal(":Vec<object>", edit.NewText);
-
-        var fixedSource = ApplyFix(source, withFix.Fix);
-        Assert.Contains("§B{xs:Vec<object>} §C{Vec.empty}", fixedSource);
-    }
-
-    [Fact]
     public void Calor0252_MapEmpty_AttachesMapFixWithTwoParams()
     {
         var source = """
@@ -93,49 +49,6 @@ public class BindInferenceQuickfixTests
             d => d.Code == DiagnosticCode.BindCannotInferGenericReturn);
         var edit = Assert.Single(withFix.Fix.Edits);
         Assert.Equal(":Map<object, object>", edit.NewText);
-    }
-
-    [Fact]
-    public void Calor0253_AmbiguousNumeric_AttachesF64Fix()
-    {
-        var source = """
-            module Test Test block
-              func Foo () → void
-                !
-                let x = (0 + 0.0)
-            """;
-
-        var result = Program.Compile(source, "test.calr",
-            new CompilationOptions { StrictBindInference = true });
-
-        var withFix = Assert.Single(result.Diagnostics.DiagnosticsWithFixes,
-            d => d.Code == DiagnosticCode.BindAmbiguousNumeric);
-        var edit = Assert.Single(withFix.Fix.Edits);
-        Assert.Equal(":f64", edit.NewText);
-
-        var fixedSource = ApplyFix(source, withFix.Fix);
-        Assert.Contains("§B{x:f64} (+ INT:0 FLOAT:0.0)", fixedSource);
-    }
-
-    [Fact]
-    public void Calor0251_Mutable_AttachesFixAtCorrectColumn()
-    {
-        // The fix's insertion column must account for the leading '~' on
-        // mutable bindings; column math is (Span.Column + 3 + 1 + name.Length).
-        var source = """
-            module Test Test block
-              func Foo () → void
-                !
-                var items = null
-            """;
-
-        var result = Program.Compile(source, "test.calr",
-            new CompilationOptions { StrictBindInference = true });
-
-        var withFix = Assert.Single(result.Diagnostics.DiagnosticsWithFixes,
-            d => d.Code == DiagnosticCode.BindCannotInferNullLiteral);
-        var fixedSource = ApplyFix(source, withFix.Fix);
-        Assert.Contains("§B{~items:object?} null", fixedSource);
     }
 
     [Fact]

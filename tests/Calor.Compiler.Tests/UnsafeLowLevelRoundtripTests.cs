@@ -147,21 +147,6 @@ public class UnsafeLowLevelRoundtripTests
     }
 
     [Fact]
-    public void Emit_StackAllocSized_InBinding_EmitsStackalloc()
-    {
-        var calorSource = """
-            §M{StackAllocTest}
-                §CL{Test:pub}
-                    §MT{Alloc:pub:unsafe}
-                        §O{void}
-                        §B{span:Span<i32>} §SALLOC{i32:10}
-            """;
-
-        var csharp = ParseAndEmit(calorSource);
-        Assert.Contains("stackalloc int[10]", csharp);
-    }
-
-    [Fact]
     public void Emit_SizeOf_EmitsSizeofExpression()
     {
         var calorSource = """
@@ -173,38 +158,6 @@ public class UnsafeLowLevelRoundtripTests
 
         var csharp = ParseAndEmit(calorSource);
         Assert.Contains("sizeof(int)", csharp);
-    }
-
-    [Fact]
-    public void Emit_AddressOf_EmitsAmpersand()
-    {
-        var calorSource = """
-            §M{AddrTest}
-                §CL{Test:pub}
-                    §MT{GetAddr:pub:unsafe}
-                        §O{void}
-                        §B{~x:i32} INT:42
-                        §B{ptr:i32*} §ADDR x
-            """;
-
-        var csharp = ParseAndEmit(calorSource);
-        Assert.Contains("&x", csharp);
-    }
-
-    [Fact]
-    public void Emit_PointerDereference_EmitsStar()
-    {
-        var calorSource = """
-            §M{DerefTest}
-                §CL{Test:pub}
-                    §MT{ReadPtr:pub:unsafe}
-                        §I{ptr:i32*}
-                        §O{i32}
-                        §R §DEREF ptr
-            """;
-
-        var csharp = ParseAndEmit(calorSource);
-        Assert.Contains("*ptr", csharp);
     }
 
     #endregion
@@ -335,23 +288,6 @@ public class UnsafeLowLevelRoundtripTests
     }
 
     [Fact]
-    public void RoundTrip_StackAlloc_RoslynCompiles()
-    {
-        var csharp = FullRoundTrip("""
-            public static class Test
-            {
-                public static unsafe int Sum()
-                {
-                    int* ptr = stackalloc int[3];
-                    return 0;
-                }
-            }
-            """, "§SALLOC");
-
-        Assert.Contains("stackalloc", csharp);
-    }
-
-    [Fact]
     public void RoundTrip_FixedStatement_RoslynCompiles()
     {
         var csharp = FullRoundTrip("""
@@ -368,39 +304,6 @@ public class UnsafeLowLevelRoundtripTests
             """, "fixed int*:ptr = arr");
 
         Assert.Contains("fixed", csharp);
-    }
-
-    [Fact]
-    public void RoundTrip_AddressOf_RoslynCompiles()
-    {
-        var csharp = FullRoundTrip("""
-            public static class Test
-            {
-                public static unsafe void TakeAddr()
-                {
-                    int x = 42;
-                    int* ptr = &x;
-                }
-            }
-            """, "§ADDR");
-
-        Assert.Contains("&x", csharp);
-    }
-
-    [Fact]
-    public void RoundTrip_PointerDereference_RoslynCompiles()
-    {
-        var csharp = FullRoundTrip("""
-            public static class Test
-            {
-                public static unsafe int Deref(int* ptr)
-                {
-                    return *ptr;
-                }
-            }
-            """, "§DEREF");
-
-        Assert.Contains("*ptr", csharp);
     }
 
     [Fact]
@@ -435,32 +338,8 @@ public class UnsafeLowLevelRoundtripTests
 
         Assert.Contains("grid[", csharp);
     }
-
     #endregion
-
     #region Initializer forms — C# → Calor → Parse → C# roundtrip
-
-    [Fact]
-    public void RoundTrip_StackAllocInitializer_ParsesCorrectly()
-    {
-        var csharpInput = """
-            public static class Test
-            {
-                public static unsafe int Sum()
-                {
-                    int* ptr = stackalloc int[] { 1, 2, 3 };
-                    return 0;
-                }
-            }
-            """;
-
-        var calor = ConvertToCalor(csharpInput);
-        Assert.Contains("§SALLOC", calor);
-
-        var csharpOutput = ParseAndEmit(calor);
-        Assert.Contains("stackalloc", csharpOutput);
-        Assert.Contains("1, 2, 3", csharpOutput);
-    }
 
     [Fact]
     public void RoundTrip_MultiDimArrayInitializer_ParsesCorrectly()

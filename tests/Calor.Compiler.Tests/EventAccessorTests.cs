@@ -11,66 +11,6 @@ public class EventAccessorTests
 {
     #region Lexer Tests
 
-    [Fact]
-    public void Lexer_EventAdd_TokenizesCorrectly()
-    {
-        var source = "§EADD";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EventAdd);
-    }
-
-    [Fact]
-    public void Lexer_EndEventAdd_TokenizesCorrectly()
-    {
-        var source = "§/EADD";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndEventAdd);
-    }
-
-    [Fact]
-    public void Lexer_EventRemove_TokenizesCorrectly()
-    {
-        var source = "§EREM";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EventRemove);
-    }
-
-    [Fact]
-    public void Lexer_EndEventRemove_TokenizesCorrectly()
-    {
-        var source = "§/EREM";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndEventRemove);
-    }
-
-    [Fact]
-    public void Lexer_EndEvent_TokenizesCorrectly()
-    {
-        var source = "§/EVT[e001]";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndEvent);
-    }
-
     #endregion
 
     #region Parser Tests

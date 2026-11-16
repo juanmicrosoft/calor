@@ -182,60 +182,6 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
         Assert.Null(typeof(CompileCalor).GetProperty("RequireDocs"));
     }
 
-    [Theory]
-    [MemberData(nameof(ExpressibleScripts))]
-    public void DiagnosticsThroughTheSdkTaskMatchTheCliProcess(string scriptName)
-    {
-        var script = LoadScript(scriptName);
-        var anyDiagnostics = false;
-        foreach (var step in script.Steps)
-        {
-            var workspace = CreateTempDir();
-            foreach (var source in Directory.GetFiles(step.SourceDirectory, "*.calr"))
-                File.Copy(source, Path.Combine(workspace, Path.GetFileName(source)), overwrite: true);
-            var sources = Directory.GetFiles(workspace, "*.calr")
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .ToArray();
-
-            // Task first: the CLI writes .g.cs beside the sources.
-            var sdk = CompileThroughTask(workspace, sources, step.Options);
-            var cli = CompileThroughCliProcess(workspace, sources, step.Options);
-
-            Assert.Equal(cli, sdk);
-            anyDiagnostics |= cli.Count > 0;
-        }
-
-        if (scriptName != "ES-06-touch-noop")
-            Assert.True(anyDiagnostics, $"{scriptName}: no step produced a diagnostic on either path; the comparison is vacuous");
-    }
-
-    /// <summary>
-    /// The edit-script corpus's findings are errors (Calor0410) and, on the
-    /// excluded ES-07, warnings the task cannot request. So warning parity gets
-    /// its own subject: the query corpus, whose <c>app.calr</c> carries both an
-    /// error and a warning under default options. Without this the leg would
-    /// pin errors only, and a severity that drifted between the two paths would
-    /// go unobserved.
-    /// </summary>
-    [Fact]
-    public void WarningsAgreeToo_NotJustErrors()
-    {
-        var workspace = CreateTempDir();
-        var corpus = Path.Combine(RepoRoot, "tests", "TestData", "QueryCorpus", "project");
-        foreach (var source in Directory.GetFiles(corpus, "*.calr"))
-            File.Copy(source, Path.Combine(workspace, Path.GetFileName(source)));
-        var sources = Directory.GetFiles(workspace, "*.calr")
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToArray();
-
-        var sdk = CompileThroughTask(workspace, sources, "effects-on");
-        var cli = CompileThroughCliProcess(workspace, sources, "effects-on");
-
-        Assert.Equal(cli, sdk);
-        Assert.Contains(cli, line => line.Contains("|warning|", StringComparison.Ordinal));
-        Assert.Contains(cli, line => line.Contains("|error|", StringComparison.Ordinal));
-    }
-
     // --- the SDK path -------------------------------------------------------
 
     /// <summary>Records every logged event that carries a Calor diagnostic code.</summary>

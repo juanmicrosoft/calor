@@ -87,22 +87,6 @@ public sealed class S2NumericRefusalTests
         Assert.Equal(ContractVerificationStatus.Proven, VerifySinglePostcondition(source).Status);
     }
 
-    [Theory]
-    [InlineData("<=", "9223372036854775807")]   // T-LIT-OVERSIZE (R1-NUM-LITERAL-OVERSIZE-003 shape)
-    [InlineData("!=", "-2147483649")]
-    public void OversizeIntLiteral_IsRefused(string relation, string big)
-    {
-        Assert.True(long.Parse(big) is > int.MaxValue or < int.MinValue);
-        var source = $$"""
-            §M{R1Case}
-              §F{Probe:pub} (i64:x) -> i32
-                §E{}
-                §S ({{relation}} x INT:{{big}})
-                §R INT:0
-            """;
-        Assert.Equal(ContractVerificationStatus.Unsupported, VerifySinglePostcondition(source).Status);
-    }
-
     [Fact]
     public void Control_SameValueSpelledLong_StaysProven()
     {

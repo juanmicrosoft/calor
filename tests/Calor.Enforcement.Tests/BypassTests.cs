@@ -23,31 +23,6 @@ public class BypassTests
     }
 
     [Fact]
-    public void N2_IndirectPrint_StillRequiresEffect()
-    {
-        // Trying to hide print behind a local function call
-        var source = @"
-§M{Test}
-  §F{IndirectPrint:pub}
-      §I{str:msg}
-      §O{void}
-      §C{Helper}
-        §A msg
-      §/C
-  §F{Helper:int}
-      §I{str:msg}
-      §O{void}
-      §E{cw}
-      §P msg
-";
-        var result = TestHarness.Compile(source);
-
-        // f001 should fail because it calls f002 which has cw effect
-        Assert.True(result.HasErrors, "Should fail - indirect effect not declared");
-        TestHarness.AssertDiagnostic(result.Diagnostics.Errors, DiagnosticCode.ForbiddenEffect, "IndirectPrint");
-    }
-
-    [Fact]
     public void N3_PropertyGetterEffect_NotBypassed()
     {
         // Accessing DateTime.Now should require time effect

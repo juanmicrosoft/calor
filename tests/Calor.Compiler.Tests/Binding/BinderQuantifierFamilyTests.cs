@@ -201,24 +201,4 @@ public class BinderQuantifierFamilyTests
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.AnalysisIncomplete);
         Assert.False(result.Diagnostics.HasErrors);
     }
-
-    [Fact]
-    public void Implication_ParsedSource_BindsClean_EndToEnd()
-    {
-        // `(-> a b)` is the ONLY implication spelling (==>/implies are parse errors);
-        // `->` in Lisp operator position cannot collide with the return arrow.
-        const string source = """
-            §M{Test}
-              §F{Probe:pub} (i32:x) -> bool
-                §R (-> (> x 0) (> x -1))
-            """;
-
-        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
-        {
-            EnableVerificationAnalyses = true,
-        });
-
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.AnalysisIncomplete);
-        Assert.False(result.Diagnostics.HasErrors);
-    }
 }

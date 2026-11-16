@@ -41,61 +41,6 @@ public class RefOutContractCaseTests
     public static IEnumerable<object[]> CSharpCases => Ids("csharp").Concat(Ids("r0-fixture"));
 
     [Theory]
-    [MemberData(nameof(CalorCases))]
-    public void CalorCaseReproducesItsObservation(string id)
-    {
-        var contract = Contract();
-        var c = Find(contract, id);
-        var source = string.Join("\n", c["source"]!.AsArray().Select(l => l!.GetValue<string>()).Prepend(Prelude(contract, c))) + "\n";
-        var verify = c["verify"]?.GetValue<bool>() == true;
-        if (verify) Assert.True(Z3ContextFactory.IsAvailable, "proof cases need Z3");
-        var cacheDir = c["warmup"] is null ? null : Directory.CreateTempSubdirectory("refout-cache-").FullName;
-        CompilationOptions Options() => new()
-        {
-            VerifyContracts = verify,
-            VerifyRefinements = verify,
-            ContractMode = verify ? ContractMode.Debug : new CompilationOptions().ContractMode,
-            VerificationCacheOptions = cacheDir is null
-                ? new VerificationCacheOptions { Enabled = false }
-                : new VerificationCacheOptions { Enabled = true, CacheDirectory = cacheDir },
-        };
-        if (c["warmup"] is JsonArray warm)
-        {
-            // RO-ANA-4: the same body passing `§A y` by value first, into the same cache directory.
-            var warmOptions = Options();
-            var warmSource = string.Join("\n", warm.Select(l => l!.GetValue<string>()).Prepend(Prelude(contract, c))) + "\n";
-            Assert.False(Program.Compile(warmSource, id + ".calr", warmOptions).HasErrors); // same file identity as the case
-            Assert.Equal(ObligationStatus.Discharged,
-                Assert.Single(warmOptions.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation).Status);
-        }
-        var options = Options();
-        var result = Program.Compile(source, id + ".calr", options);
-        var errors = result.Diagnostics.Where(d => d.IsError).Select(d => d.Code).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList();
-        var observed = c["observed"]!;
-        Assert.Equal(observed["errors"]!.AsArray().Select(e => e!.GetValue<string>()).OrderBy(x => x, StringComparer.Ordinal), errors);
-        if (c["expected"]?["proof"] is not null)
-        {
-            var proof = Assert.IsAssignableFrom<JsonNode>(observed["proof"]);
-            var obligation = Assert.Single(options.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation);
-            var owner = Assert.Single(RecursiveAstWalker.DescendantsAndSelf(result.Ast!).OfType<ProofObligationNode>());
-            Assert.Equal(owner.Id, obligation.SourceProofId);
-            var status = obligation.Status;
-            Assert.Equal(proof.GetValue<string>(), status.ToString());
-            // RO-ANA-3: an Unsupported obligation is visible (Calor1124) and keeps its runtime guard.
-            var guard = $"Proof obligation [{owner.Id}] violated";
-            if (status == ObligationStatus.Unsupported)
-            {
-                Assert.Contains(result.Diagnostics, d => d.Code == "Calor1124");
-                Assert.Contains(guard, result.GeneratedCode);
-            }
-        }
-        if (errors.Count == 0 && c["status"]!.GetValue<string>() == "holds" && c["expected"]?["emits"] is JsonArray emits)
-        {
-            foreach (var e in emits) Assert.Contains(e!.GetValue<string>(), result.GeneratedCode);
-        }
-    }
-
-    [Theory]
     [MemberData(nameof(CSharpCases))]
     public void CSharpWitnessDiscriminates(string id)
     {

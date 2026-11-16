@@ -90,22 +90,6 @@ public class RefinementStaticGapsTests
         => Assert.Throws<TargetInvocationException>(() => Invoke(assembly, type, method, args))
             .InnerException!;
 
-    private const string PrintLambda = """
-          §DEL{Mapper}
-            §I{Nat:p}
-            §O{i32}
-          §F{Apply:pub} (Mapper:fn, Nat:a) -> i32
-            §R §C{fn} §A a §/C
-          §F{Run:pub} (Nat:a) -> void
-            §P §C{Apply}
-              §A §LAM{p}
-                §ASSIGN p (- p INT:10)
-                §R p
-              §/LAM
-              §A a
-            §/C
-        """;
-
     [Fact]
     public void Print_InAModuleWithoutRefinements_StillCompiles()
     {

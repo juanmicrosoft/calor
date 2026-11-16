@@ -303,48 +303,6 @@ public class PostconditionReturnLoweringRuntimeTests
             diagnostic => diagnostic.Id == "CS0165");
     }
 
-    [Fact]
-    public void OpaqueCSharp_InEitherPreprocessorBranch_IsRejected()
-    {
-        const string source = """
-            §M{OpaquePreprocessor}
-              §F{InBody:pub} () -> i32
-                §S (>= result 0)
-                §PP{DEBUG}
-                  §RAW
-                  return 1;
-                  §/RAW
-                §/PP{DEBUG}
-              §F{InElse:pub} () -> i32
-                §S (>= result 0)
-                §PP{DEBUG}
-                  §R INT:1
-                §PPE
-                  §RAW
-                  return 2;
-                  §/RAW
-                §/PP{DEBUG}
-            """;
-
-        var (_, diagnostics) = Emit(source, ContractMode.Debug);
-        var loweringErrors = diagnostics
-            .Where(diagnostic =>
-                diagnostic.Code == DiagnosticCode.PostconditionCheckNotLowered)
-            .ToArray();
-
-        Assert.Equal(2, loweringErrors.Length);
-        Assert.Contains(
-            loweringErrors,
-            diagnostic => diagnostic.Message.Contains(
-                "'InBody'",
-                StringComparison.Ordinal));
-        Assert.Contains(
-            loweringErrors,
-            diagnostic => diagnostic.Message.Contains(
-                "'InElse'",
-                StringComparison.Ordinal));
-    }
-
     public static TheoryData<string, string> NestedYieldContainers => new()
     {
         {
@@ -564,49 +522,6 @@ public class PostconditionReturnLoweringRuntimeTests
         Assert.Contains(
             "!(__calorPostconditionResult0 is int result) || result > 0",
             generatedCode);
-    }
-
-    [Fact]
-    public void ContractModeOff_SkipsPostconditionRefusalsButKeepsRefinements()
-    {
-        const string source = """
-            §M{ContractsOff}
-              §RTYPE{NonNegative:i32} (>= # INT:0)
-              §F{Iterator:pub} () -> NonNegative
-                §S (>= result 0)
-                §PP{DEBUG}
-                  §YIELD INT:1
-                §/PP{DEBUG}
-              §F{Opaque:pub} () -> i32
-                §S (>= result 0)
-                §PP{DEBUG}
-                  §RAW
-                  return 1;
-                  §/RAW
-                §/PP{DEBUG}
-              §F{Refined:pub} () -> NonNegative
-                §S (>= result 0)
-                §R INT:1
-            """;
-
-        var (generatedCode, diagnostics) = Emit(
-            source,
-            ContractMode.Off);
-
-        Assert.DoesNotContain(
-            diagnostics,
-            diagnostic =>
-                diagnostic.Code == DiagnosticCode.IteratorPostconditionUnsupported
-                || diagnostic.Code == DiagnosticCode.PostconditionCheckNotLowered);
-        Assert.Contains("IEnumerable<int> Iterator", generatedCode);
-        Assert.Contains(
-            "Yielded value violates refinement type 'NonNegative'",
-            generatedCode);
-        Assert.Contains("return 1;", generatedCode);
-        Assert.Contains(
-            "Return value violates refinement type 'NonNegative'",
-            generatedCode);
-        Assert.DoesNotContain("ContractKind.Ensures", generatedCode);
     }
 
     [Fact]

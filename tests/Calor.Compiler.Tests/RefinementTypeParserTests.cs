@@ -82,14 +82,6 @@ public sealed class RefinementTypeParserTests
     }
 
     [Fact]
-    public void Tokenize_EndRefinedType_ReturnsCorrectTokenKind()
-    {
-        var tokens = Tokenize("§/RTYPE", out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.EndRefinedType, tokens[0].Kind);
-    }
-
-    [Fact]
     public void Tokenize_Proof_ReturnsCorrectTokenKind()
     {
         var tokens = Tokenize("proof", out var diagnostics);

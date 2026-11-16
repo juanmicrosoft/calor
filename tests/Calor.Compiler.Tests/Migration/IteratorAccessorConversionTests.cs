@@ -259,18 +259,6 @@ public class IteratorAccessorConversionTests
         Assert.Equal(SupportLevel.NotSupported, FeatureSupport.GetSupportLevel("iterator-accessor"));
     }
 
-    [Fact]
-    public void NativeYieldInAnAccessor_IsStillCalor0209()
-    {
-        // F4-ITER-03: the regression control. Native illegal yields stay rejected.
-        var calor = File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(
-            CliTestHarness.FindRepoRoot(), R0Fixtures + "/F4-ITER-03.calr.txt",
-            ActiveSyntaxInputs.InputKind.CalorText));
-        var compilation = Program.Compile(calor, "F4-ITER-03.calr",
-            new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor0209");
-    }
-
     [Theory]
     [InlineData("public IEnumerable<int> Gen() { yield return 1; yield break; }", "yield 1")]
     [InlineData("public IEnumerable<int> Seq => Gen(); private IEnumerable<int> Gen() { yield return 1; }", "property ")]

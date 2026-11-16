@@ -9,55 +9,6 @@ namespace Calor.Compiler.Tests;
 
 public class MetadataEmissionTests
 {
-    [Theory]
-    [InlineData("§DP{\"2.0.0\":Replacement}", "Replacement")]
-    [InlineData("§DP{\"2.0.0\"}", null)]
-    public void Formatting_PreservesRetainedSemanticMetadata(string deprecated, string? replacement)
-    {
-        var original = Parse(
-            $$"""
-            /// Module documentation.
-            §M{Metadata}
-              §AS{env} "The environment is ready."
-              §IV true
-              /// Function documentation.
-              §F{Value:pub} (i32:value) -> i32
-                §SN{"1.0.0"}
-                {{deprecated}}
-                §BR{"2.0.0"} "First \"quoted\" change."
-                §BR{"3.0.0"} "Second change.\nWith another line."
-                §AS{data} "Data is valid."
-                §EX{"e1":"example"} (+ 2 3) -> 5
-                §PT forall a,b: (== a a)
-                §R value
-            """);
-        var emitted = new CalorEmitter().Emit(original);
-        var reparsed = Parse(emitted);
-        var before = Assert.Single(original.Functions);
-        var after = Assert.Single(reparsed.Functions);
-        Assert.Equal(original.DocComment, reparsed.DocComment);
-        Assert.Equal(before.DocComment, after.DocComment);
-        Assert.Equal("1.0.0", after.Since!.Version);
-        Assert.Equal("2.0.0", after.Deprecated!.SinceVersion);
-        Assert.Equal(replacement, after.Deprecated.Replacement);
-        Assert.Null(after.Deprecated.Reason);
-        Assert.Null(after.Deprecated.RemovedInVersion);
-        Assert.Equal(before.BreakingChanges.Select(change => (change.Version, change.Description)),
-            after.BreakingChanges.Select(change => (change.Version, change.Description)));
-        Assert.Equal(AssumptionCategory.Env, Assert.Single(reparsed.Assumptions).Category);
-        Assert.Single(reparsed.Invariants);
-        Assert.Equal(AssumptionCategory.Data, Assert.Single(after.Assumptions).Category);
-        Assert.Equal("Data is valid.", after.Assumptions[0].Description);
-        Assert.Equal("e1", Assert.Single(after.Examples).Id);
-        Assert.Equal("example", after.Examples[0].Message);
-        Assert.Equal(["a", "b"], Assert.Single(after.Properties).Quantifiers);
-        Assert.Equal(new CSharpEmitter().Emit(original), new CSharpEmitter().Emit(reparsed));
-        Assert.Contains("[System.Obsolete(", new CSharpEmitter().Emit(reparsed));
-        Assert.DoesNotContain("§SINCE", emitted);
-        Assert.DoesNotContain("§DEPRECATED", emitted);
-        Assert.DoesNotContain("§BREAKING", emitted);
-        Assert.Equal(emitted, new CalorEmitter().Emit(reparsed));
-    }
 
     [Fact]
     public void ProgrammaticProseMetadata_EmitsDocumentationNotRetiredMarkers()

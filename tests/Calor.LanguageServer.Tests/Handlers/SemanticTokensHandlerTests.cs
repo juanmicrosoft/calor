@@ -97,40 +97,6 @@ public class SemanticTokensHandlerTests
     }
 
     [Fact]
-    public void TokenizesInterface()
-    {
-        var source = @"§M{Test}
-  §IFACE{IDrawable:pub}
-      §MT{Draw}
-          §O{void}";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        Assert.Single(state.Ast.Interfaces);
-        Assert.Equal("IDrawable", state.Ast.Interfaces[0].Name);
-    }
-
-    [Fact]
-    public void TokenizesEnum()
-    {
-        var source = @"§M{Test}
-  §EN{Color:pub}
-    §EV{Red}
-    §EV{Green}
-    §EV{Blue}
-  §/EN";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        Assert.Single(state.Ast.Enums);
-        var enumDef = state.Ast.Enums[0];
-        Assert.Equal("Color", enumDef.Name);
-        Assert.Equal(3, enumDef.Members.Count);
-    }
-
-    [Fact]
     public void TokenizesBindStatement_Readonly()
     {
         var source = @"module Test Test block
@@ -189,28 +155,6 @@ public class SemanticTokensHandlerTests
         Assert.NotNull(state.Ast);
         var func = state.Ast.Functions[0];
         Assert.Equal(5, func.Body.Count); // 4 binds + 1 return
-    }
-
-    [Fact]
-    public void TokenizesIfStatement()
-    {
-        var source = @"§M{Test}
-  §F{Max:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §IF (> a b)
-        §R a
-      §ELSE
-        §R b
-      §/IF";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        var func = state.Ast.Functions[0];
-        // Body should have an if statement (plus possibly other statements)
-        Assert.True(func.Body.Count > 0);
     }
 
     [Fact]
@@ -296,25 +240,6 @@ public class SemanticTokensHandlerTests
     }
 
     [Fact]
-    public void TokenizesLambdaExpression()
-    {
-        var source = @"§M{Test}
-  §F{Test:pub}
-      §O{i32}
-      §B{add:Func<i32,i32,i32>} §LAMBDA
-        §I{i32:a}
-        §I{i32:b}
-        §R (+ a b)
-      §/LAMBDA
-      §R §C{add} §A 1 §A 2 §/C";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        Assert.Single(state.Ast.Functions);
-    }
-
-    [Fact]
     public void TokenizesProperty()
     {
         var source = @"module Test Test block
@@ -332,44 +257,6 @@ public class SemanticTokensHandlerTests
         var cls = state.Ast.Classes[0];
         Assert.Single(cls.Properties);
         Assert.Equal("Name", cls.Properties[0].Name);
-    }
-
-    [Fact]
-    public void TokenizesTryCatch()
-    {
-        var source = @"§M{Test}
-  §F{SafeDiv:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §TRY
-        §R (/ a b)
-      §CATCH{Exception:ex}
-        §R 0
-      §/TRY";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        var func = state.Ast.Functions[0];
-        Assert.True(func.Body.Count > 0);
-    }
-
-    [Fact]
-    public void TokenizesForeach()
-    {
-        var source = @"§M{Test}
-  §F{Print:pub}
-      §I{List<str>:items}
-      §O{void}
-      §FOREACH{item:items}
-        §PRINT item
-      §/FOREACH";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        Assert.Single(state.Ast.Functions);
     }
 
     [Fact]

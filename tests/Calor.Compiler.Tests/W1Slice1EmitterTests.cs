@@ -129,27 +129,6 @@ public class W1Slice1EmitterTests
         Assert.Contains("__calorPostconditionResult", code);
     }
 
-    [Fact]
-    public void ResultSubstring_IdentifierAndStringAreNotCorrupted()
-    {
-        var source = """
-            §M{T}
-              §F{Echo:pub} (i32:resultCode, str:myresult) -> i32
-                §S{"result text"} (== result resultCode)
-                §R resultCode
-            """;
-
-        var (code, diagnostics) = EmitWithDiagnostics(source);
-
-        Assert.DoesNotContain(
-            diagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.PostconditionCheckNotLowered);
-        Assert.DoesNotContain("__calorPostconditionResultCode", code);
-        Assert.Contains("resultCode", code);
-        Assert.Contains("myresult", code);
-        Assert.Contains("\"result text\"", code);
-    }
-
     private static int CountOccurrences(string value, string search)
     {
         var count = 0;

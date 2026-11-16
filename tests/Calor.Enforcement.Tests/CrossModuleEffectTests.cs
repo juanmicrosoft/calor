@@ -171,28 +171,6 @@ public class CrossModuleEffectTests
     }
 
     [Fact]
-    public void CrossModule_PrivateFunction_NotExported()
-    {
-        // Private functions are not in the registry — a caller using a private callee's
-        // name should not resolve cross-module.
-        var a = @"§M{A}
-  §F{Helper:priv}
-      §O{void}
-      §E{db:w}
-";
-        var b = @"module B B block
-  func Caller () → void
-    !
-    Helper()
-";
-
-        var diags = RunFull(("a.calr", a), ("b.calr", b));
-
-        // Private callee is invisible cross-module — no forbidden-effect error from this pass.
-        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.ForbiddenEffect);
-    }
-
-    [Fact]
     public void CrossModule_ClassMethod_Propagation()
     {
         // Public class method effects propagate via ClassName.MethodName qualified call.

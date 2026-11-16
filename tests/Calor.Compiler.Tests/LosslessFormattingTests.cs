@@ -297,17 +297,6 @@ public sealed class LosslessFormattingTests : IDisposable
         ];
         yield return
         [
-            "multiline-raw-expression",
-            "§M{MultilineExpression}   \n" +
-            "  §F{Get:pub} () -> i32\n" +
-            "    §R §CS{\n" +
-            "      1 +   \n" +
-            "        2\t\n" +
-            "    }\n",
-            "\n      1 +   \n        2\t\n    }"
-        ];
-        yield return
-        [
             "multiline-raw-block",
             "module MultilineRaw MultilineRaw block   \n" +
                         "  func Main () → void\n" +

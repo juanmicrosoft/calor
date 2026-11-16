@@ -58,26 +58,6 @@ public class SymbolFinderTests
     }
 
     [Theory]
-    [InlineData("§R ")]
-    [InlineData("")]
-    public void ComputedCalls_ExposeNestedReceiverAndArgumentReferences(string prefix)
-    {
-        var source = $$"""
-            §M{Test}
-              §F{Probe:pub} (object:receiver, object:value) -> object
-                {{prefix}}§C (§C{Identity} §A receiver §/C).Equals §A value §/C
-              §F{Identity:pub} (object:item) -> object
-                §R item
-            """;
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-        var receiverOffset = source.IndexOf("§A receiver", StringComparison.Ordinal) + "§A ".Length;
-        var argumentOffset = source.IndexOf("§A value", StringComparison.Ordinal) + "§A ".Length;
-        Assert.Equal("receiver", new SymbolFinderVisitor(receiverOffset, source).FindSymbol(ast)?.Name);
-        Assert.Equal("value", new SymbolFinderVisitor(argumentOffset, source).FindSymbol(ast)?.Name);
-    }
-
-    [Theory]
     [InlineData("for item from 0 to 1 step 1", "for item from 2 to 3 step 1", "")]
     [InlineData("for item = 0; item < 2; item = item + 1", "for item = 2; item < 4; item = item + 1", "")]
     [InlineData("each int:item in items", "each int:item in items", "")]
@@ -191,35 +171,6 @@ public class SymbolFinderTests
     }
 
     [Fact]
-    public void ParsedDeclarationIdentifierSpans_AreSafeRenameEdits()
-    {
-        var source = """
-            §M{TestModule}
-              §CL{Container:pub}
-                §FLD{i32:field:priv}
-                §MT{Compute:pub} (i32:parameter) -> i32
-                  §B{local:i32} parameter
-                  §R (+ local field)
-            """;
-        var state = LspTestHarness.CreateDocument(source);
-        var symbols = state.BoundModule!.SymbolsById.Values.ToArray();
-
-        foreach (var (name, symbol) in new[]
-                 {
-                     ("Container", symbols.Single(symbol => symbol.Name == "Container")),
-                     ("field", symbols.Single(symbol => symbol.Name == "field")),
-                     ("Compute", symbols.Single(symbol => symbol.Name == "Container.Compute")),
-                     ("parameter", symbols.Single(symbol => symbol.Name == "parameter")),
-                     ("local", symbols.Single(symbol => symbol.Name == "local")),
-                 })
-        {
-            Assert.Equal(
-                name,
-                source.Substring(symbol.DeclarationSpan.Start, symbol.DeclarationSpan.Length));
-        }
-    }
-
-    [Fact]
     public void CallReceiverAndCallee_ResolveAndReferenceExactIdentifierSpans()
     {
         const string source = """
@@ -315,131 +266,6 @@ public class SymbolFinderTests
                     reference.Span.Length)));
     }
 
-    [Fact]
-    public void TupleGenericNewTypes_IndexContainersAndSkipAnonymousTupleNodes()
-    {
-        const string source = """
-            §M{TupleReferences}
-              §CL{List:pub}<T>
-                §CTOR{pub} ()
-                  §P STR:"list"
-              §CL{Dictionary:pub}<TKey,TValue>
-                §CTOR{pub} ()
-                  §P STR:"dictionary"
-              §F{MakeList:pub} () -> object
-                §R §NEW{List<(i32,i32)>} §/NEW
-              §F{MakeDictionary:pub} () -> object
-                §R §NEW{Dictionary<str,(i32,i32)>} §/NEW
-            """;
-        var state = LspTestHarness.CreateDocument(source);
-        Assert.NotNull(state.Ast);
-        Assert.True(
-            state.BoundModule != null,
-            string.Join(
-                Environment.NewLine,
-                state.Diagnostics.Select(diagnostic =>
-                    $"{diagnostic.Code}: {diagnostic.Message}")));
-        var typeSymbols = state.BoundModule.SymbolsById.Values
-            .OfType<TypeSymbol>()
-            .ToArray();
-        var list = Assert.Single(
-            typeSymbols,
-            symbol => symbol.QualifiedName == "List`1");
-        var dictionary = Assert.Single(
-            typeSymbols,
-            symbol => symbol.QualifiedName == "Dictionary`2");
-
-        TypeReferenceIndexResult? index = null;
-        var exception = Record.Exception(
-            () => index = TypeReferenceIndex.BuildDetailed(
-                state.Ast,
-                state.BoundModule,
-                source,
-                typeSymbols));
-
-        Assert.Null(exception);
-        Assert.NotNull(index);
-        Assert.Contains(
-            index.References,
-            reference => reference.SymbolId == list.Id
-                && TextAt(source, reference.Span) == "List");
-        Assert.Contains(
-            index.References,
-            reference => reference.SymbolId == dictionary.Id
-                && TextAt(source, reference.Span) == "Dictionary");
-        Assert.DoesNotContain(
-            index.References,
-            reference => string.IsNullOrWhiteSpace(reference.Name));
-
-        foreach (var (name, expectedId) in new[]
-                 {
-                     ("List<(i32,i32)>", list.Id),
-                     ("Dictionary<str,(i32,i32)>", dictionary.Id),
-                 })
-        {
-            var offset = source.IndexOf(name, StringComparison.Ordinal);
-            var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-            var symbol = SymbolFinder.FindSymbolAtPosition(
-                state.Ast,
-                line,
-                column,
-                source,
-                state.BoundModule);
-
-            Assert.NotNull(symbol);
-            Assert.Equal(expectedId, symbol.SymbolId);
-        }
-
-        Assert.Throws<ArgumentException>(
-            () => TypeIdentity.ToLookupName(" \t"));
-    }
-
-    [Fact]
-    public void NestedLocalDeclarationSpans_AreIdentifierTokens()
-    {
-        var source = """
-            §M{TestModule}
-              §F{Scopes:pub} ([str]:items, IDisposable:input) -> bool
-                §L{index:0:1:1}
-                  §P index
-                §EACH{item:str:position} items
-                  §P item
-                §USE{resource:IDisposable} input
-                  §P STR:"using"
-                §TR
-                  §P STR:"try"
-                §CA{Exception:error}
-                  §P STR:"catch"
-                §/TR
-                §B{predicate} §LAM{lambdaValue:i32} (> lambdaValue 0) §/LAM
-                §B{matched:i32} §W INT:1
-                  §K §VAR{captured} → captured
-                §R (forall ((quantified i32)) (>= quantified 0))
-            """;
-        var state = LspTestHarness.CreateDocument(source);
-        var symbols = state.BoundModule!.SymbolsById.Values
-            .OfType<VariableSymbol>()
-            .ToArray();
-
-        foreach (var name in new[]
-                 {
-                     "index",
-                     "item",
-                     "position",
-                     "resource",
-                     "error",
-                     "lambdaValue",
-                     "captured",
-                     "quantified",
-                 })
-        {
-            var symbol = symbols.Single(candidate => candidate.Name == name);
-            Assert.Equal(
-                name,
-                source.Substring(symbol.DeclarationSpan.Start, symbol.DeclarationSpan.Length));
-        }
-    }
-
     private static string TextAt(string source, TextSpan span) =>
         source.Substring(span.Start, span.Length);
 
@@ -493,45 +319,6 @@ public class SymbolFinderTests
 
         Assert.NotNull(def);
         Assert.IsType<Calor.Compiler.Ast.InterfaceDefinitionNode>(def);
-    }
-
-    [Fact]
-    public void FindDefinition_Enum_ReturnsEnum()
-    {
-        var source = """
-            §M{TestModule}
-              §EN{Color}
-              §EM{Red}
-              §/EN
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var def = SymbolFinder.FindDefinition(ast, "Color");
-
-        Assert.NotNull(def);
-        Assert.IsType<Calor.Compiler.Ast.EnumDefinitionNode>(def);
-    }
-
-    [Fact]
-    public void FindDefinition_Delegate_ReturnsDelegate()
-    {
-        var source = """
-            §M{TestModule}
-              §DEL{Callback}
-              §I{i32:value}
-              §O{void}
-              §/DEL
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var def = SymbolFinder.FindDefinition(ast, "Callback");
-
-        Assert.NotNull(def);
-        Assert.IsType<Calor.Compiler.Ast.DelegateDefinitionNode>(def);
     }
 
     [Fact]
@@ -629,60 +416,6 @@ public class SymbolFinderTests
         Assert.Null(method);
     }
 
-    // Position-based tests using the marker approach
-    [Fact]
-    public void FindSymbol_AtModuleName_ReturnsModule()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{/*cursor*/TestModule}
-              §F{Test}
-                §R 0
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("TestModule", result.Name);
-        Assert.Equal("module", result.Kind);
-    }
-
-    [Fact]
-    public void FindSymbol_AtFunctionName_ReturnsFunction()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §F{/*cursor*/Add}
-                §I{i32:a}
-                §O{i32}
-                §R a
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("Add", result.Name);
-        Assert.Equal("function", result.Kind);
-    }
-
-    [Fact]
-    public void FindSymbol_AtParameterName_ReturnsParameter()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §F{Add}
-                §I{i32:/*cursor*/myParam}
-                §O{i32}
-                §R myParam
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("myParam", result.Name);
-        Assert.Equal("parameter", result.Kind);
-        Assert.Equal("INT", result.Type);
-    }
-
     [Fact]
     public void FindSymbol_AtTypeName_ReturnsType()
     {
@@ -702,23 +435,6 @@ public class SymbolFinderTests
     }
 
     [Fact]
-    public void FindSymbol_AtLocalVariable_ReturnsVariable()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §F{Test}
-                §B{/*cursor*/myVar:i32} 42
-                §R myVar
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("myVar", result.Name);
-        Assert.Contains("variable", result.Kind);
-    }
-
-    [Fact]
     public void FindSymbol_AtVariableReference_ReturnsReference()
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
@@ -735,72 +451,6 @@ public class SymbolFinderTests
         Assert.Equal("n", result.Name);
         // It's either parameter or variable reference
         Assert.True(result.Kind.Contains("parameter") || result.Kind.Contains("reference"));
-    }
-
-    [Fact]
-    public void FindSymbol_AtClassName_ReturnsClass()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §CL{/*cursor*/Person}
-                §FLD{str:name}
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("Person", result.Name);
-        Assert.Equal("class", result.Kind);
-    }
-
-    [Fact]
-    public void FindSymbol_AtFieldName_ReturnsField()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §CL{Person}
-                §FLD{str:/*cursor*/name}
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("name", result.Name);
-        Assert.Equal("field", result.Kind);
-    }
-
-    [Fact]
-    public void FindSymbol_AtEnumName_ReturnsEnum()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §EN{/*cursor*/Color}
-              §EM{Red}
-              §/EN
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("Color", result.Name);
-        Assert.Equal("enum", result.Kind);
-    }
-
-    [Fact]
-    public void FindSymbol_AtEnumMember_ReturnsEnumMember()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §EN{Color}
-              §EM{/*cursor*/Red}
-              §/EN
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("Red", result.Name);
-        Assert.Equal("enum member", result.Kind);
     }
 
     [Fact]
@@ -833,26 +483,6 @@ public class SymbolFinderTests
         var result = LspTestHarness.FindSymbol(source, 100, 1);
 
         Assert.Null(result);
-    }
-
-    [Fact]
-    public void FindSymbol_AtMethodName_ReturnsMethod()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{TestModule}
-              §CL{Calculator}
-                §MT{/*cursor*/Add}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R a + b
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        Assert.Equal("Add", result.Name);
-        Assert.Equal("method", result.Kind);
     }
 
     [Fact]

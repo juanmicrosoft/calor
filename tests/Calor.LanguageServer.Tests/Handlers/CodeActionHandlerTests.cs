@@ -21,23 +21,6 @@ public class CodeActionHandlerTests
     }
 
     [Fact]
-    public void FixApplied_SourceIsValid()
-    {
-        var source = """
-            §M{TestModule}
-            §F{Test:pub} () -> i32
-            §R 0
-            """;
-
-        // The fix should change f002 to f001
-        var fixedSource = source.Replace("§/F", "§/F");
-
-        var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
-
-        Assert.False(diagnostics.HasErrors);
-    }
-
-    [Fact]
     public void UndefinedReference_WithSimilarName_GeneratesFix()
     {
         var source = """
@@ -189,49 +172,7 @@ public class CodeActionHandlerTests
         var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
         Assert.DoesNotContain(diagnostics, d => d.Code == "Calor0200");
     }
-
     #region Operator Typo Suggestion Tests
-
-    [Fact]
-    public void OperatorTypo_GeneratesFix()
-    {
-        var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{bool}
-                §R (cotains "hello" "h")
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-
-        Assert.NotEmpty(fixes);
-        var operatorFix = fixes.FirstOrDefault(f => f.Code == "Calor0106");
-        Assert.NotNull(operatorFix);
-        Assert.Contains("contains", operatorFix.Fix.Description);
-        Assert.Single(operatorFix.Fix.Edits);
-        Assert.Equal("contains", operatorFix.Fix.Edits[0].NewText);
-    }
-
-    [Fact]
-    public void OperatorTypo_AppliedFix_ProducesValidCode()
-    {
-        var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{bool}
-                §R (cotains "hello" "h")
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-        var fix = fixes.First(f => f.Code == "Calor0106");
-
-        // Apply the fix manually
-        var fixedSource = source.Replace("cotains", fix.Fix.Edits[0].NewText);
-
-        // Verify the fixed source compiles
-        var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
-        Assert.DoesNotContain(diagnostics, d => d.Code == "Calor0106");
-    }
 
     [Fact]
     public void NameofOperator_CompilesWithNoErrors()
@@ -246,29 +187,6 @@ public class CodeActionHandlerTests
         var diagnostics = LspTestHarness.GetDiagnostics(source);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-    }
-
-    [Fact]
-    public void UnknownOperator_NoSimilar_NoFix()
-    {
-        var source = """
-            §M{TestModule}
-              §F{Test:pub}
-                §O{i32}
-                §R (xyzqwerty 1 2)
-            """;
-
-        var diagnostics = LspTestHarness.GetDiagnostics(source);
-
-        Assert.True(diagnostics.HasErrors);
-        var error = diagnostics.First(d => d.Code == "Calor0106");
-        Assert.Contains("xyzqwerty", error.Message);
-        Assert.Contains("arithmetic", error.Message); // Shows valid operator categories
-
-        // No fix expected for completely unknown operators
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-        var operatorFix = fixes.FirstOrDefault(f => f.Code == "Calor0106");
-        Assert.Null(operatorFix);
     }
 
     #endregion

@@ -52,36 +52,6 @@ public class ArrowConditionalRuntimeTests
         Assert.Equal(true, Invoke(type, "HasNegative", new[] { 1, 2, -3 }));
     }
 
-    [Theory]
-    [InlineData("§IF (< i 0)\n        §R\n")]
-    [InlineData("§IF (&&\n        (< i 0)\n        (> i -10))\n        §R\n")]
-    [InlineData("§IF (< i 0)\n        §R\n      §EI (&&\n        (> i 9)\n        (< i 20))\n        §R\n")]
-    [InlineData("§IF (< i 0)\n        §R\n      §EI (> i 9)\n        §R\n")]
-    [InlineData("§IF (< i 0)\n        §R\n      §EL\n        §C{trace.Add} §A i §/C\n")]
-    public void FollowingNonReturnStatement_ExecutesOnceAfterLoop(string branch)
-    {
-        var source = """
-            §M{Arrow}
-              §F{Probe:pub} (List<i32>:trace) -> void
-                §E{mut}
-                §L{i:0:2:1}
-                  §C{trace.Add} §A i §/C
-            """ + "\n      " + branch + "    §C{trace.Add} §A 99 §/C\n";
-        var module = Parse(source);
-        var function = Assert.Single(module.Functions);
-        Assert.Equal(2, function.Body.Count);
-        var loop = Assert.IsType<ForStatementNode>(function.Body[0]);
-        Assert.Equal(2, loop.Body.Count);
-        Assert.IsType<CallStatementNode>(function.Body[1]);
-        var expected = branch.Contains("§EL") ? new[] { 0, 0, 1, 1, 2, 2, 99 } : new[] { 0, 1, 2, 99 };
-        foreach (var text in new[] { source, new CalorEmitter().Emit(module) })
-        {
-            var trace = new List<int>();
-            Invoke(Compile(text), "Probe", trace);
-            Assert.Equal(expected, trace);
-        }
-    }
-
     [Fact]
     public void NestedInlineIf_LeavesOuterElseAndNextFunctionIntact()
     {

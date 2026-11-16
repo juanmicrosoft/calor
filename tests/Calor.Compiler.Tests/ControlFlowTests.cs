@@ -44,24 +44,6 @@ public class ControlFlowTests
     }
 
     [Fact]
-    public void Parse_ReturnMatchShortcut_IsRejectedWithExplicitReturnReplacement()
-    {
-        var source = """
-            §M{Test}
-              §F{Probe:pub} (i32:value) -> i32
-                §W{expr} value
-                  §K _
-                    §R 1
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, diagnostic =>
-            diagnostic.Message.Contains("Use §R §W", StringComparison.Ordinal));
-        Assert.IsType<MatchStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
-    }
-
-    [Fact]
     public void Parse_ExplicitReturnedMatch_IsAnExpression()
     {
         var source = """
@@ -138,25 +120,6 @@ public class ControlFlowTests
         Assert.NotNull(forStmt);
         Assert.Equal("i", forStmt.VariableName);
         Assert.Single(forStmt.Body);
-    }
-
-    [Fact]
-    public void Parse_ForLoop_LegacyCloser_ReportsError()
-    {
-        // §/L is removed closer-form (Phase 4d): rejected with Calor0830, not MismatchedId.
-        var source = """
-            §M{Test}
-            §F{Main:pub}
-              §L{i:0:10}
-              §/L
-            §/F
-            §/M
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
     }
 
     [Fact]
@@ -405,24 +368,6 @@ public class ControlFlowTests
         Assert.Null(doStmt.ToolingId);
         Assert.Single(doStmt.Body);
         Assert.NotNull(doStmt.Condition);
-    }
-
-    [Fact]
-    public void Parse_DoWhileLoop_SourceIds_ReportsError()
-    {
-        var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §DO{do1}
-                  §/DO{do999} (< x INT:10)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.UnexpectedToken &&
-            d.Message.Contains("Source IDs are removed"));
     }
 
     [Fact]

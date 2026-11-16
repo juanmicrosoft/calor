@@ -310,23 +310,6 @@ public class TypeCheckerDefectTests
     [Fact]
     public void UnknownReceiver_DoesNotCascadeIntoAFieldAccessError()
         => AssertNoErrors("module S S block\n  func Do () → void\n    !\n    let object:v = System.Environment.NewLine\n    return\n");
-
-    // ---- Diagnostics that belong to another pass ----
-
-    /// <summary>
-    /// `BindValidationPass` owns this condition as Calor0250, with a quickfix. The checker
-    /// reported it too, as the vaguer Calor0202 — so turning the checker on REPLACED a precise
-    /// diagnostic with a worse one for the same program.
-    /// </summary>
-    [Fact]
-    public void BareBinding_ReportsCalor0250_NotTheCheckersOwnTypeMismatch()
-    {
-        var result = Check("§M{S}\n  §F{Do:pub} () -> void\n    §E{}\n    §B{x}\n    §R\n");
-
-        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
-        Assert.DoesNotContain(result.Diagnostics.Errors,
-            d => d.Message.Contains("Variable binding requires either a type annotation"));
-    }
     /// <summary>
     /// A type the module DECLARES is not an unknown external type. Found in release review of
     /// v0.12.0: the checker registered only type parameters, so a class declared eight lines

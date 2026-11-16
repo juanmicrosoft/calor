@@ -39,29 +39,6 @@ public class EnumExtensionTests
     }
 
     [Fact]
-    public void Lexer_RejectsLegacyEnumKeyword()
-    {
-        var tokens = Tokenize("§ENUM", out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Error, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-        Assert.Contains("'§EN'", Assert.Single(diagnostics.Errors).Message);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesEndEnumKeyword()
-    {
-        var tokens = Tokenize("§/EN", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndEnum, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
-
-    [Fact]
     public void Lexer_RejectsLegacyEndEnumKeyword()
     {
         var tokens = Tokenize("§/ENUM", out var diagnostics);
@@ -71,28 +48,6 @@ public class EnumExtensionTests
         Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
         Assert.Contains("dedenting", Assert.Single(diagnostics.Errors).Message);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesEnumExtensionKeyword()
-    {
-        var tokens = Tokenize("§EEXT", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EnumExtension, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesEndEnumExtensionKeyword()
-    {
-        var tokens = Tokenize("§/EEXT", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndEnumExtension, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
     }
 
     #endregion
@@ -160,55 +115,6 @@ public class EnumExtensionTests
         Assert.Single(module.Enums);
         var enumDef = module.Enums[0];
         Assert.Equal("byte", enumDef.UnderlyingType);
-    }
-
-    [Fact]
-    public void Parser_ParsesEnumExtension_SingleMethod()
-    {
-        var source = """
-            §M{Test}
-              §EEXT{Color}
-                §F{ToHex:pub}
-                    §I{Color:self}
-                    §O{str}
-                    §R "hex"
-              §/EEXT
-            """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Single(module.EnumExtensions);
-        var ext = module.EnumExtensions[0];
-        Assert.Equal(ext.LocalId, ext.Id);
-        Assert.Null(ext.ToolingId);
-        Assert.Equal("Color", ext.EnumName);
-        Assert.Single(ext.Methods);
-        Assert.Equal("ToHex", ext.Methods[0].Name);
-    }
-
-    [Fact]
-    public void Parser_ParsesEnumExtension_MultipleMethods()
-    {
-        var source = """
-            §M{Test}
-              §EEXT{Color}
-                §F{ToHex:pub}
-                    §I{Color:self}
-                    §O{str}
-                    §R "#000000"
-                §F{IsPrimary:pub}
-                    §I{Color:self}
-                    §O{bool}
-                    §R true
-              §/EEXT
-            """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        var ext = module.EnumExtensions[0];
-        Assert.Equal(2, ext.Methods.Count);
-        Assert.Equal("ToHex", ext.Methods[0].Name);
-        Assert.Equal("IsPrimary", ext.Methods[1].Name);
     }
 
     #endregion
@@ -321,51 +227,8 @@ public class EnumExtensionTests
         Assert.Contains("module ColorExtensions", code);
         Assert.DoesNotContain("§/EEXT", code);
     }
-
     #endregion
-
     #region Negative Tests - Error Cases
-
-    [Fact]
-    public void Parser_EnumExtension_MissingEnumParameter_ReportsError()
-    {
-        var source = """
-            §M{Test}
-              §EEXT{Color}
-                §F{BadMethod:pub}
-                    §I{i32:x}
-                    §O{str}
-                    §R "bad"
-              §/EEXT
-            """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Single(diagnostics.Errors);
-        var error = diagnostics.Errors[0];
-        Assert.Equal(DiagnosticCode.MissingExtensionSelf, error.Code);
-        Assert.Contains("BadMethod", error.Message);
-        Assert.Contains("Color", error.Message);
-    }
-
-    [Fact]
-    public void Parser_EnumExtension_MismatchedCloseId_ReportsError()
-    {
-        var source = """
-            §M{m001:Test}
-              §EEXT{ext001:Color}
-                §F{f001:ToHex:pub}
-                    §I{Color:self}
-                    §O{str}
-                    §R "hex"
-              §/EEXT{ext002}
-            """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.UnexpectedToken &&
-            e.Message.Contains("Source IDs are removed"));
-    }
 
     [Fact]
     public void Parser_EnumExtension_EmptyLeadingName_ReportsError()
@@ -404,30 +267,6 @@ public class EnumExtensionTests
     }
 
     [Fact]
-    public void Parser_EnumExtension_MultipleMethods_OneMissingEnumParam_ReportsOneError()
-    {
-        var source = """
-            §M{Test}
-              §EEXT{Color}
-                §F{ToHex:pub}
-                    §I{Color:self}
-                    §O{str}
-                    §R "hex"
-                §F{BadMethod:pub}
-                    §I{i32:value}
-                    §O{bool}
-                    §R true
-              §/EEXT
-            """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        var extensionErrors = diagnostics.Errors.Where(e => e.Code == DiagnosticCode.MissingExtensionSelf).ToList();
-        Assert.Single(extensionErrors);
-        Assert.Contains("BadMethod", extensionErrors[0].Message);
-    }
-
-    [Fact]
     public void Parser_Enum_SourceIdHeader_ReportsError()
     {
         var source = """
@@ -456,25 +295,6 @@ public class EnumExtensionTests
         Assert.False(diagnostics.HasErrors);
         Assert.Single(module.EnumExtensions);
         Assert.Empty(module.EnumExtensions[0].Methods);
-    }
-
-    [Theory]
-    [InlineData("Color", false)]
-    [InlineData("color", true)]
-    public void Parser_EnumExtension_RequiresExactEnumTypeMatch(string parameterType, bool hasError)
-    {
-        var source = $$"""
-            §M{Test}
-              §EEXT{Color}
-                §F{ToHex:pub}
-                    §I{{{parameterType}}:self}
-                    §O{str}
-                    §R "hex"
-              §/EEXT
-            """;
-        var module = Parse(source, out var diagnostics);
-
-        Assert.Equal(hasError, diagnostics.Errors.Any(e => e.Code == DiagnosticCode.MissingExtensionSelf));
     }
 
     #endregion

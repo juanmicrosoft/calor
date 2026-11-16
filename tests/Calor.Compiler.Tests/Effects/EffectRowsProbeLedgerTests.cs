@@ -573,53 +573,6 @@ public sealed class EffectRowsProbeLedgerTests
         return new Measurement(controls, mutants);
     }
 
-    // --------------------------------------------------------------- assembly
-
-    private static PpE1Ledger Assemble(Measurement m, string measuredCommit, string analysisPath,
-        bool recordedRouteDFires, PpE1CutCitation? recordedCutCitation,
-        bool recordedOwnGoal, string? recordedOwnGoalArtifact)
-    {
-        var control = AssembleControl(m);
-        var (rampFired, rampVerdict) = ReadRamp();
-        var legA = AssembleLegA(m, rampFired, rampVerdict);
-        var legB = ReadLegB(analysisPath);
-        var routes = AssembleRoutes(m, legA, legB, recordedRouteDFires, recordedCutCitation,
-            recordedOwnGoal, recordedOwnGoalArtifact);
-        var (verdict, reason) = ComputeVerdict(control.Clean, legA, routes, legB);
-
-        return new PpE1Ledger(
-            SchemaVersion,
-            "PP-E1",
-            "docs/plans/agent-native-gates.md §A.2 row PP-E1 + §A.3 entry A-1.11 (2026-08-25); "
-            + "leg-A negative control re-frozen by sub-entry A-1.11.1 (2026-08-26)",
-            measuredCommit,
-            "dotnet <calor.dll> -i <source> -o <scratch>; no flags (--permissive-effects and any "
-            + "manifest outside the built-in set are forbidden); diagnostics sorted by "
-            + "(line, column, code, severity, text) under LC_ALL=C",
-            "leg A recomputed by EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation (each "
-            + "frozen diff re-applied to the frozen fixture, compiled with the pinned invocation, codes "
-            + "and declarations compared); negative control, routes (a)/(b) and the ramp state recomputed; "
-            + "leg B recorded, with only its arithmetic recomputed by bench/phase0-agent-native/ppe1-analyze.py "
-            + "from the archived per-run result.json files, and its fails/underpowered booleans re-derived "
-            + "here from the recorded point/bound/CV; route (d) and the own-goal flag recorded, but bound to "
-            + "a cut citation / an artifact and to the recomputed mechanical evidence; verdict derived from "
-            + "the frozen outcome map",
-            "a cell is detected iff the registered code appears at the registered declaration; "
-            + "L6-MAP/L6-MATCH must name the laundered effect 'cw' and L6-MID must name the "
-            + "instantiation; L7 requires Calor0425 specifically, rising above the unmutated fixture's "
-            + "count at that declaration; a different code at the registered declaration counts as "
-            + "detected-with-code-drift only if it is in the drift set, and is published by name",
-            DriftSet,
-            NeverDetection,
-            control,
-            legA,
-            routes,
-            legB,
-            "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT",
-            verdict,
-            reason);
-    }
-
     private static PpE1Control AssembleControl(Measurement m)
     {
         var perFixture = new List<PpE1ControlFixture>();

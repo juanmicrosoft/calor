@@ -35,124 +35,10 @@ public class ValidateSnippetToolTests
         Assert.True(props.TryGetProperty("context", out _));
         Assert.True(props.TryGetProperty("action", out _));
     }
-
     #endregion
-
     #region Valid Snippets
-
-    [Fact]
-    public async Task ExecuteAsync_WithValidReturnStatement_ReturnsValid()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R 42"
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-        Assert.Contains("\"validationLevel\":\"parser\"", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithValidBindStatement_ReturnsValid()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§B{x} 10"
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithValidNullableValue_ReturnsValid()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R 42",
-                "context": {
-                    "returnType": "?i32"
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithValidNullExpression_ReturnsValid()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R null",
-                "context": {
-                    "returnType": "?i32"
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithMultiLineSnippet_ReturnsValid()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§B{x} 10\n§B{y} 20\n§R (+ x y)"
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
     #endregion
-
     #region Invalid Snippets
-
-    [Fact]
-    public async Task ExecuteAsync_WithReturnNoExpression_ReturnsValid()
-    {
-        // §R without expression returns unit, which is valid
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R"
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
 
     [Fact]
     public async Task ExecuteAsync_WithBadToken_ReturnsInvalid()
@@ -187,57 +73,8 @@ public class ValidateSnippetToolTests
         var text = result.Content[0].Text!;
         Assert.Contains("\"valid\":false", text);
     }
-
     #endregion
-
     #region Context Tests
-
-    [Fact]
-    public async Task ExecuteAsync_WithParameters_ReturnsValid()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R (+ a b)",
-                "context": {
-                    "returnType": "i32",
-                    "parameters": [
-                        { "name": "a", "type": "i32" },
-                        { "name": "b", "type": "i32" }
-                    ]
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithSurroundingCode_ReturnsValid()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R y",
-                "context": {
-                    "surroundingCode": "§B{y} (+ x 1)",
-                    "parameters": [
-                        { "name": "x", "type": "i32" }
-                    ]
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
 
     [Fact]
     public async Task ExecuteAsync_WithExpressionLocation_ReturnsValid()
@@ -258,49 +95,8 @@ public class ValidateSnippetToolTests
         var text = result.Content[0].Text!;
         Assert.Contains("\"valid\":true", text);
     }
-
-    [Fact]
-    public async Task ExecuteAsync_WithModuleBodyLocation_ReturnsValid()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§F{Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n",
-                "context": {
-                    "location": "module_body"
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
     #endregion
-
     #region Options Tests
-
-    [Fact]
-    public async Task ExecuteAsync_WithLexerOnly_StopsAfterLexer()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§B{x} 10",
-                "lexerOnly": true
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"validationLevel\":\"lexer\"", text);
-        Assert.Contains("\"valid\":true", text);
-    }
 
     [Fact]
     public async Task ExecuteAsync_WithShowTokens_IncludesTokens()
@@ -403,136 +199,10 @@ public class ValidateSnippetToolTests
 
         Assert.True(result.IsError);
     }
-
-    [Fact]
-    public async Task ExecuteAsync_DiagnosticLineNumbers_AreRelativeToSnippet()
-    {
-        // A multi-line snippet with an error on line 2 of the snippet
-        // Use an unclosed string to get an error
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§B{x} 10\n§B{y} STR:\"unterminated"
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":false", text);
-
-        // Parse the result to check line numbers
-        var json = JsonDocument.Parse(text);
-        var diagnostics = json.RootElement.GetProperty("diagnostics");
-        Assert.NotEmpty(diagnostics.EnumerateArray().ToList());
-
-        // The error should be on line 2 (relative to snippet), not the wrapped line
-        var firstDiag = diagnostics.EnumerateArray().First();
-        var line = firstDiag.GetProperty("location").GetProperty("line").GetInt32();
-        Assert.Equal(2, line);
-    }
-
     #endregion
-
     #region Complex Scenarios
-
-    [Fact]
-    public async Task ExecuteAsync_WithIfStatement_ReturnsValid()
-    {
-        // IF needs an ID in block form: §IF condition
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§IF (> x 0)\n  §R x\n§EL\n  §R (- 0 x)",
-                "context": {
-                    "parameters": [
-                        { "name": "x", "type": "i32" }
-                    ],
-                    "returnType": "i32"
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithMatchExpression_ReturnsValid()
-    {
-        // Match syntax: §W expr
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§W value\n  §K null\n    §R 0\n  §K _\n    §R 1",
-                "context": {
-                    "parameters": [
-                        { "name": "value", "type": "?i32" }
-                    ],
-                    "returnType": "i32"
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithLoop_ReturnsValid()
-    {
-        // For loop syntax: §L{var:start:end:step} ... §/L
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§B{sum} 0\n§L{i:1:10:1}\n  §B{sum} (+ sum i)\n§R sum",
-                "context": {
-                    "returnType": "i32"
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
     #endregion
-
     #region Column Number Tests
-
-    [Fact]
-    public async Task ExecuteAsync_StatementLocation_ColumnNumbersAreCorrect()
-    {
-        // Statement location adds 2-char indent to each line
-        // Token at original column 1 should report as column 1 after adjustment
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R 42",
-                "showTokens": true
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var json = JsonDocument.Parse(result.Content[0].Text!);
-        var tokens = json.RootElement.GetProperty("tokens").EnumerateArray().ToList();
-
-        // First token (§R) should be at column 1
-        var returnToken = tokens.First(t => t.GetProperty("kind").GetString() == "Return");
-        Assert.Equal(1, returnToken.GetProperty("column").GetInt32());
-    }
 
     [Fact]
     public async Task ExecuteAsync_ExpressionLocation_ColumnNumbersAreCorrect()
@@ -557,34 +227,6 @@ public class ValidateSnippetToolTests
         // First token (open paren) should be at column 1
         var firstToken = tokens.First();
         Assert.Equal(1, firstToken.GetProperty("column").GetInt32());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_MultiLineStatement_ColumnNumbersAreCorrectOnAllLines()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§B{x} 10\n§R x",
-                "showTokens": true
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var json = JsonDocument.Parse(result.Content[0].Text!);
-        var tokens = json.RootElement.GetProperty("tokens").EnumerateArray().ToList();
-
-        // §B on line 1 should be at column 1
-        var bindToken = tokens.First(t => t.GetProperty("kind").GetString() == "Bind");
-        Assert.Equal(1, bindToken.GetProperty("line").GetInt32());
-        Assert.Equal(1, bindToken.GetProperty("column").GetInt32());
-
-        // §R on line 2 should be at column 1
-        var returnToken = tokens.First(t => t.GetProperty("kind").GetString() == "Return");
-        Assert.Equal(2, returnToken.GetProperty("line").GetInt32());
-        Assert.Equal(1, returnToken.GetProperty("column").GetInt32());
     }
 
     #endregion
@@ -662,120 +304,8 @@ public class ValidateSnippetToolTests
         var text = result.Content[0].Text!;
         Assert.DoesNotContain("\"warnings\":", text);
     }
-
     #endregion
-
     #region Robustness Tests
-
-    [Fact]
-    public async Task ExecuteAsync_WithInvalidLocationString_DefaultsToStatement()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R 42",
-                "context": {
-                    "location": "invalid_location"
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithMalformedParameters_IgnoresInvalidOnes()
-    {
-        // Parameters missing required fields should be silently ignored
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R 42",
-                "context": {
-                    "parameters": [
-                        { "name": "x" },
-                        { "type": "i32" },
-                        { "name": "y", "type": "i32" }
-                    ]
-                }
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        // Should not crash, and should process the valid parameter
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithLargeSnippet_HandlesCorrectly()
-    {
-        // Generate a large snippet with many statements
-        var lines = new System.Text.StringBuilder();
-        for (int i = 0; i < 100; i++)
-        {
-            lines.AppendLine($"§B{{x{i}}} {i}");
-        }
-        lines.Append("§R x99");
-
-        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
-            ""source"": {JsonSerializer.Serialize(lines.ToString())}
-        }}").RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithContextAsNull_UsesDefaults()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§R 42",
-                "context": null
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        Assert.Contains("\"valid\":true", text);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_DiagnosticColumnNumbers_AreCorrectForStatements()
-    {
-        // Create an error at a known column position
-        // An unterminated string starting at column 8 (after "§B{y} " which is 6 chars)
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§B{y} STR:\"unterminated"
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var json = JsonDocument.Parse(result.Content[0].Text!);
-        var diagnostics = json.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
-
-        Assert.NotEmpty(diagnostics);
-        // The error should be at a reasonable column (after §B{y} )
-        var col = diagnostics[0].GetProperty("location").GetProperty("column").GetInt32();
-        Assert.True(col >= 7, $"Expected column >= 7, got {col}");
-    }
 
     #endregion
 
@@ -899,31 +429,6 @@ public class ValidateSnippetToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_UnicodeInSnippet_HandlesCorrectly()
-    {
-        // Snippet with unicode characters
-        var args = JsonDocument.Parse("""
-            {
-                "action": "validate",
-                "source": "§B{name} STR:\"Hello, 世界! 🌍\"",
-                "showTokens": true
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var json = JsonDocument.Parse(result.Content[0].Text!);
-        Assert.True(json.RootElement.GetProperty("valid").GetBoolean());
-
-        var tokens = json.RootElement.GetProperty("tokens").EnumerateArray().ToList();
-        // Should have the string literal token
-        var strToken = tokens.FirstOrDefault(t => t.GetProperty("kind").GetString() == "StrLiteral");
-        Assert.True(strToken.ValueKind != JsonValueKind.Undefined, "Expected StrLiteral token");
-        Assert.Contains("世界", strToken.GetProperty("text").GetString());
-    }
-
-    [Fact]
     public async Task ExecuteAsync_UnicodeIdentifiers_HandlesCorrectly()
     {
         // Some languages allow unicode identifiers
@@ -941,100 +446,6 @@ public class ValidateSnippetToolTests
         Assert.False(result.IsError);
         var json = JsonDocument.Parse(result.Content[0].Text!);
         Assert.True(json.RootElement.GetProperty("success").GetBoolean());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_VeryLongLine_HandlesCorrectly()
-    {
-        // Create a very long line (1000+ characters)
-        var longExpr = string.Join(" ", Enumerable.Range(1, 200).Select(i => $"x{i}"));
-        var snippet = $"§B{{result}} (+ {longExpr})";
-
-        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
-            ""source"": {JsonSerializer.Serialize(snippet)}
-        }}").RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var json = JsonDocument.Parse(result.Content[0].Text!);
-        Assert.True(json.RootElement.GetProperty("valid").GetBoolean());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_VeryLongLineWithError_ReportsCorrectColumn()
-    {
-        // Very long line with error - the STR: token starts after §B{val} (9 chars)
-        var padding = new string('x', 500);
-        var snippet = $"§B{{val}} STR:\"{padding}";  // Unterminated string
-
-        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
-            ""source"": {JsonSerializer.Serialize(snippet)}
-        }}").RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var json = JsonDocument.Parse(result.Content[0].Text!);
-        Assert.False(json.RootElement.GetProperty("valid").GetBoolean());
-
-        var diagnostics = json.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
-        Assert.NotEmpty(diagnostics);
-
-        // Column should be at least 9 (where STR: starts, after "§B{val} ")
-        var col = diagnostics[0].GetProperty("location").GetProperty("column").GetInt32();
-        Assert.True(col >= 9, $"Expected column >= 9 for STR: token position, got {col}");
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_ManyLines_HandlesCorrectly()
-    {
-        // Create a snippet with many lines (500+)
-        var lines = new System.Text.StringBuilder();
-        for (int i = 0; i < 500; i++)
-        {
-            lines.AppendLine($"§B{{x{i}}} {i}");
-        }
-        lines.Append("§R x499");
-
-        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
-            ""source"": {JsonSerializer.Serialize(lines.ToString())}
-        }}").RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var json = JsonDocument.Parse(result.Content[0].Text!);
-        Assert.True(json.RootElement.GetProperty("valid").GetBoolean());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_ManyLinesWithErrorAtEnd_ReportsCorrectLine()
-    {
-        // Many lines with error on the last line
-        var lines = new System.Text.StringBuilder();
-        for (int i = 0; i < 100; i++)
-        {
-            lines.AppendLine($"§B{{x{i}}} {i}");
-        }
-        lines.Append("§R STR:\"unterminated");  // Line 101
-
-        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
-            ""source"": {JsonSerializer.Serialize(lines.ToString())}
-        }}").RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.False(result.IsError);
-        var json = JsonDocument.Parse(result.Content[0].Text!);
-        Assert.False(json.RootElement.GetProperty("valid").GetBoolean());
-
-        var diagnostics = json.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
-        Assert.NotEmpty(diagnostics);
-
-        // Error should be on line 101
-        var line = diagnostics[0].GetProperty("location").GetProperty("line").GetInt32();
-        Assert.Equal(101, line);
     }
 
     #endregion

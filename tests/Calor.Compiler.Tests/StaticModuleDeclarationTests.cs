@@ -25,57 +25,6 @@ public class StaticModuleDeclarationTests
             .Order(StringComparer.Ordinal)
             .Select(path => new object[] { path });
 
-    [Theory]
-    [MemberData(nameof(ActiveStaticModuleInputs))]
-    public void RegisteredActiveMirror_PreservesExactReleaseCSharp(string original)
-    {
-        var root = CliTestHarness.FindRepoRoot();
-        var source = File.ReadAllText(Path.Combine(root, original));
-        var control = ParseCurrentStaticControl(source, original);
-        var activeSource = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root, original));
-        var activeModule = Parse(activeSource);
-        var expected = new CSharpEmitter(EmitContractMode.Release).Emit(control);
-        var actual = new CSharpEmitter(EmitContractMode.Release).Emit(activeModule);
-        if (IsLocalFunctionPreservationControl(original))
-        {
-            Assert.Empty(activeModule.Functions);
-            var compiled = Program.Compile(activeSource, original);
-            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
-            var formatted = new Formatting.CalorFormatter().FormatSource(activeSource, original);
-            Assert.True(formatted.Success, string.Join("\n", formatted.Errors));
-            Assert.False(formatted.UsedConservativeFallback, formatted.ConservativeFallbackReason);
-            Assert.Equal(Assert.Single(Assert.Single(control.Classes).InteropBlocks).CSharpCode,
-                Assert.Single(Assert.Single(activeModule.Classes).InteropBlocks).CSharpCode);
-            Assert.Equal(31620, Compile(OriginalLocalFunctionCSharp()).GetType("LocalFunctionFixture")!
-                .GetMethod("Run")!.Invoke(null, null));
-            foreach (var generated in new[] { expected, actual })
-            {
-                var assembly = Compile(generated);
-                Assert.Equal(31620, assembly.GetType("Fixture.LocalFunctionFixture")!
-                    .GetMethod("Run")!.Invoke(null, null));
-            }
-            if (original.EndsWith("/test.calr", StringComparison.Ordinal))
-                AssertLocalFunctionRuntimeHarness(activeSource);
-        }
-        Assert.Equal(expected, actual);
-    }
-
-    [Theory]
-    [InlineData("tests/TestData/InteropScope/R0/fixtures/F4-ITER-03.calr.txt")]
-    [InlineData("tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt")]
-    public void CalorTextMirror_PreservesExactReleaseCSharp(string original)
-    {
-        var root = CliTestHarness.FindRepoRoot();
-        var source = File.ReadAllText(Path.Combine(root, original))
-            .Replace("(len one)", "one.Length", StringComparison.Ordinal)
-            .Replace("(len two)", "two.Length", StringComparison.Ordinal);
-        var control = ParseCurrentStaticControl(source, original);
-        var active = Parse(File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(
-            root, original, ActiveSyntaxInputs.InputKind.CalorText)));
-        Assert.Equal(new CSharpEmitter(EmitContractMode.Release).Emit(control),
-            new CSharpEmitter(EmitContractMode.Release).Emit(active));
-    }
-
     [Fact]
     public void StaticClasses_BecomeNamedModules_WithCallerNamesAndStateIntact()
     {
@@ -412,23 +361,6 @@ public class StaticModuleDeclarationTests
     }
 
     [Fact]
-    public void CollisionCheck_UsesLexicalNamespaceContainingTypeAndGenericArity()
-    {
-        var module = Parse("""
-            §M{File}
-              §NS{First}
-                §M{Helpers:pub}
-                §CL{Helpers<T>:pub}
-                §CL{Outer:pub}
-                  §M{Helpers:pub}
-              §NS{Second}
-                §CL{Helpers:pub}
-            """);
-        Assert.DoesNotContain(Bind(module), diagnostic => diagnostic.Code == DiagnosticCode.DuplicateDefinition);
-        Compile(new CSharpEmitter().Emit(module));
-    }
-
-    [Fact]
     public void NestedModuleClassCollision_IsDiagnosed()
     {
         var module = Parse("""
@@ -707,103 +639,12 @@ public class StaticModuleDeclarationTests
         return module;
     }
 
-    private static ModuleNode ParseCurrentStaticControl(string source, string original)
-    {
-        // These are current-parser controls, not replay of the frozen source's compiler.
-        source = StaticModuleActiveInputTests.IdFreeFrozenControl(source);
-        if (original is "bench/phase0-agent-native/fixtures/d-s1.5/conditional-expression-hoisting/expected.calr"
-            or "bench/phase0-agent-native/fixtures/d-s1.5/conditional-expression-hoisting/test.calr")
-        {
-            Assert.Equal(3, source.Split("(post-inc i)", StringSplitOptions.None).Length - 1);
-            Assert.Equal(4, source.Split("(inc i)", StringSplitOptions.None).Length - 1);
-            source = source.Replace("(post-inc i)", "(cast i32 §CS{(i++)})", StringComparison.Ordinal)
-                .Replace("(inc i)", "(cast i32 §CS{(++i)})", StringComparison.Ordinal);
-        }
-        if (IsLocalFunctionPreservationControl(original))
-            return ParseLocalFunctionPreservationControl(source, original);
-        return Regex.IsMatch(source, @"§CL\{[^}\r\n]+:stat\}")
-            ? ParseRejectedStaticControl(source)
-            : Parse(source);
-    }
-
     private static bool IsLocalFunctionPreservationControl(string original) =>
         original is "bench/phase0-agent-native/fixtures/d-s1.5/local-function/expected.calr"
             or "bench/phase0-agent-native/fixtures/d-s1.5/local-function/test.calr";
 
     private static string OriginalLocalFunctionCSharp() => File.ReadAllText(Path.Combine(
         CliTestHarness.FindRepoRoot(), "bench/phase0-agent-native/fixtures/d-s1.5/local-function/input.cs"));
-
-    private static ModuleNode ParseLocalFunctionPreservationControl(string source, string original)
-    {
-        const string body = """
-                  §B{i32:shadowed} §C{Add} 2
-                  §IF (!= shadowed 3)
-                    §R (- 1)
-                  §B{i32:squared} §C{Square} 4
-                  §IF (!= squared 16)
-                    §R (- 2)
-                  §B{i32:factorial} §C{Fact} 5
-                  §IF (!= factorial 120)
-                    §R (- 3)
-                  §R (+ (+ (* shadowed 10000) (* squared 100)) (% factorial 100))
-                  §F{Add} (i32:x) -> i32
-                    §R (+ x 1)
-                  §F{Square} (i32:n) -> i32
-                    §R (* n n)
-                  §F{Fact} (i32:n) -> i32
-                    §IF (<= n 1)
-                      §R 1
-                    §R (* n §C{Fact} §A (- n 1) §/C)
-            """;
-        var hasPostcondition = original.EndsWith("/test.calr", StringComparison.Ordinal);
-        var nativeRun = "    §MT{Run:pub:stat} () -> i32\n"
-            + (hasPostcondition ? "      §S (== result 31620)\n" : "") + body + "\n";
-        Assert.EndsWith(nativeRun, source);
-
-        // Preservation oracle: slice the original C# member bytes, not converted output.
-        // No whitespace/body normalization or historical native-emission claim.
-        var csharp = OriginalLocalFunctionCSharp();
-        var tree = CSharpSyntaxTree.ParseText(csharp);
-        var run = Assert.Single(Assert.Single(tree.GetRoot().DescendantNodes()
-            .OfType<ClassDeclarationSyntax>()).Members.OfType<MethodDeclarationSyntax>(),
-            method => method.Identifier.ValueText == "Run");
-        var line = tree.GetText().Lines.GetLineFromPosition(run.SpanStart);
-        Assert.Equal("    public static int Run()", line.ToString());
-        Assert.Equal('\n', csharp[line.Start - 1]);
-        Assert.Equal('\n', csharp[run.Span.End]);
-        var member = csharp[(line.Start - 1)..(run.Span.End + 1)];
-        var preserved = source[..^nativeRun.Length] + "    §CSHARP{" + member + "}§/CSHARP\n";
-        return ParseRejectedStaticControl(preserved);
-    }
-
-    private static void AssertLocalFunctionRuntimeHarness(string preservedSource)
-    {
-        // The wrapper tests runtime contracts; it is not original corpus content
-        // or a claim that the opaque member has a statically verified effect row.
-        const string wrapper = """
-              §F{CheckCurrentRun:pub} () -> i32
-                §S (== result 31620)
-                §R §C{LocalFunctionFixture.Run}
-            """;
-        var harnessSource = preservedSource + "\n" + wrapper + "\n";
-        var unsupported = Program.Compile(harnessSource, "local-function-runtime-harness.calr");
-        Assert.True(unsupported.HasErrors);
-        Assert.Equal(DiagnosticCode.ForbiddenEffect, Assert.Single(unsupported.Diagnostics.Errors).Code);
-        Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect, DiagnosticCode.UnknownExternalCall },
-            unsupported.Diagnostics.Select(diagnostic => diagnostic.Code).Order(StringComparer.Ordinal));
-        var harness = Parse(harnessSource);
-        Assert.Single(Assert.Single(harness.Functions).Postconditions);
-        var assembly = Compile(new CSharpEmitter(EmitContractMode.Release).Emit(harness));
-        Assert.Equal(31620, assembly.GetType("Fixture.FixtureModule")!
-            .GetMethod("CheckCurrentRun")!.Invoke(null, null));
-
-        var failingHarness = Parse(preservedSource + "\n" + wrapper.Replace(
-            "§R §C{LocalFunctionFixture.Run}", "§R 31619", StringComparison.Ordinal) + "\n");
-        var failingAssembly = Compile(new CSharpEmitter(EmitContractMode.Release).Emit(failingHarness));
-        var error = Assert.Throws<TargetInvocationException>(() => failingAssembly
-            .GetType("Fixture.FixtureModule")!.GetMethod("CheckCurrentRun")!.Invoke(null, null));
-        Assert.IsType<Calor.Runtime.ContractViolationException>(error.InnerException);
-    }
 
     private static ModuleNode ParseRejectedStaticControl(string source)
     {

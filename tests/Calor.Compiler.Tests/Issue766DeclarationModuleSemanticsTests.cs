@@ -985,16 +985,6 @@ public class Issue766DeclarationModuleSemanticsTests
     }
 
     [Fact]
-    public void NamedConstructorKeywordArgument_IsEscapedOnlyInCSharp()
-    {
-        var creation = new NewExpressionNode(
-            Span, "Keyword", [], [new StringLiteralNode(Span, "value")], [],
-            argumentNames: ["class"]);
-        Assert.Equal("new Keyword(@class: \"value\")", creation.Accept(new CSharpEmitter()));
-        Assert.Equal("§NEW{Keyword} §A[class] \"value\" §/NEW", creation.Accept(new CalorEmitter()));
-    }
-
-    [Fact]
     public void InterfaceVarianceAndConstraints_ArePreservedMappedAndCompilable()
     {
         var module = Parse(
@@ -1424,48 +1414,6 @@ public class Issue766DeclarationModuleSemanticsTests
     }
 
     [Fact]
-    public void QualifiedNames_SanitizeKeywordsAcrossNamespacesCallsArgumentsAndTypes()
-    {
-        var result = Program.Compile(
-            """
-            §M{namespace.123bad.class}
-              §F{event:pub} (i32:class) -> i32
-                §R class
-            """);
-
-        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
-        Assert.Contains("namespace @namespace._123bad.@class", result.GeneratedCode);
-        Assert.Contains("int @event(int @class)", result.GeneratedCode);
-        Assert.Contains("return @class;", result.GeneratedCode);
-
-        var call = new CallExpressionNode(
-            Span,
-            "namespace.class",
-            [new IntLiteralNode(Span, 1)],
-            ["event"]);
-        Assert.Equal(
-            "@namespace.@class(@event: 1)",
-            call.Accept(new CSharpEmitter()));
-        Assert.Equal(
-            "Factory<int>.@class()",
-            new CallExpressionNode(
-                Span,
-                "Factory<int>.class",
-                []).Accept(new CSharpEmitter()));
-
-        var type = new GenericTypeNode(
-            Span,
-            "namespace.class",
-            ["str"]);
-        Assert.Equal(
-            "@namespace.@class<string>",
-            type.Accept(new CSharpEmitter()));
-        Assert.Equal(
-            "@var",
-            new GenericTypeNode(Span, "var", []).Accept(new CSharpEmitter()));
-    }
-
-    [Fact]
     public void GeneratedCSharp_CompilesWithImplicitUsingsDisabled()
     {
         var result = Program.Compile(
@@ -1495,64 +1443,6 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.True(
             validation.CompilationSuccess,
             string.Join(Environment.NewLine, validation.FormattedCompilationErrors));
-    }
-
-    [Fact]
-    public void BuiltInShortTypeMatrix_CompilesStandaloneWithoutImplicitUsings()
-    {
-        string[] types =
-        [
-            "i8", "i16", "i32", "i64",
-            "u8", "u16", "u32", "u64",
-            "f32", "f64", "dec", "bool", "str", "char", "any",
-            "List<i32>", "Dict<str, i32>", "Set<i32>",
-            "Seq<i32>", "IList<i32>", "IDict<str, i32>",
-            "ICollection<i32>", "ISet<i32>",
-            "ReadList<i32>", "ReadCollection<i32>",
-            "ReadDict<str, i32>", "ReadSet<i32>",
-            "Task", "Task<i32>", "ValueTask", "ValueTask<i32>",
-            "datetime", "datetimeoffset", "timespan", "date", "time", "guid",
-            "Span<i32>", "ReadOnlySpan<i32>", "Memory<i32>", "ReadOnlyMemory<i32>",
-            "StringBuilder", "void"
-        ];
-
-        foreach (var type in types)
-        {
-            var signature = type == "void"
-                ? "() -> void"
-                : $"({type}:value) -> {type}";
-            var body = type == "void" ? "" : "    §R value";
-            var result = Program.Compile(
-                $$"""
-                  §M{BuiltInMatrix}
-                    §F{Echo:pub} {{signature}}
-                  {{body}}
-                  """,
-                null,
-                new CompilationOptions
-                {
-                    DeferGeneratedOutputValidation = true
-                });
-            Assert.False(
-                result.HasErrors,
-                $"{type}: {string.Join("; ", result.Diagnostics.Select(d => d.Message))}");
-
-            var validation = GeneratedCSharpCompiler.Validate(
-                [new GeneratedCSharpSource(result.GeneratedCode, $"{type}.g.cs")],
-                new GeneratedCSharpCompilationContext
-                {
-                    IncludeImplicitGlobalUsings = false
-                });
-            Assert.True(
-                validation.CompilationSuccess,
-                $"{type}:{Environment.NewLine}"
-                + string.Join(
-                    Environment.NewLine,
-                    validation.FormattedCompilationErrors));
-
-            if (type == "StringBuilder")
-                Assert.Contains("using System.Text;", result.GeneratedCode);
-        }
     }
 
     [Fact]

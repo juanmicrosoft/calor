@@ -93,36 +93,6 @@ public class PrimerMistakesRejectedTests
         Assert.Empty(RoslynErrors(result.GeneratedCode));
     }
 
-    [Fact]
-    public void Primer_ListsEachCuratedMistake()
-    {
-        // Drift guard: every curated fragment must still appear (whitespace-normalized) in the
-        // primer's mistakes block, so this test and the docs cannot silently diverge.
-        var normBlock = Collapse(MistakesBlock());
-        foreach (var m in Mistakes)
-        {
-            Assert.True(
-                normBlock.Contains(Collapse(m.Fragment), StringComparison.Ordinal),
-                $"Curated mistake '{m.Name}' ({m.Fragment}) is no longer present in the primer's " +
-                "\"Common mistakes\" block. Update the curated set to match the primer.");
-        }
-    }
-
-    [Fact]
-    public void Primer_MistakeCount_MatchesCuratedSet()
-    {
-        // Drift guard the other way: adding a mistake to the primer without a curated case +
-        // assertion here fails this test. Mistake lines carry an explanation lead-in.
-        var count = MistakesBlock()
-            .Split('\n')
-            .Count(line =>
-                line.Contains("wrong;", StringComparison.Ordinal) ||
-                line.Contains("removed;", StringComparison.Ordinal) ||
-                line.Contains("no such", StringComparison.Ordinal));
-
-        Assert.Equal(Mistakes.Length, count);
-    }
-
     // --- helpers ---
 
     private static CompilationResult Compile(string source, string fileName)

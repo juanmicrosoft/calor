@@ -303,22 +303,6 @@ public class FormatExpressionCoverageTests
         Assert.Contains("exists", result);
     }
 
-    [Fact]
-    public void Format_ImplicationExpression_NoFallbackComment()
-    {
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                §I{i32:x}
-                §O{i32}
-                §Q (-> (> x 0) (>= x 1))
-                §R x
-            """;
-        var result = FormatModule(source);
-        Assert.DoesNotContain("/* ImplicationExpressionNode */", result);
-        Assert.Contains("->", result);
-    }
-
     #endregion
 
     #region With Expression

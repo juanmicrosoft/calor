@@ -12,45 +12,6 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ExtendedFeaturesTests
 {
-    [Theory]
-    [InlineData("TD")]
-    [InlineData("FX")]
-    [InlineData("HK")]
-    [InlineData("US")]
-    [InlineData("/US")]
-    [InlineData("UB")]
-    [InlineData("/UB")]
-    [InlineData("CX")]
-    [InlineData("DC")]
-    [InlineData("/DC")]
-    [InlineData("CHOSEN")]
-    [InlineData("REJECTED")]
-    [InlineData("REASON")]
-    [InlineData("CT")]
-    [InlineData("/CT")]
-    [InlineData("VS")]
-    [InlineData("/VS")]
-    [InlineData("HD")]
-    [InlineData("/HD")]
-    [InlineData("FC")]
-    [InlineData("FILE")]
-    [InlineData("LK")]
-    [InlineData("AU")]
-    [InlineData("TASK")]
-    [InlineData("DATE")]
-    public void RemovedMetadata_RequiresDocumentationComments(string marker)
-    {
-        var tokens = Tokenize("§" + marker, out var diagnostics);
-        Assert.Equal(TokenKind.Error, tokens[0].Kind);
-        var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
-        Assert.Contains("///", diagnostic.Message);
-        Assert.DoesNotContain(marker, SectionMarkerSuggestions.AllMarkers);
-
-        Parse($"§M{{Test}}\n  §F{{Run:pub}} () -> void\n    §{marker}\n", out var parsedDiagnostics);
-        Assert.Contains(parsedDiagnostics, d => d.Code == DiagnosticCode.UnknownSectionMarker
-            && d.Message.Contains("///", StringComparison.Ordinal));
-    }
 
     private static List<Token> Tokenize(string source, out DiagnosticBag diagnostics)
     {
@@ -73,76 +34,7 @@ public class ExtendedFeaturesTests
         var emitter = new CSharpEmitter();
         return emitter.Emit(module);
     }
-
     #region Phase 1: Quick Wins - Examples (§EX)
-
-    [Fact]
-    public void Lexer_RecognizesExampleKeyword()
-    {
-        var tokens = Tokenize("§EX", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.Example, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Parser_ParsesInlineExample()
-    {
-        var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §EX (+ 2 3) → 5
-      §R (+ a b)
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        Assert.Single(module.Functions);
-        var func = module.Functions[0];
-        Assert.Single(func.Examples);
-        Assert.IsType<ExampleNode>(func.Examples[0]);
-    }
-
-    [Fact]
-    public void Parser_ParsesExampleWithId()
-    {
-        var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §EX{ex001} (+ 2 3) → 5
-      §R (+ a b)
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        var example = module.Functions[0].Examples[0];
-        Assert.Equal("ex001", example.Id);
-    }
-
-    [Fact]
-    public void Emitter_EmitsExampleAsDebugAssert()
-    {
-        var source = @"
-§M{Test}
-  §F{Add:pub}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §EX (+ 2 3) → 5
-      §R (+ a b)
-";
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var code = Emit(module);
-        Assert.Contains("Debug.Assert", code);
-    }
 
     #endregion
 
@@ -179,28 +71,8 @@ module Test Test block
         Assert.Single(func.Assumptions);
         Assert.Equal(AssumptionCategory.Data, func.Assumptions[0].Category);
     }
-
     #endregion
-
     #region Phase 3: Enhanced Contracts - Versioning (§SN, §DP)
-
-    [Fact]
-    public void Lexer_RecognizesSinceKeyword()
-    {
-        var tokens = Tokenize("§SN", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.Since, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesDeprecatedKeyword()
-    {
-        var tokens = Tokenize("§DP", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.Deprecated, tokens[0].Kind);
-    }
 
     [Fact]
     public void Parser_ParsesSinceDeclaration()
@@ -262,140 +134,10 @@ module Test Test block
         Assert.Contains("[System.Obsolete(", code);
         Assert.Contains("NewMethod", code);
     }
-
     #endregion
-
     #region Phase 4: Future Extensions - Properties (§PT)
-
-    [Theory]
-    [InlineData("forall", false)]
-    [InlineData("Forall", true)]
-    [InlineData("FORALL", true)]
-    public void PropertyQuantifier_RequiresExactCase(string quantifier, bool hasError)
-    {
-        var module = Parse($$"""
-            §M{Properties}
-              §F{Check:pub} (i32:x, i32:y) -> bool
-                §PT {{quantifier}} x,y: (== x y)
-                §R true
-            """, out var diagnostics);
-        Assert.Equal(hasError, diagnostics.HasErrors);
-        if (!hasError)
-            Assert.Equal(new[] { "x", "y" }, module.Functions.Single().Properties.Single().Quantifiers);
-        else
-            Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Message.Contains("Use 'forall'"));
-    }
-
-    [Fact]
-    public void Lexer_RecognizesPropertyKeyword()
-    {
-        var tokens = Tokenize("§PT", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.PropertyTest, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Parser_ParsesPropertyDeclaration()
-    {
-        var source = @"
-§M{Test}
-  §F{Reverse:pub}
-      §PT (== 1 1)
-      §O{i32}
-      §R 42
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        var func = module.Functions[0];
-        Assert.Single(func.Properties);
-    }
-
     #endregion
-
     #region Integration Tests
-
-    [Fact]
-    public void Parser_ParsesComprehensiveExample()
-    {
-        // Updated to v2 positional format
-        var source = @"
-§M{Demo}
-  // TODO: Add examples
-
-  §F{Add:pub}
-      §SN{""1.0.0""}
-      §AS{data} ""Inputs are within i32 range""
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §EX (+ 2 3) → 5
-      §EX (+ 0 0) → 0
-      §R (+ a b)
-
-  §F{OldAdd:pub}
-      §SN{""0.5.0""}
-      §DP{""1.0.0"":Add}
-      §I{i32:x} §I{i32:y}
-      §O{i32}
-      §R (+ x y)
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        Assert.Equal(2, module.Functions.Count);
-        Assert.Empty(module.Issues);
-
-        var addFunc = module.Functions[0];
-        Assert.Equal("Add", addFunc.Name);
-        Assert.NotNull(addFunc.Since);
-        Assert.Null(addFunc.Complexity);
-        Assert.Null(addFunc.Uses);
-        Assert.Single(addFunc.Assumptions);
-        Assert.Equal(2, addFunc.Examples.Count);
-
-        var oldAddFunc = module.Functions[1];
-        Assert.NotNull(oldAddFunc.Deprecated);
-        Assert.Equal("Add", oldAddFunc.Deprecated.Replacement);
-    }
-
-    [Fact]
-    public void Emitter_GeneratesValidCSharpWithExtendedFeatures()
-    {
-        // Updated to v2 positional format
-        var source = @"
-§M{Demo}
-  // TODO: Add examples
-
-  §F{Add:pub}
-      §SN{""1.0.0""}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §EX (+ 2 3) → 5
-      §R (+ a b)
-
-  §F{OldAdd:pub}
-      §DP{""1.0.0"":Add}
-      §I{i32:x} §I{i32:y}
-      §O{i32}
-      §R (+ x y)
-";
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var code = Emit(module);
-
-        // Check various expected outputs
-        Assert.Contains("namespace Demo", code);
-        Assert.Contains("// SINCE: 1.0.0", code);
-        Assert.Contains("Debug.Assert", code);
-        Assert.Contains("[System.Obsolete(", code);
-        Assert.Contains("public static int Add(", code);
-        Assert.Contains("public static int OldAdd(", code);
-    }
 
     #endregion
 }

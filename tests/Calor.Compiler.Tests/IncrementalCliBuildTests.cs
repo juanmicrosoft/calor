@@ -290,24 +290,6 @@ public class IncrementalCliBuildTests : IDisposable
     }
 
     [Fact]
-    public void FailedFile_IsNotCached_AndRecompilesNextRun()
-    {
-        var (a, _) = WriteIndependentPair();
-        var broken = WriteSource("broken.calr", "§M{m003:Broken\n  not valid calor");
-
-        var cold = Run([a, broken]);
-        Assert.True(cold.Result.AnyErrors);
-
-        var warm = Run([a, broken]);
-        // The broken file was re-processed, not skipped: only a.calr is a cache hit,
-        // and the failure (with its diagnostics) is re-reported on the warm run.
-        Assert.Equal([Path.ChangeExtension(a, ".g.cs")], warm.SkippedOutputs);
-        Assert.Single(warm.Result.Skipped);
-        Assert.True(warm.Result.AnyErrors);
-        Assert.True(warm.Diagnostics.HasErrors);
-    }
-
-    [Fact]
     public void CrossModuleViolation_IsNeverPublishedOrCached()
     {
         var callee = WriteSource("callee.calr", """

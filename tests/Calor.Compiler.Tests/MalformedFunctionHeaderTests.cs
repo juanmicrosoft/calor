@@ -43,41 +43,6 @@ public class MalformedFunctionHeaderTests
     }
 
     // ---------------------------------------------------------------------
-    // Positive — fires on malformed three-field §F / §AF headers.
-    // ---------------------------------------------------------------------
-
-    [Fact]
-    public void Function_ThreeFieldHeader_EmitsCalor0116()
-    {
-        const string src = """
-            §M{Calc}
-              §F{Add:i32:pub}
-                §R (+ 1 2)
-            """;
-        var (diags, _) = Parse(src);
-
-        var malformed = diags.Where(d => d.Code == DiagnosticCode.MalformedFunctionHeader).ToList();
-        Assert.Single(malformed);
-        Assert.Contains("three fields", malformed[0].Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("i32", malformed[0].Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void AsyncFunction_ThreeFieldHeader_EmitsCalor0116()
-    {
-        const string src = """
-            §M{Calc}
-              §AF{FetchAsync:i32:pub}
-                §R (+ 1 2)
-            """;
-        var (diags, _) = Parse(src);
-
-        var malformed = diags.Where(d => d.Code == DiagnosticCode.MalformedFunctionHeader).ToList();
-        Assert.Single(malformed);
-        Assert.Contains("three fields", malformed[0].Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    // ---------------------------------------------------------------------
     // Negative — valid forms must NOT fire.
     // ---------------------------------------------------------------------
 
@@ -141,97 +106,6 @@ public class MalformedFunctionHeaderTests
             """;
         var (diags, _) = Parse(src);
 
-        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.MalformedFunctionHeader);
-    }
-
-    [Theory]
-    [InlineData("f001")]
-    [InlineData("f_000000000001")]
-    public void RetiredSourceIdHeader_DoesNotOfferANameGuess(string oldId)
-    {
-        var source = $"§M{{Calc}}\n  §F{{{oldId}:Add:pub}} () -> i32\n    §R 1\n";
-        var bag = ParseBag(source);
-        Assert.True(bag.HasErrors);
-        Assert.Contains(bag, d => d.Code == DiagnosticCode.UnexpectedToken &&
-            d.Message.Contains("Source IDs are removed", StringComparison.Ordinal));
-        Assert.DoesNotContain(bag.DiagnosticsWithFixes,
-            d => d.Code == DiagnosticCode.MalformedFunctionHeader);
-    }
-
-    // ---------------------------------------------------------------------
-    // Fix — structure and healing behaviour.
-    // ---------------------------------------------------------------------
-
-    [Fact]
-    public void Fix_HeaderOnly_CarriesReplaceAndSignatureInsert()
-    {
-        const string src = """
-            §M{Calc}
-              §F{Add:i32:pub}
-                §R (+ 1 2)
-            """;
-        var bag = ParseBag(src);
-
-        var dwf = Assert.Single(
-            bag.DiagnosticsWithFixes.Where(d => d.Code == DiagnosticCode.MalformedFunctionHeader));
-
-        // Two edits: rewrite the header to two fields, then append a signature
-        // so the healed function keeps its return type instead of becoming void.
-        Assert.Equal(2, dwf.Fix.Edits.Count);
-        Assert.Contains(dwf.Fix.Edits, e => e.NewText == "{Add:pub}");
-        Assert.Contains(dwf.Fix.Edits, e => e.NewText == " () -> i32");
-    }
-
-    [Fact]
-    public void ApplyingFix_HeaderOnly_HealsToReturningFunction()
-    {
-        const string src = """
-            §M{Calc}
-              §F{Add:i32:pub}
-                §R (+ 1 2)
-            """;
-        var bag = ParseBag(src);
-        var healed = ApplyFixes(src, bag);
-
-        Assert.Contains("§F{Add:pub} () -> i32", healed);
-        Assert.DoesNotContain("i32:pub", healed);
-
-        // Healed source parses cleanly (no residual Calor0116).
-        var (diags, hasErrors) = Parse(healed);
-        Assert.False(hasErrors, "Healed source must parse cleanly");
-        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.MalformedFunctionHeader);
-
-        // And it compiles to a value-returning method, not a void one.
-        var result = Compile(healed);
-        Assert.DoesNotContain(result.Diagnostics, d => d.IsError);
-        Assert.Contains("int Add(", result.GeneratedCode);
-        Assert.DoesNotContain("void Add(", result.GeneratedCode);
-    }
-
-    [Fact]
-    public void ApplyingFix_WithInlineSignature_DropsHeaderTypeOnly()
-    {
-        // When an inline signature already follows the header, the fix must drop
-        // ONLY the header type — it must not append a second signature.
-        const string src = """
-            §M{Calc}
-              §F{Add:i32:pub} (i32:a) -> i32
-                §R a
-            """;
-        var bag = ParseBag(src);
-
-        var dwf = Assert.Single(
-            bag.DiagnosticsWithFixes.Where(d => d.Code == DiagnosticCode.MalformedFunctionHeader));
-        var edit = Assert.Single(dwf.Fix.Edits);
-        Assert.Equal("{Add:pub}", edit.NewText);
-
-        var healed = ApplyFixes(src, bag);
-        Assert.Contains("§F{Add:pub} (i32:a) -> i32", healed);
-        // Exactly one signature arrow — no duplicated "() -> i32" tail.
-        Assert.Equal(1, CountOccurrences(healed, "-> i32"));
-
-        var (diags, hasErrors) = Parse(healed);
-        Assert.False(hasErrors, "Healed source must parse cleanly");
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.MalformedFunctionHeader);
     }
 

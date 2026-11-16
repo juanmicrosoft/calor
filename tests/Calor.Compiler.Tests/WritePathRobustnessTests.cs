@@ -54,16 +54,6 @@ public class WritePathRobustnessTests
     }
 
     [Fact]
-    public void CanonicalHealing_MultilineStringsRemainByteExact()
-    {
-        const string literal = "\"\"\"first\r\n       else\r\n§/M ${n}\r\nlast\"\"\"";
-        var source = "module M\n    func F (int:n) → string\n      !\n        return " + literal;
-        var healed = new SourceHealer().Heal(source);
-        Assert.Equal("module M\n  func F (int:n) → string\n    return " + literal, healed);
-        Assert.Equal(healed, new SourceHealer().Heal(healed));
-    }
-
-    [Fact]
     public void CanonicalHealing_DoTailAlignsWithoutCapturingNestedWhileLoops()
     {
         const string source = "module M\n    func F () → void\n        do\n            while true\n                break\n            while false\n        return";

@@ -47,65 +47,6 @@ public class DefinitionHandlerTests
     }
 
     [Fact]
-    public void FindDefinition_Interface_ReturnsInterface()
-    {
-        var source = """
-            §M{TestModule}
-              §IFACE{IShape}
-                §MT{GetArea}
-                  §O{f64}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var def = SymbolFinder.FindDefinition(ast, "IShape");
-
-        Assert.NotNull(def);
-        Assert.IsType<Calor.Compiler.Ast.InterfaceDefinitionNode>(def);
-    }
-
-    [Fact]
-    public void FindDefinition_Enum_ReturnsEnum()
-    {
-        var source = """
-            §M{TestModule}
-              §EN{Color}
-              §EM{Red}
-              §EM{Green}
-              §/EN
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var def = SymbolFinder.FindDefinition(ast, "Color");
-
-        Assert.NotNull(def);
-        Assert.IsType<Calor.Compiler.Ast.EnumDefinitionNode>(def);
-    }
-
-    [Fact]
-    public void FindDefinition_Delegate_ReturnsDelegate()
-    {
-        var source = """
-            §M{TestModule}
-              §DEL{Callback}
-              §I{i32:value}
-              §O{void}
-              §/DEL
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var def = SymbolFinder.FindDefinition(ast, "Callback");
-
-        Assert.NotNull(def);
-        Assert.IsType<Calor.Compiler.Ast.DelegateDefinitionNode>(def);
-    }
-
-    [Fact]
     public void FindDefinition_NonExistent_ReturnsNull()
     {
         var source = """
@@ -267,51 +208,6 @@ public class DefinitionHandlerTests
             if (Directory.Exists(root))
                 Directory.Delete(root, recursive: true);
         }
-    }
-
-    [Fact]
-    public async Task DefinitionResolvesNamespacedGenericStaticReceiverByArityAsync()
-    {
-        const string source = """
-            §M{GenericDefinitions}
-              §NS{Alpha}
-                §CL{Box:pub}<T>
-                  §MT{Create:pub:stat} (i32:value) -> i32
-                    §R value
-                §CL{Box:pub}<TLeft,TRight>
-                  §MT{Create:pub:stat} (str:value) -> str
-                    §R value
-              §NS{Beta}
-                §F{UseStatic:pub} () -> i32
-                  §R §C{Alpha.Box<i32>.Create} §A INT:1 §/C
-            """;
-        var uri = DocumentUri.From("file:///generic-definition.calr");
-        var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-        var handler = new DefinitionHandler(workspace);
-        var declarationOffset = source.IndexOf(
-            "Box:pub",
-            StringComparison.Ordinal);
-        var referenceOffset = source.IndexOf(
-            "Box<i32>.Create",
-            StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(
-            source,
-            referenceOffset);
-        var result = await handler.Handle(
-            new DefinitionParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-            },
-            CancellationToken.None);
-
-        Assert.NotNull(result);
-        var location = Assert.Single(result).Location;
-        Assert.NotNull(location);
-        Assert.Equal(
-            declarationOffset,
-            PositionConverter.ToOffset(location!.Range.Start, source));
     }
 
     [Fact]

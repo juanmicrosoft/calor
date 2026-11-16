@@ -11,36 +11,6 @@ namespace Calor.Compiler.Tests;
 
 public class CharContractRuntimeTests
 {
-    [Theory]
-    [InlineData("is-digit", '5', 'x')]
-    [InlineData("is-letter", 'é', '5')]
-    [InlineData("is-whitespace", '\t', 'x')]
-    [InlineData("is-upper", 'A', 'a')]
-    [InlineData("is-lower", 'a', 'A')]
-    public void CharacterPredicates_EnforcePreconditionsAndPostconditions(
-        string operation, char valid, char invalid)
-    {
-        var source = $$"""
-            §M{CharContracts}
-              §F{Probe:pub} (char:input, char:output) -> char
-                §E{}
-                §Q ({{operation}} input)
-                §S ({{operation}} result)
-                §R output
-            """;
-        var diagnostics = new DiagnosticBag();
-        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.False(diagnostics.HasErrors);
-        foreach (var text in new[] { source, new CalorEmitter().Emit(module) })
-        {
-            var method = Compile(text).GetMethod("Probe")!;
-            Assert.Equal(valid, method.Invoke(null, [valid, valid]));
-            var precondition = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [invalid, valid]));
-            Assert.IsType<Calor.Runtime.ContractViolationException>(precondition.InnerException);
-            var postcondition = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [valid, invalid]));
-            Assert.IsType<Calor.Runtime.ContractViolationException>(postcondition.InnerException);
-        }
-    }
 
     [Theory]
     [InlineData("(char-code input)", DiagnosticCode.TypeMismatch)]

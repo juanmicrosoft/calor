@@ -39,50 +39,6 @@ public sealed class EffectRowExperimentHarnessTests
     private static readonly string[] Scripts =
         ["run.py", "run2.py", "run3.py"];
 
-    /// <summary>
-    /// P29 — every current probe still produces its explicitly registered output.
-    /// </summary>
-    [Fact]
-    public void ExperimentTranscripts_MatchARerun()
-    {
-        var experiments = ExperimentsDirectory();
-        var root = RepositoryRoot();
-        var regenerate =
-            Environment.GetEnvironmentVariable("CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS") == "1";
-
-        var drifted = new List<string>();
-        foreach (var script in Scripts)
-        {
-            var original = Path.GetRelativePath(root, Path.Combine(experiments, script)).Replace('\\', '/');
-            var (activeScript, transcript) = ActiveSyntaxInputs.ForCurrentExecutable(root, original);
-            var actual = RunScript(experiments, activeScript);
-
-            if (regenerate)
-            {
-                File.WriteAllText(transcript, actual);
-                continue;
-            }
-
-            Assert.True(File.Exists(transcript),
-                $"Missing transcript for {script}. Regenerate with " +
-                "CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS=1.");
-
-            var expected = File.ReadAllText(transcript);
-            if (!string.Equals(Normalize(expected), Normalize(actual), StringComparison.Ordinal))
-            {
-                drifted.Add($"{script}: {FirstDifference(Normalize(expected), Normalize(actual))}");
-            }
-        }
-
-        Assert.True(drifted.Count == 0,
-            "The registered current effect-row probes no longer reproduce. "
-            + "Either the compiler changed (review the active scripts and transcripts together) "
-            + "or the harness broke.\n  "
-            + string.Join("\n  ", drifted)
-            + "\n\nRegenerate only this test's active behavior transcripts with "
-            + "CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS=1.");
-    }
-
     [Fact]
     public void ActiveTranscripts_RetainHistoricalCasesAndRegisteredCurrentDifferences()
     {

@@ -604,14 +604,6 @@ module Test Test block
             ! cw
             return 0
         """, "Func<int, int>:transform ! cw")]
-    // position 6 — return, §O spelling
-    [InlineData("""
-        §M{R}
-          §F{Make:pub}
-            §O{Func<i32>} §E{cw}
-            §E{cw}
-            §R §LAM{} INT:0 §/LAM
-        """, "-> Func<int> §E{cw}")]
     // position 6 — return, arrow spelling
     [InlineData("""
         module R R block

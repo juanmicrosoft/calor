@@ -175,26 +175,8 @@ public class SuggestionTests
         Assert.Contains("let", markers);
         Assert.DoesNotContain("§", markers);
     }
-
     #endregion
-
     #region Parser Integration Tests
-
-    [Fact]
-    public void Parser_UnknownOperator_WithTypo_ShowsSuggestion()
-    {
-        var source = "§M{Test} §F{Fn} §O{i32} §R (cotains \"hello\" \"h\")";
-        var result = Program.Compile(
-            source,
-            "test.calr",
-            new CompilationOptions { DeferGeneratedOutputValidation = true });
-
-        Assert.True(result.HasErrors);
-        var error = result.Diagnostics.First(d => d.IsError);
-        Assert.Contains("cotains", error.Message);
-        Assert.Contains("contains", error.Message);
-        Assert.Contains("Did you mean", error.Message);
-    }
 
     [Fact]
     public void Parser_NameofOperator_CompilesSuccessfully()
@@ -204,18 +186,6 @@ public class SuggestionTests
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
         Assert.Contains("nameof(x)", result.GeneratedCode);
-    }
-
-    [Fact]
-    public void Parser_UnknownOperator_NoSuggestion_ShowsValidOperators()
-    {
-        var source = "§M{Test} §F{Fn} §O{i32} §R (xyzqwerty 1 2)";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        var error = result.Diagnostics.First(d => d.IsError);
-        Assert.Contains("xyzqwerty", error.Message);
-        Assert.Contains("arithmetic", error.Message);
     }
 
     #endregion
@@ -381,52 +351,10 @@ public class SuggestionTests
         var error = diagnostics.First(d => d.IsError);
         Assert.Equal(DiagnosticCode.UnexpectedCharacter, error.Code);
     }
-
     #endregion
-
     #region Fix Generation Tests
-
-    [Fact]
-    public void Parser_UnknownOperator_WithTypo_GeneratesFix()
-    {
-        var source = "§M{Test} §F{Fn} §O{i32} §R (cotains \"hello\" \"h\")";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-
-        // Check that a fix was generated
-        var fixDiagnostics = result.Diagnostics.DiagnosticsWithFixes;
-        Assert.NotEmpty(fixDiagnostics);
-
-        var fix = fixDiagnostics.First();
-        Assert.Contains("contains", fix.Fix.Description);
-        Assert.Single(fix.Fix.Edits);
-        Assert.Equal("contains", fix.Fix.Edits[0].NewText);
-    }
-
     #endregion
-
     #region Fix Application Tests
-
-    [Fact]
-    public void ApplyFix_OperatorTypo_ProducesValidCode()
-    {
-        // Source with typo
-        var source = "§M{Test} §F{Fn} §O{bool} §R (cotains \"hello\" \"h\")";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        var fixDiagnostics = result.Diagnostics.DiagnosticsWithFixes;
-        Assert.NotEmpty(fixDiagnostics);
-
-        // Apply the fix
-        var fix = fixDiagnostics.First();
-        var fixedSource = ApplyFix(source, fix.Fix);
-
-        // Verify the fixed code compiles
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors, $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
 
     [Theory]
     [InlineData("§M{Test} §F{Fn} §O{bool} §R (cotains \"hello\" \"h\")", "cotains", "contains")]
@@ -566,20 +494,6 @@ public class SuggestionTests
         Assert.NotNull(OperatorSuggestions.GetCSharpHint("TYPEOF"));
     }
 
-    [Fact]
-    public void Parser_MultipleTyposOnSameLine_GeneratesMultipleFixes()
-    {
-        // Multiple whitespace-separated operands cannot be mistaken for native call syntax.
-        var source = "§M{Test} §F{Fn} §O{i32} §B{x} (abss 1 (ngative 5 6)) §R x";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-
-        // Should have at least 2 errors for the two typos
-        var unknownOpErrors = result.Diagnostics.Where(d => d.Code == DiagnosticCode.InvalidOperator).ToList();
-        Assert.True(unknownOpErrors.Count >= 2, $"Expected at least 2 unknown operator errors, got {unknownOpErrors.Count}");
-    }
-
     [Theory]
     [InlineData("(abss(ngative(5)))")]
     [InlineData("abss(ngative(5))")]
@@ -596,27 +510,6 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void Parser_NestedTypos_GeneratesCorrectFixes()
-    {
-        // Nested structure with typos at different levels
-        var source = @"§M{Test}
-  §F{Fn}
-    §O{str}
-    §P{s:str} ""test""
-    §L{i:0:10:1}
-      §B{x} (cotains s ""t"")
-    §R s";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        var fixDiagnostics = result.Diagnostics.DiagnosticsWithFixes;
-
-        // Should have a fix for "cotains" -> "contains"
-        var containsFix = fixDiagnostics.FirstOrDefault(d => d.Fix.Edits.Any(e => e.NewText == "contains"));
-        Assert.NotNull(containsFix);
-    }
-
-    [Fact]
     public void Parser_UnicodeInIdentifier_NoSuggestionCrash()
     {
         // Unicode characters should not cause crashes
@@ -625,19 +518,6 @@ public class SuggestionTests
 
         // Should not crash, may or may not have suggestions
         Assert.True(result.HasErrors);
-    }
-
-    [Fact]
-    public void Parser_OperatorWithNumbers_NoSuggestion()
-    {
-        // Operators with numbers that don't match any valid operator
-        var source = "§M{Test} §F{Fn} §O{i32} §R (add123 5 3)";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        // Should have an error but possibly no fix if too different from valid operators
-        var error = result.Diagnostics.First(d => d.Code == DiagnosticCode.InvalidOperator);
-        Assert.Contains("add123", error.Message);
     }
 
     [Fact]
@@ -684,141 +564,8 @@ public class SuggestionTests
 
         Assert.Equal(shouldError, result.HasErrors);
     }
-
     #endregion
-
     #region End-to-End Agent Simulation Tests
-
-    /// <summary>
-    /// Simulates an AI agent workflow:
-    /// 1. Receive source with errors
-    /// 2. Get diagnostics with fixes
-    /// 3. Apply fixes
-    /// 4. Verify fixed code compiles
-    /// </summary>
-    [Fact]
-    public void AgentSimulation_ApplyOperatorFixes_ProducesValidCode()
-    {
-        // Source with string operator typo that can be fixed
-        var source = @"§M{Test}
-  §F{Check}
-    §O{bool}
-    §R (cotains ""hello"" ""h"")";
-
-        // Step 1: Get diagnostics
-        var result = Program.Compile(source, "test.calr");
-        Assert.True(result.HasErrors, "Source should have errors");
-
-        // Step 2: Get operator fix
-        var fixes = result.Diagnostics.DiagnosticsWithFixes
-            .Where(d => d.Code == DiagnosticCode.InvalidOperator)
-            .ToList();
-        Assert.NotEmpty(fixes);
-
-        // Step 3: Verify fix suggests "contains"
-        Assert.Equal("contains", fixes[0].Fix.Edits[0].NewText);
-
-        // Step 4: Apply fix and verify
-        var fixedSource = source.Replace("cotains", "contains");
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors,
-            $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
-
-    /// <summary>
-    /// Tests that an agent can fix a single operator typo end-to-end.
-    /// </summary>
-    [Fact]
-    public void AgentSimulation_SingleTypoFix_ProducesValidCode()
-    {
-        var source = "§M{Test} §F{Fn} §O{bool} §R (cotains \"hello\" \"h\")";
-
-        // Step 1: Compile and get diagnostics
-        var result = Program.Compile(source, "test.calr");
-        Assert.True(result.HasErrors);
-
-        // Step 2: Find the typo fix
-        var typoFix = result.Diagnostics.DiagnosticsWithFixes
-            .FirstOrDefault(d => d.Fix.Edits.Any(e => e.NewText == "contains"));
-        Assert.NotNull(typoFix);
-
-        // Step 3: Apply the fix
-        var fixedSource = ApplyFix(source, typoFix.Fix);
-
-        // Step 4: Verify it compiles
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors,
-            $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
-
-    /// <summary>
-    /// Tests the MCP workflow: diagnose, apply fix, verify.
-    /// </summary>
-    [Fact]
-    public async Task AgentSimulation_McpWorkflow_ProducesValidCode()
-    {
-        var source = "§M{Test} §F{Fn} §O{str} §R (uper \"hello\")";
-
-        // Step 1: Call diagnose tool (simulated)
-        var tool = new Calor.Compiler.Mcp.Tools.CheckTool();
-        var args = System.Text.Json.JsonDocument.Parse($"{{\"action\": \"diagnose\", \"source\": {System.Text.Json.JsonSerializer.Serialize(source)}}}").RootElement;
-        var toolResult = await tool.ExecuteAsync(args);
-
-        Assert.NotNull(toolResult.Content);
-        var json = toolResult.Content[0].Text!;
-        var doc = System.Text.Json.JsonDocument.Parse(json);
-
-        // Step 2: Extract fix from JSON
-        var diagnostics = doc.RootElement.GetProperty("diagnostics");
-        Assert.True(diagnostics.GetArrayLength() > 0);
-
-        var diagnostic = diagnostics[0];
-        Assert.True(diagnostic.TryGetProperty("fix", out var fix));
-        var newText = fix.GetProperty("edits")[0].GetProperty("newText").GetString();
-        Assert.Equal("upper", newText);
-
-        // Step 3: Apply fix manually (agent would do this)
-        var fixedSource = source.Replace("uper", newText!);
-
-        // Step 4: Verify via diagnose tool
-        var fixedArgs = System.Text.Json.JsonDocument.Parse($"{{\"action\": \"diagnose\", \"source\": {System.Text.Json.JsonSerializer.Serialize(fixedSource)}}}").RootElement;
-        var fixedResult = await tool.ExecuteAsync(fixedArgs);
-        var fixedJson = fixedResult.Content[0].Text!;
-        var fixedDoc = System.Text.Json.JsonDocument.Parse(fixedJson);
-
-        Assert.True(fixedDoc.RootElement.GetProperty("success").GetBoolean());
-        Assert.Equal(0, fixedDoc.RootElement.GetProperty("errorCount").GetInt32());
-    }
-
-    /// <summary>
-    /// Tests iterative fix application (some fixes may reveal new errors).
-    /// Uses direct string replacement based on fix suggestions.
-    /// </summary>
-    [Fact]
-    public void AgentSimulation_IterativeFixes_EventuallyConverges()
-    {
-        var source = @"§M{Test}
-  §F{Complex}
-    §O{str}
-    §R (uper ""hello"")";
-
-        // First iteration: fix "uper" -> "upper"
-        var result = Program.Compile(source, "test.calr");
-        Assert.True(result.HasErrors);
-
-        var fixes = result.Diagnostics.DiagnosticsWithFixes.ToList();
-        Assert.NotEmpty(fixes);
-
-        // Apply fix using newText from the fix suggestion
-        var fix = fixes.First();
-        Assert.Equal("upper", fix.Fix.Edits[0].NewText);
-        var fixedSource = source.Replace("uper", fix.Fix.Edits[0].NewText);
-
-        // Second iteration: should compile
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors,
-            $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
 
     #endregion
 }

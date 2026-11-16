@@ -10,27 +10,6 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ExceptionHandlingTests
 {
-    [Theory]
-    [InlineData("§WHEN", false)]
-    [InlineData("when", true)]
-    [InlineData("WhEn", true)]
-    [InlineData("WHEN", false)]
-    public void CatchFilter_RequiresCanonicalMarker(string marker, bool hasError)
-    {
-        var source = $$"""
-            §M{Filters}
-              §F{Run:pub} () -> void
-                §TR
-                  §TH §NEW{Exception} §/NEW
-                §CA{Exception:e} {{marker}} true
-                  §P "caught"
-            """;
-        var diagnostics = new DiagnosticBag();
-        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.Equal(hasError, diagnostics.HasErrors);
-        if (hasError)
-            Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Message.Contains("Use §WHEN"));
-    }
 
     #region Code Generation Tests
 
@@ -348,29 +327,8 @@ module Test Test block
         var catchCount = CountOccurrences(result, "catch");
         Assert.Equal(0, catchCount);
     }
-
     #endregion
-
     #region Negative/Error Case Tests
-
-    [Fact]
-    public void Parse_TrySourceId_ReportsError()
-    {
-        var source = @"
-§M{Test}
-  §F{Bad:pub}
-    §O{void}
-    §TR{t1}
-    §P ""try""
-    §/TR
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken
-            && diagnostic.Message.Contains("Source IDs are removed from '§TR'", StringComparison.Ordinal));
-    }
 
     [Fact]
     public void Parse_TryWithoutSourceId_ParsesSuccessfully()
@@ -676,31 +634,6 @@ module Test Test block
 
         Assert.Contains("using (FileStream stream =", result);
         Assert.Contains("File.OpenRead(path)", result);
-    }
-
-    [Fact]
-    public void Parse_UsingStatementSourceIds_ReportsError()
-    {
-        var source = @"
-§M{m1:Test}
-  §F{f1:ReadFile:pub}
-    §O{void}
-    §USE{u1:reader:StreamReader} §NEW{StreamReader} §A ""test""
-      §P ""inside""
-    §/USE{u2}
-";
-
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath("test.calr");
-
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        var parser = new Parser(tokens, diagnostics);
-        parser.Parse();
-
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnexpectedToken &&
-            d.Message.Contains("Source IDs are removed"));
     }
 
     #endregion

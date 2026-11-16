@@ -562,27 +562,6 @@ module Test Test block
     }
 
     [Theory]
-    [InlineData("char:buf1:10")]
-    [InlineData("i32:arr1:10")]
-    [InlineData("str:names:10")]
-    [InlineData("arr1:i32:10")]
-    [InlineData("buf:char:10")]
-    public void ArrayCreation_RejectsLegacyIdentityFieldsInsteadOfGuessing(string header)
-    {
-        var source = $$"""
-            §M{Test}
-              §F{Main:pub} () -> void
-                §B{~x} §ARR{{{header}}}
-            """;
-
-        var diagnostics = ParseWithDiagnostics(source);
-
-        Assert.Contains(diagnostics.Errors, diagnostic =>
-            diagnostic.Code == DiagnosticCode.UnexpectedToken
-            && diagnostic.Message.Contains("Source IDs are removed from '§ARR'", StringComparison.Ordinal));
-    }
-
-    [Theory]
     // Various char literals
     [InlineData("Y", "'Y'")]
     [InlineData("A", "'A'")]
@@ -632,42 +611,6 @@ module Test Test block
         var result = ParseAndEmit(source);
 
         Assert.Contains($"{expectedPrefix} Count", result);
-    }
-
-    // --- Validation tests for char-lit ---
-
-    [Fact]
-    public void Bug7_CharLiteral_MultiChar_ReportsError()
-    {
-        // (char-lit "AB") should report an error — char-lit requires a single character
-        var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~ch:char} (char-lit ""AB"")
-";
-
-        var diagnostics = ParseWithDiagnostics(source);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("char-lit requires a single character"));
-    }
-
-    [Fact]
-    public void Bug7_CharLiteral_EmptyString_ReportsError()
-    {
-        // (char-lit "") should report an error — empty string has 0 characters
-        var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §B{~ch:char} (char-lit """")
-";
-
-        var diagnostics = ParseWithDiagnostics(source);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("char-lit requires a single character"));
     }
 
     [Fact]

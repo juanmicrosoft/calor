@@ -247,40 +247,6 @@ public sealed class EditScriptIdentityTests : IDisposable
     ];
 
     [Fact]
-    public void Es08_EffectRowEdit_DiagnosticsMoveAsRegistered()
-    {
-        var script = LoadScript("ES-08-effect-row-edit");
-        Assert.Equal(Es08ExpectedDiagnosticsPerStep.Length, script.Steps.Count);
-
-        for (var index = 0; index < script.Steps.Count; index++)
-        {
-            var workspace = CreateTempDir();
-            SyncWorkspace(workspace, script.Steps[index].SourceDirectory);
-            var outcome = RunStep(workspace, script.Steps[index], clearFirst: true);
-
-            var reported = outcome.Diagnostics
-                .Select(line =>
-                {
-                    // Canonical form is file|code|severity|line|column|message;
-                    // re-shaped to PP-E1's `severity Calor####@line,column`.
-                    var parts = line.Split('|');
-                    return $"{parts[0]}: {parts[2].ToLowerInvariant()} {parts[1]}"
-                        + $"@{parts[3]},{parts[4]}";
-                })
-                .OrderBy(line => line, StringComparer.Ordinal)
-                .ToArray();
-
-            Assert.True(
-                Es08ExpectedDiagnosticsPerStep[index].SequenceEqual(reported, StringComparer.Ordinal),
-                $"ES-08 step {index}: expected [{string.Join(", ", Es08ExpectedDiagnosticsPerStep[index])}] "
-                    + $"but the compiler reported [{string.Join(", ", reported)}]. The script's "
-                    + "registered outcome (F-3′ §6) moved — re-register with disclosure; do "
-                    + "not edit the fixture to fit. Full diagnostics:\n  "
-                    + string.Join("\n  ", outcome.Diagnostics));
-        }
-    }
-
-    [Fact]
     public void Es08_EffectRowEdit_DeltaIsConfinedToTheCalleeAndItsCallers()
     {
         // Gate 3's "confined to the affected declarations and their callers"

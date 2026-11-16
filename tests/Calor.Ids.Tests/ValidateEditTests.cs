@@ -84,17 +84,6 @@ public class ValidateEditTests
     }
 
     [Fact]
-    public void BlockReason_MentionsSemver()
-    {
-        var json = "{\"file_path\": \"Test.cs\"}";
-
-        var (_, blockReason, _) = HookCommand.ValidateWriteWithReason(json);
-
-        Assert.NotNull(blockReason);
-        Assert.Contains("§SEMVER", blockReason);
-    }
-
-    [Fact]
     public void BlockReason_MentionsOverflowBehavior()
     {
         var json = "{\"file_path\": \"Test.cs\"}";

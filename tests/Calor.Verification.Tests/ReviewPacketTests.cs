@@ -61,45 +61,6 @@ module Pricing
     private string Id(string name) =>
         new DeclarationIdentityStore(_root).Sync().Declarations.Single(d => d.Name == name).Id;
 
-    [Fact]
-    public void Packet_ValidatesGeneratedCodeAgainstExplicitReferences()
-    {
-        var tree = CSharpSyntaxTree.ParseText(
-            "namespace External.Library; public sealed class Api { }");
-        var compilation = CSharpCompilation.Create(
-            "External.Library",
-            [tree],
-            GeneratedCSharpCompiler.References,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var referencePath = Path.Combine(
-            Path.GetTempPath(),
-            $"calor-review-reference-{Guid.NewGuid():N}.dll");
-
-        try
-        {
-            var emit = compilation.Emit(referencePath);
-            Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
-            const string source = """
-                §M{Review}
-                  §CL{Consumer:pub}
-                    §CSHARP{public External.Library.Api Create() => new External.Library.Api();}§/CSHARP
-                """;
-
-            var result = Build(
-                source,
-                new ReviewPacketBuilder.Options(
-                    ReferencedAssemblyPaths: [referencePath]));
-
-            Assert.False(
-                result.HasCompileErrors,
-                string.Join(Environment.NewLine, result.CompileDiagnostics));
-        }
-        finally
-        {
-            File.Delete(referencePath);
-        }
-    }
-
     [SkippableFact]
     public void Packet_LeadsWithUnprovenRemainder_RefutedFirst()
     {
@@ -191,25 +152,6 @@ module Pricing
         Assert.Contains("runtime-enforced", markdown);
         Assert.DoesNotContain("NOT runtime-enforced", markdown);
         Assert.Contains("#782", markdown);
-    }
-
-    [Fact]
-    public void Packet_ModuleDisclosure_ReportsInteropFraction()
-    {
-        var source = @"
-§M{WithInterop}
-  §F{Pure:pub} (i32:x) -> i32
-    §R x
-
-  §CSHARP{
-    public static int Raw(int x) => x + 1;
-  }§/CSHARP
-";
-        var result = Build(source);
-        var module = Assert.Single(result.Packet.Modules);
-        Assert.Equal(1, module.InteropBlocks);
-        Assert.Equal(2, module.TotalMembers);
-        Assert.Equal(0.5, module.InteropFraction, 3);
     }
 
     [Fact]

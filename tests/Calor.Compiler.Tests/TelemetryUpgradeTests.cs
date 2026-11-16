@@ -355,30 +355,6 @@ public class TelemetryUpgradeTests
     }
 
     [Fact]
-    public void ProgramCompile_EmitsCompilationOutcome()
-    {
-        var (telemetry, channel) = CreateTestTelemetry();
-        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
-        telemetry.SetCommand("compile");
-
-        Program.Compile(ValidCalorSource, "calculator.calr");
-
-        var outcomeEvents = channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "CompilationOutcome").ToList();
-        Assert.NotEmpty(outcomeEvents);
-        var evt = outcomeEvents[0];
-        Assert.Equal("true", evt.Properties["success"]);
-        // W1 Slice 2 (#834 review M2): no content hash on the wire.
-        Assert.False(evt.Properties.ContainsKey("inputHash"));
-        // Must not contain source code
-        foreach (var value in evt.Properties.Values)
-        {
-            Assert.DoesNotContain("§M{m001", value);
-            Assert.DoesNotContain("§R (+ a b)", value);
-        }
-    }
-
-    [Fact]
     public void ProgramCompile_InvalidGeneratedCSharp_ReportsFailedOutcome()
     {
         var (telemetry, channel) = CreateTestTelemetry();

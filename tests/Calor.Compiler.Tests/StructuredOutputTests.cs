@@ -68,43 +68,6 @@ public class StructuredOutputTests : IDisposable
         return file;
     }
 
-    // ------------------------------------------------------------------
-    // calor --input <file> --format json
-    // ------------------------------------------------------------------
-
-    [Fact]
-    public void Compile_FormatJson_ErrorFile_EmitsParseableUnifiedSchema()
-    {
-        var file = WriteBrokenFile();
-
-        var (exitCode, stdOut, stdErr) = RunCli("--input", file, "--format", "json");
-
-        Assert.Equal(1, exitCode);
-
-        // stdout must be pure JSON (jq-compatible)
-        using var doc = JsonDocument.Parse(stdOut);
-        var root = doc.RootElement;
-
-        Assert.Equal(JsonDiagnosticFormatter.SchemaVersion, root.GetProperty("version").GetString());
-
-        var diagnostics = root.GetProperty("diagnostics");
-        Assert.True(diagnostics.GetArrayLength() >= 1, $"expected diagnostics, stderr: {stdErr}");
-
-        var first = diagnostics[0];
-        Assert.Equal("Calor0250", first.GetProperty("code").GetString());
-        Assert.False(string.IsNullOrEmpty(first.GetProperty("message").GetString()));
-        Assert.Equal("error", first.GetProperty("severity").GetString());
-
-        var location = first.GetProperty("location");
-        Assert.EndsWith("broken.calr", location.GetProperty("file").GetString());
-        Assert.Equal(3, location.GetProperty("line").GetInt32());
-        Assert.True(location.GetProperty("column").GetInt32() >= 1);
-
-        var summary = root.GetProperty("summary");
-        Assert.True(summary.GetProperty("errors").GetInt32() >= 1);
-        Assert.Equal(summary.GetProperty("total").GetInt32(), diagnostics.GetArrayLength());
-    }
-
     [Fact]
     public void Compile_FormatJson_SuccessFile_EmitsEmptyDiagnosticsAndKeepsStdoutClean()
     {

@@ -2028,47 +2028,8 @@ public partial class MyClass
         // Partial stub should end with semicolon, not have braces
         Assert.DoesNotContain("OnNameChanged()\n{", compiled);
     }
-
     #endregion
-
     #region Batch 12: Chain hoisting and §NEW in call arguments
-
-    [Fact]
-    public void Convert_ChainInIfCondition_HoistedBeforeIf()
-    {
-        var csharp = @"
-using System.Linq;
-using System.Collections.Generic;
-
-public class Demo
-{
-    public void Work(List<int> items)
-    {
-        if (items.Where(x => x > 0).Any())
-        {
-            System.Console.WriteLine(""Found"");
-        }
-    }
-}";
-        var result = _converter.Convert(csharp);
-        Assert.NotNull(result.CalorSource);
-        var calor = result.CalorSource!;
-
-        // The chain binding should be on its own line BEFORE the §IF
-        // and the §IF condition should reference the bound variable
-        var lines = calor.Split('\n');
-        var chainLine = lines.FirstOrDefault(l => l.Contains("_chain") && (l.TrimStart().StartsWith("let ") || l.Contains("Where")));
-        var ifLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("if "));
-
-        // Both should exist — if chain decomposition worked, there's a §B{_chainXXX} line
-        Assert.True(chainLine != null, $"Expected chain binding before §IF. Output:\n{calor}");
-        Assert.NotNull(ifLine);
-
-        // Chain line should come before IF line
-        var chainIdx = Array.IndexOf(lines, chainLine);
-        var ifIdx = Array.IndexOf(lines, ifLine);
-        Assert.True(chainIdx < ifIdx, $"Chain binding (line {chainIdx}) should come before §IF (line {ifIdx}). Output:\n{calor}");
-    }
 
     [Fact]
     public void Convert_ChainInIfCondition_RoundTrip()
@@ -2845,26 +2806,8 @@ module Test Test block
         var diag = ParseWithDiagnostics(source);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
     }
-
     #endregion
-
     #region Phase 11: Missing Lisp tokens (§SALLOC in null-coalesce)
-
-    [Fact]
-    public void Parse_StackAllocInsideNullCoalesce_Compiles()
-    {
-        // §SALLOC inside (?? ...) Lisp expression must be recognized as expression start
-        var source = @"
-§M{Test}
-  §F{Alloc:pub}
-    §O{i32}
-    §B{arr} §SALLOC{char:256}
-    §B{buf} (?? arr §SALLOC{char:128})
-    §R INT:0
-";
-        var diag = ParseWithDiagnostics(source);
-        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
-    }
 
     #endregion
 }

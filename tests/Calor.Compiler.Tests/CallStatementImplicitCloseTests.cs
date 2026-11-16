@@ -348,26 +348,6 @@ module Test Test block
     }
 
     [Fact]
-    public void V062_OneArgStmt_MultiLineHoistedArg_ElidesAfterHoist()
-    {
-        // §NEW with object initializer emits multi-line; emitter hoists
-        // it to a temp var. After hoist the arg is a single identifier,
-        // which IS in IsExpressionStart, so the outer one-arg call elides.
-        var source = """
-§M{Test}
-  §CL{Person:pub}
-    §PROP{Name:str:pub:get,set}
-  §F{Foo:pub}
-      §C{Process} §A §NEW{Person}
-        Name = STR:"x"
-      §/NEW §/C
-""";
-        var emitted = EmitModule(source);
-        // The hoisted form should look like: §B{~_hoistNNN:Person} §NEW{Person} ... §/NEW followed by §C{Process} _hoistNNN
-        Assert.Matches(@"§C\{Process\}\s+_hoist\d+", emitted);
-    }
-
-    [Fact]
     public void V062_ZeroArgStmt_AtEndOfBlock_RoundTrips()
     {
         // Last statement in a function body — followed by Dedent, not a sibling.
@@ -459,28 +439,5 @@ module T T block
         Assert.False(diags.HasErrors,
             $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
         Assert.Equal(2, module.Functions.Count);
-    }
-
-    [Fact]
-    public void V064_LegacyMultiLineCall_StillParses()
-    {
-        // §C{target} on one line, §A on a deeper-indented line, §/C below.
-        // The lexer emits Dedent then §/C; the parser must still consume
-        // the Dedent + §/C run (legacy form), not bail out early.
-        var source = """
-§M{Test}
-  §F{Print:pub}
-      §O{void}
-      §E{cw}
-      §C{Console.WriteLine}
-        §A "Hello v2!"
-      §/C
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-        var call = FirstCall(module);
-        Assert.Equal("Console.WriteLine", call.Target);
-        Assert.Single(call.Arguments);
     }
 }

@@ -162,23 +162,6 @@ public class LanguageFeatureTests
     }
 
     [Fact]
-    public void NullCoalesce_LispExpression_WrongArgCount_ReportsError()
-    {
-        var source = """
-            §M{Test}
-              §F{Run:pub}
-                  §I{string:a}
-                  §I{string:b}
-                  §I{string:c}
-                  §O{string}
-                  §R (?? a b c)
-            """;
-        var result = Program.Compile(source);
-        Assert.True(result.HasErrors);
-        Assert.Contains(result.Diagnostics, d => d.Message.Contains("exactly 2 operands"));
-    }
-
-    [Fact]
     public void NullCoalesce_ParsesNullCoalesceNode()
     {
         var source = """

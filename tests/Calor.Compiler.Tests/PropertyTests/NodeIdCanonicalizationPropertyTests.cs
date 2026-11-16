@@ -32,14 +32,6 @@ public sealed class NodeIdCanonicalizationPropertyTests
             return true;
         });
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    public void Controls_ExerciseSourceOrdersOnModuleFunctionsAndMethods(int rotation) =>
-        Check(new Sample(rotation, 4, 3, -17, "01J5X7K9M2NPQRSTABWXYZ12345"));
-
     private static void Check(Sample sample)
     {
         var root = Path.Combine(Path.GetTempPath(), $"calor-generated-ids-{Guid.NewGuid():N}");

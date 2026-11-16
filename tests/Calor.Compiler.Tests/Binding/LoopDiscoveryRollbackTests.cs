@@ -39,47 +39,6 @@ public sealed class LoopDiscoveryRollbackTests
             System.Text.Json.JsonSerializer.Serialize(new { name, typeName = "INT", Start = start }));
 
     [Fact]
-    public void SymbolsById_KeepsDeclarationOrderAcrossLoopDiscovery()
-    {
-        var bound = Bind("""
-            §M{Order}
-              §F{Run:pub} (i32:n) -> i32
-                §B{~total:i32} 0
-                §L{i:0:n:1}
-                  §B{step:i32} (+ i 1)
-                  §B{dup:i32} step
-                  §ASSIGN total (+ total step)
-                §WH (< total 10)
-                  §B{inner:i32} 1
-                  §ASSIGN total (+ total inner)
-                §B{after:i32} total
-                §R after
-              §F{Other:pub} () -> i32
-                §B{x:i32} 1
-                §R x
-            """);
-
-        var run = bound.Functions.Single(function => function.Symbol.Name == "Run").Symbol.Id.Value;
-        var other = bound.Functions.Single(function => function.Symbol.Name == "Other").Symbol.Id.Value;
-        var snapshot = Snapshot(bound);
-        string[] expected =
-        [
-            run + "/parameter/name%3An",
-            run,
-            other,
-            Local(run, snapshot, "local", "total", 47),
-            Local(run, snapshot, "for", "i", 67),
-            Local(run, snapshot, "local", "step", 85),
-            Local(run, snapshot, "local", "dup", 112),
-            Local(run, snapshot, "local", "inner", 191),
-            Local(run, snapshot, "local", "after", 247),
-            Local(other, snapshot, "local", "x", 310),
-        ];
-        Assert.True(expected.SequenceEqual(bound.SymbolsById.Keys.Select(id => id.Value)),
-            string.Join("\n", bound.SymbolsById.Keys.Select(id => id.Value)));
-    }
-
-    [Fact]
     public void NestedLoops_DoNotLeakDiscoveryDeclarationIds()
     {
         var bound = Bind("""

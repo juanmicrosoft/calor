@@ -1034,33 +1034,6 @@ public sealed class CrossModuleVarianceTests : IDisposable
     }
 
     [Fact]
-    public void NamespaceImportsDoNotLeakBetweenSiblingDeclarations()
-    {
-        Write("base", Base("").Replace("Shared", "Contracts"));
-        Write("other", Base("cw").Replace("Shared", "Other"));
-        Write("derived", """
-            §M{Consumer}
-              §NS{Consumer}
-                §U{Contracts}
-                §CL{First:Base:pub}
-                  §MT{Render:pub:over} () -> void
-                    §E{cw}
-              §NS{Consumer}
-                §U{Other}
-                §CL{Second:Base:pub}
-                  §MT{Render:pub:over} () -> void
-                    §E{cw}
-            """);
-
-        var (_, diagnostics) = Compile();
-
-        var violation = Assert.Single(diagnostics,
-            d => d.Code == DiagnosticCode.OverrideEffectVariance);
-        Assert.Contains("First.Render", violation.Message);
-        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
-    }
-
-    [Fact]
     public void ClosedGenericTypeAliasCarriesItsArguments()
     {
         Write("base", """

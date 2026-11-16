@@ -250,20 +250,6 @@ public sealed class IdsCommandTests : IDisposable
     }
 
     [Fact]
-    public void Check_ParseFailure_RetainsParserEnvelopeAndDoesNotCreateSidecar()
-    {
-        var file = WriteSource();
-        File.WriteAllText(file, "§M{Test}\n§/M\n");
-        var (exit, stdout, _) = CliTestHarness.RunCli(_directory, "ids", "check", file, "--format", "json");
-        Assert.Equal(1, exit);
-        using var output = JsonDocument.Parse(stdout);
-        EnvelopeSchemaValidator.ValidateEnvelopeDocument(output.RootElement);
-        Assert.Contains(output.RootElement.GetProperty("diagnostics").EnumerateArray(),
-            d => d.GetProperty("code").GetString() == DiagnosticCode.LegacyCloserForm);
-        Assert.False(File.Exists(new DeclarationIdentityStore(_directory).SidecarPath));
-    }
-
-    [Fact]
     public void Check_AmbiguousRename_ReportsIdentityFailureAndLeavesSnapshotsUntouched()
     {
         var file = WriteSource();

@@ -68,36 +68,6 @@ public class DictionaryInitializerSemanticsTests
     }
 
     [Theory]
-    [InlineData("new Dictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<int, int>:d}")]
-    [InlineData("new SortedDictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<int, int>:d}")]
-    [InlineData("new D { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<int, int>:d}")]
-    [InlineData("new SD { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<int, int>:d}")]
-    [InlineData("new CD { [1] = 2 }", "§B{System.Collections.Concurrent.ConcurrentDictionary<int, int>:d}")]
-    [InlineData("new Dictionary<int, int?> { [1] = 2 }", "§B{d}")]
-    [InlineData("new Dictionary<dynamic, int> { [1] = 2 }", "§B{d}")]
-    [InlineData("new Dictionary<(int, int), int> { [(1, 2)] = 3 }", "§B{d}")]
-    [InlineData("(object)new Dictionary<int, int> { [1] = 2 }", "§B{d}")]
-    public void PreservedDictionaryLocalType_IsBoundedAndSpellable(string initializer, string binding)
-    {
-        var conversion = new CSharpToCalorConverter().Convert($$"""
-            using System.Collections.Generic;
-            using D = System.Collections.Generic.Dictionary<int, int>;
-            using SD = System.Collections.Generic.SortedDictionary<int, int>;
-            using CD = System.Collections.Concurrent.ConcurrentDictionary<int, int>;
-            public class Migrated
-            {
-                public object Probe()
-                {
-                    var d = {{initializer}};
-                    return d;
-                }
-            }
-            """);
-        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
-        Assert.Contains(binding, conversion.CalorSource);
-    }
-
-    [Theory]
     [InlineData("var d = new Dictionary<int, int>(Capacity()) { [Key()] = Value(), [Key()] = Value() }; return Trace + \":\" + d[1];", "CKVKV:2")]
     [InlineData("var d = new Dictionary<int, int>(Capacity()) { {Key(), Value()}, {Key(), Value()}, {Key(), Value()} }; return Trace;", "throws:ArgumentException:CKVKV")]
     [InlineData("var d = new Dictionary<int, int> { {Key(), Value()}, {2, Value()} }; return Trace;", "KVV")]

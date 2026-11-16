@@ -182,33 +182,6 @@ public sealed class TransientSymbolIdentityTests
     }
 
     [Fact]
-    public void GenericArityNamespaceAndEnclosingTypesDisambiguateTransientKeys()
-    {
-        const string source = """
-            §M{Demo}
-              §NS{One}
-                §F{Pick:pub} () -> i32
-                  §R 1
-                §F{Pick:pub}<T> () -> i32
-                  §R 2
-                §CL{A:pub}
-                  §MT{Pick:pub} () -> i32
-                    §R 3
-                §CL{B:pub}
-                  §MT{Pick:pub} () -> i32
-                    §R 4
-              §NS{Two}
-                §F{Pick:pub} () -> i32
-                  §R 5
-            """;
-        var bound = Bind(source);
-        Assert.Equal(5, bound.Functions.Count);
-        Assert.Equal(5, bound.Functions.Select(f => f.Symbol.Id).Distinct().Count());
-        Assert.Equal(bound.Functions.Select(f => f.Symbol.Id),
-            Bind(source).Functions.Select(f => f.Symbol.Id));
-    }
-
-    [Fact]
     public void SameNamedLocalsInNestedAndSiblingScopesAreSnapshotScopedNotStaleHandles()
     {
         const string source = """

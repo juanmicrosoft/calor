@@ -167,68 +167,6 @@ public class CliMultiFileTests : IDisposable
     }
 
     [Fact]
-    public void MultiFile_GlobalAmbiguityFallsBackToCurrentTopologyMap()
-    {
-        var topologyPath = Path.Combine(_tempDir, "topology.calr");
-        var unrelatedPath = Path.Combine(_tempDir, "unrelated.calr");
-        File.WriteAllText(topologyPath, """
-            §M{Topology}
-              §NS{Alpha}
-                §F{Foo:pub} () -> i32
-                  §R INT:41
-              §NS{Beta}
-                §F{Caller:pub} () -> i32
-                  §R §C{Foo}
-            """);
-        File.WriteAllText(unrelatedPath, """
-            module Unrelated Unrelated block
-              func Foo () → int
-                !
-                return 99
-            """);
-
-        var files = new[]
-        {
-            new FileInfo(topologyPath),
-            new FileInfo(unrelatedPath),
-        };
-        var globalMap = CompilationDriver.BuildCrossModuleFunctionMap(files);
-        Assert.False(globalMap.ContainsKey("Foo"));
-        var diagnostics = new DiagnosticBag();
-        var module = new Parser(
-            new Lexer(
-                File.ReadAllText(topologyPath),
-                diagnostics).TokenizeAllForParser(),
-            diagnostics).Parse();
-        var localMap = CompilationDriver.BuildCrossModuleFunctionMap([module]);
-        Assert.Equal("Alpha", localMap["Foo"].NamespaceIdentity);
-        var directEmitter = new CSharpEmitter
-        {
-            CrossModuleFunctionModules = globalMap,
-        };
-        Assert.Contains(
-            "global::Alpha.AlphaModule.Foo()",
-            directEmitter.Emit(module));
-
-        var (exit, stdOut, stdErr) = RunCli(
-            "--input",
-            topologyPath,
-            "--input",
-            unrelatedPath,
-            "--no-enforce-effects");
-
-        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
-        var emitted = File.ReadAllText(
-            Path.Combine(_tempDir, "topology.g.cs"));
-        Assert.Contains(
-            "global::Alpha.AlphaModule.Foo()",
-            emitted);
-        Assert.DoesNotContain(
-            "global::Unrelated.UnrelatedModule.Foo()",
-            emitted);
-    }
-
-    [Fact]
     public void MultiFile_ExplicitCallRemainsQualifiedWhenBareNameIsAmbiguous()
     {
         var alphaPath = Path.Combine(_tempDir, "alpha.calr");

@@ -165,53 +165,6 @@ public class EffectRowLatticeTests
         Assert.True(RowOf(binding).IsUnknown);
     }
 
-    // (b) RowOnNonFunctionTypedPosition_IsCalor0405 — one case per position,
-    //     each against its executed baseline. Discriminating revert: drop the
-    //     function-typedness check in CheckRowPosition and all three go green
-    //     (Z9/Z9b compile to Calor0410, Z9c to exit 0).
-
-    [Theory]
-    // Z9 — `-> void §E{cw}`, the arrow spelling of position 6. Compiles on main.
-    [InlineData("""
-        §M{Z9}
-          §F{Log:pub} (i32:x) -> void §E{cw}
-            §P x
-        """)]
-    // Z9b — `§I{i32:x} §E{cw}`, position 4 on a non-function type. Compiles on main.
-    [InlineData("""
-        §M{Z9}
-          §F{Log:pub}
-            §I{i32:x} §E{cw}
-            §O{void}
-            §P x
-        """)]
-    // Z9c — `§O{i32} §E{cw}`, the §O spelling of position 6. Compiles on main.
-    [InlineData("""
-        §M{Z9}
-          §F{Get:pub}
-            §O{i32} §E{cw}
-            §R INT:1
-        """)]
-    // R2-A (PR #1102 review round 2) -- an EMPTY-typed field with a row must report
-    // Calor0405, not throw from TypeIdentity.Canonicalize on the empty type string.
-    [InlineData("""
-        §M{R2A}
-          §CL{Box:pub}
-            §FLD{:c:priv} §E{cw}
-        """)]
-    public void RowOnNonFunctionTypedPosition_IsCalor0405(string source)
-    {
-        var compiled = TestHarness.Compile(NativeMisplacedRowSource(source));
-
-        var misplaced = compiled.Diagnostics
-            .Where(d => d.Code == DiagnosticCode.EffectRowMisplaced)
-            .ToList();
-
-        // Reported ONCE per offending row, not once per binder visit.
-        Assert.Single(misplaced);
-        Assert.Contains("is not a function type", misplaced[0].Message);
-    }
-
     [Fact]
     public void RowOnABindingOfNonFunctionType_IsCalor0405()
     {
@@ -315,23 +268,6 @@ public class EffectRowLatticeTests
 
         Assert.DoesNotContain(compiled.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowMisplaced);
-    }
-
-    [Fact]
-    public void CSharpDeclaredDelegateParameter_GetsAFunctionBoundTypeCarryingItsRow()
-    {
-        // The other half of F2's pin: recognising the name is only useful if the
-        // position then gets a FunctionBoundType, so the row is available to the
-        // §6.2 sites rather than merely un-rejected.
-        var parameter = BindSingleParameter("""
-            §M{M}
-              §F{Apply:pub} (Handler:h §E{cw}) -> void
-                §E{cw}
-              §CSHARP{public delegate void Handler(int x);}§/CSHARP
-            """);
-
-        Assert.NotNull(parameter.FunctionType);
-        Assert.Equal(Concrete(Cw), parameter.FunctionType!.Row);
     }
 
     [Fact]
@@ -910,50 +846,6 @@ public class EffectRowLatticeTests
               || d.Code == DiagnosticCode.EffectRowMismatch);
     }
 
-    // ============================================ P10(b), now a DIAGNOSTIC ===
-
-    [Fact]
-    public void AssumedSource_ReportsExactlyOneCalor0425_AtTheHop()
-    {
-        // §4.3's third sentence, as an EMISSION: "Assumed fits like its
-        // underlying set and ALWAYS propagates 0425". `Interop`'s effects are
-        // assumed (a §RAW body the pass cannot verify), so the method group
-        // naming it carries Assumed({cw}, reasons). Its row FITS `transform`'s
-        // declared §E{cw} — so this is not a mismatch — and it reports anyway,
-        // once, carrying the reason.
-        //
-        // Discriminating revert: read the reasons off AtDestination instead of
-        // CarriedReasons, or drop the Fits-with-reasons arm, and this goes
-        // silent while the program keeps compiling on an unverified assumption.
-        var result = TestHarness.Compile("""
-            §M{M}
-              §F{Interop:pub} (i32:x) -> i32
-                §E{cw}
-                §RAW
-            System.Console.WriteLine(x);
-            §/RAW
-                §R x
-              §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-                §E{}
-                §R value
-              §F{Main:pub} () -> i32
-                §E{cw}
-                §R §C{Apply} §A Interop §A INT:1 §/C
-            """);
-
-        var hops = result.Diagnostics
-            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown)
-            .ToList();
-        var hop = Assert.Single(hops);
-        Assert.Contains("Argument 'Interop' fits parameter 'transform' of 'Apply' only under an "
-            + "assumption", hop.Message, StringComparison.Ordinal);
-        Assert.Contains("raw C# interop", hop.Message, StringComparison.Ordinal);
-
-        // Fits-with-reasons is not a mismatch.
-        Assert.DoesNotContain(result.Diagnostics,
-            d => d.Code == DiagnosticCode.EffectRowMismatch);
-    }
-
     [Fact]
     public void EveryUndecidableHopReportsExactlyOnce()
     {
@@ -987,60 +879,6 @@ public class EffectRowLatticeTests
 
         Assert.Equal(2, result.Diagnostics.Count(d => d.Code == DiagnosticCode.EffectRowUnknown));
     }
-
-    // §4.4's TWO-HOP story — bind an Assumed value, then pass it on — has NO
-    // source-level witness in slice a, and that is recorded here rather than
-    // implied by the pins above. The only producer of an Assumed row is a method
-    // group, and the binder rejects a bare method group as a §B initializer
-    // (Calor0200, "Undefined variable 'Interop'"), so site 1 can never see one.
-    // The relation itself is pinned at row level by
-    // AssumedSurvivesTheDestination_TwoHop (P10(a)); the source spelling that
-    // reaches it is a lambda whose ρ_body is Assumed, which is slice b's.
-
-    // ------------------------------------------------------------ helpers ---
-
-    private static string NativeMisplacedRowSource(string original) => original switch
-    {
-        """
-        §M{Z9}
-          §F{Log:pub} (i32:x) -> void §E{cw}
-            §P x
-        """ => NativeSource(original, """
-            module Z9 Z9
-              func Log public (int:x) → void ! cw
-                !
-                System.Console.WriteLine(x)
-            """),
-        """
-        §M{Z9}
-          §F{Log:pub}
-            §I{i32:x} §E{cw}
-            §O{void}
-            §P x
-        """ => NativeSource(original, """
-            module Z9 Z9
-              func Log public (int:x ! cw) → void
-                !
-                System.Console.WriteLine(x)
-            """),
-        """
-        §M{Z9}
-          §F{Get:pub}
-            §O{i32} §E{cw}
-            §R INT:1
-        """ => NativeSource(original, """
-            module Z9 Z9
-              func Get public () → int ! cw
-                !
-                return 1
-            """),
-        """
-        §M{R2A}
-          §CL{Box:pub}
-            §FLD{:c:priv} §E{cw}
-        """ => original,
-        _ => throw new ArgumentOutOfRangeException(nameof(original))
-    };
 
     private static string NativeSource(string original, string native)
     {
@@ -1091,43 +929,6 @@ public class EffectRowLatticeTests
         var ast = new Calor.Compiler.Parsing.Parser(tokens, diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.ToString())));
         return new Calor.Compiler.Binding.Binder(diagnostics, "test.calr").Bind(ast);
-    }
-
-    // ------------------------------------- §8.2, E3 slice b: the bound reader ---
-
-    [Fact]
-    public void CSharpDeclaredDelegateParameter_IsASite_ThroughTheBoundFunctionType()
-    {
-        // Design-doc §8.2. Slice a built a FunctionBoundType for this position
-        // and left `RowSiteChecker.IsFunctionTyped` on the STRING test, so the
-        // type existed and nothing read it — stated at the time as "exercised by
-        // tests rather than by a production reader". This is the change that
-        // makes it load-bearing: `Handler` is declared inside a §CSHARP block, so
-        // TypeIdentity.IsFunctionTypeName does not recognise it and the string
-        // test says "not function-typed", while the BINDER knows better.
-        //
-        // The A2 shape exactly: a delegate-typed parameter passed onward to a
-        // parameter whose row is narrower.
-        //
-        // Discriminating revert: drop the `_pass.BoundFunctionType(...)` arm from
-        // IsParameterFunctionTyped and the Calor0424 disappears — measured, not
-        // assumed: the same source on 9119397e produces zero Calor0424.
-        var result = TestHarness.Compile("""
-            §M{A2Shape}
-              §F{Apply:pub} (Handler:h §E{}) -> void
-                §E{}
-                §R
-              §F{Wrap:pub} (Handler:g §E{cw}) -> void
-                §E{}
-                §C{Apply} §A g §/C
-              §CSHARP{public delegate void Handler(int x);}§/CSHARP
-            """);
-
-        Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.EffectRowMismatch
-              && d.Message.Contains("Argument 'g'")
-              && d.Message.Contains("parameter 'h' of 'Apply'")
-              && d.Message.Contains("Extra effect(s): cw"));
     }
 
     [Fact]

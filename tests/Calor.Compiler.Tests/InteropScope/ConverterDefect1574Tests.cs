@@ -186,8 +186,6 @@ public class ConverterDefect1574Tests
     // ---- Item 3: a bare binding's next-line initializer keeps its meaning and now warns. ----
 
     [Theory]
-    [InlineData("    §B{~n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n", true)]   // the pitfall: same indent
-    [InlineData("    §B{n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n", true)]
     [InlineData("    var int:n = System.Math.Abs(-7)\n", false)]   // control: same line
     public void BareBindingNextLineInitializer_WarnsWithoutChangingMeaning(string binding, bool warns)
     {

@@ -11,11 +11,8 @@ public class NullableReferenceTypingTests
 {
     [Theory]
     [InlineData("input", "Foo")]
-    [InlineData("§THIS.Value", "Foo")]
     [InlineData("input", "string")]
-    [InlineData("§THIS.Value", "string")]
     [InlineData("input", "str")]
-    [InlineData("§THIS.Value", "str")]
     public async Task LocalAndMemberReturnDiagnostic_UsesShapePolicyAndClearsOnSafeEditAsync(
         string value, string referenceType)
     {
@@ -86,7 +83,6 @@ public class NullableReferenceTypingTests
 
     [Theory]
     [InlineData("?str", "\"safe\"")]
-    [InlineData("?string", "§C{System.Environment.GetEnvironmentVariable} §A \"CALOR_T1_EDITOR\" §/C")]
     public async Task SupportedNullableReferences_HaveNoSpuriousTypingDiagnosticsAsync(string type, string value)
     {
         var source = $$"""

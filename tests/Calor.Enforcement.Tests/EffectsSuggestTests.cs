@@ -633,47 +633,6 @@ module Test Test block
     }
 
     /// <summary>
-    /// Review round 1, finding 3: a direct pin for the
-    /// <c>catch (ArgumentException)</c> path. The C# → Calor converter emits a
-    /// bare <c>?</c> as a lambda parameter's type when it cannot infer one
-    /// (<c>TryInferLambdaParameterType</c>,
-    /// <c>Migration/RoslynSyntaxVisitor.cs:11774-11794</c>, called at <c>:11877</c>
-    /// and <c>:11885</c>, returns Roslyn's error-type spelling). <c>?</c> is not a
-    /// type <c>TypeIdentity.Canonicalize</c> can parse, so building the receiver
-    /// throws — and this slice must turn that into an unresolved receiver, not
-    /// into an internal-error diagnostic that abandons the rest of the member.
-    /// </summary>
-    [Fact]
-    public void E1_Slice2a_UninferredLambdaParameterReceiver_IsUnresolvedNotAnIce()
-    {
-        var source = @"
-§M{Test}
-  §F{DoWork:pub}
-      §O{void}
-      §B{f} §LAM{ctx:?}
-          §C{ctx.Trim} §/C
-      §/LAM
-";
-        var module = Parse(source);
-        var (bound, diagnostics) = Bind(module);
-
-        var unresolved = Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, "ctx.Trim")!.Type);
-        // The catch-path reason, not the inferred-local one — this fixture must
-        // exercise the canonicalization failure specifically.
-        Assert.Equal(
-            "receiver 'ctx' carries a type string the binder cannot resolve to a type",
-            unresolved.Reason);
-
-        var single = Assert.Single(
-            diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
-        Assert.Contains("'ctx'", single.Message, StringComparison.Ordinal);
-
-        // The throw never surfaces as an internal error, which is what would
-        // abandon the rest of the member.
-        Assert.Empty(diagnostics.Where(d => d.Code == DiagnosticCode.AnalysisICE));
-    }
-
-    /// <summary>
     /// Review round 1, finding 9: <c>Receiver</c> and <c>ReceiverSymbol</c> are two
     /// channels describing the same receiver, and they must not drift apart in a
     /// later slice. When the receiver is a bound variable the two agree on the

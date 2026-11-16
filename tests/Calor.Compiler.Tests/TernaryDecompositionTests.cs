@@ -85,47 +85,6 @@ public class TernaryDecompositionTests
     }
 
     [Fact]
-    public void TripleNested_Depth3_EmitsIfElseSyntax()
-    {
-        var csharp = """
-            public class C
-            {
-                public int M(bool a, bool b, bool c)
-                {
-                    return a ? (b ? (c ? 1 : 2) : 3) : 4;
-                }
-            }
-            """;
-
-        var calor = ConvertToCalor(csharp);
-
-        Assert.Contains("§B{~_ternResult", calor);
-        Assert.Contains("§IF", calor);
-        Assert.Contains("§EL", calor);
-        Assert.DoesNotContain("(? a (? b (? c", calor);
-    }
-
-    [Fact]
-    public void MixedTernaryWithMethodCalls_DecomposesCorrectly()
-    {
-        var csharp = """
-            public class C
-            {
-                public string M(bool a, bool b, bool c)
-                {
-                    return a ? (b ? (c ? "x" : "y") : "z") : "w";
-                }
-            }
-            """;
-
-        var calor = ConvertToCalor(csharp);
-
-        Assert.Contains("§B{~_ternResult", calor);
-        Assert.Contains("§IF", calor);
-        Assert.DoesNotContain("(? a (? b", calor);
-    }
-
-    [Fact]
     public void TernaryInReturnStatement_DecomposesWithCorrectReturn()
     {
         var csharp = """

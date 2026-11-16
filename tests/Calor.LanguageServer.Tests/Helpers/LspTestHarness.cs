@@ -48,17 +48,6 @@ public static class LspTestHarness
     }
 
     /// <summary>
-    /// Wraps source code in a module for testing.
-    /// </summary>
-    public static string WrapInModule(string moduleContent)
-    {
-        return $$"""
-            §M{TestModule}
-              {{moduleContent}}
-            """;
-    }
-
-    /// <summary>
     /// Compiles source and returns the AST (null if errors).
     /// </summary>
     public static ModuleNode? GetAst(string source)

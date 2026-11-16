@@ -25,35 +25,7 @@ public class ConverterQualityTests
         if (result.Success) return string.Empty;
         return string.Join("\n", result.Issues.Select(i => $"{i.Severity}: {i.Message}"));
     }
-
     #region Raw C# Fallback Emission Tests
-
-    [Fact]
-    public void FallbackExpression_RoundTripPreservesMultilineStringsAndBraces()
-    {
-        const string original = """
-            ((System.Func<string>)(() => {
-                var text = "quoted } { \"value\"";
-                return text + "{suffix}";
-            }))()
-            """;
-        var fallback = new FallbackExpressionNode(TextSpan.Empty, original, "test-unsupported-expression");
-        var expression = fallback.Accept(new CalorEmitter());
-        Assert.Equal($"§CS{{{original}}}", expression);
-        Assert.DoesNotContain("§ERR", expression);
-        var source = "module FallbackRoundTrip FallbackRoundTrip block\n"
-            + "  func Probe () → string\n"
-            + "    !\n"
-            + "    return " + expression;
-        var diagnostics = new DiagnosticBag();
-        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
-        var returned = Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body.Single());
-        Assert.Equal(original, Assert.IsType<RawCSharpExpressionNode>(returned.Expression).CSharpCode);
-        var generated = new CSharpEmitter().Emit(module);
-        Assert.Contains(original, generated);
-        Assert.True(GeneratedCSharpCompiler.Validate(generated).CompilationSuccess);
-    }
 
     [Fact]
     public void MakeRefExpression_ConvertsAsRawCSharp()

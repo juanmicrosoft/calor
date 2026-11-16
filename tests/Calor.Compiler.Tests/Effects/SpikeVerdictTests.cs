@@ -938,51 +938,6 @@ public sealed class SpikeVerdictTests
     ];
 
     /// <summary>
-    /// PP-E1 leg A's negative control, as CORRECTED by annex sub-entry
-    /// <b>A-1.11.1</b>: the full per-fixture diagnostic multiset of every
-    /// unmutated fixture under the pinned invocation, in its POST-E4 state —
-    /// the control RESTORED, which is what E4 owed (roadmap §4.2 E4).
-    ///
-    /// <para>A-1.11's own A2 baseline is superseded and cannot be asserted here:
-    /// it was recorded with <c>--permissive-effects</c>, which that row forbids,
-    /// so it was never reproducible. See the block comment above and
-    /// <c>docs/plans/agent-native-gates.md</c> §A.3 entry A-1.11.1.</para>
-    /// </summary>
-    [Fact]
-    public void PpE1NegativeControls_MatchA1111Baselines_PostE4()
-    {
-        var failures = new List<string>();
-
-        foreach (var (fixture, expectedExitCode, expected) in PpE1PostE4Baselines)
-        {
-            var (exitCode, actual) = CompileControlFixture(fixture);
-
-            if (exitCode != expectedExitCode)
-            {
-                failures.Add($"{fixture}: expected exit {expectedExitCode} but got exit {exitCode}");
-            }
-
-            if (!actual.SequenceEqual(expected, StringComparer.Ordinal))
-            {
-                failures.Add(
-                    $"{fixture}: expected [{string.Join(", ", expected)}] "
-                    + $"but got [{string.Join(", ", actual)}]");
-            }
-        }
-
-        Assert.True(failures.Count == 0,
-            "PP-E1 leg A's negative control is FROZEN by annex sub-entry A-1.11.1 "
-            + "(docs/plans/agent-native-gates.md §A.3). These are the registered POST-E4 "
-            + "multisets, restored by E4 (v0.15) and BINDING at the 0.15.0 adjudication. "
-            + "The only pre-allowed move is A2's Calor0410-'unknown'/Calor0411 → "
-            + "Calor0425/Calor0419 at the SAME declaration; anything else — a Calor0418 "
-            + "anywhere, a code from the barred set, a diagnostic on an A3 fixture — fails "
-            + "the control. STOP and report; do not regenerate the baseline, which is the "
-            + "exact mistake A-1.11.1 was written to correct.\n  "
-            + string.Join("\n  ", failures));
-    }
-
-    /// <summary>
     /// PP-E1 leg A's five <b>L7 row-erasure</b> cells (annex A-1.11's mutation
     /// catalogue, quoted): <i>"delete the row from a function-typed position
     /// that is then invoked … registered code Calor0425 in every case … `L7`

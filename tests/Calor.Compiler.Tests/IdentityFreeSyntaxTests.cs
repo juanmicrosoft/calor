@@ -374,7 +374,6 @@ public sealed class IdentityFreeSyntaxTests
     [InlineData("module Demo\n  enum Color int\n    Red\n    Blue")]
     [InlineData("module Demo\n  delegate Handler (int:value) → void\n    ! unknown")]
     [InlineData("module Demo\n  class Value\n    event Action:Changed")]
-    [InlineData("§M{Demo}\n  §RTYPE{Positive:i32} (> # 0)\n  §ITYPE{Vector:i32:n}")]
     [InlineData("module Demo\n  func Run () → void\n    !\n    proof{\"positive\"} 1 > 0")]
     [InlineData("module Demo\n  class Value\n    op + (Value:a, Value:b) → Value\n      !\n      return a")]
     [InlineData("module Demo\n  func Run () → void\n    !\n    for i from 0 to 2 step 1\n      if i > 0\n        Console.WriteLine(i)")]

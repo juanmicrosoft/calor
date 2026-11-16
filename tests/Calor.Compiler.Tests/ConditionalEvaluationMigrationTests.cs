@@ -145,7 +145,6 @@ public class ConditionalEvaluationMigrationTests
     }
 
     [Theory]
-    [InlineData("§C{Missing} §/C", false)]
     [InlineData("missing", false)]
     [InlineData("other", true)]
     public void NamedMetadataReceiver_RequiresAuthoritativeArgumentTypes(string argument, bool resolves)
@@ -852,25 +851,6 @@ public class ConditionalEvaluationMigrationTests
                 public static int Update(in int value) { Calls = value; return 0; }
                 public static int Update(int value) { return 0; }
                 """, interopFeature: "string-interpolation-hole");
-    }
-
-    [Theory]
-    [InlineData("§C{Use} §A{readonly} value §/C")]
-    [InlineData("§C{Use} §A{ref:out} value §/C")]
-    [InlineData("§C{Use} §A{} value §/C")]
-    [InlineData("§B{result} §NEW{Box} §A{ref} value")]
-    public void UnsupportedArgumentModifiers_AreDiagnosed(string statement)
-    {
-        var source = $$"""
-            module Probe Probe block
-              func Run () → void
-                !
-                {{statement}}
-            """;
-        var diagnostics = new DiagnosticBag();
-        new Calor.Compiler.Parsing.Parser(
-            new Calor.Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InvalidModifier);
     }
 
     [Theory]

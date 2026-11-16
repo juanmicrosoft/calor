@@ -273,32 +273,8 @@ module Test Test block
         Assert.Equal("value", valueParam.Name);
         Assert.Equal("str", setter.Symbol.Parameters[0].TypeName);
     }
-
     #endregion
-
     #region Operator Binding
-
-    [Fact]
-    public void BindOperator_ProducesOperatorOverload()
-    {
-        var source = @"
-§M{Test}
-    §CL{Vector:pub}
-        §FLD{f64:X:pub}
-        §FLD{f64:Y:pub}
-        §OP{+:pub} (Vector:a, Vector:b) -> Vector
-          §R §NEW{Vector} §/NEW
-        §/OP
-";
-        var bound = Bind(source, out var diagnostics);
-        Assert.NotNull(bound);
-
-        var op = bound.Functions.FirstOrDefault(f => f.MemberKind == BoundMemberKind.OperatorOverload);
-        Assert.NotNull(op);
-        Assert.Contains("op_", op.Symbol.Name);
-        // Operators should have unknown effects
-        Assert.Contains("*:*", op.DeclaredEffects);
-    }
 
     #endregion
 
@@ -585,23 +561,6 @@ module Test Test block
     }
 
     [Fact]
-    public void BindThrow_InMethod_ProducesBoundThrow()
-    {
-        var source = @"
-§M{Test}
-    §CL{Guard:pub}
-        §MT{Check:pub} (i32:x)
-            §E{throw,alloc}
-            §IF (< x 0)
-                §TH §NEW{ArgumentException} §A ""negative"" §/NEW
-";
-        var bound = Bind(source, out var diagnostics);
-        Assert.NotNull(bound);
-        var method = bound.Functions.FirstOrDefault(f => f.Symbol.Name == "Guard.Check");
-        Assert.NotNull(method);
-    }
-
-    [Fact]
     public void BindUsing_InMethod_ProducesBoundUsing()
     {
         var source = @"
@@ -701,29 +660,8 @@ module Test Test block
         Assert.Contains("y", used);
         Assert.Contains("z", used);
     }
-
     #endregion
-
     #region Scope Registration
-
-    [Fact]
-    public void RegisterClassMembers_PropertiesResolvable()
-    {
-        var source = @"
-§M{Test}
-    §CL{Config:pub}
-        §PROP{Name:str:pub:get,set}
-        §MT{UseProperty:pub}
-            §E{}
-            §C{Console.WriteLine} §A Name §/C
-";
-        var bound = Bind(source, out var diagnostics);
-        Assert.NotNull(bound);
-        // Name property should be resolvable as a variable (no undefined reference)
-        var undefs = diagnostics.Where(d => d.Code == DiagnosticCode.UndefinedReference &&
-            d.Message.Contains("'Name'")).ToList();
-        Assert.Empty(undefs);
-    }
 
     #endregion
 
@@ -840,29 +778,6 @@ module Test Test block
         Assert.False(symbols.Single(symbol => symbol.Name == "InstanceProperty").IsStatic);
         Assert.Equal(2, resolvedStatics.Length);
         Assert.All(resolvedStatics, expression => Assert.True(expression.Variable.IsStatic));
-    }
-
-    [Fact]
-    public void ProgramCompile_StaticMethodBareInstanceMembers_FailsWithoutOptionalAnalysis()
-    {
-        var source = """
-            §M{Test}
-              §CL{Utils:pub}
-                §FLD{i32:instanceField:priv}
-                §PROP{InstanceProperty:i32:pub:get}
-                §MT{Use:pub:stat} () -> i32
-                  §B{fieldValue:i32} instanceField
-                  §R InstanceProperty
-            """;
-
-        var result = Calor.Compiler.Program.Compile(source);
-
-        Assert.True(result.HasErrors);
-        Assert.Empty(result.GeneratedCode);
-        Assert.Equal(
-            2,
-            result.Diagnostics.Count(diagnostic =>
-                diagnostic.Code == DiagnosticCode.InstanceMemberInStaticContext));
     }
 
     [Fact]

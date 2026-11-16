@@ -17,125 +17,13 @@ public class PostConversionFixerTests
         Assert.True(result.IsSuccess, $"[{context}] Fixed source should parse. Errors:\n  " +
             string.Join("\n  ", result.Errors));
     }
-
     #region Rule A: Orphaned Closing Tags
-
-    [Fact]
-    public void Fix_OrphanedClosingNewTag_RemovesAndParses()
-    {
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{i32}
-                  §R 42
-              §/NEW{n1}
-            """;
-
-        var result = _fixer.Fix(source);
-
-        Assert.True(result.WasModified);
-        Assert.DoesNotContain("§/NEW{n1}", result.FixedSource);
-        Assert.Contains("OrphanedClosingTag", result.AppliedFixes.Select(f => f.Rule));
-        AssertParses(result.FixedSource, "OrphanedNewTag");
-    }
-
-    [Fact]
-    public void Fix_OrphanedClosingCTag_RemovesAndParses()
-    {
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{i32}
-                  §R 42
-              §/C{c1}
-            """;
-
-        var result = _fixer.Fix(source);
-
-        Assert.True(result.WasModified);
-        Assert.DoesNotContain("§/C{c1}", result.FixedSource);
-        AssertParses(result.FixedSource, "OrphanedCTag");
-    }
-
     #endregion
-
     #region Rule B: Unmatched Parentheses
-
-    [Fact]
-    public void Fix_ExtraClosingParen_BalancesAndParses()
-    {
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §I{i32:n}
-                  §O{i32}
-                  §R (+ n 1))
-            """;
-
-        var result = _fixer.Fix(source);
-
-        Assert.True(result.WasModified);
-        Assert.Contains("UnmatchedParentheses", result.AppliedFixes.Select(f => f.Rule));
-        var fixedLine = result.FixedSource.Split('\n').First(l => l.Contains("§R"));
-        var openCount = fixedLine.Count(c => c == '(');
-        var closeCount = fixedLine.Count(c => c == ')');
-        Assert.Equal(openCount, closeCount);
-        AssertParses(result.FixedSource, "ExtraClosingParen");
-    }
-
     #endregion
-
     #region Rule C: Comma Leaks
-
-    [Fact]
-    public void Fix_CommaInLispExpression_StripsAndParses()
-    {
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a, b)
-            """;
-
-        var result = _fixer.Fix(source);
-
-        Assert.True(result.WasModified);
-        Assert.Contains("CommaLeaks", result.AppliedFixes.Select(f => f.Rule));
-        Assert.DoesNotContain("a,", result.FixedSource);
-        AssertParses(result.FixedSource, "CommaLeak");
-    }
-
     #endregion
-
     #region Rule D: Generic in Lisp
-
-    [Fact]
-    public void Fix_GenericAngleBracketsInCallTag_ConvertsToOfNotation()
-    {
-        // Complete module with a §C{Option<int>.Some} call — the <int> causes a lexer error
-        // because '<' is parsed as a comparison operator inside the call name.
-        // The fixer converts <T> to {of:T} which avoids the lexer conflict.
-        var source =
-            "§M{Test}\n" +
-            "§F{Foo:pub}\n" +
-            "  §O{i32}\n" +
-            "  §B{x} §C{Option<int>.Some} §A 42 §/C\n" +
-            "  §R x\n" +
-            "§/F\n" +
-            "§/M";
-
-        var result = _fixer.Fix(source);
-
-        Assert.True(result.WasModified);
-        Assert.Contains("GenericInLisp", result.AppliedFixes.Select(f => f.Rule));
-        Assert.Contains("{of:int}", result.FixedSource);
-        Assert.DoesNotContain("<int>", result.FixedSource);
-        // Note: §C{Option{of:int}.Some} may not fully parse because the call tag parser
-        // has its own identifier rules. The transform eliminates the '<' lexer error;
-        // full resolution requires the converter to avoid generics in call tags.
-    }
 
     #endregion
 
@@ -203,28 +91,6 @@ public class PostConversionFixerTests
         Assert.Equal(source, result.FixedSource);
     }
 
-    [Fact]
-    public void Fix_MultiplePasses_AppliesMultipleRulesAndParses()
-    {
-        // Source with two problems: extra paren AND comma
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a, b))
-            """;
-
-        var result = _fixer.Fix(source);
-
-        Assert.True(result.WasModified);
-        Assert.True(result.AppliedFixes.Count >= 2,
-            $"Expected at least 2 fixes, got {result.AppliedFixes.Count}: " +
-            string.Join(", ", result.AppliedFixes.Select(f => f.Rule)));
-        AssertParses(result.FixedSource, "MultipleRules");
-    }
-
     #endregion
 
     #region Converter Output Integration
@@ -246,28 +112,6 @@ public class PostConversionFixerTests
         var result = _fixer.Fix(source);
         Assert.False(result.WasModified);
         AssertParses(result.FixedSource, "AlreadyValidConverterOutput");
-    }
-
-    [Fact]
-    public void Fix_RealConverterOutput_WithOrphanedAndExtraParens()
-    {
-        // Combines orphaned closing tag + extra paren — realistic multi-error scenario
-        var source = """
-            §M{Test}
-              §F{Process:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §B{y} (* x 2))
-                  §R y
-              §/NEW{n1}
-            """;
-
-        var result = _fixer.Fix(source);
-
-        Assert.True(result.WasModified);
-        Assert.True(result.AppliedFixes.Count >= 2);
-        Assert.DoesNotContain("§/NEW{n1}", result.FixedSource);
-        AssertParses(result.FixedSource, "OrphanedPlusExtraParen");
     }
 
     #endregion

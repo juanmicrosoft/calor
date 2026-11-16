@@ -11,30 +11,6 @@ public class IndexerTests
 {
     #region Lexer Tests
 
-    [Fact]
-    public void Lexer_Indexer_TokenizesCorrectly()
-    {
-        var source = "§IXER{int:pub}";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Indexer);
-    }
-
-    [Fact]
-    public void Lexer_EndIndexer_TokenizesCorrectly()
-    {
-        var source = "§/IXER";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndIndexer);
-    }
-
     #endregion
 
     #region Parser Tests

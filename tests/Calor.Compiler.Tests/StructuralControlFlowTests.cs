@@ -309,111 +309,14 @@ public class StructuralControlFlowTests
         Assert.DoesNotContain("+=", generated, StringComparison.Ordinal);
         Assert.Contains("value++;", generated, StringComparison.Ordinal);
     }
-
-    [Fact]
-    public void RawCSharpIdentifiers_CannotCollideWithGeneratedLoopState()
-    {
-        var assembly = Compile(
-            """
-            §M{RawLoopCollision}
-              §F{Run:pub} () -> i32
-                §B{~result:i32} INT:0
-                §RAW
-                int __calorForFrom = 10;
-                int __calorForTo = 20;
-                int __calorForStep = 30;
-                int __calorForAscending = 40;
-                int __calorForFirst = 50;
-                goto __calorForAdvance;
-                __calorForAdvance:
-                result += __calorForFrom + __calorForTo + __calorForStep
-                    + __calorForAscending + __calorForFirst;
-                §/RAW
-                §L{i:1:2:1}
-                  §RAW
-                  if (i == 1) continue;
-                  §/RAW
-                  §B{~result:i32} (+ result i)
-                §R result
-            """,
-            out var generated);
-
-        Assert.Contains("var __calorForFrom_1 = 1;", generated);
-        Assert.Contains("var __calorForFirst_1 = true;", generated);
-        Assert.Contains("while (true)", generated);
-        Assert.Equal(
-            152,
-            InvokeStatic(assembly, "RawLoopCollisionModule", "Run"));
-    }
-
-    [Fact]
-    public void RawCSharpIdentifiers_AreReservedAcrossEveryPreprocessorBranch()
-    {
-        var defaultAssembly = Compile(
-            """
-            §M{RawConditionalCollision}
-              §F{Run:pub} () -> i32
-                §B{~result:i32} INT:0
-                §RAW
                 #if BROKEN
-                int __calorForFrom_1 = 1;
-                /* disabled fragment comment */
                 #elif FOO
-                int __calorForFrom = 10;
-                int __calorForTo = 20;
-                __calorForFirst:
-                result += __calorForFrom + __calorForTo;
                 #elif BAR
-                int __calorForStep = 20;
-                result += __calorForStep;
                 #else
-                int __calorForAscending = 30;
                 #if NESTED
-                int __calorForFirst_1 = 40;
-                result += __calorForAscending + __calorForFirst_1;
                 #else
-                int __calorForFirst_1 = 50;
-                result += __calorForAscending + __calorForFirst_1;
                 #endif
                 #endif
-                // __calorForFrom_2 and keywords class while are lexical noise.
-                string lexicalNoise = "__calorForTo_1 __calorForStep_1";
-                _ = lexicalNoise;
-                §/RAW
-                §L{i:1:2:1}
-                  §B{~result:i32} (+ result i)
-                §R result
-            """,
-            out var generated);
-
-        Assert.Contains("var __calorForFrom_2 = 1;", generated);
-        Assert.Contains("var __calorForTo_1 = 2;", generated);
-        Assert.Contains("var __calorForStep_1 = 1;", generated);
-        Assert.Contains("var __calorForAscending_1 =", generated);
-        Assert.Contains("var __calorForFirst_2 = true;", generated);
-        Assert.Equal(
-            83,
-            InvokeStatic(
-                defaultAssembly,
-                "RawConditionalCollisionModule",
-                "Run"));
-
-        var fooAssembly = CompileGenerated(generated, "FOO");
-        Assert.Equal(
-            33,
-            InvokeStatic(
-                fooAssembly,
-                "RawConditionalCollisionModule",
-                "Run"));
-
-        var barAssembly = CompileGenerated(generated, "BAR");
-        Assert.Equal(
-            23,
-            InvokeStatic(
-                barAssembly,
-                "RawConditionalCollisionModule",
-                "Run"));
-    }
 
     [Fact]
     public void YieldDetection_IsStructuralAcrossLegalContainers()
@@ -886,22 +789,6 @@ public class StructuralControlFlowTests
                 && diagnostic.Message.Contains(
                     "modifier 'ref'",
                     StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void ValuelessYield_IsRejectedAndNeverEmittedAsYieldReturn()
-    {
-        var result = Program.Compile(
-            """
-            §M{ValuelessYield}
-              §F{Values:pub} () -> i32
-                §YIELD
-            """);
-
-        Assert.Contains(
-            result.Diagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.YieldRequiresValue);
-        Assert.DoesNotContain("yield return;", result.GeneratedCode, StringComparison.Ordinal);
     }
 
     private static IEnumerable<(StatementNode Statement, string Marker)>

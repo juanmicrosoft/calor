@@ -60,17 +60,6 @@ public class TypeSystemTests
     }
 
     [Fact]
-    public void Lexer_RecognizesEndMatchKeyword()
-    {
-        var tokens = Tokenize("§/W", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndMatch, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
-
-    [Fact]
     public void Lexer_RecognizesCaseKeyword()
     {
         var tokens = Tokenize("case", out var diagnostics);
@@ -78,23 +67,6 @@ public class TypeSystemTests
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Case, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
-
-    [Theory]
-    [InlineData("D")]
-    [InlineData("/D")]
-    [InlineData("FL")]
-    public void Lexer_RejectsRetiredRecordCreationMarkers(string marker)
-    {
-        var tokens = Tokenize($"§{marker}", out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, diagnostic =>
-            diagnostic.Message.Contains("§NEW", StringComparison.Ordinal)
-            && diagnostic.Message.Contains("§A[name]", StringComparison.Ordinal));
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
     }
 

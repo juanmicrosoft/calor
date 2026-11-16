@@ -1954,32 +1954,6 @@ public class CrossFileResolutionTests
     }
 
     [Fact]
-    public void DocumentWithParseError_SkippedInSearch()
-    {
-        var workspace = new WorkspaceState();
-
-        // Invalid document (unclosed module)
-        var source1 = """
-            §M{m001:Invalid
-            """;
-        var invalid = workspace.GetOrCreate(DocumentUri.From("file:///invalid.calr"), source1);
-        Assert.True(invalid.Diagnostics.HasErrors);
-
-        // Valid document
-        var source2 = """
-            module Valid Valid
-              func ValidFunc () → void
-                return 0
-            """;
-        OpenDocument(workspace, DocumentUri.From("file:///valid.calr"), source2);
-
-        // Should still find the valid function
-        var (doc, node) = workspace.FindDefinitionAcrossFiles("ValidFunc");
-        Assert.NotNull(doc);
-        Assert.Contains("valid.calr", doc.Uri.LocalPath);
-    }
-
-    [Fact]
     public void DuplicateSymbolNames_FindsFirst()
     {
         var workspace = new WorkspaceState();

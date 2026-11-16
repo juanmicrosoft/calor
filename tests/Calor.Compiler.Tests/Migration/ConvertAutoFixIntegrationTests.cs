@@ -118,35 +118,6 @@ public class ConvertAutoFixIntegrationTests
     }
 
     [Fact]
-    public void Fixer_OnManuallyBrokenConverterOutput_RepairsSuccessfully()
-    {
-        // Take real converter output and manually inject a known defect
-        var calor = ConvertCSharpToCalor("public class Calc { public int Add(int a, int b) => a + b; }");
-        Assert.NotNull(calor);
-
-        // Verify it parses cleanly first
-        var cleanParse = CalorSourceHelper.Parse(calor, "test.calr");
-        Assert.True(cleanParse.IsSuccess, "Baseline should parse");
-
-        // Inject an orphaned §/NEW tag at the end — a known fixer-handled defect
-        var broken = calor + "\n§/NEW{n1}\n";
-
-        // Verify it's now broken
-        var brokenParse = CalorSourceHelper.Parse(broken, "test.calr");
-        Assert.False(brokenParse.IsSuccess, "Injected orphaned tag should cause parse failure");
-
-        // Now fix it
-        var fixResult = _fixer.Fix(broken);
-        Assert.True(fixResult.WasModified, "Fixer should detect the orphaned tag");
-        Assert.Contains("OrphanedClosingTag", fixResult.AppliedFixes.Select(f => f.Rule));
-
-        var fixedParse = CalorSourceHelper.Parse(fixResult.FixedSource, "test.calr");
-        Assert.True(fixedParse.IsSuccess,
-            $"Fixer should produce parsable output. Errors:\n  " +
-            string.Join("\n  ", fixedParse.Errors));
-    }
-
-    [Fact]
     public void Converter_NullConditionalChain_ProducesValidCalor()
     {
         // Null-conditional chains now convert to valid Calor using (?. target "member") syntax

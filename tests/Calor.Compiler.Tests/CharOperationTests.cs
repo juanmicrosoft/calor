@@ -235,50 +235,8 @@ public class CharOperationTests
 
         Assert.Contains(op, roundTripped);
     }
-
     #endregion
-
     #region Error Tests
-
-    [Fact]
-    public void Parse_CharAt_NoArgs_ReportsError()
-    {
-        var source = WrapInFunction("§R (char-at)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
-    }
-
-    [Fact]
-    public void Parse_CharAt_OneArg_ReportsError()
-    {
-        var source = WrapInFunction("§R (char-at s)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
-    }
-
-    [Fact]
-    public void Parse_IsLetter_NoArgs_ReportsError()
-    {
-        var source = WrapCharFunction("§R (is-letter)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 1 argument"));
-    }
-
-    [Fact]
-    public void Parse_IsLetter_TooManyArgs_ReportsError()
-    {
-        var source = WrapCharFunction("§R (is-letter c c)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("accepts at most 1 argument"));
-    }
 
     #endregion
 

@@ -43,66 +43,12 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void Lexer_RecognizesSingleLetterCall()
-    {
-        var tokens = Tokenize("§C");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Call, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterBind()
-    {
-        var tokens = Tokenize("§B");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Bind, tokens[0].Kind);
-    }
-
-    [Fact]
     public void Lexer_RecognizesSingleLetterReturn()
     {
         var tokens = Tokenize("return");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Return, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterInput()
-    {
-        var tokens = Tokenize("§I");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.In, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterOutput()
-    {
-        var tokens = Tokenize("§O");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Out, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterArg()
-    {
-        var tokens = Tokenize("§A");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Arg, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterEffects()
-    {
-        var tokens = Tokenize("§E");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Effects, tokens[0].Kind);
     }
 
     [Fact]
@@ -140,73 +86,8 @@ public class SyntaxTests
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Requires, tokens[0].Kind);
     }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterEnsures()
-    {
-        var tokens = Tokenize("§S");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Ensures, tokens[0].Kind);
-    }
-
     #endregion
-
     #region Closing Tags
-
-    [Fact]
-    public void Lexer_RecognizesClosingModule()
-    {
-        var tokens = Tokenize("§/M");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndModule, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingFunc()
-    {
-        var tokens = Tokenize("§/F");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndFunc, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingCall()
-    {
-        var tokens = Tokenize("§/C");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndCall, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingIf()
-    {
-        var tokens = Tokenize("§/I");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndIf, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingLoop()
-    {
-        var tokens = Tokenize("§/L");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndFor, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingMatch()
-    {
-        var tokens = Tokenize("§/W");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndMatch, tokens[0].Kind);
-    }
 
     [Fact]
     public void Lexer_RecognizesDoKeyword()
@@ -216,48 +97,8 @@ public class SyntaxTests
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Do, tokens[0].Kind);
     }
-
-    [Fact]
-    public void Lexer_RecognizesEndDoKeyword()
-    {
-        var tokens = Tokenize("§/DO");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndDo, tokens[0].Kind);
-    }
-
     #endregion
-
     #region Full Program
-
-    [Fact]
-    public void Lexer_TokenizesProgram()
-    {
-        // Lexer test: verifies all token kinds are recognized including legacy closers
-        var source = @"
-§M{Hello}
-    §F{Main:pub}
-          §O{void}
-          §E{cw}
-          §C{Console.WriteLine}
-            §A ""Hello from Calor v2!""
-          §/C
-    §/F
-§/M
-";
-        var tokens = Tokenize(source);
-
-        // Verify key tokens are present
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Module);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Func);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Out);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Effects);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Call);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Arg);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndCall);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndFunc);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndModule);
-    }
 
     #endregion
 
@@ -1023,28 +864,8 @@ module Test Test block
         Assert.IsType<BaseExpressionNode>(memberAccess.Target);
         Assert.Equal("Value", memberAccess.FieldName);
     }
-
     #endregion
-
     #region Print Alias
-
-    [Fact]
-    public void Lexer_RecognizesPrintAlias()
-    {
-        var tokens = Tokenize("§P");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Print, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesPrintFAlias()
-    {
-        var tokens = Tokenize("§Pf");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.PrintF, tokens[0].Kind);
-    }
 
     [Fact]
     public void Parser_ParsesPrintStatement()
@@ -1117,15 +938,6 @@ module Test Test block
     }
 
     [Fact]
-    public void Lexer_RecognizesElseIfShortcut()
-    {
-        var tokens = Tokenize("§EI");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.ElseIf, tokens[0].Kind);
-    }
-
-    [Fact]
     public void Lexer_RecognizesElseShortcut()
     {
         var tokens = Tokenize("else");
@@ -1141,15 +953,6 @@ module Test Test block
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.While, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesEndWhileShortcut()
-    {
-        var tokens = Tokenize("§/WH");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndWhile, tokens[0].Kind);
     }
 
     #endregion

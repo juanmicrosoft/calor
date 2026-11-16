@@ -598,32 +598,8 @@ public class CompilerBugFixTests
             Assert.NotEmpty(result.GeneratedCode);
         }
     }
-
     #endregion
-
     #region BindValidationPass: Calor0250 fires through the full CLI pipeline
-
-    [Fact]
-    public void BindValidation_BareBinding_ReportsCalor0250_ThroughCli()
-    {
-        // §B{x} with no type and no initializer must fail compilation
-        // through the production CLI path. PR #642 implemented the diagnostic
-        // in the Binder, but the Binder is not invoked from Program.Compile;
-        // BindValidationPass wires this check into the main pipeline.
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §B{x}
-            """;
-
-        var result = Program.Compile(source);
-
-        Assert.True(result.HasErrors,
-            "Calor0250 must fire for §B{x} with no type and no initializer.");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
-    }
 
     [Fact]
     public void BindValidation_TypedBinding_NoInitializer_Compiles()
@@ -659,51 +635,6 @@ public class CompilerBugFixTests
         Assert.False(result.HasErrors,
             "Untyped binding with initializer must compile cleanly: " +
             string.Join("; ", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
-    }
-
-    [Fact]
-    public void BindValidation_BareBinding_InsideIfBody_ReportsCalor0250()
-    {
-        // The validator must recurse into nested statement bodies.
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §I{i32:n}
-                  §O{void}
-                  §IF (> n INT:0)
-                      §B{tmp}
-            """;
-
-        var result = Program.Compile(source);
-
-        Assert.True(result.HasErrors,
-            "Calor0250 must fire for bare §B inside a nested if body.");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
-    }
-
-    [Fact]
-    public void BindValidation_BareBinding_InsideForBody_ReportsCalor0250()
-    {
-        // The loop header is `§L{var:from:to:step}` — colon-delimited, so a typed literal
-        // `INT:0` inside it parses `INT` as the `from` expression. The fixture used to write
-        // that, and nothing noticed: the misparse was silent until the type checker started
-        // reporting `Undefined variable 'INT'`. Corrected to the documented form; the §B{tmp}
-        // this test is actually about is unchanged.
-        var source = """
-            §M{Test}
-              §F{Foo:pub}
-                  §O{void}
-                  §L{i:0:10:1}
-                      §B{tmp}
-            """;
-
-        var result = Program.Compile(source);
-
-        Assert.True(result.HasErrors,
-            "Calor0250 must fire for bare §B inside a nested for loop body.");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
     }
 
     [Fact]

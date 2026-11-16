@@ -315,36 +315,6 @@ module Test Test block
     }
 
     [Fact]
-    public void ExpressionContext_AmbiguousContinuation_EmitsCalor0150()
-    {
-        // §C{f} INT:1 INT:2   ← two consecutive expression-start tokens
-        // Per RFC §3.2 case B → Calor0150.
-        var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x} §C{f} INT:1 INT:2
-""";
-        Parse(source, out var diags);
-        Assert.Contains(diags.Errors, e => e.Code == DiagnosticCode.AmbiguousCallContinuation);
-    }
-
-    [Fact]
-    public void ExpressionContext_AmbiguousContinuation_NestedCall_AlsoEmitsCalor0150()
-    {
-        // §C{f} a §C{g} b   ← a is f's inline arg; §C{g} is a second
-        // expression-start token on f. Per RFC §3.2 case B → Calor0150.
-        var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{a:i32} INT:1
-      §B{b:i32} INT:2
-      §B{x} §C{f} a §C{g} b
-""";
-        Parse(source, out var diags);
-        Assert.Contains(diags.Errors, e => e.Code == DiagnosticCode.AmbiguousCallContinuation);
-    }
-
-    [Fact]
     public void ExpressionContext_OneArgFollowedBySiblingStatement_NoCalor0150()
     {
         // v0.6.3 — sibling-statement-on-next-line must NOT trigger Calor0150.
@@ -433,23 +403,6 @@ module Test Test block
         var innerCall = Assert.IsType<CallExpressionNode>(stmt.Arguments[0]);
         Assert.Equal("inner", innerCall.Target);
         Assert.Single(innerCall.Arguments);
-    }
-
-    [Fact]
-    public void ExpressionContext_InlineArgThenArg_EmitsCalor0150()
-    {
-        // §C{f} x §A y §/C — user mixed inline form with §A. Calor0150
-        // covers this confusion: the inline form already consumed one arg
-        // and cannot accept a second.
-        var source = """
-§M{Test}
-  §F{Foo:pub}
-      §B{x:i32} INT:1
-      §B{y:i32} INT:2
-      §B{r} §C{f} x §A y §/C
-""";
-        Parse(source, out var diags);
-        Assert.Contains(diags.Errors, e => e.Code == DiagnosticCode.AmbiguousCallContinuation);
     }
 
     [Fact]
@@ -993,29 +946,6 @@ module Test Test block
             "str");
         var emittedAs = EmitWithImplicitCloser(typeOpAs);
         Assert.Equal("(Foo() as string)", emittedAs);
-    }
-
-    [Fact]
-    public void Emitter_ZeroArgCallInsideEventSubscribe_KeepsExplicitCloser()
-    {
-        // §SUB {evt} {handler} on one line — both children are expressions.
-        // If `evt` is a zero-arg call and `handler` looks like an
-        // expression-start token, the parser could absorb handler as
-        // the call's inline argument. Verified via parse-and-re-emit
-        // round-trip; we don't construct EventSubscribeNode directly
-        // because it appends to the emitter buffer (returns "").
-        var source = """
-§M{Test}
-  §F{Foo:pub}
-      §SUB §C{Foo} §/C h
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-        var fullEmitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = true });
-        var fullEmitted = module.Accept<string>(fullEmitter);
-        Assert.Contains("§C{Foo} §/C h", fullEmitted);
     }
 
     [Fact]

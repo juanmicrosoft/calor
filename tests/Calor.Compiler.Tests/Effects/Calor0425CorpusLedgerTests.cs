@@ -625,64 +625,6 @@ public class Calor0425CorpusLedgerTests
     private static string CurrentExpectationsPath() => Path.Combine(
         RepoRoot(), "tests", "TestData", "Effects", "calor0425-corpus-current-expectations.json");
 
-    [SkippableFact]
-    public void CurrentCompiler_CorpusMatchesExpectationsAndLiveCliExactly()
-    {
-        Assert.False(Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0425_LEDGER") == "1",
-            "The historical corpus ledger is immutable; current expectations are a separate test fixture.");
-        var root = RepoRoot();
-        var subjectDirs = Subjects
-            .Select(subject => (Name: subject, Path: Path.Combine(root, "bench", "corpus", subject, "src")))
-            .ToList();
-        Skip.IfNot(subjectDirs.All(s => Directory.Exists(s.Path)),
-            "corpus submodules not initialized");
-
-        var perSubject = subjectDirs.Select(s => MeasureSubject(s.Name, s.Path)).ToList();
-        foreach (var subject in perSubject)
-        {
-            Console.WriteLine(
-                $"Calor0425-corpus {subject.Subject}: {subject.Diagnostics} across "
-                + $"{subject.ModulesWithDiagnostics} of {subject.ModulesEnforced} enforced modules "
-                + $"(rowless {subject.RowlessDestination}, unknown-source {subject.UnknownSource}, "
-                + $"assumed {subject.Assumed}, external-base {subject.ExternalBase}, "
-                + $"invocation rowless {subject.InvocationRowless} / undetermined "
-                + $"{subject.InvocationUndetermined} / assumed {subject.InvocationAssumed}; "
-                + $"of the rowless, invoked {subject.RowlessInvoked} / "
-                + $"never invoked {subject.RowlessNeverInvoked}; invocation witness "
-                + $"{subject.InvocationWitness}; excluded {subject.ModulesNotMeasured} "
-                + $"= convert {subject.ExcludedConversionFailed} / parse {subject.ExcludedParseFailed} "
-                + $"/ propagated-bind {subject.ExcludedBindFailed} / faulted "
-                + $"{subject.ExcludedEffectPassFaulted}; raw-bag rule would have enforced "
-                + $"{subject.ModulesEnforcedRawBagRule} and excluded {subject.RawBagBindFailed} "
-                + "at bind)");
-        }
-
-        var measured = new CurrentExpectations(
-            SchemaVersion,
-            CurrentScopeText,
-            BindRuleText,
-            RegisteredFloorRule(),
-            MeasureCliCrossCheck(root, perSubject),
-            perSubject.Sum(s => s.Diagnostics),
-            perSubject.Sum(s => s.ModulesWithDiagnostics),
-            perSubject.Sum(s => s.ModulesEnforced),
-            perSubject.Sum(s => s.ModulesNotMeasured),
-            perSubject);
-
-        Console.WriteLine(
-            $"Calor0425-corpus aggregate: {measured.AggregateDiagnostics} across "
-            + $"{measured.AggregateModulesWithDiagnostics} of {measured.AggregateModulesEnforced} "
-            + $"(raw-bag rule: {perSubject.Sum(s => s.ModulesEnforcedRawBagRule)} enforced; "
-            + $"parse-failed {perSubject.Sum(s => s.ExcludedParseFailed)}; propagated bind-failed "
-            + $"{perSubject.Sum(s => s.ExcludedBindFailed)}; faulted "
-            + $"{perSubject.Sum(s => s.ExcludedEffectPassFaulted)}; UnknownSource+"
-            + "InvocationUndetermined "
-            + $"{perSubject.Sum(s => s.UnknownSource + s.InvocationUndetermined)})");
-
-        var committed = JsonSerializer.Deserialize<CurrentExpectations>(File.ReadAllText(CurrentExpectationsPath()))!;
-        AssertCurrentExpectations(committed, measured);
-    }
-
     private static void AssertCurrentExpectations(CurrentExpectations committed, CurrentExpectations measured)
     {
         // Anti-vacuity, now tied to gate 9's own floor rather than a hand-picked

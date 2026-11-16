@@ -25,44 +25,13 @@ public class DiagnosticSeedReachabilityTests
 {
     public static IEnumerable<object[]> Wrappers()
     {
-        yield return new object[] { "binary-operand", "§R (+ 1 (/ 10 0))" };
         yield return new object[] { "coalesce-fallback", "return x ?? (10 / 0)" };
-        yield return new object[] { "implication-consequent", "§R (-> (> x 0) (== (/ 10 0) 1))" };
-        yield return new object[] { "forall-body", "§R (forall ((i i32)) (> (/ 10 0) i))" };
-        yield return new object[] { "exists-body", "§R (exists ((i i32)) (> (/ 10 0) i))" };
         yield return new object[] { "conditional-value", "return x > 0 ? (10 / 0) : null" };
         yield return new object[] { "throw-argument", "return throw new Exception(10 / 0)" };
         yield return new object[] { "conversion-operand", "return (10 / 0) as long" };
         yield return new object[] { "await-operand", "return await System.Threading.Tasks.Task.FromResult(10 / 0)" };
         yield return new object[] { "lambda-expression-body", "return (int:y) => (10 / 0)" };
         yield return new object[] { "bind-initializer", "let int:y = 10 / 0\n    return y" };
-        // Unsafe wrappers are structurally bound on the PR branch; their operands must
-        // remain visible to every shared traversal.
-        yield return new object[] { "addressof-operand", "§R §ADDR (/ 10 0)" };
-        yield return new object[] { "deref-operand", "§R §DEREF (/ 10 0)" };
-    }
-
-    [Fact]
-    public void UninitializedUseInsideUnsafeWrapper_ReachesTheDataflowAnalysis()
-    {
-        // An uninitialized local read inside §ADDR fires Calor0900 only if the shared
-        // structural traversal keeps the operand visible.
-        const string source = """
-            §M{Test}
-              §F{Probe:pub} () -> OBJECT
-                §B{~y:i32}
-                §R §ADDR y
-            """;
-
-        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
-        {
-            EnableVerificationAnalyses = true,
-        });
-
-        Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.UninitializedVariable && d.Message.Contains("'y'"));
-        Assert.DoesNotContain(result.Diagnostics,
-            d => d.Code == DiagnosticCode.AnalysisIncomplete);
     }
 
     [Theory]

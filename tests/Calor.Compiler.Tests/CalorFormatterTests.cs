@@ -376,31 +376,8 @@ module Test Test block
         Assert.Contains("Add", formatted);
         Assert.Contains("func Add (int:a, int:b) → int", formatted);
     }
-
     #endregion
-
     #region Foreach Formatting
-
-    [Fact]
-    public void Format_ForeachWithIndex_EmitsForeachBlock()
-    {
-        var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACH{item:i32:idx} items
-                      §P item
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var formatter = new CalorFormatter();
-        var result = formatter.Format(module);
-
-        Assert.Contains("§EACH{", result);
-        Assert.Contains("item:int:idx", result);
-    }
 
     [Fact]
     public void Format_ForeachWithoutIndex_EmitsForeachBlockWithoutIndex()

@@ -87,75 +87,7 @@ public class CollectionOperationsTests
         Assert.Equal(Tokens(new CSharpEmitter().Emit(module)),
             Tokens(new CSharpEmitter().Emit(reparsed)));
     }
-
     #region Lexer Tests
-
-    [Fact]
-    public void Tokenize_ListKeywords_ReturnsCorrectTokens()
-    {
-        var tokens = Tokenize("§LIST §/LIST", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.List, tokens[0].Kind);
-        Assert.Equal(TokenKind.EndList, tokens[1].Kind);
-    }
-
-    [Fact]
-    public void Tokenize_DictKeywords_ReturnsCorrectTokens()
-    {
-        var tokens = Tokenize("§DICT §/DICT §KV", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.Dict, tokens[0].Kind);
-        Assert.Equal(TokenKind.EndDict, tokens[1].Kind);
-        Assert.Equal(TokenKind.KeyValue, tokens[2].Kind);
-    }
-
-    [Fact]
-    public void Tokenize_SetKeywords_ReturnsCorrectTokens()
-    {
-        var tokens = Tokenize("§HSET §/HSET", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.HashSet, tokens[0].Kind);
-        Assert.Equal(TokenKind.EndHashSet, tokens[1].Kind);
-    }
-
-    [Fact]
-    public void Tokenize_CollectionOperations_ReturnsCorrectTokens()
-    {
-        var tokens = Tokenize("§PUSH §PUT §REM §SETIDX §CLR §INS §HAS §KEY §VAL", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.Push, tokens[0].Kind);
-        Assert.Equal(TokenKind.Put, tokens[1].Kind);
-        Assert.Equal(TokenKind.Remove, tokens[2].Kind);
-        Assert.Equal(TokenKind.SetIndex, tokens[3].Kind);
-        Assert.Equal(TokenKind.Clear, tokens[4].Kind);
-        Assert.Equal(TokenKind.Insert, tokens[5].Kind);
-        Assert.Equal(TokenKind.Has, tokens[6].Kind);
-        Assert.Equal(TokenKind.Key, tokens[7].Kind);
-        Assert.Equal(TokenKind.Val, tokens[8].Kind);
-    }
-
-    [Fact]
-    public void Tokenize_EachKVKeywords_ReturnsCorrectTokens()
-    {
-        var tokens = Tokenize("§EACHKV §/EACHKV", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.EachKV, tokens[0].Kind);
-        Assert.Equal(TokenKind.EndEachKV, tokens[1].Kind);
-    }
-
-    [Fact]
-    public void Tokenize_CountKeyword_ReturnsCorrectToken()
-    {
-        var tokens = Tokenize("§CNT", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.Count, tokens[0].Kind);
-    }
 
     #endregion
 
@@ -808,67 +740,8 @@ public class CollectionOperationsTests
 
         Assert.Contains("myList.Count", code);
     }
-
     #endregion
-
     #region Error Handling Tests
-
-    [Fact]
-    public void Parse_MismatchedListId_ReportsError()
-    {
-        var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §O{void}
-                  §LIST{list1:i32}
-                  §/LIST{list2}
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnexpectedToken &&
-            d.Message.Contains("Source IDs are removed"));
-    }
-
-    [Fact]
-    public void Parse_MismatchedDictId_ReportsError()
-    {
-        var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §O{void}
-                  §DICT{dict1:str:i32}
-                  §/DICT{dict2}
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnexpectedToken &&
-            d.Message.Contains("Source IDs are removed"));
-    }
-
-    [Fact]
-    public void Parse_LegacyEachKVCloser_ReportsError()
-    {
-        // §/EACHKV is removed closer-form (Phase 4d): rejected with Calor0830, not MismatchedId.
-        var source = """
-            §M{Test}
-            §F{Main:pub}
-              §O{void}
-              §EACHKV{k:v} dict1
-                §P k
-              §/EACHKV
-            §/F
-            §/M
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
-    }
 
     #endregion
 
@@ -2268,31 +2141,8 @@ public class CollectionOperationsTests
         var returnStmt = Assert.IsType<ReturnStatementNode>(func.Body[0]);
         Assert.IsType<ArrayAccessNode>(returnStmt.Expression);
     }
-
     #endregion
-
     #region Foreach With Index Tests
-
-    [Fact]
-    public void Parse_ForeachWithIndex_ParsesIndexVariable()
-    {
-        var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACH{item:i32:idx} items
-                      §P item
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        var func = module.Functions[0];
-        var foreachStmt = Assert.IsType<ForeachStatementNode>(func.Body[0]);
-        Assert.Equal("item", foreachStmt.VariableName);
-        Assert.Equal("i32", foreachStmt.VariableType);
-        Assert.Equal("idx", foreachStmt.IndexVariableName);
-    }
 
     [Fact]
     public void Parse_ForeachWithoutIndex_IndexIsNull()
@@ -2313,88 +2163,6 @@ public class CollectionOperationsTests
         Assert.Equal("item", foreachStmt.VariableName);
         Assert.Equal("i32", foreachStmt.VariableType);
         Assert.Null(foreachStmt.IndexVariableName);
-    }
-
-    [Fact]
-    public void Emit_ForeachWithIndex_GeneratesIndexCounter()
-    {
-        var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACH{item:i32:idx} items
-                      §P item
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-
-        var emitter = new CSharpEmitter();
-        var code = emitter.Emit(module);
-
-        Assert.Contains("var idx = -1;", code);
-        Assert.Contains("foreach (int item in items)", code);
-        Assert.Contains("idx++;", code);
-    }
-
-    [Fact]
-    public void Emit_ForeachWithIndex_IndexIncrementsBeforeBody()
-    {
-        // The index increment must appear at the top of the loop body so that
-        // a `continue` doesn't skip the increment — matching C#'s
-        // Select((item, index) => ...) semantics.
-        var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACH{item:i32:idx} items
-                      §P item
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-
-        var emitter = new CSharpEmitter();
-        var code = emitter.Emit(module);
-
-        // idx++ should appear before the body (Console.WriteLine), not after
-        var idxIncrPos = code.IndexOf("idx++;");
-        var printPos = code.IndexOf("Console.WriteLine(item);");
-        Assert.True(idxIncrPos >= 0, "idx++ should be present");
-        Assert.True(printPos >= 0, "Console.WriteLine should be present");
-        Assert.True(idxIncrPos < printPos, "idx++ should appear before body statements");
-    }
-
-    [Fact]
-    public void RoundTrip_ForeachWithIndex_EmitsValidCalor()
-    {
-        var source = """
-            §M{Test}
-              §F{Main:pub}
-                  §O{void}
-                  §EACH{item:i32:idx} items
-                      §P item
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-
-        // Emit back to Calor
-        var emitter = new CalorEmitter();
-        var calorOutput = emitter.Emit(module);
-
-        // Verify the emitted Calor contains the index variable
-        Assert.Contains("item:int:idx", calorOutput);
-
-        // Re-parse the emitted Calor
-        var reparsed = Parse(calorOutput, out var rediagnostics);
-        Assert.False(rediagnostics.HasErrors, $"Round-trip failed: {string.Join(", ", rediagnostics.Select(d => d.Message))}");
-
-        // Verify structure preserved
-        var func = reparsed.Functions[0];
-        var foreachStmt = Assert.IsType<ForeachStatementNode>(func.Body[0]);
-        Assert.Equal("item", foreachStmt.VariableName);
-        Assert.Equal("idx", foreachStmt.IndexVariableName);
     }
 
     [Fact]

@@ -79,56 +79,6 @@ public class RefinementIdentityAndInferenceTests
             && (d.Message.Contains($"Cannot use {source} as {target}")
                 || d.Message.Contains($"Cannot assign {source} to variable of type {target}")));
 
-    // ───────────────────────── #1529: inferred locals carry the refinement ─────────────────────────
-
-    private const string InferredLocals = """
-          §F{FromParam:pub} (Nat:a, i32:v) -> i32
-            §B{~x} a
-            §ASSIGN x v
-            §R x
-          §F{WriteBack:pub} (Nat:a, i32:d) -> i32
-            §B{~x} a
-            §ASSIGN x (- x d)
-            §R x
-          §F{Decrement:pub} (Nat:a) -> i32
-            §B{~x} a
-            §ASSIGN x (- x INT:1)
-            §R x
-          §F{GetNat:pub} (i32:v) -> Nat
-            §R v
-          §F{FromCall:pub} (i32:seed, i32:v) -> i32
-            §B{~x} §C{GetNat} §A seed §/C
-            §ASSIGN x v
-            §R x
-          §F{Chained:pub} (Nat:a, i32:v) -> i32
-            §B{~x} a
-            §B{~y} x
-            §ASSIGN y v
-            §R y
-          §F{FromBase:pub} (i32:a, i32:v) -> i32
-            §B{~x} a
-            §ASSIGN x v
-            §R x
-          §F{FromInline:pub}
-            §I{i32:a} | (>= # INT:0)
-            §I{i32:v}
-            §O{i32}
-            §B{~x} a
-            §ASSIGN x v
-            §R x
-          §F{Rebound:pub} (Nat:a, i32:v) -> i32
-            §B{~x:i32} INT:1
-            §B{~x} a
-            §ASSIGN x v
-            §R x
-          §CL{Holder:pub}
-            §MT{InMethod:pub} (Nat:a, i32:v) -> i32
-              §E{}
-              §B{~x} a
-              §ASSIGN x v
-              §R x
-        """;
-
     // ───────────────────────── #1530: named refinements are nominal ─────────────────────────
 
     [Fact]

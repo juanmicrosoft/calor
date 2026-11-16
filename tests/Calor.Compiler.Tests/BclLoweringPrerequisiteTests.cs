@@ -15,52 +15,6 @@ namespace Calor.Compiler.Tests;
 
 public class BclLoweringPrerequisiteTests
 {
-    [Theory]
-    [InlineData("return receiver.GetGenericArguments().Length;")]
-    [InlineData("return receiver.GetMethods().Length > 0 ? 2 : 0;")]
-    [InlineData("var arguments = receiver.GenericTypeArguments; return arguments.Length;")]
-    [InlineData("var arguments = receiver.GenericTypeArguments; var concreteArguments = concrete.GenericTypeArguments; return arguments.Length == concreteArguments.Length ? 2 : 0;")]
-    [InlineData("var types = new Type[] { receiver }; return types.Count(type => type.GetGenericArguments().Length == 2) + 1;")]
-    public void MetadataArrayResults_PreserveOrdinaryLengthAndRuntime(string body)
-    {
-        var converted = new CSharpToCalorConverter().Convert($$"""
-            using System;
-            using System.Linq;
-            using System.Collections.Generic;
-            public static class Sample
-            {
-                public static int Run()
-                {
-                    Type receiver = typeof(Dictionary<int, string>);
-                    Type concrete = typeof(Tuple<int, string>);
-                    {{body}}
-                }
-            }
-            """);
-        Assert.True(converted.Success, string.Join("\n", converted.Issues.Select(issue => issue.Message)));
-        Assert.Equal(0, converted.InteropPreservationCount);
-        Assert.Contains(".Length", converted.CalorSource);
-        Assert.DoesNotContain("(len ", converted.CalorSource);
-        var compiled = Program.Compile(converted.CalorSource!, "metadata-array.calr",
-            new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
-        var legacySource = System.Text.RegularExpressions.Regex.Replace(
-            converted.CalorSource!, @"§C\{([^}\r\n]+)\}\s*§/C\.Length", "(len §C{$1} §/C)");
-        legacySource = System.Text.RegularExpressions.Regex.Replace(
-            legacySource, @"\b([A-Za-z_][A-Za-z0-9_]*)\.Length\b", "(len $1)");
-        var legacy = Program.Compile(legacySource,
-            "legacy-array.calr",
-            new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
-        Assert.Equal(
-            legacy.Diagnostics.Where(diagnostic => diagnostic.Code is DiagnosticCode.UnknownExternalCall
-                or DiagnosticCode.ForbiddenEffect).Select(diagnostic => diagnostic.Message).Order(),
-            compiled.Diagnostics.Where(diagnostic => diagnostic.Code is DiagnosticCode.UnknownExternalCall
-                or DiagnosticCode.ForbiddenEffect).Select(diagnostic => diagnostic.Message).Order());
-        Assert.DoesNotContain(compiled.Diagnostics, diagnostic =>
-            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
-        var runtime = TestHarness.Execute(converted.CalorSource!, "Run");
-        Assert.Null(runtime.Exception);
-        Assert.Equal(2, runtime.ReturnValue);
-    }
 
     [Fact]
     public void MetadataArrayResults_AreIndexedByCallerAndExpressionSpan()

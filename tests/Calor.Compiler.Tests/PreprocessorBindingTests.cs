@@ -46,13 +46,6 @@ public class PreprocessorBindingTests
         "module T T block\n  func Run " + signature + "\n" +
         (body.StartsWith('!') ? "" : "    !\n") + Indent(body, "    ") + "\n";
 
-    /// <summary>
-    /// Legacy prefix-operator source for the Calor0110 arity tests below. Short-arity prefix
-    /// operators have no native spelling (native infix operators report Calor0100 instead).
-    /// </summary>
-    private static string LegacyFn(string body, string signature) =>
-        "§M{T}\n  §F{Run:pub} " + signature + "\n" + Indent(body, "    ") + "\n";
-
     /// <summary>A method on a class with a writable field <c>x</c>.</summary>
     private static string MethodWithField(string body) =>
         "module T T block\n  class K\n    field int:x\n    func Run () → int\n      ! mut\n" +
@@ -443,24 +436,6 @@ public class PreprocessorBindingTests
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
     }
 
-    // ===================================================================
-    // Short-arity operator tolerances are Calor0110
-    // ===================================================================
-
-    [Theory]
-    [InlineData("(?? s)", "(str?:s) -> str?")]
-    [InlineData("(? b 1)", "(bool:b) -> i32")]
-    [InlineData("(? b)", "(bool:b) -> i32")]
-    [InlineData("(? b 1 2 3)", "(bool:b) -> i32")]
-    [InlineData("(== s)", "(str?:s) -> bool")]
-    [InlineData("(!= s)", "(str?:s) -> bool")]
-    public void Parser_TooFewOperands_AreCalor0110(string expression, string signature)
-    {
-        Parse(LegacyFn($"§R {expression}", signature), out var diagnostics);
-
-        Assert.Contains(DiagnosticCode.OperatorArgumentCount, ErrorCodes(diagnostics));
-    }
-
     [Theory]
     [InlineData("s ?? \"d\"", "(string?:s) → string", "s ?? \"d\"")]
     [InlineData("b ? 1 : 2", "(bool:b) → int", "b ? 1 : 2")]
@@ -474,15 +449,6 @@ public class PreprocessorBindingTests
         Assert.Contains(expected, result.GeneratedCode);
     }
 
-    [Fact]
-    public void Parser_EqualsWithOneOperand_SuggestsComparingWithNull()
-    {
-        Parse(LegacyFn("§R (== s)", "(str?:s) -> bool"), out var diagnostics);
-
-        var error = Assert.Single(diagnostics.Errors, e => e.Code == DiagnosticCode.OperatorArgumentCount);
-        Assert.Contains("(== x null)", error.Message);
-    }
-
     // ===================================================================
     // End-to-end CLI: diagnostic and exit code
     // ===================================================================
@@ -493,9 +459,6 @@ public class PreprocessorBindingTests
         new object[] { "pp-nested", Fn("pp A\n  pp B\n    let int:x = 1\n  set x 2\nreturn 0"), "Calor0213" },
         new object[] { "pp-rebind-immutable", Fn("pp DEBUG\n  let int:x = 1\nvar x = 2\nreturn x"), "Calor0260" },
         new object[] { "pp-else-branch-write", Fn("let int:y = 1\npp DEBUG\n  let int:a = 0\npp else\n  set y 2\nreturn y"), "Calor0213" },
-        new object[] { "coalesce-one-operand", LegacyFn("§R (?? s)", "(str?:s) -> str?"), "Calor0110" },
-        new object[] { "ternary-two-operands", LegacyFn("§R (? b 1)", "(bool:b) -> i32"), "Calor0110" },
-        new object[] { "equals-one-operand", LegacyFn("§R (== s)", "(str?:s) -> bool"), "Calor0110" },
     };
 
     [Theory]

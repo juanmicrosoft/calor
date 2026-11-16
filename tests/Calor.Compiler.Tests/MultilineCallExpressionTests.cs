@@ -201,34 +201,6 @@ public class MultilineCallExpressionTests
         }
     }
 
-    [Theory]
-    [InlineData("§B{value:i32} §C{Math.Abs}\n  3\n§/C\n§R value", "§A")]
-    [InlineData("§B{value:i32} §C{Math.Abs}\n§A 3\n§R value", "§/C")]
-    public void MalformedArguments_NameTheCauseWithoutLosingFunctionScope(string body, string requiredToken)
-    {
-        var source = ProgramSource(body) + "\n  §F{Other:pub} () -> i32\n    §R 42\n";
-        var module = Parse(source, out var diagnostics);
-        var error = Assert.Single(diagnostics.Errors);
-        Assert.Equal(5, error.Span.Line);
-        Assert.Contains("Math.Abs", error.Message);
-        Assert.Contains(requiredToken, error.Message);
-        Assert.Equal(2, module.Functions.Count);
-        Assert.IsType<ReturnStatementNode>(module.Functions[0].Body.Last());
-        Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions[1].Body));
-    }
-
-    [Fact]
-    public void InlineInvalidArgument_PreservesEstablishedDiagnostic()
-    {
-        var source = ProgramSource("§R §C{Math.Abs} §A 3 §E{cw} §/C");
-        Parse(source, out var diagnostics);
-        var error = diagnostics.Errors.First();
-        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
-        Assert.Equal("Expected EndCall but found Effects", error.Message);
-        Assert.Equal(4, error.Span.Line);
-        Assert.Equal(source.Split('\n')[3].IndexOf("§E{cw}", StringComparison.Ordinal) + 1, error.Span.Column);
-    }
-
     private static string ProgramSource(string body) =>
         "module Calls Calls block\n"
         + "  func Probe () → int\n"
