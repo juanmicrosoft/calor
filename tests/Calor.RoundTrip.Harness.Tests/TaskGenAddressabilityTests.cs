@@ -69,7 +69,8 @@ public class TaskGenAddressabilityTests
 
         // The converter DECLARES the injected effect rather than hiding it: that is
         // the fix, and it is why the check below finds nothing to report.
-        Assert.Contains("§E{", conv.CalorSource!);
+        // The clean method is pure (a bare `!` row); the mutated one carries a non-empty row.
+        Assert.Matches(@"(?m)^\s*! \S", conv.CalorSource!);
 
         var result = _probe.Probe("Calor0410", cand.MutatedSource, EffectClean, "Counter.cs");
         Assert.True(result.Determinable, $"probe should be determinable; note: {result.Note}");

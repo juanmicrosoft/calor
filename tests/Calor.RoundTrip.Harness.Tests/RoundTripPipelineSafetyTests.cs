@@ -380,7 +380,7 @@ public sealed class RoundTripPipelineSafetyTests
             Assert.Equal(
                 PreprocessorConversionMode.PreserveAllBranches,
                 preserved.Metadata.PreprocessorMode);
-            Assert.Contains("§PP{FEATURE}", preserved.CalorSource);
+            Assert.Contains("pp FEATURE", preserved.CalorSource);
             Assert.Contains("Selected", preserved.CalorSource);
             Assert.Contains("Fallback", preserved.CalorSource);
 
@@ -1880,7 +1880,15 @@ public sealed class RoundTripPipelineSafetyTests
     [Fact]
     public async Task InteropPreservedFile_IsCountedAsNonNative()
     {
-        var root = CreateProject("public record Person(string Name);");
+        // Event subscription has no native Calor statement, so it is preserved as C# interop.
+        var root = CreateProject("""
+            public class Source
+            {
+                public event System.Action? Changed;
+                public void Hook() { Changed += OnChanged; }
+                private void OnChanged() { }
+            }
+            """);
         try
         {
             var config = CreateConfig(root);
