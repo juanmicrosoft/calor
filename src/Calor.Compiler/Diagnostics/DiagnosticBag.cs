@@ -239,7 +239,7 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
             // Create fix to add parentheses to call the function
             var fix = new SuggestedFix(
                 $"Call '{name}()'",
-                TextEdit.Replace(filePath, span.Line, span.Column, span.Line, span.Column + name.Length, $"§C{{{name}}} §/C"));
+                TextEdit.Replace(filePath, span.Line, span.Column, span.Line, span.Column + name.Length, $"{name}()"));
 
             ReportErrorWithFix(span, DiagnosticCode.TypeMismatch, message, fix);
         }

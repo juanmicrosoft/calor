@@ -83,7 +83,7 @@ public sealed class AnalyzeTool : McpToolBase
                 },
                 "filePath": {
                     "type": "string",
-                    "description": "Path to a .calr file to analyze for §CSHARP blocks (minimize action)"
+                    "description": "Path to a .calr file to analyze for raw C# blocks (minimize action)"
                 },
                 "directoryPath": {
                     "type": "string",

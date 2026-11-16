@@ -419,7 +419,7 @@ public static class QueryCommand
                 own = row;
                 writer.WriteLine($"  {answer.Subject}");
                 writer.WriteLine($"    declared: {row.DeclaredRow.Display}"
-                    + (row.Declared ? "" : "  (no §E written — a declaration without one is pure)"));
+                    + (row.Declared ? "" : "  (no effect row written — a declaration without one is pure)"));
                 writer.WriteLine($"    inferred: {row.InferredRow?.Display ?? "(not inferred)"}");
                 writer.WriteLine($"    verdict:  {ProjectIndexQueryReader.DescribeVerdict(row)}");
                 foreach (var reason in row.InferredRow?.Reasons ?? [])

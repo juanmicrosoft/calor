@@ -1001,127 +1001,91 @@ internal sealed class SnippetWrapper
     public int FirstLineColumnOffset { get; }
 
     /// <summary>
+    /// Column offset for every snippet line after the first: the indent the wrapper added
+    /// to place those lines in their block (0 when continuation lines are copied as is).
+    /// </summary>
+    public int ContinuationColumnOffset { get; }
+
+    /// <summary>
     /// Warnings about context configuration issues.
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
 
-    private SnippetWrapper(string wrappedSource, int snippetStartLine, int snippetEndLine, int firstLineColumnOffset = 0, IReadOnlyList<string>? warnings = null)
+    private SnippetWrapper(string wrappedSource, int snippetStartLine, int snippetEndLine, int firstLineColumnOffset,
+        int continuationColumnOffset, IReadOnlyList<string>? warnings = null)
     {
         WrappedSource = wrappedSource;
         SnippetStartLine = snippetStartLine;
         SnippetEndLine = snippetEndLine;
         FirstLineColumnOffset = firstLineColumnOffset;
+        ContinuationColumnOffset = continuationColumnOffset;
         Warnings = warnings ?? [];
     }
 
+    private const string ModuleHeader = "module SnippetCheck";
+    private const string ModuleIndent = "  ";
+    private const string BodyIndent = "    ";
+    private const string ExpressionPrefix = BodyIndent + "let _result = ";
+
     /// <summary>
-    /// Wraps the snippet in appropriate synthetic code based on context.
+    /// Wraps the snippet in native synthetic code based on context: a module, and for every
+    /// location except <c>module_body</c> a private function whose header carries the context's
+    /// parameters and return type. Block structure is indentation, so each snippet line is
+    /// indented into its block (an expression's continuation lines are copied as is).
     /// </summary>
     public static SnippetWrapper Wrap(string snippet, SnippetContext context)
     {
         var sb = new StringBuilder();
         var warnings = new List<string>();
-        int currentLine = 1;
-        int firstLineColumnOffset = 0;
+        var lines = snippet.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
 
-        // Module header
-        sb.AppendLine("§M{_:_snippet_}");
-        currentLine++;
+        sb.Append(ModuleHeader).Append('\n');
+        var snippetStart = 2;
 
         if (context.Location == SnippetLocation.ModuleBody)
         {
             if (context.Parameters.Count > 0)
-            {
                 warnings.Add("Context 'parameters' ignored for module_body location");
-            }
             if (context.ReturnType != null)
-            {
                 warnings.Add("Context 'returnType' ignored for module_body location");
-            }
             if (context.SurroundingCode != null)
-            {
                 warnings.Add("Context 'surroundingCode' ignored for module_body location");
-            }
 
-            int snippetStart = currentLine;
-            sb.Append(snippet);
-            int snippetLines = CountLines(snippet);
-            currentLine += snippetLines;
-            int snippetEnd = currentLine - 1;
-
-            if (!snippet.EndsWith('\n'))
-            {
-                sb.AppendLine();
-                currentLine++;
-            }
-
-            return new SnippetWrapper(sb.ToString(), snippetStart, snippetEnd, 0, warnings);
+            AppendIndented(sb, lines, ModuleIndent);
+            return new SnippetWrapper(sb.ToString(), snippetStart, snippetStart + lines.Length - 1,
+                ModuleIndent.Length, ModuleIndent.Length, warnings);
         }
 
-        // Function header
-        sb.AppendLine("§F{_:_validate_:priv}");
-        currentLine++;
+        var parameters = string.Join(", ", context.Parameters.Select(p => $"{p.Type}:{p.Name}"));
+        var returnType = context.ReturnType is null or "unit" ? "void" : context.ReturnType;
+        sb.Append(ModuleIndent).Append($"func _validate_ private ({parameters}) → {returnType}").Append('\n');
+        snippetStart++;
 
-        // Parameters
-        foreach (var param in context.Parameters)
-        {
-            sb.AppendLine($"  §I{{{param.Type}:{param.Name}}}");
-            currentLine++;
-        }
-
-        // Return type
-        var returnType = context.ReturnType ?? "unit";
-        sb.AppendLine($"  §O{{{returnType}}}");
-        currentLine++;
-
-        // Surrounding code if any
         if (!string.IsNullOrEmpty(context.SurroundingCode))
         {
-            sb.Append("  ");
-            sb.AppendLine(context.SurroundingCode);
-            currentLine += CountLines(context.SurroundingCode);
+            var surrounding = context.SurroundingCode.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
+            AppendIndented(sb, surrounding, BodyIndent);
+            snippetStart += surrounding.Length;
         }
 
-        int snippetStartLine = currentLine;
-
-        switch (context.Location)
+        if (context.Location == SnippetLocation.Expression)
         {
-            case SnippetLocation.Expression:
-                const string expressionPrefix = "  §B{_result} ";
-                sb.Append(expressionPrefix);
-                sb.Append(snippet);
-                firstLineColumnOffset = expressionPrefix.Length;
-                break;
-
-            case SnippetLocation.Statement:
-            case SnippetLocation.FunctionBody:
-            default:
-                const string statementIndent = "  ";
-                var lines = snippet.Split('\n');
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    sb.Append(statementIndent);
-                    sb.Append(lines[i]);
-                    if (i < lines.Length - 1)
-                    {
-                        sb.AppendLine();
-                    }
-                }
-                firstLineColumnOffset = statementIndent.Length;
-                break;
+            sb.Append(ExpressionPrefix).Append(lines[0]).Append('\n');
+            foreach (var line in lines.Skip(1))
+                sb.Append(line).Append('\n');
+            return new SnippetWrapper(sb.ToString(), snippetStart, snippetStart + lines.Length - 1,
+                ExpressionPrefix.Length, 0, warnings);
         }
 
-        int snippetLines2 = CountLines(snippet);
-        int snippetEndLine = snippetStartLine + snippetLines2 - 1;
-        currentLine += snippetLines2;
+        AppendIndented(sb, lines, BodyIndent);
+        return new SnippetWrapper(sb.ToString(), snippetStart, snippetStart + lines.Length - 1,
+            BodyIndent.Length, BodyIndent.Length, warnings);
+    }
 
-        if (!snippet.EndsWith('\n'))
-        {
-            sb.AppendLine();
-            currentLine++;
-        }
-
-        return new SnippetWrapper(sb.ToString(), snippetStartLine, snippetEndLine, firstLineColumnOffset, warnings);
+    private static void AppendIndented(StringBuilder sb, IEnumerable<string> lines, string indent)
+    {
+        foreach (var line in lines)
+            sb.Append(line.Length > 0 ? indent + line : line).Append('\n');
     }
 
     /// <summary>
@@ -1162,35 +1126,11 @@ internal sealed class SnippetWrapper
     /// </summary>
     public int AdjustColumn(int line, int column)
     {
-        if (FirstLineColumnOffset == 0)
-        {
-            return column;
-        }
-
         if (line == SnippetStartLine)
         {
             return Math.Max(1, column - FirstLineColumnOffset);
         }
 
-        if (FirstLineColumnOffset == 2)
-        {
-            return Math.Max(1, column - 2);
-        }
-
-        return column;
-    }
-
-    private static int CountLines(string text)
-    {
-        if (string.IsNullOrEmpty(text))
-            return 1;
-
-        int count = 1;
-        for (int i = 0; i < text.Length; i++)
-        {
-            if (text[i] == '\n')
-                count++;
-        }
-        return count;
+        return Math.Max(1, column - ContinuationColumnOffset);
     }
 }

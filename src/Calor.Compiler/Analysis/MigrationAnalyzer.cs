@@ -223,7 +223,7 @@ public sealed class MigrationAnalyzer
             {
                 Name = "ref-parameter",
                 // #943: native since F1; only the D1 RO-UNS-1 shapes stay C# (see FeatureSupport "ref-parameter").
-                Description = "out/ref parameters convert natively (§A{ref}, §A{out}); ref locals and returns, scoped and ref readonly " +
+                Description = "out/ref parameters convert natively (ref int:value, out int:result); ref locals and returns, scoped and ref readonly " +
                     "parameters, by-reference delegates and method-generic by-reference parameters stay C#",
                 Count = visitor.OutRefParameterCount,
                 Examples = visitor.OutRefParameterExamples
@@ -351,7 +351,7 @@ public sealed class MigrationAnalyzer
             result.Add(new UnsupportedConstruct
             {
                 Name = "in-parameter",
-                Description = "in parameters convert natively (§A{in}); call sites that omit in stay C#",
+                Description = "in parameters convert natively (in int:value); call sites that omit in stay C#",
                 Count = visitor.InParameterCount,
                 Examples = visitor.InParameterExamples
             });

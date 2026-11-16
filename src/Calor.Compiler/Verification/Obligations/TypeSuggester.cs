@@ -222,10 +222,10 @@ public sealed class TypeSuggester
                 FunctionId = functionId,
                 ParameterName = paramName,
                 CurrentType = typeName,
-                SuggestedPredicate = $"(!= # INT:0)",
+                SuggestedPredicate = $"{paramName} != 0",
                 Reason = $"'{paramName}' is used as a divisor without a non-zero constraint",
                 Confidence = "high",
-                CalorSyntax = $"§I{{{typeName}:{paramName}}} | (!= # INT:0)"
+                CalorSyntax = $"requires {paramName} != 0"
             });
         }
 
@@ -236,10 +236,10 @@ public sealed class TypeSuggester
                 FunctionId = functionId,
                 ParameterName = paramName,
                 CurrentType = typeName,
-                SuggestedPredicate = $"(>= # INT:0)",
+                SuggestedPredicate = $"{paramName} >= 0",
                 Reason = $"'{paramName}' is used as an array index without a non-negative constraint",
                 Confidence = "high",
-                CalorSyntax = $"§I{{{typeName}:{paramName}}} | (>= # INT:0)"
+                CalorSyntax = $"requires {paramName} >= 0"
             });
         }
 
@@ -250,10 +250,10 @@ public sealed class TypeSuggester
                 FunctionId = functionId,
                 ParameterName = paramName,
                 CurrentType = typeName,
-                SuggestedPredicate = $"(>= # INT:0)",
+                SuggestedPredicate = $"{paramName} >= 0",
                 Reason = $"'{paramName}' is compared with >= 0, suggesting a non-negative constraint",
                 Confidence = "medium",
-                CalorSyntax = $"§I{{{typeName}:{paramName}}} | (>= # INT:0)"
+                CalorSyntax = $"requires {paramName} >= 0"
             });
         }
 
@@ -264,10 +264,10 @@ public sealed class TypeSuggester
                 FunctionId = functionId,
                 ParameterName = paramName,
                 CurrentType = typeName,
-                SuggestedPredicate = $"(> # INT:0)",
+                SuggestedPredicate = $"{paramName} > 0",
                 Reason = $"'{paramName}' is compared with > 0, suggesting a positive constraint",
                 Confidence = "medium",
-                CalorSyntax = $"§I{{{typeName}:{paramName}}} | (> # INT:0)"
+                CalorSyntax = $"requires {paramName} > 0"
             });
         }
 

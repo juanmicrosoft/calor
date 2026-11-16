@@ -61,10 +61,10 @@ public sealed class ContractInferencePass
         var divisorParams = FindDivisorParameters(function);
         foreach (var paramName in divisorParams)
         {
-            var contractText = $"§Q (!= {paramName} 0)";
+            var contractText = $"requires {paramName} != 0";
             var fix = new SuggestedFix(
                 $"Add inferred precondition: {contractText}",
-                TextEdit.Insert("", function.Span.Line, 0, $"  {contractText}\n"));
+                ContractFixEdit.Insert(function, contractText));
 
             _diagnostics.ReportWithFix(
                 function.Span,
@@ -101,14 +101,14 @@ public sealed class ContractInferencePass
             .Select(parameter => parameter.Id)
             .ToHashSet();
 
-        // Pattern: function returns a parameter directly → §S (== result paramName)
+        // Pattern: function returns a parameter directly → => result == paramName
         if (retExpr is BoundVariableExpression varExpr
             && parameterIds.Contains(varExpr.Variable.Id))
         {
-            var contractText = $"§S (== result {varExpr.Variable.Name})";
+            var contractText = $"=> result == {varExpr.Variable.Name}";
             var fix = new SuggestedFix(
                 $"Add inferred postcondition: {contractText}",
-                TextEdit.Insert("", function.Span.Line, 0, $"  {contractText}\n"));
+                ContractFixEdit.Insert(function, contractText));
 
             _diagnostics.ReportWithFix(
                 function.Span,
@@ -120,7 +120,7 @@ public sealed class ContractInferencePass
             inferred++;
         }
 
-        // Pattern: function returns (+ a b) where both are non-negative params → §S (>= result 0)
+        // Pattern: function returns x * x for a parameter x → => result >= 0
         // Only if both parameters have non-negative preconditions or are unsigned-like
         if (retExpr is BoundBinaryExpression binExpr &&
             binExpr.Operator == BinaryOperator.Multiply &&
@@ -130,10 +130,10 @@ public sealed class ContractInferencePass
             parameterIds.Contains(leftVar.Variable.Id))
         {
             // x * x is always non-negative for integers
-            var contractText = $"§S (>= result 0)";
+            var contractText = "=> result >= 0";
             var fix = new SuggestedFix(
                 $"Add inferred postcondition: {contractText}",
-                TextEdit.Insert("", function.Span.Line, 0, $"  {contractText}\n"));
+                ContractFixEdit.Insert(function, contractText));
 
             _diagnostics.ReportWithFix(
                 function.Span,

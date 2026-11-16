@@ -63,7 +63,7 @@ public sealed class ConvertTool : McpToolBase
                 "conversionMode": {
                     "type": "string",
                     "enum": ["standard", "interop"],
-                    "description": "Conversion mode: 'standard' (default) or 'interop' for §CSHARP blocks"
+                    "description": "Conversion mode: 'standard' (default) or 'interop' for raw C# blocks"
                 },
                 "fidelity": {
                     "type": "string",
@@ -155,11 +155,11 @@ public sealed class ConvertTool : McpToolBase
                 },
                 "passthroughOnError": {
                     "type": "boolean",
-                    "description": "Wrap unsupported constructs in §CSHARP blocks instead of emitting broken Calor (default: false)"
+                    "description": "Wrap unsupported constructs in raw C# blocks instead of emitting broken Calor (default: false)"
                 },
                 "explicitCallClosers": {
                     "type": "boolean",
-                    "description": "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision (default: false — v0.6.1 default elides zero-arg §/C)"
+                    "description": "Legacy compatibility option; current native calls use parentheses and never emit closer tags (default: false)"
                 }
             },
             "additionalProperties": false

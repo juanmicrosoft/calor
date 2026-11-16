@@ -46,8 +46,8 @@ public class SuggestionTests
     }
 
     [Theory]
-    [InlineData("typeof", "Use (typeof Type)")]
-    [InlineData("new", "§NEW")]
+    [InlineData("typeof", "typeof(Type)")]
+    [InlineData("new", "new Type(arg1, arg2)")]
     [InlineData("await", "await")]
     [InlineData("null", "nullable type")]
     [InlineData("ToString", "Use (str expr)")]

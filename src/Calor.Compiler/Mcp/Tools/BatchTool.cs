@@ -31,7 +31,7 @@ public sealed class BatchTool : McpToolBase
         "action='convert': Convert an entire C# project to Calor in a single call. " +
         "Discovers .cs files, converts each to Calor, and writes output files. " +
         "Module names are derived from C# namespace declarations. Use moduleNameOverride to force a specific namespace. " +
-        "IMPORTANT: If results contain §CSHARP interop blocks, use calor_help to check for native equivalents. " +
+        "IMPORTANT: If results contain raw C# interop blocks, use calor_help to check for native equivalents. " +
         "action='analyze': Analyze convertibility of an entire C# project directory. " +
         "Returns aggregate scores, tier breakdowns, and top blockers across the project. " +
         "action='compile': Compile .calr files in batch. Discovers files via directory, explicit paths, or glob pattern. " +
@@ -116,7 +116,7 @@ public sealed class BatchTool : McpToolBase
                 },
                 "passthroughOnError": {
                     "type": "boolean",
-                    "description": "Wrap unsupported constructs in §CSHARP blocks instead of emitting broken Calor (default: false)"
+                    "description": "Wrap unsupported constructs in raw C# blocks instead of emitting broken Calor (default: false)"
                 },
                 "files": {
                     "type": "array",
@@ -298,9 +298,9 @@ public sealed class BatchTool : McpToolBase
             if (hasInteropBlocks)
             {
                 recommendations.Add(
-                    "Some files contain §CSHARP interop blocks. Many C# constructs have native Calor equivalents " +
+                    "Some files contain raw C# interop blocks. Many C# constructs have native Calor equivalents " +
                     "(foreach, switch, async/await, yield, structs, delegates, events, operators, preprocessor directives). " +
-                    "Use calor_help to check for native equivalents before leaving code in §CSHARP blocks.");
+                    "Use calor_help to check for native equivalents before leaving code in raw C# blocks.");
             }
 
             var totalCsharpBlocks = fileResults.Sum(f => f.CsharpBlockCount);

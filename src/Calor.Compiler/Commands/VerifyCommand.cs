@@ -73,7 +73,7 @@ public static class VerifyCommand
             aliases: ["--weakening-check"],
             description: "M-G4 mode (gates doc Annex A-1.3): with exactly two input files "
                 + "(frozen, final), mechanically decide whether the named declaration's "
-                + "§Q/§S conjunction was weakened — prints a JSON verdict, exit 0");
+                + "requires/=> conjunction was weakened — prints a JSON verdict, exit 0");
 
         var command = new Command("verify", "Verify contracts in Calor files using Z3 SMT solver")
         {
@@ -973,8 +973,8 @@ public static class VerifyCommand
                 sWeakened && qStrengthened
                     ? "postcondition relaxed and precondition strengthened — weakened"
                     : sWeakened
-                        ? "frozen §S implies final §S but not conversely — postcondition weakened"
-                        : "final §Q implies frozen §Q but not conversely — precondition strengthened (prover appeasement)",
+                        ? "frozen postcondition implies final postcondition but not conversely — postcondition weakened"
+                        : "final precondition implies frozen precondition but not conversely — precondition strengthened (prover appeasement)",
                 false, sF, sB, qF, qB);
         }
 

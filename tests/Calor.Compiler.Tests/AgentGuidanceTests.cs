@@ -137,7 +137,8 @@ public sealed class AgentGuidanceTests
         var guards = discovery.DiscoverGuards(tracker);
 
         Assert.NotEmpty(guards);
-        Assert.Contains(guards, g => g.CalorExpression.Contains("§Q"));
+        Assert.Contains(guards, g => g.CalorExpression.StartsWith("requires ", StringComparison.Ordinal));
+        Assert.DoesNotContain(guards, g => g.CalorExpression.Contains('§'));
     }
 
     [Fact]
@@ -385,7 +386,7 @@ public sealed class AgentGuidanceTests
     [Fact]
     public void GuardDiscovery_NestedAndPredicate_FormatsCorrectly()
     {
-        // Test that a compound predicate like (&& (>= # INT:0) (<= # INT:100)) formats correctly
+        // A compound predicate formats as native infix with the parameter in place of #
         var source = """
             module Test Test block
               func Main private (int:x | ((# >= 0) && (# <= 100))) → void
@@ -409,9 +410,9 @@ public sealed class AgentGuidanceTests
         Assert.NotEmpty(guards);
         // The precondition guard should contain the formatted condition with >= and <=
         var precondGuard = guards.First(g => g.InsertionKind == "precondition");
-        Assert.Contains(">=", precondGuard.CalorExpression);
-        Assert.Contains("<=", precondGuard.CalorExpression);
-        Assert.Contains("§Q", precondGuard.CalorExpression);
+        Assert.Equal("requires (x >= 0) && (x <= 100)", precondGuard.CalorExpression);
+        var ifGuard = guards.First(g => g.InsertionKind == "if_guard");
+        Assert.StartsWith("if !((x >= 0) && (x <= 100))\n  throw new InvalidOperationException(", ifGuard.CalorExpression);
     }
 
     [Fact]

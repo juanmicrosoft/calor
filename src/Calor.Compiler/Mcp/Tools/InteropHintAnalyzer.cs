@@ -22,57 +22,57 @@ internal static class InteropHintAnalyzer
     private static readonly (Regex Pattern, string Feature, string CalorTag, string HintTemplate)[] HintRules =
     [
         (new Regex(@"\bforeach\s*\(", RegexOptions.Compiled),
-            "foreach", "§L{item:collection}",
-            "foreach loops are supported natively via §L{item:collection} — consider converting §CSHARP blocks containing foreach"),
+            "foreach", "each T:item in collection",
+            "foreach loops are supported natively via each T:item in collection — consider converting raw C# blocks containing foreach"),
 
         (new Regex(@"\bswitch\s*[\(\{]", RegexOptions.Compiled),
-            "switch", "§W{expr} §K{pattern}",
-            "switch/match is supported via §W{expr} §K{pattern} — consider converting switch statements"),
+            "switch", "match value / case pattern",
+            "switch/match is supported via match value with case pattern arms — consider converting switch statements"),
 
         (new Regex(@"\basync\s+", RegexOptions.Compiled),
-            "async", "§AMT/§AF/§AWAIT",
-            "async/await is supported via §AMT (async method), §AF (async function), and §AWAIT — consider converting async methods"),
+            "async", "func Name async / await",
+            "async/await is supported via func Name async (...) → T and await expr — consider converting async methods"),
 
         (new Regex(@"\byield\s+(return|break)", RegexOptions.Compiled),
-            "yield", "§YIELD/§YBRK",
-            "yield return/break is supported via §YIELD and §YBRK — consider converting iterator methods"),
+            "yield", "yield expr / yield break",
+            "yield return/break is supported via yield expr and yield break — consider converting iterator methods"),
 
         (new Regex(@"\busing\s*\(", RegexOptions.Compiled),
-            "using-statement", "§USE{var} expr",
-            "using statements are supported via §USE{var} expr with an indented body — consider converting resource management blocks"),
+            "using-statement", "using T:name = resource",
+            "using statements are supported via using T:name = resource with an indented body — consider converting resource management blocks"),
 
         (new Regex(@"\bdelegate\s+", RegexOptions.Compiled),
-            "delegate", "§DEL{id:name:vis}",
-            "delegate definitions are supported via §DEL — consider converting delegate type declarations"),
+            "delegate", "delegate Name (T:x) → R",
+            "delegate definitions are supported via delegate Name (T:x) → R — consider converting delegate type declarations"),
 
         (new Regex(@"\bevent\s+", RegexOptions.Compiled),
-            "event", "§EVT{id:name:vis}",
-            "events are supported via §EVT — consider converting event declarations"),
+            "event", "event DelegateType:Name",
+            "events are supported via event DelegateType:Name — consider converting event declarations"),
 
         // Match both conversion operators and regular operators as one hint
         (new Regex(@"\boperator\s+[+\-*/=<>!~%&|^]|\b(?:implicit|explicit)\s+operator\b", RegexOptions.Compiled),
-            "operator", "§OP{id:operator:vis}",
-            "operator overloading (including implicit/explicit conversions) is supported via §OP — consider converting operator definitions"),
+            "operator", "op + (T:left, T:right) → R",
+            "operator overloading (including implicit/explicit conversions) is supported via op — consider converting operator definitions"),
 
         (new Regex(@"#if\s+\w", RegexOptions.Compiled),
-            "preprocessor", "§PP{CONDITION}",
-            "preprocessor directives are supported via §PP{CONDITION} ... §/PP — consider converting #if/#else/#endif blocks"),
+            "preprocessor", "pp CONDITION",
+            "preprocessor directives are supported via pp CONDITION, pp elif and pp else with indented bodies — consider converting #if/#else/#endif blocks"),
 
         (new Regex(@"\bstruct\s+\w", RegexOptions.Compiled),
-            "struct", "§CL{id:name:vis:struct}",
-            "structs are supported via §CL with struct modifier — consider converting struct definitions"),
+            "struct", "class Name struct",
+            "structs are supported via class Name struct — consider converting struct definitions"),
 
         (new Regex(@"\bwhere\s+\w+\s*:", RegexOptions.Compiled),
-            "generic-constraint", "§WHERE{T:constraint}",
-            "generic type constraints are supported via §WHERE — consider converting where clauses"),
+            "generic-constraint", "where T : constraint",
+            "generic type constraints are supported via where T : constraint — consider converting where clauses"),
 
         (new Regex(@"\bthis\s*\[", RegexOptions.Compiled),
-            "indexer", "§IXER{id:type:vis}",
-            "indexers (this[]) are supported via §IXER — consider converting indexer definitions to native §IXER{id:type:vis} syntax"),
+            "indexer", "this[int:index] → T",
+            "indexers (this[]) are supported via this[int:index] → T — consider converting indexer definitions"),
     ];
 
     /// <summary>
-    /// Analyzes Calor source for §CSHARP interop blocks and returns hints about
+    /// Analyzes Calor source for raw C# interop blocks and returns hints about
     /// C# constructs that could be expressed natively.
     /// </summary>
     /// <param name="calorSource">The generated Calor source code.</param>
@@ -82,7 +82,7 @@ internal static class InteropHintAnalyzer
         if (string.IsNullOrWhiteSpace(calorSource))
             return [];
 
-        // Extract content from §CSHARP{...}§/CSHARP blocks
+        // Extract the payloads of raw C# frames
         var interopContent = ExtractInteropContent(calorSource);
         if (string.IsNullOrWhiteSpace(interopContent))
             return [];

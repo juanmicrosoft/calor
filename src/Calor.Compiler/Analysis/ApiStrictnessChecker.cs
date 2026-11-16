@@ -108,7 +108,7 @@ public sealed class ApiStrictnessChecker
                 func.Span,
                 DiagnosticCode.MissingDocComment,
                 $"Public function '{func.Name}' has no contracts or documentation. " +
-                "Add §Q (precondition), §S (postcondition), or documentation.");
+                "Add a requires precondition, an => postcondition, or documentation.");
         }
     }
 
@@ -239,7 +239,7 @@ public sealed class BreakingChangeDetector
                         _diagnostics.ReportError(
                             newFunc.Span,
                             DiagnosticCode.BreakingChangeWithoutMarker,
-                            $"Breaking change in '{newFunc.Name}': {change}. Add §BREAKING marker to document this change.");
+                            $"Breaking change in '{newFunc.Name}': {change}. Add a breaking-change comment (/// breaking <version> \"description\") to document this change.");
                     }
                     report.BreakingChanges.Add($"{newFunc.Name}: {change}");
                 }

@@ -608,7 +608,7 @@ public sealed class McpMessageHandler
                     {
                         Type = "text",
                         Text = $"Convert this C# code to Calor. Use calor_convert first, then calor_compile to validate (autoFix is on by default). " +
-                               $"If there are §CSHARP interop blocks, use calor_help to check for native equivalents.\n\n" +
+                               $"If there are raw C# interop blocks, use calor_help to check for native equivalents.\n\n" +
                                $"```csharp\n{args?.GetValueOrDefault("csharpSource", "// paste C# here")}\n```"
                     }
                 }

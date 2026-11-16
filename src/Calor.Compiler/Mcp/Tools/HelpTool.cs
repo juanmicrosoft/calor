@@ -264,14 +264,16 @@ public sealed class HelpTool : McpToolBase
 
     #region SyntaxHelp (explicit overview and reference)
 
+    // Query terms that select a topic. Native keywords come first; the retired `§` markers stay
+    // as recognized synonyms so a query in the old spelling still finds the native topic.
     private static readonly Dictionary<string, string[]> FeatureAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["async"] = ["async", "await", "§AF", "§AMT", "§AWAIT", "§ASYNC"],
-        ["contracts"] = ["contract", "§Q", "§S", "precondition", "postcondition", "requires", "ensures"],
-        ["effects"] = ["effect", "§E", "side effect", "cw", "cr", "fs:"],
-        ["loops"] = ["loop", "for", "for loop", "foreach", "while", "§L{", "§WH{", "§DO{", "§BK", "§CN"],
+        ["contracts"] = ["contract", "invariant", "proof", "§Q", "§S", "precondition", "postcondition", "requires", "ensures"],
+        ["effects"] = ["effect", "effect row", "§E", "side effect", "cw", "cr", "fs:"],
+        ["loops"] = ["loop", "for", "for loop", "foreach", "each", "while", "break", "continue", "§L{", "§WH{", "§DO{", "§BK", "§CN"],
         ["conditionals"] = ["if", "if statement", "if-else", "else", "conditional", "§IF{", "§EI", "§EL", "ternary"],
-        ["functions"] = ["function", "§F{", "§I{", "§O{", "§R", "return", "parameter", "extension method", "params", "default parameter", "ref", "out", "in"],
+        ["functions"] = ["function", "func", "§F{", "§I{", "§O{", "§R", "return", "parameter", "extension method", "params", "default parameter", "ref", "out", "in"],
         ["classes"] = ["class", "§CL{", "§EXT{", "§IMPL{", "inheritance", "interface", "static class"],
         ["generics"] = ["generic", "<T>", "§WHERE", "type parameter", "constraint"],
         ["collections"] = ["list", "dict", "array", "§LIST{", "§DICT{", "§ARR", "§IDX"],
@@ -282,7 +284,7 @@ public sealed class HelpTool : McpToolBase
         ["types"] = ["type", "i32", "i64", "f32", "f64", "bool", "void"],
         ["records"] = ["record", "§D{", "union", "§T{", "§V{"],
         ["enums"] = ["enum", "§EN{"],
-        ["constructors"] = ["constructor", "§CTOR{", "§BASE", "§THIS"],
+        ["constructors"] = ["constructor", "ctor", "§CTOR{", "§BASE", "§THIS"],
         ["properties"] = ["property", "§PROP{", "§GET", "§SET", "field", "§FLD{"],
         ["structs"] = ["struct", "§ST{", "value type"],
         ["operators"] = ["operator", "§OP{", "overload", "arithmetic"],

@@ -472,7 +472,7 @@ public sealed class FactCollector
                 || SharesEmittedName(name))
                 return "shares its C# name with another variable, so its value at the proof is not known";
             if (bind.IsMutable)
-                return "is mutable (§B{~...}), so its value at the proof is not modeled";
+                return "is mutable (var), so its value at the proof is not modeled";
             if (rebound.Contains(name) || _parameterNames.Contains(name))
                 return "is reassigned, passed by reference, or shadows another variable, so its value at the proof is not modeled";
             if (bind.Initializer is not { } definition)

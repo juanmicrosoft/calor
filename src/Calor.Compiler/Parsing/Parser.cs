@@ -2276,11 +2276,11 @@ public sealed class Parser
     private static string DescribeEffectRowPosition(EffectRowPosition position) => position switch
     {
         EffectRowPosition.Return => "a return row — a returned function mentioning the caller's effect variable would be rank-2 polymorphism",
-        EffectRowPosition.Binding => "a binding's row — a §B binds no effect variable",
-        EffectRowPosition.Field => "a field's row — a §FLD binds no effect variable",
-        EffectRowPosition.Property => "a property's row — a §PROP binds no effect variable",
-        EffectRowPosition.Lambda => "a lambda literal's row — a §LAM has no type-parameter list to bind one",
-        EffectRowPosition.Delegate => "a delegate declaration's row — a §DEL has no type-parameter list to bind one",
+        EffectRowPosition.Binding => "a binding's row — a let or var binds no effect variable",
+        EffectRowPosition.Field => "a field's row — a field binds no effect variable",
+        EffectRowPosition.Property => "a property's row — a property binds no effect variable",
+        EffectRowPosition.Lambda => "a lambda literal's row — a lambda has no type-parameter list to bind one",
+        EffectRowPosition.Delegate => "a delegate declaration's row — a delegate has no type-parameter list to bind one",
         _ => "this position",
     };
 
@@ -2484,9 +2484,9 @@ public sealed class Parser
             _diagnostics.ReportError(
                 Current.Span,
                 DiagnosticCode.EffectRowMisplaced,
-                "A type can carry only one §E{…} effect row. Combine the codes into a single "
-                + "row — §E{cw, net} — or, if this is meant to be the function's own effect "
-                + "declaration, move it onto its own line in the §F body.");
+                "A type can carry only one effect row. Combine the effects into a single "
+                + "row — ! cw, net — or, if this is meant to be the function's own effect "
+                + "row, move it onto its own line at the top of the function body.");
 
             var startToken = Advance();
             if (startToken.Kind == TokenKind.Exclamation)
@@ -2514,8 +2514,8 @@ public sealed class Parser
         _diagnostics.ReportError(
             Current.Span,
             DiagnosticCode.EffectRowMisplaced,
-            $"A §E{{…}} effect row must be on the same line as the type it annotates. Move it onto {target}, "
-            + "or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.");
+            $"An effect row must be on the same line as the type it annotates. Move it onto {target}, "
+            + "or — if this is meant to be the function's own effect row — onto its own line at the top of the function body.");
 
         // Consume §E and its attribute group(s) so the caller resumes cleanly.
         var startToken = Advance();
@@ -2957,10 +2957,10 @@ public sealed class Parser
     /// </summary>
     private StatementNode? ParseMisalignedElseClause()
     {
-        var clauseToken = Advance(); // §EI or §EL
-        var tag = clauseToken.Kind == TokenKind.ElseIf ? "§EI" : "§EL";
-        var message = $"'{tag}' is not aligned with any open §IF -- the if-chain already closed at a " +
-            "shallower indent level. Indent the clause to the same column as its §IF.";
+        var clauseToken = Advance(); // else if / else
+        var tag = clauseToken.Kind == TokenKind.ElseIf ? "else if" : "else";
+        var message = $"'{tag}' is not aligned with any open 'if' -- the if-chain already closed at a " +
+            "shallower indent level. Indent the clause to the same column as its 'if'.";
 
         // The edit replaces the clause line's leading columns with spaces;
         // it is a no-op when the clause already sits at the target column.
@@ -2973,7 +2973,7 @@ public sealed class Parser
             int targetIndent = Math.Max(0, ifTok.Span.Column - 1);
             int leadingLength = Math.Max(0, clauseToken.Span.Column - 1);
             var fix = new SuggestedFix(
-                $"Re-indent '{tag}' to column {ifTok.Span.Column} (aligned with the §IF on line {ifTok.Span.Line})",
+                $"Re-indent '{tag}' to column {ifTok.Span.Column} (aligned with the 'if' on line {ifTok.Span.Line})",
                 TextEdit.Replace(_diagnostics.CurrentFilePath ?? "", clauseToken.Span.Line, 1,
                     clauseToken.Span.Line, leadingLength + 1, new string(' ', targetIndent)));
             _diagnostics.ReportErrorWithFix(clauseToken.Span,
@@ -3374,7 +3374,7 @@ public sealed class Parser
             if (op.Kind == TokenKind.Minus && Check(TokenKind.Minus)
                 && op.Span.End == Current.Span.Start)
                 _diagnostics.ReportError(op.Span.Union(Current.Span), DiagnosticCode.UnexpectedToken,
-                    "Update operator '--' is removed. Use §ASSIGN with an explicit value instead.");
+                    "Update operator '--' is removed. Use set with an explicit value instead, for example set x x - 1.");
             var right = ParseInfixOperand(op,
                 op.Kind == TokenKind.NullCoalesce ? precedence : precedence + 1);
             expr = op.Kind == TokenKind.NullCoalesce
@@ -3611,7 +3611,7 @@ public sealed class Parser
         if (op.Kind == TokenKind.Minus && Check(TokenKind.Minus)
             && op.Span.End == Current.Span.Start)
             _diagnostics.ReportError(op.Span.Union(Current.Span), DiagnosticCode.UnexpectedToken,
-                "Update operator '--' is removed. Use §ASSIGN with an explicit value instead.");
+                "Update operator '--' is removed. Use set with an explicit value instead, for example set x x - 1.");
         var immediateInteger = Check(TokenKind.IntLiteral);
         var literalText = Current.Text;
         var savedMinimum = _allowSignedMinimumLiteral;
@@ -4833,7 +4833,7 @@ public sealed class Parser
         if (text is "inc" or "pre-inc" or "dec" or "pre-dec" or "post-inc" or "post-dec")
         {
             _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                $"Update operator '{text}' is removed. Use §ASSIGN with an explicit value instead.");
+                $"Update operator '{text}' is removed. Use set with an explicit value instead, for example set x x + 1.");
             return null;
         }
         return text switch
@@ -6772,7 +6772,7 @@ public sealed class Parser
         // Expect §EL (else)
         if (!Check(TokenKind.Else))
         {
-            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "IF expression requires an else clause (§EL)");
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "An if expression requires an else clause (else → value)");
             return thenExpr;
         }
         Expect(TokenKind.Else);
@@ -6780,7 +6780,7 @@ public sealed class Parser
         // Expect arrow and else expression
         if (!Check(TokenKind.Arrow))
         {
-            _diagnostics.ReportError(Current.Span, "Calor0102", "Expected '→' after §EL in IF expression");
+            _diagnostics.ReportError(Current.Span, "Calor0102", "Expected '→' after else in an if expression");
             return thenExpr;
         }
         Advance(); // consume →
@@ -9422,7 +9422,7 @@ public sealed class Parser
                 DiagnosticCode.EffectVariableScope,
                 $"An 'eff' effect variable cannot be declared on {owner}. In 0.15 an effect "
                 + "variable may only be bound by a function or method declaration — write it on "
-                + "the member's own type-parameter list, for example §MT{Handle:pub}<eff e>.");
+                + "the member's own type-parameter list, for example func Handle<eff e> public (...).");
             return;
         }
 

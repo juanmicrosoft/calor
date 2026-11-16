@@ -98,8 +98,8 @@ public sealed class ReturnValidationPass
     {
         if (node is ReferenceNode reference && names.Contains(reference.Name) && !allowed)
             _diagnostics.ReportError(reference.Span, DiagnosticCode.UnsupportedLocalFunction,
-                $"Local function '{reference.Name}' can be used as a value only directly in a §B initializer, " +
-                "a §R, a simple §ASSIGN or a ?: branch of those (outside lambdas), or as a §C{…} argument.");
+                $"Local function '{reference.Name}' can be used as a value only directly in a let or var initializer, " +
+                "a return, a simple set or a ?: branch of those (outside lambdas), or as a call argument.");
         var children = node is LocalFunctionStatementNode local
             ? [new RecursiveAstWalker.ChildEdge(local.Function, null!)]
             : RecursiveAstWalker.GetAllChildEdges(node);
@@ -126,12 +126,12 @@ public sealed class ReturnValidationPass
         var function = local.Function;
         string? reason = null;
         if (!_placedLocalFunctions.Contains(local))
-            reason = "must be declared directly in the body of a §F function or §MT method, not in a block, lambda or another local function";
+            reason = "must be declared directly in the body of a function or method, not in a block, lambda or another local function";
         else if (function.Effects != null || function.Output?.Row != null
                  || function.Parameters.Any(parameter => parameter.Row != null))
             reason = "cannot declare an effect row; its effects are charged to the enclosing callable";
         else if (function.Preconditions.Count > 0 || function.Postconditions.Count > 0)
-            reason = "cannot declare §Q/§S contracts";
+            reason = "cannot declare requires or => contracts";
         else if (function.TypeParameters.Count > 0 || function.EffectParameters.Count > 0
                  || function.Name.Contains('<'))
             reason = "cannot be generic";
@@ -141,10 +141,10 @@ public sealed class ReturnValidationPass
             reason = "cannot use a refinement or indexed type in its signature";
         else if (RecursiveAstWalker.EnumerateStatements(function.Body).Any(statement =>
                      statement is YieldReturnStatementNode or YieldBreakStatementNode))
-            reason = "cannot be an iterator (§YIELD/§YBRK)";
+            reason = "cannot be an iterator (yield or yield break)";
         else if (RecursiveAstWalker.EnumerateStatements(function.Body).Any(statement =>
                      statement is ProofObligationNode))
-            reason = "cannot contain §PROOF obligations";
+            reason = "cannot contain proof obligations";
         if (reason != null)
         {
             _diagnostics.ReportError(
@@ -428,7 +428,7 @@ public sealed class ReturnValidationPass
             _diagnostics.ReportError(
                 yieldReturn.Span,
                 DiagnosticCode.YieldRequiresValue,
-                "'§YIELD' requires a value. Use '§YBRK' for 'yield break'.");
+                "'yield' requires a value. Use 'yield break' to stop the iterator.");
             return;
         }
 
@@ -438,7 +438,7 @@ public sealed class ReturnValidationPass
             _diagnostics.ReportError(
                 yieldReturn.Span,
                 DiagnosticCode.IllegalYield,
-                $"'§YIELD' is illegal {reason}.");
+                $"'yield' is illegal {reason}.");
         }
     }
 
@@ -452,7 +452,7 @@ public sealed class ReturnValidationPass
             _diagnostics.ReportError(
                 yieldBreak.Span,
                 DiagnosticCode.IllegalYield,
-                $"'§YBRK' is illegal {reason}.");
+                $"'yield break' is illegal {reason}.");
         }
     }
 
@@ -515,25 +515,25 @@ public sealed class ReturnValidationPass
     private static string MessageFor(ReturnShape.Kind kind) => kind switch
     {
         ReturnShape.Kind.Void =>
-            "'§R' returns a value, but the enclosing function/method declares no return type and " +
-            "compiles to 'void', which cannot return a value. Add a return type ('§O{type}' or a " +
-            "return type in the header), or drop the value and use a bare '§R' to return early.",
+            "'return' gives a value, but the enclosing function/method declares no return type and " +
+            "compiles to 'void', which cannot return a value. Add a return type ('→ type' in the " +
+            "header), or drop the value and use a bare 'return' to return early.",
         ReturnShape.Kind.AsyncVoid =>
-            "'§R' returns a value, but the enclosing async function/method declares no return type and " +
-            "compiles to 'Task', which cannot return a value. Add a return type ('§O{type}', emitted as " +
-            "'Task<type>'), or drop the value and use a bare '§R'.",
+            "'return' gives a value, but the enclosing async function/method declares no return type and " +
+            "compiles to 'Task', which cannot return a value. Add a return type ('→ type', emitted as " +
+            "'Task<type>'), or drop the value and use a bare 'return'.",
         ReturnShape.Kind.Iterator =>
-            "'§R' returns a value, but the enclosing member is an iterator (its body uses '§YIELD'/'§YBRK') " +
-            "and cannot 'return' a value. Use '§YIELD expr' to produce a value, or a bare '§R' to stop iteration.",
+            "'return' gives a value, but the enclosing member is an iterator (its body uses 'yield' or 'yield break') " +
+            "and cannot 'return' a value. Use 'yield expr' to produce a value, or 'yield break' to stop iteration.",
         ReturnShape.Kind.Setter =>
-            "'§R' returns a value, but a property/indexer 'set' or 'init' accessor cannot return a value. " +
-            "Use a bare '§R' to return early.",
+            "'return' gives a value, but a property/indexer 'set' or 'init' accessor cannot return a value. " +
+            "Use a bare 'return' to return early.",
         ReturnShape.Kind.Constructor =>
-            "'§R' returns a value, but a constructor cannot return a value. Use a bare '§R' to return early.",
+            "'return' gives a value, but a constructor cannot return a value. Use a bare 'return' to return early.",
         ReturnShape.Kind.EventAccessor =>
-            "'§R' returns a value, but an event 'add'/'remove' accessor cannot return a value. " +
-            "Use a bare '§R' to return early.",
-        _ => "'§R' returns a value in a member that has no return value.",
+            "'return' gives a value, but an event 'add'/'remove' accessor cannot return a value. " +
+            "Use a bare 'return' to return early.",
+        _ => "'return' gives a value in a member that has no return value.",
     };
 
     /// <summary>

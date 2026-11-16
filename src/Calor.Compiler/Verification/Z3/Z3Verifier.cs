@@ -624,7 +624,7 @@ public sealed class Z3Verifier : IDisposable
                 }
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.AssumedProof(
-                        $"Proof is conditional on §S normal-return semantics: {string.Join("; ", reasons)}. Runtime check kept.",
+                        $"Proof is conditional on the postcondition's normal-return semantics: {string.Join("; ", reasons)}. Runtime check kept.",
                         assumptions)),
                     warnings,
                     sw.Elapsed);
@@ -1317,7 +1317,7 @@ public static class FunctionBodyEncoder
             case BindStatementNode bind:
             {
                 if (bind.IsMutable)
-                    return (null, "the body contains a mutable (§B{~}) binding, which is outside the encodable surface");
+                    return (null, "the body contains a mutable (var) binding, which is outside the encodable surface");
                 if (bind.Initializer == null)
                     return (null, "the body contains a binding without an initializer");
                 if (bind.Name == "result")

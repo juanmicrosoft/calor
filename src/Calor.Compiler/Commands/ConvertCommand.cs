@@ -686,7 +686,7 @@ public static class ConvertCommand
         if (interopCount > 0)
         {
             statusOut.WriteLine(
-                $"  ⓘ {interopCount} member{(interopCount == 1 ? "" : "s")} preserved as §CSHARP interop " +
+                $"  ⓘ {interopCount} member{(interopCount == 1 ? "" : "s")} preserved as raw C# " +
                 "block(s) — the output parses, but this C# still needs migrating.");
         }
         if (ConversionPathSummary.Describe(losses, "--passthrough") is { } pathLine)

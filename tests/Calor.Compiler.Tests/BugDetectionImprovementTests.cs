@@ -354,10 +354,11 @@ module Test Test block
         foreach (var func in bound.Functions)
             runner.CheckFunction(func);
 
-        // Check that we have a fix with contract text
+        // Check that we have a fix with native contract text, placed so the result parses
         Assert.True(diagnostics.DiagnosticsWithFixes.Count > 0);
         var fix = diagnostics.DiagnosticsWithFixes[0].Fix;
-        Assert.Contains("§Q (!= b 0)", fix.Description);
+        Assert.Contains("requires b != 0", fix.Description);
+        AssertFixAddsContract(source, fix, preconditions: 1, postconditions: 0);
     }
 
     #endregion
@@ -536,7 +537,50 @@ module Test Test block
 
         Assert.True(diagnostics.DiagnosticsWithFixes.Count > 0);
         var fix = diagnostics.DiagnosticsWithFixes[0].Fix;
-        Assert.Contains("§Q (!= b 0)", fix.Description);
+        Assert.Contains("requires b != 0", fix.Description);
+        AssertFixAddsContract(source, fix, preconditions: 1, postconditions: 0);
+    }
+
+    [Theory]
+    [InlineData("func Identity (int:x) → int\n    !\n    return x", "=> result == x")]
+    [InlineData("func Square (int:x) → int\n    !\n    return (x * x)", "=> result >= 0")]
+    public void InferredPostcondition_FixInsertsANativeClauseThatParses(string function, string clause)
+    {
+        var source = "module Test Test block\n  " + function + "\n";
+        var module = Parse(source, out var parseDiag);
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
+
+        var diagnostics = new DiagnosticBag();
+        new ContractInferencePass(diagnostics).Infer(module, Bind(module));
+
+        var fix = Assert.Single(diagnostics.DiagnosticsWithFixes).Fix;
+        Assert.Contains(clause, fix.Description);
+        AssertFixAddsContract(source, fix, preconditions: 0, postconditions: 1);
+    }
+
+    /// <summary>
+    /// Applies a fix's edits (1-based line and column) and checks that the result parses and
+    /// the function gained exactly the expected contract clauses.
+    /// </summary>
+    private static void AssertFixAddsContract(string source, SuggestedFix fix, int preconditions, int postconditions)
+    {
+        var lines = source.Replace("\r\n", "\n").Split('\n').ToList();
+        foreach (var edit in fix.Edits.OrderByDescending(e => e.StartLine).ThenByDescending(e => e.StartColumn))
+        {
+            Assert.Equal(edit.StartLine, edit.EndLine);
+            Assert.Equal(edit.StartColumn, edit.EndColumn);
+            var line = lines[edit.StartLine - 1];
+            var text = line[..(edit.StartColumn - 1)] + edit.NewText + line[(edit.StartColumn - 1)..];
+            lines.RemoveAt(edit.StartLine - 1);
+            lines.InsertRange(edit.StartLine - 1, text.Split('\n'));
+        }
+        var patched = string.Join("\n", lines);
+
+        var module = Parse(patched, out var parseDiag);
+        Assert.False(parseDiag.HasErrors, patched + "\n" + string.Join("\n", parseDiag.Select(d => d.Message)));
+        var function = Assert.Single(module.Functions);
+        Assert.Equal(preconditions, function.Preconditions.Count);
+        Assert.Equal(postconditions, function.Postconditions.Count);
     }
 
     #endregion
@@ -706,7 +750,7 @@ module Test Test block
     [Fact]
     public void ContractInference_IdentityReturn_InfersPostcondition()
     {
-        // Function that just returns a parameter should infer §S (== result param)
+        // Function that just returns a parameter should infer => result == param
         var source = @"
 module Test Test block
   func Identity (int:x) → int
@@ -730,7 +774,7 @@ module Test Test block
     [Fact]
     public void ContractInference_SquareFunction_InfersNonNegative()
     {
-        // Function that returns x * x should infer §S (>= result 0)
+        // Function that returns x * x should infer => result >= 0
         var source = @"
 module Test Test block
   func Square (int:x) → int
@@ -748,7 +792,7 @@ module Test Test block
         Assert.True(count > 0, "Should infer non-negative postcondition for square");
         Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.InferredContract &&
-            d.Message.Contains(">= result 0"));
+            d.Message.Contains("=> result >= 0"));
     }
 
     #endregion

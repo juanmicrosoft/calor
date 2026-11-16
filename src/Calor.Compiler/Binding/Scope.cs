@@ -221,7 +221,7 @@ public static class BindingDiagnosticPolicy
             new(DiagnosticCode.InvalidByReferenceOperand, BindingDiagnosticDisposition.CompilationError,
                 "A ref/out/in operand C# cannot pass by reference would otherwise fail only in generated C# (Calor1002); D1 RO-LV-2/RO-DECL-2.", 943),
             new(DiagnosticCode.WriteToReadOnlyLocal, BindingDiagnosticDisposition.CompilationError,
-                "A write to an immutable §B binding or §L loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1.", 1550),
+                "A write to an immutable let binding or a counted-loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1.", 1550),
             Analysis(DiagnosticCode.ExpectedTypeName, "Parser owns the user-facing missing-type error; binder recovery is not a new activation.", 1396),
             Analysis(DiagnosticCode.UndefinedReference, "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception.", 1396),
             Analysis(DiagnosticCode.TypeMismatch, "Binder variable-use recovery is not full production type checking; cross-pass ownership must remain explicit.", 1397),

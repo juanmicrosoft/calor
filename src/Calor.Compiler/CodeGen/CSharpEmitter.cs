@@ -9319,7 +9319,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
                 else if (value is not null && !same(current, value))
                 {
                     EmissionDiagnostics.ReportError(node.Span, Diagnostics.DiagnosticCode.DuplicateDefinition,
-                        $"Variable '{name}' has a different refinement in each branch of the §PP{{{node.Condition}}} block; " +
+                        $"Variable '{name}' has a different refinement in each branch of the pp {node.Condition} block; " +
                         "give it the same type in every branch");
                 }
             }

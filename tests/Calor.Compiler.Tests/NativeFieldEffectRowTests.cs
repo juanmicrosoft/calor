@@ -16,14 +16,14 @@ public sealed class NativeFieldEffectRowTests
         """;
 
     private const string MisplacedMessage =
-        "A §E{…} effect row must be on the same line as the type it annotates. "
+        "An effect row must be on the same line as the type it annotates. "
         + "Move it onto the end of the 'count' field line, or — if this is meant to be "
-        + "the function's own effect declaration — onto its own line in the §F body.";
+        + "the function's own effect row — onto its own line at the top of the function body.";
 
     private const string DuplicateMessage =
-        "A type can carry only one §E{…} effect row. Combine the codes into a single "
-        + "row — §E{cw, net} — or, if this is meant to be the function's own effect "
-        + "declaration, move it onto its own line in the §F body.";
+        "A type can carry only one effect row. Combine the effects into a single "
+        + "row — ! cw, net — or, if this is meant to be the function's own effect "
+        + "row, move it onto its own line at the top of the function body.";
 
     [Theory]
     [InlineData("field")]
