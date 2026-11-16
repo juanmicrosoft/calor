@@ -313,23 +313,22 @@ namespace Calculator
     [Fact]
     public async Task RefactoringStability_AsyncFunction_ScoresOnIdPreservation()
     {
-        // Arrange - AsyncConcurrency program using §AF{ markers
+        // Arrange - AsyncConcurrency program with an async function
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:AsyncApp}
-  §AF{af001:FetchData:pub}
-      §I{str:url}
-      §O{Task_str}
-      §R (await (httpGet url))",
+            calor: @"module AsyncApp AsyncApp block
+  func FetchData public async (string:url) → string
+    !
+    return await HttpGet(url)",
             csharp: @"namespace AsyncApp { public class AsyncModule { public async Task<string> FetchData(string url) { return await HttpGet(url); } } }");
 
         // Act
         var result = await calculator.CalculateAsync(context);
 
-        // Assert - §AF{ should now be recognized, contributing to ID Preservation score
+        // Assert - the async function's sidecar ID contributes to the ID Preservation score
         // Expected CalorScore ≈ 0.775 (ID=1.0, Ref=0.80, Structure=1.0, Semantic=0.30)
         Assert.True(result.CalorScore > result.CSharpScore,
-            "Calor with §AF{ markers should score higher than C# on refactoring stability");
+            "Calor with an async function should score higher than C# on refactoring stability");
         Assert.True(result.CalorScore >= 0.70,
             $"Async function programs should score ≥0.70 (got {result.CalorScore:F3})");
         Assert.True(result.AdvantageRatio >= 1.3,
@@ -339,28 +338,26 @@ namespace Calculator
     [Fact]
     public async Task RefactoringStability_OopProgram_ScoresOnIdAndStructure()
     {
-        // Arrange - OOP program using §CL{, §MT{, §CTOR{, §PROP{ markers
+        // Arrange - OOP program with a class, property, constructor and method
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Shapes}
-  §CL{cl001:Circle}
-      §PROP{p001:Radius:pub} §O{f64}
-      §CTOR{ct001:New:pub}
-        §I{f64:radius}
-        §R (set this.Radius radius)
-      §/CTOR{ct001}
-      §MT{mt001:Area:pub}
-          §O{f64}
-          §R (* 3.14159 (* this.Radius this.Radius))",
+            calor: @"module Shapes Shapes block
+  class Circle
+    property double:Radius public
+    ctor public (double:radius)
+      set Radius radius
+    func Area public () → double
+      !
+      return 3.14159 * (Radius * Radius)",
             csharp: @"namespace Shapes { public class Circle { public double Radius { get; set; } public Circle(double radius) { Radius = radius; } public double Area() { return 3.14159 * Radius * Radius; } } }");
 
         // Act
         var result = await calculator.CalculateAsync(context);
 
-        // Assert - §CL{, §MT{, §CTOR{, §PROP{ should all be recognized
+        // Assert - the class, method, constructor and property sidecar IDs should all count
         // Expected CalorScore ≈ 0.80 (ID=1.0, Ref=0.90, Structure=1.0, Semantic=0.30)
         Assert.True(result.CalorScore > result.CSharpScore,
-            "Calor with OOP markers (§CL{, §MT{, §CTOR{, §PROP{) should score higher than C#");
+            "Calor OOP declarations (class, method, constructor, property) should score higher than C#");
         Assert.True(result.CalorScore >= 0.70,
             $"OOP programs should score ≥0.70 (got {result.CalorScore:F3})");
         Assert.True(result.AdvantageRatio >= 1.3,
@@ -370,21 +367,17 @@ namespace Calculator
     [Fact]
     public async Task RefactoringStability_OriginalMarkers_MaintainScores()
     {
-        // Arrange - program using only original markers (§M{, §F{, §V{, §LOOP{, §IF{)
+        // Arrange - program with a module, function, local binding, loop and branch
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Math}
-  §F{f001:SumPositive:pub}
-      §I{arr_i32:nums}
-      §O{i32}
-      §V{v001:total} 0
-      §LOOP{l001:each} nums
-        §IF{if001:positive}
-          (> item 0)
-          (set total (+ total item))
-        §/IF{if001}
-      §/LOOP{l001}
-      §R total",
+            calor: @"module Math Math block
+  func SumPositive public (int[]:nums) → int
+    !
+    var int:total = 0
+    each int:item in nums
+      if item > 0
+        set total total + item
+    return total",
             csharp: @"namespace Math { public class MathOps { public int SumPositive(int[] nums) { int total = 0; foreach (var item in nums) { if (item > 0) total += item; } return total; } } }");
 
         // Act
@@ -404,27 +397,25 @@ namespace Calculator
     [Fact]
     public async Task RefactoringStability_FieldAndOperator_ScoresOnIdPreservation()
     {
-        // Arrange - program using §FLD{ and §OP{ markers
+        // Arrange - program with fields and an operator
         var calculator = new RefactoringStabilityCalculator();
         var context = CreateContext(
-            calor: @"§M{m001:Vector}
-  §CL{cl001:Vec2}
-      §FLD{fld001:X:pub} §O{f64}
-      §FLD{fld002:Y:pub} §O{f64}
-      §OP{op001:Add:pub}
-        §I{Vec2:a} §I{Vec2:b}
-        §O{Vec2}
-        §R (new Vec2 (+ a.X b.X) (+ a.Y b.Y))
-      §/OP{op001}",
+            calor: @"module Vector Vector block
+  class Vec2
+    field double:X public
+    field double:Y public
+    op + (Vec2:a, Vec2:b) → Vec2
+      !
+      return a",
             csharp: @"namespace Vector { public struct Vec2 { public double X; public double Y; public static Vec2 operator +(Vec2 a, Vec2 b) => new Vec2 { X = a.X + b.X, Y = a.Y + b.Y }; } }");
 
         // Act
         var result = await calculator.CalculateAsync(context);
 
-        // Assert - §FLD{ and §OP{ should be recognized
+        // Assert - the field and operator sidecar IDs should count
         // Expected CalorScore ≈ 0.80 (ID=1.0, Ref=0.90, Structure=1.0, Semantic=0.30)
         Assert.True(result.CalorScore > result.CSharpScore,
-            "Calor with §FLD{ and §OP{ markers should score higher than C#");
+            "Calor with fields and an operator should score higher than C#");
         Assert.True(result.CalorScore >= 0.70,
             $"Field/operator programs should score ≥0.70 (got {result.CalorScore:F3})");
         Assert.True(result.AdvantageRatio >= 1.3,

@@ -98,6 +98,7 @@ public class TestDataAdapter
 
         var calorSource = await File.ReadAllTextAsync(resolvedCalorPath);
         var csharpSource = await File.ReadAllTextAsync(csharpPath);
+        var sidecar = RegisteredSidecar(resolvedCalorPath);
 
         return new EvaluationContext
         {
@@ -106,7 +107,9 @@ public class TestDataAdapter
             FileName = entry.Id,
             Level = entry.Level,
             Features = entry.Features,
-            Metadata = InputMetadata(calorPath, resolvedCalorPath, csharpPath)
+            Metadata = InputMetadata(calorPath, resolvedCalorPath, csharpPath),
+            CalorIdentitySidecar = sidecar.Text,
+            CalorIdentityFile = sidecar.File
         };
     }
 
@@ -123,6 +126,7 @@ public class TestDataAdapter
         var resolvedCalorPath = ResolveCurrentCalorPath(ActiveSyntaxInputs.RepositoryRoot, calorPath);
         var calorSource = await File.ReadAllTextAsync(resolvedCalorPath);
         var csharpSource = await File.ReadAllTextAsync(csharpPath);
+        var sidecar = RegisteredSidecar(resolvedCalorPath);
 
         return new EvaluationContext
         {
@@ -131,8 +135,33 @@ public class TestDataAdapter
             FileName = Path.GetFileNameWithoutExtension(calorPath),
             Level = level,
             Features = features ?? new List<string>(),
-            Metadata = InputMetadata(calorPath, resolvedCalorPath, csharpPath)
+            Metadata = InputMetadata(calorPath, resolvedCalorPath, csharpPath),
+            CalorIdentitySidecar = sidecar.Text,
+            CalorIdentityFile = sidecar.File
         };
+    }
+
+    /// <summary>
+    /// The identity sidecar (<c>.calor/ids.json</c>) that registers <paramref name="calorPath"/>, read
+    /// without locking or changing the project, or nulls when no sidecar registers the file.
+    /// </summary>
+    internal static (string? Text, string? File) RegisteredSidecar(string calorPath)
+    {
+        var store = Calor.Compiler.Ids.DeclarationIdentityStore.Find(calorPath);
+        if (store == null || !File.Exists(store.SidecarPath)) return (null, null);
+        var relative = Path.GetRelativePath(store.Root, Path.GetFullPath(calorPath)).Replace('\\', '/');
+        var text = File.ReadAllText(store.SidecarPath);
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(text);
+            var registered = document.RootElement.TryGetProperty("Files", out var files)
+                && files.EnumerateArray().Any(f => f.GetString() == relative);
+            return registered ? (text, relative) : (null, null);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return (null, null);
+        }
     }
 
     private static string ResolveCurrentCalorPath(string root, string path)

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
+using Calor.Compiler.Ids;
 using Calor.Evaluation.Core;
 
 namespace Calor.Evaluation.Metrics;
@@ -10,8 +11,9 @@ namespace Calor.Evaluation.Metrics;
 /// Category 8: Refactoring Stability Calculator
 /// Measures how well unique IDs preserve references during code transformations.
 ///
-/// Calor's unique IDs (§F{funcId:, §M{modId:, etc.) are hypothesized to survive
-/// refactoring operations better than C#'s name-based references.
+/// Calor's stable declaration IDs (kept in the project sidecar, <c>.calor/ids.json</c>) are
+/// hypothesized to survive refactoring operations better than C#'s name-based references.
+/// IDs are read and carried across edits by the compiler's identity store; see CalorIdentities.
 /// </summary>
 public class RefactoringStabilityCalculator : IMetricCalculator
 {
@@ -71,10 +73,11 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double CalculateCalorStability(EvaluationContext context)
     {
         var source = context.CalorSource;
+        var ids = CalorIdentities.Of(context);
         var score = 0.0;
 
         // ID Preservation potential (30% weight)
-        var idScore = CalculateIdPreservationScore(source);
+        var idScore = CalculateIdPreservationScore(source, ids);
         score += idScore * 0.30;
 
         // Reference validity potential (25% weight)
@@ -82,7 +85,7 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         score += referenceScore * 0.25;
 
         // Diff minimization potential (20% weight) - based on structural clarity
-        var structureScore = CalculateStructuralClarityScore(source);
+        var structureScore = CalculateStructuralClarityScore(source, ids);
         score += structureScore * 0.20;
 
         // Semantic equivalence potential (25% weight) - based on explicit semantics
@@ -123,77 +126,36 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Calculates score based on unique ID presence and diversity.
-    /// Groups markers by role with relative weights. Score is normalized by
-    /// the total weight of groups that have markers present, so programs are
-    /// not penalized for groups they don't use (e.g., a purely functional
-    /// program won't lose points for lacking §CL{ markers).
+    /// Calculates score based on stable ID presence and diversity.
+    /// Groups declarations by role with relative weights. A group applies when the source
+    /// has that kind of construct, and earns its weight when those constructs carry sidecar
+    /// IDs. The score is normalized by the applicable weight, so programs are not penalized
+    /// for groups they don't use (e.g., a purely functional program has no type group).
+    /// Native Calor gives IDs to modules, types, callables, properties and fields; loops,
+    /// branches and local bindings have none, so those groups apply but earn nothing.
     /// </summary>
-    private static double CalculateIdPreservationScore(string source)
+    private static double CalculateIdPreservationScore(string source, IReadOnlyList<CalorDeclarationId> ids)
     {
         var earnedWeight = 0.0;
         var applicableWeight = 0.0;
 
-        // Module-level IDs (base weight: 0.20)
-        var moduleIds = ExtractIds(source, @"§M\{([^:]+):");
-        if (moduleIds.Count > 0)
+        void Group(double weight, bool applicable, bool earned)
         {
-            applicableWeight += 0.20;
-            if (moduleIds.All(IsUniqueId))
-                earnedWeight += 0.20;
+            if (!applicable) return;
+            applicableWeight += weight;
+            if (earned) earnedWeight += weight;
         }
 
-        // Type-level IDs (base weight: 0.15)
-        var classIds = ExtractIds(source, @"§CL\{([^:]+):");
-        var ifaceIds = ExtractIds(source, @"§IFACE\{([^:]+):");
-        var structIds = ExtractIds(source, @"§STRUCT\{([^:]+):");
-        if (classIds.Count > 0 || ifaceIds.Count > 0 || structIds.Count > 0)
-        {
-            applicableWeight += 0.15;
-            earnedWeight += 0.15;
-        }
+        // Module-level IDs (0.20), type-level (0.15), member-level (0.30), property/field (0.15):
+        // the sidecar assigns every such declaration a unique ID.
+        Group(0.20, ids.Any(d => d.Kind == IdKind.Module), earned: true);
+        Group(0.15, ids.Any(d => CalorIdentities.IsType(d.Kind)), earned: true);
+        Group(0.30, ids.Any(d => CalorIdentities.IsCallable(d.Kind)), earned: true);
+        Group(0.15, ids.Any(d => CalorIdentities.IsMemberData(d.Kind)), earned: true);
 
-        // Member-level IDs (base weight: 0.30)
-        var functionIds = ExtractIds(source, @"§F\{([^:]+):");
-        var asyncFuncIds = ExtractIds(source, @"§AF\{([^:]+):");
-        var methodIds = ExtractIds(source, @"§MT\{([^:]+):");
-        var ctorIds = ExtractIds(source, @"§CTOR\{([^:]+):");
-        var opIds = ExtractIds(source, @"§OP\{([^:]+):");
-        if (functionIds.Count > 0 || asyncFuncIds.Count > 0 || methodIds.Count > 0 ||
-            ctorIds.Count > 0 || opIds.Count > 0)
-        {
-            applicableWeight += 0.30;
-            earnedWeight += 0.30;
-        }
-
-        // Property/Field IDs (base weight: 0.15)
-        var propIds = ExtractIds(source, @"§PROP\{([^:]+):");
-        var fieldIds = ExtractIds(source, @"§FLD\{([^:]+):");
-        if (propIds.Count > 0 || fieldIds.Count > 0)
-        {
-            applicableWeight += 0.15;
-            earnedWeight += 0.15;
-        }
-
-        // Control flow IDs (base weight: 0.10)
-        var loopIds = ExtractIds(source, @"§LOOP\{([^:]+):");
-        var ifIds = ExtractIds(source, @"§IF\{([^:]+):");
-        var whileIds = ExtractIds(source, @"§WH\{([^:]+):");
-        var forIds = ExtractIds(source, @"§FOR\{([^:]+):");
-        if (loopIds.Count > 0 || ifIds.Count > 0 || whileIds.Count > 0 || forIds.Count > 0)
-        {
-            applicableWeight += 0.10;
-            earnedWeight += 0.10;
-        }
-
-        // Variable/Binding IDs (base weight: 0.10)
-        var variableIds = ExtractIds(source, @"§V\{([^:]+):");
-        var bindingIds = ExtractIds(source, @"§B\{([^:]+):");
-        if (variableIds.Count > 0 || bindingIds.Count > 0)
-        {
-            applicableWeight += 0.10;
-            earnedWeight += 0.10;
-        }
+        // Control flow (0.10) and local bindings (0.10) carry no IDs in native Calor.
+        Group(0.10, CalorSyntax.If.IsMatch(source) || CalorSyntax.Loop.IsMatch(source), earned: false);
+        Group(0.10, CalorSyntax.Binding.IsMatch(source), earned: false);
 
         // Normalize: score relative to applicable groups only
         if (applicableWeight == 0) return 0.0;
@@ -208,29 +170,25 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     {
         var score = 0.5; // Base score
 
-        // Function calls with proper IDs
-        var funcCalls = CountPattern(source, @"§C\{[^\}]+\}");
-        if (funcCalls > 0) score += 0.2;
+        // Function calls
+        if (CalorSyntax.Call.IsMatch(source)) score += 0.2;
 
-        // Proper closing tags (enable safe boundary detection)
-        var closingTags = CountPattern(source, @"§/[A-Z]+\{");
-        if (closingTags > 0) score += 0.15;
+        // Closing tags: native source has none (blocks end by indentation), so no bonus.
 
         // Input/output annotations (typed references)
-        var typeAnnotations = CountPattern(source, @"§[IO]\{");
-        if (typeAnnotations > 0) score += 0.15;
+        if (CalorSyntax.HasTypedParameters(source) || CalorSyntax.TypedOutput.IsMatch(source)) score += 0.15;
 
-        // Property/field references (reference-bearing constructs)
-        var propRefs = CountPattern(source, @"§PROP\{[^\}]+\}");
-        var fieldRefs = CountPattern(source, @"§FLD\{[^\}]+\}");
-        if (propRefs > 0 || fieldRefs > 0) score += 0.1;
+        // Property/field declarations (reference-bearing constructs)
+        if (PropertyOrField.IsMatch(source)) score += 0.1;
 
         // Binding references
-        var bindingRefs = CountPattern(source, @"§B\{[^\}]+\}");
-        if (bindingRefs > 0) score += 0.05;
+        if (CalorSyntax.Binding.IsMatch(source)) score += 0.05;
 
         return Math.Min(score, 1.0);
     }
+
+    private static readonly Regex PropertyOrField = new(@"^[ \t]*(?:property|field)\b",
+        RegexOptions.Compiled | RegexOptions.Multiline);
 
     /// <summary>
     /// Calculates score based on structural clarity for diff minimization.
@@ -238,49 +196,27 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     /// budget is normalized by applicable boundary types so programs are not
     /// penalized for boundary types they don't use.
     /// </summary>
-    private static double CalculateStructuralClarityScore(string source)
+    private static double CalculateStructuralClarityScore(string source, IReadOnlyList<CalorDeclarationId> ids)
     {
         var earnedBonus = 0.0;
         var applicableBonus = 0.0;
 
-        // Indent form (Phase 4): every structural opener (§M{, §F{,
-        // §MT{, …) is terminated by a dedent. The "earned" signal is
-        // that there is at least one indented body line following the
-        // opener — that's how Calor encodes a complete, well-scoped
-        // block now. We approximate "has indented body" with a single
-        // file-level regex (`^[ \t]+\S` in multiline mode) since the
-        // calculators are heuristic, not parser-based.
-        var hasIndentedBody = System.Text.RegularExpressions.Regex.IsMatch(
-            source, @"^[ \t]+\S", System.Text.RegularExpressions.RegexOptions.Multiline);
+        // Every structural opener is terminated by a dedent. The "earned" signal is that
+        // there is at least one indented body line; a single file-level regex approximates
+        // it, since the calculators are heuristic, not parser-based.
+        var hasIndentedBody = Regex.IsMatch(source, @"^[ \t]+\S", RegexOptions.Multiline);
 
-        // Module boundaries
-        if (source.Contains("§M{"))
+        void Boundary(bool present)
         {
+            if (!present) return;
             applicableBonus += 0.125;
             if (hasIndentedBody) earnedBonus += 0.125;
         }
 
-        // Type boundaries (class, interface)
-        if (source.Contains("§CL{") || source.Contains("§IFACE{"))
-        {
-            applicableBonus += 0.125;
-            if (hasIndentedBody) earnedBonus += 0.125;
-        }
-
-        // Function boundaries
-        if (source.Contains("§F{"))
-        {
-            applicableBonus += 0.125;
-            if (hasIndentedBody) earnedBonus += 0.125;
-        }
-
-        // Member boundaries (method, async function, constructor, operator)
-        if (source.Contains("§MT{") || source.Contains("§AF{") ||
-            source.Contains("§CTOR{") || source.Contains("§OP{"))
-        {
-            applicableBonus += 0.125;
-            if (hasIndentedBody) earnedBonus += 0.125;
-        }
+        Boundary(ids.Any(d => d.Kind == IdKind.Module));                                   // Module
+        Boundary(ids.Any(d => d.Kind is IdKind.Class or IdKind.Interface));                // Type
+        Boundary(ids.Any(d => d.Kind == IdKind.Function));                                 // Function
+        Boundary(ids.Any(d => d.Kind is IdKind.Method or IdKind.Constructor or IdKind.OperatorOverload)); // Member
 
         // Normalize bonus to the 0.50 budget, scaled by applicable groups
         var bonusScore = applicableBonus > 0 ? (earnedBonus / applicableBonus) * 0.50 : 0.0;
@@ -295,12 +231,12 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var score = 0.3;
 
         // Contracts preserve semantic intent during refactoring
-        if (source.Contains("§REQ")) score += 0.2;
-        if (source.Contains("§ENS")) score += 0.2;
-        if (source.Contains("§INV")) score += 0.1;
+        if (CalorSyntax.Requires.IsMatch(source)) score += 0.2;
+        if (CalorSyntax.Ensures.IsMatch(source)) score += 0.2;
+        if (CalorSyntax.Invariant.IsMatch(source)) score += 0.1;
 
         // Effect declarations preserve behavior constraints
-        if (source.Contains("§E{")) score += 0.2;
+        if (CalorSyntax.EffectRow.IsMatch(source)) score += 0.2;
 
         return Math.Min(score, 1.0);
     }
@@ -346,11 +282,10 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorRename(string before, string after)
     {
         // In Calor, IDs should stay the same even when names change
-        var beforeIds = ExtractIds(before, @"§F\{([^:]+):");
-        var afterIds = ExtractIds(after, @"§F\{([^:]+):");
-
-        var preserved = beforeIds.Intersect(afterIds).Count();
-        return beforeIds.Count > 0 ? (double)preserved / beforeIds.Count : 0.5;
+        var (beforeIds, afterIds) = CalorIdentities.Track(before, after);
+        var callables = beforeIds.Count(d => CalorIdentities.IsCallable(d.Kind));
+        var preserved = CalorIdentities.Preserved(beforeIds, afterIds, CalorIdentities.IsCallable);
+        return callables > 0 ? (double)preserved / callables : 0.5;
     }
 
     private static double EvaluateCSharpRename(string before, string after)
@@ -364,8 +299,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorExtract(string before, string after)
     {
         // After extract, original IDs should remain, new function gets new ID
-        var beforeFuncCount = CountPattern(before, @"§F\{");
-        var afterFuncCount = CountPattern(after, @"§F\{");
+        var beforeFuncCount = CalorSyntax.Function.Matches(before).Count;
+        var afterFuncCount = CalorSyntax.Function.Matches(after).Count;
 
         // Extract should add exactly one new function
         return afterFuncCount == beforeFuncCount + 1 ? 1.0 : 0.5;
@@ -382,11 +317,10 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorMove(string before, string after)
     {
         // Moving a function should preserve its ID
-        var beforeIds = ExtractIds(before, @"§F\{([^:]+):");
-        var afterIds = ExtractIds(after, @"§F\{([^:]+):");
-
-        var preserved = beforeIds.Intersect(afterIds).Count();
-        return beforeIds.Count > 0 ? (double)preserved / beforeIds.Count : 0.5;
+        var (beforeIds, afterIds) = CalorIdentities.Track(before, after);
+        var callables = beforeIds.Count(d => CalorIdentities.IsCallable(d.Kind));
+        var preserved = CalorIdentities.Preserved(beforeIds, afterIds, CalorIdentities.IsCallable);
+        return callables > 0 ? (double)preserved / callables : 0.5;
     }
 
     private static double EvaluateCSharpMove(string before, string after)
@@ -399,10 +333,10 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorSignatureChange(string before, string after)
     {
         // Signature change keeps ID, updates callers
-        var beforeIds = ExtractIds(before, @"§F\{([^:]+):");
-        var afterIds = ExtractIds(after, @"§F\{([^:]+):");
-
-        return beforeIds.SetEquals(afterIds) ? 1.0 : 0.6;
+        var (beforeIds, afterIds) = CalorIdentities.Track(before, after);
+        var beforeSet = beforeIds.Where(d => CalorIdentities.IsCallable(d.Kind)).Select(d => d.Id).ToHashSet();
+        var afterSet = afterIds.Where(d => CalorIdentities.IsCallable(d.Kind)).Select(d => d.Id).ToHashSet();
+        return beforeSet.Count > 0 && beforeSet.SetEquals(afterSet) ? 1.0 : 0.6;
     }
 
     private static double EvaluateCSharpSignatureChange(string before, string after)
@@ -415,8 +349,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorInline(string before, string after)
     {
         // Inlining should reduce variable count but maintain readability
-        var beforeVars = CountPattern(before, @"§V\{");
-        var afterVars = CountPattern(after, @"§V\{");
+        var beforeVars = CalorSyntax.Binding.Matches(before).Count;
+        var afterVars = CalorSyntax.Binding.Matches(after).Count;
 
         return afterVars < beforeVars ? 0.9 : 0.6;
     }
@@ -431,9 +365,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
 
     private static int CountPreservedIds(string before, string after)
     {
-        var beforeIds = ExtractIds(before, @"§[A-Z]+\{([^:]+):");
-        var afterIds = ExtractIds(after, @"§[A-Z]+\{([^:]+):");
-        return beforeIds.Intersect(afterIds).Count();
+        var (beforeIds, afterIds) = CalorIdentities.Track(before, after);
+        return CalorIdentities.Preserved(beforeIds, afterIds);
     }
 
     private static int CountPreservedNames(string before, string after)
@@ -441,12 +374,6 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var beforeNames = ExtractNames(before);
         var afterNames = ExtractNames(after);
         return beforeNames.Intersect(afterNames).Count();
-    }
-
-    private static HashSet<string> ExtractIds(string source, string pattern)
-    {
-        var matches = Regex.Matches(source, pattern);
-        return matches.Select(m => m.Groups[1].Value).ToHashSet();
     }
 
     private static HashSet<string> ExtractNames(string source)
@@ -466,14 +393,6 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         return names;
     }
 
-    private static bool IsUniqueId(string id)
-    {
-        // Check if ID looks like a unique identifier
-        // Supports: test IDs (f001, m001), named IDs (mod_main), and ULID-style IDs (f_01J5X7K9M2NPQRSTABWXYZ12)
-        // ULID format: prefix + underscore + 26 chars of Crockford Base32 (excludes I, L, O, U)
-        return Regex.IsMatch(id, @"^[a-z]+[0-9]+$|^[a-z_]+$|^[a-z]+_[0-9A-HJKMNP-TV-Z]{26}$", RegexOptions.IgnoreCase);
-    }
-
     private static int CalculateDiffSize(string before, string after)
     {
         var diffBuilder = new InlineDiffBuilder(new Differ());
@@ -485,13 +404,14 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static Dictionary<string, object> AnalyzeCalorIds(EvaluationContext context)
     {
         var source = context.CalorSource;
+        var ids = CalorIdentities.Of(context);
         return new Dictionary<string, object>
         {
-            ["moduleIds"] = ExtractIds(source, @"§M\{([^:]+):").ToList(),
-            ["functionIds"] = ExtractIds(source, @"§F\{([^:]+):").ToList(),
-            ["variableIds"] = ExtractIds(source, @"§V\{([^:]+):").ToList(),
-            ["hasClosingTags"] = source.Contains("§/"),
-            ["idDensity"] = CountPattern(source, @"§[A-Z]+\{") / Math.Max(1.0, source.Split('\n').Length)
+            ["moduleIds"] = ids.Where(d => d.Kind == IdKind.Module).Select(d => d.Id).ToList(),
+            ["functionIds"] = ids.Where(d => CalorIdentities.IsCallable(d.Kind)).Select(d => d.Id).ToList(),
+            ["variableIds"] = new List<string>(), // local bindings carry no IDs in native Calor
+            ["hasClosingTags"] = false,
+            ["idDensity"] = ids.Count / Math.Max(1.0, source.Split('\n').Length)
         };
     }
 

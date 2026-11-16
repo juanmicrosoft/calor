@@ -265,8 +265,8 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "§F{f001:Test} §R x §/F §F{f002:Other} §R y §/F";
-        var after = "§F{f001:Test} §R x §/F §F{f002:Other} §R y §/F §F{f003:New} §R z §/F";
+        var before = "module M M block\n  " + "func Test () → int\n  !\n  return 1\nfunc Other () → int\n  !\n  return 2\n".Replace("\n", "\n  ").TrimEnd();
+        var after = before + "\n  func New () → int\n    !\n    return 3";
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");
@@ -280,8 +280,8 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "§F{f001:Test} §R x §/F §F{f002:Other} §R y §/F";
-        var after = "§F{f001:Test} §R x §/F"; // f002 removed
+        var before = "module M M block\n  " + "func Test () → int\n  !\n  return 1\nfunc Other () → int\n  !\n  return 2\n".Replace("\n", "\n  ").TrimEnd();
+        var after = before[..before.IndexOf("\n  func Other", StringComparison.Ordinal)]; // Other removed
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");

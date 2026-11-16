@@ -301,11 +301,14 @@ public partial class AgentRefactoringCalculator : IMetricCalculator
         return afterCount >= beforeCount;
     }
 
+    /// <summary>
+    /// Every declaration ID the identity sidecar gives <paramref name="before"/> survives the
+    /// edit, as the compiler's identity store reconciles it (see CalorIdentities).
+    /// </summary>
     private static bool AreIdsPreserved(string before, string after)
     {
-        var beforeIds = ExtractIds(before);
-        var afterIds = ExtractIds(after);
-        return beforeIds.All(id => afterIds.Contains(id));
+        var (beforeIds, afterIds) = CalorIdentities.Track(before, after);
+        return CalorIdentities.Preserved(beforeIds, afterIds) == beforeIds.Count;
     }
 
     private static bool AreCommentsPreserved(string before, string after)
@@ -314,12 +317,6 @@ public partial class AgentRefactoringCalculator : IMetricCalculator
         var beforeComments = CountPattern(before, @"//\s*(Pre|Post)condition:");
         var afterComments = CountPattern(after, @"//\s*(Pre|Post)condition:");
         return afterComments >= beforeComments;
-    }
-
-    private static HashSet<string> ExtractIds(string source)
-    {
-        var matches = IdRegex().Matches(source);
-        return matches.Select(m => m.Groups[1].Value).ToHashSet();
     }
 
     private static int CountPattern(string source, string pattern)
@@ -347,9 +344,6 @@ public partial class AgentRefactoringCalculator : IMetricCalculator
 
     [GeneratedRegex(@"(refactor-\S+):\s*(\d+/\d+\s+passed|\w+)", RegexOptions.IgnoreCase)]
     private static partial Regex TaskResultRegex();
-
-    [GeneratedRegex(@"§[FMV]\{([^:]+):")]
-    private static partial Regex IdRegex();
 }
 
 /// <summary>

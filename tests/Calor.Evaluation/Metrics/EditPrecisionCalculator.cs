@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
+using Calor.Compiler.Ids;
 using Calor.Evaluation.Core;
 
 namespace Calor.Evaluation.Metrics;
@@ -60,13 +61,14 @@ public class EditPrecisionCalculator : IMetricCalculator
         var calorSource = context.CalorSource;
         var csharpSource = context.CSharpSource;
 
-        // Task 1: Change loop bounds (if loops exist)
-        var calorLoops = Regex.Matches(calorSource, @"§LOOP\{([^:]+):");
+        // Task 1: Change loop bounds (if loops exist). Native loops carry no ID, so the
+        // Calor target is located by context, like the C# one.
+        var calorLoops = CalorSyntax.Loop.Matches(calorSource);
         var csharpLoops = Regex.Matches(csharpSource, @"\bfor\s*\([^)]+\)");
 
         if (calorLoops.Count > 0 || csharpLoops.Count > 0)
         {
-            var loopId = calorLoops.Count > 0 ? calorLoops[0].Groups[1].Value : "loop1";
+            var loopId = "loop1";
             tasks.Add(new SimulatedEditTask
             {
                 Id = "edit_loop_bounds",
@@ -78,13 +80,13 @@ public class EditPrecisionCalculator : IMetricCalculator
             });
         }
 
-        // Task 2: Add precondition to function
-        var calorFunctions = Regex.Matches(calorSource, @"§F\{([^:]+):([^\}]+)\}");
+        // Task 2: Add precondition to function (targeted by its sidecar ID)
+        var calorFunctions = CalorIdentities.Of(context).Where(d => CalorIdentities.IsCallable(d.Kind)).ToList();
         var csharpMethods = Regex.Matches(csharpSource, @"\b(public|private|protected)\s+\w+\s+(\w+)\s*\(");
 
         if (calorFunctions.Count > 0 || csharpMethods.Count > 0)
         {
-            var funcId = calorFunctions.Count > 0 ? calorFunctions[0].Groups[1].Value : "func";
+            var funcId = calorFunctions.Count > 0 ? calorFunctions[0].Id : "func";
             var methodName = csharpMethods.Count > 0 ? csharpMethods[0].Groups[2].Value : "Method";
 
             tasks.Add(new SimulatedEditTask
@@ -101,8 +103,8 @@ public class EditPrecisionCalculator : IMetricCalculator
         // Task 3: Rename function
         if (calorFunctions.Count > 0 || csharpMethods.Count > 0)
         {
-            var funcId = calorFunctions.Count > 0 ? calorFunctions[0].Groups[1].Value : "func";
-            var funcName = calorFunctions.Count > 0 ? calorFunctions[0].Groups[2].Value : "Method";
+            var funcId = calorFunctions.Count > 0 ? calorFunctions[0].Id : "func";
+            var funcName = calorFunctions.Count > 0 ? calorFunctions[0].Name : "Method";
             var methodName = csharpMethods.Count > 0 ? csharpMethods[0].Groups[2].Value : "Method";
 
             tasks.Add(new SimulatedEditTask
@@ -119,7 +121,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         // Task 4: Add parameter to function
         if (calorFunctions.Count > 0 || csharpMethods.Count > 0)
         {
-            var funcId = calorFunctions.Count > 0 ? calorFunctions[0].Groups[1].Value : "func";
+            var funcId = calorFunctions.Count > 0 ? calorFunctions[0].Id : "func";
             var methodName = csharpMethods.Count > 0 ? csharpMethods[0].Groups[2].Value : "Method";
 
             tasks.Add(new SimulatedEditTask
@@ -136,7 +138,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         // Task 5: Change return type
         if (calorFunctions.Count > 0 || csharpMethods.Count > 0)
         {
-            var funcId = calorFunctions.Count > 0 ? calorFunctions[0].Groups[1].Value : "func";
+            var funcId = calorFunctions.Count > 0 ? calorFunctions[0].Id : "func";
             var methodName = csharpMethods.Count > 0 ? csharpMethods[0].Groups[2].Value : "Method";
 
             tasks.Add(new SimulatedEditTask
@@ -185,21 +187,21 @@ public class EditPrecisionCalculator : IMetricCalculator
         var source = context.CalorSource;
         var result = new EditTaskResult { TaskId = task.Id };
 
-        // Check if target is uniquely identifiable
-        var targetPattern = $@"§[A-Z]\{{{Regex.Escape(task.CalorTarget)}:";
-        var matches = Regex.Matches(source, targetPattern);
+        // Check if the target is uniquely identifiable by its sidecar ID
+        var matches = CalorIdentities.Of(context).Count(d => d.Id == task.CalorTarget);
 
-        result.TargetFound = matches.Count > 0;
-        result.TargetUnique = matches.Count == 1;
+        result.TargetFound = matches > 0;
+        result.TargetUnique = matches == 1;
+        var hasId = result.TargetFound;
 
         // Calculate precision based on edit type
         result.Score = task.EditType switch
         {
-            EditType.ModifyValue => EvaluateValueModification(source, task.CalorTarget, true),
-            EditType.AddContract => EvaluateContractAddition(source, task.CalorTarget, true),
-            EditType.Rename => EvaluateRename(source, task.CalorTarget, true),
-            EditType.ChangeSignature => EvaluateSignatureChange(source, task.CalorTarget, true),
-            EditType.ChangeType => EvaluateTypeChange(source, task.CalorTarget, true),
+            EditType.ModifyValue => EvaluateValueModification(source, task.CalorTarget, true, hasId),
+            EditType.AddContract => EvaluateContractAddition(source, task.CalorTarget, true, hasId),
+            EditType.Rename => EvaluateRename(source, task.CalorTarget, true, hasId),
+            EditType.ChangeSignature => EvaluateSignatureChange(source, task.CalorTarget, true, hasId),
+            EditType.ChangeType => EvaluateTypeChange(source, task.CalorTarget, true, hasId),
             _ => 0.5
         };
 
@@ -249,31 +251,27 @@ public class EditPrecisionCalculator : IMetricCalculator
         return result;
     }
 
-    private static double EvaluateValueModification(string source, string target, bool isCalor)
+    private static double EvaluateValueModification(string source, string target, bool isCalor, bool hasId = false)
     {
-        if (isCalor)
+        if (isCalor && hasId)
         {
-            // Calor: Find loop/variable by ID
-            var pattern = $@"§(?:LOOP|V)\{{{Regex.Escape(target)}:";
-            return Regex.IsMatch(source, pattern) ? 0.9 : 0.4;
+            // Calor: find the declaration by its sidecar ID
+            return 0.9;
         }
-        else
-        {
-            // C#: Need to find by line context
-            return source.Contains("for") || source.Contains("while") ? 0.6 : 0.4;
-        }
+        // No ID (C#, or a native Calor loop): find the target by line context
+        var hasLoop = isCalor ? CalorSyntax.Loop.IsMatch(source) : source.Contains("for") || source.Contains("while");
+        return hasLoop ? 0.6 : 0.4;
     }
 
-    private static double EvaluateContractAddition(string source, string target, bool isCalor)
+    private static double EvaluateContractAddition(string source, string target, bool isCalor, bool hasId = false)
     {
         if (isCalor)
         {
-            // Calor: Insert §REQ after function header (well-defined insertion point)
-            var pattern = $@"§F\{{{Regex.Escape(target)}:";
-            if (!Regex.IsMatch(source, pattern)) return 0.3;
+            // Calor: insert `requires` after the function header (well-defined insertion point)
+            if (!hasId) return 0.3;
 
             // Already has contracts = easier to add more
-            return source.Contains("§REQ") || source.Contains("§ENS") ? 0.95 : 0.85;
+            return CalorSyntax.Requires.IsMatch(source) || CalorSyntax.Ensures.IsMatch(source) ? 0.95 : 0.85;
         }
         else
         {
@@ -283,13 +281,12 @@ public class EditPrecisionCalculator : IMetricCalculator
         }
     }
 
-    private static double EvaluateRename(string source, string target, bool isCalor)
+    private static double EvaluateRename(string source, string target, bool isCalor, bool hasId = false)
     {
         if (isCalor)
         {
-            // Calor: Change name but keep ID - call sites don't need updating if using ID
-            var idPattern = $@"§F\{{{Regex.Escape(target)}:";
-            return Regex.IsMatch(source, idPattern) ? 0.95 : 0.5;
+            // Calor: the name changes but the sidecar ID stays, so ID-addressed tooling still finds it
+            return hasId ? 0.95 : 0.5;
         }
         else
         {
@@ -300,14 +297,13 @@ public class EditPrecisionCalculator : IMetricCalculator
         }
     }
 
-    private static double EvaluateSignatureChange(string source, string target, bool isCalor)
+    private static double EvaluateSignatureChange(string source, string target, bool isCalor, bool hasId = false)
     {
         if (isCalor)
         {
-            // Calor: Update §I{ section, call sites can be found by ID
-            var pattern = $@"§F\{{{Regex.Escape(target)}:";
-            var hasInputSection = source.Contains("§I{");
-            return Regex.IsMatch(source, pattern) ? (hasInputSection ? 0.9 : 0.8) : 0.4;
+            // Calor: update the typed parameter list; the declaration is found by ID
+            var hasInputSection = CalorSyntax.HasTypedParameters(source);
+            return hasId ? (hasInputSection ? 0.9 : 0.8) : 0.4;
         }
         else
         {
@@ -317,14 +313,13 @@ public class EditPrecisionCalculator : IMetricCalculator
         }
     }
 
-    private static double EvaluateTypeChange(string source, string target, bool isCalor)
+    private static double EvaluateTypeChange(string source, string target, bool isCalor, bool hasId = false)
     {
         if (isCalor)
         {
-            // Calor: Update §O{ section
-            var pattern = $@"§F\{{{Regex.Escape(target)}:";
-            var hasOutputSection = source.Contains("§O{");
-            return Regex.IsMatch(source, pattern) ? (hasOutputSection ? 0.9 : 0.75) : 0.4;
+            // Calor: update the `→ T` return type
+            var hasOutputSection = CalorSyntax.TypedOutput.IsMatch(source);
+            return hasId ? (hasOutputSection ? 0.9 : 0.75) : 0.4;
         }
         else
         {
@@ -338,12 +333,10 @@ public class EditPrecisionCalculator : IMetricCalculator
         if (isCalor)
         {
             // Calor: IDs reduce collateral risk significantly
-            // Risk mainly from incorrect boundary detection. In indent
-            // form the boundary signal is "the opener is followed by
-            // at least one indented body line"; that gives the editor
-            // a localizable scope just as well as the legacy §/F{ /
-            // §/M{ closers used to.
-            var hasFunctionOpener = source.Contains("§F{") || source.Contains("§M{");
+            // Risk mainly from incorrect boundary detection. The boundary
+            // signal is "the opener is followed by at least one indented
+            // body line", which gives the editor a localizable scope.
+            var hasFunctionOpener = CalorSyntax.Function.IsMatch(source) || CalorSyntax.Module.IsMatch(source);
             var hasIndentedBody = Regex.IsMatch(source, @"^[ \t]+\S", RegexOptions.Multiline);
             var hasLocalizableScope = hasFunctionOpener && hasIndentedBody;
             return hasLocalizableScope ? 0.1 : 0.25;
@@ -429,20 +422,13 @@ public class EditPrecisionCalculator : IMetricCalculator
         var score = 0.5; // Base score
 
         var source = context.CalorSource;
+        var ids = CalorIdentities.Of(context);
 
-        // Calor unique IDs enable precise targeting
-        var moduleIds = CountPattern(source, @"\§M\{[^\}]+:");
-        var functionIds = CountPattern(source, @"\§F\{[^\}]+:");
-        var variableIds = CountPattern(source, @"\§V\{[^\}]+:");
+        // Sidecar IDs enable precise targeting. Local bindings carry no IDs in native Calor.
+        if (ids.Any(d => d.Kind == IdKind.Module)) score += 0.15;
+        if (ids.Any(d => CalorIdentities.IsCallable(d.Kind))) score += 0.20;
 
-        // More unique IDs = higher precision capability
-        if (moduleIds > 0) score += 0.15;
-        if (functionIds > 0) score += 0.20;
-        if (variableIds > 0) score += 0.10;
-
-        // Indent form (Phase 4) signals safe-modification scope by
-        // pairing each opener with an indented body — the equivalent
-        // of the legacy §/F{ / §/M{ closer-presence bonus.
+        // Each opener paired with an indented body marks a safe-modification scope.
         if (Regex.IsMatch(source, @"^[ \t]+\S", RegexOptions.Multiline))
             score += 0.10;
 
@@ -476,15 +462,15 @@ public class EditPrecisionCalculator : IMetricCalculator
 
     private static Dictionary<string, object> GetCalorTargetingCapabilities(EvaluationContext context)
     {
-        var source = context.CalorSource;
+        var ids = CalorIdentities.Of(context);
         return new Dictionary<string, object>
         {
-            ["hasUniqueModuleIds"] = source.Contains("§M{"),
-            ["hasUniqueFunctionIds"] = source.Contains("§F{"),
-            ["hasUniqueVariableIds"] = source.Contains("§V{"),
-            ["hasClosingTags"] = source.Contains("§/"),
-            ["moduleIdCount"] = CountPattern(source, @"\§M\{"),
-            ["functionIdCount"] = CountPattern(source, @"\§F\{")
+            ["hasUniqueModuleIds"] = ids.Any(d => d.Kind == IdKind.Module),
+            ["hasUniqueFunctionIds"] = ids.Any(d => CalorIdentities.IsCallable(d.Kind)),
+            ["hasUniqueVariableIds"] = false,
+            ["hasClosingTags"] = false,
+            ["moduleIdCount"] = ids.Count(d => d.Kind == IdKind.Module),
+            ["functionIdCount"] = ids.Count(d => CalorIdentities.IsCallable(d.Kind))
         };
     }
 
