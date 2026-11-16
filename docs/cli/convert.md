@@ -186,7 +186,6 @@ calor convert MyService.cs --benchmark
 | `--reference` | — | — | Metadata reference path, optionally `path=alias1,alias2` for extern aliases. |
 | `--validate` | — | — | Compatibility flag. Generated Calor validation is now mandatory in every mode. |
 | `--passthrough` | — | `false` | Preserve unconvertible members as raw C# interop blocks. Lossless mode already preserves unsupported descendants at the nearest complete boundary. |
-| `--explicit-call-closers` | — | `false` | Legacy compatibility option; current native calls use parentheses and never emit closing tags. |
 | `--format` | — | `text` | Output format: `text` or `json` (envelope document on stdout) — see [JSON Output](#json-output---format-json). No `-f` short alias |
 
 ---

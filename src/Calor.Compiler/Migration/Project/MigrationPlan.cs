@@ -160,10 +160,4 @@ public sealed class MigrationPlanOptions
         Microsoft.CodeAnalysis.DocumentationMode.Parse;
     public Dictionary<string, string> ParseFeatures { get; init; } =
         new(StringComparer.Ordinal);
-
-    /// <summary>
-    /// When true (default), the emitter elides redundant §/C closers for zero-arg §C calls (v0.6.1 default).
-    /// Set to false to emit v0.6.0-compatible output where every §C has an explicit §/C.
-    /// </summary>
-    public bool UseImplicitCallCloser { get; set; } = true;
 }

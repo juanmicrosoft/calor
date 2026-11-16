@@ -62,11 +62,6 @@ public static class MigrateCommand
             description: "Z3 verification timeout per contract in milliseconds",
             getDefaultValue: () => (int)VerificationOptions.DefaultTimeoutMs);
 
-        var explicitCallClosersOption = new Option<bool>(
-            aliases: new[] { "--explicit-call-closers" },
-            description: "Legacy compatibility option; current native calls use parentheses and never emit closer tags.",
-            getDefaultValue: () => false);
-
         var noImplicitSystemOption = new Option<bool>(
             "--no-implicit-system", "Validate without the implicit System project import");
         var splitNamespacesOption = new Option<bool>(
@@ -111,7 +106,6 @@ public static class MigrateCommand
             skipAnalyzeOption,
             skipVerifyOption,
             verificationTimeoutOption,
-            explicitCallClosersOption,
             noImplicitSystemOption,
             splitNamespacesOption,
             defineOption,
@@ -134,7 +128,6 @@ public static class MigrateCommand
             var skipAnalyze = ctx.ParseResult.GetValueForOption(skipAnalyzeOption);
             var skipVerify = ctx.ParseResult.GetValueForOption(skipVerifyOption);
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
-            var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
             var definedSymbols = ctx.ParseResult.GetValueForOption(defineOption) ?? [];
             var configuration = ctx.ParseResult.GetValueForOption(configurationOption) ?? "Debug";
             var targetFramework = ctx.ParseResult.GetValueForOption(targetFrameworkOption);
@@ -146,7 +139,7 @@ public static class MigrateCommand
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
             ctx.ExitCode = await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
                 reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout,
-                explicitCallClosers, definedSymbols,
+                definedSymbols,
                 configuration, targetFramework, languageVersion,
                 documentationMode, parseFeatures,
                 !ctx.ParseResult.GetValueForOption(noImplicitSystemOption),
@@ -167,7 +160,6 @@ public static class MigrateCommand
         bool skipAnalyze,
         bool skipVerify,
         uint verificationTimeout,
-        bool explicitCallClosers,
         IReadOnlyCollection<string> definedSymbols,
         string configuration,
         string? targetFramework,
@@ -219,8 +211,7 @@ public static class MigrateCommand
                 Microsoft.CodeAnalysis.DocumentationMode>(
                     documentationMode,
                     ignoreCase: true),
-            ParseFeatures = ParseFeatures(parseFeatures),
-            UseImplicitCallCloser = !explicitCallClosers
+            ParseFeatures = ParseFeatures(parseFeatures)
         };
 
         var migrator = new ProjectMigrator(options);

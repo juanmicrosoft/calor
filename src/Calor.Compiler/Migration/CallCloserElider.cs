@@ -218,8 +218,7 @@ public sealed class CallCloserElider
             return;
         }
         // The arg's first character must match the parser's safe inline-
-        // expression starter set (mirror of
-        // CalorEmitter.StartsWithExpressionStarter).
+        // expression starter set.
         if (!IsSafeExpressionStarter(source, nextTok.Span.Start))
         {
             return;
@@ -323,7 +322,7 @@ public sealed class CallCloserElider
     }
 
     /// <summary>
-    /// Mirror of <c>CalorEmitter.StartsWithExpressionStarter</c>: a
+    /// A
     /// conservative subset of expression starters that are safe for
     /// call-closer elision. Braced collection initializers keep §/C.
     /// </summary>

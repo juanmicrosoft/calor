@@ -145,7 +145,7 @@ public sealed class SharedInteropControlsTests : IDisposable
         }
         Check("library", new ConversionOptions());
         Check("cli-convert", Commands.ConvertCommand.BuildCSharpToCalorOptions(benchmark: false, verbose: false, explain: false,
-            noFallback: false, passthrough: false, explicitCallClosers: false));
+            noFallback: false, passthrough: false));
         // Every committed cell reports the options that applied; they must agree with the recorded defaults.
         foreach (var (control, node) in Results())
             foreach (var (surface, cell) in node!["surfaces"]!.AsObject())

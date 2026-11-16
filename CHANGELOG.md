@@ -32,6 +32,10 @@ All notable changes to this project will be documented in this file.
   `calor_compile` apply only patches marked `isSafeToApply`. Fuzzy matches,
   inferred contract changes and ambiguous indentation remain suggestions.
   Explicit `calor format --heal` remains available for reviewed heuristic repair.
+- **`--explicit-call-closers` is removed.** The `calor convert` and `calor migrate`
+  option and the MCP `explicitCallClosers` argument chose between two spellings of
+  the retired `§C` call form. Native calls are always written `name(args)`, so the
+  option had no effect. Remove it from scripts: the CLI now rejects it as unknown.
 
 ### Added
 
@@ -73,6 +77,13 @@ no substitute tokenizer or estimated result is reported here.
 
 ### Fixed
 
+- **Signature help works on native calls.** The language server looked for the
+  retired `§C{name}` call form, so it never showed parameter hints in 0.30 code. It
+  now finds the `name(` call around the cursor, skips strings and comments, and
+  highlights the argument the cursor is in. Typing `(` or `,` triggers it.
+- **C# conversion no longer writes `§ASSIGN` for a compound assignment it could not
+  analyze.** When the converter has no semantic model for a statement such as
+  `x += y`, it now writes the native `set x (x + y)`.
 - **Paid evaluation cost estimates account for prompt caching.** Claude cache
   reads no longer reduce the separate uncached-input charge, and five-minute
   cache writes include their surcharge. Reported input totals include cached

@@ -594,7 +594,7 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
         {
             var options = ConvertCommand.BuildCSharpToCalorOptions(
                 benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: false, explicitCallClosers: false);
+                passthrough: false);
             var result = new CSharpToCalorConverter(options).Convert(source);
             Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
             return (result.CalorSource!, result.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved));

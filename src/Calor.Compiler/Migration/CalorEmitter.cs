@@ -135,22 +135,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void Dedent() => _indentLevel--;
 
     /// <summary>
-    /// Phase 3 — indent-form block terminator. The CalorEmitter no longer
-    /// emits structural `§/X{...}` closing tags; block ends are conveyed by
-    /// dedentation at the parent indent column, which the indent-aware lexer
-    /// converts to <see cref="Calor.Compiler.Parsing.TokenKind.Dedent"/>.
-    /// This is a documented no-op (kept as an explicit call so the diff
-    /// reviewing the Phase 3 transition shows clearly which sites stopped
-    /// emitting closers and which still do — see do-while, switch case
-    /// bodies, and preprocessor blocks for the remaining exceptions, which
-    /// carry trailing payload on the closer and need Phase 4 design work).
-    /// </summary>
-    private static void EmitBlockEnd(string legacyCloser)
-    {
-        _ = legacyCloser;
-    }
-
-    /// <summary>
     /// Emits doc comment lines (if present) as Calor line comments before a construct.
     /// </summary>
     private void EmitDocComment(AstNode node)
@@ -233,103 +217,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
     }
 
-    private string BuildLambdaHeader(LambdaExpressionNode node)
-    {
-        // Format: §LAM{[static:][async:]param1:type1[:param2:type2:...]}
-        // The parameter list is positional name:type pairs. A parameter whose
-        // type the converter could not infer (#1097: TypeName null, previously
-        // written as the bare "?" the binder cannot canonicalize) is written
-        // WITHOUT a type when it is the last parameter — the parser reads a
-        // trailing unpaired name as untyped, the binder defaults it to OBJECT
-        // (Binder.BindLambdaExpression), and the C# emitter writes the bare
-        // name so C# infers it. An earlier untyped parameter still needs a slot
-        // to keep the pairing aligned (an empty slot lexes as `::`), so it is
-        // written as `object` — the same type the binder would default to.
-        var headerParts = new List<string>();
-        if (node.IsStatic) headerParts.Add("static");
-        if (node.IsAsync) headerParts.Add("async");
-        for (var i = 0; i < node.Parameters.Count; i++)
-        {
-            var p = node.Parameters[i];
-            headerParts.Add(p.Name);
-            if (p.TypeName != null)
-                headerParts.Add(TypeMapper.ToSurfaceType(p.TypeName));
-            else if (i < node.Parameters.Count - 1)
-                headerParts.Add("object");
-        }
-        return string.Join(":", headerParts);
-    }
-
-    /// <summary>
-    /// Block form of a statement-bodied lambda as a list of lines relative to
-    /// indent 0: <c>{opener} §LAM{header}</c>, each captured statement's lines one
-    /// level deeper, and <c>§/LAM</c> at the opener's column. Nested block
-    /// content keeps its relative indentation, so prefixing every line by the
-    /// caller's indent (AppendLine / FlushHoistedLines) yields a well-formed block
-    /// wherever it lands (#903 cluster 1: the legacy multi-line string put the
-    /// closer at column 0 and only re-indented the first line of each statement).
-    /// </summary>
-    private static List<string> BuildBlockLambdaLines(
-        string opener, string header, string lambdaRow, IReadOnlyList<string> capturedStatements)
-    {
-        var lines = new List<string> { $"{opener}§LAM{{{header}}}{lambdaRow}" };
-        foreach (var stmt in capturedStatements)
-        {
-            if (string.IsNullOrWhiteSpace(stmt)) continue;
-            if (RawCSharpFrame.ReadTokens(stmt).Any(t => t.Value is RawCSharpFrame))
-            {
-                lines.Add(RawCSharpFrame.RewriteOutsideFrames(stmt, text =>
-                    string.Join("\n", text.Split('\n')
-                        .Select(line => line.Length == 0 ? "" : "  " + line.TrimEnd('\r')))));
-                continue;
-            }
-            foreach (var line in stmt.Split('\n'))
-            {
-                var trimmed = line.TrimEnd('\r');
-                lines.Add(trimmed.Length == 0 ? "" : "  " + trimmed);
-            }
-        }
-        lines.Add($"§/LAM");
-        return lines;
-    }
-
-    /// <summary>
-    /// True when a statement-bodied lambda may be space-joined on one line:
-    /// at most two statements, none a fallback/raw node, and — new for #903 — none
-    /// whose captured rendering spans several lines (a nested block lambda, an object
-    /// initializer, or a hoisted temp all do). The old check looked only at node
-    /// kinds, so a two-statement lambda with a multi-line statement was joined onto
-    /// one line and its continuation lines landed at column 0/2 mid-block.
-    /// </summary>
-    private static bool CanInlineLambdaStatements(LambdaExpressionNode node, IReadOnlyList<string> captured)
-        => node.StatementBody!.Count <= 2
-           && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)
-           && captured.All(s => !s.Contains('\n') && !s.Contains('\r'));
-
-    /// <summary>
-    /// Captures a statement-bodied lambda's statements once and reports whether the
-    /// single-line form is valid. When it is, <paramref name="inline"/> holds the
-    /// complete <c>§LAM{...} ... §/LAM</c> text; otherwise the caller builds the
-    /// block form from <paramref name="stmts"/> without re-visiting the body.
-    /// </summary>
-    private bool TryRenderStatementLambdaInline(
-        LambdaExpressionNode node, string header, string lambdaRow, out string inline, out List<string> stmts)
-    {
-        var shortCandidate = node.StatementBody!.Count <= 2
-            && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)
-            // A lone call on the header line denotes an expression body. Keep
-            // discarded-return statement lambdas unambiguously block-bodied.
-            && !(node.StatementBody.Count == 1 && node.StatementBody[0] is CallStatementNode);
-        stmts = CaptureLambdaStatements(node, inlineSibling: shortCandidate);
-        if (shortCandidate && CanInlineLambdaStatements(node, stmts))
-        {
-            inline = $"§LAM{{{header}}}{lambdaRow} {string.Join(" ", stmts)} §/LAM";
-            return true;
-        }
-        inline = "";
-        return false;
-    }
-
     public string Visit(ModuleNode node)
     {
         EmitDocComment(node);
@@ -369,162 +256,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         EmitModuleItems(node, scopeId: null, includeUsings: true);
 
         Dedent();
-        EmitBlockEnd($"§/M");
 
         return _builder.ToString();
-    }
-
-    private static bool HasExplicitNamespaceTopology(ModuleNode node)
-        => node.NamespaceScopes.Count > 0
-           || node.Usings.Any(item => item.NamespaceScopeId != null)
-           || EnumerateModuleDeclarations(node).Any(item =>
-               item.NamespaceScopeId != null
-               && !(item.NamespaceScopeId == ""
-                    && !string.IsNullOrEmpty(item.NamespaceIdentity)));
-
-    private void EmitScopedModuleBody(ModuleNode node)
-    {
-        var leadingItems = node.Items.Count > 0
-            ? node.Items.TakeWhile(IsCompilationUnitPrefixItem).ToList()
-            : [];
-        if (leadingItems.Count > 0)
-        {
-            foreach (var item in leadingItems)
-                EmitModuleItem(item);
-        }
-        else
-        {
-            foreach (var usingDirective in node.Usings.Where(item => item.NamespaceScopeId == null))
-                Visit(usingDirective);
-            if (node.Usings.Any(item => item.NamespaceScopeId == null))
-                AppendLine();
-            foreach (var preprocessor in node.TypePreprocessorBlocks.Where(
-                         item => item.NamespaceScopeId == null
-                                 && !ContainsConditionalDeclarations(item)))
-            {
-                Visit(preprocessor);
-                AppendLine();
-            }
-        }
-
-        var usedScopeIds = EnumerateModuleDeclarations(node)
-            .Select(item => item.NamespaceScopeId)
-            .Concat(node.Usings.Select(item => item.NamespaceScopeId))
-            .Concat(node.NamespaceScopes.Select(scope => scope.Id))
-            .Where(scopeId => !string.IsNullOrEmpty(scopeId))
-            .Select(scopeId => scopeId!)
-            .ToHashSet(StringComparer.Ordinal);
-        var emittedScopeIds = new HashSet<string>(StringComparer.Ordinal);
-        var hasGlobalScopeItems =
-            EnumerateModuleDeclarations(node).Any(item => item.NamespaceScopeId == "")
-            || node.Items.Except(leadingItems).Any(item =>
-                item.NamespaceScopeId == null
-                && item is CompilerDirectiveNode);
-        if (hasGlobalScopeItems)
-        {
-            EmitSyntheticNamespaceScope(
-                node,
-                CreateSyntheticScopeId("ns_global", usedScopeIds),
-                "_global",
-                "",
-                NamespaceScopeKind.Global,
-                includeUnscopedCompilerItems: true,
-                excludedItems: leadingItems);
-        }
-
-        foreach (var root in node.NamespaceScopes.Where(scope => scope.ParentScopeId == null))
-        {
-            EmitNamespaceScope(node, root, emittedScopeIds);
-        }
-        if (!hasGlobalScopeItems)
-        {
-            foreach (var directive in node.Items
-                         .Except(leadingItems)
-                         .OfType<CompilerDirectiveNode>()
-                         .Where(item => item.NamespaceScopeId == null))
-            {
-                Visit(directive);
-            }
-        }
-
-        var orphanScopeIds = EnumerateModuleDeclarations(node)
-            .Select(item => item.NamespaceScopeId)
-            .Concat(node.Usings.Select(item => item.NamespaceScopeId))
-            .Where(scopeId => !string.IsNullOrEmpty(scopeId) && !emittedScopeIds.Contains(scopeId))
-            .Select(scopeId => scopeId!)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-        foreach (var scopeId in orphanScopeIds)
-        {
-            var namespaceIdentity = EnumerateModuleDeclarations(node)
-                .FirstOrDefault(item => item.NamespaceScopeId == scopeId)
-                ?.NamespaceIdentity
-                ?? node.Usings.FirstOrDefault(item => item.NamespaceScopeId == scopeId)
-                    ?.NamespaceIdentity;
-            if (namespaceIdentity == null)
-            {
-                _context.AddError(
-                    $"Namespace scope '{scopeId}' has no scope declaration or namespace identity; " +
-                    "its declarations were preserved in the global namespace.",
-                    feature: "namespace-topology");
-                namespaceIdentity = "";
-            }
-            EmitSyntheticNamespaceScope(
-                node,
-                scopeId,
-                string.IsNullOrEmpty(namespaceIdentity) ? "_global" : namespaceIdentity,
-                scopeId,
-                string.IsNullOrEmpty(namespaceIdentity)
-                    ? NamespaceScopeKind.Global
-                    : NamespaceScopeKind.Named);
-        }
-
-        var unscopedDeclarations = EnumerateModuleDeclarations(node)
-            .Where(item => item.NamespaceScopeId == null)
-            .ToList();
-        foreach (var namespaceIdentity in unscopedDeclarations
-                     .Where(item => !string.IsNullOrEmpty(item.NamespaceIdentity))
-                     .Select(item => item.NamespaceIdentity!)
-                     .Distinct(StringComparer.Ordinal))
-        {
-            EmitSyntheticNamespaceScope(
-                node,
-                CreateSyntheticScopeId("ns_synthetic", usedScopeIds),
-                namespaceIdentity,
-                scopeId: null,
-                NamespaceScopeKind.Named,
-                exactUnscoped: true,
-                unscopedNamespaceIdentity: namespaceIdentity);
-        }
-
-        var missingIdentity = unscopedDeclarations
-            .Where(item => item.NamespaceIdentity == null)
-            .ToList();
-        if (missingIdentity.Count > 0)
-        {
-            _context.AddError(
-                "Explicit namespace topology contains declarations with neither a namespace scope " +
-                "nor an explicit namespace identity; they were preserved in the global namespace: " +
-                string.Join(
-                    ", ",
-                    missingIdentity.Select(item =>
-                        item.FullyQualifiedSymbolIdentity ?? item.GetType().Name)),
-                feature: "namespace-topology");
-        }
-
-        if (missingIdentity.Count > 0
-            || unscopedDeclarations.Any(item => item.NamespaceIdentity == ""))
-        {
-            EmitSyntheticNamespaceScope(
-                node,
-                CreateSyntheticScopeId("ns_global", usedScopeIds),
-                "_global",
-                scopeId: null,
-                NamespaceScopeKind.Global,
-                exactUnscoped: true,
-                unscopedNamespaceIdentity: "",
-                includeMissingNamespaceIdentity: true);
-        }
     }
 
     private void EmitNamespaceScope(
@@ -540,40 +273,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var child in module.NamespaceScopes.Where(item => item.ParentScopeId == scope.Id))
             EmitNamespaceScope(module, child, emittedScopeIds);
         Dedent();
-        EmitBlockEnd("§/NS");
-        AppendLine();
-    }
-
-    private void EmitSyntheticNamespaceScope(
-        ModuleNode module,
-        string id,
-        string name,
-        string? scopeId,
-        NamespaceScopeKind kind,
-        bool exactUnscoped = false,
-        string? unscopedNamespaceIdentity = null,
-        bool includeMissingNamespaceIdentity = false,
-        bool includeUnscopedCompilerItems = false,
-        IReadOnlyCollection<AstNode>? excludedItems = null)
-    {
-        var marker = kind == NamespaceScopeKind.Global
-            ? ":global"
-            : name == "_global"
-                ? ":named"
-                : "";
-        AppendLine($"§NS{{{name}{marker}}}");
-        Indent();
-        EmitModuleItems(
-            module,
-            scopeId,
-            includeUsings: !exactUnscoped,
-            exactUnscoped,
-            unscopedNamespaceIdentity,
-            includeMissingNamespaceIdentity,
-            includeUnscopedCompilerItems,
-            excludedItems);
-        Dedent();
-        EmitBlockEnd($"§/NS");
         AppendLine();
     }
 
@@ -700,12 +399,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
            || block.ElseBranch != null
            && ContainsConditionalDeclarations(block.ElseBranch);
 
-    private static bool IsCompilationUnitPrefixItem(AstNode item)
-        => item.NamespaceScopeId == null
-           && (item is UsingDirectiveNode or CompilerDirectiveNode
-               || item is TypePreprocessorBlockNode block
-               && !ContainsConditionalDeclarations(block));
-
     private static bool IsCompilerDirectiveCode(string code)
         => code.TrimStart().StartsWith("#", StringComparison.Ordinal);
 
@@ -719,17 +412,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (scope.IsFileScoped)
             markers.Add("file");
         return markers.Count == 0 ? "" : ":" + string.Join(":", markers);
-    }
-
-    private static string CreateSyntheticScopeId(
-        string prefix,
-        ISet<string> usedScopeIds)
-    {
-        var candidate = prefix;
-        var suffix = 1;
-        while (!usedScopeIds.Add(candidate))
-            candidate = $"{prefix}_{suffix++}";
-        return candidate;
     }
 
     private void EmitModuleItem(AstNode item)
@@ -870,7 +552,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/IFACE");
 
         return "";
     }
@@ -907,9 +588,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     // Otherwise an initial parenthesized callee can be mistaken for the declaration's signature.
-    private static bool NeedsEmptyPostfixSignature(IReadOnlyList<StatementNode> body) =>
-        body.FirstOrDefault() is ExpressionStatementNode { Expression: ExpressionCallNode };
-
     private void EmitOutputLine(OutputNode? output)
     {
         if (output != null)
@@ -955,7 +633,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var postcondition in node.Postconditions) Visit(postcondition);
         Dedent();
 
-        EmitBlockEnd($"§/MT");
 
         return "";
     }
@@ -1107,8 +784,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        if (!node.IsRecord)
-            EmitBlockEnd($"§/{declarationTag}");
 
         return "";
     }
@@ -1221,63 +896,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
     }
 
-    /// <summary>
-    /// #1541/#1595: a collection in expression position (a member default, or an element of another
-    /// collection) is written on one line with its closer: <c>§LIST{T} e1 e2 §/LIST</c>. The
-    /// statement form appends its own lines and returns nothing, which in expression position left
-    /// the value empty and put a §LIST statement in the class body.
-    /// </summary>
-    private string RenderInlineCollection(string open, string close, IEnumerable<string> items) =>
-        $"{open}{string.Concat(items.Select(item => " " + item))} {close}";
-
-    /// <summary>
-    /// An element (or §KV key/value) of a collection block. A nested collection is written inline on
-    /// its element line (#1595); anything else as an inline sibling.
-    /// </summary>
-    private string AcceptCollectionElement(ExpressionNode element)
-    {
-        if (element is ListCreationNode or SetCreationNode or DictionaryCreationNode)
-            return AcceptInlineCollection(element);
-        // #1541: an object-initializer element stays on its line (`§NEW{T} A = 1 §/NEW`), so it is
-        // created in element order instead of being hoisted ahead of the earlier elements.
-        _inlineObjectInitializers++;
-        try
-        {
-            return AcceptInInlineSibling(element);
-        }
-        finally
-        {
-            _inlineObjectInitializers--;
-        }
-    }
-
-    private string AcceptInlineCollection(ExpressionNode collection)
-    {
-        _inlineCollections++;
-        try
-        {
-            return collection.Accept(this);
-        }
-        finally
-        {
-            _inlineCollections--;
-        }
-    }
-
-    private List<string> RenderInlineCollectionItems(IEnumerable<ExpressionNode> elements)
-    {
-        var values = new List<string>();
-        foreach (var element in elements)
-        {
-            var value = AcceptCollectionElement(element);
-            if (value.Contains('\n') || string.IsNullOrWhiteSpace(value))
-                throw new InvalidOperationException(
-                    "An inline collection element must render on one line (#1541); the converter keeps such collections as C#.");
-            values.Add(value);
-        }
-        return values;
-    }
-
     public string Visit(PropertyNode node)
     {
         EmitDocComment(node);
@@ -1327,7 +945,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/PROP");
 
         return "";
     }
@@ -1387,7 +1004,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
             _memberBodyDepth--;
             Dedent();
-            EmitBlockEnd($"§/{keyword}");
         }
 
         return "";
@@ -1444,7 +1060,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/CTOR");
 
         return "";
     }
@@ -1485,7 +1100,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/OP");
 
         return "";
     }
@@ -1585,7 +1199,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/{methodTag}");
 
         return "";
     }
@@ -1701,7 +1314,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/{funcTag}");
 
         return "";
     }
@@ -1874,101 +1486,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
-    private string EmitLegacyCallStatement(CallStatementNode node)
-    {
-        // Emit named argument labels as §A[name] value when present.
-        // Argument expressions are visited in inline-sibling context so that
-        // nested zero-arg calls keep their explicit §/C (else the parser
-        // would absorb the following §A as the nested call's inline arg —
-        // RFC v0.6 call-closer-elision §3.2, v0.6.1 BLOCKER fix).
-        // Hoist only args that span multiple lines (e.g. §NEW with object
-        // initializers that emit `\n  Prop = val\n§/NEW`); single-line
-        // inline forms like `§NEW{T} §/NEW` and `§NEW{T} §A x §/NEW` are
-        // safe to embed directly — the parser tracks nested §NEW/§/NEW
-        // via HasEndNewBeforeEndCall, and nested §C/§/C balance the same
-        // way. Hoisting those would needlessly introduce §B{~_hoist000}
-        // temps that re-shape the source.
-        var rendered = node.Arguments.Select((a, i) =>
-        {
-            var argValue = AcceptInInlineSibling(a);
-            if (argValue.Contains('\n'))
-                argValue = HoistToTempVar(argValue);
-            bool named = node.ArgumentNames != null
-                      && i < node.ArgumentNames.Count
-                      && node.ArgumentNames[i] != null;
-            var modifier = node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
-                ? node.ArgumentModifiers[i] : null;
-            var marker = modifier == null ? "§A" : $"§A{{{modifier}}}";
-            var standardWrapped = named
-                ? $"{marker}[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
-                : $"{marker} {argValue}";
-            return (named, modifier, standardWrapped, argValue);
-        }).ToList();
-
-        var target = ConvertVerbatimStringsInTarget(NormalizeCallTarget(node.Target).Replace("->", "."));
-        if (node.TypeArguments is { Count: > 0 })
-            target += $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>";
-
-        // RFC v0.6 call-closer-elision §3.2 / §4 — statement-context elision.
-        // Stmt-context calls normally end at a newline (AppendLine adds \n),
-        // so §/C is safe to elide. Two elision shapes:
-        //   • Zero-arg: §C{target}<EOL>  (Parser.cs:1409-1413 path)
-        //   • One-arg positional: §C{target} <expr><EOL>  (Parser.cs:1398-1403 path)
-        // Named args, multi-arg, or args whose first token is not in
-        // IsExpressionStart() keep the standard §A ... §/C form.
-        // Also held back inside _inInlineSiblingContext (e.g. when a lambda
-        // short-body emits two statements space-joined on one line): there
-        // the next-sibling-statement opener IS on the same line, so eliding
-        // would risk absorption — mirrors the expression-context discipline
-        // at Visit(CallExpressionNode) line ~2380.
-        // Flag defaults to true as of v0.6.1 (was false in v0.6.0); set
-        // ConversionContext.UseImplicitCallCloser = false to opt out.
-        bool canElide = _context?.UseImplicitCallCloser != false
-                     && _inInlineSiblingContext == 0;
-
-        if (canElide && rendered.Count == 0)
-        {
-            AppendLine($"§C{{{target}}}");
-            return "";
-        }
-
-        if (canElide && rendered.Count == 1 && !rendered[0].named && rendered[0].modifier == null
-            && StartsWithExpressionStarter(rendered[0].argValue))
-        {
-            AppendLine($"§C{{{target}}} {rendered[0].argValue}");
-            return "";
-        }
-
-        var argsStr = rendered.Count > 0
-            ? $" {string.Join(" ", rendered.Select(r => r.standardWrapped))}"
-            : "";
-        AppendLine($"§C{{{target}}}{argsStr} §/C");
-        return "";
-    }
-
-    /// <summary>
-    /// Conservative whitelist for rendered expressions that are safe for
-    /// stmt-context one-arg §/C elision. Braced collection initializers are
-    /// valid expression starters, but retain the explicit §A/§/C form to avoid
-    /// ambiguity with adjacent structural brace payloads in migrated text.
-    /// </summary>
-    private static bool StartsWithExpressionStarter(string rendered)
-    {
-        if (string.IsNullOrEmpty(rendered)) return false;
-        char c = rendered[0];
-        // §  → section markers (§C, §NEW, §ARR, §SOME, §IF, …)
-        // letter/_ → identifier or typed-literal prefix (INT:, STR:, BOOL:, …)
-        // digit → bare numeric literal
-        // (  → Lisp-style expression or inline lambda
-        // "  → string literal
-        // @  → verbatim identifier (@keyword)
-        // #  → self-reference (refinement predicates)
-        return c == '§'
-            || char.IsLetter(c) || c == '_'
-            || char.IsDigit(c)
-            || c == '(' || c == '"' || c == '@' || c == '#';
-    }
-
     public string Visit(PrintStatementNode node)
     {
         var expr = node.Expression.Accept(this);
@@ -2059,258 +1576,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
-    private void EmitListCreationWithName(ListCreationNode node, string variableName)
-    {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-
-        // Sanitize variable names containing section markers
-        var originalTarget = variableName;
-        if (ContainsSectionMarker(variableName))
-            variableName = FreshTemp("_hoist");
-
-        // Pre-evaluate all elements to collect hoisted bindings before the list block.
-        // AcceptInInlineSibling: each element line is parsed as a sibling expression
-        // and a one-arg closer-less §C inside an element would absorb the next
-        // sibling (or §/LIST) as its inline argument (v0.6.3 RFC §3.2 case B).
-        // Mirrors §DICT entries, §HSET elements, and §ARR inline elements.
-        var evaluatedElements = new List<string>();
-        var allHoisted = new List<string>();
-        foreach (var element in node.Elements)
-        {
-            var val = AcceptCollectionElement(element);
-            // #903: a multi-line element (an object initializer) cannot sit on an
-            // element line; hoist it so the block lands at the enclosing indent.
-            if (val.Contains('\n'))
-                val = HoistToTempVar(val);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedElements.Add(val);
-        }
-
-        // Emit hoisted bindings before the list
-        foreach (var hoisted in allHoisted)
-            AppendLine(hoisted);
-
-        AppendLine($"§LIST{{{variableName}:{elementType}}}");
-        Indent();
-
-        foreach (var val in evaluatedElements)
-        {
-            AppendLine(val);
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/LIST{{{variableName}}}");
-        if (originalTarget != variableName)
-            AppendLine($"§ASSIGN {originalTarget} {variableName}");
-    }
-
-    private void EmitDictionaryCreationWithName(DictionaryCreationNode node, string variableName)
-    {
-        var keyType = TypeMapper.ToSurfaceType(node.KeyType);
-        var valueType = TypeMapper.ToSurfaceType(node.ValueType);
-
-        // Pre-evaluate entries to collect hoisted bindings before the dict block
-        var evaluatedEntries = new List<(string Key, string Value)>();
-        var allHoisted = new List<string>();
-        foreach (var entry in node.Entries)
-        {
-            // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C —
-            // otherwise the parser would absorb the value (or next §KV) as the call's arg.
-            var key = AcceptCollectionElement(entry.Key);
-            var value = AcceptCollectionElement(entry.Value);
-            // Review M3: the KEY needs the same guard as the value - a dictionary
-            // whose key is an object initializer is multi-line too.
-            if (key.Contains('\n'))
-                key = HoistToTempVar(key);
-            if (value.Contains('\n'))
-                value = HoistToTempVar(value);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedEntries.Add((key, value));
-        }
-
-        // Emit hoisted bindings before the dict
-        foreach (var hoisted in allHoisted)
-            AppendLine(hoisted);
-
-        AppendLine($"§DICT{{{variableName}:{keyType}:{valueType}}}");
-        Indent();
-
-        foreach (var (key, value) in evaluatedEntries)
-        {
-            AppendLine($"§KV {key} {value}");
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/DICT{{{variableName}}}");
-    }
-
-    private void EmitSetCreationWithName(SetCreationNode node, string variableName)
-    {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-
-        // AcceptInInlineSibling: each §HSET element is emitted on its own line,
-        // but the parser treats elements as sibling expressions and a one-arg
-        // closer-less §C inside an element would absorb the next §C / §/HSET
-        // as its inline argument (v0.6.3 RFC §3.2 case B). Mirrors §DICT entries
-        // (line ~1346) and §ROW elements (line ~1474). Pre-evaluate to flush
-        // any hoisted bindings BEFORE the §HSET opener so they sit at the parent
-        // scope, not inside the set body.
-        var evalElements = new List<string>();
-        var allHoisted = new List<string>();
-        foreach (var element in node.Elements)
-        {
-            var val = AcceptCollectionElement(element);
-            // #903: a multi-line element (an object initializer) cannot sit on an
-            // element line; hoist it so the block lands at the enclosing indent.
-            if (val.Contains('\n'))
-                val = HoistToTempVar(val);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evalElements.Add(val);
-        }
-
-        foreach (var hoisted in allHoisted)
-            AppendLine(hoisted);
-
-        AppendLine($"§HSET{{{variableName}:{elementType}}}");
-        Indent();
-
-        foreach (var val in evalElements)
-        {
-            AppendLine(val);
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/HSET{{{variableName}}}");
-    }
-
-    /// <summary>
-    /// #1550/#1635: the fields of a typed <c>§B</c> header. A mutable binding is name-first
-    /// with <c>~</c>; an immutable one uses the spelling the parser reads back unchanged.
-    /// </summary>
-    private static string BindHeaderFields(string name, string type, bool isMutable) =>
-        isMutable ? $"~{name}:{type}" : AttributeHelper.FormatImmutableBindHeader(name, type);
-
-    private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName, bool isMutable = false)
-    {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-        // #1132: `[T]` cannot spell an array of arrays (`[i32[]]` does not parse).
-        var arrayType = elementType.Contains('[') ? ArrayOf(elementType, "[]") : $"[{elementType}]";
-
-        // Sanitize variable names containing section markers (e.g., §IDX §THIS §C{GetInt} §/C)
-        // These can't appear inside {…} attribute blocks. Use a hoisted temp var instead.
-        var originalTarget = variableName;
-        if (ContainsSectionMarker(variableName))
-        {
-            variableName = FreshTemp("_hoist");
-        }
-
-        if (node.Initializer.Count > 0)
-        {
-            // Pre-evaluate elements so hoisted bindings land before the §ARR block
-            var evalElements = RenderInPlace(node.Initializer);
-            AppendLine($"§ARR{{{variableName}:{elementType}}}");
-            Indent();
-            foreach (var val in evalElements)
-            {
-                AppendLine(val.Replace("\n", "\n  ")); // a multi-line element moves with its line
-            }
-            Dedent();
-            EmitBlockEnd($"§/ARR{{{variableName}}}");
-            // If we sanitized the name, assign the result to the original target
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-        else if (node.Size != null)
-        {
-            // #1132: a complex size is quoted in place, not hoisted (a hoisted size ran
-            // before the statement's earlier reads).
-            var size = EmitSizeAttribute(node.Size);
-            AppendLine($"§B{{{BindHeaderFields(variableName, arrayType, isMutable)}}} §ARR{{{elementType}:{size}}}");
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-        else
-        {
-            AppendLine($"§B{{{BindHeaderFields(variableName, arrayType, isMutable)}}} §C{{Array.Empty<{elementType}>}} §/C");
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-    }
-
-    private void EmitMultiDimArrayCreationWithName(MultiDimArrayCreationNode node, string variableName, string? typeName, bool isMutable = false)
-    {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-        var mappedType = typeName != null ? TypeMapper.ToSurfaceType(typeName) : ArrayOf(elementType, $"[{new string(',', Math.Max(node.Rank - 1, 0))}]");
-
-        // Sanitize variable names containing section markers
-        var originalTarget = variableName;
-        if (ContainsSectionMarker(variableName))
-            variableName = FreshTemp("_hoist");
-
-        if (node.Initializer.Count > 0)
-        {
-            // Review N1: pre-evaluate every row BEFORE the §ARR2D opener so hoisted
-            // bindings land ahead of it; the §ARR2D body accepts only §ROW (Calor0100).
-            // #1132: the sized form carries the rank (and shape) of a rank-3+ or sized
-            // initializer; the rows are its innermost vectors in source order.
-            var dims = node.DimensionSizes.Count > 0
-                ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
-                : "";
-            var rows = RenderMultiDimRows(node);
-            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{elementType}{dims}}}");
-            Indent();
-            foreach (var row in rows)
-                AppendLine($"§ROW {row}");
-            Dedent();
-            EmitBlockEnd($"§/ARR2D");
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-        else if (node.DimensionSizes.Count > 0)
-        {
-            // #1132: complex sizes are quoted in place, in order; hoisting only some of
-            // them ran a call before an earlier size was read (`new int[n, Next()]`).
-            var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
-            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{elementType}:{dims}}}");
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-        else
-        {
-            var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
-            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{elementType}:{zeros}}}");
-        }
-    }
-
-    /// <summary>#1132: a mapped array type with Calor's `[T]` spelled `T[]`, for comparison.</summary>
-    private static string OneDimensional(string type)
-    {
-        var mapped = TypeMapper.ToSurfaceType(type);
-        return mapped.Length > 2 && mapped[0] == '[' && mapped[^1] == ']' ? mapped[1..^1] + "[]" : mapped;
-    }
-
-    /// <summary>
-    /// #1132: the type of an array of <paramref name="elementType"/>. The new array's own
-    /// rank comes first, as in C# source: a 2-D array of i32[] is i32[,][], not i32[][,].
-    /// </summary>
-    private static string ArrayOf(string elementType, string rank)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(elementType, @"^(.+?)((?:\[,*\])+)$");
-        return match.Success ? match.Groups[1].Value + rank + match.Groups[2].Value : elementType + rank;
-    }
-
     /// <summary>
     /// #1132: renders elements (or arguments) left to right, object initializers on one line.
     /// If any must leave its line, every non-literal one is bound in source order, so none
@@ -2354,20 +1619,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
             values.Add(hoistAll && !literal ? HoistToTempVar(value) : value);
         }
         return values;
-    }
-
-    /// <summary>The §ROW lines (innermost vectors, row-major).</summary>
-    private List<string> RenderMultiDimRows(MultiDimArrayCreationNode node)
-    {
-        var values = RenderInPlace(node.Initializer.SelectMany(row => row));
-        var rows = new List<string>(node.Initializer.Count);
-        var next = 0;
-        foreach (var row in node.Initializer)
-        {
-            rows.Add(string.Join(" ", values.Skip(next).Take(row.Count)));
-            next += row.Count;
-        }
-        return rows;
     }
 
     /// <summary>#1132: array elements, never hoisted (a hoist ran an element or its conversion early).</summary>
@@ -2422,33 +1673,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    /// <summary>
+    /// A compound store that reached the emitter unlowered (the converter lowers it itself when
+    /// it has a semantic model) is written as the native plain store <c>set t (t op v)</c>. The
+    /// target text is repeated, as the retired <c>§ASSIGN</c> form also did.
+    /// </summary>
     public string Visit(CompoundAssignmentStatementNode node)
     {
         if (node.Operator == CompoundAssignmentOperator.NullCoalesce)
             throw new NotSupportedException(
                 "Null-coalescing stores require declaration-proven lowering before Calor emission.");
 
-        var target = node.Target.Accept(this);
-        var value = node.Value.Accept(this);
-        var opSymbol = node.Operator switch
-        {
-            CompoundAssignmentOperator.Add => "+",
-            CompoundAssignmentOperator.Subtract => "-",
-            CompoundAssignmentOperator.Multiply => "*",
-            CompoundAssignmentOperator.Divide => "/",
-            CompoundAssignmentOperator.Modulo => "%",
-            CompoundAssignmentOperator.BitwiseAnd => "&",
-            CompoundAssignmentOperator.BitwiseOr => "|",
-            CompoundAssignmentOperator.BitwiseXor => "^",
-            CompoundAssignmentOperator.LeftShift => "<<",
-            CompoundAssignmentOperator.RightShift => ">>",
-            CompoundAssignmentOperator.NullCoalesce => "??",
-            // #774: no silent fallback to "+" — exhaustive over the enum.
-            _ => throw new ArgumentOutOfRangeException(nameof(node),
-                $"Unhandled compound assignment operator: {node.Operator}")
-        };
-        AppendLine($"§ASSIGN {target} ({opSymbol} {target} {value})");
-        return "";
+        return Visit(new AssignmentStatementNode(node.Span, node.Target,
+            new BinaryOperationNode(node.Span, RoslynSyntaxVisitor.ToBinaryOperator(node.Operator),
+                node.Target, node.Value)));
     }
 
     public string Visit(UsingStatementNode node)
@@ -3208,85 +2446,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"new {TypeMapper.ToSurfaceType(node.TypeName)}{types}({string.Join(", ", arguments)}){initializers}";
     }
 
-    private string EmitLegacyNew(NewExpressionNode node)
-    {
-        var typeArgs = node.TypeArguments.Count > 0
-            ? $"<{string.Join(",", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>"
-            : "";
-
-        // Inside interpolation, use C# new() syntax instead of §NEW tags
-        if (_inInterpolation)
-        {
-            var inlineArgs = node.Arguments.Select((argument, index) =>
-                node.ArgumentNames?[index] is { } name
-                    ? $"{name}: {argument.Accept(this)}"
-                    : argument.Accept(this));
-            return $"new {TypeMapper.ToSurfaceType(node.TypeName)}{typeArgs}({string.Join(", ", inlineArgs)})";
-        }
-
-        // Arguments need §A prefix for parser to recognize them
-        // Hoist arguments containing section markers (e.g., §C calls) to avoid nested §A conflicts.
-        // Use AcceptInInlineSibling so nested zero-arg §C{...} keeps explicit §/C —
-        // the v0.6.1 emitter default would otherwise let the next §A be absorbed
-        // as the nested call's inline argument (silent AST corruption).
-        // #1132: if one argument is hoisted, every non-literal argument is, in order
-        // (`new Cell(x, Next())` read x after Next() ran).
-        var args = RenderArrayElements(node.Arguments, hoistSectionMarkers: true)
-            .Select((value, index) => node.ArgumentNames?[index] is { } name
-                ? $"§A[{(name.StartsWith('@') ? name[1..] : name)}] {value}"
-                : $"§A {value}");
-        var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
-
-        // Handle object initializers (multi-line block format)
-        if (node.Initializers.Count > 0)
-        {
-            // Pre-evaluate initializer values to collect hoisted bindings
-            var evalInits = new List<(string PropName, string Value)>();
-            // #1524: a nested object initializer value stays on its line (`A = §NEW{U} B = 1 §/NEW`).
-            _inlineObjectInitializers++;
-            try
-            {
-                foreach (var init in node.Initializers)
-                {
-                    var valueStr = init.Value is ListCreationNode or SetCreationNode or DictionaryCreationNode
-                        ? AcceptInlineCollection(init.Value)
-                        // A one-argument §C must keep its §/C, or it reads the next `Name =` as its argument.
-                        : AcceptInInlineSibling(init.Value);
-                    // An empty rendering used to drop the assignment silently (#1524).
-                    if (string.IsNullOrWhiteSpace(valueStr))
-                        throw new InvalidOperationException(
-                            $"Object initializer value for '{init.PropertyName}' rendered empty (#1524).");
-                    evalInits.Add((init.PropertyName, valueStr));
-                }
-            }
-            finally
-            {
-                _inlineObjectInitializers--;
-            }
-
-            // #1132: an array element stays on its line (`§NEW{T} A = x §/NEW`), not hoisted early.
-            if (_inlineObjectInitializers > 0 && evalInits.All(i => !i.Value.Contains('\n')))
-            {
-                var inits = string.Concat(evalInits.Select(i =>
-                    $" {(i.PropName.StartsWith('@') ? i.PropName[1..] : i.PropName)} = {i.Value}"));
-                return $"§NEW{{{TypeMapper.ToSurfaceType(node.TypeName)}{typeArgs}}}{argsStr}{inits} §/NEW";
-            }
-
-            var indent = new string(' ', _indentLevel * 2);
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"§NEW{{{TypeMapper.ToSurfaceType(node.TypeName)}{typeArgs}}}{argsStr}");
-            foreach (var (propName, valueStr) in evalInits)
-            {
-                var safeName = propName.StartsWith("@") ? propName[1..] : propName;
-                sb.Append($"\n{indent}  {safeName} = {valueStr}");
-            }
-            sb.Append($"\n{indent}§/NEW");
-            return sb.ToString();
-        }
-
-        return $"§NEW{{{TypeMapper.ToSurfaceType(node.TypeName)}{typeArgs}}}{argsStr} §/NEW";
-    }
-
     public string Visit(AnonymousObjectCreationNode node)
     {
         var values = RenderArrayElements(node.Initializers.Select(init => init.Value), hoistSectionMarkers: true);
@@ -3508,82 +2667,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return head + "\n" + string.Join("\n", statements.Select(statement =>
             RawCSharpFrame.RewriteOutsideFrames(statement,
                 text => "  " + text.Replace("\n", "\n  ", StringComparison.Ordinal))));
-    }
-
-    private string EmitLegacyLambda(LambdaExpressionNode node)
-    {
-        // Build §LAM{p1:t1:p2:t2} header
-        var header = BuildLambdaHeader(node);
-
-        // Position 2 (§3.3 / §5): §LAM{lam1:x:i32} §E{…}. The parser has always read
-        // this tag; the emitter never wrote it back, so a lambda row did not survive a
-        // round trip. An EMPTY §E{} is emitted too — §3.5 gives "declared pure" and
-        // "no row" different meanings.
-        var lambdaRow = node.Effects != null ? " " + FormatEffectsTag(node.Effects) : "";
-
-        if (node.IsExpressionLambda && node.ExpressionBody != null)
-        {
-            // Inline-sibling context: the body is space-joined between §LAM{...}
-            // and §/LAM{...} on a single emitted line, so any one-arg §C{...} arg
-            // inside the body (v0.6.3 RFC §2.1) would absorb the §/LAM as its
-            // inline argument and corrupt the AST. Mirrors the v0.6.1 zero-arg
-            // discipline at all other sibling-context sites.
-            _lambdaBodyDepth++;
-            string body;
-            try { body = AcceptInInlineSibling(node.ExpressionBody); }
-            finally { _lambdaBodyDepth--; }
-            return $"§LAM{{{header}}}{lambdaRow} {body} §/LAM";
-        }
-        else if (node.StatementBody != null && node.StatementBody.Count > 0)
-        {
-            // Short lambdas (1-2 statements) are space-joined on one line. The
-            // statements are captured in inline-sibling context so any nested
-            // zero-arg §C{...} keeps §/C — otherwise the next statement's leading
-            // token is absorbed as the call's inline argument (v0.6.1 loop-4
-            // devil's-advocate finding #1). The capture is reused for the block
-            // form below, so the body is visited exactly once.
-            if (TryRenderStatementLambdaInline(node, header, lambdaRow, out var inline, out var stmts))
-                return inline;
-
-            // Longer (or multi-line) lambdas in expression position — a §R operand,
-            // an object-initializer value, a call argument, an assignment RHS —
-            // are hoisted to a §B{_hoistLamNNN} block at the enclosing statement's
-            // indent and referenced by name (#903 cluster 1). The block's lines are
-            // queued exactly like any other hoisted binding, so they flush ahead of
-            // the statement that uses the lambda and inherit its column.
-            // NOT while inside another lambda's body (review C1): the hoisted §B
-            // would land ahead of the enclosing statement, outside the outer
-            // lambda's parameter scope, and the emitted Calor would reference a
-            // parameter that is not in scope there. In that case fall through to
-            // the in-place block form below, which stays inside the body.
-            if (_memberBodyDepth > 0 && _lambdaBodyDepth == 0)
-            {
-                var name = FreshTemp("_hoistLam");
-                _pendingHoistedLines.AddRange(
-                    BuildBlockLambdaLines($"§B{{{name}}} ", header, lambdaRow, stmts));
-                return name;
-            }
-
-            // Rendered in place at the CURRENT indent when there is no statement to
-            // hoist ahead of (a field initializer at type scope, e.g. a collection
-            // initializer of lambdas) or when hoisting would escape an enclosing
-            // lambda's scope (C1) —
-            // body one level deeper, §/LAM at the opener's column — the same
-            // absolute-indent convention Visit(NewExpressionNode) uses for its own
-            // continuation lines. (The old string fixed the body at column 2 and the
-            // closer at column 0, which the lexer rejected with Calor0099.)
-            var indent = new string(' ', _indentLevel * 2);
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"§LAM{{{header}}}{lambdaRow}");
-            foreach (var line in BuildBlockLambdaLines("", header, lambdaRow, stmts).Skip(1))
-                sb.Append('\n').Append(line.Length == 0 ? "" : indent).Append(line);
-            return sb.ToString();
-        }
-        else
-        {
-            // Empty lambda
-            return $"§LAM{{{header}}}{lambdaRow} §/LAM";
-        }
     }
 
     public string Visit(LambdaParameterNode node)
@@ -3830,7 +2913,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/EN");
         return "";
     }
 
@@ -3999,7 +3081,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         AppendLine(node.Effects == null ? "! unknown" : FormatEffectsTag(node.Effects));
 
         Dedent();
-        EmitBlockEnd($"§/DEL");
         return "";
     }
 
@@ -4025,7 +3106,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     stmt.Accept(this);
                 }
                 Dedent();
-                EmitBlockEnd("§/EADD");
             }
 
             if (node.RemoveBody != null)
@@ -4037,12 +3117,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     stmt.Accept(this);
                 }
                 Dedent();
-                EmitBlockEnd("§/EREM");
             }
 
             _memberBodyDepth--;
             Dedent();
-            EmitBlockEnd($"§/EVT");
         }
         else
         {
@@ -4298,34 +3376,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         "true", "false", "null"
     };
 
-    /// <summary>
-    /// Wraps a name in backticks if it's a C# reserved word.
-    /// This is the inverse of CSharpEmitter.SanitizeIdentifier which adds @ prefix.
-    /// Handles both bare names ("class") and @-prefixed names ("@class") from Roslyn.
-    /// </summary>
-    /// <summary>
-    /// Converts C# verbatim string literals (@"...") in raw passthrough targets
-    /// to properly escaped regular string literals for Calor.
-    /// </summary>
-    private static string ConvertVerbatimStringsInTarget(string target)
-    {
-        // Find @"..." patterns and convert them
-        var result = System.Text.RegularExpressions.Regex.Replace(target, @"@""((?:""""|[^""])*)""", match =>
-        {
-            // Decode verbatim string: "" → " and everything else is literal
-            var content = match.Groups[1].Value.Replace("\"\"", "\"");
-            // Re-escape for Calor regular strings
-            content = content
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\n", "\\n")
-                .Replace("\r", "\\r")
-                .Replace("\t", "\\t");
-            return $"\"{content}\"";
-        });
-        return result;
-    }
-
     private static string EscapeCalorIdentifier(string name)
     {
         // Strip @ prefix if present (Roslyn's Identifier.Text includes it for verbatim identifiers)
@@ -4454,35 +3504,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _ => throw new ArgumentOutOfRangeException(nameof(op),
             $"Unhandled binary operator in Calor emitter: {op}")
     };
-
-    private static string GetCalorOperatorKind(BinaryOperator op)
-    {
-        return op switch
-        {
-            BinaryOperator.Add => "add",
-            BinaryOperator.Subtract => "sub",
-            BinaryOperator.Multiply => "mul",
-            BinaryOperator.Divide => "div",
-            BinaryOperator.Modulo => "mod",
-            BinaryOperator.Power => "pow",
-            BinaryOperator.Equal => "eq",
-            BinaryOperator.NotEqual => "neq",
-            BinaryOperator.LessThan => "lt",
-            BinaryOperator.LessOrEqual => "lte",
-            BinaryOperator.GreaterThan => "gt",
-            BinaryOperator.GreaterOrEqual => "gte",
-            BinaryOperator.And => "and",
-            BinaryOperator.Or => "or",
-            BinaryOperator.BitwiseAnd => "band",
-            BinaryOperator.BitwiseOr => "bor",
-            BinaryOperator.BitwiseXor => "xor",
-            BinaryOperator.LeftShift => "shl",
-            BinaryOperator.RightShift => "shr",
-            // #774: no silent fallback to "add" — exhaustive over BinaryOperator.
-            _ => throw new ArgumentOutOfRangeException(nameof(op),
-                $"Unhandled binary operator in Calor emitter: {op}")
-        };
-    }
 
     private static string FormatComplexity(ComplexityClass c)
     {
@@ -4989,15 +4010,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
                         $"Unsupported type preprocessor item: {item.GetType().Name}");
             }
         }
-    }
-
-    private void RecordEmitterFallback(AstNode node, string feature, string description)
-    {
-        _context?.RecordLoss(
-            ConversionLossKind.EmitterFallback,
-            feature,
-            description,
-            node.Span.Line);
     }
 
     public string Visit(CSharpInteropBlockNode node)

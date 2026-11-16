@@ -80,9 +80,9 @@ public sealed class ImplicitSystemContextTests(ITestOutputHelper output)
         Assert.False(new GeneratedCSharpCompilationContext().IncludeImplicitSystemUsing);
         Assert.False(new CompilationOptions().IncludeImplicitSystemUsing);
         Assert.False(new ConversionOptions().IncludeImplicitSystemUsing);
-        Assert.True(ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false, false)
+        Assert.True(ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false)
             .IncludeImplicitSystemUsing);
-        Assert.False(ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false, false,
+        Assert.False(ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false,
             includeImplicitSystemUsing: false).IncludeImplicitSystemUsing);
     }
 

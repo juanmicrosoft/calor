@@ -265,13 +265,6 @@ public sealed class ConversionOptions
     public bool RescueUnusableMembers { get; set; } = false;
 
     /// <summary>
-    /// Whether the emitter should elide `§/C` for zero-argument calls (v0.6.1 default behaviour).
-    /// Set to <c>false</c> to produce v0.6.0-compatible output that always emits explicit `§/C` closers.
-    /// Default is <c>true</c> (matches <see cref="ConversionContext.UseImplicitCallCloser"/>).
-    /// </summary>
-    public bool UseImplicitCallCloser { get; set; } = true;
-
-    /// <summary>
     /// Whether lossless conversion validates generated C# as a standalone unit.
     /// Project migration disables this per file and validates all generated files together.
     /// </summary>
@@ -2493,8 +2486,7 @@ public sealed class CSharpToCalorConverter
             Fidelity = _options.Fidelity,
             Mode = _options.Mode,
             PassthroughOnError = _options.PassthroughOnError,
-            RescueUnusableMembers = _options.RescueUnusableMembers,
-            UseImplicitCallCloser = _options.UseImplicitCallCloser
+            RescueUnusableMembers = _options.RescueUnusableMembers
         };
     }
 
@@ -3093,8 +3085,7 @@ public static class Converter
         => ConvertCSharpToCalorAsync(csharpPath, outputPath, options: null);
 
     /// <summary>
-    /// Converts C# to Calor with optional <see cref="ConversionOptions"/> (e.g.
-    /// <c>UseImplicitCallCloser = false</c> for v0.6.0-compatible output).
+    /// Converts C# to Calor with optional <see cref="ConversionOptions"/>.
     /// </summary>
     public static async Task<ConversionResult> ConvertCSharpToCalorAsync(string csharpPath, string? outputPath, ConversionOptions? options)
     {

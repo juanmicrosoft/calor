@@ -311,8 +311,7 @@ public class MigrateWorkflowTests : IDisposable
             Parallel = false, Configuration = "Release",
             DefinedSymbols = ["EXTRA"],
             DocumentationMode = Microsoft.CodeAnalysis.DocumentationMode.Diagnose,
-            ParseFeatures = new Dictionary<string, string> { ["receipt-control"] = "true" },
-            UseImplicitCallCloser = false
+            ParseFeatures = new Dictionary<string, string> { ["receipt-control"] = "true" }
         };
         var migrator = new ProjectMigrator(options);
         var plan = await migrator.CreatePlanAsync(project, MigrationDirection.CSharpToCalor);
@@ -339,7 +338,7 @@ public class MigrateWorkflowTests : IDisposable
             Assert.Contains("EXTRA", receipt.Original.Symbols);
             Assert.Equal("Diagnose", receipt.Original.DocumentationMode);
             Assert.Equal("true", receipt.Original.Features["receipt-control"]);
-            Assert.False(receipt.Settings.GetProperty("UseImplicitCallCloser").GetBoolean());
+            Assert.False(receipt.Settings.TryGetProperty("UseImplicitCallCloser", out _));
             Assert.True(receipt.Metadata.ReferencesAreComplete);
             Assert.Contains(receipt.Metadata.References, reference =>
                 CanonicalPath.Resolve(reference.Path) == CanonicalPath.Resolve(referencePath)

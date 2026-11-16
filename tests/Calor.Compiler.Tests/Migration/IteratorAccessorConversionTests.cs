@@ -239,7 +239,7 @@ public class IteratorAccessorConversionTests
         // The iterator accessor is refused by name; no Calor is produced to mislead.
         var result = new CSharpToCalorConverter(ConvertCommand.BuildCSharpToCalorOptions(
             benchmark: false, verbose: false, explain: false, noFallback: true,
-            passthrough: false, explicitCallClosers: false)).Convert(R0Fixture(row));
+            passthrough: false)).Convert(R0Fixture(row));
         Assert.True(result.Success);
         Assert.Contains(result.Issues, issue => issue.Feature == "iterator-accessor"
             && issue.Severity == ConversionIssueSeverity.Warning);
@@ -398,7 +398,7 @@ public class IteratorAccessorConversionTests
             case Surface.CliDefault or Surface.CliPassthrough:
                 return Library(ConvertCommand.BuildCSharpToCalorOptions(
                     benchmark: false, verbose: false, explain: false, noFallback: false,
-                    passthrough: surface == Surface.CliPassthrough, explicitCallClosers: false));
+                    passthrough: surface == Surface.CliPassthrough));
             case Surface.McpDefault or Surface.McpPassthroughOnError or Surface.McpPassthroughOnErrorModuleName:
             {
                 var args = new Dictionary<string, object> { ["source"] = source };

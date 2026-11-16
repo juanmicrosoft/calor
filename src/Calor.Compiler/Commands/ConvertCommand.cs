@@ -114,10 +114,6 @@ public static class ConvertCommand
             description: "Timeout in seconds for the conversion (0 = no timeout)",
             getDefaultValue: () => 0);
 
-        var explicitCallClosersOption = new Option<bool>(
-            aliases: new[] { "--explicit-call-closers" },
-            description: "Legacy compatibility option; current native calls use parentheses and never emit closer tags.");
-
         // No -f short alias (consistent with lint, where -f means --fix).
         var formatOption = new Option<string>(
             aliases: new[] { "--format" },
@@ -145,7 +141,6 @@ public static class ConvertCommand
             featureOption,
             referenceOption,
             timeoutOption,
-            explicitCallClosersOption,
             formatOption
         };
 
@@ -168,7 +163,6 @@ public static class ConvertCommand
             var features = ctx.ParseResult.GetValueForOption(featureOption) ?? [];
             var references = ctx.ParseResult.GetValueForOption(referenceOption) ?? [];
             var timeoutSeconds = ctx.ParseResult.GetValueForOption(timeoutOption);
-            var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
             var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
             // Exit code returned through ctx.ExitCode: a code parked only on
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
@@ -177,7 +171,7 @@ public static class ConvertCommand
                 passthrough, definedSymbols, configuration,
                 targetFramework, languageVersion, timeoutSeconds,
                 documentationMode, sourceKind, features,
-                references, explicitCallClosers, format,
+                references, format,
                 !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
         });
 
@@ -192,7 +186,7 @@ public static class ConvertCommand
         int timeoutSeconds, string documentationMode, string sourceKind,
         IReadOnlyCollection<string> features,
         IReadOnlyCollection<string> references,
-        bool explicitCallClosers, string format, bool includeImplicitSystemUsing)
+        string format, bool includeImplicitSystemUsing)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -250,7 +244,7 @@ public static class ConvertCommand
                     noFallback, validate, passthrough,
                     definedSymbols, configuration, targetFramework,
                     languageVersion, documentationMode, sourceKind,
-                    features, references, timeoutSeconds, explicitCallClosers,
+                    features, references, timeoutSeconds,
                     envelope, includeImplicitSystemUsing);
             }
             else
@@ -333,7 +327,7 @@ public static class ConvertCommand
     /// unit-testable without driving the full command handler.
     /// </summary>
     internal static ConversionOptions BuildCSharpToCalorOptions(
-        bool benchmark, bool verbose, bool explain, bool noFallback, bool passthrough, bool explicitCallClosers,
+        bool benchmark, bool verbose, bool explain, bool noFallback, bool passthrough,
         bool lossy = false,
         bool selectActivePreprocessorBranchLossy = false,
         IReadOnlyCollection<string>? definedSymbols = null,
@@ -373,8 +367,7 @@ public static class ConvertCommand
         // Review C1(b)/N2: the CLI discards the output entirely when conversion
         // fails, so preserving one unusable member as §CSHARP beats writing
         // nothing. Library callers keep the native tree (option defaults false).
-        RescueUnusableMembers = true,
-        UseImplicitCallCloser = !explicitCallClosers
+        RescueUnusableMembers = true
     };
 
     private static Microsoft.CodeAnalysis.CSharp.CSharpParseOptions
@@ -465,14 +458,14 @@ public static class ConvertCommand
         string documentationMode, string sourceKind,
         IReadOnlyCollection<string> features,
         IReadOnlyCollection<string> references,
-        int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope,
+        int timeoutSeconds, ConvertEnvelope? envelope,
         bool includeImplicitSystemUsing)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
 
         var conversionOptions = BuildCSharpToCalorOptions(
             benchmark, verbose, explain, noFallback, passthrough,
-            explicitCallClosers, definedSymbols: definedSymbols,
+            definedSymbols: definedSymbols,
             configuration: configuration, targetFramework: targetFramework, languageVersion: languageVersion,
             documentationMode: documentationMode, sourceKind: sourceKind, features: features, references: references,
             includeImplicitSystemUsing: includeImplicitSystemUsing);

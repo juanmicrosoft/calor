@@ -135,16 +135,15 @@ module Test Test block
     // -------------------------------------------------------------------
     // The parser already accepts both `§C{Foo}` (zero-arg implicit close)
     // and `§C{Foo} primary_expr` (one-arg inline) since pre-v0.6.
-    // v0.6.2 makes the EMITTER produce these shorter forms when
-    // `ConversionContext.UseImplicitCallCloser` is true (the default).
+    // Native emission writes every call as name(args).
 
-    private static string EmitModule(string source, bool useImplicitCallCloser = true)
+    private static string EmitModule(string source)
     {
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
             $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
         var emitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = useImplicitCallCloser });
+            new Migration.ConversionContext());
         return module.Accept<string>(emitter);
     }
 
@@ -158,19 +157,6 @@ module Test Test block
     DoWork()
 """;
         var emitted = EmitModule(source);
-        Assert.Contains("DoWork()", emitted);
-    }
-
-    [Fact]
-    public void V062_ZeroArgStmt_FlagOff_KeepsCloser()
-    {
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    DoWork()
-""";
-        var emitted = EmitModule(source, useImplicitCallCloser: false);
         Assert.Contains("DoWork()", emitted);
     }
 
@@ -339,7 +325,7 @@ module Test Test block
             attributes: new AttributeCollection());
 
         var emitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = true });
+            new Migration.ConversionContext());
         var emitted = lam.Accept<string>(emitter);
 
         // Both inner calls must keep §/C inside lambda short-body.

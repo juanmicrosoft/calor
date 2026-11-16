@@ -36,8 +36,8 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         if (Calor.Compiler.Parsing.RawCSharpFrame.FindAtOffset(snapshot.Source, offset) != null)
             return Task.FromResult<SignatureHelp?>(null);
 
-        // Find if we're inside a function call
-        var callContext = FindCallContext(
+        // Find the native call (name(args)) around the cursor.
+        var callContext = NativeCallContext.Find(
             Calor.Compiler.Parsing.RawCSharpFrame.MaskForAnalysis(snapshot.Source), offset);
         if (callContext == null)
         {
@@ -47,7 +47,8 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         var resolvedSymbol = SymbolFinder.FindResolvedCall(
             snapshot.BoundModule,
             offset);
-        if (resolvedSymbol != null)
+        if (resolvedSymbol != null
+            && string.Equals(resolvedSymbol.Name, callContext.Name, StringComparison.Ordinal))
         {
             return Task.FromResult<SignatureHelp?>(
                 BuildSignatureHelp(resolvedSymbol, callContext.ArgumentIndex));
@@ -56,7 +57,7 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         var boundCall = SymbolFinder.FindBoundCallAtOffset(
             snapshot.BoundModule,
             offset,
-            callContext.FunctionName);
+            callContext.Callee);
         var projectCall = _workspace.ResolveProjectCall(
             workspace,
             document,
@@ -72,12 +73,11 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
             return Task.FromResult<SignatureHelp?>(null);
         }
 
-        // Find the function definition
-        var func = SymbolFinder.FindFunction(snapshot.Ast, callContext.FunctionName);
+        // Fall back to declarations in this file, by name.
+        var func = SymbolFinder.FindFunction(snapshot.Ast, callContext.Name);
         if (func == null)
         {
-            // Try to find a method in classes
-            var method = FindMethodInClasses(snapshot.Ast, callContext.FunctionName);
+            var method = FindMethodInClasses(snapshot.Ast, callContext.Name);
             if (method != null)
             {
                 return Task.FromResult<SignatureHelp?>(BuildSignatureHelp(method, callContext.ArgumentIndex, snapshot.Ast));
@@ -136,7 +136,11 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
 
         var signature = new SignatureInformation
         {
-            Label = $"{function.DisplaySignature} -> {function.ReturnType}",
+            // Each parameter label must be a substring of the signature label so the client
+            // can highlight the active parameter.
+            Label = $"{function.DisplaySignature[..function.DisplaySignature.IndexOf('(')]}("
+                + string.Join(", ", function.Parameters.Select(parameter => $"{parameter.Name}: {parameter.TypeName}"))
+                + $") → {function.ReturnType}",
             Parameters = new Container<ParameterInformation>(parameters),
             ActiveParameter = parameters.Count == 0
                 ? 0
@@ -190,7 +194,7 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
             func.Output?.TypeName ?? "void", func.IsAsync, module,
             Compiler.Analysis.ReturnShape.GetCallableTypeParameters(func, module)
                 .Select(parameter => parameter.Name)).CallableType;
-        return $"{func.Name}({parameters}) -> {returnType}";
+        return $"{func.Name}({parameters}) → {returnType}";
     }
 
     private static string BuildSignatureLabel(MethodNode method, ModuleNode module)
@@ -200,7 +204,7 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
             method.Output?.TypeName ?? "void", method.IsAsync, module,
             Compiler.Analysis.ReturnShape.GetCallableTypeParameters(method, module)
                 .Select(parameter => parameter.Name)).CallableType;
-        return $"{method.Name}({parameters}) -> {returnType}";
+        return $"{method.Name}({parameters}) → {returnType}";
     }
 
     private static string BuildFunctionDocumentation(FunctionNode func)
@@ -272,44 +276,6 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         return null;
     }
 
-    private static CallContext? FindCallContext(string source, int offset)
-    {
-        // Look backwards for §C{FunctionName}
-        var searchStart = Math.Max(0, offset - 200);
-        var searchText = source.Substring(searchStart, offset - searchStart);
-
-        // Find the last §C{ pattern
-        var callIndex = searchText.LastIndexOf("§C{", StringComparison.Ordinal);
-        if (callIndex < 0)
-            return null;
-
-        // Extract function name
-        var afterCall = searchText.Substring(callIndex + 3);
-        var closeBrace = afterCall.IndexOf('}');
-        if (closeBrace < 0)
-            return null;
-
-        var functionName = afterCall.Substring(0, closeBrace);
-
-        // Count §A markers to determine which argument we're on
-        var afterFunctionName = afterCall.Substring(closeBrace + 1);
-        var argumentIndex = CountArgumentMarkers(afterFunctionName);
-
-        return new CallContext(functionName, argumentIndex);
-    }
-
-    private static int CountArgumentMarkers(string text)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = text.IndexOf("§A", index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += 2;
-        }
-        return count;
-    }
-
     protected override SignatureHelpRegistrationOptions CreateRegistrationOptions(
         SignatureHelpCapability capability,
         ClientCapabilities clientCapabilities)
@@ -317,20 +283,8 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         return new SignatureHelpRegistrationOptions
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("calor"),
-            TriggerCharacters = new Container<string>("{", " "),
-            RetriggerCharacters = new Container<string>("§")
+            TriggerCharacters = new Container<string>("(", ","),
+            RetriggerCharacters = new Container<string>(")")
         };
-    }
-
-    private sealed class CallContext
-    {
-        public string FunctionName { get; }
-        public int ArgumentIndex { get; }
-
-        public CallContext(string functionName, int argumentIndex)
-        {
-            FunctionName = functionName;
-            ArgumentIndex = argumentIndex;
-        }
     }
 }

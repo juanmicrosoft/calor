@@ -941,7 +941,7 @@ public class RefOutImplementationTests
         }
         var options = surface == Surface.Library ? new ConversionOptions()
             : ConvertCommand.BuildCSharpToCalorOptions(benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: surface == Surface.CliPassthrough, explicitCallClosers: false);
+                passthrough: surface == Surface.CliPassthrough);
         var result = new CSharpToCalorConverter(options).Convert(source);
         return (result.CalorSource ?? "", result.Losses.Select(loss => loss.Feature).ToList());
     }

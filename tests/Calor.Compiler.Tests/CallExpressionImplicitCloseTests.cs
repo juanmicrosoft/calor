@@ -428,7 +428,7 @@ module Test Test block
         Assert.IsType<CallExpressionNode>(lisp.Right);
     }
 
-    // ----- Phase 2: CalorEmitter.UseImplicitCallCloser flag -----
+    // ----- Phase 2: emitted call form -----
 
     [Fact]
     public void Emitter_ZeroArgCall_DefaultFlag_EmitsImplicitCloser()
@@ -437,18 +437,6 @@ module Test Test block
         // RFC v0.6 §6 / docs/plans/v0.6-call-closer-elision.md.
         var call = new CallExpressionNode(default, "Foo", new List<ExpressionNode>());
         var emitter = new Migration.CalorEmitter();
-        var output = call.Accept<string>(emitter);
-        Assert.Equal("Foo()", output);
-    }
-
-    [Fact]
-    public void Emitter_ZeroArgCall_ImplicitCloserFlagFalse_PinsExplicitCloser()
-    {
-        // Opt-out path: setting the flag to false restores explicit §/C.
-        // Test pins this so the opt-out doesn't silently disappear.
-        var call = new CallExpressionNode(default, "Foo", new List<ExpressionNode>());
-        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = false };
-        var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
         Assert.Equal("Foo()", output);
     }
@@ -581,7 +569,7 @@ module Test Test block
     {
         // With the flag set, zero-arg calls drop §/C.
         var call = new CallExpressionNode(default, "Foo", new List<ExpressionNode>());
-        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
+        var ctx = new Migration.ConversionContext();
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
         Assert.Equal("Foo()", output);
@@ -598,7 +586,7 @@ module Test Test block
             new IntLiteralNode(default, 2),
         };
         var call = new CallExpressionNode(default, "Add", args);
-        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
+        var ctx = new Migration.ConversionContext();
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
         Assert.EndsWith(")", output);
@@ -617,24 +605,7 @@ module Test Test block
             new IntLiteralNode(default, 42),
         };
         var call = new CallExpressionNode(default, "Identity", args);
-        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
-        var emitter = new Migration.CalorEmitter(ctx);
-        var output = call.Accept<string>(emitter);
-        Assert.Equal("Identity(42)", output);
-    }
-
-    [Fact]
-    public void Emitter_OneArgCall_ImplicitCloserFlagFalse_PinsExplicitCloser()
-    {
-        // Opt-out path mirror for one-arg: UseImplicitCallCloser=false restores
-        // the explicit §A ... §/C form. Pins the opt-out so it can't silently
-        // regress alongside the v0.6.3 default flip.
-        var args = new List<ExpressionNode>
-        {
-            new IntLiteralNode(default, 42),
-        };
-        var call = new CallExpressionNode(default, "Identity", args);
-        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = false };
+        var ctx = new Migration.ConversionContext();
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
         Assert.Equal("Identity(42)", output);
@@ -710,7 +681,7 @@ module Test Test block
     {
         // End-to-end: parser accepts the emitter's flag-true output.
         var call = new CallExpressionNode(default, "Foo", new List<ExpressionNode>());
-        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
+        var ctx = new Migration.ConversionContext();
         var emitter = new Migration.CalorEmitter(ctx);
         var emitted = call.Accept<string>(emitter);
         Assert.Equal("Foo()", emitted);
@@ -746,7 +717,7 @@ module Test Test block
 
     private static string EmitWithImplicitCloser(AstNode node)
     {
-        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
+        var ctx = new Migration.ConversionContext();
         var emitter = new Migration.CalorEmitter(ctx);
         return node.Accept<string>(emitter);
     }
@@ -867,7 +838,7 @@ module Test Test block
             $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
 
         var emitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = true });
+            new Migration.ConversionContext());
         var emitted = emitter.Emit(module);
         Assert.Contains("K()", emitted);
         Assert.Contains("V()", emitted);
@@ -893,7 +864,7 @@ module Test Test block
         Assert.False(diags.HasErrors,
             $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
 
-        var ctx2 = new Migration.ConversionContext { UseImplicitCallCloser = true };
+        var ctx2 = new Migration.ConversionContext();
         var fullEmitter = new Migration.CalorEmitter(ctx2);
         var fullEmitted = module.Accept<string>(fullEmitter);
 
@@ -914,13 +885,6 @@ module Test Test block
         Assert.Empty(calls[0].Arguments);
         Assert.Equal("Baz", calls[1].Target);
         Assert.Empty(calls[1].Arguments);
-
-        // Opt-out: with the flag off, both keep §/C.
-        var legacyEmitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = false });
-        var legacyEmitted = module.Accept<string>(legacyEmitter);
-        Assert.Contains("Bar()", legacyEmitted);
-        Assert.Contains("Baz()", legacyEmitted);
     }
 
     [Fact]
@@ -1090,7 +1054,7 @@ module Test Test block
             $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
 
         var fullEmitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = true });
+            new Migration.ConversionContext());
         var emitted = module.Accept<string>(fullEmitter);
         // Emitted form must still close the operand call.
         Assert.Contains("(Foo() is string)", emitted);
@@ -1197,7 +1161,7 @@ module Test Test block
             $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
 
         var fullEmitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = true });
+            new Migration.ConversionContext());
         var emitted = module.Accept<string>(fullEmitter);
         // Emitted form must keep §/C on the call target — otherwise the
         // member name string literal would be absorbed as inline arg.

@@ -581,7 +581,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
             "--configuration", "Release", "--framework", "net10.0", "--language-version", "preview",
             "--documentation-mode", "diagnose", "--source-kind", sourceKind,
             "--reference", typeof(Console).Assembly.Location + "=console_alias",
-            "--feature", "receipt-control=true", "--explicit-call-closers");
+            "--feature", "receipt-control=true");
         Assert.True(run.ExitCode == 0, run.StdErr);
         var receipt = ConversionReceipt.Deserialize(
             File.ReadAllText(Path.ChangeExtension(input, ".calr") + ".conversion.json"));
@@ -595,7 +595,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.Equal("net10.0", receipt.Metadata.TargetFramework);
         Assert.Contains(receipt.Metadata.References, reference => reference.Path == typeof(Console).Assembly.Location
             && reference.Aliases.SequenceEqual(["console_alias"]));
-        Assert.False(receipt.Settings.GetProperty("UseImplicitCallCloser").GetBoolean());
+        Assert.False(receipt.Settings.TryGetProperty("UseImplicitCallCloser", out _));
         Assert.True(receipt.Settings.GetProperty("ValidateRoundTripCSharp").GetBoolean());
         Assert.True(receipt.Settings.GetProperty("RescueUnusableMembers").GetBoolean());
         Assert.False(receipt.Settings.GetProperty("PassthroughOnError").GetBoolean());

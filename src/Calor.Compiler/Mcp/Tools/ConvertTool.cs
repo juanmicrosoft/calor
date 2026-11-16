@@ -156,10 +156,6 @@ public sealed class ConvertTool : McpToolBase
                 "passthroughOnError": {
                     "type": "boolean",
                     "description": "Wrap unsupported constructs in raw C# blocks instead of emitting broken Calor (default: false)"
-                },
-                "explicitCallClosers": {
-                    "type": "boolean",
-                    "description": "Legacy compatibility option; current native calls use parentheses and never emit closer tags (default: false)"
                 }
             },
             "additionalProperties": false
@@ -227,7 +223,6 @@ public sealed class ConvertTool : McpToolBase
         var fallback = GetBool(arguments, "fallback", defaultValue: true);
         var explain = GetBool(arguments, "explain", defaultValue: false);
         var passthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false);
-        var explicitCallClosers = GetBool(arguments, "explicitCallClosers", defaultValue: false);
         var conversionMode = ResolveConversionMode(arguments);
         var fidelity = ConversionFidelity.Lossless;
 
@@ -249,8 +244,7 @@ public sealed class ConvertTool : McpToolBase
                 TargetFramework = GetString(arguments, "targetFramework"),
                 ParseOptions = ResolveParseOptions(arguments),
                 References = GetConversionReferences(arguments),
-                PassthroughOnError = passthroughOnError,
-                UseImplicitCallCloser = !explicitCallClosers
+                PassthroughOnError = passthroughOnError
             };
 
             var converter = new CSharpToCalorConverter(options);
@@ -493,8 +487,7 @@ public sealed class ConvertTool : McpToolBase
                 TargetFramework = GetString(arguments, "targetFramework"),
                 ParseOptions = ResolveParseOptions(arguments),
                 References = GetConversionReferences(arguments),
-                PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false),
-                UseImplicitCallCloser = !GetBool(arguments, "explicitCallClosers", defaultValue: false)
+                PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false)
             };
 
             var converter = new CSharpToCalorConverter(options);
@@ -760,8 +753,7 @@ public sealed class ConvertTool : McpToolBase
                 ParseOptions = ResolveParseOptions(arguments),
                 References = GetConversionReferences(arguments),
                 // #1144: honour the documented passthroughOnError argument here too.
-                PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false),
-                UseImplicitCallCloser = !GetBool(arguments, "explicitCallClosers", defaultValue: false)
+                PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false)
             };
 
             var converter = new CSharpToCalorConverter(options);

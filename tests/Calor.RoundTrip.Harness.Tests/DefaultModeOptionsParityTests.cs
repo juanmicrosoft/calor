@@ -22,7 +22,7 @@ public class DefaultModeOptionsParityTests
     private static readonly string[] KnownConvertOptions =
     [
         "--benchmark", "--configuration", "--define", "--documentation-mode",
-        "--explain", "--explicit-call-closers", "--feature", "--format",
+        "--explain", "--feature", "--format",
         "--framework", "--language-version", "--no-fallback",
         "--output", "--passthrough", "--reference",
         "--source-kind",
@@ -163,7 +163,6 @@ public class DefaultModeOptionsParityTests
     [InlineData("--define=PARITY_NEGATIVE_CONTROL", "DefinedSymbols")]
     [InlineData("--passthrough", "PassthroughOnError")]
     [InlineData("--no-fallback", "GracefulFallback")]
-    [InlineData("--explicit-call-closers", "UseImplicitCallCloser")]
     public async Task CliRunWithAFlag_DoesNotMatchDefaultMode(string flag, string changedOption)
     {
         var cli = Snapshot(await CaptureCliOptionsAsync(flag));

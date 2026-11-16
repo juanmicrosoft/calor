@@ -589,7 +589,6 @@ public sealed class ProjectMigrator
             PreprocessorMode = _options.PreprocessorMode,
             ValidateRoundTripCSharp = false,
             PassthroughOnError = _options.PassthroughOnError,
-            UseImplicitCallCloser = _options.UseImplicitCallCloser,
             Configuration = _options.Configuration,
             TargetFramework = _options.TargetFramework
         };

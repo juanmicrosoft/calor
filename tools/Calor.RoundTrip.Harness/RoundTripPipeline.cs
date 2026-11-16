@@ -1635,7 +1635,6 @@ public sealed class RoundTripPipeline
             explain: false,
             noFallback: false,
             passthrough: false,
-            explicitCallClosers: false,
             lossy: false,
             selectActivePreprocessorBranchLossy: false,
             definedSymbols: [],

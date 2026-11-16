@@ -877,8 +877,7 @@ public sealed class LosslessConversionContractTests
             verbose: false,
             explain: false,
             noFallback: false,
-            passthrough: false,
-            explicitCallClosers: false);
+            passthrough: false);
 
         Assert.Equal(ConversionFidelity.Lossless, options.Fidelity);
     }
@@ -917,7 +916,6 @@ public sealed class LosslessConversionContractTests
             explain: false,
             noFallback: false,
             passthrough: false,
-            explicitCallClosers: false,
             selectActivePreprocessorBranchLossy: true,
             definedSymbols: ["FEATURE"],
             configuration: "Release",

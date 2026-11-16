@@ -3183,7 +3183,7 @@ public class ArrayExpressionConversionTests
             case Surface.CliDefault or Surface.CliPassthrough:
                 return Library(ConvertCommand.BuildCSharpToCalorOptions(
                     benchmark: false, verbose: false, explain: false, noFallback: false,
-                    passthrough: surface == Surface.CliPassthrough, explicitCallClosers: false));
+                    passthrough: surface == Surface.CliPassthrough));
             case Surface.McpDefault or Surface.McpPassthroughOnError or Surface.McpPassthroughOnErrorModuleName:
             {
                 var args = new Dictionary<string, object> { ["source"] = source };

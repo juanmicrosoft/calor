@@ -52,11 +52,6 @@ public sealed class MigrateTool : McpToolBase
                     "description": "Whether to apply compiler-authorized safe diagnostic patches after conversion (default: true). Never guesses constructor types.",
                     "default": true
                 },
-                "explicitCallClosers": {
-                    "type": "boolean",
-                    "description": "Compatibility option; current native calls use parentheses, not section-marker closers.",
-                    "default": false
-                },
                 "fidelity": {
                     "type": "string",
                     "enum": ["lossless"],
@@ -81,7 +76,6 @@ public sealed class MigrateTool : McpToolBase
         var phase = GetString(arguments, "phase") ?? "full";
         var maxFiles = GetInt(arguments, "maxFiles", defaultValue: 0);
         var autoFix = GetBool(arguments, "autoFix", defaultValue: true);
-        var explicitCallClosers = GetBool(arguments, "explicitCallClosers", defaultValue: false);
         if (GetString(arguments, "fidelity") is { } requestedFidelity
             && !requestedFidelity.Equals("lossless", StringComparison.OrdinalIgnoreCase))
             return McpToolResult.Error("Only lossless migration is supported; unsupported C# is preserved, not dropped.");
@@ -108,10 +102,10 @@ public sealed class MigrateTool : McpToolBase
             return phase switch
             {
                 "assess" => RunAssess(directory, maxFiles, cancellationToken),
-                "convert" => await RunConvertAsync(directory, projectPath, maxFiles, explicitCallClosers, fidelity, cancellationToken, implicitSystem),
+                "convert" => await RunConvertAsync(directory, projectPath, maxFiles, fidelity, cancellationToken, implicitSystem),
                 "compile" => RunCompile(directory, maxFiles, cancellationToken, implicitSystem),
                 "fix" => await RunFixAsync(directory, maxFiles, cancellationToken, implicitSystem),
-                "full" => await RunFullAsync(directory, projectPath, maxFiles, autoFix, explicitCallClosers, fidelity, cancellationToken, implicitSystem),
+                "full" => await RunFullAsync(directory, projectPath, maxFiles, autoFix, fidelity, cancellationToken, implicitSystem),
                 _ => McpToolResult.Error($"Unknown phase: '{phase}'. Must be 'assess', 'convert', 'compile', 'fix', or 'full'.")
             };
         }
@@ -177,7 +171,7 @@ public sealed class MigrateTool : McpToolBase
 
     // ── Phase: convert ──────────────────────────────────────────────
 
-    internal async Task<McpToolResult> RunConvertAsync(string directory, string projectPath, int maxFiles, bool explicitCallClosers, ConversionFidelity fidelity, CancellationToken ct, bool implicitSystem = true)
+    internal async Task<McpToolResult> RunConvertAsync(string directory, string projectPath, int maxFiles, ConversionFidelity fidelity, CancellationToken ct, bool implicitSystem = true)
     {
         var options = new MigrationPlanOptions
         {
@@ -185,8 +179,7 @@ public sealed class MigrateTool : McpToolBase
             IncludeTests = true,
             MaxFiles = maxFiles,
             Fidelity = fidelity,
-            PassthroughOnError = false,
-            UseImplicitCallCloser = !explicitCallClosers
+            PassthroughOnError = false
         };
 
         var migrator = new ProjectMigrator(options);
@@ -225,13 +218,11 @@ public sealed class MigrateTool : McpToolBase
         string directory,
         string projectPath,
         int maxFiles,
-        bool explicitCallClosers,
         CancellationToken ct) =>
         RunConvertAsync(
             directory,
             projectPath,
             maxFiles,
-            explicitCallClosers,
             ConversionFidelity.Lossless,
             ct);
 
@@ -368,7 +359,7 @@ public sealed class MigrateTool : McpToolBase
     // ── Phase: full ─────────────────────────────────────────────────
 
     internal async Task<McpToolResult> RunFullAsync(
-        string directory, string projectPath, int maxFiles, bool autoFix, bool explicitCallClosers,
+        string directory, string projectPath, int maxFiles, bool autoFix,
         ConversionFidelity fidelity, CancellationToken ct, bool implicitSystem = true)
     {
         var sw = Stopwatch.StartNew();
@@ -412,8 +403,7 @@ public sealed class MigrateTool : McpToolBase
             IncludeTests = true,
             MaxFiles = maxFiles,
             Fidelity = fidelity,
-            PassthroughOnError = false,
-            UseImplicitCallCloser = !explicitCallClosers
+            PassthroughOnError = false
         };
 
         var migrator = new ProjectMigrator(options);
@@ -637,14 +627,12 @@ public sealed class MigrateTool : McpToolBase
         string projectPath,
         int maxFiles,
         bool autoFix,
-        bool explicitCallClosers,
         CancellationToken ct) =>
         RunFullAsync(
             directory,
             projectPath,
             maxFiles,
             autoFix,
-            explicitCallClosers,
             ConversionFidelity.Lossless,
             ct);
 

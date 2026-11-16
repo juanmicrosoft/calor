@@ -8062,7 +8062,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<ElseIfClauseNode>(), null, new AttributeCollection());
     }
 
-    private static BinaryOperator ToBinaryOperator(CompoundAssignmentOperator op) => op switch
+    internal static BinaryOperator ToBinaryOperator(CompoundAssignmentOperator op) => op switch
     {
         CompoundAssignmentOperator.Add => BinaryOperator.Add,
         CompoundAssignmentOperator.Subtract => BinaryOperator.Subtract,

@@ -410,7 +410,7 @@ public sealed class Issue1401NullableContextConversionTests
     private static ConversionOptions PreservationOptions(bool evaluated)
     {
         var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(
-            false, false, false, false, false, false);
+            false, false, false, false, false);
         if (evaluated)
         {
             options.NullableContextOptions = NullableContextOptions.Disable;
@@ -1376,7 +1376,7 @@ public sealed class Issue1401NullableContextConversionTests
     {
         var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
             "tests/TestData/CSharpImport/Level3_Types/052_NullableTypes.cs"));
-        var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false, false);
+        var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false);
         var converter = new CSharpToCalorConverter(options);
         var conversion = project
             ? Assert.Single(converter.ConvertProject(source, "052_NullableTypes.cs").Outputs).Conversion
@@ -1411,7 +1411,7 @@ public sealed class Issue1401NullableContextConversionTests
                 public static int Read(int? value) => value.GetValueOrDefault();
             }
             """;
-        var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false, false);
+        var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(false, false, false, false, false);
         var converter = new CSharpToCalorConverter(options);
         foreach (var conversion in new[]
         {

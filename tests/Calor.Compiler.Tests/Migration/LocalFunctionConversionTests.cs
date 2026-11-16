@@ -875,7 +875,7 @@ public class LocalFunctionConversionTests
 
     private static ConversionOptions NoFallbackOptions() => ConvertCommand.BuildCSharpToCalorOptions(
         benchmark: false, verbose: false, explain: false, noFallback: true,
-        passthrough: false, explicitCallClosers: false);
+        passthrough: false);
 
     private static string R0Fixture(string id) => File.ReadAllText(Path.Combine(
         CliTestHarness.FindRepoRoot(), R0Fixtures, id + ".cs.txt"));

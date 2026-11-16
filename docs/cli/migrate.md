@@ -168,7 +168,6 @@ validation do not use these receipts yet.
 | `--language-version` | — | Project value | Override the C# language version. |
 | `--documentation-mode` | — | `parse` | Roslyn documentation mode: `none`, `parse`, or `diagnose`. |
 | `--feature` | — | — | Roslyn parse feature in `key=value` form. |
-| `--explicit-call-closers` | — | `false` | Legacy compatibility option; current native calls use parentheses and never emit closing tags. |
 
 ### Direction Values
 

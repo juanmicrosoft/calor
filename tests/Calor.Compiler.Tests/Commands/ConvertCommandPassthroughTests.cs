@@ -33,12 +33,12 @@ public class ConvertCommandPassthroughTests
     {
         var on = ConvertCommand.BuildCSharpToCalorOptions(
             benchmark: false, verbose: false, explain: false, noFallback: false,
-            passthrough: true, explicitCallClosers: false);
+            passthrough: true);
         Assert.True(on.PassthroughOnError);
 
         var off = ConvertCommand.BuildCSharpToCalorOptions(
             benchmark: false, verbose: false, explain: false, noFallback: false,
-            passthrough: false, explicitCallClosers: false);
+            passthrough: false);
         Assert.False(off.PassthroughOnError);
     }
 
@@ -48,46 +48,39 @@ public class ConvertCommandPassthroughTests
         // CLI defaults to the lossless contract.
         var opts = ConvertCommand.BuildCSharpToCalorOptions(
             benchmark: false, verbose: false, explain: false, noFallback: false,
-            passthrough: false, explicitCallClosers: false);
+            passthrough: false);
 
         Assert.False(opts.PassthroughOnError);
         Assert.True(opts.GracefulFallback);
-        Assert.True(opts.UseImplicitCallCloser);
         Assert.Equal(ConversionFidelity.Lossless, opts.Fidelity);
     }
 
     [Fact]
-    public void NoFallbackAndExplicitClosers_AreInverted()
+    public void NoFallback_IsInverted()
     {
         var opts = ConvertCommand.BuildCSharpToCalorOptions(
             benchmark: true, verbose: true, explain: true, noFallback: true,
-            passthrough: true, explicitCallClosers: true);
+            passthrough: true);
 
         Assert.False(opts.GracefulFallback);       // --no-fallback → GracefulFallback = false
-        Assert.False(opts.UseImplicitCallCloser);  // --explicit-call-closers → false
         Assert.True(opts.IncludeBenchmark);
         Assert.True(opts.Verbose);
         Assert.True(opts.Explain);
     }
 
     [Fact]
-    public void ExplicitClosersCompatibilityFlag_DoesNotReintroduceRetiredNativeSyntax()
+    public void ZeroArgumentCall_ConvertsToANativeCall()
     {
         const string source = "public static class Calls { public static int Value() => 1; public static int Run() => Value(); }";
-        string Convert(bool explicitClosers)
-        {
-            var options = ConvertCommand.BuildCSharpToCalorOptions(
-                benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: false, explicitCallClosers: explicitClosers);
-            var result = new CSharpToCalorConverter(options).Convert(source);
-            Assert.True(result.Success);
-            Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-            Assert.NotNull(result.CalorSource);
-            Assert.Contains("return Value()", result.CalorSource);
-            Assert.DoesNotContain('§', result.CalorSource);
-            return result.CalorSource;
-        }
-        Assert.Equal(Convert(false), Convert(true));
+        var options = ConvertCommand.BuildCSharpToCalorOptions(
+            benchmark: false, verbose: false, explain: false, noFallback: false,
+            passthrough: false);
+        var result = new CSharpToCalorConverter(options).Convert(source);
+        Assert.True(result.Success);
+        Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("return Value()", result.CalorSource);
+        Assert.DoesNotContain('§', result.CalorSource);
     }
 
     [Fact]
@@ -99,7 +92,7 @@ public class ConvertCommandPassthroughTests
         var converter = new CSharpToCalorConverter(
             ConvertCommand.BuildCSharpToCalorOptions(
                 benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: true, explicitCallClosers: false))
+                passthrough: true))
         {
             ParseValidatorOverride = CondemnOutsideCSharp("Breakme"),
         };
@@ -126,7 +119,7 @@ public class ConvertCommandPassthroughTests
         var converter = new CSharpToCalorConverter(
             ConvertCommand.BuildCSharpToCalorOptions(
                 benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: true, explicitCallClosers: false))
+                passthrough: true))
         {
             ParseValidatorOverride = _ => false,
         };
@@ -153,7 +146,7 @@ public class ConvertCommandPassthroughTests
         var converter = new CSharpToCalorConverter(
             ConvertCommand.BuildCSharpToCalorOptions(
                 benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: false, explicitCallClosers: false, lossy: true))
+                passthrough: false, lossy: true))
         {
             ParseValidatorOverride = CondemnOutsideCSharp("Breakme"),
         };
