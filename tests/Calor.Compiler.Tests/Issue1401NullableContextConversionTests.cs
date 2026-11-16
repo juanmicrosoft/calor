@@ -344,46 +344,21 @@ public sealed class Issue1401NullableContextConversionTests
         Assert.Equal(source, compiled.GeneratedCode);
     }
 
-    // 062 and 075 convert natively since the 2026-11-14 oblivious-module decision (see
-    // ObliviousReceiverInputs_NowConvertNatively); 061_TupleTypes still takes the fallback.
+    // Before the 2026-11-14 decision 062 and 075 preserved the whole file: an oblivious `string`
+    // receiver (`text.Trim()`, `str.Length`) failed Calor0274 inside the oblivious module.
+    // 061 preserved the whole file until the converter stopped printing a legacy `§B{~` temp
+    // for its hoisted nested tuple (0.30).
     [Theory]
+    [InlineData("Level4_Methods", "062_OptionalParameters.cs", false)]
+    [InlineData("Level4_Methods", "062_OptionalParameters.cs", true)]
+    [InlineData("Level4_Methods", "075_ExtensionMethods.cs", false)]
+    [InlineData("Level4_Methods", "075_ExtensionMethods.cs", true)]
     [InlineData("Level3_Types", "061_TupleTypes.cs", false)]
     [InlineData("Level3_Types", "061_TupleTypes.cs", true)]
-    public void PostValidationFallback_RetainsOriginalObliviousDeclarations(
-        string level, string fileName, bool evaluated)
+    public void ObliviousReceiverInputs_NowConvertNatively(string level, string fileName, bool evaluated)
     {
         var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
             "tests", "TestData", "CSharpImport", level, fileName));
-        var project = new CSharpToCalorConverter(PreservationOptions(evaluated))
-            .ConvertProject(source, fileName);
-        var converted = Assert.Single(project.Outputs).Conversion;
-        Assert.True(converted.Success, FormatIssues(converted));
-        Assert.True(converted.InteropPreservationCount > 0);
-        Assert.Equal(0, converted.LossySubstitutionCount);
-        Assert.Equal(0, converted.DropCount);
-        var compiled = Program.Compile(converted.CalorSource!, "preserved.calr",
-            new CompilationOptions
-            {
-                StrictEffects = true,
-                UnknownCallPolicy = Effects.UnknownCallPolicy.Strict
-            });
-        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
-        Assert.Equal(DeclaredMetadata(source), DeclaredMetadata(compiled.GeneratedCode));
-        Assert.Equal(source, compiled.GeneratedCode);
-        Assert.Contains(converted.Losses, loss => loss.Feature == "whole-file-preservation");
-    }
-
-    // Before the 2026-11-14 decision these preserved the whole file: an oblivious `string`
-    // receiver (`text.Trim()`, `str.Length`) failed Calor0274 inside the oblivious module.
-    [Theory]
-    [InlineData("062_OptionalParameters.cs", false)]
-    [InlineData("062_OptionalParameters.cs", true)]
-    [InlineData("075_ExtensionMethods.cs", false)]
-    [InlineData("075_ExtensionMethods.cs", true)]
-    public void ObliviousReceiverInputs_NowConvertNatively(string fileName, bool evaluated)
-    {
-        var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
-            "tests", "TestData", "CSharpImport", "Level4_Methods", fileName));
         var project = new CSharpToCalorConverter(PreservationOptions(evaluated))
             .ConvertProject(source, fileName);
         var converted = Assert.Single(project.Outputs).Conversion;

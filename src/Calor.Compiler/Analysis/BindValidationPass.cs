@@ -776,7 +776,7 @@ public sealed class BindValidationPass
         {
             _diagnostics.ReportError(bind.Span, DiagnosticCode.BindRequiresTypeOrInitializer,
                 $"Binding '{bind.Name}' has no type annotation and no initializer. " +
-                "Add either ':type' (e.g. '§B{" + bind.Name + ":i32}') " +
+                "Add either a type (e.g. 'let int:" + bind.Name + "') " +
                 "or an initializer expression so the binder can infer the type.");
             return;
         }
@@ -853,7 +853,7 @@ public sealed class BindValidationPass
             _diagnostics.ReportError(bind.Span, DiagnosticCode.BindDuplicateInScope,
                 $"Binding '{bind.Name}' is already declared in this scope. C# forbids two locals " +
                 "of the same name in one scope (CS0128). If you intended a reassignment, use a " +
-                $"mutable rebind ('§B{{~{bind.Name}}}'); if the two are independent, rename this one " +
+                $"'set {bind.Name} ...' on a 'var' binding; if the two are independent, rename this one " +
                 $"(e.g. '{bind.Name}2'). (If this is C#→Calor converter output, the source likely " +
                 "had two separate '{ }' block scopes whose scoping the converter did not preserve.)");
             // Keep the existing declaration; don't overwrite its type with the duplicate's.
@@ -1753,7 +1753,7 @@ public sealed class BindValidationPass
         {
             var msg = $"Binding '{bind.Name}' is initialised from '{call.Target}' whose return type " +
                 "is generic and has no resolved type argument. " +
-                "Add an explicit type annotation, e.g. '§B{" + bind.Name + ":Vec<i32>} §C{Vec<i32>.empty} §/C'.";
+                "Add an explicit type annotation, e.g. 'let List<int>:" + bind.Name + " = new List<int>()'.";
             ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferGenericReturn, msg,
                 $"Annotate binding with ':{template}'", $":{template}");
             return;
@@ -1774,8 +1774,8 @@ public sealed class BindValidationPass
         {
             var msg = $"Binding '{bind.Name}' is initialised from a numeric expression that mixes " +
                 "integer and floating-point literals; widening could pick more than one type. " +
-                "Add an explicit numeric annotation, e.g. '§B{" + bind.Name + ":f64} ...' " +
-                "or '§B{" + bind.Name + ":i32} ...'.";
+                "Add an explicit numeric annotation, e.g. 'let double:" + bind.Name + " = ...' " +
+                "or 'let int:" + bind.Name + " = ...'.";
             ReportStrictWithMaybeFix(bind, DiagnosticCode.BindAmbiguousNumeric, msg,
                 "Annotate binding with ':f64' (widening default)", ":f64");
             return;

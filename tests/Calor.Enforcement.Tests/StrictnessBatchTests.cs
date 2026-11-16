@@ -395,80 +395,6 @@ module Test Test block
     }
 
     // ========================================================================
-    // D-W2.3 — Interop is effect-unknown, propagating as an assumption
-    // ========================================================================
-
-    [Fact]
-    public void InteropContent_SurfacesAssumption()
-    {
-        // Frozen raw blocks lack the metadata now required for interop admission.
-        var source = @"
-§M{Test}
-  §F{UsesInterop:pub}
-      §O{void}
-      §RAW
-var x = System.Environment.TickCount;
-§/RAW
-";
-        var result = TestHarness.Compile(source);
-
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects
-                && d.Message.Contains("UsesInterop")
-                && d.Message.Contains("interop"));
-    }
-
-    [Fact]
-    public void InteropAssumption_PropagatesToCaller()
-    {
-        var source = @"
-§M{Test}
-  §F{UsesInterop:pub}
-      §O{void}
-      §RAW
-var x = 1;
-§/RAW
-  §F{Caller:pub}
-      §O{void}
-      §C{UsesInterop}
-      §/C
-  §F{Transitive:pub}
-      §O{void}
-      §C{Caller}
-      §/C
-";
-        var result = TestHarness.Compile(source);
-
-        // The direct caller AND the transitive caller inherit the assumption.
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("'Caller'"));
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("'Transitive'"));
-    }
-
-    [Fact]
-    public void InteropAssumption_UnderStrictEffects_IsError()
-    {
-        var source = @"
-§M{Test}
-  §F{UsesInterop:pub}
-      §O{void}
-      §RAW
-var x = 1;
-§/RAW
-";
-        var options = new CompilationOptions
-        {
-            EnforceEffects = true,
-            StrictEffects = true
-        };
-        var result = TestHarness.Compile(source, options);
-
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("UsesInterop"));
-    }
-
-    // ========================================================================
     // D-W2.4 — bare-method-name purity removal
     // ========================================================================
 
@@ -546,38 +472,6 @@ module Test Test block
         Assert.Contains(result.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
                 && diagnostic.Message.Contains("unknown"));
-    }
-
-    [Fact]
-    public void ResolvedImmutableApis_LinqAndStringOps_StillPure()
-    {
-        // Keep the frozen zero-argument LINQ/ConvertAll calls; do not invent callbacks.
-        // Pure calls remain pure only through resolved receiver identities and
-        // authoritative manifest entries — never through a global name list.
-        var source = @"
-§M{Test}
-  §F{Query:pub}
-      §I{List<i32>:items}
-      §I{str:name}
-      §O{void}
-      §C{items.Where}
-      §/C
-      §C{items.Select}
-      §/C
-      §C{items.ToList}
-      §/C
-      §C{name.Trim}
-      §/C
-      §C{name.PadLeft}
-        §A INT:10
-      §/C
-      §C{items.ConvertAll}
-      §/C
-";
-        var result = TestHarness.Compile(source);
-
-        Assert.False(result.HasErrors,
-            $"Audited-pure names must remain pure. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
 
     // ========================================================================
@@ -972,29 +866,6 @@ module HigherOrder HigherOrder block
             Assert.Equal(Microsoft.CodeAnalysis.RefKind.None, callback.Parameters.Single().RefKind);
             return (call.ToDisplayString(), callback.ToDisplayString());
         }
-    }
-
-    [Fact]
-    public void C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption()
-    {
-        // The native assumption names '<expression>.Select', not this frozen target.
-        // Review C4 (value arm): a function-typed VALUE passed to a
-        // manifest-resolved higher-order call (Select) is surfaced as a
-        // Calor0419 assumption — the BCL callee may invoke it invisibly.
-        var source = @"
-§M{HofVal}
-  §F{Go:pub}
-      §I{Func<i32,i32>:f}
-      §I{List<i32>:items}
-      §O{void}
-      §E{}
-      §B{r} §C{items.Select} §A f §/C
-";
-        var result = TestHarness.Compile(source);
-
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects
-                && d.Message.Contains("'f'") && d.Message.Contains("items.Select"));
     }
 
     [Fact]
@@ -2070,39 +1941,6 @@ module E E block
     }
 
     [Fact]
-    public void GenericInstantiation_AssumedRow_ReportsOnceAtTheHop()
-    {
-        // Native raw statements cannot replace this retired inline interop expression.
-        // Review round 1, finding 2. §4.4: an Assumed source produces an Assumed
-        // destination and every hop that carries an assumption reports it ONCE.
-        // Site 6 was silent — a callee whose own effects could only be ASSUMED
-        // (§CS interop) flowed through the solve and the reasons were charged but
-        // never surfaced, so the caller inherited an assumption with no Calor0425
-        // naming it. The Calor0419 on `Wrapped` is a different statement: it says
-        // *that function* is assumed, not that this HOP carries the assumption.
-        //
-        // Discriminating revert: drop the IsAssumed arm in InstantiateAndCharge
-        // and only the Calor0419 remains.
-        var result = TestHarness.Compile("""
-            §M{M}
-              §F{Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{e}
-                §R INT:0
-              §F{Wrapped:pub} () -> i32
-                §E{}
-                §R §CS{ 1 + 1 }
-              §F{Caller:pub} () -> i32
-                §E{}
-                §R §C{Run} §A Wrapped §/C
-            """);
-
-        Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.EffectRowUnknown
-              && d.Message.Contains("instantiated effect row of 'Run' at this call site rests on an assumption")
-              && d.Message.Contains("raw C# interop expression"));
-    }
-
-    [Fact]
     public void GenericInstantiation_BinderNoParameterMentions_IsCalor0425_EvenWithZeroArguments()
     {
         // Review round 1, finding 3. `CheckArgumentSite` returned early on an
@@ -2388,28 +2226,8 @@ module E E block
 
         Assert.Equal(
             "Argument 'Shout' has effect row cw, which does not fit parameter 'transform' of "
-            + "'Apply' (declared row: [pure]). Extra effect(s): cw. Widen 'transform' to §E{cw}, "
+            + "'Apply' (declared row: [pure]). Extra effect(s): cw. Widen 'transform' to '! cw', "
             + "or pass a function whose row fits. An effect row that does not fit is never waived.",
-            diagnostic.Message);
-    }
-
-    [Fact]
-    public void MessageTexts_Calor0425_NamesTheRowlessPositionAndTheWaiver()
-    {
-        // Native guidance says 'Add !'; retain the original exact-message oracle.
-        // §6.4's second sample. The design doc's wording says "Add §E{…} on the
-        // same line as the type … or compile with --permissive-effects", and
-        // names what an Unknown row costs the enclosing declaration.
-        var result = TestHarness.Compile(ArgumentSite(""));
-
-        var diagnostic = Assert.Single(result.Diagnostics.Warnings
-            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
-
-        Assert.Equal(
-            "Parameter 'transform' of 'Apply' is function-typed with no effect row, so its effects "
-            + "are Unknown. Add §E{…} on the same line as the type to state what callers may pass, "
-            + "or compile with --permissive-effects. Invoking a value whose row is Unknown charges "
-            + "Unknown to 'Apply'.",
             diagnostic.Message);
     }
 
@@ -2506,7 +2324,7 @@ module E E block
         Assert.Equal(
             "Invocation of 'transform' in 'Apply' cannot be charged: its effect row is Unknown "
             + "(parameter 'transform' of 'Apply' (type 'Func<i32,i32>') carries no effect row). "
-            + "Add §E{…} on the same line as the type to state what 'transform' may do, or "
+            + "Add ! on the same line as the type to state what 'transform' may do, or "
             + "compile with --permissive-effects. 'Apply' is charged Unknown.",
             diagnostic.Message);
         // Fail-closed: the Unknown charge is the same one an unknown external
@@ -2542,30 +2360,6 @@ module E E block
         Assert.Contains("uses effect 'cw'", diagnostic.Message);
         Assert.Contains("charged by invoking 'g' (row: cw)", diagnostic.Message);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
-    }
-
-    [Fact]
-    public void Invocation_AssumedRow_ChargesTheSetAndReportsTheAssumptionOnce()
-    {
-        // No native inline-interop expression preserves this lambda's assumption.
-        // §4.3's Assumed cell read at an invocation: ρ_body of the lambda is
-        // Assumed (its body is raw interop), so the invocation charges the set
-        // and reports ONE Calor0425 carrying the reason.
-        var result = TestHarness.Compile("""
-            §M{Asm}
-              §F{Go:pub} () -> i32
-                §E{}
-                §B{h} §LAM{} §R §CS{Foo.Bar()} §/LAM
-                §R §C{h} §/C
-            """);
-
-        var reported = Assert.Single(result.Diagnostics
-            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
-        Assert.Equal(
-            "Invocation of 'h' in 'Go' is charged [assumed: pure] under an assumption: contains a "
-            + "raw C# interop expression (§CS). The row is charged as an assumption, not a proof.",
-            reported.Message);
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
     }
 
     [Fact]

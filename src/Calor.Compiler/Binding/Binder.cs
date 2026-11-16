@@ -5655,7 +5655,7 @@ public sealed class Binder
                 _diagnostics.ReportError(
                     newExpr.TypeNameSpan,
                     DiagnosticCode.ExpectedTypeName,
-                    "§NEW requires a non-empty type name.");
+                    "new requires a non-empty type name.");
             }
 
             return new BoundNewExpression(
@@ -10425,10 +10425,10 @@ public sealed class Binder
     {
         var what = form.Replace("{0}", $"'{name}'", StringComparison.Ordinal);
         _diagnostics.ReportError(span, DiagnosticCode.WriteToReadOnlyLocal, isLoopVariable
-            ? $"Cannot {what}: it is a §L loop variable, which only the loop may update. " +
-              $"Copy it into a mutable binding (§B{{~name}} {name}) or use a §WH loop."
+            ? $"Cannot {what}: it is a 'for' loop variable, which only the loop may update. " +
+              $"Copy it into a mutable binding (var copy = {name}) or use a 'while' loop."
             : $"Cannot {what}: it is an immutable binding. " +
-              $"Declare it mutable with a leading '~' (§B{{~{name}}} or §B{{~{name}:type}}).");
+              $"Declare it mutable with 'var' instead of 'let' (var {name} = ... or var type:{name} = ...).");
     }
 
     private BoundAssignmentStatement BindAssignmentStatement(AssignmentStatementNode assign)
@@ -10718,7 +10718,7 @@ public sealed class Binder
                 // field, parameter or local, so after the block it would mean different variables
                 // depending on the active branch. The binding still hoists, so writes to it are
                 // checked too.
-                conflict = $"Variable '{visible.Name}' declared in a §PP branch hides a variable or member of the " +
+                conflict = $"Variable '{visible.Name}' declared in a pp branch hides a variable or member of the " +
                     "same name, but not every branch declares it, so after the block the name would refer to " +
                     "different variables depending on the active branch. Declare it in every branch, or rename it";
                 hoistDespiteConflict = true;
@@ -10729,7 +10729,7 @@ public sealed class Binder
                 // The code after the block has one variable, so its type (and any refinement
                 // the emitter guards writes with) must not depend on which branch is active.
                 conflict = $"Variable '{visible.Name}' is declared with different types in the branches " +
-                    $"of a §PP block ({string.Join(", ", alternatives.Select(variable => $"'{variable.TypeName}'").Distinct())}); " +
+                    $"of a pp block ({string.Join(", ", alternatives.Select(variable => $"'{variable.TypeName}'").Distinct())}); " +
                     "declare it with the same type in every branch";
             }
             if (conflict != null)
@@ -11951,7 +11951,7 @@ public sealed class Binder
         _diagnostics.ReportError(
             row.Span,
             DiagnosticCode.EffectRowMisplaced,
-            $"{described}, so it cannot carry an effect row. Remove the §E{{…}}, or — if this is "
+            $"{described}, so it cannot carry an effect row. Remove the '!' row, or — if this is "
             + "the function's own effect declaration — move it onto its own line.");
     }
 
@@ -12009,7 +12009,7 @@ public sealed class Binder
                     row.Span,
                     DiagnosticCode.EffectVariableScope,
                     $"Effect variable '{variable}' is not bound by this declaration. "
-                    + "Declare it in the type-parameter list — §F{f:Name:pub}<eff "
+                    + "Declare it in the type-parameter list — func Name<! "
                     + $"{variable}> — or use an effect code from the taxonomy.");
             }
             mentionsVariable = true;

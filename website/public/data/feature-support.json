@@ -9,7 +9,7 @@
     "info": 0
   },
   "data": {
-    "totalFeatures": 182,
+    "totalFeatures": 183,
     "features": {
       "full": [
         {
@@ -151,14 +151,6 @@
         {
           "name": "unsafe",
           "description": "Unsafe code blocks are represented by unsafe block nodes"
-        },
-        {
-          "name": "pointer",
-          "description": "Pointer types (int*) have address-of and dereference expression nodes"
-        },
-        {
-          "name": "stackalloc",
-          "description": "Stackalloc expressions are represented by stack-allocation nodes"
         },
         {
           "name": "fixed",
@@ -413,7 +405,7 @@
         },
         {
           "name": "for",
-          "description": "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations are preserved inline; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
+          "description": "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations keep the containing member as C# interop; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
         },
         {
           "name": "string-interpolation",
@@ -427,7 +419,7 @@
         },
         {
           "name": "string-interpolation-hole",
-          "description": "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as converter-owned inline interop inside the hole, with assumed effects",
+          "description": "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) have no native form since 0.30 retired inline raw C# holes; the containing member is preserved as C# interop",
           "workaround": "Move the expression into a local before the interpolated string to convert it natively"
         },
         {
@@ -442,7 +434,7 @@
         },
         {
           "name": "linq-query",
-          "description": "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. Complex or unresolved selectors remain inline and deferred."
+          "description": "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. A complex or unresolved selector keeps the containing member as C# interop so it stays deferred."
         },
         {
           "name": "initializer-interop",
@@ -562,6 +554,21 @@
           "name": "array-element-block",
           "description": "Statement-only array elements require counted C# preservation when inline emission or safe typed hoisting is unavailable. Anonymous objects and ordinary collection initializers use inline native syntax",
           "workaround": "Bind the element to a local first, then use the local in the array"
+        },
+        {
+          "name": "pointer",
+          "description": "Address-of (\u0026x) and pointer dereference (*p) have no native Calor form yet; the containing member is preserved as C# interop",
+          "workaround": "Keep pointer code in a C# member, or use Span\u003CT\u003E and indexing"
+        },
+        {
+          "name": "stackalloc",
+          "description": "stackalloc has no native Calor form yet; the containing member is preserved as C# interop",
+          "workaround": "Keep the stackalloc in a C# member, or allocate an array"
+        },
+        {
+          "name": "event-subscription",
+          "description": "Event subscription and unsubscription (e \u002B= h, e -= h) have no native Calor statement; the statement is preserved as C# interop",
+          "workaround": "Keep the subscription as a raw C# statement"
         },
         {
           "name": "static-abstract-member",

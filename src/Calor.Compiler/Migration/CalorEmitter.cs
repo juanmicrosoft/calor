@@ -1762,8 +1762,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(InvariantNode node)
     {
         var condition = node.Condition.Accept(this);
-        var message = node.Message != null ? $" \"{node.Message}\"" : "";
-        AppendLine($"§IV {condition}{message}");
+        if (node.Message != null)
+            throw new InvalidOperationException("Canonical invariant message syntax has not been selected.");
+        AppendLine($"invariant {condition}");
         return "";
     }
 
@@ -3091,12 +3092,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private string HoistToTempVar(string expr)
     {
         // Don't hoist outside of executable bodies (methods, ctors, operators, property accessors).
-        // Hoisting at class/module scope would leak §B bindings between members.
+        // Hoisting at class/module scope would leak bindings between members.
         if (_memberBodyDepth == 0 || _conditionalExpressionDepth > 0)
             return expr;
 
         var varName = FreshTemp("_hoist");
-        _pendingHoistedLines.Add($"§B{{~{varName}}} {expr}");
+        _pendingHoistedLines.Add($"var {varName} = {expr}");
         return varName;
     }
 
@@ -3117,6 +3118,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var name = node.Name.Replace("@", "");
         if (node.IsNullLiteral)
             return name;
+        // The default literal: native source spells it `default`, and escaping it would turn
+        // it into a reference to a member named `@default`.
+        if (node.Name == "default" && !node.IsVerbatim)
+            return "default";
         if (node.IsVerbatim)
             return $"@{name}";
         if (TypeMapper.IsPrimitiveType(name) && TypeMapper.ToSurfaceType(name) == name)

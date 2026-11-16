@@ -835,9 +835,9 @@ public sealed class EffectEnforcementPass
             _diagnostics.Report(
                 declaration.Span,
                 diagnosticCode,
-                $"The {displayName} uses effect(s) '{codes}', but this declaration has no §E effect-contract surface. " +
+                $"The {displayName} uses effect(s) '{codes}', but this declaration cannot declare an effect row. " +
                 $"Only {intrinsicDescription} is permitted. " +
-                "Move effectful work to a method with an explicit §E declaration.",
+                "Move effectful work to a method with an explicit '!' effect row.",
                 DiagnosticSeverity.Error);
         }
 
@@ -847,7 +847,7 @@ public sealed class EffectEnforcementPass
                 declaration.Span,
                 diagnosticCode,
                 $"The {displayName} has unverifiable effects: {string.Join("; ", reasons.Take(3))}. " +
-                "Declarations without a §E surface fail closed.",
+                "Declarations that cannot declare an effect row fail closed.",
                 DiagnosticSeverity.Error);
         }
     }
@@ -2966,7 +2966,7 @@ public sealed class EffectEnforcementPass
                         $"{sourceDescription} has effect row {source.Display()}, which does "
                         + $"not fit {destinationDescription} (declared row: "
                         + $"{destination.Display()}). Extra effect(s): {extra}. Widen "
-                        + $"{destinationName} to §E{{{extra}}}, or pass a function whose row fits. "
+                        + $"{destinationName} to '! {extra}', or pass a function whose row fits. "
                         + "An effect row that does not fit is never waived.",
                         DiagnosticSeverity.Error);
                     break;
@@ -3897,7 +3897,7 @@ public sealed class EffectEnforcementPass
                 LocalFunctionStatementNode local => InferFromLocalFunction(local),
                 // D-W2.3: interop content — effects are assumed, not silently pure
                 RawCSharpNode => InferFromStructuralChildren(statement)
-                    .Union(RecordAssumption("contains a raw C# interop statement (§CSHARP)")),
+                    .Union(RecordAssumption("contains a raw C# interop statement")),
                 FallbackCommentNode => InferFromStructuralChildren(statement)
                     .Union(RecordAssumption("contains an unconverted C# fallback statement")),
                 // D-W2.6: fail-loud catch-all
@@ -4337,7 +4337,7 @@ public sealed class EffectEnforcementPass
                     DiagnosticCode.UnknownExternalCall,
                     $"Unknown call target '{target}': not an internal function, parameter, binding, or field " +
                     "visible to the effect pass. If this is a delegate-typed member, declare it where this " +
-                    "module can see it with an effect row (§E{…} on the same line as its type); otherwise " +
+                    "module can see it with an effect row ('! codes' after its type); otherwise " +
                     "add the callee to a .calor-effects.json manifest.",
                     unknownSeverity);
             }
@@ -6990,7 +6990,7 @@ public sealed class EffectEnforcementPass
                     => InferFromStructuralChildren(expr),
                 // D-W2.3: interop / unconverted content — assumed, not silently pure
                 RawCSharpExpressionNode => InferFromStructuralChildren(expr)
-                    .Union(RecordAssumption("contains a raw C# interop expression (§CS)")),
+                    .Union(RecordAssumption("contains a raw C# interop expression")),
                 FallbackExpressionNode fallback => InferFromStructuralChildren(expr)
                     .Union(RecordAssumption(
                         $"contains an unconverted C# fallback expression ('{fallback.FeatureName}')")),

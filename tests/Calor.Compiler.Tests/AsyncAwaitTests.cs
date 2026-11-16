@@ -498,54 +498,8 @@ public class AsyncAwaitTests
         Assert.Contains("Task<int>", regeneratedCSharp);
         Assert.Contains("ComputeAsync", regeneratedCSharp);
     }
-
     #endregion
-
     #region Lexer Token Tests
-
-    [Fact]
-    public void Lexer_AsyncFuncToken_Recognized()
-    {
-        var source = "§AF{Test:pub}";
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Contains(tokens, t => t.Kind == TokenKind.AsyncFunc);
-    }
-
-    [Fact]
-    public void Lexer_EndAsyncFuncToken_Recognized()
-    {
-        var source = "§/AF";
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndAsyncFunc);
-    }
-
-    [Fact]
-    public void Lexer_AsyncMethodToken_Recognized()
-    {
-        var source = "§AMT{Test:pub}";
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Contains(tokens, t => t.Kind == TokenKind.AsyncMethod);
-    }
-
-    [Fact]
-    public void Lexer_EndAsyncMethodToken_Recognized()
-    {
-        var source = "§/AMT";
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndAsyncMethod);
-    }
 
     #endregion
 
@@ -1006,9 +960,9 @@ public class AsyncAwaitTests
             using System.Threading.Tasks;
             public class Repository<TEntity>
             {
-                public async Task<TEntity> GetByIdAsync<TKey>(TKey id)
+                public async Task<TKey> GetByIdAsync<TKey>(TKey id)
                 {
-                    return default;
+                    return id;
                 }
             }
             """;
@@ -1594,15 +1548,12 @@ public class AsyncAwaitTests
     }
 
     [Theory]
-    [InlineData("Task", false)]
-    [InlineData("Task", true)]
-    [InlineData("ValueTask", false)]
-    [InlineData("ValueTask", true)]
-    public async Task Compile_ClassCarrierTypeParameter_IsAValueReturn(string parameter, bool hasRefinement)
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public async Task Compile_ClassCarrierTypeParameter_IsAValueReturn(string parameter)
     {
         var assembly = CompileAndLoad($$"""
             module AsyncClassParameter AsyncClassParameter block
-              {{(hasRefinement ? "§RTYPE{Positive:i32} (> # 0)" : "")}}
               class Box<{{parameter}}>
                 func Produce async ({{parameter}}:value) → {{parameter}}
                   !

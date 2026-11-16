@@ -66,7 +66,7 @@ public class ExtensionMethodTests
             {
                 public static T FirstOrDefault<T>(this IEnumerable<T> source, T defaultValue)
                 {
-                    return default;
+                    return defaultValue;
                 }
             }
             """;

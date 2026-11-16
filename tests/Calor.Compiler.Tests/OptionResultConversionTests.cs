@@ -60,7 +60,7 @@ public class OptionResultConversionTests
 
             public static Option<T> Some(T value) => new(value);
 
-            public static Option<T> None => default;
+            public static Option<T> None => new Option<T>();
 
             public bool HasValue => _hasValue;
 

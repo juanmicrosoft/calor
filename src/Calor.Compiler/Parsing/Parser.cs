@@ -682,7 +682,15 @@ public sealed class Parser
                // type could not be converted, and it was being absorbed as an
                // interface member with no diagnostic. Deeper §CSHARP is still a
                // member (an interface can carry interop).
-               || Check(TokenKind.CSharpInterop));
+               || Check(TokenKind.CSharpInterop)
+               // 0.30: interface members are indented under the interface, so any other
+               // declaration at its own column (a module function, field, nested module,
+               // pp block...) is a sibling that follows an empty marker interface.
+               || Check(TokenKind.Func) || Check(TokenKind.Method)
+               || Check(TokenKind.Property) || Check(TokenKind.FieldDef)
+               || Check(TokenKind.Constructor) || Check(TokenKind.Event)
+               || Check(TokenKind.OperatorOverload) || Check(TokenKind.Module)
+               || Check(TokenKind.Preprocessor) || Check(TokenKind.Using));
 
     /// <summary>
     /// Phase 3 (indent-aware) -- consumes the block-end marker and returns
@@ -6824,7 +6832,7 @@ public sealed class Parser
                 {
                     var arrowToken = Advance();
                     _diagnostics.ReportError(arrowToken.Span, DiagnosticCode.UnexpectedToken,
-                        "Arrow conditional statements are removed. Put the statement on an indented line under §IF, §EI, or §EL.");
+                        "Arrow conditional statements are removed. Put the statement on an indented line under if, else if, or else.");
                     // An inline statement creates no indentation level. Its next
                     // dedent belongs to the enclosing loop, branch, or function.
                     ownsDedent = Current.IndentationDepth > arrowToken.IndentationDepth;
@@ -6916,7 +6924,7 @@ public sealed class Parser
             var elseIfBody = new List<StatementNode>();
             if (Check(TokenKind.Arrow))
                 _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                    "Arrow conditional statements are removed. Put the statement on an indented line under §EI.");
+                    "Arrow conditional statements are removed. Put the statement on an indented line under else if.");
 
             clauseOwner = BeginBlockBody(elseIfToken, TokenKind.EndIf, id);
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf)
@@ -6942,7 +6950,7 @@ public sealed class Parser
             elseBody = new List<StatementNode>();
             if (Check(TokenKind.Arrow))
                 _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                    "Arrow conditional statements are removed. Put the statement on an indented line under §EL.");
+                    "Arrow conditional statements are removed. Put the statement on an indented line under else.");
 
             clauseOwner = BeginBlockBody(elseToken, TokenKind.EndIf, id);
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && IsInBlockBody(clauseOwner))
@@ -8835,9 +8843,7 @@ public sealed class Parser
         var id = GenerateParserAutoId("each");
         var variableType = "var";
         Token variable;
-        if (Check(TokenKind.Identifier)
-            && (Peek(1).Kind == TokenKind.Colon
-                || Peek(1).Kind == TokenKind.Question && Peek(2).Kind == TokenKind.Colon))
+        if (IsTypedBinderAhead(TokenKind.In, TokenKind.Comma))
         {
             variableType = ReadInlineTypeToken();
             Expect(TokenKind.Colon);
@@ -12873,6 +12879,44 @@ public sealed class Parser
     ///   ...body...
     /// §/USE{id}
     /// </summary>
+    /// <summary>
+    /// True when the tokens ahead are a typed binder <c>type:name</c> followed by one of
+    /// <paramref name="followers"/>. The type may be dotted, generic (<c>IEnumerator&lt;int&gt;</c>,
+    /// nested closers lexed as <c>&gt;&gt;</c>), an array or nullable.
+    /// </summary>
+    private bool IsTypedBinderAhead(params TokenKind[] followers)
+    {
+        if (!Check(TokenKind.Identifier))
+            return false;
+        var depth = 0;
+        for (var i = 1; i < 64; i++)
+        {
+            switch (Peek(i).Kind)
+            {
+                case TokenKind.Less:
+                    depth++;
+                    break;
+                case TokenKind.Greater:
+                    depth--;
+                    break;
+                case TokenKind.GreaterGreater:
+                    depth -= 2;
+                    break;
+                case TokenKind.Colon when depth == 0:
+                    return Peek(i + 1).Kind == TokenKind.Identifier
+                        && Array.IndexOf(followers, Peek(i + 2).Kind) >= 0;
+                case TokenKind.Identifier or TokenKind.Comma or TokenKind.OpenBracket or TokenKind.CloseBracket
+                    or TokenKind.Question or TokenKind.NullCoalesce:
+                    break;
+                default:
+                    return false;
+            }
+            if (depth < 0)
+                return false;
+        }
+        return false;
+    }
+
     private UsingStatementNode ParseUsingStatement()
     {
         var startToken = Expect(Check(TokenKind.Using) ? TokenKind.Using : TokenKind.Use);
@@ -12888,9 +12932,7 @@ public sealed class Parser
             variableSpan = binder.Span;
             Advance();
         }
-        else if (Check(TokenKind.Identifier)
-            && (Peek(1).Kind == TokenKind.Colon
-                || Peek(1).Kind == TokenKind.Question && Peek(2).Kind == TokenKind.Colon))
+        else if (IsTypedBinderAhead(TokenKind.Equals))
         {
             variableType = ReadInlineTypeToken();
             Expect(TokenKind.Colon);
@@ -13487,7 +13529,8 @@ public sealed class Parser
         List<CSharpInteropBlockNode>? interopBlocks = null,
         bool allowSymbolDirectives = false)
     {
-        if (usings != null && Check(TokenKind.Using))
+        if (usings != null
+            && (Check(TokenKind.Using) || Current.Text == "global" && Peek(1).Kind == TokenKind.Using))
         {
             var node = ParseUsingDirective();
             usings.Add(node);

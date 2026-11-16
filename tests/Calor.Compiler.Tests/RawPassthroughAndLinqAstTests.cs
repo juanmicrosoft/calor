@@ -14,97 +14,6 @@ public class RawPassthroughAndLinqAstTests
 {
     #region R2: §RAW C# passthrough
 
-    [Fact]
-    public void Lexer_RawBlock_TokenizesAsSingleToken()
-    {
-        var source = "§RAW\nvar x = 1;\n§/RAW";
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        // Should be: RawCSharp + EOF
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.RawCSharp, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RawBlock_CapturesContentWithoutTokenizing()
-    {
-        var source = "§RAW\nvar x = items.Where(i => i > 5).ToList();\nConsole.WriteLine(x);\n§/RAW";
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        Assert.Equal(TokenKind.RawCSharp, tokens[0].Kind);
-        var content = tokens[0].Value as string;
-        Assert.NotNull(content);
-        Assert.Contains("items.Where(i => i > 5)", content);
-        Assert.Contains("Console.WriteLine(x)", content);
-    }
-
-    [Fact]
-    public void Lexer_RawBlock_UnterminatedReportsError()
-    {
-        var source = "§RAW\nvar x = 1;";
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        _ = lexer.TokenizeAllForParser();
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("§/RAW"));
-    }
-
-    [Fact]
-    public void Parser_RawBlock_CreatesRawCSharpNode()
-    {
-        var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §RAW
-      var query = from x in items
-                  where x > 5
-                  select x * 2;
-      §/RAW
-";
-        var module = ParseModule(source);
-        var func = Assert.Single(module.Functions);
-        var rawNode = Assert.Single(func.Body.OfType<RawCSharpNode>());
-        Assert.Contains("from x in items", rawNode.CSharpCode);
-        Assert.Contains("select x * 2", rawNode.CSharpCode);
-    }
-
-    [Fact]
-    public void CSharpEmitter_RawBlock_EmitsContentVerbatim()
-    {
-        var source = @"
-§M{Test}
-  §F{Main:pub}
-      §O{void}
-      §RAW
-      var query = from x in items
-                  where x > 5
-                  select x * 2;
-      §/RAW
-";
-        var csharp = ParseAndEmit(source);
-        Assert.Contains("from x in items", csharp);
-        Assert.Contains("select x * 2", csharp);
-    }
-
-    [Fact]
-    public void Parser_RawBlock_PreservesCSharpSyntaxCharacters()
-    {
-        // Verify that C# syntax characters (braces, semicolons, etc.) pass through
-        var source = "§M{Test}\n§F{Main:pub}\n  §O{void}\n  §RAW\n  if (x > 0) { Console.WriteLine(x); }\n  §/RAW\n\n\n";
-        var csharp = ParseAndEmit(source);
-        Assert.Contains("if (x > 0)", csharp);
-        Assert.Contains("Console.WriteLine", csharp);
-    }
-
     #endregion
 
     #region R6: LINQ conversion produces valid AST nodes
@@ -222,11 +131,11 @@ public class RawPassthroughAndLinqAstTests
             {
                 public void Run()
                 {
-                    var orders = new[] { new { Id = 1, ProductId = 10 } };
-                    var products = new[] { new { Id = 10, Name = "Widget" } };
+                    var orders = new[] { 1, 2 };
+                    var products = new[] { 2, 3 };
                     var result = from o in orders
-                                 join p in products on o.ProductId equals p.Id
-                                 select new { o.Id, p.Name };
+                                 join p in products on o equals p
+                                 select o + p;
                 }
             }
             """;

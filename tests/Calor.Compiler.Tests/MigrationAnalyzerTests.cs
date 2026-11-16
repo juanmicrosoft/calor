@@ -1041,7 +1041,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_UnsafeCode_NowFullySupported()
+    public void AnalyzeSource_UnsafeCode_PointersKeptAsCSharp()
     {
         var source = """
             public class UnsafeService
@@ -1057,9 +1057,9 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.False(result.WasSkipped);
-        // unsafe and pointer are now fully supported
+        // unsafe is supported; 0.30 has no native pointer syntax, so pointers stay C#.
         Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "unsafe");
-        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "pointer");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "pointer");
     }
 
     [Fact]

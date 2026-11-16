@@ -116,7 +116,7 @@ public static class FeatureSupport
         {
             Name = "for",
             Support = SupportLevel.Partial,
-            Description = "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations are preserved inline; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
+            Description = "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations keep the containing member as C# interop; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
         },
         ["foreach"] = new FeatureInfo
         {
@@ -207,7 +207,7 @@ public static class FeatureSupport
         {
             Name = "string-interpolation-hole",
             Support = SupportLevel.Partial,
-            Description = "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as converter-owned inline interop inside the hole, with assumed effects",
+            Description = "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) have no native form since 0.30 retired inline raw C# holes; the containing member is preserved as C# interop",
             Workaround = "Move the expression into a local before the interpolated string to convert it natively"
         },
         ["null-coalescing"] = new FeatureInfo
@@ -255,7 +255,7 @@ public static class FeatureSupport
         {
             Name = "linq-query",
             Support = SupportLevel.Partial,
-            Description = "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. Complex or unresolved selectors remain inline and deferred."
+            Description = "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. A complex or unresolved selector keeps the containing member as C# interop so it stays deferred."
         },
         ["array-initializer"] = new FeatureInfo
         {
@@ -386,14 +386,23 @@ public static class FeatureSupport
         ["pointer"] = new FeatureInfo
         {
             Name = "pointer",
-            Support = SupportLevel.Full,
-            Description = "Pointer types (int*) have address-of and dereference expression nodes"
+            Support = SupportLevel.NotSupported,
+            Description = "Address-of (&x) and pointer dereference (*p) have no native Calor form yet; the containing member is preserved as C# interop",
+            Workaround = "Keep pointer code in a C# member, or use Span<T> and indexing"
         },
         ["stackalloc"] = new FeatureInfo
         {
             Name = "stackalloc",
-            Support = SupportLevel.Full,
-            Description = "Stackalloc expressions are represented by stack-allocation nodes"
+            Support = SupportLevel.NotSupported,
+            Description = "stackalloc has no native Calor form yet; the containing member is preserved as C# interop",
+            Workaround = "Keep the stackalloc in a C# member, or allocate an array"
+        },
+        ["event-subscription"] = new FeatureInfo
+        {
+            Name = "event-subscription",
+            Support = SupportLevel.NotSupported,
+            Description = "Event subscription and unsubscription (e += h, e -= h) have no native Calor statement; the statement is preserved as C# interop",
+            Workaround = "Keep the subscription as a raw C# statement"
         },
         ["fixed"] = new FeatureInfo
         {
@@ -1345,6 +1354,7 @@ public static class FeatureSupport
             "conditional-type-placement", "conditional-unmodeled-placement",
             "conversion-error", "csharp-script", "default-expression", "default-member-collision",
             "delegate", "dictionary-initializer", "embedded-assignment", "enum", "event-definition",
+            "event-subscription", "pointer", "stackalloc",
             "explicit-interface", "extern-alias", "foreach-collection-order", "in-parameter",
             "initializer-interop", "interface", "iterator-accessor",
             "labeled-statement", "line-directive", "linq-query", "local-function",
