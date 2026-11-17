@@ -1,17 +1,23 @@
 // Current nullable/exception semantics, not a replay of the frozen benchmark.
+// Seeded dereferences use a user-defined nullable reference type (BenchmarkText?).
+// Since 0.30 a possibly-null receiver of a .NET member (string?.Length) is a hard
+// Calor0274 error before bug-pattern analysis runs, so a string? seed would no
+// longer measure null-dereference detection. Each vulnerable case keeps its safe
+// control on the same type and access shape. Dereferences are field reads, so the
+// subject keeps exactly eight functions.
 module NullDerefBenchmark NullDerefBenchmark
-  func VulnerableNullDeref public (string?:maybeNull) → int
+  func VulnerableNullDeref public (BenchmarkText?:maybeNull) → int
     !
     // BUG: Potential null dereference without check
     // EXPECTED: Calor0922 Null Dereference
-    return maybeNull.Length
+    return maybeNull . Size
 
-  func SafeNullCheck public (string?:maybeNull) → int
+  func SafeNullCheck public (BenchmarkText?:maybeNull) → int
     !
     // SAFE: Null check before use
     // EXPECTED: No warnings
     if maybeNull != null
-      return maybeNull.Length
+      return maybeNull . Size
     else
       return 0
 
@@ -45,20 +51,23 @@ module NullDerefBenchmark NullDerefBenchmark
     else
       return 0
 
-  func VulnerableFunctionReturn public (int:key, System.Collections.Generic.Dictionary<int,string?>:dict) → int
+  func VulnerableFunctionReturn public (int:key, System.Collections.Generic.Dictionary<int,BenchmarkText?>:dict) → int
     !
     // BUG: Function return may be null
     // EXPECTED: Calor0922 Null Dereference
-    let string?:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key)
-    return result.GetHashCode()
+    let BenchmarkText?:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key)
+    return result . Size
 
-  func SafeOrDefault public (int:key, System.Collections.Generic.Dictionary<int,string?>:dict) → int
+  func SafeOrDefault public (int:key, System.Collections.Generic.Dictionary<int,BenchmarkText?>:dict, BenchmarkText:fallback) → int
     !
     // SAFE: Using get_or_default
     // EXPECTED: No warnings
-    let string:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key) ?? ""
-    return result.GetHashCode()
+    let BenchmarkText:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key) ?? fallback
+    return result . Size
 
   class BenchmarkNode public
     field BenchmarkNode?:Inner public
     field string?:Value public
+
+  class BenchmarkText public
+    field int:Size public

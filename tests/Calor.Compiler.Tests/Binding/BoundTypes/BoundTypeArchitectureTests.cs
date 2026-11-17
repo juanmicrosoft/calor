@@ -291,7 +291,6 @@ public class BoundTypeArchitectureTests
     [Theory]
     [InlineData("benchmarks/security/command-injection.calr", "Replace", 9, "string")]
     [InlineData("benchmarks/security/sql-injection.calr", "Replace", 1, "string")]
-    [InlineData("benchmarks/null-safety/null-deref.calr", "GetHashCode", 2, "int")]
     public void CorpusScalarInstanceCalls_UseSelectedStringMetadata(
         string relativePath, string methodName, int expectedCount, string expectedDisplay)
     {
