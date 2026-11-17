@@ -78,7 +78,7 @@ public class EventAccessorTests
     }
 
     [Fact]
-    public void Parser_EventWithAddOnly_ParsesCorrectly()
+    public void Parser_EventWithAddOnly_RequiresRemoveAccessor()
     {
         var source = """
             module Test Test block
@@ -94,11 +94,10 @@ public class EventAccessorTests
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
-        Assert.Empty(diag);
-        var evt = Assert.Single(module.Classes[0].Events);
-        Assert.True(evt.HasAccessors);
-        Assert.NotNull(evt.AddBody);
-        Assert.Null(evt.RemoveBody);
+        // 0.30: as in C#, an explicit event needs both accessors; an add-only event is an error.
+        var error = Assert.Single(diag.Errors);
+        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
+        Assert.Contains("requires both add and remove accessors", error.Message);
     }
 
     #endregion
@@ -245,12 +244,14 @@ public class EventAccessorTests
                 private EventHandler _click;
                 public event EventHandler Click
                 {
-                    add { _click += value; }
-                    remove { _click -= value; }
+                    add { _click = (EventHandler)Delegate.Combine(_click, value); }
+                    remove { _click = (EventHandler)Delegate.Remove(_click, value); }
                 }
             }
             """;
 
+        // 0.30: native Calor lowers only primitive compound assignments, so `_click += value`
+        // (delegate combination) stays C#; the accessor bodies call Delegate.Combine directly.
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
@@ -274,8 +275,8 @@ public class EventAccessorTests
                 private EventHandler _click;
                 public event EventHandler Click
                 {
-                    add { _click += value; }
-                    remove { _click -= value; }
+                    add { _click = (EventHandler)Delegate.Combine(_click, value); }
+                    remove { _click = (EventHandler)Delegate.Remove(_click, value); }
                 }
             }
             """;

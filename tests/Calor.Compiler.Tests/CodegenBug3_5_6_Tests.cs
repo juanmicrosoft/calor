@@ -222,8 +222,14 @@ module Test Test block
     [Fact]
     public void Bug3_CalorEmitter_EmitsExtTag_NotPositional()
     {
+        // Parent is declared so the base resolves: an unresolved base could be a class or an
+        // interface, and the converter keeps such a class as C# (class-unresolved-base-kind).
         var csharp = """
             public class Child : Parent
+            {
+            }
+
+            public class Parent
             {
             }
             """;
@@ -532,7 +538,8 @@ module Test Test block
             """;
 
         var result = ParseAndEmit(source);
-        Assert.Contains("$\"{dict.GetOrAdd(key, () => new V { P = 1 })}\"", result);
+        // The hole is parsed as a native expression, so the creation prints in canonical form.
+        Assert.Contains("$\"{dict.GetOrAdd(key, () => new V() { P = 1 })}\"", result);
     }
 
     [Fact]
