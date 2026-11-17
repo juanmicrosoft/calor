@@ -27,7 +27,7 @@ namespace Calor.Tasks.Tests;
 public sealed class SdkSurfaceAgreementTests : IDisposable
 {
     [Theory]
-    [InlineData("module Gate\n  func Run () \u2192 void\n    ", "statement", "return;")]
+    [InlineData("module Gate\n  func Run () \u2192 void\n    !\n    ", "statement", "return;")]
     [InlineData("module Gate\n  class Host\n    ", "member", "public int Value => 7;")]
     [InlineData("module _global\n  ", "unit", "public class Kept { }")]
     public void InteropReasonGate_SdkTaskAndCliProcessRejectIdentically(
@@ -93,11 +93,15 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
         var api = Calor.Compiler.Program.Compile(source, path, options);
         var invokes = usage is "invoke" or "alias";
         // Existing inference loses known rows beyond one binding hop.
-        var invokesUnknown = suffix is "" or " ! unknown" || usage == "alias";
-        var expectedFailure = invokes
+        var invokesUnknown = suffix is " ! unknown" || usage == "alias";
+        // D2 (0.30): an omitted callback row is Calor0407 in every mode and for
+        // every usage, so no policy can admit it; the surfaces must still agree.
+        var omittedRow = suffix == "";
+        var expectedFailure = omittedRow || invokes
             && (usage != "alias" && suffix == " ! cw" || !permissive && invokesUnknown);
         Assert.Equal(expectedFailure, api.HasErrors);
-        if (usage == "alias")
+        Assert.Equal(omittedRow, api.Diagnostics.Any(d => d.Code == "Calor0407"));
+        if (usage == "alias" && !omittedRow)
             Assert.Equal(!permissive, api.Diagnostics.Any(d => d.Code == "Calor0425"));
 
         var engine = new CapturingBuildEngine();

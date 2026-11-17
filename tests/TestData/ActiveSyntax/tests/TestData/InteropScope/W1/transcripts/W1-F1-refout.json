@@ -4,13 +4,12 @@
     "exit": 0,
     "stdout": [
       "✓ Conversion successful",
-      "Warnings (2):",
+      "Warnings (1):",
       "  ⚠ Feature 'out-var' is partially supported. Declare the variable before the statement and pass it with out",
-      "  ⚠ Nested oblivious reference semantics for 'Dictionary<string, int>' are not modeled; preserving syntax-only type mapping.",
       "Output: <dir>/Inventory.calr"
     ],
     "stderr": [],
-    "calor": "module Inventory overflow unchecked\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      var int:n = default(int)\n      if int.TryParse(text, out n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      return (x * 2)\n\n    func Run () → int\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
+    "calor": "module Inventory overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      !\n      var int:n = default(int)\n      if int.TryParse(text, out @n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      !\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      !\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      ! mut\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      !\n      return (x * 2)\n\n    func Run () → int\n      ! mut\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Inventory.cs -o Inventory.calr --format json",
@@ -34,7 +33,7 @@
       "roundTrip": "verified"
     },
     "diagnosticCodes": [
-      "Calor1343 x2"
+      "Calor1343 x1"
     ]
   },
   "cli-compile": {
@@ -81,10 +80,9 @@
       "roundTrip": "verified"
     },
     "issueCodes": [
-      "warning:Calor1343:nullable-oblivious-nested-shape",
       "warning:Calor1343:out-var"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      var int:n = default(int)\n      if int.TryParse(text, out n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      return (x * 2)\n\n    func Run () → int\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      !\n      var int:n = default(int)\n      if int.TryParse(text, out @n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      !\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      !\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      ! mut\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      !\n      return (x * 2)\n\n    func Run () → int\n      ! mut\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -107,9 +105,8 @@
       "roundTrip": "verified"
     },
     "issueCodes": [
-      "warning:Calor1343:nullable-oblivious-nested-shape",
       "warning:Calor1343:out-var"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      var int:n = default(int)\n      if int.TryParse(text, out n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      return (x * 2)\n\n    func Run () → int\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      !\n      var int:n = default(int)\n      if int.TryParse(text, out @n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      !\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      !\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      ! mut\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      !\n      return (x * 2)\n\n    func Run () → int\n      ! mut\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
   }
 }

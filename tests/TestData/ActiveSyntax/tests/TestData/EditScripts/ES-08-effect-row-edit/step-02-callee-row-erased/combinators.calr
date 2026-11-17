@@ -1,5 +1,5 @@
 module Combinators
-  func Map (int[]:xs, Func<int,int>:f) → int[]
+  func Map (int[]:xs, Func<int,int>:f ! unknown) → int[]
     ! alloc, mut
     let int:n = xs.Length
     var int[]:@out = new int[n]

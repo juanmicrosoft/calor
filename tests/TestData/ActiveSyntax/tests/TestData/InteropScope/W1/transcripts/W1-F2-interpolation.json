@@ -9,11 +9,11 @@
       "  Preservation paths: 1 by converter interop (unsupported construct)",
       "Warnings (2):",
       "  ⚠ Feature 'string-interpolation-formattable' is partially supported. Review preserved hole-free FormattableString calls; they stay C# interop",
-      "  ⚠ Unsupported feature [string-interpolation-handler] escalated to §CSHARP interop preservation: $\"x={x}\"",
+      "  ⚠ Unsupported feature [string-interpolation-handler] escalated to raw C# preservation of the containing member: $\"x={x}\"",
       "Output: <dir>/Report.calr"
     ],
     "stderr": [],
-    "calor": "module Report overflow unchecked\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
+    "calor": "module Report overflow unchecked nullable oblivious\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      !\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      ! unknown\n      return (\"fs:\" + f . Format)\n\n    func Kind (object:o) → string\n      ! unknown\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      ! unknown\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Report.cs -o Report.calr --format json",
@@ -49,12 +49,9 @@
   },
   "cli-compile": {
     "command": "calor --input Report.calr --output Report.g.cs",
-    "exit": 1,
-    "errorCodes": [
-      "Calor0410 x1"
-    ],
+    "exit": 0,
+    "errorCodes": [],
     "warningCodes": [
-      "Calor0411 x1",
       "Calor0419 x1"
     ]
   },
@@ -106,7 +103,7 @@
       "warning:Calor1343:string-interpolation-formattable",
       "warning:Calor1343:string-interpolation-handler"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      !\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      ! unknown\n      return (\"fs:\" + f . Format)\n\n    func Kind (object:o) → string\n      ! unknown\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      ! unknown\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -139,6 +136,6 @@
       "warning:Calor1343:string-interpolation-formattable",
       "warning:Calor1343:string-interpolation-handler"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      !\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      ! unknown\n      return (\"fs:\" + f . Format)\n\n    func Kind (object:o) → string\n      ! unknown\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      ! unknown\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
   }
 }

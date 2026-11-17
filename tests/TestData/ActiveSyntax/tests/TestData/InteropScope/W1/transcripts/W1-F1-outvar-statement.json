@@ -9,7 +9,7 @@
       "Output: <dir>/Parser.calr"
     ],
     "stderr": [],
-    "calor": "module Parser overflow unchecked\n  module Parser\n    func ParseOrZero (string:text) → int\n      var int:n = default(int)\n      int.TryParse(text, out n)\n      return n\n\n\n"
+    "calor": "module Parser overflow unchecked nullable oblivious\n  module Parser\n    func ParseOrZero (string:text) → int\n      !\n      var int:n = default(int)\n      int.TryParse(text, out @n)\n      return n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Parser.cs -o Parser.calr --format json",
@@ -82,7 +82,7 @@
     "issueCodes": [
       "warning:Calor1343:out-var"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  module Parser\n    func ParseOrZero (string:text) → int\n      var int:n = default(int)\n      int.TryParse(text, out n)\n      return n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  module Parser\n    func ParseOrZero (string:text) → int\n      !\n      var int:n = default(int)\n      int.TryParse(text, out @n)\n      return n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -107,6 +107,6 @@
     "issueCodes": [
       "warning:Calor1343:out-var"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  module Parser\n    func ParseOrZero (string:text) → int\n      var int:n = default(int)\n      int.TryParse(text, out n)\n      return n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  module Parser\n    func ParseOrZero (string:text) → int\n      !\n      var int:n = default(int)\n      int.TryParse(text, out @n)\n      return n\n\n\n"
   }
 }
