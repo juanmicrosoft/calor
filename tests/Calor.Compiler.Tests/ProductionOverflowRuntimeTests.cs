@@ -71,7 +71,7 @@ public class ProductionOverflowRuntimeTests
     [Theory]
     [InlineData("wrap")]
     [InlineData("true")]
-    [InlineData("unchecked-typo")]
+    [InlineData("unchecked_typo")]
     public void UnknownOverflowPolicy_IsRejectedRatherThanSilentlyChanged(string policy)
     {
         var result = Program.Compile($$"""

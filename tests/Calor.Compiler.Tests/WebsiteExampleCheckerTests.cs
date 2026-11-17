@@ -110,7 +110,9 @@ public sealed class WebsiteExampleCheckerTests
     [Fact]
     public void NegativeExample_ThatAlsoRaisesAnUndeclaredWarning_Fails()
     {
-        // HandleRequest is public with no effect row: cross-module checking adds Calor0417.
+        // HandleRequest's System.Type parameter is a type the checker does not model, which
+        // adds the warning-only Calor0200 next to the cross-module Calor0410. (0.30: Calor0417,
+        // the old warning for a public function without a row, can no longer be reached.)
         const string page = """
             ```calor group=g
             module OrderService
@@ -118,18 +120,19 @@ public sealed class WebsiteExampleCheckerTests
                 ! db:w
             ```
 
-            Fails with Calor0410 and warns with Calor0417.
+            Fails with Calor0410 and warns with Calor0200.
 
             ```calor group=g expect=Calor0410
             module Handler
-              func HandleRequest () → void
+              func HandleRequest (System.Type:kind) → void
+                !
                 SaveOrder()
             ```
             """;
         var finding = Assert.Single(Check(page));
         Assert.Equal(DiagnosticCode.DocDriftWebsiteExampleMismatch, finding.Code);
-        Assert.Contains("Calor0417", finding.Message);
-        Assert.Empty(Check(page.Replace("expect=Calor0410", "expect=Calor0410,Calor0417")));
+        Assert.Contains("Calor0200", finding.Message);
+        Assert.Empty(Check(page.Replace("expect=Calor0410", "expect=Calor0410,Calor0200")));
     }
 
     [Fact]
@@ -325,11 +328,12 @@ public sealed class WebsiteExampleCheckerTests
                 ! db:w
             ```
 
-            Handler fails with Calor0410 and warns with Calor0417.
+            Handler fails with Calor0410 and warns with Calor0200.
 
-            ```calor group=g expect=Calor0410,Calor0417
+            ```calor group=g expect=Calor0410,Calor0200
             module Handler
               func HandleRequest () → void
+                !
                 SaveOrder()
               func Flush (DbContext:context) → void
                 ! db:w
@@ -356,14 +360,15 @@ public sealed class WebsiteExampleCheckerTests
         // Review round 2, finding 3: Orders expects only a warning, yet its generated C# is
         // broken; the lexer-negative member suppresses validation for the whole group.
         const string page = """
-            Orders warns with Calor0417.
+            Orders warns with Calor0200.
 
-            ```calor group=g expect=Calor0417
+            ```calor group=g expect=Calor0200
             module Orders
               func Save (DbContext:context) → void
                 ! db:w
                 return
               func Version () → int
+                !
                 return 1
             ```
 
@@ -388,14 +393,15 @@ public sealed class WebsiteExampleCheckerTests
         // Review round 2, finding 5: the retry keeps warning-only members, so a caller that
         // depends on one still resolves.
         const string page = """
-            Warns with Calor0417.
+            Warns with Calor0200.
 
-            ```calor group=g expect=Calor0417
+            ```calor group=g expect=Calor0200
             module Store
               func Save () → int
                 !
                 return 1
-              func Version () → int
+              func Version (System.Type:kind) → int
+                !
                 return 2
             ```
 
@@ -514,7 +520,7 @@ public sealed class WebsiteExampleCheckerTests
     [Theory]
     [InlineData("contracts", "x >= 0", "missing >= 0")]
     [InlineData("effects", "! db:rw,net:rw", "! db:rw,net:rw\nMissingType.Save()")]
-    [InlineData("stableId", "func Process () → void\n  !", "func Process (MissingType:x) → void\n  !")]
+    [InlineData("stableId", "func Process () → void", "func Process (MissingType:x) → void")]
     public void Landing_MutatedDisplayedCodeFails(string id, string original, string replacement)
     {
         var (source, components) = LandingInputs();
@@ -733,17 +739,21 @@ public sealed class WebsiteExampleCheckerTests
     // #1619: named static-container example and the corrected native W1-F6 Counter output.
     // #1600: current-language.mdx adds one page and 82 actually compiled complete examples.
     // Native records add one complete constructor/default/copy example.
-    private const string Pinned = "pages=98 complete=152 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
+    // 0.30 native syntax: pages moved to native examples that now count as complete programs
+    // (complete 152 -> 275, negative 7 -> 23, illustrative 34 -> 31), mostly in the syntax
+    // reference and current-language pages rewritten between the cutover and the 3b439c47a
+    // checkpoint. Re-pinned in the 0.30 stale-test triage; no page is skipped.
+    private const string Pinned = "pages=98 complete=275 negative=23 grouped=3 checkedOutputs=2 illustrative=31";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]
-    [InlineData("guides/cross-module-effect-propagation.mdx", "expect=Calor0410,Calor0417", "expect=Calor0410")]
+    [InlineData("guides/cross-module-effect-propagation.mdx", "```calor group=orders expect=Calor0410\n", "```calor group=orders\n")]
     [InlineData("guides/dependent-types-tutorial.mdx", "(int:balance, int:amount) → int\n    !\n    requires balance >= 0\n    requires amount > 0\n    requires balance >= amount", "(int:balance, int:amount) → string\n    !\n    requires balance >= 0\n    requires amount > 0\n    requires balance >= amount")]
     [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\nmodule TokenHello\n",
         "```calor\nmodule TokenHello\nnamespace Name\n")]
     [InlineData("syntax-reference/structure-tags.mdx", "      if i > 1\n", "      if missing > 1\n")]
-    [InlineData("cli/compile.mdx", "error Calor0200: Undefined variable 'x'", "error Calor0200: Undefined variable 'y'")]
-    [InlineData("guides/cross-module-effect-propagation.mdx", "warning Calor0417: Public function 'HandleRequest'", "warning Calor0417: Public function 'HandleRequests'")]
+    [InlineData("cli/compile.mdx", "Calor0200 Undefined variable 'x'", "Calor0200 Undefined variable 'y'")]
+    [InlineData("guides/cross-module-effect-propagation.mdx", "error Calor0410: Function 'HandleRequest'", "error Calor0410: Function 'HandleRequests'")]
     public void PublishedWebsite_MutatedExampleIsCaught(string page, string original, string mutated)
     {
         var root = CliTestHarness.FindRepoRoot();

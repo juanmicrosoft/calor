@@ -735,6 +735,10 @@ public sealed class BinderErrorEmissionCatalogTests
             var path = helperPath.Add(display);
             if (method.Name is "Add" or "AddRange")
                 return [AnalyzeForwarder(invocation, model, method, path)];
+            // 922e0882b: ImportMatchingFixes only attaches a carried fix to a diagnostic that
+            // is already in the bag (same code, span, severity and file); it reports nothing.
+            if (method.Name is "ImportMatchingFixes")
+                return [];
 
             if (TryAnalyzePrimitiveReport(invocation, model, method, substitutions, path, out var primitive))
                 return primitive is null ? [] : [primitive];

@@ -301,7 +301,9 @@ public class UnsafeLowLevelRoundtripTests
                     }
                 }
             }
-            """, "fixed int*:ptr = arr");
+            """, "fixed (int* ptr = arr)");
+        // 0.30 (af5d914ab): a pointer dereference keeps its member as C#, so the fixed
+        // statement survives verbatim inside the preserved member.
 
         Assert.Contains("fixed", csharp);
     }

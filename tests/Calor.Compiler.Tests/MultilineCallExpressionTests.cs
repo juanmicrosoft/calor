@@ -153,9 +153,11 @@ public class MultilineCallExpressionTests
                 .Select(binding => binding.Initializer).ToArray();
             var constructor = Assert.Single(initializers.OfType<NewExpressionNode>());
             Assert.Equal(2, constructor.Arguments.Count);
-            var call = constructor.Arguments[0] as CallExpressionNode
-                ?? Assert.Single(initializers.OfType<CallExpressionNode>());
-            Assert.Equal("Math.Max", call.Target);
+            // A dotted native call is an expression call on a member access (`Math.Max`).
+            var call = Assert.IsType<ExpressionCallNode>(constructor.Arguments[0]);
+            var member = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+            Assert.Equal("Max", member.FieldName);
+            Assert.Equal("Math", Assert.IsType<ReferenceNode>(member.Target).Name);
             Assert.Equal(new[] { 3L, 7L }, call.Arguments.Select(arg => Assert.IsType<IntLiteralNode>(arg).Value));
             Assert.Equal(9, Assert.IsType<IntLiteralNode>(constructor.Arguments[1]).Value);
         }

@@ -329,13 +329,15 @@ module Test Test block
 module Test Test block
   func Test (bool:a, bool:b) → int
     !
+    var int:result = 0
     if a
       if b
-        return 2
+        set result 2
       else
-        return 1
+        set result 1
     else
-      return 0
+      set result 0
+    return result
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));

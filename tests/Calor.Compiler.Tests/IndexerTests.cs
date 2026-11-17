@@ -42,7 +42,7 @@ public class IndexerTests
         Assert.Equal(Visibility.Public, indexer.Visibility);
         Assert.Single(indexer.Parameters);
         Assert.Equal("index", indexer.Parameters[0].Name);
-        Assert.Equal("INT", indexer.Parameters[0].TypeName); // ExpandType maps "int" -> "INT"
+        Assert.Equal("int", indexer.Parameters[0].TypeName);
         Assert.NotNull(indexer.Getter);
         Assert.NotNull(indexer.Setter);
     }

@@ -495,7 +495,7 @@ public class LanguageFeatureTests
         Assert.False(diag.HasErrors);
         var isNode = FindExpression<IsPatternNode>(module);
         Assert.NotNull(isNode);
-        Assert.Equal("Dictionary<string, List<int>>", isNode.TargetType);
+        Assert.Equal("Dictionary<string,List<int>>", isNode.TargetType);
 
         var code = CompileToCode(source);
         Assert.Contains("x is Dictionary<string, List<int>>", code);
@@ -514,7 +514,7 @@ public class LanguageFeatureTests
         Assert.False(diag.HasErrors);
         var asNode = FindExpression<TypeOperationNode>(module);
         Assert.NotNull(asNode);
-        Assert.Equal("Dictionary<string, List<int>>", asNode.TargetType);
+        Assert.Equal("Dictionary<string,List<int>>", asNode.TargetType);
 
         var code = CompileToCode(source);
         Assert.Contains("x as Dictionary<string, List<int>>", code);
@@ -653,7 +653,7 @@ public class LanguageFeatureTests
     {
         var source = """
             module Test Test block
-              func Run (object:x) → string
+              func Run (object:x) → string?
                 !
                 return x.ToString()
             """;

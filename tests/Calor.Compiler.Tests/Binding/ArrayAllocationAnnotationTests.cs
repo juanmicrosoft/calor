@@ -388,14 +388,43 @@ public sealed class ArrayAllocationAnnotationTests
         => AssertNullableArrayRejected(type, boundary, initializedLocal: false);
 
     [Theory]
-    [InlineData("string[]?", "binding")]
-    [InlineData("string[]?", "return")]
-    [InlineData("string[]?", "input")]
     [InlineData("string?[]", "binding")]
     [InlineData("string?[]", "return")]
     [InlineData("string?[]", "input")]
     public void ExplicitNullableLocalAnnotation_RemainsRejected(string type, string boundary)
         => AssertNullableArrayRejected(type, boundary, initializedLocal: true);
+
+    // 4d7a36e3d (0.30): a `let` initialized with a non-null array narrows only its current
+    // container; the declared annotation and the element annotations are kept, and writes,
+    // loop back edges and mutable captures invalidate the fact. So `string[]?` initialized
+    // with `new string[3]` now reaches a non-null container boundary, as in C# flow analysis.
+    [Theory]
+    [InlineData("binding")]
+    [InlineData("return")]
+    [InlineData("input")]
+    public void InitializedNullableArrayContainer_IsNarrowedByItsNonNullInitializer(string boundary)
+    {
+        var sink = boundary switch
+        {
+            "binding" => "let string[]:required = values",
+            "return" => "return values",
+            _ => "Take(values)"
+        };
+        var result = Program.Compile($$"""
+            module NullableArray
+              func Take public (string[]:value) → void
+                !
+              func Probe public () → {{(boundary == "return" ? "string[]" : "void")}}
+                ! alloc
+                let string[]?:values = new string[3]
+                {{sink}}
+            """, "nullable-array.calr");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code is
+            DiagnosticCode.NullableToNonNullableBinding
+            or DiagnosticCode.NullableReturnFromNonNullable
+            or DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+    }
 
     private static void AssertNullableArrayRejected(string type, string boundary, bool initializedLocal)
     {

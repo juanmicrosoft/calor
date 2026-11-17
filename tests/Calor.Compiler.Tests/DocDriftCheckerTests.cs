@@ -91,50 +91,61 @@ public class DocDriftCheckerTests
     [Theory]
     [InlineData("calls.mdx", 3, 1, new[] { "CallExamples", "RefOutDemo" }, new[] { "9", "44" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()" })]
-    [InlineData("binding.mdx", 8, 6, new[] { "BindingExamples", "ExplicitBindings" }, new[] { "150", "16" },
+    [InlineData("binding.mdx", 10, 8, new[] { "BindingExamples", "ExplicitBindings" }, new[] { "150", "16" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()" })]
     [InlineData("types.mdx", 6, 2, new[] { "ArrayTypes", "NullableFallback", "Division", "CollectionTypes" },
         new[] { "6", "anonymous", "42", "51" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
-    [InlineData("control-flow.mdx", 10, 0,
+    [InlineData("control-flow.mdx", 11, 0,
         new[] { "RangeSnapshots", "ReevaluatedLoops", "WhileAndDo", "DictionaryIteration", "LoopExits", "FizzBuzz",
-            "Example", "EarlyReturn", "HttpStatus", "MatchBlocks" },
-        new[] { "33", "4", "31", "55", "5", "FizzBuzz:Fizz:Buzz:7", "3", "120", "Not Found:A:large positive", "two" },
+            "Example", "EarlyReturn", "HttpStatus", "MatchBlocks", "IteratorValues" },
+        new[] { "33", "4", "31", "55", "5", "FizzBuzz:Fizz:Buzz:7", "3", "120", "Not Found:A:large positive", "two", "3" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()",
-            "GlobalModule.Classify(15) + \":\" + GlobalModule.Classify(3) + \":\" + GlobalModule.Classify(5) + \":\" + GlobalModule.Classify(7)",
-            "GlobalModule.CountEvens(6)", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Word(2)" })]
+            "((System.Func<string>)(() => { var previous = System.Console.Out; using var output = new System.IO.StringWriter(); try { System.Console.SetOut(output); GlobalModule.PrintOne(15); GlobalModule.PrintOne(3); GlobalModule.PrintOne(5); GlobalModule.PrintOne(7); return output.ToString().Replace(System.Environment.NewLine, \":\").TrimEnd(':'); } finally { System.Console.SetOut(previous); } }))()",
+            "GlobalModule.CountEvens(6)", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Word(2)",
+            "GlobalModule.Main()" })]
     [InlineData("inheritance.mdx", 8, 0,
         new[] { "ClassModifiers", "VirtualDispatch", "InterfaceInheritance", "InterfaceDispatch", "SealedOverride", "BaseMethods",
             "BaseConstructors", "ShapeHierarchy" },
-        new[] { "59", "Woof!", "...:Rex:7", "9", "42", "15", "Rex:Collie", "Circle with area 78.53975" },
+        new[] { "59", "Woof!", "(..., Rex, 7)", "9", "42", "15", "Rex:Collie", "(Circle, 78.53975)" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()",
             "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Demo()" })]
-    [InlineData("string-operations.mdx", 5, 1,
-        new[] { "StringBasics", "StringComparisons", "TextTools", "Receipt" },
-        new[] { "11:HELLO WORLD:ell:hello Calor", "True:True:6:True", "True:True:Cat", "coffee  |      3.50|7.0:${x}" },
-        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" })]
-    [InlineData("contracts.mdx", 4, 0,
-        new[] { "ContractDivide", "AbsoluteValue", "ContractClamp", "NonEmptyCollection" },
-        new[] { "4", "5", "15", "42" },
-        new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Abs(-5)", "GlobalModule.Main()",
-            "GlobalModule.First(new int[] { 42 })" })]
-    [InlineData("index.mdx", 2, 0,
-        new[] { "LabelExample", "FizzBuzz" }, new[] { "42", "FizzBuzz:Fizz:Buzz:7" },
-        new[] { "Demo.DemoModule.Main()", "GlobalModule.Main()" })]
-    [InlineData("expressions.mdx", 5, 0,
-        new[] { "ExpressionPrecedence", "ArithmeticBehavior", "ComparisonExpressions", "ExpressionEvaluation",
-            "CollectionExpressions" },
-        new[] { "14:20:5:4:8:2:5:5:True:11:2", "42:-2:-1", "True:False:True:False:False:True",
-            "False:True:True:True:5:7:8:100:6:3:4:5:8:9:10", "True:True:True:1:5" },
+    [InlineData("string-operations.mdx", 6, 1,
+        new[] { "StringBasics", "StringComparisons", "TextTools", "StringHoles", "Receipt" },
+        new[] { "(11, HELLO WORLD, e, hello world!)", "True:True:6:True", "True:True:Cat", "hello Calor:${x}",
+            "coffee  |      3.50|7.0:${x}" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()" })]
-    [InlineData("refinement-types.mdx", 5, 0,
-        new[] { "PortConstraint", "TextConstraint", "TransferConstraint", "ConstraintBoundary", "TransferProof" },
-        new[] { "443", "5", "7", "-1", "7" },
+    [InlineData("contracts.mdx", 8, 0,
+        new[] { "ContractDivide", "AbsoluteValue", "ContractClamp", "NonEmptyCollection", "FunctionCallBoundary",
+            "MatrixSymmetry", "NonNegativeArray", "ArraySearch" },
+        new[] { "4", "5", "15", "42", "1", "True", "True", "2" },
+        new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Abs(-5)", "GlobalModule.Main()",
+            "GlobalModule.First(new int[] { 42 })", "GlobalModule.Identity(1)",
+            "GlobalModule.CheckSymmetric(new int[,] { { 1, 2 }, { 2, 1 } }, 2)",
+            "GlobalModule.ProcessArray(new int[] { 1, 2 }, 2)", "GlobalModule.Find(new int[] { 4, 5, 6 }, 6)" })]
+    [InlineData("index.mdx", 3, 0,
+        new[] { "LabelExample", "DocumentedArithmetic", "FizzBuzz" }, new[] { "42", "42", "100:Fizz:FizzBuzz" },
+        new[] { "Demo.DemoModule.Main()", "GlobalModule.Add(20, 22)",
+            "((System.Func<string>)(() => { var previous = System.Console.Out; using var output = new System.IO.StringWriter(); try { System.Console.SetOut(output); GlobalModule.Main(); var lines = output.ToString().Split(System.Environment.NewLine, System.StringSplitOptions.RemoveEmptyEntries); return lines.Length + \":\" + lines[2] + \":\" + lines[14]; } finally { System.Console.SetOut(previous); } }))()" })]
+    [InlineData("expressions.mdx", 7, 0,
+        new[] { "ExpressionPrecedence", "ArithmeticBehavior", "OverflowExpressions", "ComparisonExpressions",
+            "ExpressionEvaluation", "ArrayDimensions", "CollectionExpressions" },
+        new[] { "(14, 20, 5, 4, 8, 2, 5, 5, True, 11, 2)", "(42, -2, -1)", "-2147483648:42",
+            "True:False:True:False:False:True", "(False, True, True, True):(5, 7, 8, 100):3,4,5,8,9,10", "3",
+            "(True, True, True, 1, 5)" },
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()",
+            "GlobalModule.Wrap(int.MaxValue) + \":\" + GlobalModule.Narrow(42L)", "GlobalModule.Main()",
+            "((System.Func<string>)(() => { var r = GlobalModule.Main(); return r.Item1 + \":\" + r.Item2 + \":\" + string.Join(\",\", r.Item3); }))()", "GlobalModule.Main()", "GlobalModule.Main()" })]
+    [InlineData("refinement-types.mdx", 7, 0,
+        new[] { "PortConstraint", "TextConstraint", "TransferConstraint", "ConstraintBoundary", "TransferProofAtPoint",
+            "TransferProof", "ArrayIndexConstraint" },
+        new[] { "443", "5", "7", "-1", "7", "7", "5" },
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
-            "GlobalModule.Transfer(10, 3)" })]
+            "GlobalModule.Transfer(10, 3)", "GlobalModule.Transfer(10, 3)",
+            "GlobalModule.At(new int[] { 4, 5, 6 }, 1)" })]
     [InlineData("cli/convert.mdx", 4, 0,
         new[] { "Counter", "Probe", "Countdown", "Grids" }, new[] { "1", "3", "3,2,1", "13" },
         new[] { "new Counter().Next()", "Probe.UseShadow()", "System.String.Join(\",\", new Countdown().Steps)",
@@ -229,14 +240,15 @@ public class DocDriftCheckerTests
                 finally { System.Console.SetOut(previousOutput); }
             }))()
             """ })]
-    [InlineData("structure-tags.mdx", 22, 1,
-        new[] { "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
+    [InlineData("structure-tags.mdx", 23, 1,
+        new[] { "Legacy", "StructureModules", "BlockNamespace", "FunctionHeaders", "AsyncFunctions", "AsyncMethods",
             "AwaitExpressions", "ConfigureAwaitLimit", "LambdaExamples", "AsyncLambdas", "LocalCallables", "DelegateDefinitions",
             "EnumDefinitions", "EnumExtensions", "EnumReceiverLimit", "EscapedEnumLimit", "EventDefinitions", "ParameterArrays", "ArrayDeclarations",
             "IndentedBlocks", "GenericDeclarations", "AttributeDeclarations" },
-        new[] { "42", "42", "10", "21:7:9", "42", "42", "42", "24", "42", "3", "5", "True",
+        new[] { "null", "42", "42", "10", "21:7:9", "42", "42", "42", "24", "42", "3", "5", "True",
             "#FF0000:True", "#FF0000", "7", "0", "7", "2:7", "15", "42", "7" },
-        new[] { "Demo.DemoModule.Main()", "new Demo.Tools.Box().Read()", "GlobalModule.Main()",
+        new[] { "GlobalModule.Find(\"k\") ?? \"null\"", "Demo.DemoModule.Main()", "new Demo.Tools.Box().Read()",
+            "GlobalModule.Main()",
             "GlobalModule.Read().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitTask().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitValueTask().GetAwaiter().GetResult()",
             "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Main().GetAwaiter().GetResult()",
             "GlobalModule.Read().GetAwaiter().GetResult()",
@@ -799,7 +811,7 @@ public class DocDriftCheckerTests
     [Theory]
     [InlineData("41", "42")]
     [InlineData("int.MaxValue", "!OverflowException")]
-    public void MarkdownSemanticsVersioning_UsesInstalledRulesWithoutInventingASourceGate(
+    public void MarkdownSemanticsVersioning_DeclaresTheInstalledSemanticsVersion(
         string input, string expected)
     {
         const string path = "docs/semantics/versioning.md";
@@ -810,7 +822,8 @@ public class DocDriftCheckerTests
         {
             var compiled = Program.Compile(source, path, new CompilationOptions { ContractMode = mode });
             Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
-            Assert.Null(Assert.IsType<Ast.ModuleNode>(compiled.Ast).DeclaredSemanticsVersion);
+            // The native `semver "2.0.0"` declaration was restored in 49a31a175.
+            Assert.Equal("2.0.0", Assert.IsType<Ast.ModuleNode>(compiled.Ast).DeclaredSemanticsVersion);
             var observed = InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + $$"""
 
                 public static class Probe

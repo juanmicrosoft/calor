@@ -83,7 +83,7 @@ public class Issue766DeclarationModuleSemanticsTests
 
         var conditional = new CSharpEmitter().Emit(Parse(
             """
-            module ConditionalUsing ConditionalUsing block
+            module ConditionalUsing
               pp FEATURE
                 global using System.Text
                 using Buffers = System.Buffers
@@ -1234,17 +1234,16 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.True(
             explicitResult.Success,
             string.Join("; ", explicitResult.Issues.Select(issue => issue.Message)));
-        var explicitMethod = Assert.Single(
-            Assert.Single(
-                explicitResult.Ast!.Classes.Where(type => type.Name == "Explicit"))
-            .Methods);
-        Assert.Equal("IExplicit.Echo", explicitMethod.Name);
-        Assert.Equal(
-            TypeConstraintKind.Default,
-            Assert.Single(explicitMethod.TypeParameters[0].Constraints).Kind);
+        // 0.30 native syntax has no explicit-interface method form (015ee950f), so the
+        // member is preserved as its original C#, constraint included.
+        var explicitType = Assert.Single(
+            explicitResult.Ast!.Classes.Where(type => type.Name == "Explicit"));
+        Assert.Empty(explicitType.Methods);
+        Assert.Contains("T? IExplicit.Echo<T>(T? value) where T : default", explicitResult.CalorSource);
 
         var generated = CompileConvertedCalor(explicitResult);
         Assert.Contains("IExplicit.Echo<T>", generated);
+        Assert.Contains("where T : default", generated);
         Assert.DoesNotContain("private T? IExplicit.Echo<T>", generated);
         var validation = GeneratedCSharpCompiler.Validate(generated);
         Assert.True(
@@ -1325,24 +1324,10 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.True(
             conversion.Success,
             string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
-        var sender = Assert.Single(
-            conversion.Ast!.Interfaces.Where(type => type.Name == "ISender"));
-        Assert.Collection(
-            sender.Methods,
-            method => Assert.Equal(
-                "IRequest",
-                Assert.Single(method.TypeParameters[0].Constraints).TypeName),
-            method => Assert.Equal(
-                "IRequest<TResponse>",
-                Assert.Single(method.TypeParameters[0].Constraints).TypeName));
-        var publisher = Assert.Single(
-            conversion.Ast.Interfaces.Where(type => type.Name == "IPublisher"));
-        Assert.Equal(
-            "INotification",
-            Assert.Single(
-                Assert.Single(publisher.Methods)
-                    .TypeParameters[0]
-                    .Constraints).TypeName);
+        // 0.30: `CancellationToken cancellationToken = default` has no native spelling
+        // (a non-primitive `default`, af5d914ab), so each of these members is preserved as
+        // its original C#. The constraints must still survive the round trip verbatim.
+        Assert.NotNull(conversion.Ast);
 
         Assert.Contains("where TRequest : IRequest", conversion.CalorSource);
         Assert.Contains(

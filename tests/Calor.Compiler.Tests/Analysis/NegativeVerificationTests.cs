@@ -504,7 +504,10 @@ module Test Test block
 module Test Test block
   func TestNone (string:maybeNull) → int
     !
-    return ((maybeNull != null) ? 1 : 0)";
+    if maybeNull != null
+      return 1
+    else
+      return 0";
 
         var bound = Bind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));

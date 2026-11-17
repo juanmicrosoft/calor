@@ -1,10 +1,10 @@
-§M{MatchTest}
-  §F{Describe:pub} (i32:n) -> str
-    §W n
-      §K 0
-        §R "zero"
-      §K 1
-        §R "one"
-      §K _
-        §R "other"
-
+module MatchTest
+  func Describe (int:n) → string
+    !
+    match n
+      case 0
+        return "zero"
+      case 1
+        return "one"
+      case _
+        return "other"

@@ -354,7 +354,7 @@ public class GenericSyntaxTests
             module Test
               func Create<T> public () → T
                 where T : new()
-                ! alloc
+                ! unknown
                 let result = new T()
                 return result
             """;

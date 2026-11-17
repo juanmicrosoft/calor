@@ -437,10 +437,32 @@ public sealed class TokenEconomicsActiveMirrorTests
             return Visit(scaffold.WithStatements(scaffold.Statements.Replace(loop, projected)));
         }
 
-        public override SyntaxNode? VisitIfStatement(IfStatementSyntax node) =>
-            node.Statement is ThrowStatementSyntax { Expression: ObjectCreationExpressionSyntax creation }
-                && creation.Type.ToString() == "Calor.Runtime.ContractViolationException"
-                ? null : base.VisitIfStatement(node);
+        public override SyntaxNode? VisitIfStatement(IfStatementSyntax node)
+        {
+            if (node.Statement is ThrowStatementSyntax { Expression: ObjectCreationExpressionSyntax creation }
+                && creation.Type.ToString() == "Calor.Runtime.ContractViolationException")
+                return null;
+            // Current policy (f81638a7a): `if c return L1 else return L2` with two literals of
+            // one type is emitted as the single conditional return `return c ? L1 : L2`.
+            if (node.Else is { Statement: var otherwise }
+                && SingleReturn(node.Statement) is LiteralExpressionSyntax whenTrue
+                && SingleReturn(otherwise) is LiteralExpressionSyntax whenFalse
+                && (whenTrue.Kind() == whenFalse.Kind()
+                    || IsBoolLiteral(whenTrue) && IsBoolLiteral(whenFalse)))
+                return Visit(SyntaxFactory.ReturnStatement(
+                    SyntaxFactory.ConditionalExpression(node.Condition, whenTrue, whenFalse)));
+            return base.VisitIfStatement(node);
+
+            static ExpressionSyntax? SingleReturn(StatementSyntax statement) => statement switch
+            {
+                ReturnStatementSyntax ret => ret.Expression,
+                BlockSyntax { Statements: [ReturnStatementSyntax ret] } => ret.Expression,
+                _ => null
+            };
+
+            static bool IsBoolLiteral(LiteralExpressionSyntax literal) =>
+                literal.IsKind(SyntaxKind.TrueLiteralExpression) || literal.IsKind(SyntaxKind.FalseLiteralExpression);
+        }
 
         public override SyntaxNode? VisitLocalDeclarationStatement(LocalDeclarationStatementSyntax node) =>
             node.Declaration.Variables is [{ Identifier.ValueText: "__result__" }]

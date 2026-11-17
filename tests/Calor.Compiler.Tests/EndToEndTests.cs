@@ -24,7 +24,7 @@ public class EndToEndTests
 
         // Verify generated code structure
         Assert.Contains("namespace Hello", result.GeneratedCode);
-        Assert.Contains("public static class HelloModule", result.GeneratedCode);
+        Assert.Contains("public static partial class HelloModule", result.GeneratedCode);
         Assert.Contains("public static void Main()", result.GeneratedCode);
         Assert.Contains("Console.WriteLine(\"Hello from Calor!\")", result.GeneratedCode);
     }

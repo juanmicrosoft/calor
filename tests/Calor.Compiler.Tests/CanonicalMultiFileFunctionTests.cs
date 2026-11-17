@@ -52,7 +52,10 @@ public sealed class CanonicalMultiFileFunctionTests
     [Fact]
     public void MissingCrossModuleEffectRowsSuggestOnlyTheNativeSyntax()
     {
-        var result = Program.Compile("module Orders\n  func SaveOrder () → int\n    !\n    return 41");
+        // A public function without a row is Calor0124 in 0.30; an internal one may omit its
+        // row (Calor0125 forbids only an own row on private bodies), and the cross-module
+        // registry still reports it as Calor0417. Its suggestion must teach the native row.
+        var result = Program.Compile("module Orders\n  func SaveOrder internal () → int\n    return 41");
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
         var registry = CrossModuleEffectRegistry.Build([(result.Ast!, "Orders.calr")]);
         var diagnostic = Assert.Single(registry.BuildDiagnostics,

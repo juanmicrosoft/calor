@@ -368,8 +368,9 @@ public class EnvelopeEarlyExitTests : IDisposable
         // parse error, and the formatter (correctly) declines to write a file it cannot parse,
         // which would make the test fail for a reason unrelated to the gate.
         var file = Path.Combine(_tempDir, "c.calr");
-        var misformatted = ValidSource.Replace("\u00a7M{T}\n", "\u00a7M{T}\n\n\n")
-                                      .Replace("-> void", "-> void   ");
+        var misformatted = ValidSource.Replace("module T T block\n", "module T T block\n\n\n")
+                                      .Replace("→ void", "→ void   ");
+        Assert.NotEqual(ValidSource, misformatted);
         File.WriteAllText(file, misformatted);
 
         var (exitCode, _, stdErr) = CliTestHarness.RunCli(

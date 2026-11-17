@@ -94,8 +94,9 @@ public class SyntaxLookupToolTests
         Assert.Contains("action=features", result.GetProperty("message").GetString());
     }
 
+    // "indexof" was dropped in 0.30: the primer_strings example now scans with a loop and no
+    // canonical string example calls IndexOf, so that query has no precise example to keep.
     [Theory]
-    [InlineData("indexof", "primer_strings")]
     [InlineData("postfix", "complete_postfix")]
     [InlineData("record", "complete_records")]
     public async Task PreciseExampleMatches_DoNotPadResponseWithUnrelatedSecondProgram(string query, string program)

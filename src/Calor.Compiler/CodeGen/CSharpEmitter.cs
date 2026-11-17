@@ -8417,8 +8417,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
         RegisterTypeDependencies(name);
 
-        var finalIdentifier = identifiers[^1];
-        if (finalIdentifier is
+        RegisterLinqMethodDependency(identifiers[^1]);
+    }
+
+    private void RegisterLinqMethodDependency(string methodName)
+    {
+        if (methodName is
             "Select" or "Where" or "Any" or "All" or "First" or
             "FirstOrDefault" or "OrderBy" or "OrderByDescending" or
             "GroupBy" or "ToList" or "ToArray" or "Count" or "Single" or
@@ -9218,6 +9222,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
             if (_boundCrossModuleCallTargets.TryGetValue(node.Span, out var boundTarget))
                 target = QualifyCrossModuleTarget(boundTarget);
         }
+        // A native member call (`items.Any(...)`) needs the same LINQ import as a dotted
+        // call target; without it the emitted extension call fails with CS1061.
+        if (node.TargetExpression is FieldAccessNode memberTarget)
+            RegisterLinqMethodDependency(memberTarget.FieldName);
         if (node.TypeArguments is { Count: > 0 })
             target += $"<{string.Join(", ", node.TypeArguments.Select(MapTypeName))}>";
         var args = EmitCallArguments(node.Arguments, node.ArgumentNames, node.ArgumentModifiers);

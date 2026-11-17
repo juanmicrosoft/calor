@@ -32,7 +32,7 @@ public class EmptyInterfaceSiblingParsingTests
     [InlineData("class Impl public\n    implements IMarker")]
     [InlineData("interface IOther\n    func Run () → void\n      !")]
     [InlineData("enum Mode public\n    Fast\n    Slow")]
-    [InlineData("delegate Handler (int:x) → bool\n  ! unknown")]
+    [InlineData("delegate Handler (int:x) → bool\n    ! unknown")]
     [InlineData("raw member 24\npublic class Sibling { }\n")]
     public void EmptyInterface_FollowedBySameColumnSibling_Parses(string sibling)
     {

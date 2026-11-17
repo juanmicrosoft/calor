@@ -232,8 +232,12 @@ public sealed class HelpTool : McpToolBase
             .Sum(k => 100 + k.Length);
         score += queryTerms.Count(t => ContainsTerm(name, t) || keywords.Any(k => ContainsTerm(k, t))) * 50;
         if (ContainsTerm(queryLower, name)) score += 500;
-        if (score == 0 && !queryTerms.Any(t => t.Length > 2
-            && ContainsTerm(construct.Description, t) && construct.Examples.Any(e => ContainsTerm(e.Calor, t))))
+        // With no name or keyword hit, prose admits a construct only when EVERY significant
+        // query term appears in both its description and an example. One shared word is
+        // not a match: `unknown_feature_xyz` must not land on the `! unknown` effect row.
+        var significantTerms = queryTerms.Where(t => t.Length > 2).ToArray();
+        if (score == 0 && (significantTerms.Length == 0 || !significantTerms.All(t =>
+                ContainsTerm(construct.Description, t) && construct.Examples.Any(e => ContainsTerm(e.Calor, t)))))
             return 0;
         // Program IDs and actual code help distinguish precise built-ins from
         // broad topic names; prose alone never admits an unrelated result.

@@ -56,7 +56,14 @@ public sealed class CanonicalClassPolicyTests
             }
             """);
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
-        var compiled = Program.Compile(conversion.CalorSource!);
+        // 0.30: constructors carry their own row, and the converter charges Owner's
+        // constructor the base constructor's cw (the base is a class despite its name).
+        var source = conversion.CalorSource!.Replace("\r\n", "\n");
+        var ownerCtor = source.LastIndexOf("ctor ()\n      ! cw", StringComparison.Ordinal);
+        Assert.True(ownerCtor > source.IndexOf("class Owner", StringComparison.Ordinal), source);
+        Assert.False(Program.Compile(source).HasErrors);
+        var withoutRow = source.Remove(ownerCtor, "ctor ()\n      ! cw".Length).Insert(ownerCtor, "ctor ()");
+        var compiled = Program.Compile(withoutRow);
         Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable
             && diagnostic.Message.Contains("'Owner.", StringComparison.Ordinal)
             && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));

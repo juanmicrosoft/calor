@@ -177,7 +177,7 @@ public class SymbolFinderTests
     public void CallReceiverAndCallee_ResolveAndReferenceExactIdentifierSpans()
     {
         const string source = """
-            module TestModule TestModule block
+            module TestModule
               class Worker
                 func Pick (int:value) → int
                   !

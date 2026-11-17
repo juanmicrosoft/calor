@@ -114,20 +114,15 @@ public class ExemplarCompilesTests
             Assert.DoesNotContain("§C{", text);
             if (program["id"]!.GetValue<string>() == "complete_linq")
             {
-                Assert.Contains("System.Collections.Generic.IEnumerable<int>:filtered", text);
-                Assert.Contains("System.Linq.Enumerable.ToArray<int>(filtered)", text);
+                // 0.30 rewrote this example as explicit loops over native arrays (3b439c47a);
+                // it no longer calls System.Linq. It must still compile with every effect
+                // resolved, and its result is pinned by the runtime rows below.
                 var result = Program.Compile(text);
                 Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
                 Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code is "Calor0410" or "Calor0411");
                 var diagnostics = new DiagnosticBag();
-                var bound = new Binding.Binder(diagnostics).Bind(Assert.IsType<Ast.ModuleNode>(result.Ast));
+                new Binding.Binder(diagnostics).Bind(Assert.IsType<Ast.ModuleNode>(result.Ast));
                 Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
-                var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound)
-                    .OfType<BoundCallExpression>(), call => call.ResolvedMethodName == "ToArray");
-                var method = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(call.ResolvedMetadataMethod);
-                Assert.Equal("System.Linq.Enumerable", method.ContainingType.ToDisplayString());
-                Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_Int32, Assert.Single(method.TypeArguments).SpecialType);
-                Assert.False(call.HasUnknownInferredType);
             }
         }
     }

@@ -188,9 +188,10 @@ module Test Test block
     #region 3. Null-Coalescing Assignment ??=
 
     [Fact]
-    public void NullCoalesceAssignment_CSharpConversion_ProducesCompoundAssignment()
+    public void NullCoalesceAssignment_CSharpConversion_ProducesNullCheckAndSet()
     {
-        // Convert `x ??= y` from C# and verify it produces a CompoundAssignment with NullCoalesce operator
+        // 0.30 has no authored `??=` (current-language: "use a null check and set"), so
+        // `x ??= y` converts to `if (!(x is object))` guarding `set x y`.
         var result = _converter.Convert(@"
 public class Cache
 {
@@ -204,10 +205,11 @@ public class Cache
         Assert.True(result.Success, GetErrorMessage(result));
 
         var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
-        // Should have a compound assignment statement
-        var compoundAssign = method.Body.OfType<CompoundAssignmentStatementNode>().FirstOrDefault();
-        Assert.NotNull(compoundAssign);
-        Assert.Equal(CompoundAssignmentOperator.NullCoalesce, compoundAssign!.Operator);
+        Assert.Empty(method.Body.OfType<CompoundAssignmentStatementNode>());
+        var guard = Assert.IsType<IfStatementNode>(Assert.Single(method.Body));
+        var set = Assert.IsType<AssignmentStatementNode>(Assert.Single(guard.ThenBody));
+        Assert.Contains("_value", set.Target.Accept(new CalorEmitter()));
+        Assert.Contains("if (!(_value is object))", result.CalorSource);
     }
 
     [Fact]
@@ -233,10 +235,9 @@ public class Cache
             EnforceEffects = false
         });
         Assert.False(compileResult.HasErrors, FormatDiagnostics(compileResult));
-        // The round-trip may emit either ??= or the expanded form x = x ?? fallback
-        Assert.True(
-            compileResult.GeneratedCode!.Contains("??=") || compileResult.GeneratedCode.Contains("?? "),
-            "Expected null-coalescing assignment or null-coalesce expression in output");
+        // 0.30 converts `??=` to a null check and set, which compiles back to the same guard.
+        Assert.Contains("is object", compileResult.GeneratedCode);
+        Assert.Contains("_value = fallback;", compileResult.GeneratedCode);
     }
 
     #endregion

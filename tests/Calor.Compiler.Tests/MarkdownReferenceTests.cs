@@ -11,7 +11,7 @@ public class MarkdownReferenceTests
     [InlineData("binding", 10, 8,
         new[] { "GlobalModule.Main()", "GlobalModule.Main()" }, new[] { "150", "16" })]
     [InlineData("calls", 3, 1,
-        new[] { "GlobalModule.Main()", "GlobalModule.Main()" }, new[] { "9", "42" })]
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()" }, new[] { "9", "44" })]
     [InlineData("contracts", 8, 0,
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Abs(-5)", "GlobalModule.Main()",
             "GlobalModule.First(new int[] { 42 })", "GlobalModule.Identity(1)",
@@ -21,7 +21,7 @@ public class MarkdownReferenceTests
     [InlineData("control-flow", 11, 0,
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Main()",
-            "GlobalModule.Classify(15) + \":\" + GlobalModule.Classify(3) + \":\" + GlobalModule.Classify(5) + \":\" + GlobalModule.Classify(7)",
+            "((System.Func<string>)(() => { var previous = System.Console.Out; using var output = new System.IO.StringWriter(); try { System.Console.SetOut(output); GlobalModule.PrintOne(15); GlobalModule.PrintOne(3); GlobalModule.PrintOne(5); GlobalModule.PrintOne(7); return output.ToString().Replace(System.Environment.NewLine, \":\").TrimEnd(':'); } finally { System.Console.SetOut(previous); } }))()",
             "GlobalModule.CountEvens(6)", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Word(2)",
             "GlobalModule.Main()" },
         new[] { "33", "4", "31", "55", "5", "FizzBuzz:Fizz:Buzz:7", "3", "120",
@@ -30,25 +30,28 @@ public class MarkdownReferenceTests
         new[] { "GlobalModule.Apply(x => x + 1, 41)", "GlobalModule.Use(x => x + 1, 41)(1)",
             "GlobalModule.Twice(x => x + 1, 40)", "GlobalModule.Encode(\"a b&c\")" },
         new[] { "42", "2", "42", "a+b%26c" })]
-    [InlineData("expressions", 6, 0,
-        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
-            "GlobalModule.Main()", "GlobalModule.Main()" },
-        new[] { "14:20:5:4:8:2:5:5:True:11:2", "42:-2:-1", "True:False:True:False:False:True",
-            "False:True:True:True:5:7:8:100:6:3:4:5:8:9:10", "3", "True:True:True:1:5" })]
+    [InlineData("expressions", 7, 0,
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()",
+            "GlobalModule.Wrap(int.MaxValue) + \":\" + GlobalModule.Narrow(42L)", "GlobalModule.Main()",
+            "((System.Func<string>)(() => { var r = GlobalModule.Main(); return r.Item1 + \":\" + r.Item2 + \":\" + string.Join(\",\", r.Item3); }))()", "GlobalModule.Main()", "GlobalModule.Main()" },
+        new[] { "(14, 20, 5, 4, 8, 2, 5, 5, True, 11, 2)", "(42, -2, -1)", "-2147483648:42",
+            "True:False:True:False:False:True", "(False, True, True, True):(5, 7, 8, 100):3,4,5,8,9,10", "3",
+            "(True, True, True, 1, 5)" })]
     [InlineData("index", 3, 0,
         new[] { "Demo.DemoModule.Main()", "GlobalModule.Add(20, 22)",
-            "GlobalModule.Classify(15) + \":\" + GlobalModule.Classify(3) + \":\" + GlobalModule.Classify(5) + \":\" + GlobalModule.Classify(7)" },
-        new[] { "42", "42", "FizzBuzz:Fizz:Buzz:7" })]
-    [InlineData("refinement-types", 6, 0,
+            "((System.Func<string>)(() => { var previous = System.Console.Out; using var output = new System.IO.StringWriter(); try { System.Console.SetOut(output); GlobalModule.Main(); var lines = output.ToString().Split(System.Environment.NewLine, System.StringSplitOptions.RemoveEmptyEntries); return lines.Length + \":\" + lines[2] + \":\" + lines[14]; } finally { System.Console.SetOut(previous); } }))()" },
+        new[] { "42", "42", "100:Fizz:FizzBuzz" })]
+    [InlineData("refinement-types", 7, 0,
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
-            "GlobalModule.Transfer(10, 3)", "GlobalModule.At(new int[] { 4, 9 }, 1)" },
-        new[] { "443", "5", "7", "-1", "7", "9" })]
-    [InlineData("string-operations", 5, 1,
-        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" },
-        new[] { "11:HELLO WORLD:ell:hello Calor", "True:True:6:True", "True:True:Cat",
+            "GlobalModule.Transfer(10, 3)", "GlobalModule.Transfer(10, 3)", "GlobalModule.At(new int[] { 4, 9 }, 1)" },
+        new[] { "443", "5", "7", "-1", "7", "7", "9" })]
+    [InlineData("string-operations", 6, 1,
+        new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()",
+            "GlobalModule.Main()" },
+        new[] { "(11, HELLO WORLD, e, hello world!)", "True:True:6:True", "True:True:Cat", "hello Calor:${x}",
             "coffee  |      3.50|7.0:${x}" })]
-    [InlineData("structure-tags", 22, 1,
-        new[] { "Demo.DemoModule.Main()", "new Demo.Tools.Box().Read()", "GlobalModule.Main()",
+    [InlineData("structure-tags", 23, 1,
+        new[] { "GlobalModule.Find(\"k\") ?? \"null\"", "Demo.DemoModule.Main()", "new Demo.Tools.Box().Read()", "GlobalModule.Main()",
             "GlobalModule.Read().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitTask().GetAwaiter().GetResult() + \":\" + GlobalModule.ExplicitValueTask().GetAwaiter().GetResult()",
             "GlobalModule.Main().GetAwaiter().GetResult()", "GlobalModule.Main().GetAwaiter().GetResult()",
             "GlobalModule.Read().GetAwaiter().GetResult()", "GlobalModule.Main()",
@@ -57,7 +60,7 @@ public class MarkdownReferenceTests
             "new SubscriptionCounter().Count", "GlobalModule.Main()",
             "new DataProcessor().ProcessData(new string[] { \"a\", \"b\" }) + \":\" + GlobalModule.First(new int[][] { new int[] { 7 } })",
             "GlobalModule.Main()", "GlobalModule.Main()", "new Data().Read()" },
-        new[] { "42", "42", "10", "21:7:9", "42", "42", "42", "24", "42", "3", "5", "True",
+        new[] { "null", "42", "42", "10", "21:7:9", "42", "42", "42", "24", "42", "3", "5", "True",
             "#FF0000:True", "#FF0000", "7", "0", "7", "2:7", "15", "42", "7" })]
     [InlineData("types", 6, 2,
         new[] { "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()", "GlobalModule.Main()" },

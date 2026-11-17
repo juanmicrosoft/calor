@@ -54,6 +54,21 @@ public class BinderIncompleteRatchetTests
             ["tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"] =
                 "error fixture (NOTE: currently fails on Calor0830 legacy closers, not the " +
                 "mismatched ids it was built for — stale in its own way, see #901's pattern)",
+            // 0.30 native-syntax cutover: these checked-in files are still written in the
+            // retired `§` syntax and have no active-syntax mirror, so the parser rejects them
+            // (Calor0006). Migrating or deleting them belongs to their owning suites.
+            ["tests/Calor.Conversion.Tests/Snapshots/02-03.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/02-04.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/04-01.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/04-02.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/04-04.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/11-02.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/13-01.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/13-07.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/E2E/agent-tasks/fixtures/refactor-signature-calor/Signature.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/E2E/scenarios/07_collections/output.g.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
         };
 
     private static string RepoRoot()

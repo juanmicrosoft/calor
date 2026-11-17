@@ -332,7 +332,7 @@ public class FeatureCheckCommandTests
     [Theory]
     [InlineData("public static object Run() => global::System.EventArgs.Empty;", "alias-qualified-value")]
     [InlineData("public static object Run() { string? text = null; return text!.Length; }", "null-forgiving-expression")]
-    [InlineData("public static object Run() { System.Text.StringBuilder value; value = new System.Text.StringBuilder(); return value.Length; }", "default-expression")]
+    [InlineData("public enum Level { Low, High } public static object Run() { Level value; value = Level.High; return (int)value; }", "default-expression")]
     [InlineData("public static object Run() { var values = new System.Collections.Generic.Dictionary<int,int> { [1] = 2, [1] = 3 }; return values[1]; }", "dictionary-initializer")]
     [InlineData("public static bool Enabled { get; } = !System.AppContext.TryGetSwitch(\"Calor.Shape.Absent\", out var enabled) || enabled;", "conditional-expression-hoisting")]
     [InlineData("public static object Run() { int[] values = {1, 2}; var query = from value in values let next = value + 1 select next; return System.Linq.Enumerable.Sum(query); }", "linq-query")]

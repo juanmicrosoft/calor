@@ -214,10 +214,11 @@ public class BinderArrayCollectionFamilyTests
         // produce the actual Calor0920 through the full pipeline, not merely a subtree.
         const string source = @"
 module Test Test block
-  func Trap () → void
-    ! cw, alloc
+  using System.Collections.Generic
+  func Trap () → List<int>
+    ! alloc
     let List<int>:xs = new List<int>() { (10 / 0) }
-    Console.WriteLine(xs . Count)";
+    return xs";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
         {

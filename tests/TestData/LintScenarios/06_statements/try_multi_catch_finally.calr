@@ -1,38 +1,38 @@
-§M{MultiCatch}
-  §F{MultiHandler:pub} (str:input) -> i32
-    §E{cw}
-    §TR
-      §R §C{Int32.Parse} §A input §/C
-    §CA{ArgumentNullException:e1}
-      §R -1
-    §CA{FormatException:e2}
-      §R -2
-    §CA{OverflowException:e3}
-      §R -3
-    §CA{Exception}
-      §R -99
-    §FI
-      §P "Done"
+module MultiCatch
+  func MultiHandler (string:input) → int
+    ! cw
+    try
+      return Int32.Parse(input)
+    catch ArgumentNullException:e1
+      return -1
+    catch FormatException:e2
+      return -2
+    catch OverflowException:e3
+      return -3
+    catch Exception
+      return -99
+    finally
+      Console.WriteLine("Done")
 
-  §F{OrderedCatches:pub} (i32:x) -> str
-    §TR
-      §R (/ 100 x)
-    §CA{DivideByZeroException:e1}
-      §R "divide by zero"
-    §CA{ArithmeticException:e2}
-      §R "arithmetic error"
-    §CA{SystemException:e3}
-      §R "system error"
-    §CA{Exception:e4}
-      §R "general error"
+  func OrderedCatches (int:x) → string
+    !
+    try
+      return (100 / x)
+    catch DivideByZeroException:e1
+      return "divide by zero"
+    catch ArithmeticException:e2
+      return "arithmetic error"
+    catch SystemException:e3
+      return "system error"
+    catch Exception:e4
+      return "general error"
 
-  §F{CatchAllWithFinally:pub} () -> void
-    §E{cw}
-    §TR
-      §TH "error"
-    §CA{Exception}
-      §P "caught"
-      §RT
-    §FI
-      §P "finally"
-
+  func CatchAllWithFinally () → void
+    ! cw
+    try
+      throw "error"
+    catch Exception
+      Console.WriteLine("caught")
+      throw
+    finally
+      Console.WriteLine("finally")

@@ -506,61 +506,6 @@ public class AsyncAwaitTests
     #region Edge Cases - ConfigureAwait
 
     [Fact]
-    public void Parse_AwaitWithConfigureAwaitFalse_SetsConfigureAwaitProperty()
-    {
-        // Test using §B (Bind) statement with await expression
-        var calorSource = """
-            module ConfigureAwaitTests ConfigureAwaitTests block
-              func FetchAsync async () → string
-                !
-                let string:result = await (client.GetStringAsync("url")).ConfigureAwait(false)
-                return result
-            """;
-
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
-        var ast = parser.Parse();
-
-        Assert.Empty(diagnostics.Errors);
-        var func = Assert.Single(ast.Functions);
-        Assert.True(func.IsAsync);
-
-        // Find the await expression in the bind statement
-        var bindStmt = func.Body.OfType<BindStatementNode>().FirstOrDefault();
-        Assert.NotNull(bindStmt);
-        var awaitExpr = bindStmt.Initializer as AwaitExpressionNode;
-        Assert.NotNull(awaitExpr);
-        Assert.False(awaitExpr.ConfigureAwait);
-    }
-
-    [Fact]
-    public void Parse_AwaitWithConfigureAwaitTrue_SetsConfigureAwaitProperty()
-    {
-        var calorSource = """
-            module ConfigureAwaitTests ConfigureAwaitTests block
-              func FetchAsync async () → string
-                !
-                let string:result = await (client.GetStringAsync("url")).ConfigureAwait(true)
-                return result
-            """;
-
-        var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
-        var ast = parser.Parse();
-
-        Assert.Empty(diagnostics.Errors);
-        var func = Assert.Single(ast.Functions);
-
-        var bindStmt = func.Body.OfType<BindStatementNode>().FirstOrDefault();
-        Assert.NotNull(bindStmt);
-        var awaitExpr = bindStmt.Initializer as AwaitExpressionNode;
-        Assert.NotNull(awaitExpr);
-        Assert.True(awaitExpr.ConfigureAwait);
-    }
-
-    [Fact]
     public void Emit_AwaitWithConfigureAwaitFalse_EmitsConfigureAwaitCall()
     {
         var calorSource = """

@@ -1054,15 +1054,17 @@ public class Calor0425CorpusLedgerTests
     [Fact]
     public void K1_ManifestRule_TheLedgerReadsBuiltInManifestsOnly()
     {
-        // A call to a type no built-in manifest covers. Unresolved, the strict
-        // policy fails closed with Calor0411; the manifest below resolves it to
-        // the effect the caller declares, so a pass that reads the manifest is
-        // silent and a pass that does not is not.
+        // A call to a real metadata type no built-in manifest covers. Unresolved, the
+        // strict policy fails closed with Calor0411; the manifest below resolves it to
+        // the effect the caller declares, so a pass that reads the manifest is silent
+        // and a pass that does not is not. (0.30, D3: a manifest no longer resolves a
+        // type that is missing from referenced metadata by name alone, so the old
+        // invented K1ScratchWidget type cannot carry this pin.)
         const string source = """
             module ScratchCwd ScratchCwd block
               func Main () → void
                 ! cw
-                K1ScratchWidget.Ping()
+                System.Diagnostics.Debugger.Break()
             """;
 
         var scratch = Path.Combine(Path.GetTempPath(), "calor-k1-manifest-" + Guid.NewGuid().ToString("N"));
@@ -1074,7 +1076,7 @@ public class Calor0425CorpusLedgerTests
                   "version": "1.0",
                   "description": "K1 manifest-rule pin — must never be consulted by the ledger",
                   "mappings": [
-                    { "type": "K1ScratchWidget", "methods": { "Ping": ["cw"] } }
+                    { "type": "System.Diagnostics.Debugger", "methods": { "Break": ["cw"] } }
                   ]
                 }
                 """);
