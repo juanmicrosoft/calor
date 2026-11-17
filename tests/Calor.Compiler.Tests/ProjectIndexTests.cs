@@ -738,6 +738,38 @@ public sealed class ProjectIndexTests : IDisposable
 
     // --- contents ----------------------------------------------------------
 
+    /// <summary>
+    /// A native module-qualified call into another file (<c>OrderService.SaveOrder()</c>)
+    /// is charged to the caller's inferred row the way <c>calor build</c> charges
+    /// it. 0.30 regression: the summary was built without the driver's cross-module
+    /// map and recorded the call as <c>&lt;expression&gt;.SaveOrder</c>, so the
+    /// callee's <c>db:w</c> never reached the caller and an undeclared write was
+    /// indexed as fitting.
+    /// </summary>
+    [Fact]
+    public void EffectsFacet_NativeQualifiedCrossFileCall_IsChargedToTheCaller()
+    {
+        const string orderService = """
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
+            """;
+        const string handler = """
+            module Handler Handler block
+              func HandleRequest () → void
+                !
+                OrderService.SaveOrder()
+            """;
+        var dir = NewProject(("orders.calr", orderService), ("handler.calr", handler));
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        var row = Assert.Single(index.EffectRows, row => row.Name == "HandleRequest");
+        Assert.NotNull(row.InferredRow);
+        Assert.Contains("db:w", row.InferredRow!.Display, StringComparison.Ordinal);
+        Assert.NotEqual("fits", row.Verdict);
+    }
+
     [Fact]
     public void CrossFileCallProducesAnEdgeWithItsCaller()
     {

@@ -13,7 +13,8 @@ namespace Calor.Enforcement.Tests;
 ///
 /// Verifies the contract-based enforcement model (declared effects propagate,
 /// not inferred effects), bare-name resolution, qualified-name resolution,
-/// and the Calor0417 warning for undeclared public functions.
+/// and that an explicit pure row never raises Calor0417 (a public function with no
+/// row at all is a parse error, Calor0124, so Calor0417 has no positive case here).
 /// </summary>
 public class CrossModuleEffectTests
 {
@@ -176,7 +177,7 @@ public class CrossModuleEffectTests
         // Public class method effects propagate via ClassName.MethodName qualified call.
         var a = @"module Domain Domain block
   class OrderRepo
-    func Save () → void
+    func Save static () → void
       ! db:w
       return
 ";
@@ -330,28 +331,6 @@ public class CrossModuleEffectTests
         var diags = RunFull(("a.calr", a), ("b.calr", b));
 
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.ForbiddenEffect);
-    }
-
-    [Fact]
-    public void CrossModule_UndeclaredPublicFunction_Warning()
-    {
-        // Public function without §E declaration → Calor0417 warning.
-        var a = @"module A A block
-  func Mystery () → void
-    !
-    return
-";
-        var b = @"module B B block
-  func Caller () → void
-    !
-    Mystery()
-";
-
-        var (_, registryDiags) = CompileAll(("a.calr", a), ("b.calr", b));
-
-        var warn = registryDiags.FirstOrDefault(d => d.Code == DiagnosticCode.UndeclaredPublicFunction);
-        Assert.NotNull(warn);
-        Assert.Contains("Mystery", warn!.Message);
     }
 
     [Fact]
@@ -689,7 +668,7 @@ public class CrossModuleEffectTests
         // declare db:w. Exercises both call-site directions for class methods simultaneously.
         var a = @"module Repo Repo block
   class OrderRepo
-    func Save () → void
+    func Save static () → void
       ! db:w
       return
 ";

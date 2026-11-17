@@ -101,6 +101,16 @@ public sealed record RawCall(string CallerId, string CallerName, string Target, 
 ///      with no bound symbol) arrives as a null <c>Receiver</c> and is reported
 ///      unresolved — the source text is never echoed as a type.
 ///
+/// <para>0.30 native syntax: <c>X.Y()</c> always parses to an
+/// <c>ExpressionCallNode</c> over a member access, and the binder binds its
+/// receiver as an ordinary expression (the call's <c>EvaluatedReceiver</c>). The
+/// raw target is rebuilt from the written receiver (<c>OrderRepo.Save</c>, not
+/// <c>&lt;expression&gt;.Save</c>); a receiver typed by the binder's
+/// <c>OBJECT</c> fallback (<c>HasUnknownInferredType</c>) is unresolved; and a
+/// receiver whose head the binder could not bind at all is shape 4 above — it
+/// counts only when written as a type reference, with short BCL names
+/// expanded.</para>
+///
 /// An unresolved receiver keeps its source text in <see cref="CollectedCall.TypeName"/>
 /// for the report and sets <see cref="CollectedCall.ReceiverResolved"/> false; it
 /// is never given a guessed type.
@@ -232,10 +242,23 @@ public sealed class ExternalCallCollector
                 if (_computedMemberCalls.TryGetValue((node.Span.Start, node.Span.End), out var bound)
                     && expressionCall.TargetExpression is FieldAccessNode member)
                 {
+                    // A native `X.Y()` always parses to an expression call over a
+                    // member access, so the receiver's source text has to be
+                    // recovered here: it is what the summary's raw target, the
+                    // report of an unresolved receiver, and the type-reference
+                    // fallback below all read. Only a receiver that is not a
+                    // dotted name (`GetX().Y()`) stays `<expression>`.
+                    var receiverText = SourceReceiverText(member.Target) ?? "<expression>";
                     var target = _crossModuleFunctions?.TryGetValue(bound.Target, out var moduleTarget) == true
                         ? $"{moduleTarget.ModuleName}.{member.FieldName}"
-                        : $"<expression>.{member.FieldName}";
-                    _boundReceiverTypes[(node.Span.Start, node.Span.End, target)] = ResolveBoundReceiver(bound.Receiver);
+                        : $"{receiverText}.{member.FieldName}";
+                    // A head the binder could not bind to anything (no variable,
+                    // no type) is a receiver it does not vouch for — the same
+                    // null-receiver case as `§C{OrderRepo.Save}`. Leave it out of
+                    // the bound map so TryAddCall applies the written-as-a-type
+                    // rule (short BCL names expanded) or reports it unresolved.
+                    if (!HasUnboundHead(bound.Receiver))
+                        _boundReceiverTypes[(node.Span.Start, node.Span.End, target)] = ResolveBoundReceiver(bound.Receiver);
                     TryAddCall(target, CallKind.Method, node.Span);
                 }
                 else
@@ -364,6 +387,32 @@ public sealed class ExternalCallCollector
     private static bool HasReceiver(string target) => target.LastIndexOf('.') > 0;
 
     /// <summary>
+    /// The receiver of a native member call as written: a dotted name
+    /// (<see cref="Binder.DottedReferenceName"/>), optionally rooted at
+    /// <c>this</c>/<c>base</c>. Null for any other expression.
+    /// </summary>
+    private static string? SourceReceiverText(ExpressionNode expression) => expression switch
+    {
+        ThisExpressionNode => "this",
+        BaseExpressionNode => "base",
+        FieldAccessNode field when SourceReceiverText(field.Target) is { } prefix => $"{prefix}.{field.FieldName}",
+        _ => Binder.DottedReferenceName(expression)
+    };
+
+    /// <summary>
+    /// True when the receiver chain bottoms out in a name the binder could not
+    /// bind at all — the undefined-name variable it substitutes for an unknown
+    /// head. Such a receiver carries no binder decision to report.
+    /// </summary>
+    private static bool HasUnboundHead(BoundExpression? receiver)
+    {
+        var head = receiver;
+        while (head is BoundFieldAccessExpression access)
+            head = access.Target;
+        return head is BoundVariableExpression { Variable.Id.IsNone: true };
+    }
+
+    /// <summary>
     /// Receiver identity for one bound call site. <see cref="TypeName"/> is the
     /// fully-qualified receiver type when the bound tree resolves it and null
     /// when it does not; an unresolved receiver is reported as such, never
@@ -391,14 +440,26 @@ public sealed class ExternalCallCollector
     /// </summary>
     private static BoundReceiver ResolveBoundReceiver(BoundExpression? receiver)
     {
-        if (receiver is null)
+        // HasUnknownInferredType is the binder's own "this type is its OBJECT
+        // fallback" mark. A native receiver is bound as an ordinary expression,
+        // so a member chain through an untyped segment (`a.b.c`, `this.sb`)
+        // arrives typed OBJECT with this mark rather than as
+        // UnresolvedBoundType; it is the same answer and is never System.Object.
+        if (receiver is null || receiver.HasUnknownInferredType)
             return BoundReceiver.Unresolved;
 
         if (receiver is BoundTypeReferenceExpression)
         {
-            return receiver.Type is UnresolvedBoundType
-                ? BoundReceiver.Unresolved
-                : new BoundReceiver(receiver.Type.FullyQualifiedName);
+            return receiver.Type switch
+            {
+                UnresolvedBoundType => BoundReceiver.Unresolved,
+                // A metadata-resolved type reference keeps its SOURCE spelling
+                // (`Console`, `File`) as its qualified name; its identity is the
+                // Roslyn symbol, named the way the resolver keys it.
+                NominalBoundType { RoslynSymbol: not null, Declaration: null } metadata =>
+                    new BoundReceiver(EffectResolverKey.FromBoundReceiver(metadata, string.Empty).DeclaringType),
+                _ => new BoundReceiver(receiver.Type.FullyQualifiedName)
+            };
         }
 
         return FromBoundType(receiver.Type);

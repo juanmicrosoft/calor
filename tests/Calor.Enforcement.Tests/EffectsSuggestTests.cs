@@ -395,35 +395,66 @@ module Test Test block
         }
     }
 
-    /// <summary>The receiver the binder attached to the call whose target is
-    /// <paramref name="target"/>. Fails the test if no such call node exists, so
-    /// a null return means "the binder attached no receiver", never "not found".</summary>
-    private static BoundExpression? ReceiverOf(BoundNode root, string target)
+    /// <summary>The receiver the binder attached to the call written as
+    /// <paramref name="target"/>. A native <c>x.M()</c> binds as an expression
+    /// call (<c>Target == "&lt;expression-call&gt;"</c>), so it is found by its
+    /// receiver and callee spans in <paramref name="source"/>. Fails the test if
+    /// no such call node exists, so a null return means "the binder attached no
+    /// receiver", never "not found".</summary>
+    private static BoundExpression? ReceiverOf(BoundNode root, string source, string target) =>
+        CallOf(root, source, target) switch
+        {
+            BoundCallStatement statement => statement.Receiver,
+            BoundCallExpression expression => expression.Receiver,
+            _ => null
+        };
+
+    private static BoundNode CallOf(BoundNode root, string source, string target)
     {
         foreach (var node in Descendants(root))
         {
             switch (node)
             {
                 case BoundCallStatement statement when statement.Target == target:
-                    return statement.Receiver;
-                case BoundCallExpression expression when expression.Target == target:
-                    return expression.Receiver;
+                    return statement;
+                case BoundCallExpression expression when expression.Target == target
+                    || WrittenTarget(source, expression) == target:
+                    return expression;
             }
         }
 
         Assert.Fail($"No bound call node with target '{target}'.");
-        return null;
+        return null!;
     }
 
+    private static string? WrittenTarget(string source, BoundCallExpression call) =>
+        call.ReceiverSpan is { } receiver
+            ? $"{source.Substring(receiver.Start, receiver.Length)}.{source.Substring(call.CalleeSpan.Start, call.CalleeSpan.Length)}"
+            : null;
+
+    /// <summary>The Calor0270s the binder reports for an unresolved call
+    /// RECEIVER (<c>Binder.UnresolvedReceiver</c>) — not the metadata
+    /// member-resolution Calor0270 the same code also carries.</summary>
+    private static List<Diagnostic> ReceiverUnresolvedDiagnostics(DiagnosticBag diagnostics) =>
+        diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved
+            && d.Message.Contains("so the call's receiver type is unresolved", StringComparison.Ordinal)).ToList();
+
     /// <summary>
-    /// E1 slice 2a pin (a): a dotted head the binder cannot bind gets NO receiver
-    /// expression at all — the binder says nothing rather than guessing — and the
-    /// collector reports the call unresolved. <c>foo</c> is not a bound variable
-    /// and is not written as a type reference; <c>this.sb</c> is a chain through
-    /// <c>this</c>, which is not a bound variable either.
+    /// E1 slice 2a pin (a): a dotted head the binder cannot bind is never given a
+    /// type, and the collector reports the call unresolved. <c>foo</c> is not a
+    /// bound variable and is not written as a type reference; <c>this.sb</c> is a
+    /// chain through <c>this</c> to a member <c>Holder</c> does not declare.
+    ///
+    /// <para>0.30 native syntax: <c>foo.Bar()</c> binds as an expression call
+    /// whose receiver is bound as an ordinary expression, so the binder no longer
+    /// attaches NO receiver — it attaches its undefined-name variable for
+    /// <c>foo</c> (typed <see cref="UnresolvedBoundType"/>) and the
+    /// <c>OBJECT</c>-fallback member access for <c>this.sb</c> (marked
+    /// <c>HasUnknownInferredType</c>). Neither is a type the collector may
+    /// report.</para>
     /// </summary>
     [Fact]
-    public void E1_Slice2a_UnboundDottedHead_YieldsNullReceiverAndUnresolvedCall()
+    public void E1_Slice2a_UnboundDottedHead_YieldsUnresolvedReceiverAndUnresolvedCall()
     {
         var source = @"
 module Test Test block
@@ -439,12 +470,21 @@ module Test Test block
         var module = Parse(source);
         var (bound, _) = Bind(module);
 
-        Assert.Null(ReceiverOf(bound, "foo.Bar"));
-        Assert.Null(ReceiverOf(bound, "this.sb.Append"));
+        var foo = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, source, "foo.Bar"));
+        Assert.True(foo.Variable.Id.IsNone);
+        Assert.IsType<UnresolvedBoundType>(foo.Type);
+
+        var sb = Assert.IsType<BoundFieldAccessExpression>(ReceiverOf(bound, source, "this.sb.Append"));
+        Assert.IsType<BoundThisExpression>(sb.Target);
+        Assert.True(sb.HasUnknownInferredType);
 
         var calls = ExternalCallCollector.Collect(module);
-        Assert.False(Assert.Single(calls, c => c.MethodName == "Bar").ReceiverResolved);
-        Assert.False(Assert.Single(calls, c => c.MethodName == "Append").ReceiverResolved);
+        var bar = Assert.Single(calls, c => c.MethodName == "Bar");
+        Assert.False(bar.ReceiverResolved);
+        Assert.Equal("foo", bar.TypeName);
+        var append = Assert.Single(calls, c => c.MethodName == "Append");
+        Assert.False(append.ReceiverResolved);
+        Assert.Equal("this.sb", append.TypeName);
     }
 
     /// <summary>
@@ -469,7 +509,7 @@ module Test Test block
         var module = Parse(source);
         var (bound, _) = Bind(module);
 
-        var receiver = ReceiverOf(bound, "g.ToString");
+        var receiver = ReceiverOf(bound, source, "g.ToString");
         var variable = Assert.IsType<BoundVariableExpression>(receiver);
         var nominal = Assert.IsType<NominalBoundType>(variable.Type);
         Assert.Equal("System.Guid", nominal.QualifiedName);
@@ -517,7 +557,7 @@ module Test Test block
         var module = Parse(source);
         var (bound, diagnostics) = Bind(module);
 
-        var receiver = ReceiverOf(bound, "x.Run");
+        var receiver = ReceiverOf(bound, source, "x.Run");
         var unresolved = Assert.IsType<UnresolvedBoundType>(
             Assert.IsType<BoundVariableExpression>(receiver).Type);
         Assert.Equal(
@@ -541,6 +581,13 @@ module Test Test block
     /// chain the binder does not type, a type reference, or nothing at all.
     /// A member chain reports ONE Calor0270 for the whole chain, not one per
     /// segment.
+    ///
+    /// <para>0.30 native syntax binds the receiver of <c>x.M()</c> as an ordinary
+    /// expression, so the chain and the unbound head take the shapes the
+    /// expression binder gives them: the chain is typed segment by segment (the
+    /// first unknown segment is <see cref="UnresolvedBoundType"/>, later ones the
+    /// <c>OBJECT</c> fallback marked <c>HasUnknownInferredType</c>), and the
+    /// unbound head is the binder's undefined-name variable, not null.</para>
     /// </summary>
     [Fact]
     public void E1_Slice2a_ReceiverShapes_AreTheFourDocumentedOnes()
@@ -560,15 +607,16 @@ module Test Test block
         var (bound, diagnostics) = Bind(module);
 
         // 1. bound local → BoundVariableExpression carrying the symbol's type.
-        var local = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, "sb.Append"));
+        var local = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, source, "sb.Append"));
         Assert.Equal("System.Text.StringBuilder", local.Type.DisplayString);
 
         // 2. member chain → a field-access chain over the typed head, unresolved.
-        var chain = Assert.IsType<BoundFieldAccessExpression>(ReceiverOf(bound, "a.b.c.Chain"));
-        Assert.IsType<UnresolvedBoundType>(chain.Type);
+        var chain = Assert.IsType<BoundFieldAccessExpression>(ReceiverOf(bound, source, "a.b.c.Chain"));
+        Assert.True(chain.HasUnknownInferredType);
         Assert.Equal("c", chain.FieldName);
         var inner = Assert.IsType<BoundFieldAccessExpression>(chain.Target);
         Assert.Equal("b", inner.FieldName);
+        Assert.IsType<UnresolvedBoundType>(inner.Type);
         var chainHead = Assert.IsType<BoundVariableExpression>(inner.Target);
         // The head keeps the binder's own spelling — short-BCL-name expansion is
         // the collector's step, not the binder's, and the binder must not be
@@ -577,18 +625,22 @@ module Test Test block
 
         // 3. static type receiver → BoundTypeReferenceExpression naming the type.
         var typeRef = Assert.IsType<BoundTypeReferenceExpression>(
-            ReceiverOf(bound, "System.Console.WriteLine"));
+            ReceiverOf(bound, source, "System.Console.WriteLine"));
         Assert.Equal("System.Console", typeRef.Name);
         Assert.Equal("System.Console", typeRef.Type.DisplayString);
 
-        // 4. unbound head → nothing.
-        Assert.Null(ReceiverOf(bound, "foo.Bar"));
+        // 4. unbound head → the binder's undefined-name variable, never typed.
+        var unbound = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, source, "foo.Bar"));
+        Assert.True(unbound.Variable.Id.IsNone);
+        Assert.IsType<UnresolvedBoundType>(unbound.Type);
 
-        // Marking is not reporting: every unresolved receiver above is MARKED
-        // UnresolvedBoundType, but a member chain is a binder limitation the
-        // author cannot act on, so it is silent. No shape in this fixture is
-        // reportable, so the whole module produces zero Calor0270.
-        Assert.Empty(diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+        // Marking is not reporting: every unresolved receiver above is MARKED,
+        // but a member chain is a binder limitation the author cannot act on, so
+        // it is silent. No shape in this fixture is reportable, so the module
+        // produces zero receiver-unresolved Calor0270. (Native binding does report
+        // `Random` having no member `b` — a metadata member-resolution Calor0270
+        // about the member, not the receiver.)
+        Assert.Empty(ReceiverUnresolvedDiagnostics(diagnostics));
     }
 
     /// <summary>
@@ -621,12 +673,12 @@ module Test Test block
         // editor, never about what the type system claims.
         foreach (var target in new[] { "x.Run", "a.b.Chain", "_chainIsValid042.Run" })
         {
-            Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, target)!.Type);
+            Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, source, target)!.Type);
         }
 
-        // Only the inferred local the author actually wrote is reported.
-        var single = Assert.Single(
-            diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+        // Only the inferred local the author actually wrote is reported as an
+        // unresolved receiver.
+        var single = Assert.Single(ReceiverUnresolvedDiagnostics(diagnostics));
         Assert.Contains("'x'", single.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("a.b", single.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("_chain", single.Message, StringComparison.Ordinal);
@@ -638,6 +690,17 @@ module Test Test block
     /// later slice. When the receiver is a bound variable the two agree on the
     /// symbol; when the binder attached no receiver there is no receiver symbol
     /// either; and a type-reference receiver never carries a variable symbol.
+    ///
+    /// <para>0.30 native syntax: a member chain <c>a.b.Chain()</c> binds as an
+    /// expression call whose chain receiver is ALSO its evaluated receiver, a
+    /// child of the call node. <c>ReceiverSymbol</c> is then null — deliberately
+    /// not re-derived from the chain head: every reader of it
+    /// (<c>BoundNodeHelpers.GetUsedVariables*</c>, the bug-pattern receiver
+    /// dereference check, <c>CallGraphAnalysis</c>'s per-site record) also walks
+    /// the call's children, where the head variable is visited as an ordinary
+    /// <see cref="BoundVariableExpression"/> (and dereferenced by the chain's
+    /// field access), so nothing is lost. The pin is that the head is reachable
+    /// there.</para>
     /// </summary>
     [Fact]
     public void E1_Slice2a_ReceiverAndReceiverSymbol_DoNotDrift()
@@ -678,11 +741,23 @@ module Test Test block
                     Assert.Same(symbol, variable.Variable);
                     break;
                 case BoundFieldAccessExpression chain:
-                    // The chain's head is the receiver symbol.
                     var head = chain.Target;
                     while (head is BoundFieldAccessExpression inner)
                         head = inner.Target;
-                    Assert.Same(symbol, Assert.IsType<BoundVariableExpression>(head).Variable);
+                    var headVariable = Assert.IsType<BoundVariableExpression>(head).Variable;
+                    if (node is BoundCallExpression { EvaluatedReceiver: { } evaluated } native)
+                    {
+                        // Native: the chain is the evaluated receiver, so the
+                        // head reaches dataflow through the call's children.
+                        Assert.Same(chain, evaluated);
+                        Assert.Contains(chain, native.Children);
+                        Assert.Null(symbol);
+                    }
+                    else
+                    {
+                        // Legacy §C: the chain's head is the receiver symbol.
+                        Assert.Same(symbol, headVariable);
+                    }
                     break;
                 case BoundTypeReferenceExpression:
                     Assert.Null(symbol);

@@ -85,12 +85,8 @@ public sealed class CrossModuleEffectRegistry
     public static CrossModuleEffectRegistry Build(
         IReadOnlyList<(ModuleNode Ast, string FilePath)> modules)
     {
-        var summaries = new List<(EffectSummary, string)>(modules.Count);
-        foreach (var (ast, path) in modules)
-        {
-            summaries.Add((EffectSummaryBuilder.Build(ast), path));
-        }
-        return Build(summaries);
+        // The driver's cross-module map, as `calor build` passes it.
+        return Build(EffectSummaryBuilder.BuildAll(modules));
     }
 
     private void RegisterFunction(string moduleName, string filePath, EffectFunctionSummary func)

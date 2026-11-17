@@ -169,13 +169,24 @@ public sealed class ProjectSymbolIndex
         var sourceTypes = CrossModuleTypeRegistry.Build(
             parsed.Select(document => (document.Ast, document.Path)).ToArray(),
             sourceHashes);
+        // The driver binds every file of a multi-file build over its cross-module
+        // function map; without it a native qualified call into another module
+        // (`OrderService.SaveOrder()`) is an undefined name, and the whole file
+        // would be skipped as a bind error that `calor build` never reports.
+        var crossModuleFunctions = parsed.Count > 1
+            ? CompilationDriver.BuildCrossModuleFunctionMap(parsed.Select(document => document.Ast).ToList())
+            : null;
         foreach (var (path, source, ast) in parsed)
         {
             var bindDiagnostics = new DiagnosticBag();
             BoundModule bound;
             try
             {
-                bound = new Binder(bindDiagnostics, path) { CrossModuleTypes = sourceTypes }.Bind(ast);
+                bound = new Binder(bindDiagnostics, path)
+                {
+                    CrossModuleTypes = sourceTypes,
+                    CrossModuleFunctionModules = crossModuleFunctions
+                }.Bind(ast);
             }
             catch (Exception)
             {

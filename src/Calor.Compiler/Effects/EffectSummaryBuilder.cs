@@ -13,6 +13,36 @@ public static class EffectSummaryBuilder
 {
     public static EffectSummary Build(ModuleNode module) => Build(module, null);
 
+    /// <summary>
+    /// Summaries for a whole set of modules, built over the cross-module
+    /// qualification map <c>calor build</c> passes (see
+    /// <see cref="CrossModuleFunctionMap"/>). Without that map a qualified call
+    /// into another module (<c>OrderService.SaveOrder()</c>) is not recognized as
+    /// one, so every multi-module entry point that builds summaries from ASTs goes
+    /// through here rather than <see cref="Build(ModuleNode)"/>.
+    /// </summary>
+    internal static List<(EffectSummary Summary, string FilePath)> BuildAll(
+        IReadOnlyList<(ModuleNode Ast, string FilePath)> modules)
+    {
+        var crossModuleFunctions = CrossModuleFunctionMap(modules);
+        var summaries = new List<(EffectSummary, string)>(modules.Count);
+        foreach (var (ast, path) in modules)
+            summaries.Add((Build(ast, crossModuleFunctions), path));
+        return summaries;
+    }
+
+    /// <summary>
+    /// The driver's cross-module function map over <paramref name="modules"/> —
+    /// built only when there is more than one module, exactly as
+    /// <c>CompilationDriver</c> builds it before calling
+    /// <see cref="Build(ModuleNode, IReadOnlyDictionary{string, CodeGen.CrossModuleFunctionTarget})"/>.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctionMap(
+        IReadOnlyList<(ModuleNode Ast, string FilePath)> modules) =>
+        modules.Count > 1
+            ? CompilationDriver.BuildCrossModuleFunctionMap(modules.Select(module => module.Ast).ToList())
+            : null;
+
     internal static EffectSummary Build(ModuleNode module,
         IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
     {

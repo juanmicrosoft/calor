@@ -303,6 +303,11 @@ public static class ProjectIndexBuilder
             .Keys
             .ToArray();
         var registry = CrossModuleEffectRegistry.Build(modules);
+        // The map `calor build` hands both the per-file pass and the summary
+        // (built only for a multi-file project): without it a native qualified
+        // call into another module (`OrderService.SaveOrder()`) is charged as
+        // unknown by the pass and missed by the summary.
+        var summaryCrossModuleMap = EffectSummaryBuilder.CrossModuleFunctionMap(modules);
         var crossPass = new CrossModuleEffectEnforcementPass(UnknownCallPolicy.Strict);
 
         foreach (var document in symbols.Documents)
@@ -326,7 +331,8 @@ public static class ProjectIndexBuilder
                 // says the same thing.
                 var effectDiagnostics = new DiagnosticBag();
                 var pass = CreateEffectPass(
-                    effectDiagnostics, resolver, projectDirectory, crossModuleNames, options);
+                    effectDiagnostics, resolver, projectDirectory, crossModuleNames, options,
+                    summaryCrossModuleMap);
                 pass.CrossModuleTypes = symbols.SourceTypes;
                 pass.SourcePath = document.FilePath;
                 pass.Enforce(document.Ast);
@@ -338,7 +344,7 @@ public static class ProjectIndexBuilder
                 }
                 facts = pass.DeclarationFacts;
                 crossCharges = crossPass.ResolveCrossModuleEffects(
-                    EffectSummaryBuilder.Build(document.Ast), document.FilePath, registry);
+                    EffectSummaryBuilder.Build(document.Ast, summaryCrossModuleMap), document.FilePath, registry);
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
@@ -430,18 +436,23 @@ public static class ProjectIndexBuilder
         EffectResolver resolver,
         string projectDirectory,
         IEnumerable<string> crossModuleFunctionNames,
-        Options options) =>
+        Options options,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions = null) =>
         (options.SccFixpointIterationCap, options.InstantiatedChargeIterationCap) switch
         {
             (null, null) => new EffectEnforcementPass(
                 diagnostics, UnknownCallPolicy.Strict, resolver: resolver,
                 projectDirectory: projectDirectory,
-                crossModuleFunctionNames: crossModuleFunctionNames),
+                crossModuleFunctionNames: crossModuleFunctionNames)
+            {
+                CrossModuleFunctionModules = crossModuleFunctions,
+            },
             (not null, null) => new EffectEnforcementPass(
                 diagnostics, UnknownCallPolicy.Strict, resolver: resolver,
                 projectDirectory: projectDirectory,
                 crossModuleFunctionNames: crossModuleFunctionNames)
             {
+                CrossModuleFunctionModules = crossModuleFunctions,
                 SccFixpointIterationCap = options.SccFixpointIterationCap.Value,
             },
             (null, not null) => new EffectEnforcementPass(
@@ -449,6 +460,7 @@ public static class ProjectIndexBuilder
                 projectDirectory: projectDirectory,
                 crossModuleFunctionNames: crossModuleFunctionNames)
             {
+                CrossModuleFunctionModules = crossModuleFunctions,
                 InstantiatedChargeIterationCap = options.InstantiatedChargeIterationCap.Value,
             },
             _ => new EffectEnforcementPass(
@@ -456,6 +468,7 @@ public static class ProjectIndexBuilder
                 projectDirectory: projectDirectory,
                 crossModuleFunctionNames: crossModuleFunctionNames)
             {
+                CrossModuleFunctionModules = crossModuleFunctions,
                 SccFixpointIterationCap = options.SccFixpointIterationCap!.Value,
                 InstantiatedChargeIterationCap = options.InstantiatedChargeIterationCap!.Value,
             },
