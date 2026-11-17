@@ -121,6 +121,53 @@ public class ManifestLoaderTests
     }
 
     [Fact]
+    public void LoadFromJson_ParsesFields()
+    {
+        var json = @"{
+            ""version"": ""1.0"",
+            ""mappings"": [
+                {
+                    ""type"": ""System.String"",
+                    ""fields"": {
+                        ""Empty"": []
+                    }
+                }
+            ]
+        }";
+
+        var loader = new ManifestLoader();
+        var manifest = loader.LoadFromJson(json, "test");
+
+        Assert.NotNull(manifest);
+        var mapping = manifest.Mappings[0];
+        Assert.NotNull(mapping.Fields);
+        Assert.Empty(Assert.Single(mapping.Fields).Value);
+        Assert.Null(mapping.Getters);
+    }
+
+    [Fact]
+    public void ValidateManifests_ReportsUnknownFieldEffectCodes()
+    {
+        var json = @"{
+            ""version"": ""1.0"",
+            ""mappings"": [
+                {
+                    ""type"": ""TestType"",
+                    ""fields"": {
+                        ""Shared"": [""unknown_effect""]
+                    }
+                }
+            ]
+        }";
+
+        var loader = new ManifestLoader();
+        loader.LoadFromJson(json, "test");
+        var errors = loader.ValidateManifests();
+
+        Assert.Contains("TestType fields.Shared: Unknown effect code 'unknown_effect'", Assert.Single(errors));
+    }
+
+    [Fact]
     public void LoadFromJson_ReportsInvalidJson()
     {
         var json = "{ invalid json }";

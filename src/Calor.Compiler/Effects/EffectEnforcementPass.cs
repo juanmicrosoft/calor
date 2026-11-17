@@ -6172,14 +6172,28 @@ public sealed class EffectEnforcementPass
             => _context.CallGraph.MetadataField(_context.CurrentFunctionId, field.Span) is { } metadataField
                 ? InferFromMetadataField(metadataField,
                     metadataField is { IsStatic: true, IsConst: true }
+                        // A bound type qualifier (`System . String`) evaluates nothing; the
+                        // field's own entry covers the declaring type's initialization.
+                        || _context.CallGraph.IsTypeQualifiedMetadataField(_context.CurrentFunctionId, field.Span)
                         ? EffectSet.Empty : InferFromExpression(field.Target), field.Span)
                 : InferFromMemberAccess(field.Target, field.FieldName, field.Span,
                     _context.CallGraph.SelectedMetadataGetter(field));
 
         private EffectSet InferFromMetadataField(CS.IFieldSymbol field, EffectSet receiverEffects, TextSpan span)
-            // Constants do not run a type initializer. Other metadata fields have no getter contract.
-            => field.IsConst ? receiverEffects
-                : receiverEffects.Union(UnknownResolvedOperation(field.ToDisplayString(), span));
+        {
+            // Constants do not run a type initializer.
+            if (field.IsConst)
+                return receiverEffects;
+            // Other metadata fields never borrow a getter contract. Only a manifest `fields`
+            // entry for this exact selected field (which also covers the declaring type's
+            // initialization) can answer; every other field stays unknown.
+            var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                Binding.Metadata.MetadataBinderResult.ToNominalBoundType(field.ContainingType),
+                field.Name, null, EffectMemberKind.Field));
+            return receiverEffects.Union(resolution.Status == EffectResolutionStatus.Unknown
+                ? UnknownResolvedOperation(field.ToDisplayString(), span)
+                : resolution.Effects);
+        }
 
         private EffectSet InferFromMemberAccess(ExpressionNode target, string memberName, TextSpan span,
             CallGraphAnalysis.MetadataGetterSelection? selectedGetter = null)
@@ -7630,8 +7644,10 @@ public sealed class EffectEnforcementPass
             else
             {
                 var metadataType = _context.CallGraph.MetadataCreationType(_context.CurrentFunctionId, newExpr.Span);
+                // Key a selected metadata type by its CLR metadata name: its display string
+                // prints keywords (`object`) and type-parameter lists, which no manifest names.
                 effects = effects.Union(ResolveConstructorEffects(
-                    metadataType?.OriginalDefinition.ToDisplayString() ?? newExpr.TypeName,
+                    metadataType is not null ? EffectResolverKey.MetadataTypeName(metadataType) : newExpr.TypeName,
                     newExpr.Arguments,
                     newExpr.TypeNameSpan));
             }
@@ -7730,7 +7746,10 @@ public sealed class EffectEnforcementPass
                     span);
             }
 
-            var manifestType = MapShortTypeNameToFullName(typeName);
+            // A C# keyword (`new object()`) names its System type outright; a
+            // constructor does not dispatch, so the keyword may reach that entry.
+            var manifestType = EffectResolverKey.KeywordAliasMetadataName(typeName)
+                ?? MapShortTypeNameToFullName(typeName);
             // A constructor has no receiver — the type is named outright, so this
             // key is text by construction, not by a missing binder answer.
             var resolution = _context.Resolver.Resolve(EffectResolverKey.FromStrings(

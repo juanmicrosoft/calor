@@ -663,7 +663,7 @@ public sealed class CanonicalControlFlowTests
                 {{other}}
                 func Make public static () → object
                   ! alloc
-                  return new object()
+                  return new System.Version()
               func Probe () → int
                 ! alloc
                 return Holder.Value

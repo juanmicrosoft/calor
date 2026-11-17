@@ -39,6 +39,14 @@ safety verdict.
 
 ## Compilation and API modeling
 
+The null-dereference subject seeds its dereferences on a user-defined nullable
+class (`BenchmarkText?`), not on `string?`. Since Calor 0.30, a possibly-null
+receiver of a .NET member (`string?.Length`) is a hard `Calor0274` error that
+stops compilation before bug-pattern analysis, so a `string?` seed would no
+longer measure null-dereference detection. The subject keeps its three seeded
+dereferences and five safe controls, and each safe control uses the same type
+and access shape as its vulnerable case.
+
 With effect enforcement disabled (these tests target bug/taint detection), all
 seven subjects produce Roslyn-clean C#, with zero compilation errors required by
 the actual-file tests. The SQL subject declares a native injected `db` interface

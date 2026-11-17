@@ -216,7 +216,9 @@ public sealed class NativeMcpSurfaceTests : IDisposable
     [Fact]
     public async Task Fix_UnknownConstructorEffectsRemainErrorsWithoutChangingObjectSemantics()
     {
-        const string source = "module Native\n  func Make () → object\n    ! alloc\n    return new object()\n";
+        // System.Version's constructors have no effect contract (`new object()` now
+        // reaches the System.Object() contract by its metadata name).
+        const string source = "module Native\n  func Make () → System.Version\n    ! alloc\n    return new System.Version()\n";
         var result = await Call("calor_fix", new { source });
         Assert.True(result.IsError);
         var output = Output(result);

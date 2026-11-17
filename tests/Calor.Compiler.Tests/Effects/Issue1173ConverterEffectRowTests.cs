@@ -140,9 +140,9 @@ public class Issue1173ConverterEffectRowTests
             "Run",
             "alloc"
         },
-        // 0.30: strict inference finds an uncontracted call in the next two bodies
-        // (MemoryStream.Dispose; the System.Object constructor key 'object..ctor()'),
-        // so the converter declares ! unknown, which admits the alloc they perform.
+        // 0.30: strict inference finds an uncontracted call in the next body
+        // (MemoryStream.Dispose), so the converter declares ! unknown, which admits
+        // the alloc it performs. `new object()` reaches the System.Object() contract.
         {
             "a §USE resource expression",
             """
@@ -165,7 +165,7 @@ public class Issue1173ConverterEffectRowTests
             }
             """,
             "Run",
-            "unknown"
+            "alloc"
         },
         {
             "a mutating call on a collection parameter",

@@ -2126,6 +2126,7 @@ public sealed class CallGraphAnalysis
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IFieldSymbol>
             MetadataFields
         { get; } = new();
+        internal HashSet<(string CallerId, int Start, int End)> TypeQualifiedMetadataFields { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), VariableSymbol>
             SourceEnumConstants
         { get; } = new();
@@ -2191,6 +2192,13 @@ public sealed class CallGraphAnalysis
 
     internal Microsoft.CodeAnalysis.IFieldSymbol? MetadataField(string callerId, TextSpan span) =>
         _boundValues.MetadataFields.GetValueOrDefault((callerId, span.Start, span.End));
+
+    /// <summary>
+    /// Whether the binder selected a static metadata field through a type reference
+    /// (<c>System . String . Empty</c>), whose qualifier evaluates nothing.
+    /// </summary>
+    internal bool IsTypeQualifiedMetadataField(string callerId, TextSpan span) =>
+        _boundValues.TypeQualifiedMetadataFields.Contains((callerId, span.Start, span.End));
 
     internal VariableSymbol? SourceEnumConstant(string callerId, TextSpan span) =>
         _boundValues.SourceEnumConstants.GetValueOrDefault((callerId, span.Start, span.End));
@@ -3143,6 +3151,12 @@ public sealed class CallGraphAnalysis
                     if (node is BoundFieldAccessExpression
                         { ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol metadataField })
                         boundValues.MetadataFields.TryAdd((callerId, node.Span.Start, node.Span.End), metadataField);
+                    if (node is BoundFieldAccessExpression
+                        {
+                            Target: BoundTypeReferenceExpression,
+                            ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol { IsStatic: true }
+                        })
+                        boundValues.TypeQualifiedMetadataFields.Add((callerId, node.Span.Start, node.Span.End));
                     if (node is BoundFieldAccessExpression
                         {
                             Target: BoundTypeReferenceExpression { ResolvedType.IsEnum: true },
