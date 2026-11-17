@@ -437,14 +437,17 @@ public sealed class Issue1401NullableContextConversionTests
             compilation.GetSemanticModel(tree), tree.GetCompilationUnitRoot());
     }
 
+    // 0.30: an annotation-disabled context converts to a `nullable oblivious` module whose
+    // unannotated reference types are oblivious (as in C#), instead of writing `?T`.
     [Theory]
-    [InlineData(NullableContextOptions.Enable, "(string:value) → string")]
-    [InlineData(NullableContextOptions.Annotations, "(string:value) → string")]
-    [InlineData(NullableContextOptions.Disable, "(string?:value) -> string?")]
-    [InlineData(NullableContextOptions.Warnings, "(string?:value) -> string?")]
+    [InlineData(NullableContextOptions.Enable, "(string:value) → string", false)]
+    [InlineData(NullableContextOptions.Annotations, "(string:value) → string", false)]
+    [InlineData(NullableContextOptions.Disable, "(string:value) → string", true)]
+    [InlineData(NullableContextOptions.Warnings, "(string:value) → string", true)]
     public void EvaluatedProjectContextControlsObliviousDeclarations(
         NullableContextOptions nullableContext,
-        string expectedSignature)
+        string expectedSignature,
+        bool oblivious)
     {
         var result = Convert(
             """
@@ -459,13 +462,32 @@ public sealed class Issue1401NullableContextConversionTests
         Assert.True(
             result.CalorSource!.Contains(expectedSignature, StringComparison.Ordinal),
             result.CalorSource);
+        Assert.Equal(oblivious, result.CalorSource.Contains(" nullable oblivious\n", StringComparison.Ordinal));
+    }
+
+    // 0.30: a `#nullable disable` directive inside an enabled project is a lexical context the
+    // single module policy does not represent, so the file is kept as C# exactly.
+    [Fact]
+    public void DisableDirectiveInEnabledProjectPreservesTheFile()
+    {
+        const string source = """
+            #nullable disable
+            public static class Fixture
+            {
+                public static string Echo(string value) => value;
+            }
+            """;
+        var result = Convert(source, NullableContextOptions.Enable);
+
+        Assert.Equal("whole-file-preservation", Assert.Single(result.Losses).Feature);
+        Assert.Contains(result.Issues, issue => issue.Feature == "nullable-module-fidelity"
+            && issue.Message.Contains("cannot represent the original lexical nullable contexts", StringComparison.Ordinal));
+        var compiled = Program.Compile(result.CalorSource!, "preserved.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(source, compiled.GeneratedCode);
     }
 
     [Theory]
-    [InlineData(
-        NullableContextOptions.Enable,
-        "#nullable disable",
-        "(string?:value) -> string?")]
     [InlineData(
         NullableContextOptions.Disable,
         "#nullable enable",
@@ -511,9 +533,12 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
+        // 0.30: in a `nullable oblivious` module every unannotated reference is oblivious, as in
+        // C#'s disabled context; the unknown invocation is no longer rewritten to `?T`.
+        Assert.Contains(" nullable oblivious\n", result.CalorSource);
         Assert.Contains("let string:literal = \"safe\"", result.CalorSource);
         Assert.Contains("let Item:created = new Item()", result.CalorSource);
-        Assert.Contains("let string?:unknown", result.CalorSource);
+        Assert.Contains("let string:unknown = Read()", result.CalorSource);
         Assert.DoesNotContain("Option<", result.CalorSource);
         Assert.DoesNotContain("§NN", result.CalorSource);
         Assert.DoesNotContain("§UNWRAP", result.CalorSource);
@@ -697,7 +722,10 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
-        Assert.Contains("() → string?", result.CalorSource);
+        // 0.30: the oblivious `Task<string>` result is an unannotated `string` in a
+        // `nullable oblivious` module (not rewritten to `string?`).
+        Assert.Contains(" nullable oblivious\n", result.CalorSource);
+        Assert.Contains("func Read async () → string\n", result.CalorSource);
     }
 
     [Fact]
@@ -732,8 +760,10 @@ public sealed class Issue1401NullableContextConversionTests
         Assert.Contains(read.Modifiers, modifier => modifier.IsKind(SyntaxKind.AsyncKeyword));
     }
 
+    // 0.30 (2026-11-14 decision): a `nullable oblivious` module models oblivious nested shapes,
+    // so an oblivious array converts natively instead of being reported as unsupported.
     [Fact]
-    public void ObliviousArrayDeclarationIsReportedAsUnsupportedNestedShape()
+    public void ObliviousArrayDeclarationConvertsInAnObliviousModule()
     {
         var result = Convert(
             """
@@ -744,12 +774,11 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
+        Assert.Contains(" nullable oblivious\n", result.CalorSource);
         Assert.Contains("() → string[]", result.CalorSource);
         Assert.DoesNotContain("() → string[]?", result.CalorSource);
-        Assert.Contains(
-            result.Issues,
-            issue => issue.Feature == "nullable-oblivious-nested-shape"
-                && issue.Severity == ConversionIssueSeverity.Warning);
+        Assert.DoesNotContain(result.Issues, issue => issue.Feature == "nullable-oblivious-nested-shape");
+        Assert.Empty(result.Losses);
         Assert.DoesNotContain("Option<", result.CalorSource);
     }
 
@@ -770,7 +799,11 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
-        Assert.Contains("var string?:value = \"safe\"", result.CalorSource);
+        // 0.30: the local stays oblivious (`string` in a `nullable oblivious` module), never
+        // narrowed to non-null by its safe initializer.
+        Assert.Contains(" nullable oblivious\n", result.CalorSource);
+        Assert.Contains("var string:value = \"safe\"", result.CalorSource);
+        Assert.Empty(result.Losses);
     }
 
     [Theory]
@@ -795,7 +828,9 @@ public sealed class Issue1401NullableContextConversionTests
             """,
             NullableContextOptions.Disable);
 
-        Assert.Contains("var string?:value = \"safe\"", result.CalorSource);
+        Assert.Contains(" nullable oblivious\n", result.CalorSource);
+        Assert.Contains("var string:value = \"safe\"", result.CalorSource);
+        Assert.Empty(result.Losses);
     }
 
     [Fact]
@@ -1085,7 +1120,8 @@ public sealed class Issue1401NullableContextConversionTests
                         Path.Combine(directory, "Fixture.cs")),
                     Path.Combine(directory, "Fixture.cs"));
             Assert.True(direct.Success, FormatIssues(direct));
-            Assert.Contains("(string?:value) → string?", direct.CalorSource);
+            Assert.Contains("(string:value) → string", direct.CalorSource);
+            Assert.Contains(" nullable oblivious", direct.CalorSource);
 
             var migrator = new ProjectMigrator(
                 new MigrationPlanOptions
@@ -1119,6 +1155,9 @@ public sealed class Issue1401NullableContextConversionTests
                 NullableContextOptions.Disable.ToString(),
                 file.Metadata!.NullableContextOptions);
             Assert.NotEmpty(file.Metadata.References);
+            // The migrator defers the C# round trip to the project build
+            // (ValidateRoundTripCSharp = false), so it does not run the oblivious-module
+            // certification and keeps the `?T` spelling for oblivious declarations.
             Assert.True(
                 file.ConvertedSource!.Contains(
                     "(string?:value) → string?",

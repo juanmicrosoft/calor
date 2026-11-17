@@ -956,8 +956,9 @@ public class Test
         var calor = ConvertToCalor(csharp);
         Assert.NotNull(calor);
 
-        // Lambda should be hoisted to a temp binding
-        Assert.Contains("_lam", calor);
+        // 0.30: a native lambda is an inline expression, so it stays in the call argument.
+        Assert.Contains("return (numbers.Select((int:x) => (x * 2))).ToArray()", calor);
+        Assert.DoesNotContain("_lam", calor);
     }
 
     [Fact]
@@ -975,8 +976,9 @@ public class Test
         var calor = ConvertToCalor(csharp);
         Assert.NotNull(calor);
 
-        // Both lambdas should be hoisted
-        Assert.Contains("_lam", calor);
+        // 0.30: both lambdas stay inline in the chain.
+        Assert.Contains("(numbers.Where((int:x) => (x > 0))).Select((int:x) => (x * 2)).ToArray()", calor);
+        Assert.DoesNotContain("_lam", calor);
     }
 
     [Fact]
@@ -1052,15 +1054,18 @@ public class Test
             }
             """;
 
-        // Depth > 2 ternary chains are decomposed into if/else with a result variable
+        // 0.30: native conditionals nest inline, so a deep ternary chain is no longer
+        // decomposed into if/else with a `_ternResult` variable.
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
         var emitter = new CalorEmitter();
         var calor = emitter.Emit(result.Ast!);
-        Assert.Contains("score >= 90", calor);
-        Assert.Contains("if ", calor);
-        Assert.Contains("_ternResult", calor);
+        Assert.Contains("return ((score >= 90) ? 4 : ((score >= 80) ? 3 : ((score >= 70) ? 2 : 1)))", calor);
+        Assert.DoesNotContain("_ternResult", calor);
+        var compiled = Program.Compile(calor, "ternary.calr",
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
     }
 
     [Fact]

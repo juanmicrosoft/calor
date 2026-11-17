@@ -246,8 +246,11 @@ public sealed class CanonicalNamespaceTests
         Assert.Equal(source, new CSharpEmitter().Emit(Parse(conversion.CalorSource!)));
     }
 
+    // 0.30: a disabled context now converts natively too, as a `nullable oblivious` module, so
+    // both rows are native and must keep the original declared nullability exactly (None for
+    // the disabled context, NotAnnotated for the enabled one).
     [Theory]
-    [InlineData(NullableContextOptions.Disable, false)]
+    [InlineData(NullableContextOptions.Disable, true)]
     [InlineData(NullableContextOptions.Enable, true)]
     public void ProjectScopedImportsRequireExactDeclaredNullability(
         NullableContextOptions nullableContext, bool native)
@@ -278,11 +281,15 @@ public sealed class CanonicalNamespaceTests
             var original = Compile(source).WithOptions(new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: nullableContext));
             var generated = Compile(new CSharpEmitter().Emit(Parse(output.CalorSource!)));
+            var expected = nullableContext == NullableContextOptions.Disable
+                ? NullableAnnotation.None : NullableAnnotation.NotAnnotated;
+            Assert.Equal(nullableContext == NullableContextOptions.Disable,
+                output.CalorSource!.Contains(" nullable oblivious", StringComparison.Ordinal));
             foreach (var compilation in new[] { original, generated })
             {
                 var echo = Assert.Single(compilation.GetTypeByMetadataName("Witness.Probe")!.GetMembers("Echo").OfType<IMethodSymbol>());
-                Assert.Equal(NullableAnnotation.NotAnnotated, echo.ReturnNullableAnnotation);
-                Assert.Equal(NullableAnnotation.NotAnnotated, echo.Parameters.Single().NullableAnnotation);
+                Assert.Equal(expected, echo.ReturnNullableAnnotation);
+                Assert.Equal(expected, echo.Parameters.Single().NullableAnnotation);
             }
         }
     }
@@ -925,8 +932,9 @@ public sealed class CanonicalNamespaceTests
         var source = $"module Values\n  func Read () → object\n    !\n    return {expression}";
         var diagnostics = new DiagnosticBag();
         _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        // Line 4: the native body starts with its `!` effect row on line 3.
         Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken
-            && diagnostic.Span.Line == 3 && diagnostic.Span.Column == column);
+            && diagnostic.Span.Line == 4 && diagnostic.Span.Column == column);
         Assert.Equal("::", source.Substring(source.LastIndexOf('\n') + column, 2));
     }
 

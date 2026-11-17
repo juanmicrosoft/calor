@@ -72,7 +72,14 @@ public class Issue1173ConverterEffectRowTests
     [Fact]
     public void ReorderedNamespaceScopes_DoNotExchangeSameNamedMethodRows()
     {
-        var conversion = Convert(
+        // 0.30: a native module carries one namespace, so two namespaces convert as a
+        // project split (one module per namespace); same-named Worker.Run methods must still
+        // keep their own rows.
+        var project = new CSharpToCalorConverter(new ConversionOptions
+        {
+            ModuleName = "Issue1173",
+            AutoGenerateIds = true
+        }).ConvertProject(
             """
             using System.Collections.Generic;
             namespace Outer
@@ -81,20 +88,25 @@ public class Issue1173ConverterEffectRowTests
                 {
                     public void Run(List<int> values) { }
                 }
-                namespace Inner
+            }
+            namespace Outer.Inner
+            {
+                public class Worker
                 {
-                    public class Worker
-                    {
-                        public void Run(List<int> values) { values.Add(1); }
-                    }
+                    public void Run(List<int> values) { values.Add(1); }
                 }
             }
             """);
-        foreach (var module in new[] { conversion.Ast!, Parse(conversion.CalorSource!) })
+        Assert.True(project.Success, string.Join("\n", project.Outputs.SelectMany(output => output.Conversion.Issues)));
+        Assert.True(project.IsSplit);
+        Assert.Equal(2, project.Outputs.Count);
+        foreach (var output in project.Outputs)
         {
-            Assert.Equal(2, module.Classes.Count);
-            foreach (var cls in module.Classes)
+            var conversion = output.Conversion;
+            Assert.Empty(conversion.Losses);
+            foreach (var module in new[] { conversion.Ast!, Parse(conversion.CalorSource!) })
             {
+                var cls = Assert.Single(module.Classes);
                 var scope = Assert.Single(module.NamespaceScopes.Where(scope => scope.Id == cls.NamespaceScopeId));
                 var row = EffectEnforcementPass.GetDeclaredEffects(Assert.Single(cls.Methods).Effects);
                 if (scope.FullName == "Outer.Inner")
@@ -105,8 +117,8 @@ public class Issue1173ConverterEffectRowTests
                     Assert.Empty(row.Effects);
                 }
             }
+            Assert.Empty(EffectErrors(conversion.CalorSource!));
         }
-        Assert.Empty(EffectErrors(conversion.CalorSource!));
     }
 
     public static TheoryData<string, string, string, string> UnderDeclaredConstructs => new()

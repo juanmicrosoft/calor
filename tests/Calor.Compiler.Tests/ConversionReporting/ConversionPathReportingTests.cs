@@ -19,19 +19,23 @@ public class ConversionPathReportingTests : IDisposable
     private const string Fixtures = "tests/TestData/InteropScope/R0/fixtures";
 
     /// <summary>
-    /// A reduced version of RoundTripFailureStandIn: current Calor compilation refuses
-    /// its nullable array boundary. Labels and private properties no longer supply a failure.
+    /// A reduced version of RoundTripFailureStandIn: C# only warns (CS8603) when a
+    /// `string?` local is returned as `string`, but Calor refuses it (Calor0273), so the
+    /// emitted member parses and fails the round trip. 0.30 converts the earlier nullable
+    /// array boundary natively. The `#nullable enable` directive keeps the file out of the
+    /// oblivious-module certification, which preserves a whole disabled-context file
+    /// instead of rescuing one member.
     /// </summary>
     internal const string RoundTripFailure = """
         #nullable enable
         public class G
         {
-            public object[] Build()
+            public string Build()
             {
-                object[]? cells = Make();
-                return cells;
+                string? cell = Make();
+                return cell;
             }
-            private static string[] Make() => new string[] { "a", "b" };
+            private static string? Make() => "a";
         }
         """;
 
@@ -43,18 +47,32 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     // #1132 (0.25 F5) converts F5-ARRAY-01 and F5-ARRAY-02 natively, so they no longer trigger a rescue.
-    // These stand-ins keep each id's role: F5-ARRAY-02 a 1-member parse-failure rescue of class Probe
-    // (a switch expression as a one-dimensional array element), F5-ARRAY-01 a 2-member round-trip-failure
-    // rescue (an `object[]?` local bound from a call; both pre-existing on main).
+    // These stand-ins keep each id's role: F5-ARRAY-02 a 1-member parse-failure rescue of class Probe,
+    // F5-ARRAY-01 a 2-member round-trip-failure rescue. 0.30: the earlier switch-in-array-element and
+    // `object[]?` inputs no longer fail (the first stays statement interop, the second converts), so:
+    // F5-ARRAY-02 binds an `out var` of a user struct, which the converter lowers to
+    // `default(Probe.Cell)`, a form the native parser rejects (Calor0100); F5-ARRAY-01 returns a
+    // `string?` local as `string` and dereferences a `string?`, which C# only warns about and Calor
+    // refuses. Both keep `#nullable enable` so the member rescue is what reports (see RoundTripFailure).
     private const string ParseFailureStandIn = """
+        #nullable enable
         using System;
 
         public static class Probe
         {
+            public struct Cell { public int V; }
+
+            private static bool TryRead(int x, out Cell cell)
+            {
+                cell = new Cell { V = x };
+                return x > 0;
+            }
+
             public static int Pick(int x)
             {
-                int[] a = { x switch { 1 => 2, _ => 3 } };
-                return a[0];
+                if (TryRead(x, out var cell))
+                    return cell.V;
+                return 0;
             }
 
             public static string Run()
@@ -70,21 +88,21 @@ public class ConversionPathReportingTests : IDisposable
 
         public class Grid
         {
-            public object[] Build()
+            public string Build()
             {
-                object[]? cells = Make();
-                return cells;
+                string? cell = Make();
+                return cell;
             }
 
-            private static string[] Make() => new string[] { "a", "b" };
+            private static string? Make() => "a";
         }
 
         public static class Probe
         {
             public static string Run()
             {
-                object[]? cells = new Grid().Build();
-                return "" + cells.Length;
+                string? cell = new Grid().Build();
+                return "" + cell.Length;
             }
         }
         """;
@@ -293,7 +311,8 @@ public class ConversionPathReportingTests : IDisposable
     [Fact]
     public void F6_REPORT_11_ModuleNameAlias_RefusesAmbiguousGlobalAndNamespaceTypes()
     {
-        // Global Probe would be keyed as Custom.Probe; a real Custom.Probe makes that ambiguous.
+        // 0.30: ModuleName is only a file label, so a global Probe keeps the identity
+        // `global::Probe` and is never confused with a real Custom.Probe.
         var source = Fixture("F5-ARRAY-02").Replace("public static class Probe", "public static partial class Probe")
             + "\nnamespace Custom { public static partial class Probe { public static int Other() => 1; } }\n";
         Assert.Contains("partial class Probe", source);
@@ -305,12 +324,13 @@ public class ConversionPathReportingTests : IDisposable
 
         Assert.DoesNotContain(result.Losses, l => l.Feature == "post-validation-fallback" && l.Description.Contains("Custom.Probe"));
 
-        // Control: without the real Custom.Probe the aliased global Probe is rescued.
+        // Control: without the real Custom.Probe the global Probe is rescued under its own identity.
         var control = Convert(Fixture("F5-ARRAY-02"), new ConversionOptions
         {
             Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true, ModuleName = "Custom"
         });
-        Assert.Contains(control.Losses, l => l.Feature == "post-validation-fallback" && l.Description.Contains("Custom.Probe"));
+        Assert.Contains(control.Losses, l => l.Feature == "post-validation-fallback" && l.Description.Contains("'global::Probe'"));
+        Assert.DoesNotContain(control.Losses, l => l.Description.Contains("Custom.Probe"));
     }
 
     [Fact]
@@ -747,7 +767,11 @@ public class ConversionPathReportingTests : IDisposable
     [Fact]
     public async Task F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough()
     {
-        var dir = ProjectWithRoundTripFailure("F5-ARRAY-02", "F1-REFOUT-01");
+        var dir = ProjectWithRoundTripFailure("F5-ARRAY-02");
+        // 0.30: project conversion defers the C# round trip, so it does not certify an oblivious
+        // module, and F1-REFOUT-01's oblivious string arguments to Dictionary.TryGetValue fail
+        // Calor0274 (whole-file preservation). The native file is inline, as in the test above.
+        File.WriteAllText(Path.Combine(dir, "F1REFOUT01.cs"), "public static class Plain { public static int One() => 1; }");
 
         foreach (var passthroughOnError in new[] { false, true })
         {

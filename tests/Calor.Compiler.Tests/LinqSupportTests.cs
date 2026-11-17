@@ -369,10 +369,11 @@ module TestMod TestMod block
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("Where", result.CalorSource);
-        Assert.Contains("Select", result.CalorSource);
-        // Chained calls are now decomposed, recording "linq-method-chain" instead of "linq-method"
-        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+        // 0.30: native lambdas are inline expressions, so a chain stays one native call
+        // chain (the retired `_chain` temp decomposition and its "linq-method-chain" feature).
+        Assert.Contains("(numbers.Where((n) => (n > 0))).Select((n) => (n * 2))", result.CalorSource);
+        Assert.DoesNotContain("_chain", result.CalorSource);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]
@@ -397,7 +398,13 @@ module TestMod TestMod block
     [Fact]
     public void LinqQuery_Converter_SimpleWhereSelect()
     {
+        // 0.30: a query converts natively only when its range variable resolves (here through
+        // System.Linq over a declared array) and its selectors are inline native expressions;
+        // otherwise the statement stays C#.
         var csharpSource = """
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
             var evens = from n in numbers
                         where n % 2 == 0
                         select n;
@@ -407,55 +414,65 @@ module TestMod TestMod block
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("Where", result.CalorSource);
+        Assert.Contains("numbers.Where((int:n) => ((n % 2) == 0))", result.CalorSource);
         Assert.Contains("linq-query", result.Context.UsedFeatures);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]
     public void LinqQuery_Converter_GroupBy()
     {
         var csharpSource = """
-            var grouped = from p in products
-                          group p by p.Category;
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
+            var grouped = from n in numbers
+                          group n by n % 2;
             """;
 
         var result = _converter.Convert(csharpSource);
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("GroupBy", result.CalorSource);
+        Assert.Contains("numbers.GroupBy((int:n) => (n % 2))", result.CalorSource);
     }
 
     [Fact]
     public void LinqQuery_Converter_OrderBy()
     {
         var csharpSource = """
-            var sorted = from p in products
-                         orderby p.Name
-                         select p;
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
+            var sorted = from n in numbers
+                         orderby n
+                         select n;
             """;
 
         var result = _converter.Convert(csharpSource);
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("OrderBy", result.CalorSource);
+        Assert.Contains("numbers.OrderBy((int:n) => n)", result.CalorSource);
     }
 
     [Fact]
     public void LinqQuery_Converter_OrderByDescending()
     {
         var csharpSource = """
-            var sorted = from p in products
-                         orderby p.Price descending
-                         select p;
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
+            var sorted = from n in numbers
+                         orderby n descending
+                         select n;
             """;
 
         var result = _converter.Convert(csharpSource);
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("OrderByDescending", result.CalorSource);
+        Assert.Contains("numbers.OrderByDescending((int:n) => n)", result.CalorSource);
     }
 
     [Fact]

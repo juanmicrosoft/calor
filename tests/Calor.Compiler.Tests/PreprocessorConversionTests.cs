@@ -3010,6 +3010,12 @@ public class Test
                 new Lexer(calor, new DiagnosticBag()).TokenizeAll(),
                 token => token.Kind == TokenKind.Preprocessor);
 
+            // 0.30: a lossless refresh refuses an output whose conversion receipt does not
+            // match it (it may hold hand edits). The lossy runs above rewrote the output
+            // without updating the first run's receipt, so this run starts from a fresh one.
+            foreach (var stale in new[] { outputPath, outputPath + ".conversion.json", outputPath + ".conversion.lock" })
+                File.Delete(stale);
+
             var preserveSelected = await new ProjectMigrator(
                 new MigrationPlanOptions
                 {

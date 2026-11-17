@@ -51,7 +51,14 @@ public sealed class CanonicalEffectParameterTests
                 methods.Single(method => method.Name == "GetPrinter").Output!.Row).ToDisplayString());
         }
         else
-            Assert.All(module.Delegates, declaration => Assert.Null(declaration.Effects));
+            // D2: a callback row cannot be omitted (Calor0407); a delegate whose invocations the
+            // converter cannot bound declares the sound `! unknown` row, never a binder.
+            Assert.All(module.Delegates, declaration =>
+            {
+                Assert.NotNull(declaration.Effects);
+                Assert.True(EffectEnforcementPass.GetDeclaredEffects(declaration.Effects).IsUnknown);
+                Assert.Empty(declaration.Effects!.EffectVariables);
+            });
         Assert.Equal(Observe(before, filename), Observe(after, filename));
     }
 
@@ -144,7 +151,14 @@ public sealed class CanonicalEffectParameterTests
         Assert.NotNull(converted.Ast);
         var method = converted.Ast.Classes.Single(owner => owner.Name == "Callbacks").Methods.Single(method => method.Name == "Run");
         Assert.Empty(method.EffectParameters);
-        Assert.All(method.Parameters, parameter => Assert.Null(parameter.Row));
+        // D2: a callback parameter still declares a row (Calor0407), but an unsupported relation
+        // gets the sound `! unknown` row, never an effect variable.
+        Assert.All(method.Parameters.Where(parameter => parameter.Row != null), parameter =>
+        {
+            Assert.StartsWith("Func<", parameter.TypeName, StringComparison.Ordinal);
+            Assert.True(EffectEnforcementPass.GetDeclaredEffects(parameter.Row).IsUnknown);
+            Assert.Empty(parameter.Row!.EffectVariables);
+        });
     }
 
     [Theory]
@@ -154,7 +168,7 @@ public sealed class CanonicalEffectParameterTests
     [InlineData("Func<int>", "return () => Other();", null)]
     [InlineData("Func<int>", "if (choice) return () => 1; return () => Other();", null)]
     [InlineData("Action", "return existing;", null)]
-    public void ReturnedRowsUseAllNativeLambdaFactsAndNeverUnknownDeclarations(
+    public void ReturnedRowsUseAllNativeLambdaFactsAndOtherwiseDeclareUnknown(
         string returnType, string body, string? expected)
     {
         var converted = new CSharpToCalorConverter(new() { Fidelity = ConversionFidelity.Lossy,
@@ -168,8 +182,13 @@ public sealed class CanonicalEffectParameterTests
             """);
         Assert.True(converted.Success, string.Join("\n", converted.Issues));
         var output = converted.Ast!.Classes.Single().Methods.Single(method => method.Name == "Make").Output!;
+        // D2: a returned callback row cannot be omitted; when the native lambda facts do not
+        // bound it (an uncontracted callee, a returned parameter) it is the sound `! unknown`.
         if (expected == null)
-            Assert.True(output.Row == null, converted.CalorSource);
+        {
+            Assert.True(output.Row != null, converted.CalorSource);
+            Assert.True(EffectEnforcementPass.GetDeclaredEffects(output.Row).IsUnknown, converted.CalorSource);
+        }
         else
         {
             Assert.True(output.Row != null, converted.CalorSource);

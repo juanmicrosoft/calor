@@ -18,7 +18,7 @@ namespace Calor.Compiler.Tests.ConversionReporting;
 public class LossyRoundTripReportingTests : IDisposable
 {
     /// <summary>
-    /// A nullable array local still fails the round trip, unlike the repaired label/property fixtures.
+    /// A `string?` local returned as `string` still fails the round trip (Calor0273); C# only warns.
     /// </summary>
     private const string NullableArray = ConversionPathReportingTests.RoundTripFailure;
 

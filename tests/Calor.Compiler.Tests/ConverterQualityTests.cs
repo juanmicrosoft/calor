@@ -471,8 +471,8 @@ public class ConverterQualityTests
     [Fact]
     public void Ternary_WithMethodCallBranches_Decomposes()
     {
-        // Ternary where branches are method calls (emitted as §C{...} §/C)
-        // should be decomposed into §IF/§EL/§/I
+        // Ternary where branches are method calls. 0.30: native calls are inline
+        // expressions, so the conditional stays one expression (no if/else decomposition).
         var csharp = """
             public class Test
             {
@@ -487,11 +487,7 @@ public class ConverterQualityTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Should NOT contain (? ... §C ...) inline
-        Assert.DoesNotContain("(? flag §C", result.CalorSource);
-        // Should contain the decomposed form
-        Assert.Contains("if ", result.CalorSource);
-        Assert.Contains("else", result.CalorSource);
+        Assert.Contains("return (flag ? Helper() : Other())", result.CalorSource);
 
         // Should parse and compile
         var compileResult = Program.Compile(result.CalorSource);

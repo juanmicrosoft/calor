@@ -689,6 +689,12 @@ public sealed class CSharpToCalorConverter
                     generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal);
         }
 
+        // The certification compiles check the binder and effects here, and check the
+        // generated C# in MetadataMatches, which compiles it inside the original compilation
+        // (its references with their aliases, and sibling project trees). Program.Compile's
+        // own standalone C# validation has neither, so a call into a referenced assembly or a
+        // sibling type failed it and a faithful native conversion was preserved whole.
+
         // Preserved declarations also inherit the emitted nullable context.
         if (attempted.Success && attempted.CalorSource is { } current)
         {
@@ -696,6 +702,7 @@ public sealed class CSharpToCalorConverter
             {
                 IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
                 ProjectDirectory = _options.ProjectDirectory,
+                DeferGeneratedOutputValidation = true,
                 CancellationToken = cancellationToken
             });
             if (!compiledCurrent.HasErrors && MetadataMatches(compiledCurrent.GeneratedCode, out _))
@@ -757,11 +764,13 @@ public sealed class CSharpToCalorConverter
                 "The oblivious module candidate did not produce successful, entirely native Calor "
                 + "or direct, lossless member preservation; the replacement could not be certified.", candidate);
         // Reparse the actual deliverable and enforce the normal binder/effect
-        // checks. No deferred or unchecked output can authorize this recovery.
+        // checks. No unchecked output can authorize this recovery: the generated
+        // C# is compiled in the original context by MetadataMatches below.
         var compiled = Program.Compile(calorSource, sourceFile, new CompilationOptions
         {
             IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
             ProjectDirectory = _options.ProjectDirectory,
+            DeferGeneratedOutputValidation = true,
             CancellationToken = cancellationToken
         });
         if (compiled.HasErrors)
@@ -2092,10 +2101,11 @@ public sealed class CSharpToCalorConverter
                     ? ConversionTrigger.RoundTripFailure
                     : null;
 
-        // #1144 (F6-REPORT-11): the visitor gives a global-namespace type the
-        // caller's ModuleName as its namespace identity, so the source side must
-        // use the same fallback or a custom module name disables the rescue.
-        var sources = CollectTopLevelTypeSources(root, context.ModuleName);
+        // #1144 (F6-REPORT-11): the source side must key a type exactly as the
+        // visitor does, or a custom module name disables the rescue. 0.30: ModuleName
+        // is only a file label and a global type keeps its global identity
+        // (`global::Probe`), so global sources are keyed without the module name.
+        var sources = CollectTopLevelTypeSources(root, globalNamespaceIdentity: null);
         var triggers = new List<string>();
 
         var failedClasses = new List<ClassDefinitionNode>();

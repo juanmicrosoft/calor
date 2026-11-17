@@ -12467,7 +12467,19 @@ public sealed class Parser
             if (Current.Span.Line == startToken.Span.Line && Check(TokenKind.Identifier))
             {
                 var visibilityToken = Advance();
-                attrs.Add("_pos0", visibilityToken.Text, visibilityToken.Span);
+                var visibilityWord = visibilityToken.Text;
+                var visibilitySpan = visibilityToken.Span;
+                // A two-word accessibility (`set protected internal`, `get private protected`)
+                // is one visibility, as on the declaration line.
+                if (Current.Span.Line == startToken.Span.Line && Check(TokenKind.Identifier)
+                    && ((visibilityWord == "protected" && Current.Text == "internal")
+                        || (visibilityWord == "private" && Current.Text == "protected")))
+                {
+                    var second = Advance();
+                    visibilityWord += "-" + second.Text;
+                    visibilitySpan = visibilitySpan.Union(second.Span);
+                }
+                attrs.Add("_pos0", visibilityWord, visibilitySpan);
             }
         }
         else attrs = ParseAttributes();

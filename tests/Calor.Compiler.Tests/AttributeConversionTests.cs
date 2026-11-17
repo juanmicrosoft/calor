@@ -12,6 +12,10 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class AttributeConversionTests
 {
+    // The native-conversion inputs below declare no base type: without the ASP.NET Core
+    // assembly an unresolved base (`: ControllerBase`) could be a class or an interface, so
+    // the converter keeps that class as C# (`class-unresolved-base-kind`). The attributes
+    // themselves need no resolution to be preserved.
     private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     #region C# to Calor Attribute Conversion Tests
@@ -24,7 +28,7 @@ public class AttributeConversionTests
 
             [Route("api/[controller]")]
             [ApiController]
-            public class TestController : ControllerBase
+            public class TestController
             {
             }
             """;
@@ -55,7 +59,7 @@ public class AttributeConversionTests
         var csharpSource = """
             using Microsoft.AspNetCore.Mvc;
 
-            public class TestController : ControllerBase
+            public class TestController
             {
                 [HttpPost]
                 public void Post()
@@ -128,7 +132,7 @@ public class AttributeConversionTests
             using Microsoft.AspNetCore.Mvc;
             using Microsoft.AspNetCore.Authorization;
 
-            public class TestController : ControllerBase
+            public class TestController
             {
                 [HttpGet("status")]
                 [Authorize]
@@ -228,7 +232,7 @@ public class AttributeConversionTests
 
             [Route("api/test")]
             [ApiController]
-            public class TestController : ControllerBase
+            public class TestController
             {
             }
             """;
@@ -249,7 +253,7 @@ public class AttributeConversionTests
         var csharpSource = """
             using Microsoft.AspNetCore.Mvc;
 
-            public class TestController : ControllerBase
+            public class TestController
             {
                 [HttpPost]
                 public void Post() { }

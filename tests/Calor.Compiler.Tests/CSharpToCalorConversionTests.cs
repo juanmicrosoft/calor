@@ -1117,8 +1117,11 @@ public class CSharpToCalorConversionTests
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = false });
         var result = converter.Convert(csharpSource);
 
-        // __makeref is now supported, so conversion should succeed
-        Assert.True(result.Success, GetErrorMessage(result));
+        // 0.30: __makeref has no native form (typed-reference); with the fallback disabled the
+        // unsupported construct is an error and the conversion fails.
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue =>
+            issue.Severity == ConversionIssueSeverity.Error && issue.Feature == "typed-reference");
     }
 
     [Fact]
@@ -1220,9 +1223,11 @@ public class CSharpToCalorConversionTests
         });
         var result = converter.Convert(csharpSource);
 
-        Assert.False(result.Success);
+        // 0.30: a type pattern combined with a property pattern converts to a native `and` pattern.
+        Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
+        Assert.Contains("case (and string s { Length: > 5 }) → \"long\"", result.CalorSource);
+        Assert.DoesNotContain(result.Issues, issue => issue.Feature == "generated-calor-validation");
     }
 
     [Fact]
@@ -1709,59 +1714,17 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Should NOT contain raw C# embedded in Calor (the old buggy behavior)
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
-        // Should contain the chain feature usage
-        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+        // 0.30: native lambdas are inline expressions, so a chain stays one native call
+        // chain; the retired `_chain` temps (and the "linq-method-chain" feature) are gone.
+        Assert.Contains("let int:result = (numbers.Where((int:n) => (n > 2))).First()", result.CalorSource);
+        AssertNativeChain(result);
     }
 
-    [Fact]
-    public void Convert_LinqChainedCall_ProducesMultipleBindStatements()
+    private static void AssertNativeChain(ConversionResult result)
     {
-        var csharpSource = """
-            using System.Linq;
-
-            var numbers = new[] { 1, 2, 3, 4, 5 };
-            var result = numbers.Where(n => n > 2).First();
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.Ast);
-
-        var mainFunc = result.Ast.Functions[0];
-        // Should have more than 2 statements: numbers decl + chain intermediate + result
-        Assert.True(mainFunc.Body.Count >= 3,
-            $"Expected at least 3 statements (decomposed chain), got {mainFunc.Body.Count}");
-    }
-
-    [Fact]
-    public void Convert_LinqChainedCall_IntermediateBindsHaveNoType()
-    {
-        var csharpSource = """
-            using System.Linq;
-
-            var numbers = new[] { 1, 2, 3 };
-            var result = numbers.Where(n => n > 1).Select(n => n * 2).ToList();
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.Ast);
-
-        var mainFunc = result.Ast.Functions[0];
-        // Find intermediate chain binds (they have generated names like _chain001)
-        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-
-        Assert.True(chainBinds.Count >= 2, $"Expected at least 2 intermediate chain binds, got {chainBinds.Count}");
-        foreach (var bind in chainBinds)
-        {
-            Assert.Null(bind.TypeName); // Intermediate binds should have no explicit type
-        }
+        Assert.DoesNotContain("_chain", result.CalorSource);
+        Assert.DoesNotContain("raw ", result.CalorSource);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]
@@ -1875,40 +1838,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Should contain decomposed chain, not embedded C#
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
-        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
-    }
-
-    [Fact]
-    public void Convert_LinqChainInMethodBody_IntermediateBindsHaveNoType()
-    {
-        var csharpSource = """
-            public class Service
-            {
-                public void Process(int[] numbers)
-                {
-                    var result = numbers.Where(n => n > 0).Select(n => n * 2).ToList();
-                }
-            }
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.Ast);
-
-        var cls = result.Ast.Classes[0];
-        var method = cls.Methods[0];
-        var chainBinds = method.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-
-        Assert.True(chainBinds.Count >= 2, $"Expected at least 2 intermediate chain binds, got {chainBinds.Count}");
-        foreach (var bind in chainBinds)
-        {
-            Assert.Null(bind.TypeName); // Intermediate binds should have no explicit type
-        }
+        Assert.Contains("let result = (numbers.Where((n) => (n > 0))).First()", result.CalorSource);
+        AssertNativeChain(result);
     }
 
     [Fact]
@@ -1929,22 +1860,12 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
-        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+        Assert.Contains("return (numbers.Where((n) => (n > 0))).First()", result.CalorSource);
+        AssertNativeChain(result);
 
-        // Should have intermediate bind + return in the method body
-        var cls = result.Ast!.Classes[0];
-        var method = cls.Methods[0];
-        Assert.True(method.Body.Count >= 2,
-            $"Expected at least 2 statements (intermediate bind + return), got {method.Body.Count}");
-
-        // Last statement should be a return
-        Assert.IsType<ReturnStatementNode>(method.Body[^1]);
-        // Previous statements should be intermediate chain binds
-        var chainBinds = method.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-        Assert.NotEmpty(chainBinds);
+        // The chain is the return statement's own expression: nothing is hoisted ahead of it.
+        var method = result.Ast!.Classes[0].Methods[0];
+        Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body));
     }
 
     [Fact]
@@ -1988,50 +1909,18 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.Ast);
+        AssertNativeChain(result);
 
         var mainFunc = result.Ast.Functions[0];
-        // Intermediate chain binds should have null type
-        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-        Assert.NotEmpty(chainBinds);
-        foreach (var bind in chainBinds)
-        {
-            Assert.Null(bind.TypeName);
-        }
+        // The chain stays inline; only the declared binding carries a type.
+        Assert.Contains("let IEnumerable<int>:result = (numbers.Where((n) => (n > 0))).Select((n) => (n * 2))",
+            result.CalorSource);
 
         // Final bind ("result") should have the declared type
         var resultBind = mainFunc.Body.OfType<BindStatementNode>()
             .FirstOrDefault(b => b.Name == "result");
         Assert.NotNull(resultBind);
         Assert.NotNull(resultBind.TypeName);
-    }
-
-    [Fact]
-    public void Convert_ThreeStepChain_ProducesCorrectIntermediates()
-    {
-        // Three-step chain: numbers.Where(...).OrderBy(...).ToList()
-        var csharpSource = """
-            using System.Linq;
-
-            var numbers = new[] { 3, 1, 2 };
-            var sorted = numbers.Where(n => n > 0).OrderBy(n => n).ToList();
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.Ast);
-
-        var mainFunc = result.Ast.Functions[0];
-        // Should have: numbers decl + 2 intermediate binds + final bind = 4 statements
-        Assert.True(mainFunc.Body.Count >= 4,
-            $"Expected at least 4 statements for 3-step chain, got {mainFunc.Body.Count}");
-
-        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-        Assert.Equal(2, chainBinds.Count);
     }
 
     [Fact]
@@ -2085,7 +1974,7 @@ public class CSharpToCalorConversionTests
     #region Expression-Level Chain Hoisting Tests
 
     [Fact]
-    public void Convert_LinqChainInIfCondition_HoistsToTempBind()
+    public void Convert_LinqChainInIfCondition_StaysInline()
     {
         var csharpSource = """
             if (numbers.Where(n => n > 0).Any())
@@ -2098,14 +1987,13 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // The chain should be hoisted: a temp _chain bind before the if
-        Assert.Contains("_chain", result.CalorSource);
-        // Should NOT contain the broken CalorEmitter serialization pattern
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        // 0.30: the chain is the condition itself; no temp is hoisted before the if.
+        Assert.Contains("if (numbers.Where((n) => (n > 0))).Any()", result.CalorSource);
+        AssertNativeChain(result);
     }
 
     [Fact]
-    public void Convert_LinqChainAsMethodArgument_HoistsToTempBind()
+    public void Convert_LinqChainAsMethodArgument_StaysInline()
     {
         var csharpSource = """
             Console.WriteLine(numbers.Where(n => n > 0).Count());
@@ -2115,13 +2003,12 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // The chain should be hoisted: a temp _chain bind before the call
-        Assert.Contains("_chain", result.CalorSource);
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        Assert.Contains("System.Console.WriteLine((numbers.Where((n) => (n > 0))).Count())", result.CalorSource);
+        AssertNativeChain(result);
     }
 
     [Fact]
-    public void Convert_LinqChainInWhileCondition_HoistsToTempBind()
+    public void Convert_LinqChainInWhileCondition_StaysInline()
     {
         var csharpSource = """
             while (items.Where(x => x.Active).Any())
@@ -2134,8 +2021,9 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("_chain", result.CalorSource);
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        // A while condition runs on every iteration, so it must not be hoisted ahead of the loop.
+        Assert.Contains("while (items.Where((x) => x . Active)).Any()", result.CalorSource);
+        AssertNativeChain(result);
     }
 
     [Fact]
@@ -2155,7 +2043,7 @@ public class CSharpToCalorConversionTests
     }
 
     [Fact]
-    public void Convert_ThreeDeepChainInArgument_HoistsAllLevels()
+    public void Convert_ThreeDeepChainInArgument_StaysInline()
     {
         var csharpSource = """
             Console.WriteLine(numbers.Where(n => n > 0).OrderBy(n => n).First());
@@ -2165,10 +2053,9 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // A 3-deep chain should produce at least 2 temp binds (_chain for Where, _chain for OrderBy)
-        var chainCount = System.Text.RegularExpressions.Regex.Matches(result.CalorSource!, "_chain").Count;
-        Assert.True(chainCount >= 2, $"Expected at least 2 _chain temp binds, got {chainCount}. Calor:\n{result.CalorSource}");
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        Assert.Contains("System.Console.WriteLine((numbers.Where((n) => (n > 0))).OrderBy((n) => n).First())",
+            result.CalorSource);
+        AssertNativeChain(result);
     }
 
     #endregion
@@ -2417,12 +2304,13 @@ public class CSharpToCalorConversionTests
             compilationResult.Diagnostics,
             d => d.Code == DiagnosticCode.UnknownExternalCall);
 
-        // Calor0419 REMAINS, and should: the manifest says the LINQ operators are
-        // pure but cannot verify what the lambdas handed to them do, so the row is
-        // an assumption rather than a proof. That is the designed outcome, not the
-        // defect #1128 reported, and asserting it keeps a future "fix" from
-        // silencing an honest warning.
-        Assert.Contains(
+        // The manifest says the LINQ operators are pure but cannot verify what the
+        // lambdas handed to them do. 0.30: the converter writes that honestly as the
+        // sound `! unknown` row instead of a narrower row accepted as an assumption,
+        // and a declared `! unknown` assumes nothing, so Calor0419 no longer fires.
+        // Pin the row so a future "fix" cannot narrow it to an unverified claim.
+        Assert.Contains("    func Run ()\n      ! unknown\n", conversionResult.CalorSource!.Replace("\r\n", "\n"));
+        Assert.DoesNotContain(
             compilationResult.Diagnostics,
             d => d.Code == DiagnosticCode.AssumedEffects);
     }
@@ -3981,11 +3869,15 @@ public class CSharpToCalorConversionTests
     [Fact]
     public void PartialClassMerger_PreservesBaseClass()
     {
+        // The base type is declared so it resolves: an unresolved base could be a class or an
+        // interface, and the converter keeps such a class as C# (class-unresolved-base-kind).
         var csharp1 = """
             public partial class Bar : BaseType
             {
                 public void MethodA() { }
             }
+
+            public class BaseType { }
             """;
 
         var csharp2 = """
@@ -4021,6 +3913,8 @@ public class CSharpToCalorConversionTests
     public void PartialClassMerger_MergesInterfaces()
     {
         var csharp1 = """
+            using System;
+
             public partial class Baz : IDisposable
             {
                 public void Dispose() { }
@@ -4028,6 +3922,8 @@ public class CSharpToCalorConversionTests
             """;
 
         var csharp2 = """
+            using System;
+
             public partial class Baz : ICloneable
             {
                 public object Clone() { return this; }
@@ -4113,7 +4009,11 @@ public class CSharpToCalorConversionTests
     [Fact]
     public void PartialClassMerger_DifferentNamespaces_DoesNotMerge()
     {
+        // 0.30: ModuleName is only a file label and no longer changes a global type's CLR
+        // namespace, so the two partials must live in different C# namespaces to stay apart.
         var csharp1 = """
+            namespace App.Models;
+
             public partial class Widget
             {
                 public int X { get; set; }
@@ -4121,13 +4021,15 @@ public class CSharpToCalorConversionTests
             """;
 
         var csharp2 = """
+            namespace App.Views;
+
             public partial class Widget
             {
                 public int Y { get; set; }
             }
             """;
 
-        // Different module names = different namespaces — should NOT merge
+        // Different namespaces — should NOT merge
         var result1 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "App.Models" }).Convert(csharp1);
         var result2 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "App.Views" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));

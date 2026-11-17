@@ -422,7 +422,9 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = fieldAccess.Accept(emitter);
 
-        Assert.Equal("this.Name", output);
+        // 0.30: a structural member access prints spaced (`a . b`); `a.b` would reparse as
+        // one dotted name rather than a FieldAccessNode.
+        Assert.Equal("this . Name", output);
         Assert.DoesNotContain("§THIS", output);
     }
 
@@ -435,7 +437,7 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = fieldAccess.Accept(emitter);
 
-        Assert.Equal("base.Name", output);
+        Assert.Equal("base . Name", output);
         Assert.DoesNotContain("§BASE", output);
     }
 
@@ -904,11 +906,13 @@ public class ConverterImprovementTests
         var method = Assert.Single(cls.Methods);
         var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
 
-        // Upper bound should be (- 3 1) for the proven constant range.
-        var to = Assert.IsType<BinaryOperationNode>(loop.To);
-        Assert.Equal(BinaryOperator.Subtract, to.Operator);
-        var right = Assert.IsType<IntLiteralNode>(to.Right);
-        Assert.Equal(1, right.Value);
+        // 0.30: an exclusive bound is kept as the native loop condition `(i < 3)` instead of
+        // being rewritten to the inclusive bound `(- 3 1)`.
+        var condition = Assert.IsType<BinaryOperationNode>(loop.Condition);
+        Assert.Equal(BinaryOperator.LessThan, condition.Operator);
+        Assert.Equal(3, Assert.IsType<IntLiteralNode>(condition.Right).Value);
+        Assert.NotNull(loop.Update);
+        Assert.Contains("for i = 0; (i < 3); @i = (@i + 1)", result.CalorSource);
     }
 
     [Fact]
@@ -959,10 +963,11 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        var scope = Assert.IsType<IfStatementNode>(method.Body[0]);
-        var loop = Assert.Single(scope.ThenBody.OfType<WhileStatementNode>());
-        Assert.Contains(loop.Body.OfType<IfStatementNode>(), guard =>
-            guard.ElseBody?.SingleOrDefault() is BreakStatementNode);
+        // 0.30: the native loop keeps its condition and re-evaluates `arr.Length` on every
+        // iteration (no while-loop lowering is needed to keep that).
+        var loop = Assert.IsType<ForStatementNode>(Assert.Single(method.Body));
+        Assert.True(loop.ReevaluatesCondition);
+        Assert.Contains("for i = 0; (i < arr . Length); @i = (@i + 1)", result.CalorSource);
         Assert.DoesNotContain(result.Losses, loss =>
             loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
     }
@@ -990,11 +995,11 @@ public class ConverterImprovementTests
         var method = Assert.Single(cls.Methods);
         var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
 
-        // Upper bound should be (+ 0 1) for the proven constant range.
-        var to = Assert.IsType<BinaryOperationNode>(loop.To);
-        Assert.Equal(BinaryOperator.Add, to.Operator);
-        var right = Assert.IsType<IntLiteralNode>(to.Right);
-        Assert.Equal(1, right.Value);
+        // 0.30: the exclusive bound stays the native loop condition `(i > 0)`.
+        var condition = Assert.IsType<BinaryOperationNode>(loop.Condition);
+        Assert.Equal(BinaryOperator.GreaterThan, condition.Operator);
+        Assert.Equal(0, Assert.IsType<IntLiteralNode>(condition.Right).Value);
+        Assert.Contains("for i = 10; (i > 0); @i = (@i - 1)", result.CalorSource);
     }
 
     #endregion
@@ -1663,8 +1668,9 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(result.Ast!);
 
-        // Should emit the enum member access as a default value
-        Assert.Contains("= StringComparison.Ordinal", output);
+        // Should emit the enum member access as a default value (a structural member access
+        // prints spaced in native Calor).
+        Assert.Contains("StringComparison:comparison = StringComparison . Ordinal", output);
     }
 
     [Fact]
