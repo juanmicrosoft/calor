@@ -182,10 +182,17 @@ public class Calor0270CorpusVolumeTests
         var committed = expectation.Volume;
         var measured = observation.Volume;
         // Anti-vacuity: a ledger that measured nothing would pass every equality
-        // below. The corpus binds hundreds of modules; assert the denominator.
-        Assert.True(measured.AggregateModulesBound > 250,
-            $"Only {measured.AggregateModulesBound} modules bound — the corpus denominator "
-            + "collapsed, so the equalities below would be vacuous.");
+        // below. Every one of the 364 inputs is either bound or a pinned refusal, and
+        // the bound side is still the majority of the corpus. 0.30: the denominator
+        // is the CONVERTED modules (204), not all 364. Files the converter refuses
+        // under the legs' options (no Calor at all) are counted in ModulesNotMeasured
+        // and pinned by name and cause in the current fixture; before 0.30 every
+        // input converted, so the old "> 250 bound" guard measured the same set.
+        Assert.Equal(OriginalInputCount, measured.AggregateModulesBound
+            + measured.PerSubject.Sum(subject => subject.ModulesNotMeasured));
+        Assert.True(measured.AggregateModulesBound > OriginalInputCount / 2,
+            $"Only {measured.AggregateModulesBound} of {OriginalInputCount} modules bound — the "
+            + "corpus denominator collapsed, so the equalities below would be vacuous.");
 
         Assert.Equal(committed.PerSubject.Count, measured.PerSubject.Count);
         foreach (var (expected, actual) in committed.PerSubject.Zip(measured.PerSubject))
@@ -214,6 +221,10 @@ public class Calor0270CorpusVolumeTests
         {
             var observed = observation.Files[file];
             Assert.True(identity.SourceHash == observed.SourceHash, $"Source input changed: {file}");
+            Assert.True(identity.Refusal == observed.Refusal,
+                $"Conversion refusal moved for {file}: committed '{identity.Refusal ?? "<converted>"}', "
+                + $"measured '{observed.Refusal ?? "<converted>"}'. A file that starts or stops "
+                + "converting, or is refused for a different cause, is a ledger move to adjudicate.");
             Assert.True(identity.Sites.SequenceEqual(observed.Sites),
                 $"Calor0270 named diagnostic sites moved for {file}.\n"
                 + $"Expected: {JsonSerializer.Serialize(identity.Sites)}\n"
@@ -239,29 +250,88 @@ public class Calor0270CorpusVolumeTests
             "bench", "phase0-agent-native", "binder-source-coverage.json")));
         var inputs = original.RootElement.EnumerateObject()
             .OrderBy(property => property.Name, StringComparer.Ordinal).ToArray();
-        Assert.Equal(364, inputs.Length);
+        Assert.Equal(OriginalInputCount, inputs.Length);
         Assert.Equal(inputs.Select(input => input.Name), expected.Files.Keys);
         foreach (var input in inputs)
             Assert.Equal(input.Value.GetProperty("SourceHash").GetString(), expected.Files[input.Name].SourceHash);
     }
 
+    private const int OriginalInputCount = 364;
+
+    /// <summary>
+    /// The current fixture's volumes, restated.
+    /// <para><b>0.30 refresh: 260 diagnostics / 48 modules / 364 bound became
+    /// 14 / 7 / 204 bound + 160 refused.</b> Every move has one of three causes.</para>
+    /// <list type="number">
+    /// <item><b>160 refusals (222 diagnostics over 37 modules leave).</b> Since
+    /// 92b4d8c42 a file whose <c>using</c> directives sit inside its namespace converts
+    /// under Lossy/SelectActiveBranchLossy only if its original C# compiles in the
+    /// per-file semantic model and the result is fully native and compiles as Calor;
+    /// otherwise the converter returns no Calor. 141 fail the source validation
+    /// (siblings, package types or generated code missing from a one-file model),
+    /// 6 are not fully native or fail the Calor/C# re-check, and 13 have a
+    /// namespace topology no native module header can express. Each refused file
+    /// is pinned by name and cause; none is silently dropped. Giving each file the
+    /// project context <c>calor migrate</c> uses (evaluated Compile items, references,
+    /// defines, language version) was measured on 2026-11-17: 14 recover and 4 newly
+    /// refuse (150 refused); adding FluentValidation's source-generator output lowers
+    /// that to about 133. Most refusals are the strict lossy path itself, not missing
+    /// context, so the legs keep their one-file options.</item>
+    /// <item><b>Positions only.</b> LoggerSinkConfiguration, LogContext,
+    /// FailureAwareBatchScheduler, CallableConfigurationMethodFinder,
+    /// SettingValueConversions and one ServiceRegistrar <c>type</c> receiver keep the
+    /// same span text and message at new lines: the 0.30 emitter (af5d914ab) writes
+    /// indentation-only native blocks without closer lines.</item>
+    /// <item><b>38 → 14 in 7 converted files, each by a named change.</b>
+    /// (a) fb2b3fe06 resolves primitive metadata property results, so bool and long
+    /// member reads stop reporting: 4 <c>i.IsGenericType</c> (MediatrServiceConfiguration),
+    /// <c>x.IsGenericType</c>, <c>type.IsClass</c>, <c>type.IsAbstract</c>,
+    /// <c>type.IsGenericType</c> (ServiceRegistrar) and <c>Stopwatch.Frequency</c>
+    /// (TimeProvider): -9. (b) af5d914ab prints LINQ chains natively instead of
+    /// hoisting <c>_chain</c> temporaries, so the local keeps its declared type
+    /// (<c>IEnumerable&lt;Type&gt;</c>, <c>List&lt;Type[]&gt;</c>) and the receiver
+    /// resolves: 4 <c>implementedGenericInterfaces</c> and 1
+    /// <c>constraintsForEachParameter</c>: -5. The same change makes a former dotted
+    /// name a native member read, whose struct result is outside the supported scalar
+    /// reads: <c>cts . Token</c> (ServiceRegistrar) and <c>DateTime . UtcNow</c>
+    /// (SelfLog): +2. (c) 015ee950f keeps AddMediatRClasses and
+    /// ConnectImplementationsToTypesClosing as C# (<c>default-expression</c>), so their
+    /// receivers are not bound: -7. (d) 047dd14b8 (<c>class-unresolved-base-kind</c>)
+    /// keeps PropertyValueConverter, ReusableStringWriter and KeyValuePairSettings as C#
+    /// classes: -5. Total 38 - 9 - 5 + 2 - 7 - 5 = 14. Attributed by diffing this
+    /// leg's output at 2cc3cf3e5 (where the fixture was pinned) against the current
+    /// output, file by file.</item>
+    /// </list>
+    /// </summary>
     [Fact]
     public void CurrentExpectation_PinsOriginalInputsAndExactVolumes()
     {
         var expected = ReadCurrentExpectation();
-        Assert.Equal(260, expected.Volume.AggregateDiagnostics);
-        Assert.Equal(48, expected.Volume.AggregateModulesWithDiagnostics);
-        Assert.Equal(364, expected.Volume.AggregateModulesBound);
+        Assert.Equal(14, expected.Volume.AggregateDiagnostics);
+        Assert.Equal(7, expected.Volume.AggregateModulesWithDiagnostics);
+        Assert.Equal(204, expected.Volume.AggregateModulesBound);
         Assert.Equal(new[]
         {
-            new SubjectVolume("MediatR", 29, 4, 36, 0),
-            new SubjectVolume("serilog", 17, 9, 112, 0),
-            new SubjectVolume("FluentValidation", 214, 35, 216, 0)
+            new SubjectVolume("MediatR", 2, 1, 24, 12),
+            new SubjectVolume("serilog", 12, 6, 111, 1),
+            new SubjectVolume("FluentValidation", 0, 0, 69, 147)
         }, expected.Volume.PerSubject);
+        // The 160 refusals, by cause. Each is a file the converter returns no Calor for
+        // under the legs' options (see the 0.30 note on AggregateDiagnostics below).
+        Assert.Equal(new Dictionary<string, int>
+        {
+            ["namespace-topology"] = 13,
+            ["scoped-namespace-fidelity"] = 6,
+            ["scoped-namespace-source-validation"] = 141,
+        }, expected.Files.Values.Where(file => file.Refusal != null)
+            .GroupBy(file => file.Refusal!).ToDictionary(group => group.Key, group => group.Count()));
         foreach (var subject in expected.Volume.PerSubject)
         {
-            var files = expected.Files.Where(pair => pair.Key.StartsWith(subject.Subject + "/",
+            var allFiles = expected.Files.Where(pair => pair.Key.StartsWith(subject.Subject + "/",
                 StringComparison.Ordinal)).Select(pair => pair.Value).ToArray();
+            Assert.Equal(subject.ModulesNotMeasured, allFiles.Count(file => file.Refusal != null));
+            Assert.All(allFiles.Where(file => file.Refusal != null), file => Assert.Empty(file.Sites));
+            var files = allFiles.Where(file => file.Refusal == null).ToArray();
             Assert.Equal(subject.ModulesBound, files.Length);
             Assert.Equal(subject.Diagnostics, files.Sum(file => file.Sites.Count));
             Assert.Equal(subject.ModulesWithDiagnostics, files.Count(file => file.Sites.Count > 0));
@@ -292,6 +362,9 @@ public class Calor0270CorpusVolumeTests
     [InlineData("extra-file")]
     [InlineData("wrong-file")]
     [InlineData("wrong-volume")]
+    [InlineData("refused-to-converted")]
+    [InlineData("converted-to-refused")]
+    [InlineData("wrong-refusal-cause")]
     public void CurrentExpectation_RejectsCountPreservingAndInputMutations(string mutation)
     {
         var expected = ReadCurrentExpectation();
@@ -323,6 +396,18 @@ public class Calor0270CorpusVolumeTests
                 files[file] = identity with { Sites = [] };
                 break;
             case "wrong-volume": volume = volume with { AggregateDiagnostics = volume.AggregateDiagnostics + 1 }; break;
+            case "refused-to-converted":
+                var refused = files.First(pair => pair.Value.Refusal != null).Key;
+                files[refused] = files[refused] with { Refusal = null };
+                break;
+            case "converted-to-refused":
+                var converted = files.First(pair => pair.Value.Refusal == null && pair.Value.Sites.Count == 0).Key;
+                files[converted] = files[converted] with { Refusal = "namespace-topology" };
+                break;
+            case "wrong-refusal-cause":
+                var cause = files.First(pair => pair.Value.Refusal != null).Key;
+                files[cause] = files[cause] with { Refusal = files[cause].Refusal + ",changed" };
+                break;
             default: throw new ArgumentOutOfRangeException(nameof(mutation));
         }
         if (mutation is "moved-site" or "wrong-code" or "wrong-message" or "wrong-text"
@@ -385,9 +470,11 @@ public class Calor0270CorpusVolumeTests
         string file, string receiver, int warningCount)
     {
         var observed = MeasureFile(Path.Combine(RepoRoot(), "bench", "corpus", file));
+        if (AssertPinnedRefusal(file, observed))
+            return;
         var source = CSharpSyntaxTree.ParseText(observed.Source, new CSharpParseOptions(LanguageVersion.Preview)).GetRoot();
         var emitted = CSharpSyntaxTree.ParseText(
-            new Compiler.CodeGen.CSharpEmitter().Emit(observed.Module)).GetRoot();
+            new Compiler.CodeGen.CSharpEmitter().Emit(observed.Module!)).GetRoot();
         var originalBindings = Bindings(source);
         var currentBindings = Bindings(emitted);
         Assert.NotEmpty(originalBindings);
@@ -421,9 +508,11 @@ public class Calor0270CorpusVolumeTests
         string file, string receiver, string member, int warningCount)
     {
         var observed = MeasureFile(Path.Combine(RepoRoot(), "bench", "corpus", file));
+        if (AssertPinnedRefusal(file, observed))
+            return;
         var source = CSharpSyntaxTree.ParseText(observed.Source, new CSharpParseOptions(LanguageVersion.Preview)).GetRoot();
         var emitted = CSharpSyntaxTree.ParseText(
-            new Compiler.CodeGen.CSharpEmitter().Emit(observed.Module)).GetRoot();
+            new Compiler.CodeGen.CSharpEmitter().Emit(observed.Module!)).GetRoot();
         var originalReads = Reads(source);
         Assert.Equal(warningCount, originalReads.Length);
         Assert.Equal(originalReads, Reads(emitted));
@@ -438,6 +527,24 @@ public class Calor0270CorpusVolumeTests
             .Where(read => read.Expression is IdentifierNameSyntax identifier
                 && identifier.Identifier.ValueText == receiver && read.Name.Identifier.ValueText == member)
             .Select(ScopedOperationShape).ToArray();
+    }
+
+    /// <summary>
+    /// A named-site row whose file the converter now refuses under the legs' options
+    /// has no emitted C# to compare. The row stays: it asserts the refusal is the
+    /// pinned one, and its producer/call checks resume when the file converts again
+    /// (the refusal pin then fails and the expectation must be re-adjudicated).
+    /// </summary>
+    private static bool AssertPinnedRefusal(string file, FileMeasurement observed)
+    {
+        var expected = ReadCurrentExpectation().Files[file];
+        Assert.Equal(expected.Refusal, observed.Identity.Refusal);
+        Assert.Equal(expected, observed.Identity with { Sites = expected.Sites });
+        if (expected.Refusal == null)
+            return false;
+        Assert.Null(observed.Module);
+        Assert.Empty(observed.Identity.Sites);
+        return true;
     }
 
     private static string ScopedOperationShape(SyntaxNode node) =>
@@ -549,11 +656,17 @@ public class Calor0270CorpusVolumeTests
             .OrderBy(file => file, StringComparer.Ordinal)
             .ToArray();
 
-        int diagnostics = 0, modulesWithDiagnostics = 0, modulesBound = 0;
+        int diagnostics = 0, modulesWithDiagnostics = 0, modulesBound = 0, modulesNotMeasured = 0;
         foreach (var file in files)
         {
             var observed = MeasureFile(file);
             measuredFiles.Add(name + "/src/" + Path.GetRelativePath(srcRoot, file).Replace('\\', '/'), observed.Identity);
+            if (observed.Identity.Refusal != null)
+            {
+                // Counted separately and pinned by name: never a silent denominator shrink.
+                modulesNotMeasured++;
+                continue;
+            }
             modulesBound++;
             var count = observed.Identity.Sites.Count;
             diagnostics += count;
@@ -561,7 +674,7 @@ public class Calor0270CorpusVolumeTests
                 modulesWithDiagnostics++;
         }
 
-        return new SubjectVolume(name, diagnostics, modulesWithDiagnostics, modulesBound, 0);
+        return new SubjectVolume(name, diagnostics, modulesWithDiagnostics, modulesBound, modulesNotMeasured);
     }
 
     private static FileMeasurement MeasureFile(string file) => MeasureSource(File.ReadAllText(file), file);
@@ -581,7 +694,11 @@ public class Calor0270CorpusVolumeTests
                 GracefulFallback = true,
                 AutoGenerateIds = true
             }).Convert(source, Path.GetFileName(file));
-        Assert.False(string.IsNullOrEmpty(conversion.CalorSource), $"Empty conversion: {file}");
+        // Match the original source-coverage input identity, not platform checkout line endings.
+        var sourceHash = Convert.ToHexStringLower(SHA256.HashData(
+            Encoding.UTF8.GetBytes(source.Replace("\r\n", "\n"))));
+        if (string.IsNullOrEmpty(conversion.CalorSource))
+            return new FileMeasurement(source, null, new FileExpectation(sourceHash, [], RefusalOf(conversion, file)));
 
         var serialized = RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource);
         var parseDiagnostics = new DiagnosticBag();
@@ -594,10 +711,26 @@ public class Calor0270CorpusVolumeTests
         var bindDiagnostics = new DiagnosticBag();
         new Binder(bindDiagnostics).Bind(module);
         var sites = CaptureSites(bindDiagnostics, serialized);
-        // Match the original source-coverage input identity, not platform checkout line endings.
-        var identity = new FileExpectation(Convert.ToHexStringLower(SHA256.HashData(
-            Encoding.UTF8.GetBytes(source.Replace("\r\n", "\n")))), sites);
-        return new FileMeasurement(source, module, identity);
+        return new FileMeasurement(source, module, new FileExpectation(sourceHash, sites));
+    }
+
+    /// <summary>
+    /// A file the converter refuses under the legs' options produces no Calor. It is
+    /// pinned by name with the sorted, distinct features of its conversion errors
+    /// (for example <c>scoped-namespace-fidelity</c>), so a refusal that appears,
+    /// disappears or changes cause is a visible ledger move rather than a smaller
+    /// denominator.
+    /// </summary>
+    private static string RefusalOf(Compiler.Migration.ConversionResult conversion, string file)
+    {
+        var features = conversion.Issues
+            .Where(issue => issue.Severity == Compiler.Migration.ConversionIssueSeverity.Error)
+            .Select(issue => issue.Feature ?? "unattributed")
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.True(features.Length > 0, $"Empty conversion without a conversion error: {file}");
+        return string.Join(",", features);
     }
 
     private static List<DiagnosticSite> CaptureSites(DiagnosticBag diagnostics, string serialized) =>
@@ -610,9 +743,10 @@ public class Calor0270CorpusVolumeTests
 
     private sealed record DiagnosticSite(
         string Code, int Start, int End, int Line, int Column, string Message, string SpanText);
-    private sealed record FileExpectation(string SourceHash, List<DiagnosticSite> Sites);
+    /// <summary><paramref name="Refusal"/> is null for a converted, bound module.</summary>
+    private sealed record FileExpectation(string SourceHash, List<DiagnosticSite> Sites, string? Refusal = null);
     private sealed record CurrentExpectation(Ledger Volume, SortedDictionary<string, FileExpectation> Files);
-    private sealed record FileMeasurement(string Source, Compiler.Ast.ModuleNode Module, FileExpectation Identity);
+    private sealed record FileMeasurement(string Source, Compiler.Ast.ModuleNode? Module, FileExpectation Identity);
 
     private sealed record SubjectVolume(
         string Subject,
