@@ -672,11 +672,15 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(3, coverage.OpaqueSourceExpressions); // Invocation, callee, argument.
         Assert.Equal(0, coverage.ExactExpressionSourceSpans);
 
-        var calor = new Compiler.Migration.CalorEmitter().Emit(module);
-        var diagnostics = new DiagnosticBag();
-        var reparsed = new Parser(new Lexer(calor, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.False(diagnostics.HasErrors);
-        AssertOpaqueSerializationPreserved(module, reparsed, "expression.cs");
+        // 0.30 (af5d914ab): native syntax has no inline raw C# expression form, and
+        // the converter no longer builds RawCSharpExpressionNode; an expression it
+        // cannot express natively is preserved at its member boundary instead (see
+        // SelectedBranchMode_UsesRoslynBooleanConditions). So this node no longer
+        // round-trips through CalorEmitter (which still prints the retired `§CS{}`
+        // marker). The identity guard below is exercised directly; converted corpus
+        // output, whose opaque boundaries are raw members, is reparsed in MeasureNative.
+        AssertOpaqueSerializationPreserved(module, MeasurementModule(
+            new RawCSharpExpressionNode(expression.Span, "Call(1)")), "expression.cs");
         Assert.Throws<Xunit.Sdk.TrueException>(() =>
             AssertOpaqueSerializationPreserved(module, MeasurementModule(), "dropped.cs"));
         Assert.Throws<Xunit.Sdk.TrueException>(() =>
@@ -901,7 +905,13 @@ public class BinderIncompleteRatchetTests
         Assert.NotEqual(shifted.SourceHash, shifted.SelectedSourceHash);
         Assert.Equal(identity.SourceHash, identity.SelectedSourceHash);
         Assert.Equal(1, shifted.OpaqueBoundaries);
-        Assert.Equal(selectedInvocation.DescendantNodesAndSelf()
+        // 0.30 (af5d914ab): native syntax has no inline raw C# expression, so the
+        // out-var call inside `&&` (conditional-expression-hoisting) is preserved at
+        // its member boundary, not as the invocation alone: the opaque expressions are
+        // every expression of the selected method (its types, `&&`, `gate`, the call).
+        var selectedMethod = Assert.Single(selectedInvocation.Ancestors()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>());
+        Assert.Equal(selectedMethod.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax>().Count(),
             shifted.OpaqueSourceExpressions);
         Assert.Equal(identity.OpaqueSourceExpressionIdentityHash, shifted.OpaqueSourceExpressionIdentityHash);
