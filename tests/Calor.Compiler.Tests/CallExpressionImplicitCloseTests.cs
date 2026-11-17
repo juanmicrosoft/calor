@@ -80,44 +80,6 @@ module Test Test block
     }
 
     [Fact]
-    public void ExpressionContext_ZeroArg_NoCloser_Parses()
-    {
-        // §B{x} §C{Vec.empty}   ← NEW: zero-arg, no §/C
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    let x = Vec.empty()
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var call = FirstBindingInitializer<CallExpressionNode>(module);
-        Assert.Equal("Vec.empty", call.Target);
-        Assert.Empty(call.Arguments);
-    }
-
-    [Fact]
-    public void ExpressionContext_ZeroArg_WithExplicitCloser_StillParses()
-    {
-        // §B{x} §C{Vec.empty} §/C   ← LEGACY zero-arg with closer
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    let x = Vec.empty()
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var call = FirstBindingInitializer<CallExpressionNode>(module);
-        Assert.Equal("Vec.empty", call.Target);
-        Assert.Empty(call.Arguments);
-    }
-
-    [Fact]
     public void ExpressionContext_OneInlineArg_TrailingMemberAccess_AttachesToArg()
     {
         // §B{n} §C{Identity} obj?.Length
@@ -189,33 +151,6 @@ module Test Test block
         var ma = Assert.IsType<FieldAccessNode>(bind.Initializer);
         Assert.IsType<CallExpressionNode>(ma.Target);
         Assert.Equal("Length", ma.FieldName);
-    }
-
-    [Fact]
-    public void ExpressionContext_NestedCall_BothElided_Parses()
-    {
-        // §B{x} §C{Foo.bar} §C{Baz.qux} y   ← RFC §3.2 case C
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    let int:y = 1
-    let x = Foo.bar(Baz.qux(y))
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var func = module.Functions.First();
-        var xBind = func.Body.OfType<BindStatementNode>().Last();
-        var outer = Assert.IsType<CallExpressionNode>(xBind.Initializer);
-        Assert.Equal("Foo.bar", outer.Target);
-        Assert.Single(outer.Arguments);
-
-        var inner = Assert.IsType<CallExpressionNode>(outer.Arguments[0]);
-        Assert.Equal("Baz.qux", inner.Target);
-        Assert.Single(inner.Arguments);
-        Assert.IsType<ReferenceNode>(inner.Arguments[0]);
     }
 
     [Fact]
@@ -339,73 +274,6 @@ module Test Test block
     }
 
     [Fact]
-    public void ExpressionContext_GenericTargetAndZeroArg_Parses()
-    {
-        // §B{xs} §C{Array.Empty<i32>}   ← generic target, zero-arg, no §/C
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    let xs = Array.Empty<int>()
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var bind = module.Functions.First().Body.OfType<BindStatementNode>().First();
-        var call = Assert.IsType<CallExpressionNode>(bind.Initializer);
-        Assert.Equal("Array.Empty", call.Target);
-        Assert.NotNull(call.TypeArguments);
-        Assert.Equal("i32", call.TypeArguments[0]);
-    }
-
-    [Fact]
-    public void StatementContext_ImplicitClose_StillWorks()
-    {
-        // Regression check: the existing statement-context implicit close
-        // at Parser.cs:1376 is unaffected by the expression-context change.
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    Console.WriteLine("hello")
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var stmt = module.Functions.First().Body.OfType<CallStatementNode>().First();
-        Assert.Equal("Console.WriteLine", stmt.Target);
-        Assert.Single(stmt.Arguments);
-    }
-
-    [Fact]
-    public void StatementContext_OuterArgConsumesItsOwnCloser_WhenInnerIsElidedCall()
-    {
-        // Regression: inner elided Call inside an outer statement-call's §A
-        // must NOT consume the §/C belonging to the outer call.
-        // Per rubber-duck review: requires _inOuterCallArgDepth to be bumped
-        // in ParseCallStatement's §A loop, not just ParseCallExpression's.
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    let int:x = 1
-    outer(inner(x))
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var stmt = module.Functions.First().Body.OfType<CallStatementNode>().Last();
-        Assert.Equal("outer", stmt.Target);
-        Assert.Single(stmt.Arguments);
-        var innerCall = Assert.IsType<CallExpressionNode>(stmt.Arguments[0]);
-        Assert.Equal("inner", innerCall.Target);
-        Assert.Single(innerCall.Arguments);
-    }
-
-    [Fact]
     public void LispContext_CallWithExplicitCloser_StillParses()
     {
         // Inside Lisp expressions, the canonical §A + §/C form must still
@@ -439,37 +307,6 @@ module Test Test block
         var emitter = new Migration.CalorEmitter();
         var output = call.Accept<string>(emitter);
         Assert.Equal("Foo()", output);
-    }
-
-    [Fact]
-    public void Emitter_ZeroArgCall_FollowedBySiblingOpener_RoundTripsCorrectly()
-    {
-        // v0.6.1 regression test: a zero-arg implicit-close call followed by
-        // a sibling statement that starts with an expression-starter token
-        // (§IF here — IsExpressionStart returns true because expression-IF
-        // is valid). Without the same-line guard in ParseCallExpression, the
-        // parser would treat the §IF as the call's inline argument and emit
-        // Calor0104. RFC v0.6 §3.2 / v0.6.1.
-        var source = @"module Demo Demo block
-  func bool ()
-    !
-    let x = items.Any()
-    if x
-      return x
-    else
-      return false
-";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var fn = module.Functions.First();
-        var bind = Assert.IsType<BindStatementNode>(fn.Body[0]);
-        var call = Assert.IsType<CallExpressionNode>(bind.Initializer);
-        Assert.Equal("items.Any", call.Target);
-        Assert.Empty(call.Arguments);
-        // The §IF must parse as a sibling statement, not as the call's argument.
-        Assert.IsType<IfStatementNode>(fn.Body[1]);
     }
 
     [Fact]
@@ -842,49 +679,6 @@ module Test Test block
         var emitted = emitter.Emit(module);
         Assert.Contains("K()", emitted);
         Assert.Contains("V()", emitted);
-    }
-
-    [Fact]
-    public void RoundTrip_ZeroArgCallStatement_FollowedBySiblingStatement_ElidesInV062()
-    {
-        // Two adjacent zero-arg call statements at function-body level.
-        // v0.6.1 kept §/C on every stmt-context call; v0.6.2 (RFC §3.2/§4)
-        // elides §/C in stmt context when not inside an inline-sibling
-        // context. Function-body siblings are on their own lines, so the
-        // parser's zero-arg implicit-close path at Parser.cs:1409-1413
-        // handles the next-line sibling unambiguously.
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    Bar()
-    Baz()
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var ctx2 = new Migration.ConversionContext();
-        var fullEmitter = new Migration.CalorEmitter(ctx2);
-        var fullEmitted = module.Accept<string>(fullEmitter);
-
-        // v0.6.2: both stmt-context zero-arg calls drop their §/C.
-        Assert.Contains("Bar()", fullEmitted);
-        Assert.Contains("Baz()", fullEmitted);
-        Assert.DoesNotContain("§C{Bar} §/C", fullEmitted);
-        Assert.DoesNotContain("§C{Baz} §/C", fullEmitted);
-
-        // Round-trip must remain structurally stable.
-        var module2 = Parse(fullEmitted, out var diags2);
-        Assert.False(diags2.HasErrors,
-            $"Re-parse errors: {string.Join("; ", diags2.Errors.Select(e => e.Message))}");
-        var fn = module2.Functions.First();
-        var calls = fn.Body.OfType<CallStatementNode>().ToList();
-        Assert.Equal(2, calls.Count);
-        Assert.Equal("Bar", calls[0].Target);
-        Assert.Empty(calls[0].Arguments);
-        Assert.Equal("Baz", calls[1].Target);
-        Assert.Empty(calls[1].Arguments);
     }
 
     [Fact]

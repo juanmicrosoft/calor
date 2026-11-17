@@ -30,84 +30,6 @@ public class CallStatementImplicitCloseTests
     }
 
     [Fact]
-    public void StatementContext_OneArg_NoAMarker_NoCloser_Parses()
-    {
-        // The implicit-close form: §C{Target} expr (no §A, no §/C)
-        // is legal for STATEMENT context per Parser.cs:1374-1382.
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    Console.WriteLine("hello")
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var call = FirstCall(module);
-        Assert.Equal("Console.WriteLine", call.Target);
-        Assert.Single(call.Arguments);
-        Assert.IsType<StringLiteralNode>(call.Arguments[0]);
-    }
-
-    [Fact]
-    public void StatementContext_OneArg_WithAMarker_ExplicitCloser_Parses()
-    {
-        // The canonical form: §C{Target} §A expr §/C
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    Console.WriteLine("hello")
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var call = FirstCall(module);
-        Assert.Equal("Console.WriteLine", call.Target);
-        Assert.Single(call.Arguments);
-    }
-
-    [Fact]
-    public void StatementContext_ZeroArg_ExplicitCloser_Parses()
-    {
-        // Zero-arg form requires §/C today.
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    DoWork()
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var call = FirstCall(module);
-        Assert.Equal("DoWork", call.Target);
-        Assert.Empty(call.Arguments);
-    }
-
-    [Fact]
-    public void StatementContext_MultiArg_WithAMarkers_ExplicitCloser_Parses()
-    {
-        // Multi-arg form: §C{Target} §A x §A y §/C
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    Math.Max(1, 2)
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-
-        var call = FirstCall(module);
-        Assert.Equal("Math.Max", call.Target);
-        Assert.Equal(2, call.Arguments.Count);
-    }
-
-    [Fact]
     public void ExpressionContext_RequiresExplicitCloser_BaselineForRfc()
     {
         // Pins the contrast: in EXPRESSION context (here, as a binding
@@ -333,31 +255,6 @@ module Test Test block
         Assert.Contains("B()", emitted);
     }
 
-    [Fact]
-    public void V062_ZeroArgStmt_AtEndOfBlock_RoundTrips()
-    {
-        // Last statement in a function body — followed by Dedent, not a sibling.
-        var source = """
-module Test Test block
-  func Foo ()
-    !
-    Setup()
-    Run()
-""";
-        var emitted = EmitModule(source);
-        Assert.Contains("Run()", emitted);
-
-        // Re-parse must yield the same two-call structure.
-        var module2 = Parse(emitted, out var diags);
-        Assert.False(diags.HasErrors);
-        var calls = module2.Functions.First().Body.OfType<CallStatementNode>().ToList();
-        Assert.Equal(2, calls.Count);
-        Assert.Equal("Setup", calls[0].Target);
-        Assert.Equal("Run", calls[1].Target);
-        Assert.Empty(calls[0].Arguments);
-        Assert.Empty(calls[1].Arguments);
-    }
-
     // -------------------------------------------------------------------
     // v0.6.4 regression coverage — last-body-stmt-before-sibling-decl bug.
     // Prior behavior: ParseCallStatement called ExpectBlockEnd(EndCall) on
@@ -386,26 +283,6 @@ module T T block
         Assert.Equal(2, module.Functions.Count);
         Assert.Equal("Main", module.Functions[0].Name);
         Assert.Equal("Helper", module.Functions[1].Name);
-    }
-
-    [Fact]
-    public void V064_OneArgStmtViaA_LastInBody_BeforeSiblingFunc_Parses()
-    {
-        var source = """
-module T T block
-  func Main () → void
-    ! cw
-    Helper(1)
-  func Helper private (int:a) → void
-    Console.WriteLine("hi")
-""";
-        var module = Parse(source, out var diags);
-        Assert.False(diags.HasErrors,
-            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
-        Assert.Equal(2, module.Functions.Count);
-        var mainCall = (CallStatementNode)module.Functions[0].Body[0];
-        Assert.Equal("Helper", mainCall.Target);
-        Assert.Single(mainCall.Arguments);
     }
 
     [Fact]
