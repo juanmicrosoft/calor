@@ -19,7 +19,7 @@ public class RenameHandlerTests
         var root = CreateWorkspaceDirectory();
         try
         {
-            var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      return value\n";
+            var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      !\n      return value\n";
             var file = Path.Combine(root, "active.calr");
             File.WriteAllText(file, source);
             var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
@@ -66,7 +66,7 @@ public class RenameHandlerTests
         var root = CreateWorkspaceDirectory();
         try
         {
-            const string source = "module Demo\n  func Compute () → int\n    return 42\n";
+            const string source = "module Demo\n  func Compute () → int\n    !\n    return 42\n";
             var file = Path.Combine(root, "active.calr");
             File.WriteAllText(file, source);
             var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
@@ -98,8 +98,10 @@ public class RenameHandlerTests
             const string source = """
                 module Demo
                   func Compute () → int
+                    !
                     return 42
                   func Use () → int
+                    !
                     return Compute()
                 """;
             var file = Path.Combine(root, "active.calr");
@@ -147,8 +149,10 @@ public class RenameHandlerTests
         const string source = """
             module TestModule
               func Compute () → int
+                !
                 return 42
               func Use () → int
+                !
                 return Compute()
             """;
         var uri = DocumentUri.From("file:///rename.calr");
@@ -181,6 +185,7 @@ public class RenameHandlerTests
                 field int:shared protected
               class Derived extends Base
                 func Use () → int
+                  !
                   return this.shared + base.shared
             """;
         var uri = DocumentUri.From("file:///rename-field.calr");
@@ -246,6 +251,7 @@ public class RenameHandlerTests
         const string source = """
             module OriginalModule
               func Run () → int
+                !
                 return 1
             """;
         var uri = DocumentUri.From("file:///rename-module.calr");
@@ -280,6 +286,7 @@ public class RenameHandlerTests
             const string use = """
                 module Models
                   func Make () → Widget
+                    !
                     return new Widget()
                 """;
             var definitionPath = Path.Combine(root, "definition.calr");
@@ -336,6 +343,7 @@ public class RenameHandlerTests
         const string source = """
             module TestModule
               func Compute () → int
+                !
                 return 42
             """;
         var uri = DocumentUri.From("file:///rename-cursor.calr");
@@ -362,8 +370,10 @@ public class RenameHandlerTests
         const string source = """
             module GenericModule
               func Identity<T> (T:value) → T
+                !
                 return value
               func Use () → int
+                !
                 return Identity<int>(1)
             """;
         var uri = DocumentUri.From("file:///generic-refactor.calr");
@@ -413,17 +423,21 @@ public class RenameHandlerTests
               using System.Collections.Generic
               interface IWidget
                 func Marker () → void
+                  !
               class WidgetException
                 extends System.Exception
                 implements IWidget
                 func Create static () → WidgetException
+                  ! alloc
                   return new WidgetException()
                 func Marker () → void
+                  ! cw
                   System.Console.WriteLine("marker")
               class DerivedException
                 extends WidgetException
                 field int:Code
               func Use (object:value) → WidgetException
+                ! alloc
                 let WidgetException[]:items = new WidgetException[1]
                 let List<WidgetException>:values = new List<WidgetException> {new WidgetException()}
                 try
@@ -550,15 +564,18 @@ public class RenameHandlerTests
               class Worker
                 pp FEATURE
                   func Pick () → int
+                    !
                     return 1
                 pp else
                   func Pick () → int
+                    !
                     return 2
                 pp FEATURE
                   field int:value
                 pp else
                   field int:value
                 func Run () → int
+                  !
                   return Pick() + this.value
             """;
         var uri = DocumentUri.From("file:///conditional-refactor.calr");
@@ -602,6 +619,7 @@ public class RenameHandlerTests
         const string source = """
             module Keywords
               func Compute () → int
+                !
                 return 1
             """;
         var uri = DocumentUri.From("file:///rename-keyword.calr");
@@ -617,10 +635,13 @@ public class RenameHandlerTests
         const string source = """
             module Collisions
               func First () → int
+                !
                 return 1
               func Second () → int
+                !
                 return 2
               func Use () → int
+                !
                 return First()
             """;
         var uri = DocumentUri.From("file:///rename-collision.calr");
@@ -647,12 +668,14 @@ public class RenameHandlerTests
                     module Services
                       using Models
                       func Make () → Widget
+                        !
                         return new Widget()
                     """,
                 ["app.calr"] = """
                     module App
                       using Models
                       func Run () → Widget
+                        !
                         return Make()
                     """,
             };
@@ -734,12 +757,14 @@ public class RenameHandlerTests
                     module Split
                       class Worker partial
                         func Pick (int:value) → int
+                          !
                           return value
                     """,
                 ["use.calr"] = """
                     module Split
                       class Worker partial
                         func Run () → int
+                          !
                           return Pick(1)
                     """,
                 ["broken.calr"] = ConvertInteropSupport("""
@@ -825,6 +850,7 @@ public class RenameHandlerTests
         var source = """
             module SwapErrors
               func Old () → int
+                !
                 return 1
             """;
         const string supportingPayload = """
@@ -915,6 +941,7 @@ public class RenameHandlerTests
               class Box
                 field int:stored private
                 func Read (int:value) → int
+                  !
                   return stored
             """;
         var candidate = source
@@ -941,6 +968,7 @@ public class RenameHandlerTests
               class Box
                 field int:value private
                 func Read (int:input) → int
+                  !
                   return input + value
             """;
         var candidate = source
@@ -967,6 +995,7 @@ public class RenameHandlerTests
               class Box
                 field int:stored private
                 func Read () → int
+                  !
                   let int:value = 2
                   return stored + value
             """;
@@ -989,6 +1018,7 @@ public class RenameHandlerTests
               class Box
                 field int:value private
                 func Read () → int
+                  !
                   let int:input = 2
                   return input + value
             """;
@@ -1015,6 +1045,7 @@ public class RenameHandlerTests
               class Box
                 field int:stored private
                 func Read (int:value) → int
+                  !
                   return this.stored + value
             """;
         var uri = DocumentUri.From("file:///shadow-safe-field-rename.calr");
@@ -1113,6 +1144,7 @@ public class RenameHandlerTests
                 module ConditionalCollision
                   class Worker partial
                     func Compute () → int
+                      !
                       return 1
                 """;
             const string conditional = """
@@ -1120,6 +1152,7 @@ public class RenameHandlerTests
                   class Worker partial
                     pp COLLIDING_METHOD
                       func Calculate () → int
+                        !
                         return 2
                 """;
             var targetPath = Path.Combine(root, "target.calr");
@@ -1200,6 +1233,7 @@ public class RenameHandlerTests
             const string target = """
                 module RawGuard
                   func Compute () → int
+                    !
                     return 1
                 """;
             var guardedReference = "module RawGuard\n" + CreateRawMember("""
@@ -1254,6 +1288,7 @@ public class RenameHandlerTests
             const string target = """
                 module RawSpacing
                   func Compute () → int
+                    !
                     return 1
                 """;
             var guardedReference = "module RawSpacing\n" + CreateRawMember($$$"""
@@ -1302,6 +1337,7 @@ public class RenameHandlerTests
             const string target = """
                 module RawCompound
                   func Compute () → int
+                    !
                     return 1
                 """;
             var guardedReference = "module RawCompound\n" + CreateRawMember("""
@@ -1355,15 +1391,19 @@ public class RenameHandlerTests
         var source = """
             module ListOps
               func Sum (int:a, int:b) → int
+                !
                 return a + b
               func Count (int:n) → int
+                !
                 return n
               func FirstOrDefault (int:value, int:defaultVal, bool:hasElements) → int
+                !
                 if hasElements
                   return value
                 else
                   return defaultVal
               func Use () → int
+                !
                 return FirstOrDefault(1, 0, true)
             """;
         if (includeTrailingContext)
@@ -1371,6 +1411,7 @@ public class RenameHandlerTests
             source += """
 
                   func TrailingContext () → int
+                    !
                     return 0
                 """;
         }
@@ -1403,6 +1444,7 @@ public class RenameHandlerTests
                 module ConditionalControl
                   class Worker partial
                     func Compute () → int
+                      !
                       return 1
                     field int:stored
                 """;
@@ -1411,6 +1453,7 @@ public class RenameHandlerTests
                   class Worker partial
                     pp UNRELATED_MEMBERS
                       func OtherMethod () → int
+                        !
                         return 2
                       field int:otherField
                 """;
@@ -1585,6 +1628,7 @@ public class RenameHandlerTests
               class Widget
                 field int:Value
               func Use<T> (T:value) → T
+                !
                 where T : Widget
                 return value
             """;
@@ -1609,11 +1653,13 @@ public class RenameHandlerTests
             const string definitions = """
                 module Definitions
                   func Pick (int:value) → int
+                    !
                     return value
                 """;
             const string use = """
                 module Use
                   func Run () → int
+                    !
                     return Pick(1)
                 """;
             File.WriteAllText(Path.Combine(root, "definitions.calr"), definitions);
@@ -1998,7 +2044,13 @@ public class RenameHandlerTests
         var conversion = new Calor.Compiler.Migration.CSharpToCalorConverter(
             new Calor.Compiler.Migration.ConversionOptions
             {
+                // The converter parses at LanguageVersion.Preview; Roslyn rejects a compilation
+                // whose trees disagree on language version, so align the semantic context.
                 AdditionalSemanticSyntaxTrees = context
+                    .Select(tree => tree.WithRootAndOptions(
+                        tree.GetRoot(),
+                        new CSharpParseOptions(LanguageVersion.Preview)))
+                    .ToArray()
             }).Convert(payload, sourceFile);
         Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
         // These are intentionally erroneous C# oracles, not native or verified conversion acceptance.
@@ -2109,8 +2161,10 @@ public class RenameHandlerTests
         if (includeRenameTarget)
         {
             lines.Add("  func Compute () → int");
+            lines.Add("    !");
             lines.Add("    return 1");
             lines.Add("  func Use () → int");
+            lines.Add("    !");
             lines.Add("    return Compute()");
         }
         return string.Join(Environment.NewLine, lines);
@@ -2213,6 +2267,7 @@ public sealed class ExactSpanRefactoringGateTests
                       class Worker partial
                         field int:value
                         func Pick (int:value) → int
+                          !
                           if value == 0
                             let int:result = 10
                             return result
@@ -2220,12 +2275,15 @@ public sealed class ExactSpanRefactoringGateTests
                             let int:result = value
                             return result
                         func Pick (string:value) → int
+                          !
                           return 2
                         func Run () → int
+                          !
                           let int:value = 3
                           return value + this.value
                         class Nested
                           func Run () → int
+                            !
                             let int:result = 4
                             return result
                     """,
@@ -2233,12 +2291,14 @@ public sealed class ExactSpanRefactoringGateTests
                     module Collision
                       class Worker partial
                         func UseOne () → int
+                          !
                           return Pick(1)
                     """,
                 ["closed-use.calr"] = """
                     module Collision
                       class Worker partial
                         func UseTwo () → int
+                          !
                           return Pick(2)
                     """,
                 ["collisions.calr"] = """
@@ -2246,8 +2306,10 @@ public sealed class ExactSpanRefactoringGateTests
                       class OtherType
                         field int:value
                         func Pick (string:value) → int
+                          !
                           return 3
                         func Run (int:value) → int
+                          !
                           return value
                     """,
             };
@@ -2372,12 +2434,14 @@ public sealed class ExactSpanRefactoringGateTests
                     module Collision
                       class Worker partial
                         func Pick (int:value) → int
+                          !
                           return value
                     """,
                 ["open-use.calr"] = """
                     module Collision
                       class Worker partial
                         func UseOne () → int
+                          !
                           return Pick(1)
                     """,
             };
@@ -2454,6 +2518,7 @@ public sealed class ExactSpanRefactoringGateTests
                     module App
                       using Models
                       func Make () → Widget
+                        !
                         return new Widget()
                     """,
             };

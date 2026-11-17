@@ -21,8 +21,10 @@ public sealed class QualifiedBaseResolutionTests
             module Shared Right
               class Base
                 func Pick (int:value) → int
+                  !
                   return value
                 func Pick (string:value) → string
+                  !
                   return value
             """);
         AddBase(workspace, "wrong.calr", "Wrong");
@@ -56,6 +58,7 @@ public sealed class QualifiedBaseResolutionTests
               class Right
                 class Base
                   func Pick (int:value) → int
+                    !
                     return value
             """);
         var expected = AddBase(workspace, "right.calr", "Right");
@@ -80,6 +83,7 @@ public sealed class QualifiedBaseResolutionTests
               class Missing
                 class Base
                   func Pick (int:value) → int
+                    !
                     return value
             """);
         AssertUnresolved(Resolve(workspace, AddCaller(workspace, "Caller", "Missing.Base")));
@@ -117,6 +121,7 @@ public sealed class QualifiedBaseResolutionTests
             module Shared Right
               class Base partial
                 func Pick (int:value) → int
+                  !
                   return value
             """);
         AssertOwner(Resolve(workspace, AddCaller(workspace, "Caller", "Right.Base")), expected, "Right.Base");
@@ -129,7 +134,8 @@ public sealed class QualifiedBaseResolutionTests
     {
         var workspace = new WorkspaceState();
         var expected = Add(workspace, "right.calr",
-            $"module Shared Right\n  class Base\n    func Pick {visibility} (int:value) → int\n      return value");
+            $"module Shared Right\n  class Base\n    func Pick {visibility} (int:value) → int\n"
+            + (visibility == "private" ? "" : "      !\n") + "      return value");
         AddBase(workspace, "wrong.calr", "Wrong");
         var result = Resolve(workspace, AddCaller(workspace, "Caller", "Right.Base"));
         if (accessible)
@@ -149,6 +155,7 @@ public sealed class QualifiedBaseResolutionTests
               class Outer<T,U>
                 class Base<V>
                   func Pick (int:value) → int
+                    !
                     return value
             """);
         var expected = includeActualBase ? Add(workspace, "right.calr", """
@@ -156,6 +163,7 @@ public sealed class QualifiedBaseResolutionTests
               class Outer<T>
                 class Base<U>
                   func Pick (int:value) → int
+                    !
                     return value
             """) : null;
         var caller = Add(workspace, "caller.calr", """
@@ -163,6 +171,7 @@ public sealed class QualifiedBaseResolutionTests
               class Outer<T>
                 class Derived extends Right.Outer<int>.Base<string>
                   func Use () → int
+                    !
                     return base.Pick(1)
             """);
         var result = Resolve(workspace, caller);
@@ -181,6 +190,7 @@ public sealed class QualifiedBaseResolutionTests
             module Shared Caller
               class Derived extends Right.Base
                 func Use () → int
+                  !
                   base.Pick(1)
                   return 0
             """);
@@ -189,13 +199,13 @@ public sealed class QualifiedBaseResolutionTests
 
     private static DocumentState AddBase(WorkspaceState workspace, string file, string namespaceName)
         => Add(workspace, file,
-            $"module Shared {namespaceName}\n  class Base\n    func Pick (int:value) → int\n      return value");
+            $"module Shared {namespaceName}\n  class Base\n    func Pick (int:value) → int\n      !\n      return value");
 
     private static DocumentState AddCaller(
         WorkspaceState workspace, string namespaceName, string baseName, string imports = "")
         => Add(workspace, "caller.calr",
             $"module Shared {namespaceName}\n{imports}  class Derived extends {baseName}\n"
-            + "    func Use () → int\n      return base.Pick(1)");
+            + "    func Use () → int\n      !\n      return base.Pick(1)");
 
     private static DocumentState Add(WorkspaceState workspace, string file, string source)
     {

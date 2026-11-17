@@ -9,8 +9,8 @@ namespace Calor.Compiler.Tests.Diagnostics;
 /// diagnostics promoted to default-on in v0.6.3 (RFC v0.6 §6 Phase 4):
 /// Calor0251 (none/null), Calor0252 (generic factory), Calor0253
 /// (ambiguous numeric). Each diagnostic now carries a
-/// <see cref="SuggestedFix"/> that inserts the recommended <c>:type</c>
-/// annotation before the closing <c>}</c> of the bind's attribute block.
+/// <see cref="SuggestedFix"/> that inserts the recommended native
+/// <c>Type:</c> prefix before the binding name (<c>let Type:name = ...</c>).
 /// </summary>
 public class BindInferenceQuickfixTests
 {
@@ -48,7 +48,13 @@ public class BindInferenceQuickfixTests
         var withFix = Assert.Single(result.Diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.BindCannotInferGenericReturn);
         var edit = Assert.Single(withFix.Fix.Edits);
-        Assert.Equal(":Map<object, object>", edit.NewText);
+        Assert.Equal("Dictionary<object,object>:", edit.NewText);
+        var fixedSource = ApplyFix(source, withFix.Fix);
+        Assert.Contains("    let Dictionary<object,object>:m = Map.empty()", fixedSource);
+        var recompiled = Program.Compile(fixedSource, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+        Assert.DoesNotContain(recompiled.Diagnostics,
+            d => d.Code is DiagnosticCode.BindCannotInferGenericReturn or DiagnosticCode.TypeFirstBindingHeader);
     }
 
     [Fact]
@@ -73,7 +79,11 @@ public class BindInferenceQuickfixTests
             .ToList();
         Assert.Equal(3, fixes.Count);
         Assert.All(fixes, f => Assert.Single(f.Fix.Edits));
-        Assert.All(fixes, f => Assert.StartsWith(":", f.Fix.Edits[0].NewText));
+        Assert.All(fixes, f => Assert.EndsWith(":", f.Fix.Edits[0].NewText));
+        var fixedSource = fixes.Aggregate(source, (text, f) => ApplyFix(text, f.Fix));
+        Assert.Contains("    let object?:a = null", fixedSource);
+        Assert.Contains("    let List<object>:b = Vec.empty()", fixedSource);
+        Assert.Contains("    let double:c = (1 + 1.0)", fixedSource);
     }
 
     [Fact]
