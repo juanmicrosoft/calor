@@ -871,7 +871,6 @@ module HigherOrder HigherOrder block
     [Fact]
     public void C5_ExternalTypedReceiver_CollidingMethodName_FailsLoud()
     {
-        // Keep the absent external type and original receiver-message oracles.
         // Review C5: a receiver whose static type is KNOWN and external must not
         // be captured by an in-module method-name collision — it goes to the
         // unknown chain (fail loud), for both single and chained receivers.
@@ -893,10 +892,16 @@ module RC RC block
         var result = TestHarness.Compile(source);
 
         Assert.True(result.HasErrors, "External-typed receiver collisions must fail loud");
+        // The unknown-call message names the receiver's type, not its path:
+        // 'SomeExternal.Refresh' for the single receiver; for the chain, the
+        // external getter 'SomeExternal.get_conn' and the untyped Refresh after it.
         Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("svc.Refresh"));
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("'SomeExternal.Refresh'"));
         Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("svc.conn.Refresh"));
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("'SomeExternal.get_conn'"));
+        Assert.Equal(2, result.Diagnostics.Count(
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains(".Refresh'")));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("Helper.Refresh"));
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("GoSingle"));
         Assert.Contains(result.Diagnostics.Errors,
@@ -2308,13 +2313,23 @@ module E E block
     [Fact]
     public void MessageTexts_Calor0425_AtInvocation_NamesTheValueTheCauseAndTheWaiver()
     {
-        // Native type spelling and row guidance differ from this exact-message oracle.
-        // E4's new string (recorded in design-doc §10.1 alongside the provenance
+        // E4's string (recorded in design-doc §10.1 alongside the provenance
         // clause), by FULL equality. X9c's shape with the row deleted — PP-E1's
-        // L7 class.
-        var result = TestHarness.Compile("""
+        // L7 class. Under the 0.30 callback-row policy (D2) an OMITTED callback
+        // row is a hard Calor0407 at the declaration, so the Unknown row that
+        // reaches the invocation is the explicit `! unknown` one.
+        var omitted = TestHarness.Compile("""
             module X9 X9 block
               func Apply (Func<int, int>:transform, int:value) → int
+                ! cw
+                return transform(value)
+            """);
+        Assert.Contains(omitted.Diagnostics.Errors, d => d.Code == DiagnosticCode.MissingCallableEffectRow);
+        Assert.DoesNotContain(omitted.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+
+        var result = TestHarness.Compile("""
+            module X9 X9 block
+              func Apply (Func<int, int>:transform ! unknown, int:value) → int
                 ! cw
                 return transform(value)
             """);
@@ -2323,7 +2338,7 @@ module E E block
             .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
         Assert.Equal(
             "Invocation of 'transform' in 'Apply' cannot be charged: its effect row is Unknown "
-            + "(parameter 'transform' of 'Apply' (type 'Func<i32,i32>') carries no effect row). "
+            + "(parameter 'transform' of 'Apply' (type 'Func<int,int>') explicitly declares Unknown effects). "
             + "Add ! on the same line as the type to state what 'transform' may do, or "
             + "compile with --permissive-effects. 'Apply' is charged Unknown.",
             diagnostic.Message);
@@ -2395,12 +2410,12 @@ module E E block
     [Fact]
     public void Invocation_ProvablyNonFunctionValue_IsTheResidualCalor0418_NeverWaived()
     {
-        // Native rejection names 'int'; the frozen oracle requires 'i32'.
+        // The message quotes the source spelling of the type ('int' in native syntax).
         // The ONE shape Calor0418 is kept for: the invoked value's type is
         // provably not a function type, so there is no row to read. An error
         // under the default policy AND under --permissive-effects — this is "we
         // know it is wrong", not "we cannot tell" (§4.5), and the binder does
-        // not catch it (measured: `§C{x}` on an i32 parameter binds clean).
+        // not catch it (measured: `x()` on an int parameter binds clean).
         const string source = """
             module P1 P1 block
               func Go (int:x) → int
@@ -2413,7 +2428,7 @@ module E E block
             var diagnostic = Assert.Single(result.Diagnostics.Errors
                 .Where(d => d.Code == DiagnosticCode.DelegateInvocation));
             Assert.Equal(
-                "'x' has type 'i32', which is not a function type, so invoking it cannot be "
+                "'x' has type 'int', which is not a function type, so invoking it cannot be "
                 + "charged to any effect row. Calor0418 is reported only for a value that is "
                 + "provably not a function; a function-typed value is charged through its "
                 + "effect row.",
@@ -2690,7 +2705,7 @@ module E E block
     public void Invocation_ExplicitBindingRow_UsesIdentifierIdentity(
         string row, bool initialized, bool captured)
     {
-        var result = TestHarness.Compile(NativeExplicitBinding($$"""
+        var source = NativeExplicitBinding($$"""
             §M{BindingIdentity}
               §F{Go:pub} (Func<i32,i32>:source §E{ {{row}}}) -> i32
                 §E{}
@@ -2698,14 +2713,17 @@ module E E block
                 {{(initialized ? "" : "§ASSIGN f source")}}
                 {{(captured ? "§B{g:Func<i32,i32>} §LAM{x:i32} §C{f} §A x §/C §/LAM" : "")}}
                 §R §C{ {{(captured ? "g" : "f")}}} §A 1 §/C
-            """, row, initialized, captured));
+            """, row, initialized, captured);
+        var result = TestHarness.Compile(source);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Code is
             DiagnosticCode.EffectRowUnknown or DiagnosticCode.EffectRowMismatch or DiagnosticCode.DelegateInvocation);
         var binding = Assert.Single(Assert.Single(result.Ast!.Functions).Body.OfType<BindStatementNode>(),
             bind => bind.Name == "f");
-        if (!initialized)
-            Assert.True(binding.IdentifierSpan.Start > binding.Span.End);
+        // The binding's identity is its identifier, not the statement: the native
+        // statement span also covers the type, the row and any initializer.
+        Assert.Equal("f", source.Substring(binding.IdentifierSpan.Start, binding.IdentifierSpan.Length));
+        Assert.NotEqual(binding.Span, binding.IdentifierSpan);
         if (row.Length == 0)
             Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         else
@@ -2716,8 +2734,14 @@ module E E block
     private static string NativeExplicitBinding(
         string original, string row, bool initialized, bool captured) => (row, initialized, captured) switch
     {
-        // Native bare bindings include their identifier in Span; keep the frozen span oracle.
-        ("", false, false) => original,
+        ("", false, false) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source !) → int
+                !
+                var Func<int,int>:f !
+                set f source
+                return f(1)
+            """),
         ("", true, false) => NativeSource(original, """
             module BindingIdentity BindingIdentity
               func Go (Func<int,int>:source !) → int
@@ -2725,7 +2749,15 @@ module E E block
                 var Func<int,int>:f ! = source
                 return f(1)
             """),
-        ("", false, true) => original,
+        ("", false, true) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source !) → int
+                !
+                var Func<int,int>:f !
+                set f source
+                let Func<int,int>:g = (int:x) => f(x)
+                return g(1)
+            """),
         ("", true, true) => NativeSource(original, """
             module BindingIdentity BindingIdentity
               func Go (Func<int,int>:source !) → int
@@ -2734,7 +2766,14 @@ module E E block
                 let Func<int,int>:g = (int:x) => f(x)
                 return g(1)
             """),
-        ("cw", false, false) => original,
+        ("cw", false, false) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source ! cw) → int
+                !
+                var Func<int,int>:f ! cw
+                set f source
+                return f(1)
+            """),
         ("cw", true, false) => NativeSource(original, """
             module BindingIdentity BindingIdentity
               func Go (Func<int,int>:source ! cw) → int
@@ -2742,7 +2781,15 @@ module E E block
                 var Func<int,int>:f ! cw = source
                 return f(1)
             """),
-        ("cw", false, true) => original,
+        ("cw", false, true) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source ! cw) → int
+                !
+                var Func<int,int>:f ! cw
+                set f source
+                let Func<int,int>:g = (int:x) => f(x)
+                return g(1)
+            """),
         ("cw", true, true) => NativeSource(original, """
             module BindingIdentity BindingIdentity
               func Go (Func<int,int>:source ! cw) → int

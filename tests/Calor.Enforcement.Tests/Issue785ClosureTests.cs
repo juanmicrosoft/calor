@@ -281,14 +281,9 @@ public sealed class Issue785ClosureTests
     [Fact]
     public void ConstructedGenericArgument_UsesOverloadSpecificEffects()
     {
-        var diagnostics = Enforce(
-            """
-            module Test Test block
-              func Run () → void
-                ! alloc
-                Example.Api.Transform(new Example.Box<int>())
-            """,
-            """
+        // The overload-specific entry for a constructed generic argument wins over
+        // the name-only wildcard, across CLR and Calor spellings of the argument.
+        const string manifest = """
             {
               "version": "1.0",
               "mappings": [
@@ -305,11 +300,43 @@ public sealed class Issue785ClosureTests
                 }
               ]
             }
-            """);
+            """;
+        var loader = new ManifestLoader();
+        loader.LoadFromJson(manifest, "issue-785-test");
+        var resolver = new EffectResolver(loader);
+        foreach (var spelling in new[] { "Example.Box`1<System.Int32>", "Example.Box<int>", "Example.Box<i32>" })
+        {
+            var specific = resolver.Resolve(EffectResolverKey.FromStrings("Example.Api", "Transform", [spelling]));
+            Assert.Equal(EffectResolutionStatus.Resolved, specific.Status);
+            Assert.True(specific.Effects.Contains(EffectKind.IO, "console_write"));
+        }
+        var other = resolver.Resolve(EffectResolverKey.FromStrings("Example.Api", "Transform", ["Example.Box<string>"]));
+        Assert.Equal(EffectResolutionStatus.PureExplicit, other.Status);
+        Assert.True(other.Effects.IsEmpty);
 
+        // End to end, 0.30 charges a native member call only through the
+        // metadata method the binder selected. Example.Api is absent from the
+        // binder's metadata, and decision D3 rules out a name-only manifest
+        // fallback, so the call fails closed as Unknown instead of reading either
+        // entry by spelling.
+        var diagnostics = Enforce(
+            """
+            module Test Test block
+              func Run () → void
+                ! alloc
+                Example.Api.Transform(new Example.Box<int>())
+            """,
+            manifest);
+
+        Assert.Contains(diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains(".Transform'", StringComparison.Ordinal));
         Assert.Contains(diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("cw"));
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
     }
 
     [Fact]

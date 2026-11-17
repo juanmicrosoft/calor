@@ -522,11 +522,40 @@ public sealed class UnknownCallbackContractTests
             Assert.True(row.IsUnknown || row.EffectVariables.Count > 0);
         });
         Assert.True(methods.Single(method => method.Name == "Keep").Output!.Row!.IsUnknown);
-        var source = suffix.Length == 0 ? conversion.CalorSource! :
-            conversion.CalorSource!.Replace(":callback)", ":callback ! unknown)", StringComparison.Ordinal);
+        // The converter writes Run row-polymorphic (`<! callback0>`), so the ""
+        // row compiles Run cleanly. The " ! unknown" row replaces that with an
+        // explicit Unknown callback row on a pure Run: invoking it is charged
+        // Unknown (Calor0425 at the invocation) and the pure row is rejected
+        // (Calor0410). In both rows Keep's explicit `! unknown` return is
+        // Calor0425, an error under --strict-effects (callback-row policy D2).
+        const string polymorphicRun = """
+                func Run <! callback0> (Func<int>:callback ! callback0) → int
+                  ! callback0
+            """;
+        const string unknownRun = """
+                func Run (Func<int>:callback ! unknown) → int
+                  !
+            """;
+        var converted = conversion.CalorSource!.ReplaceLineEndings("\n");
+        Assert.Contains(polymorphicRun.ReplaceLineEndings("\n"), converted, StringComparison.Ordinal);
+        var source = suffix.Length == 0 ? converted
+            : converted.Replace(polymorphicRun.ReplaceLineEndings("\n"), unknownRun.ReplaceLineEndings("\n"),
+                StringComparison.Ordinal);
         var result = Compile(source);
-        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
-        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.EffectRowUnknown);
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.EffectRowUnknown
+            && d.Message.Contains("The return of 'Keep' explicitly declares Unknown effects", StringComparison.Ordinal));
+        if (suffix.Length == 0)
+        {
+            Assert.DoesNotContain(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
+            Assert.Single(result.Diagnostics.Errors);
+        }
+        else
+        {
+            Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("'Run' uses effect 'unknown'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.EffectRowUnknown
+                && d.Message.Contains("Invocation of 'callback' in 'Run'", StringComparison.Ordinal));
+        }
     }
 
     private static string ExplicitContract(string suffix) => suffix.Length == 0 ? " ! unknown" : suffix;

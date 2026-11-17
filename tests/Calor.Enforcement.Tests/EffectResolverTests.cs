@@ -116,6 +116,10 @@ public class EffectResolverTests
         Assert.Equal(true, RunStringProbe(source + witness, []));
     }
 
+    // 0.30 restored the 0.29 System.String contract (`"*": []`). The null check below can
+    // still read CurrentUICulture in the original C#; the restored wildcard admits the call,
+    // so this pins only that the native translation preserves that runtime behavior. Sound
+    // String contracts are tracked separately; when they land this flips back to a refusal.
     [Fact]
     public void StringCopyContracts_ToCharArrayNullCheckCanInvokeUICultureBeforeMethodEntry()
     {
@@ -143,21 +147,24 @@ public class EffectResolverTests
             Assert.StartsWith("True:", original);
             Assert.True(int.Parse(original["True:".Length..], System.Globalization.CultureInfo.InvariantCulture) > 0);
         }
-        AssertStringRejected(source, """
+        AssertStringAdmittedWithParity(source, """
             module StringContracts overflow unchecked nullable oblivious
               module Target
                 func Apply (string:value) → char[]
                   !
                   return value.ToCharArray()
-            """);
+            """, expectedInterop: null,
+            [driver + NumericWitness("NullWitness.Run()", throws: false, providerIsCulture: true)]);
     }
 
+    // Formerly "UnprovedNeighborsRemainStrictlyRejected". Under the restored 0.29 String
+    // contract (`"*": []`) these neighbors resolve PureExplicit and compile; the theory now pins
+    // that admission plus runtime parity of the native translation (including the throwing rows).
     [Theory]
     [InlineData(false, "value.ToCharArray()", "string", "char[]")]
-    [InlineData(false, "((string)null).ToCharArray()", "string", "char[]")]
     [InlineData(false, "value.ToCharArray(0, 1)", "string", "char[]")]
     [InlineData(false, "value.Contains('x', (System.StringComparison)123)", "string", "bool")]
-    public void StringCopyContracts_UnprovedNeighborsRemainStrictlyRejected(
+    public void StringCopyContracts_NeighborsAreAdmittedByRestoredContract(
         bool constructor, string expression, string parameter, string returnType)
     {
         var source = $$"""
@@ -170,33 +177,56 @@ public class EffectResolverTests
         var resolver = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false));
         Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(EffectResolverKey.FromStrings(
             "System.String", ".ctor", ["System.Char[]"], EffectMemberKind.Constructor)).Status);
-        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(StringCopyKey(selected)).Status);
-        var conversion = ConvertStringSource(source);
-        Assert.True(conversion.Success);
-        var native = $$"""
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(StringCopyKey(selected)).Status);
+        AssertStringAdmittedWithParity(source, $$"""
             module StringContracts overflow unchecked nullable oblivious
               module Target
                 func Apply ({{parameter}}:value) → {{returnType}}
                   !
                   return {{expression}}
+            """, expectedInterop: null, ["""
+
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    object result;
+                    try { result = Target.Apply("abc"); }
+                    catch (System.Exception error) { return error.GetType().FullName; }
+                    return result is char[] chars ? new string(chars)
+                        : System.Convert.ToString(result, System.Globalization.CultureInfo.InvariantCulture);
+                }
+            }
+            """]);
+    }
+
+    // The former `((string)null).ToCharArray()` row of the neighbor theory: the effect contract
+    // now admits ToCharArray, but the native compiler still refuses the call because the receiver
+    // is provably nullable (Calor0274), and it does so without inventing an effect diagnostic.
+    [Fact]
+    public void StringCopyContracts_NullLiteralReceiverIsRejectedByNullSafetyNotEffects()
+    {
+        const string native = """
+            module StringContracts overflow unchecked nullable oblivious
+              module Target
+                func Apply (string:value) → char[]
+                  !
+                  return ((string)null).ToCharArray()
             """;
-        var emissions = StringEmissions(native);
-        if (conversion.InteropPreservationCount == 0)
-            emissions = emissions.Concat(StringEmissions(conversion.CalorSource!)).ToArray();
-        foreach (var emission in emissions)
+        foreach (var emission in StringEmissions(native))
         foreach (var typing in new[] { false, true })
         {
-            var result = Calor.Compiler.Program.Compile(emission, "unknown-string-copy.calr",
+            var result = Calor.Compiler.Program.Compile(emission, "null-string-copy.calr",
                 new Calor.Compiler.CompilationOptions
                 {
                     EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
                 });
             Assert.True(result.HasErrors);
             Assert.Empty(result.GeneratedCode);
-            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
-            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                && diagnostic.Message.Contains("." + selected.Name, StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+                && diagnostic.Message.Contains("ToCharArray", StringComparison.Ordinal));
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code is DiagnosticCode.ForbiddenEffect
+                or DiagnosticCode.UnknownExternalCall);
         }
     }
 
@@ -353,12 +383,15 @@ public class EffectResolverTests
         }
     }
 
+    // Formerly "...AndIsStrictlyRejected". The original C# still dispatches to the culture's
+    // TextInfo (and propagates its exception); the restored 0.29 String contract admits the call,
+    // so the native translation must reproduce exactly that dispatch.
     [Theory]
     [InlineData("value.ToUpper()", "a", "A")]
     [InlineData("value.ToLower()", "A", "a")]
     [InlineData("value.ToUpper(culture)", "a", "A")]
     [InlineData("value.ToLower(culture)", "A", "a")]
-    public void StringContracts_CultureDispatchMutatesOrThrowsInOriginalAndIsStrictlyRejected(
+    public void StringContracts_CultureDispatchMutatesOrThrowsInOriginalAndIsAdmittedWithParity(
         string expression, string input, string output)
     {
         var csharp = $$"""
@@ -367,27 +400,31 @@ public class EffectResolverTests
                 public static string Apply(string value, System.Globalization.CultureInfo culture) => {{expression}};
             }
             """;
+        var drivers = new List<string>();
         foreach (var throws in new[] { false, true })
-        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
         {
             var driver = CultureProbe.Replace("$CALL$", $"Target.Apply(\"{input}\", culture)", StringComparison.Ordinal)
                 .Replace("$THROW$", throws ? "true" : "false", StringComparison.Ordinal);
-            Assert.Equal(throws ? "throw:1" : output + ":1", RunStringProbe(csharp + driver, symbols));
+            drivers.Add(driver);
+            foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+                Assert.Equal(throws ? "throw:1" : output + ":1", RunStringProbe(csharp + driver, symbols));
         }
-        AssertStringRejected(csharp, $$"""
+        AssertStringAdmittedWithParity(csharp, $$"""
             module StringContracts overflow unchecked nullable oblivious
               module Target
                 func Apply (string:value, System.Globalization.CultureInfo:culture) → string
                   !
                   return {{expression}}
-            """);
+            """, expectedInterop: null, drivers);
     }
 
+    // Formerly "ComparisonDispatchAlsoStaysUnknown": the restored 0.29 String contract admits
+    // these culture-sensitive comparisons; the native translation must keep the CompareInfo dispatch.
     [Theory]
     [InlineData("value.CompareTo(other)", "-1")]
     [InlineData("string.Compare(value, other, false, culture)", "-1")]
     [InlineData("value.IndexOf(other)", "1")]
-    public void StringContracts_ComparisonDispatchAlsoStaysUnknown(string expression, string expected)
+    public void StringContracts_ComparisonDispatchIsAdmittedWithParity(string expression, string expected)
     {
         var csharp = $$"""
             #nullable enable
@@ -396,23 +433,25 @@ public class EffectResolverTests
                 public static int Apply(string value, string other, System.Globalization.CultureInfo culture) => {{expression}};
             }
             """;
+        var drivers = new List<string>();
         foreach (var throws in new[] { false, true })
-        foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
         {
             var driver = CultureProbe.Replace("System.Globalization.TextInfo TextInfo",
                     "System.Globalization.CompareInfo CompareInfo", StringComparison.Ordinal)
                 .Replace("base.TextInfo", "base.CompareInfo", StringComparison.Ordinal)
                 .Replace("$CALL$", "Target.Apply(\"abc\", \"b\", culture)", StringComparison.Ordinal)
                 .Replace("$THROW$", throws ? "true" : "false", StringComparison.Ordinal);
-            Assert.Equal(throws ? "throw:1" : expected + ":1", RunStringProbe(csharp + driver, symbols));
+            drivers.Add(driver);
+            foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+                Assert.Equal(throws ? "throw:1" : expected + ":1", RunStringProbe(csharp + driver, symbols));
         }
-        AssertStringRejected(csharp, $$"""
+        AssertStringAdmittedWithParity(csharp, $$"""
             module StringContracts overflow unchecked
               module Target
                 func Apply (string:value, string:other, System.Globalization.CultureInfo:culture) → int
                   !
                   return {{expression}}
-            """, expectedInterop: 0);
+            """, expectedInterop: 0, drivers);
     }
 
     [Fact]
@@ -440,7 +479,14 @@ public class EffectResolverTests
         Assert.Equal(false, RunStringProbe(result.GeneratedCode, []));
     }
 
-    private static void AssertStringRejected(string csharp, string nativeSource, int expectedInterop = 1)
+    /// <summary>
+    /// Restored-contract check: the selected System.String member resolves PureExplicit from the
+    /// embedded bcl-system manifest, every native emission (hand-written and, when the converter
+    /// stays native, converted) compiles under a pure row, the generated C# selects the same BCL
+    /// member, and each driver observes identical results against the original and generated C#.
+    /// </summary>
+    private static void AssertStringAdmittedWithParity(string csharp, string nativeSource, int? expectedInterop,
+        IReadOnlyList<string> drivers)
     {
         var original = StringProbeCompilation(csharp, []);
         var tree = original.SyntaxTrees.Single();
@@ -450,26 +496,36 @@ public class EffectResolverTests
             .Where(method => method.ContainingType.SpecialType == SpecialType.System_String));
         Assert.Equal(typeof(string).Assembly.FullName, selected.ContainingAssembly.Identity.ToString());
         Assert.DoesNotContain(selected.Locations, location => location.IsInSource);
+        var resolution = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
+            .Resolve(StringCopyKey(selected));
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+        Assert.True(resolution.Effects.IsEmpty);
+        Assert.Contains("embedded:Calor.Compiler.Manifests.bcl-system", resolution.Source);
         var conversion = ConvertStringSource(csharp);
         Assert.True(conversion.Success);
-        Assert.Equal(expectedInterop, conversion.InteropPreservationCount);
+        if (expectedInterop.HasValue)
+            Assert.Equal(expectedInterop.Value, conversion.InteropPreservationCount);
         var emissions = StringEmissions(nativeSource);
-        if (expectedInterop == 0)
+        if (conversion.InteropPreservationCount == 0)
             emissions = emissions.Concat(StringEmissions(conversion.CalorSource!)).ToArray();
         foreach (var native in emissions)
         foreach (var typeChecking in new[] { false, true })
         {
-            var result = Calor.Compiler.Program.Compile(native, "unknown-string.calr",
+            var result = Calor.Compiler.Program.Compile(native, "restored-string.calr",
                 new Calor.Compiler.CompilationOptions
                 {
                     EnableTypeChecking = typeChecking, VerifyContracts = false, StatusWriter = TextWriter.Null
                 });
-            Assert.True(result.HasErrors);
-            Assert.Empty(result.GeneratedCode);
-            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
-            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                && diagnostic.Message.Contains("." + selected.Name, StringComparison.Ordinal));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            var generated = StringProbeCompilation(result.GeneratedCode, []);
+            var generatedTree = generated.SyntaxTrees.Single();
+            var generatedModel = generated.GetSemanticModel(generatedTree);
+            Assert.Contains(generatedTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Select(node => generatedModel.GetSymbolInfo(node).Symbol).OfType<IMethodSymbol>(),
+                method => method.ToDisplayString() == selected.ToDisplayString());
+            foreach (var driver in drivers)
+            foreach (var symbols in new string[][] { [], ["NET6_0_OR_GREATER"] })
+                Assert.Equal(RunStringProbe(csharp + driver, symbols), RunStringProbe(result.GeneratedCode + driver, symbols));
         }
     }
 
@@ -2143,12 +2199,17 @@ public class EffectResolverTests
         }
     }
 
+    // Formerly "ConvertContracts_CallbackOverloadsAreUnknownAndNeverExecuteAfterRefusal". 0.30
+    // restored the 0.29 System.Convert contract (`"*": []`), so the numeric provider overloads now
+    // resolve PureExplicit and compile; the original culture/provider dispatch still happens and the
+    // native translation must reproduce it exactly. The former `object?` row (Convert.ToString
+    // invoking a user ToString that writes to the console) was removed: under the restored wildcard
+    // it compiles, and pinning that as expected behavior would pin the documented soundness gap.
     [Theory]
-    [InlineData("object?", "new Loud()", "value")]
     [InlineData("int", "-1234", "-1234")]
     [InlineData("long", "-1234L", "-1234")]
     [InlineData("double", "-1234.5", "-1234.5")]
-    public void ConvertContracts_CallbackOverloadsAreUnknownAndNeverExecuteAfterRefusal(
+    public void ConvertContracts_ProviderOverloadsAreAdmittedByRestoredContractWithParity(
         string type, string argument, string expected)
     {
         foreach (var provider in new[] { false, true })
@@ -2156,14 +2217,6 @@ public class EffectResolverTests
             var expression = $"System.Convert.ToString(value{(provider ? ", provider" : "")})";
             var source = $$"""
                 #nullable enable
-                public sealed class Loud
-                {
-                    public override string ToString()
-                    {
-                        System.Console.WriteLine("convert-callback");
-                        return "value";
-                    }
-                }
                 public static class Target
                 {
                     public static string? Apply({{type}} value, System.IFormatProvider provider) => {{expression}};
@@ -2171,35 +2224,18 @@ public class EffectResolverTests
                 """;
             var selected = SelectedConvertMethod(source);
             Assert.False(IsProvedConvertOverload(selected));
-            Assert.Equal(EffectResolutionStatus.Unknown,
-                new EffectResolver(new ManifestLoader(loadUserLevelManifests: false)).Resolve(NumericKey(selected)).Status);
-            if (type == "object?")
+            var resolution = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
+                .Resolve(NumericKey(selected));
+            Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+            Assert.Contains("embedded:Calor.Compiler.Manifests.bcl-system", resolution.Source);
+            var witnesses = new List<string>();
+            foreach (var throws in new[] { false, true })
+            foreach (var providerIsCulture in new[] { false, true })
             {
-                var witness = """
-
-                    public static class Probe
-                    {
-                        public static string Run()
-                        {
-                            var previous = System.Console.Out;
-                            using var output = new System.IO.StringWriter();
-                            try
-                            {
-                                System.Console.SetOut(output);
-                                var result = Target.Apply(new Loud(), null);
-                                return result + ":" + output.ToString();
-                            }
-                            finally { System.Console.SetOut(previous); }
-                        }
-                    }
-                    """;
-                Assert.Equal("value:convert-callback" + Environment.NewLine, RunStringProbe(source + witness, []));
+                var witness = NumericWitness($"Target.Apply({argument}, provider)", throws, providerIsCulture);
+                witnesses.Add(witness);
+                Assert.Equal(throws ? "throw:1" : expected + ":1", RunStringProbe(source + witness, []));
             }
-            else
-                foreach (var throws in new[] { false, true })
-                foreach (var providerIsCulture in new[] { false, true })
-                    Assert.Equal(throws ? "throw:1" : expected + ":1", RunStringProbe(source
-                        + NumericWitness($"Target.Apply({argument}, provider)", throws, providerIsCulture), []));
             var conversion = ConvertStringSource(source);
             Assert.True(conversion.Success);
             Assert.Equal(0, conversion.InteropPreservationCount);
@@ -2213,17 +2249,15 @@ public class EffectResolverTests
             foreach (var native in StringEmissions(direct).Concat(StringEmissions(conversion.CalorSource!)))
             foreach (var typing in new[] { false, true })
             {
-                var result = Calor.Compiler.Program.Compile(native, "unknown-convert.calr",
+                var result = Calor.Compiler.Program.Compile(native, "restored-convert.calr",
                     new Calor.Compiler.CompilationOptions
                     {
                         EnableTypeChecking = typing, VerifyContracts = false, StatusWriter = TextWriter.Null
                     });
-                Assert.True(result.HasErrors);
-                Assert.Empty(result.GeneratedCode);
-                Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                    && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
-                Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                    && diagnostic.Message.Contains("System.Convert.ToString", StringComparison.Ordinal));
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+                Assert.Equal(selected.ToDisplayString(), SelectedConvertMethod(result.GeneratedCode).ToDisplayString());
+                foreach (var witness in witnesses)
+                    Assert.Equal(RunStringProbe(source + witness, []), RunStringProbe(result.GeneratedCode + witness, []));
             }
         }
     }

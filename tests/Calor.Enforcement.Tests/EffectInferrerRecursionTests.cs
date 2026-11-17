@@ -36,6 +36,18 @@ namespace Calor.Enforcement.Tests;
 /// assembly (every test in it dies, not just these) plus an
 /// <c>eng/test-manifest.json</c> count mismatch, never as a named red test.</para>
 ///
+/// <para><b>0.30 native AST.</b> The native parser builds a receiver call
+/// (<c>a.M(x)</c>) as an <see cref="ExpressionCallNode"/>, whose result type the
+/// pass reads from the bound call graph without asking the AST for argument
+/// types, so the self-referential bindings below no longer enter the cycle when
+/// parsed. The guard itself is unchanged: it still protects the
+/// <see cref="CallExpressionNode"/> arm (<c>InferKnownCallResultType</c> types
+/// a dotted target's arguments through <c>ResolveLocalValueType</c>), which the
+/// binder and verification passes still synthesize. The cycle pins therefore
+/// re-inject that shape (<see cref="WithDottedCallInitializers"/>) into the
+/// parsed module, and the fixture pins also check that the native parse
+/// completes without a cycle stop.</para>
+///
 /// <para><b>Gate 6 / §9 (no resolution answer changes on acyclic code
 /// shallower than the cap)</b>: the visited set fires only when a name is asked
 /// for while its own resolution is on the stack, which is a cycle by
@@ -100,9 +112,23 @@ public class EffectInferrerRecursionTests
     }
 
     [Fact]
+    public void SerilogFixture_NativeParse_TypesTheCallWithoutEnteringTheCycle()
+    {
+        // The native parse yields an ExpressionCallNode initializer, whose type
+        // comes from the bound call graph: no AST ask re-enters the binding.
+        var (bag, bound) = Enforce(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
+
+        Assert.Equal(0, bound.CycleStops);
+        Assert.Equal(0, bound.DepthCapStops);
+        Assert.Empty(bound.StoppedNames);
+        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
+    }
+
+    [Fact]
     public void SerilogFixture_CycleResolvesToSentinel_ByVisitedSetNotByCap()
     {
-        var (bag, bound) = Enforce(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
+        var (bag, bound) = Enforce(WithDottedCallInitializers(
+            Parse(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative))));
 
         // The hoisted `out var` binding is the name whose own resolution was
         // re-entered; it resolved by the VISITED SET, never by the backstop.
@@ -125,12 +151,20 @@ public class EffectInferrerRecursionTests
         // unknown (Calor0411) and the unknown effect propagates to the
         // enclosing callable (Calor0410) — the sentinel must never be read as
         // "pure". If a future change makes a cycle resolve to a REAL type,
-        // this goes red and the change gets looked at.
-        var (bag, _) = Enforce(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
-
-        Assert.Contains(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
+        // this goes red and the change gets looked at. Checked on both the
+        // cycle-stopped (dotted call) shape and the native parse.
+        var source = NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative);
+        var (cycled, cycledBound) = Enforce(WithDottedCallInitializers(Parse(source)));
+        Assert.True(cycledBound.CycleStops >= 1);
+        Assert.Contains(cycled, d => d.Code == DiagnosticCode.UnknownExternalCall
             && d.Message.Contains("_batchScheduler.MarkFailure", StringComparison.Ordinal));
-        Assert.Contains(bag, d => d.Code == DiagnosticCode.ForbiddenEffect
+        Assert.Contains(cycled, d => d.Code == DiagnosticCode.ForbiddenEffect
+            && d.Message.Contains("uses effect 'unknown'", StringComparison.Ordinal));
+
+        var (native, _) = Enforce(source);
+        Assert.Contains(native, d => d.Code == DiagnosticCode.UnknownExternalCall
+            && d.Message.Contains("FailureAwareBatchScheduler.MarkFailure", StringComparison.Ordinal));
+        Assert.Contains(native, d => d.Code == DiagnosticCode.ForbiddenEffect
             && d.Message.Contains("uses effect 'unknown'", StringComparison.Ordinal));
     }
 
@@ -150,8 +184,13 @@ public class EffectInferrerRecursionTests
         var method = Assert.Single(cls.Methods);
         var bind = Assert.IsType<BindStatementNode>(Assert.Single(method.Body));
         Assert.Equal("shouldDropQueue", bind.Name);
-        var call = Assert.IsType<CallExpressionNode>(bind.Initializer);
-        Assert.Equal("_batchScheduler.MarkFailure", call.Target);
+        // 0.30 native AST: a receiver call is an ExpressionCallNode over a
+        // FieldAccessNode callee (it was a CallExpressionNode with a dotted
+        // string target in the retired syntax).
+        var call = Assert.IsType<ExpressionCallNode>(bind.Initializer);
+        var callee = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+        Assert.Equal("MarkFailure", callee.FieldName);
+        Assert.Equal("_batchScheduler", Assert.IsType<ReferenceNode>(callee.Target).Name);
         Assert.Contains(call.Arguments, a => a is ReferenceNode { Name: "shouldDropQueue" });
     }
 
@@ -173,7 +212,8 @@ public class EffectInferrerRecursionTests
                 var x = scheduler.MarkFailure(x)
             """);
 
-        var (bag, bound) = Enforce(source);
+        Assert.Equal(0, Enforce(source).Bound.CycleStops);
+        var (bag, bound) = Enforce(WithDottedCallInitializers(Parse(source)));
 
         Assert.True(bound.CycleStops >= 1);
         Assert.Equal(0, bound.DepthCapStops);
@@ -220,9 +260,9 @@ public class EffectInferrerRecursionTests
                 var x = scheduler.MarkFailure(x)
             """);
 
-        pass.Enforce(Parse(source));
+        pass.Enforce(WithDottedCallInitializers(Parse(source)));
         var afterFirst = bound.CycleStops;
-        pass.Enforce(Parse(source));
+        pass.Enforce(WithDottedCallInitializers(Parse(source)));
 
         Assert.True(afterFirst >= 1);
         Assert.Equal(afterFirst * 2, bound.CycleStops);
@@ -365,11 +405,52 @@ public class EffectInferrerRecursionTests
         return module;
     }
 
+    /// <summary>
+    /// Replaces every top-level binding whose initializer is a native receiver
+    /// call (<c>a.M(args)</c>, an <see cref="ExpressionCallNode"/> over a
+    /// reference/field-access path) with the same call as a
+    /// <see cref="CallExpressionNode"/> with the dotted target <c>"a.M"</c> and
+    /// the same span and arguments: the shape whose result type the pass infers
+    /// by typing the arguments through the AST, which is the arm the #1104
+    /// guard bounds.
+    /// </summary>
+    private static ModuleNode WithDottedCallInitializers(ModuleNode module)
+    {
+        var bodies = module.Functions.Select(function => function.Body)
+            .Concat(module.Classes.SelectMany(cls => cls.Methods).Select(method => method.Body));
+        var replaced = 0;
+        foreach (var body in bodies)
+        {
+            var statements = Assert.IsAssignableFrom<IList<StatementNode>>(body);
+            for (var i = 0; i < statements.Count; i++)
+            {
+                if (statements[i] is not BindStatementNode { Initializer: ExpressionCallNode call } bind
+                    || DottedPath(call.TargetExpression) is not { } target || !target.Contains('.'))
+                    continue;
+                statements[i] = new BindStatementNode(bind.Span, bind.Name, bind.TypeName, bind.IsMutable,
+                    new CallExpressionNode(call.Span, target, call.Arguments), bind.Attributes, bind.IdentifierSpan);
+                replaced++;
+            }
+        }
+        Assert.True(replaced > 0, "expected a native receiver-call initializer to re-shape");
+        return module;
+
+        static string? DottedPath(ExpressionNode expression) => expression switch
+        {
+            ReferenceNode reference => reference.Name,
+            FieldAccessNode field when DottedPath(field.Target) is { } receiver => $"{receiver}.{field.FieldName}",
+            _ => null
+        };
+    }
+
     private static (DiagnosticBag Bag, EffectEnforcementPass.AstResolutionBound Bound) Enforce(
         string source,
+        int? cap = null) => Enforce(Parse(source), cap);
+
+    private static (DiagnosticBag Bag, EffectEnforcementPass.AstResolutionBound Bound) Enforce(
+        ModuleNode module,
         int? cap = null)
     {
-        var module = Parse(source);
         var bag = new DiagnosticBag();
         var bound = cap is { } c
             ? new EffectEnforcementPass.AstResolutionBound { DepthCap = c }
