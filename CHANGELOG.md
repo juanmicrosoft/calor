@@ -84,6 +84,16 @@ no substitute tokenizer or estimated result is reported here.
 - **C# conversion no longer writes `§ASSIGN` for a compound assignment it could not
   analyze.** When the converter has no semantic model for a statement such as
   `x += y`, it now writes the native `set x (x + y)`.
+- **More compound assignments convert natively.** `a[i] += v`, `s.X += 1` and
+  `arr[n] *= 3` were kept as raw C# whenever the target was not a plain local or
+  field. They now become `set a[i] (a[i] + v)` when the receiver and index have no
+  side effects, because both forms then evaluate them before the right-hand side.
+  Targets with calls in them still stay C#.
+- **The conversion library handles namespace-local `using` like `calor convert`.**
+  `CSharpToCalorConverter.Convert` kept any file whose single namespace had its own
+  `using` directives as whole-file C#. It now uses the same scoped-import path as
+  the CLI and falls back to whole-file C# only when that path cannot certify the
+  file. The conversion scorecard is back to 100 of 100 snippets (it was 86).
 - **Paid evaluation cost estimates account for prompt caching.** Claude cache
   reads no longer reduce the separate uncached-input charge, and five-minute
   cache writes include their surcharge. Reported input totals include cached
