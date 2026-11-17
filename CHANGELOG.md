@@ -39,6 +39,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Constructors can declare an effect row.** A constructor body may always
+  initialize (`mut`, `alloc`). Before, anything else, such as printing, throwing or
+  calling an API with no effect contract, was the error `Calor0422`, and C#
+  conversion kept the whole file as C#. A constructor can now write a row after its
+  header, for example `! throw` or `! unknown`, and the converter writes it for you.
+  Code that calls `new` is still charged what the constructor body really does.
+  Field and static initializers in a class without an explicit constructor still
+  have no row and fail closed.
 - **Functions can declare `! unknown`.** A function or method may write
   `! unknown` as its own effect row when it calls an API with no effect contract.
   Calls in its body are accepted, and every caller is charged `unknown`, so a
@@ -94,6 +102,18 @@ no substitute tokenizer or estimated result is reported here.
   `using` directives as whole-file C#. It now uses the same scoped-import path as
   the CLI and falls back to whole-file C# only when that path cannot certify the
   file. The conversion scorecard is back to 100 of 100 snippets (it was 86).
+- **Effects of qualified calls to another module are charged again.** In a
+  multi-file project, a call such as `OrderService.SaveOrder()` lost its receiver in
+  three places: cross-module enforcement through the library API, the cross-module
+  effect registry, and the project index (used by `calor query` and rename). Its
+  effects were never charged, so a caller declaring `!` could pass while the callee
+  wrote to a database. The CLI build was not affected. `calor effects suggest` also
+  printed `<expression>` for these receivers and suggested nothing. It now names the
+  receiver as written and expands short type names such as `Console`.
+- **Contracts that use `Substring` verify again.** Every native `s.Substring(...)`
+  in a contract body came back "unsupported", and so did any body-local string
+  binding. Z3 now checks them as it did for the retired `(substr s a b)` form, with
+  the same UTF-16 length and range rules.
 - **Paid evaluation cost estimates account for prompt caching.** Claude cache
   reads no longer reduce the separate uncached-input charge, and five-minute
   cache writes include their surcharge. Reported input totals include cached
