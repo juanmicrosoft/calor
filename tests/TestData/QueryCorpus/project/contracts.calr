@@ -1,14 +1,16 @@
-§M{Contracted}
-  §AS{env} "the clock is monotonic"
-  §F{Bounded:pub} (i32:n) -> i32
-    §E{}
-    §Q (>= n 0)
-    §S (>= result 1)
-    §AS{perf} "callers pass small values"
-    §R (+ n INT:1)
-  §F{Plain:pub} () -> i32
-    §E{}
-    §R INT:0
-  §F{Shout:pub} (str:s) -> void
-    §E{cw}
-    §P s
+module Contracted Contracted block
+  assume{env} "the clock is monotonic"
+  func Bounded (int:n) → int
+    !
+    requires n >= 0
+    => result >= 1
+    assume{perf} "callers pass small values"
+    return n + 1
+
+  func Plain () → int
+    !
+    return 0
+
+  func Shout (string:s) → void
+    ! cw
+    Console.WriteLine(s)

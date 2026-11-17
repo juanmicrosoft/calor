@@ -14,7 +14,7 @@ namespace Calor.Compiler.Tests;
 /// OBL-REFINEMENT-RETURN (-020), OBL-SUBTYPE (-021), and OBL-SELFREF (-022..026).
 /// The sources are the registered S1 cases, verbatim.
 ///
-/// - False proof: a §Q fact survived `§ASSIGN x` and discharged `§PROOF` on the new value,
+/// - False proof: a `requires` fact survived `set x` and discharged `proof` on the new value,
 ///   deleting its guard (R1-OBL-MUTATION-KILL-001/-003).
 /// - Spurious refutations (compile errors on correct programs, or a wrong counterexample):
 ///   models that ignored a reassignment, an else-branch guard, the returned value, or a
@@ -51,60 +51,52 @@ public sealed class S2ObligationStateTests
 
     // Review round 1 witnesses: each was a false Discharged (guard elided) or a lost proof.
     [Theory]
+    // The opaque writes are converter-owned raw frames (a raw payload's line starts at
+    // column 0, so those cases are concatenated rather than raw string literals).
+    [InlineData("module M M block\n"
+        + "  func Probe private (int:x) \u2192 int\n"
+        + "    requires (x > 0)\n"
+        + "    raw member:checked-block:Other:checked%20overflow%20block%20preserved%20verbatim 19\n"
+        + "checked { x = -5; }\n"
+        + "    proof{\"claim\"} (x > 0)\n"
+        + "    return x\n")]
     [InlineData("""
-        §M{M}
-          §F{Probe:priv} (i32:x) -> i32
-            §E{}
-            §Q (> x INT:0)
-            §B{sink:i32} §CS{(x = -5)}
-            §PROOF{claim} (> x INT:0)
-            §R x
+        module M M block
+          func Probe private (ref int:x, ref int:y) → int
+            if (x < 0)
+              return 0
+            else
+              set y -5
+              proof{"claim"} (x >= 0)
+            return x
         """)]
+    [InlineData("module M M block\n"
+        + "  func Probe private (int:x) \u2192 int\n"
+        + "    requires (x > 0)\n"
+        + "    unsafe\n"
+        + "      raw member:pointer:Other:Statement%20preserved%20as%20raw%20C%23%3A%20int%2A%20ptr%20%3D%20%26x%3B 15\n"
+        + "int* ptr = &x; \n"
+        + "      raw member:pointer:Other:Statement%20preserved%20as%20raw%20C%23%3A%20%2Aptr%20%3D%20-5%3B 11\n"
+        + "*ptr = -5; \n"
+        + "    proof{\"claim\"} (x > 0)\n"
+        + "    return x\n")]
     [InlineData("""
-        §M{M}
-          §F{Probe:priv} (i32:x:ref, i32:y:ref) -> i32
-            §E{}
-            §IF (< x INT:0)
-              §R INT:0
-            §EL
-              §ASSIGN y INT:-5
-              §PROOF{claim} (>= x INT:0)
-            §R x
+        module M M block
+          func Probe private (int:x) → int
+            let Func<int>:bump = () =>
+              set x -5
+              return 0
+            if (x < 0)
+              return 0
+            else
+              let int:z = bump()
+              proof{"claim"} (x >= 0)
+            return x
         """)]
-    [InlineData("""
-        §M{M}
-          §F{Probe:priv} (i32:x) -> i32
-            §E{unsafe}
-            §Q (> x INT:0)
-            §UNSAFE
-              §B{ptr:i32*} §ADDR x
-              §ASSIGN §DEREF ptr INT:-5
-            §PROOF{claim} (> x INT:0)
-            §R x
-        """)]
-    [InlineData("""
-        §M{M}
-          §F{Probe:priv} (i32:x) -> i32
-            §E{}
-            §B{bump:Func<i32>} §LAM{} §ASSIGN x INT:-5 §R INT:0 §/LAM
-            §IF (< x INT:0)
-              §R INT:0
-            §EL
-              §B{z:i32} §C{bump} §/C
-              §PROOF{claim} (>= x INT:0)
-            §R x
-        """)]
-    // Review round 2 witnesses: a compiler-directive payload ("x = -5;") and a field the caller
-    // can pass by reference as x.
-    [InlineData("""
-        §M{M}
-          §F{Probe:priv} (i32:x) -> i32
-            §E{}
-            §Q (> x INT:0)
-            §CDIR{compiler-directive:eCA9IC01Ow}
-            §PROOF{claim} (> x INT:0)
-            §R x
-        """)]
+    // Review round 2 witness: a field the caller can pass by reference as x. (The other
+    // round 2 witness, an executable payload in a compiler-directive frame, can no longer be
+    // written: native directive frames reject executable payloads at lexing, as pinned by
+    // NativeCompilerDirectiveFrameTests.DirectiveFrame_RejectsMalformedMismatchedAndExecutablePayloads.)
     [InlineData("""
         module M M block
           class Box

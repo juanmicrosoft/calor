@@ -18,7 +18,7 @@ public class SyntaxLookupMcpIntegrationTests
 
         Assert.Contains("found", response);
         Assert.Contains("true", response.ToLower());
-        Assert.Contains("NEW", response);
+        Assert.Contains("new ClassName(", response);
         Assert.Contains("examples", response);
     }
 
@@ -55,7 +55,7 @@ public class SyntaxLookupMcpIntegrationTests
 
         Assert.Contains("found", response);
         Assert.Contains("true", response.ToLower());
-        Assert.Contains("TR", response);
+        Assert.Contains("catch ExceptionType:name", response);
     }
 
     [Fact]

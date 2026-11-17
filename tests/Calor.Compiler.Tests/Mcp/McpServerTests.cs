@@ -303,8 +303,8 @@ public class McpServerTests
         var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
         Assert.Contains("found", json);
         Assert.Contains("true", json.ToLower());
-        // Check for NEW tag (JSON escapes § as \u00a7)
-        Assert.Contains("NEW", json);
+        // The native construction spelling
+        Assert.Contains("new ClassName(", json);
         Assert.Contains("examples", json);
     }
 

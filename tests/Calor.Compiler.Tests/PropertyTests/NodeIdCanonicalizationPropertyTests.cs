@@ -94,19 +94,21 @@ public sealed class NodeIdCanonicalizationPropertyTests
     private static string Render(Sample sample)
     {
         var source = new StringBuilder();
-        source.AppendLine($"§M{{GeneratedIds{sample.Payload[..4]}R{sample.Rotation}}}");
+        source.AppendLine($"module GeneratedIds{sample.Payload[..4]}R{sample.Rotation}");
         foreach (var index in Enumerable.Range(1, sample.FunctionCount)
                      .OrderBy(index => (index + sample.Rotation) % sample.FunctionCount))
         {
-            source.AppendLine($"  §F{{Compute{index}:pub}} (int:x) -> int");
-            source.AppendLine($"    §B{{offset:int}} {sample.Value}");
-            source.AppendLine($"    §R (+ x (+ offset {index}))");
+            source.AppendLine($"  func Compute{index} (int:x) \u2192 int");
+            source.AppendLine("    !");
+            source.AppendLine($"    let int:offset = {sample.Value}");
+            source.AppendLine($"    return (x + (offset + {index}))");
         }
-        source.AppendLine("  §CL{Calculator:pub}");
+        source.AppendLine("  class Calculator");
         for (var index = 1; index <= sample.MethodCount; index++)
         {
-            source.AppendLine($"    §MT{{Apply{index}:pub}} (bool:flag) -> bool");
-            source.AppendLine($"      §R (|| flag BOOL:{(index % 2 == 0 ? "true" : "false")})");
+            source.AppendLine($"    func Apply{index} (bool:flag) \u2192 bool");
+            source.AppendLine("      !");
+            source.AppendLine($"      return (flag || {(index % 2 == 0 ? "true" : "false")})");
         }
         return source.ToString();
     }

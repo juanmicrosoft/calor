@@ -23,8 +23,7 @@ module App App block
     ! cw
     Relay()
 
-  func Quiet () → int
-    !
+  func Quiet private () → int
     return 1
 
   func Whisper () → void

@@ -177,16 +177,25 @@ public sealed class S2NumericRefusalTests
     [Fact]
     public void OversizeLiteralRemovedBySimplification_IsStillRefused()
     {
-        // Review round 2: the simplifier folded the conditional to LONG:0 == LONG:0 before the
-        // translator saw the refused INT: literal.
-        const string source = """
-            module R1Case R1Case block
-              func Probe () → int
-                !
-                => ((true ? 0L : 3000000000L) == 0L)
-                return 0
-            """;
-        Assert.Equal(ContractVerificationStatus.Unsupported, VerifySinglePostcondition(source).Status);
+        // Review round 2: the simplifier folded the conditional to 0 == 0 before the translator
+        // saw the refused int-typed literal. Native source can no longer spell an int-typed
+        // literal outside int32, so the D2 form is built at AST level (as an SDK caller can, see
+        // OversizeLiteralBuiltWithoutTheLexer_IsRefused) and run through the pipeline's simplifier.
+        Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
+        var span = Calor.Compiler.Parsing.TextSpan.Empty;
+        var conditional = new Calor.Compiler.Ast.ConditionalExpressionNode(span,
+            new Calor.Compiler.Ast.BoolLiteralNode(span, true),
+            new Calor.Compiler.Ast.IntLiteralNode(span, 0),
+            new Calor.Compiler.Ast.IntLiteralNode(span, 3000000000L) { IsLong = false });
+        var condition = new Calor.Compiler.Ast.BinaryOperationNode(span, Calor.Compiler.Ast.BinaryOperator.Equal,
+            conditional, new Calor.Compiler.Ast.IntLiteralNode(span, 0));
+        var simplified = new ExpressionSimplifier().Simplify(condition);
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+        var result = verifier.VerifyPostcondition(
+            [], "i32", [],
+            new Calor.Compiler.Ast.EnsuresNode(span, simplified, null, new Calor.Compiler.Ast.AttributeCollection()));
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
     [Fact]
@@ -210,52 +219,6 @@ public sealed class S2NumericRefusalTests
                 new Calor.Compiler.Ast.ReturnStatementNode(span, new Calor.Compiler.Ast.IntLiteralNode(span, 0)),
             ]);
         Assert.NotEqual(ContractVerificationStatus.Proven, result.Status);
-    }
-
-    [Fact]
-    public void WarmCache_DoesNotCarryAVerdictBetweenIntAndLongSpellings()
-    {
-        // Review round 2: warming one spelling must not change the other's verdict, in either order.
-        const string intSource = """
-            module R1Case R1Case block
-              func Probe (long:x) → int
-                !
-                => (x <= 9223372036854775807L)
-                return 0
-            """;
-        var longSource = intSource.Replace("INT:9223372036854775807", "LONG:9223372036854775807");
-        foreach (var (first, second, expected) in new[]
-                 {
-                     (longSource, intSource, ContractVerificationStatus.Unsupported),
-                     (intSource, longSource, ContractVerificationStatus.Proven),
-                 })
-        {
-            var directory = Path.Combine(Path.GetTempPath(), "calor-s2-num-cache-" + Guid.NewGuid().ToString("N")[..8]);
-            try
-            {
-                Calor.Compiler.Verification.Z3.ContractVerificationResult Compile(string source)
-                {
-                    var options = new CompilationOptions
-                    {
-                        VerifyContracts = true,
-                        VerificationCacheOptions = new VerificationCacheOptions { Enabled = true, CacheDirectory = directory },
-                    };
-                    var compiled = Program.Compile(source, "case.calr", options);
-                    Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Select(d => d.Message)));
-                    return Assert.Single(Assert.Single(options.VerificationResults!.Functions).PostconditionResults);
-                }
-                var primed = Compile(first);
-                // The LONG text is cacheable (Proven) and writes an entry; the refused INT text writes none.
-                Assert.Equal(first == longSource ? ContractVerificationStatus.Proven : ContractVerificationStatus.Unsupported, primed.Status);
-                var written = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json", SearchOption.AllDirectories).Length : 0;
-                Assert.Equal(first == longSource, written > 0);
-                Assert.Equal(expected, Compile(second).Status);
-            }
-            finally
-            {
-                try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
-            }
-        }
     }
 
     [Theory]

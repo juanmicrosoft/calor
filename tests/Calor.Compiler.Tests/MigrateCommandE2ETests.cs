@@ -103,7 +103,9 @@ public class MigrateCommandE2ETests : IDisposable
         foreach (var calr in calrFiles)
         {
             var text = File.ReadAllText(calr);
-            var members = Regex.Matches(Parsing.RawCSharpFrame.MaskForAnalysis(text), @"§(MT|F|CTOR|PROP|OP|IXER)\{").Count;
+            // Native member headers: functions/methods, constructors, properties, operators, indexers.
+            var members = Regex.Matches(Parsing.RawCSharpFrame.MaskForAnalysis(text),
+                @"^[ \t]*(func [A-Za-z_]|ctor\b|property [^\r\n]|op [^\r\n]|this\[)", RegexOptions.Multiline).Count;
             var cs = RawFrameAssertions.GetFrames(text).Length;
             totalMemberDeclarations += members;
             totalCSharpBlocks += cs;

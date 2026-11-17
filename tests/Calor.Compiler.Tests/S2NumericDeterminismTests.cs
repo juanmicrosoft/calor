@@ -12,7 +12,7 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// #1413 (S2 R-NUM, amendments 1.3.1 and 1.3.2): overflow sensitivity is decided by rule from operand
 /// widths, with no solver, so the verdict does not depend on solver time (the linux-arm64
-/// z3-consumer-matrix failure on i32 * u32); and k-induction refuses a whole
+/// z3-consumer-matrix failure on int * uint); and k-induction refuses a whole
 /// loop whose bounds hold a literal outside int32. The tests need Z3 and fail, not skip, without it.
 /// </summary>
 public sealed class S2NumericDeterminismTests
@@ -36,11 +36,11 @@ public sealed class S2NumericDeterminismTests
     }
 
     [Theory]
-    [InlineData("i32", "u32", "(* x y)", false)]     // linux-arm64 case: i32 * u32 in 64 bits
-    [InlineData("u32", "i32", "(- x y)", false)]
-    [InlineData("i32", "i32", "(* x y)", true)]      // a 32-bit product can overflow
-    [InlineData("i32", "i32", "(+ x y)", true)]
-    [InlineData("i64", "i64", "(* x y)", true)]      // 64-bit nonlinear: once a solver-timeout shape
+    [InlineData("int", "uint", "(x * y)", false)]     // linux-arm64 case: int * uint in 64 bits
+    [InlineData("uint", "int", "(x - y)", false)]
+    [InlineData("int", "int", "(x * y)", true)]      // a 32-bit product can overflow
+    [InlineData("int", "int", "(x + y)", true)]
+    [InlineData("long", "long", "(x * y)", true)]      // 64-bit nonlinear: once a solver-timeout shape
     public void OverflowSensitivity_IsDecidedByRule_WithoutTheSolver(
         string leftType, string rightType, string arithmetic, bool sensitive)
     {
@@ -58,8 +58,8 @@ public sealed class S2NumericDeterminismTests
     }
 
     [Theory]
-    [InlineData("i32", "(+ x y)")]
-    [InlineData("i64", "(* x y)")]
+    [InlineData("int", "(x + y)")]
+    [InlineData("long", "(x * y)")]
     public void OverflowSensitivePostcondition_IsAssumedByRule(string type, string arithmetic)
     {
         Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
@@ -69,16 +69,16 @@ public sealed class S2NumericDeterminismTests
         var ensures = new EnsuresNode(TextSpan.Empty,
             new BinaryOperationNode(TextSpan.Empty, BinaryOperator.Equal, expression, expression),
             null, new AttributeCollection());
-        var outcome = verifier.VerifyPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), ensures).EffectiveOutcome;
+        var outcome = verifier.VerifyPostcondition(parameters, "int", Array.Empty<RequiresNode>(), ensures).EffectiveOutcome;
         Assert.Equal(ProofStatus.Assumed, outcome.Status);
         Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], outcome.Assumptions);
     }
 
     [Theory]
     // Truncated-bound witness: 3000000000 truncates to a negative bound, giving a false Proven.
-    [InlineData("(&& (<= i INT:3000000000) (>= i INT:0))")]
+    [InlineData("((i <= 3000000000L) && (i >= 0))")]
     // Dropped-conjunct witness: refusing only the bad conjunct gives a fabricated Disproven.
-    [InlineData("(&& (<= i INT:-4294967296) (>= i INT:1))")]
+    [InlineData("((i <= -4294967296L) && (i >= 1))")]
     public void WhileLoopWithAnOutOfRangeBound_IsUnsupported(string condition)
     {
         Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");

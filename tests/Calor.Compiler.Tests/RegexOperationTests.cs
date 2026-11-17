@@ -128,12 +128,12 @@ public class RegexOperationTests
     }
 
     [Theory]
-    [InlineData("Regex.IsMatch(s, \"\\\\d+\")", "regex-test")]
-    [InlineData("Regex.Match(s, \"\\\\d+\")", "regex-match")]
-    [InlineData("Regex.Split(s, \",\")", "regex-split")]
-    public void Migration_RegexStaticMethod_ConvertsToStringOp(string csharpExpr, string expectedCalorOp)
+    [InlineData("Regex.IsMatch(s, \"\\\\d+\")", "Regex.IsMatch(s, ")]
+    [InlineData("Regex.Match(s, \"\\\\d+\")", "Regex.Match(s, ")]
+    [InlineData("Regex.Split(s, \",\")", "Regex.Split(s, ")]
+    public void Migration_RegexStaticMethod_ConvertsToStringOp(string csharpExpr, string expectedCalorCall)
     {
-        // The C# to Calor converter converts Regex static methods
+        // The C# to Calor converter keeps Regex static methods as ordinary native calls
         var csharp = $@"
 using System.Text.RegularExpressions;
 public class Test {{ public object M(string s) {{ return {csharpExpr}; }} }}";
@@ -145,13 +145,13 @@ public class Test {{ public object M(string s) {{ return {csharpExpr}; }} }}";
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains(expectedCalorOp, calor);
+        Assert.Contains(expectedCalorCall, calor);
     }
 
     [Fact]
     public void Migration_RegexReplace_ConvertsToStringOp()
     {
-        // The C# to Calor converter converts Regex.Replace
+        // The C# to Calor converter keeps Regex.Replace as an ordinary native call
         var csharp = @"
 using System.Text.RegularExpressions;
 public class Test { public string M(string s) { return Regex.Replace(s, ""\\s+"", ""-""); } }";
@@ -163,13 +163,13 @@ public class Test { public string M(string s) { return Regex.Replace(s, ""\\s+""
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("regex-replace", calor);
+        Assert.Contains("Regex.Replace(s, ", calor);
     }
 
     [Fact]
     public void Migration_RegexIsMatch_FullyQualified_ConvertsToStringOp()
     {
-        // The C# to Calor converter converts fully qualified Regex.IsMatch
+        // The C# to Calor converter keeps fully qualified Regex.IsMatch as a native call
         var csharp = @"
 public class Test { public bool M(string s) { return System.Text.RegularExpressions.Regex.IsMatch(s, ""\\d+""); } }";
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
@@ -180,15 +180,15 @@ public class Test { public bool M(string s) { return System.Text.RegularExpressi
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("regex-test", calor);
+        Assert.Contains("System.Text.RegularExpressions.Regex.IsMatch(s, ", calor);
     }
 
     [Theory]
-    [InlineData("Regex.IsMatch(s, \"\\\\d+\")", "regex-test")]
-    [InlineData("Regex.Match(s, \"\\\\d+\")", "regex-match")]
-    [InlineData("Regex.Replace(s, \"\\\\s+\", \"-\")", "regex-replace")]
-    [InlineData("Regex.Split(s, \",\")", "regex-split")]
-    public void Migration_RegexOperation_RoundTripsToCalor(string csharpExpr, string expectedCalorOp)
+    [InlineData("Regex.IsMatch(s, \"\\\\d+\")", "Regex.IsMatch(s, ")]
+    [InlineData("Regex.Match(s, \"\\\\d+\")", "Regex.Match(s, ")]
+    [InlineData("Regex.Replace(s, \"\\\\s+\", \"-\")", "Regex.Replace(s, ")]
+    [InlineData("Regex.Split(s, \",\")", "Regex.Split(s, ")]
+    public void Migration_RegexOperation_RoundTripsToCalor(string csharpExpr, string expectedCalorCall)
     {
         var csharp = $@"
 using System.Text.RegularExpressions;
@@ -201,7 +201,7 @@ public class Test {{ public object M(string s) => {csharpExpr}; }}";
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains(expectedCalorOp, calor);
+        Assert.Contains(expectedCalorCall, calor);
     }
 
     #endregion

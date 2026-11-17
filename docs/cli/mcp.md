@@ -80,11 +80,11 @@ calls, infix expressions and indentation. Declaration IDs belong in
 `.calor/ids.json`, not source.
 
 ```json
-{"name":"calor_compile","arguments":{"source":"module Calc\n  func Add (int:x, int:y) → int\n    return x + y\n"}}
+{"name":"calor_compile","arguments":{"source":"module Calc\n  func Add (int:x, int:y) → int\n    !\n    return x + y\n"}}
 ```
 
 ```json
-{"name":"calor_check","arguments":{"action":"diagnose","source":"module Calc\n  func Add (int:x, int:y) → int\n    return x + y\n","apply":true}}
+{"name":"calor_check","arguments":{"action":"diagnose","source":"module Calc\n  func Add (int:x, int:y) → int\n    !\n    return x + y\n","apply":true}}
 ```
 
 `diagnose` returns `success`, counts, shared diagnostic entries and optional
@@ -93,7 +93,7 @@ common-mistake hints. With `apply: true`, it also returns `fixedSource` and
 `calor_compile options.autoFix` and `calor_fix` use the same safe-patch machinery.
 
 ```json
-{"name":"calor_fix","arguments":{"source":"module Calc\n    func Add (int:x, int:y) → int\n        return x + y\n","errors":["safe_diagnostics"]}}
+{"name":"calor_fix","arguments":{"source":"module Calc\n    func Add (int:x, int:y) → int\n        !\n        return x + y\n","errors":["safe_diagnostics"]}}
 ```
 
 `calor_fix` returns `success`, `fixedSource`, `wasModified`, `fixCount`,
