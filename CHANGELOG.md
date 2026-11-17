@@ -166,6 +166,13 @@ no substitute tokenizer or estimated result is reported here.
   refactoring tools. Attaching them used to re-parse every registered source once per
   file, so the cost grew with the square of the file count. On a 106-file project that
   step drops from about 15 s to 0.3 s.
+- **Binding time is linear in module size again.** A 50-function module binds in
+  about 90 ms instead of 20 s. Binding had started building a full C# compilation even
+  when every parameter had a scalar type. Three lookups were also quadratic: finding the
+  Calor expression behind each C# operation, finding source types on every variable
+  reference, and naming for-loop temporaries. Indexing a 106-file project drops from
+  about 48 s to 26 s; 0.29 took under a second, so that work continues. No diagnostics
+  or effect results change.
 - **Paid evaluation cost estimates account for prompt caching.** Claude cache
   reads no longer reduce the separate uncached-input charge, and five-minute
   cache writes include their surcharge. Reported input totals include cached
