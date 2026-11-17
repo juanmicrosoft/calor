@@ -1780,7 +1780,10 @@ public sealed class Parser
                 return new UsingDirectiveNode(startToken.Span, "", nativeAlias, isStaticUsing, isGlobalUsing);
             }
             var target = ReadInlineTypeToken();
-            if (target.Length == 0 || Current.Span.Line == startToken.Span.Line && !IsAtEnd)
+            // A using on the last line without a trailing newline is followed by the
+            // closing dedents on that same line; they are not trailing tokens.
+            if (target.Length == 0 || Current.Span.Line == startToken.Span.Line && !IsAtEnd
+                    && !Check(TokenKind.Dedent))
                 _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
                     "Use 'using Namespace', 'using static Type', or 'using Alias = Target'.");
             return new UsingDirectiveNode(startToken.Span.Union(PreviousToken.Span),

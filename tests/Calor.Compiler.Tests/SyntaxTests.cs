@@ -884,9 +884,10 @@ module Test Test block
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         Assert.Single(module.Functions[0].Body);
-        Assert.IsType<PrintStatementNode>(module.Functions[0].Body[0]);
-        var printStmt = (PrintStatementNode)module.Functions[0].Body[0];
-        Assert.True(printStmt.IsWriteLine);
+        var printStmt = Assert.IsType<ExpressionStatementNode>(module.Functions[0].Body[0]);
+        var printCall = Assert.IsType<ExpressionCallNode>(printStmt.Expression);
+        Assert.Equal("WriteLine", Assert.IsType<FieldAccessNode>(printCall.TargetExpression).FieldName);
+        Assert.Single(printCall.Arguments);
     }
 
     [Fact]
@@ -905,8 +906,10 @@ module Test Test block
         var module = parser.Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        var printStmt = (PrintStatementNode)module.Functions[0].Body[0];
-        Assert.IsType<BinaryOperationNode>(printStmt.Expression);
+        var printStmt = Assert.IsType<ExpressionStatementNode>(module.Functions[0].Body[0]);
+        var printCall = Assert.IsType<ExpressionCallNode>(printStmt.Expression);
+        Assert.Equal("WriteLine", Assert.IsType<FieldAccessNode>(printCall.TargetExpression).FieldName);
+        Assert.IsType<BinaryOperationNode>(Assert.Single(printCall.Arguments));
     }
 
     #endregion
@@ -934,7 +937,8 @@ module Test Test block
         var ifStmt = module.Functions[0].Body[0] as IfStatementNode;
         Assert.NotNull(ifStmt);
         Assert.Single(ifStmt!.ThenBody);
-        Assert.IsType<PrintStatementNode>(ifStmt.ThenBody[0]);
+        var thenStmt = Assert.IsType<ExpressionStatementNode>(ifStmt.ThenBody[0]);
+        Assert.IsType<ExpressionCallNode>(thenStmt.Expression);
     }
 
     [Fact]
@@ -976,9 +980,9 @@ module Test Test block
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         Assert.Single(module.Functions[0].Body);
-        var callStmt = module.Functions[0].Body[0] as CallStatementNode;
-        Assert.NotNull(callStmt);
-        Assert.Single(callStmt!.Arguments);
+        var callStmt = Assert.IsType<ExpressionStatementNode>(module.Functions[0].Body[0]);
+        var call = Assert.IsType<ExpressionCallNode>(callStmt.Expression);
+        Assert.Single(call.Arguments);
     }
 
     [Fact]
@@ -997,34 +1001,34 @@ module Test Test block
         var module = parser.Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        var callStmt = module.Functions[0].Body[0] as CallStatementNode;
-        Assert.NotNull(callStmt);
-        Assert.Single(callStmt!.Arguments);
-        Assert.IsType<BinaryOperationNode>(callStmt.Arguments[0]);
+        var callStmt = Assert.IsType<ExpressionStatementNode>(module.Functions[0].Body[0]);
+        var call = Assert.IsType<ExpressionCallNode>(callStmt.Expression);
+        Assert.Single(call.Arguments);
+        Assert.IsType<BinaryOperationNode>(call.Arguments[0]);
     }
 
     #endregion
 
-    #region Backtick Identifiers
+    #region Using directives
 
-    [Fact]
-    public void Lexer_RecognizesBacktickIdentifier()
+    [Theory]
+    [InlineData("using Buffers = System.Buffers")]
+    [InlineData("using static System.Math")]
+    [InlineData("global using System.Text")]
+    public void Parser_UsingOnLastLineWithoutTrailingNewline_Parses(string directive)
     {
-        var tokens = Tokenize("`true`");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Identifier, tokens[0].Kind);
-        Assert.Equal("true", tokens[0].Text);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesBacktickIdentifierWithSpaces()
-    {
-        var tokens = Tokenize("`my var`");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Identifier, tokens[0].Kind);
-        Assert.Equal("my var", tokens[0].Text);
+        // The closing dedents of a file without a final newline sit on the using's own
+        // line; they must not be read as trailing tokens of the directive.
+        foreach (var source in new[]
+        {
+            "module UsingTail\n  " + directive,
+            "module UsingTail UsingTail block\n  pp FEATURE\n    " + directive,
+        })
+        {
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        }
     }
 
     #endregion
