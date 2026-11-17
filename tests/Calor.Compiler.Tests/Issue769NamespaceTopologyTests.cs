@@ -103,8 +103,14 @@ public class Issue769NamespaceTopologyTests
 
         var enumDefinition = Assert.Single(
             reparsed.Enums.Where(item => item.Name == "TypedBugPatternKind"));
+        // 0.30: without the compiler assembly as a reference, the checker's base
+        // `IBugPatternChecker` does not resolve (class or interface?), so the class is kept as
+        // C# (class-unresolved-base-kind); it must still stay in the enum's namespace scope.
         var followingClass = Assert.Single(
-            reparsed.Classes.Where(item => item.Name == "TypedBugPatternChecker"));
+            reparsed.InteropBlocks.Where(item =>
+                item.CSharpCode.Contains(
+                    "class TypedBugPatternChecker",
+                    StringComparison.Ordinal)));
         var analysisInterop = Assert.Single(
             reparsed.InteropBlocks.Where(item =>
                 item.CSharpCode.Contains(
@@ -116,9 +122,6 @@ public class Issue769NamespaceTopologyTests
         Assert.Equal(
             enumDefinition.NamespaceScopeId,
             followingClass.NamespaceScopeId);
-        Assert.Equal(
-            enumDefinition.NamespaceIdentity,
-            followingClass.NamespaceIdentity);
         Assert.Equal(
             enumDefinition.NamespaceScopeId,
             analysisInterop.NamespaceScopeId);
@@ -177,11 +180,7 @@ public class Issue769NamespaceTopologyTests
             """;
 
         var result = ConvertLossy(source);
-        var aliases = result.Ast!.Usings.Where(item => item.Alias == "Item").ToList();
-        Assert.Equal(2, aliases.Count);
-        Assert.Equal(2, aliases.Select(item => item.NamespaceScopeId).Distinct().Count());
-        Assert.Contains(aliases, item => item.NamespaceIdentity == "Alpha");
-        Assert.Contains(aliases, item => item.NamespaceIdentity == "Beta");
+        AssertWholeFileTopology(result, source);
 
         var generated = CompileConverted(result);
         var compilation = CreateCompilation(generated);
@@ -213,17 +212,13 @@ public class Issue769NamespaceTopologyTests
             """;
 
         var result = ConvertLossy(source);
-        var staticUsings = result.Ast!.Usings.Where(item => item.IsStatic).ToList();
-        Assert.Equal(2, staticUsings.Count);
-        Assert.Contains(
-            staticUsings,
-            item => item.Namespace == "System.Math"
-                    && item.NamespaceIdentity == "Alpha");
-        Assert.Contains(
-            staticUsings,
-            item => item.Namespace == "System.MathF"
-                    && item.NamespaceIdentity == "Beta");
-        AssertNoCompilationErrors(CreateCompilation(CompileConverted(result)));
+        AssertWholeFileTopology(result, source);
+        var compilation = CreateCompilation(CompileConverted(result));
+        AssertNoCompilationErrors(compilation);
+        Assert.Equal(SpecialType.System_Double, compilation.GetTypeByMetadataName("Alpha.Calculator")!
+            .GetMembers("Value").OfType<IMethodSymbol>().Single().ReturnType.SpecialType);
+        Assert.Equal(SpecialType.System_Single, compilation.GetTypeByMetadataName("Beta.Calculator")!
+            .GetMembers("Value").OfType<IMethodSymbol>().Single().ReturnType.SpecialType);
     }
 
     [Fact]
@@ -252,16 +247,7 @@ public class Issue769NamespaceTopologyTests
             """;
 
         var result = ConvertLossy(source);
-        Assert.Contains(
-            result.Ast!.Usings,
-            item => item.IsGlobal
-                    && item.Namespace == "System.Collections.Generic"
-                    && item.NamespaceScopeId == null);
-        Assert.Contains(
-            result.Ast.Usings,
-            item => item.Alias == "Text"
-                    && item.NamespaceIdentity == "Alpha"
-                    && item.NamespaceScopeId != null);
+        AssertWholeFileTopology(result, source);
 
         var generated = CompileConverted(result);
         Assert.True(
@@ -289,18 +275,13 @@ public class Issue769NamespaceTopologyTests
                 }
             }
             """);
-        var outer = Assert.Single(
-            nested.Ast!.NamespaceScopes.Where(scope => scope.ParentScopeId == null));
-        var inner = Assert.Single(
-            nested.Ast.NamespaceScopes.Where(scope => scope.ParentScopeId == outer.Id));
-        Assert.Equal("Outer.Inner", inner.FullName);
-        Assert.Equal(
-            "global::Outer.Inner.NestedType",
-            Assert.Single(nested.Ast.Classes).FullyQualifiedSymbolIdentity);
+        AssertWholeFileTopology(nested);
         var nestedGenerated = CompileConverted(nested);
         Assert.Contains("namespace Outer", nestedGenerated);
         Assert.Contains("namespace Inner", nestedGenerated);
-        AssertNoCompilationErrors(CreateCompilation(nestedGenerated));
+        var nestedCompilation = CreateCompilation(nestedGenerated);
+        AssertNoCompilationErrors(nestedCompilation);
+        Assert.NotNull(nestedCompilation.GetTypeByMetadataName("Outer.Inner.NestedType"));
 
         var fileScoped = new CSharpToCalorConverter().Convert(
             "namespace Files.Scoped;\npublic class FileType { }");
@@ -405,7 +386,7 @@ public class Issue769NamespaceTopologyTests
             namespace Beta { public class Kept { } }
             """);
 
-        Assert.Equal(2, result.Ast!.NamespaceScopes.Count);
+        AssertWholeFileTopology(result);
         var generated = CompileConverted(result);
         var compilation = CreateCompilation(generated);
         AssertNoCompilationErrors(compilation);
@@ -414,7 +395,7 @@ public class Issue769NamespaceTopologyTests
     }
 
     [Fact]
-    public void LossyConversion_EmptyClassBeforeNestedNamespace_RemainsNative()
+    public void LossyConversion_EmptyClassBeforeNestedNamespace_KeepsBothScopes()
     {
         var result = ConvertLossy(
             """
@@ -429,32 +410,15 @@ public class Issue769NamespaceTopologyTests
             }
             """);
 
-        Assert.DoesNotContain(
-            result.Losses,
-            loss => loss.Kind == ConversionLossKind.InteropPreserved);
-        var reparsed = ParseCalor(result.CalorSource!);
-        var outer = Assert.Single(
-            reparsed.NamespaceScopes.Where(scope => scope.ParentScopeId == null));
-        var inner = Assert.Single(
-            reparsed.NamespaceScopes.Where(scope => scope.ParentScopeId == outer.Id));
-        Assert.Equal("Outer.Inner", inner.FullName);
-        Assert.Equal(
-            "Outer",
-            Assert.Single(reparsed.Classes.Where(type => type.Name == "Marker"))
-                .NamespaceIdentity);
-        Assert.Equal(
-            "Outer.Inner",
-            Assert.Single(reparsed.Classes.Where(type => type.Name == "Real"))
-                .NamespaceIdentity);
-
-        var compilation = CreateCompilation(new CSharpEmitter().Emit(reparsed));
+        AssertWholeFileTopology(result);
+        var compilation = CreateCompilation(CompileConverted(result));
         AssertNoCompilationErrors(compilation);
         Assert.NotNull(compilation.GetTypeByMetadataName("Outer.Marker"));
         Assert.NotNull(compilation.GetTypeByMetadataName("Outer.Inner.Real"));
     }
 
     [Fact]
-    public void LossyConversion_EmptyInterfaceBeforeNestedNamespace_RemainsNative()
+    public void LossyConversion_EmptyInterfaceBeforeNestedNamespace_KeepsBothScopes()
     {
         var result = ConvertLossy(
             """
@@ -469,23 +433,8 @@ public class Issue769NamespaceTopologyTests
             }
             """);
 
-        Assert.DoesNotContain(
-            result.Losses,
-            loss => loss.Kind == ConversionLossKind.InteropPreserved);
-        var reparsed = ParseCalor(result.CalorSource!);
-        var outer = Assert.Single(
-            reparsed.NamespaceScopes.Where(scope => scope.ParentScopeId == null));
-        var inner = Assert.Single(
-            reparsed.NamespaceScopes.Where(scope => scope.ParentScopeId == outer.Id));
-        Assert.Equal("Outer.Inner", inner.FullName);
-        Assert.Equal(
-            "Outer",
-            Assert.Single(reparsed.Interfaces).NamespaceIdentity);
-        Assert.Equal(
-            "Outer.Inner",
-            Assert.Single(reparsed.Classes).NamespaceIdentity);
-
-        var compilation = CreateCompilation(new CSharpEmitter().Emit(reparsed));
+        AssertWholeFileTopology(result);
+        var compilation = CreateCompilation(CompileConverted(result));
         AssertNoCompilationErrors(compilation);
         Assert.NotNull(compilation.GetTypeByMetadataName("Outer.IMarker"));
         Assert.NotNull(compilation.GetTypeByMetadataName("Outer.Inner.Real"));
@@ -532,20 +481,16 @@ public class Issue769NamespaceTopologyTests
             }
             """);
 
+        // 0.30: the two-namespace donor is whole-file C#, so the merger has no native Alpha.Shared
+        // to move out of it and its second namespace stays exactly where the source put it.
+        AssertWholeFileTopology(donor);
         var merged = new PartialClassMerger().Merge([target.Ast!, donor.Ast!]);
         var donorModule = merged[1];
-        Assert.DoesNotContain(
-            donorModule.Classes,
-            type => type.FullyQualifiedSymbolIdentity == "global::Alpha.Shared");
-        Assert.Contains(
-            donorModule.Classes,
-            type => type.FullyQualifiedSymbolIdentity == "global::Beta.Survivor");
+        Assert.Empty(donorModule.Classes);
+        Assert.Single(Assert.Single(merged[0].Classes).Methods);
 
         var calor = new CalorEmitter(new ConversionContext()).Emit(donorModule);
         var reparsed = ParseCalor(calor);
-        Assert.Equal(
-            "Beta",
-            Assert.Single(reparsed.Classes).NamespaceIdentity);
         var generated = new CSharpEmitter().Emit(reparsed);
         var compilation = CreateCompilation(generated);
         AssertNoCompilationErrors(compilation);
@@ -613,33 +558,6 @@ public class Issue769NamespaceTopologyTests
         AssertNoCompilationErrors(compilation);
         Assert.NotNull(compilation.GetTypeByMetadataName("Alpha.Worker"));
         Assert.NotNull(compilation.GetTypeByMetadataName("Alpha.IWorker"));
-    }
-
-    [Fact]
-    public void CalorEmitter_MalformedNullScope_ReportsAndPreservesDeclaration()
-    {
-        var module = ParseCalor(
-            """
-            module Test Alpha block
-              class Malformed
-            """);
-        var type = Assert.Single(module.Classes);
-        type.NamespaceScopeId = null;
-        type.NamespaceIdentity = null;
-
-        var context = new ConversionContext();
-        var emitted = new CalorEmitter(context).Emit(module);
-
-        Assert.Contains(
-            context.Issues,
-            issue => issue.Severity == ConversionIssueSeverity.Error
-                     && issue.Message.Contains(
-                         "neither a namespace scope",
-                         StringComparison.Ordinal));
-        var reparsed = ParseCalor(emitted);
-        var preserved = Assert.Single(reparsed.Classes);
-        Assert.Equal("", preserved.NamespaceIdentity);
-        Assert.Contains(reparsed.NamespaceScopes, scope => scope.IsGlobal);
     }
 
     [Fact]
@@ -813,7 +731,7 @@ public class Issue769NamespaceTopologyTests
     {
         const string source =
             """
-            module GenericArity GenericArity block
+            module GenericArity
               class Box<T>
                 ctor (int:value)
                   let int:copy1 = value
@@ -960,6 +878,21 @@ public class Issue769NamespaceTopologyTests
 
         Assert.NotEqual(entries[0].OutputPath, entries[1].OutputPath);
         Assert.Contains("Beta_Widget", entries[1].OutputPath);
+    }
+
+    /// <summary>
+    /// 0.30: a native module header carries one namespace, so a file with several (or nested)
+    /// namespace scopes, or namespace-local usings, is kept as one whole-file C# interop block.
+    /// The tests then check the semantics through the compiled output.
+    /// </summary>
+    private static void AssertWholeFileTopology(ConversionResult result, string? source = null)
+    {
+        Assert.Contains(result.Losses, loss => loss.Feature == "namespace-topology"
+            && loss.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Empty(result.Ast!.Classes);
+        var interop = Assert.Single(result.Ast.InteropBlocks);
+        if (source != null)
+            Assert.Equal(source, interop.CSharpCode);
     }
 
     private static ConversionResult ConvertLossy(string source)
