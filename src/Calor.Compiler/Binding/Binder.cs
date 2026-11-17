@@ -18,6 +18,9 @@ internal sealed record SourceCallable(MethodNode Declaration, ClassDefinitionNod
 internal interface ISourceBindingContext
 {
     IReadOnlyList<SourceProjection> CompanionSources(string? sourcePath, ContractMode mode);
+    // One annotated image of every module of the pass, shared by every projection that
+    // binds a module of it (null when there is none to share).
+    CallGraphAnalysis.SharedProjectionImage? SharedImage(string? sourcePath, ContractMode mode) => null;
     SourceCallable? FindCallable(AstNode declaration);
 }
 

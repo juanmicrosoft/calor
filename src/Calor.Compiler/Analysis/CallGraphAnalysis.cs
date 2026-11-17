@@ -308,6 +308,325 @@ public sealed class CallGraphAnalysis
         CompanionTrees.GetOrCreateValue(companion).GetOrAdd(options,
             selected => CSharpSyntaxTree.ParseText(companion.Source, selected, companion.Path));
 
+    // The preprocessor symbols a parsed companion's #if/#elif conditions name. A tree
+    // is immutable, so this is read once per companion tree, not once per module
+    // binding against it.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<SyntaxTree, string[]>
+        CompanionConditionSymbols = new();
+
+    private static string[] ConditionSymbols(SyntaxTree tree) =>
+        CompanionConditionSymbols.GetValue(tree, ReadConditionSymbols);
+
+    private static string[] ReadConditionSymbols(SyntaxTree tree) => tree.GetRoot()
+        .DescendantTrivia(descendIntoTrivia: true)
+        .Select(trivia => trivia.GetStructure()).OfType<DirectiveTriviaSyntax>()
+        .Select(directive => directive switch
+        {
+            IfDirectiveTriviaSyntax conditional => conditional.Condition,
+            ElifDirectiveTriviaSyntax conditional => conditional.Condition,
+            _ => null
+        })
+        .OfType<ExpressionSyntax>()
+        .SelectMany(condition => condition.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+        .Select(identifier => identifier.Identifier.ValueText)
+        .ToArray();
+
+    /// <summary>
+    /// The comment markers an annotated projection writes: expression start/end
+    /// around every emitted expression or statement, and an origin marker before
+    /// every callable and class declaration. Each set carries a fresh GUID, so
+    /// user text can never forge one.
+    /// </summary>
+    internal sealed record ProjectionMarkers(string Expression, string ExpressionEnd, string Callable, string Type)
+    {
+        internal static ProjectionMarkers Create()
+        {
+            var identity = Guid.NewGuid().ToString("N");
+            return new($"calor-expression-{identity}:", $"calor-expression-end-{identity}:",
+                $"calor-callable-{identity}:", $"calor-type-{identity}:");
+        }
+    }
+
+    internal sealed record AnnotatedProjection(string Source, List<AstNode> Expressions,
+        List<AstNode> Callables, List<ClassDefinitionNode> Types, DiagnosticBag Diagnostics);
+
+    /// <summary>
+    /// The C# image of one module that operator and source-call binding reads:
+    /// the module's real emission, with every expression and declaration marked
+    /// with its Calor origin. Deterministic for a given module, contract mode,
+    /// cross-module map and marker set.
+    /// </summary>
+    internal static AnnotatedProjection EmitAnnotatedProjection(ModuleNode module, ContractMode contractMode,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        ProjectionMarkers markers)
+    {
+        var expressions = new List<AstNode>();
+        var callables = new List<AstNode>();
+        var types = new List<ClassDefinitionNode>();
+        var diagnostics = new DiagnosticBag();
+        var emitter = new CSharpEmitter(contractMode, null, null, diagnostics: diagnostics)
+        {
+            // Qualify cross-module calls as the real emission does, so a call into a
+            // companion module binds instead of failing the whole projection.
+            CrossModuleFunctionModules = crossModuleFunctions,
+            AnnotateSource = (expression, text) =>
+            {
+                var index = expressions.Count;
+                expressions.Add(expression);
+                return $"/*{markers.Expression}{index}*/{text}/*{markers.ExpressionEnd}{index}*/";
+            },
+            CallableOrigin = declaration =>
+            {
+                var index = callables.Count;
+                callables.Add(declaration);
+                return $"/*{markers.Callable}{index}*/";
+            },
+            TypeOrigin = declaration =>
+            {
+                var index = types.Count;
+                types.Add(declaration);
+                return $"/*{markers.Type}{index}*/";
+            }
+        };
+        var source = emitter.Emit(module);
+        return new(source, expressions, callables, types, diagnostics);
+    }
+
+    // The source methods one companion tree declares, keyed by its callable markers,
+    // in declaration order: what binding a module against that companion records.
+    private static IEnumerable<(IMethodSymbol Method, AstNode Origin)> DeclaredCompanionMethods(
+        Compilation compilation, SyntaxTree tree, string marker, IReadOnlyList<AstNode> callables)
+    {
+        var model = compilation.GetSemanticModel(tree);
+        foreach (var declaration in tree.GetRoot().DescendantNodes().OfType<BaseMethodDeclarationSyntax>())
+        {
+            foreach (var trivia in declaration.GetLeadingTrivia())
+            {
+                if (TryReadMarker(trivia, marker, out var index)
+                    && model.GetDeclaredSymbol(declaration) is IMethodSymbol method)
+                    yield return (method, callables[index]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// One C# image of every module in a project pass, compiled once per
+    /// preprocessor configuration and shared by every module that binds against
+    /// its companions (the binder's projection and the call graph's alike).
+    ///
+    /// <para>Without it each module compiled its own image (itself plus every
+    /// companion), and the projection's proof gate asks whether that compilation
+    /// has any error, which compiles every companion body. Index builds were
+    /// therefore quadratic in project size.</para>
+    ///
+    /// <para>The module's own image is used only when its projection text is
+    /// exactly the text recorded here (same markers, same cross-module map, same
+    /// module content), so a changed source, a different map or a different
+    /// contract mode can never reuse it. The companions here are the annotated
+    /// projections, not the plain ones a per-module compilation uses; a
+    /// configuration is shared only after every module's annotated tree is
+    /// checked to be the same program as its plain tree: the same tokens, the
+    /// same directives and inactive text, the same callable origins at the same
+    /// tokens, differing only in comment markers and in the marker text the
+    /// contract messages quote inside string literals. Any difference makes the
+    /// module bind against its own compilation exactly as before.</para>
+    /// </summary>
+    internal sealed class SharedProjectionImage
+    {
+        private readonly (string Path, AnnotatedProjection Projection, SourceProjection Plain)[] _entries;
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<CSharpParseOptions,
+            Lazy<SharedCompilation?>> _compilations = new();
+        private readonly System.Text.RegularExpressions.Regex _annotation;
+
+        private SharedProjectionImage(ProjectionMarkers markers,
+            (string Path, AnnotatedProjection Projection, SourceProjection Plain)[] entries)
+        {
+            Markers = markers;
+            _entries = entries;
+            _annotation = new(
+                $@"/\*(?:{System.Text.RegularExpressions.Regex.Escape(markers.Expression)}"
+                + $"|{System.Text.RegularExpressions.Regex.Escape(markers.ExpressionEnd)}"
+                + $@"|{System.Text.RegularExpressions.Regex.Escape(markers.Type)})[0-9]+\*/",
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        }
+
+        internal ProjectionMarkers Markers { get; }
+
+        /// <summary>
+        /// Emits every module's annotated projection, in the order of the plain
+        /// companion projections. Null when any module cannot be projected.
+        /// </summary>
+        internal static SharedProjectionImage? Create(IReadOnlyList<SourceProjection> plain, ContractMode mode,
+            IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
+        {
+            var markers = ProjectionMarkers.Create();
+            var entries = new (string, AnnotatedProjection, SourceProjection)[plain.Count];
+            for (var index = 0; index < plain.Count; index++)
+            {
+                AnnotatedProjection projection;
+                try
+                {
+                    projection = EmitAnnotatedProjection(plain[index].Module, mode, crossModuleFunctions, markers);
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException)
+                {
+                    // Sharing is only an optimization: a module that cannot be projected
+                    // here still projects (or fails) on its own path, exactly as before.
+                    return null;
+                }
+                if (projection.Diagnostics.HasErrors)
+                    return null;
+                entries[index] = (plain[index].Path, projection, plain[index]);
+            }
+            return new(markers, entries);
+        }
+
+        internal sealed record Selection(int Index, IReadOnlyList<SharedCompilation> Compilations);
+
+        /// <summary>
+        /// The shared compilations a module's projection may bind in, one per
+        /// configuration, or null when the module must compile its own image: its
+        /// path is not exactly one entry, its text differs from that entry's, or a
+        /// configuration failed the equivalence check.
+        /// </summary>
+        internal Selection? Select(string sourcePath, string source, IReadOnlyList<CSharpParseOptions> configurations)
+        {
+            var comparer = Incremental.BuildStateCache.GetPathComparer();
+            var path = Path.GetFullPath(sourcePath);
+            var index = -1;
+            for (var candidate = 0; candidate < _entries.Length; candidate++)
+            {
+                if (!comparer.Equals(_entries[candidate].Path, path))
+                    continue;
+                if (index >= 0)
+                    return null;
+                index = candidate;
+            }
+            if (index < 0 || !string.Equals(_entries[index].Projection.Source, source, StringComparison.Ordinal))
+                return null;
+            var compilations = new SharedCompilation[configurations.Count];
+            for (var configuration = 0; configuration < configurations.Count; configuration++)
+            {
+                var options = configurations[configuration];
+                if (_compilations.GetOrAdd(options, selected => new Lazy<SharedCompilation?>(() => Compile(selected)))
+                        .Value is not { } compilation)
+                    return null;
+                compilations[configuration] = compilation;
+            }
+            return new(index, compilations);
+        }
+
+        private SharedCompilation? Compile(CSharpParseOptions options)
+        {
+            var trees = new SyntaxTree[_entries.Length];
+            for (var index = 0; index < _entries.Length; index++)
+            {
+                var (path, projection, plain) = _entries[index];
+                trees[index] = CSharpSyntaxTree.ParseText(projection.Source, options, path);
+                if (!SameProgram(trees[index], projection.Callables, ParseCompanion(plain, options), plain))
+                    return null;
+            }
+            var compilation = CSharpCompilation.Create("CalorOperatorBindings", trees,
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
+            return new SharedCompilation(compilation, trees,
+                _entries.Select(entry => (IReadOnlyList<AstNode>)entry.Projection.Callables).ToArray(),
+                Markers.Callable);
+        }
+
+        // The annotated tree and the plain tree are the same program: equal token
+        // kinds and texts (a literal's text may differ only by the expression and
+        // type markers the annotation quotes into it), equal inactive text, and the
+        // same callable origins before the same tokens. Directives, doc comments and
+        // skipped text are structured trivia, so their tokens are compared too.
+        private bool SameProgram(SyntaxTree annotated, IReadOnlyList<AstNode> annotatedCallables,
+            SyntaxTree plain, SourceProjection plainProjection)
+        {
+            if (annotatedCallables.Count != plainProjection.Callables.Count
+                || annotatedCallables.Where((callable, index) =>
+                    !ReferenceEquals(callable, plainProjection.Callables[index])).Any())
+                return false;
+            var left = annotated.GetRoot().DescendantTokens(descendIntoTrivia: true).ToArray();
+            var right = plain.GetRoot().DescendantTokens(descendIntoTrivia: true).ToArray();
+            if (left.Length != right.Length)
+                return false;
+            for (var index = 0; index < left.Length; index++)
+            {
+                if (left[index].RawKind != right[index].RawKind)
+                    return false;
+                if (string.Equals(left[index].Text, right[index].Text, StringComparison.Ordinal))
+                    continue;
+                if (!IsLiteralText(left[index])
+                    || !string.Equals(Plain(left[index].Text, plainProjection.Marker), right[index].Text,
+                        StringComparison.Ordinal))
+                    return false;
+            }
+            return Landmarks(annotated, left, Markers.Callable, plainProjection.Marker)
+                .SequenceEqual(Landmarks(plain, right, plainProjection.Marker, plainProjection.Marker),
+                    StringComparer.Ordinal);
+        }
+
+        private IEnumerable<string> Landmarks(SyntaxTree tree, SyntaxToken[] tokens, string callableMarker,
+            string plainMarker)
+        {
+            foreach (var trivia in tree.GetRoot().DescendantTrivia(descendIntoTrivia: true))
+            {
+                if (trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                    yield return "inactive:" + Plain(trivia.ToString(), plainMarker);
+                else if (TryReadMarker(trivia, callableMarker, out var index))
+                    yield return $"callable:{index}@{FirstTokenFrom(tokens, trivia.Span.End)}";
+            }
+        }
+
+        // Annotated text with the expression and type markers removed and the
+        // callable markers spelled as the plain projection spells them.
+        private string Plain(string text, string plainMarker) =>
+            _annotation.Replace(text, "").Replace("/*" + Markers.Callable, "/*" + plainMarker, StringComparison.Ordinal);
+
+        private static int FirstTokenFrom(SyntaxToken[] tokens, int position)
+        {
+            int low = 0, high = tokens.Length;
+            while (low < high)
+            {
+                var middle = low + (high - low) / 2;
+                if (tokens[middle].SpanStart < position)
+                    low = middle + 1;
+                else
+                    high = middle;
+            }
+            return low;
+        }
+
+        private static bool IsLiteralText(SyntaxToken token) => token.Kind() is SyntaxKind.StringLiteralToken
+            or SyntaxKind.Utf8StringLiteralToken or SyntaxKind.SingleLineRawStringLiteralToken
+            or SyntaxKind.Utf8SingleLineRawStringLiteralToken or SyntaxKind.MultiLineRawStringLiteralToken
+            or SyntaxKind.Utf8MultiLineRawStringLiteralToken or SyntaxKind.InterpolatedStringTextToken
+            or SyntaxKind.CharacterLiteralToken or SyntaxKind.XmlTextLiteralToken;
+    }
+
+    /// <summary>One configuration of a <see cref="SharedProjectionImage"/>.</summary>
+    internal sealed class SharedCompilation
+    {
+        private readonly Lazy<(IMethodSymbol Method, AstNode Origin)[]>[] _companionMethods;
+
+        internal SharedCompilation(CSharpCompilation compilation, IReadOnlyList<SyntaxTree> trees,
+            IReadOnlyList<IReadOnlyList<AstNode>> callables, string marker)
+        {
+            Compilation = compilation;
+            Trees = trees;
+            _companionMethods = trees.Select((tree, index) => new Lazy<(IMethodSymbol, AstNode)[]>(() =>
+                DeclaredCompanionMethods(compilation, tree, marker, callables[index]).ToArray())).ToArray();
+        }
+
+        internal CSharpCompilation Compilation { get; }
+        internal IReadOnlyList<SyntaxTree> Trees { get; }
+
+        // What a per-module compilation records for its companions: every other
+        // module's declared methods, in module order.
+        internal IEnumerable<(IMethodSymbol Method, AstNode Origin)> CompanionMethodsExcept(int index) =>
+            _companionMethods.Where((_, candidate) => candidate != index).SelectMany(methods => methods.Value);
+    }
+
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
         ContractMode contractMode = ContractMode.Debug, bool singleModuleContext = true,
         ISourceBindingContext? crossModuleTypes = null, string? sourcePath = null,
@@ -412,15 +731,16 @@ public sealed class CallGraphAnalysis
         }
         // Bind the emitted expressions, not operator names or approximate operand
         // types. This also sees implicit receiving conversions and lifted operators.
-        var markerIdentity = Guid.NewGuid().ToString("N");
-        var expressionPrefix = $"calor-expression-{markerIdentity}:";
-        var expressionEndPrefix = $"calor-expression-end-{markerIdentity}:";
-        var callablePrefix = $"calor-callable-{markerIdentity}:";
-        var typePrefix = $"calor-type-{markerIdentity}:";
-        var expressions = new List<AstNode>();
+        // A project pass shares one image of every module (see SharedProjectionImage);
+        // this module's projection carries the image's markers so that, when its text
+        // is the image's text for this module, the shared compilation stands in for it.
+        var image = crossModuleTypes?.SharedImage(sourcePath, contractMode);
+        var markers = image?.Markers ?? ProjectionMarkers.Create();
+        var expressionPrefix = markers.Expression;
+        var expressionEndPrefix = markers.ExpressionEnd;
+        var callablePrefix = markers.Callable;
+        var typePrefix = markers.Type;
         var operatorIds = operators.ToDictionary(pair => pair.Node, pair => pair.Id);
-        var emittedCallables = new List<AstNode>();
-        var emittedTypes = new List<ClassDefinitionNode>();
         var initializationIds = new Dictionary<AstNode, string>(ReferenceEqualityComparer.Instance);
         foreach (var function in module.Functions)
             initializationIds[function] = function.Id;
@@ -437,33 +757,12 @@ public sealed class CallGraphAnalysis
                     if (accessor != null)
                         initializationIds[accessor] = GetPropertyAccessorFunctionId(owner.Name, property, accessor);
         }
-        string CallableOrigin(AstNode declaration)
-        {
-            var index = emittedCallables.Count;
-            emittedCallables.Add(declaration);
-            return $"/*{callablePrefix}{index}*/";
-        }
-        var emissionDiagnostics = new DiagnosticBag();
-        var emitter = new CSharpEmitter(contractMode, null, null, diagnostics: emissionDiagnostics)
-        {
-            // Qualify cross-module calls as the real emission does, so a call into a
-            // companion module binds instead of failing the whole projection.
-            CrossModuleFunctionModules = crossModuleFunctions,
-            AnnotateSource = (expression, text) =>
-            {
-                var index = expressions.Count;
-                expressions.Add(expression);
-                return $"/*{expressionPrefix}{index}*/{text}/*{expressionEndPrefix}{index}*/";
-            },
-            CallableOrigin = CallableOrigin,
-            TypeOrigin = declaration =>
-            {
-                var index = emittedTypes.Count;
-                emittedTypes.Add(declaration);
-                return $"/*{typePrefix}{index}*/";
-            }
-        };
-        var source = emitter.Emit(module);
+        var projection = EmitAnnotatedProjection(module, contractMode, crossModuleFunctions, markers);
+        var source = projection.Source;
+        var expressions = projection.Expressions;
+        var emittedCallables = projection.Callables;
+        var emittedTypes = projection.Types;
+        var emissionDiagnostics = projection.Diagnostics;
         var companions = crossModuleTypes?.CompanionSources(sourcePath, contractMode) ?? [];
         foreach (var diagnostic in emissionDiagnostics)
             diagnostics?.Add(diagnostic);
@@ -478,18 +777,10 @@ public sealed class CallGraphAnalysis
         }
         var options = new CSharpParseOptions(LanguageVersion.Preview);
         var initial = CSharpSyntaxTree.ParseText(source, options);
+        // A companion's condition symbols are read once per parsed companion, not once
+        // per module that binds against it; the union is the same set.
         var symbols = companions.Select(companion => ParseCompanion(companion, options))
-            .Prepend(initial).SelectMany(tree => tree.GetRoot().DescendantTrivia(descendIntoTrivia: true))
-            .Select(trivia => trivia.GetStructure()).OfType<DirectiveTriviaSyntax>()
-            .Select(directive => directive switch
-            {
-                IfDirectiveTriviaSyntax conditional => conditional.Condition,
-                ElifDirectiveTriviaSyntax conditional => conditional.Condition,
-                _ => null
-            })
-            .OfType<ExpressionSyntax>()
-            .SelectMany(condition => condition.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
-            .Select(identifier => identifier.Identifier.ValueText)
+            .Select(ConditionSymbols).Prepend(ReadConditionSymbols(initial)).SelectMany(names => names)
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         // Match the converter's exhaustive conditional-analysis bound. An image
         // we cannot exhaust is an explicit failure, never proof of a pure caller.
@@ -499,15 +790,22 @@ public sealed class CallGraphAnalysis
             bindingFailures.Add($"Source operator binding requires at most {exhaustiveSymbolLimit} preprocessor condition symbols; found {symbols.Length}.");
             return bindings;
         }
-        for (var mask = 0; mask < 1 << symbols.Length; mask++)
+        var configurations = Enumerable.Range(0, 1 << symbols.Length)
+            .Select(mask => options.WithPreprocessorSymbols(symbols.Where((_, index) => (mask & 1 << index) != 0)))
+            .ToArray();
+        // The shared image serves this module only when its text is exactly this
+        // projection and every configuration passed the image's equivalence check.
+        // Otherwise the module binds against its own compilation, as before.
+        if (image?.Select(sourcePath!, source, configurations) is { } shared)
         {
-            var defined = symbols.Where((_, index) => (mask & 1 << index) != 0);
-            BindTree(CSharpSyntaxTree.ParseText(source, options.WithPreprocessorSymbols(defined)));
+            foreach (var compilation in shared.Compilations)
+                BindTree(compilation.Trees[shared.Index], compilation.Compilation,
+                    compilation.CompanionMethodsExcept(shared.Index));
+            return bindings;
         }
-        return bindings;
-
-        void BindTree(SyntaxTree tree)
+        foreach (var configuration in configurations)
         {
+            var tree = CSharpSyntaxTree.ParseText(source, configuration);
             var companionTrees = companions.Select(companion => (
                 Projection: companion,
                 Tree: ParseCompanion(companion, (CSharpParseOptions)tree.Options))).ToArray();
@@ -515,23 +813,19 @@ public sealed class CallGraphAnalysis
                 companionTrees.Select(companion => (SyntaxTree)companion.Tree).Prepend(tree),
                 GeneratedCSharpCompiler.References,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
+            BindTree(tree, compilation, companionTrees.SelectMany(companion => DeclaredCompanionMethods(
+                compilation, companion.Tree, companion.Projection.Marker, companion.Projection.Callables)));
+        }
+        return bindings;
+
+        void BindTree(SyntaxTree tree, CSharpCompilation compilation,
+            IEnumerable<(IMethodSymbol Method, AstNode Origin)> companionMethods)
+        {
             var model = compilation.GetSemanticModel(tree);
             var root = tree.GetRoot();
             var methods = new Dictionary<ISymbol, AstNode>(SymbolEqualityComparer.Default);
-            foreach (var companion in companionTrees)
-            {
-                var companionModel = compilation.GetSemanticModel(companion.Tree);
-                foreach (var declaration in companion.Tree.GetRoot().DescendantNodes()
-                             .OfType<BaseMethodDeclarationSyntax>())
-                {
-                    foreach (var trivia in declaration.GetLeadingTrivia())
-                    {
-                        if (TryReadMarker(trivia, companion.Projection.Marker, out var index)
-                            && companionModel.GetDeclaredSymbol(declaration) is IMethodSymbol method)
-                            methods[method] = companion.Projection.Callables[index];
-                    }
-                }
-            }
+            foreach (var (method, origin) in companionMethods)
+                methods[method] = origin;
             var events = new Dictionary<ISymbol, EventDefinitionNode>(SymbolEqualityComparer.Default);
             foreach (var declaration in root.DescendantNodes().OfType<EventFieldDeclarationSyntax>())
             {
@@ -2101,6 +2395,8 @@ public sealed class CallGraphAnalysis
     /// </summary>
     public sealed class BoundValueIndex
     {
+        // The bound module the index was read from; null when binding threw.
+        internal BoundModule? Module { get; set; }
         internal Dictionary<string, FunctionNode> ExternalSourceFunctions { get; } = [];
         internal Dictionary<(string CallerId, int Start, int End), SourceArgumentSelection>
             SourceArguments
@@ -2929,8 +3225,32 @@ public sealed class CallGraphAnalysis
         analysis._boundValues = boundValues;
         analysis._operatorBindings = operatorBindings;
         analysis.ContractInheritance = contractInheritance;
+        if (crossModuleTypes is null && sourcePath is null && projectionContractMode == ContractMode.Debug
+            && boundValues.Module is { } plainModule)
+            analysis._plainBinding = (ast, crossModuleFunctions, contractInheritance, plainModule);
         return analysis;
     }
+
+    private (ModuleNode Ast, IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctions,
+        Verification.ModuleInheritanceResult? ContractInheritance, BoundModule Module)? _plainBinding;
+
+    /// <summary>
+    /// The module this analysis bound, when that binding is exactly the one
+    /// <c>new Binder(bag) { CrossModuleFunctionModules = crossModuleFunctions }
+    /// .Bind(ast, contractInheritance)</c> performs: the same module, the same
+    /// cross-module map and inheritance result, no source path, no project source
+    /// registry, and the default projection contract mode. Binding is a function of
+    /// those inputs (it does not change the AST), so a caller that would bind again
+    /// with them can read this result instead. Null otherwise, or when binding threw.
+    /// </summary>
+    internal BoundModule? PlainBoundModule(ModuleNode ast,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        Verification.ModuleInheritanceResult? contractInheritance) =>
+        _plainBinding is { } binding && ReferenceEquals(binding.Ast, ast)
+            && ReferenceEquals(binding.CrossModuleFunctions, crossModuleFunctions)
+            && ReferenceEquals(binding.ContractInheritance, contractInheritance)
+            ? binding.Module
+            : null;
 
     internal IReadOnlyDictionary<string, FunctionNode> ExternalSourceFunctions =>
         _boundValues.ExternalSourceFunctions;
@@ -3035,6 +3355,7 @@ public sealed class CallGraphAnalysis
             };
             var boundModule = binder.Bind(ast, contractInheritance);
             boundValues.Complete = true;
+            boundValues.Module = boundModule;
             var incompatibleCallSpans = diagnostics
                 .Where(diagnostic =>
                     diagnostic.Code is Calor.Compiler.Diagnostics.DiagnosticCode.NoMatchingOverload

@@ -303,16 +303,26 @@ public static class ProjectIndexBuilder
             .BuildCrossModuleFunctionMap(modules.Select(module => module.Ast).ToList())
             .Keys
             .ToArray();
-        var registry = CrossModuleEffectRegistry.Build(modules);
         // The map `calor build` hands both the per-file pass and the summary
         // (built only for a multi-file project): without it a native qualified
         // call into another module (`OrderService.SaveOrder()`) is charged as
         // unknown by the pass and missed by the summary.
         var summaryCrossModuleMap = EffectSummaryBuilder.CrossModuleFunctionMap(modules);
+        // One summary per module, built once: the registry is built from them
+        // (what CrossModuleEffectRegistry.Build(modules) does), and the same summary
+        // is what each document's cross-module charge is resolved from. A summary is
+        // a function of the module and the map, and the effect pass below does not
+        // change the module, so building it a second time gave the same summary.
+        var summaries = modules
+            .Select(module => EffectSummaryBuilder.Build(module.Ast, summaryCrossModuleMap))
+            .ToList();
+        var registry = CrossModuleEffectRegistry.Build(
+            summaries.Select((summary, position) => (summary, modules[position].FilePath)).ToList());
         var crossPass = new CrossModuleEffectEnforcementPass(UnknownCallPolicy.Strict);
 
-        foreach (var document in symbols.Documents)
+        for (var position = 0; position < symbols.Documents.Count; position++)
         {
+            var document = symbols.Documents[position];
             var relative = Relative(options.ProjectDirectory, document.FilePath);
             if (document.BindHadErrors)
             {
@@ -345,7 +355,7 @@ public static class ProjectIndexBuilder
                 }
                 facts = pass.DeclarationFacts;
                 crossCharges = crossPass.ResolveCrossModuleEffects(
-                    EffectSummaryBuilder.Build(document.Ast, summaryCrossModuleMap), document.FilePath, registry);
+                    summaries[position], document.FilePath, registry);
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
