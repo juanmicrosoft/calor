@@ -460,9 +460,10 @@ def self_test() -> int:
     except checkout_compiler.CompilerResolutionError as e:
         print(f"fixture_compile_check self-test: {e}", file=sys.stderr)
         return 2
-    good = "§M{Pos}\n  §F{Echo:pub} (i32:x) -> i32\n    §R x\n"
-    broken = "§M{Neg}\n  §Q (unterminated\n"
-    effect = "§M{Eff}\n  §F{Hi:pub} () -> void\n    §P \"hi\"\n"
+    good = "module Pos\n  func Echo public (int:x) \u2192 int\n    !\n    return x\n"
+    broken = "module Neg\n  requires (unterminated\n"
+    effect = ("module Eff Eff block\n  func Hi public () \u2192 void\n    !\n"
+              "    Console.WriteLine(\"hi\")\n")
     cases = [  # (source, expect, errors, wanted status)
         (good, "compile", [], "passed"),
         (broken, "compile", [], "failed"),

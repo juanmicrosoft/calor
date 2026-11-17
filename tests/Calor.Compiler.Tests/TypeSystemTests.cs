@@ -364,10 +364,13 @@ public class TypeSystemTests
     }
 
     [Theory]
-    [InlineData("i32!str")]
-    [InlineData("str!str")]
+    [InlineData("int!string")]
+    [InlineData("string!string")]
     public void RemovedResultShorthand_DoesNotExpandOrCompile(string typeName)
     {
+        // Native syntax reads `T!E` as the output type T followed by an output effect row
+        // naming E, not as a Result shorthand: the type stays T and the row's unknown
+        // effect code fails compilation.
         var source = $$"""
             module Test Test block
               func TryParse (string:input) → {{typeName}}
@@ -378,7 +381,7 @@ public class TypeSystemTests
         var module = Parse(source, out _);
         var output = Assert.Single(module.Functions).Output;
         Assert.NotNull(output);
-        Assert.Contains("!", output.TypeName);
+        Assert.Equal(typeName[..typeName.IndexOf('!')], output.TypeName);
         Assert.DoesNotContain("RESULT[", output.TypeName);
         Assert.DoesNotContain("Result<", output.TypeName);
         Assert.True(Program.Compile(source).HasErrors);

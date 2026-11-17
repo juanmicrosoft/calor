@@ -49,7 +49,7 @@
       "matchCodes": ["Calor0113"],
       "description": "Array types use C# suffix brackets: int[], string[] or int[,].",
       "wrongExample": "func UseItems ([int:items) → int     // ERROR - array brackets go after the type",
-      "correctExample": "func UseItems (int[]:items) → int\n  return items.Length\nfunc UseOtherItems (int[]:items) → int\n  return items.Length",
+      "correctExample": "func UseItems (int[]:items) → int\n  !\n  return items.Length\nfunc UseOtherItems (int[]:items) → int\n  !\n  return items.Length",
       "explanation": "Keep array brackets balanced and retain the element type and rank. Prefix arrays such as [int] and aliases such as i32 are retired."
     },
     {
@@ -109,7 +109,7 @@
       "matchCodes": ["Calor0103"],
       "description": "The parser expected a native Calor keyword or a correctly formed declaration.",
       "wrongExample": "module MyApp\n  function Add(a b)    // Use func and typed parameters",
-      "correctExample": "module MyApp\n  func Add (int:a, int:b) → int\n    return a + b",
+      "correctExample": "module MyApp\n  func Add (int:a, int:b) → int\n    !\n    return a + b",
       "explanation": "Use module Name and func Name (type:name, ...) → ReturnType. Section markers and the ASCII signature arrow are retired."
     },
     {
@@ -119,7 +119,7 @@
       "matchCodes": ["Calor0107"],
       "description": "A modifier keyword was used in an invalid position or an unrecognized modifier was applied to a declaration.",
       "wrongExample": "static func Helper () → int    // C# modifier before the Calor keyword",
-      "correctExample": "func Helper () → int\n  return 0\nfunc Good private () → int\n  return 1",
+      "correctExample": "func Helper () → int\n  !\n  return 0\nfunc Good private () → int\n  return 1",
       "explanation": "Visibility and modifiers follow the declaration name, before parameters: func Good private (...) → int. Use full spellings such as public, private and virtual; public is the default."
     },
     {
@@ -129,7 +129,7 @@
       "matchCodes": ["Calor0115"],
       "description": "A reference to a generic type parameter (like T, K, V) was used but the parameter is not declared in the current scope.",
       "wrongExample": "func Identity (T:x) → T      // T not declared as type param",
-      "correctExample": "func Identity<T> (T:x) → T\n  return x",
+      "correctExample": "func Identity<T> (T:x) → T\n  !\n  return x",
       "explanation": "Generic type parameters must be declared in the function or type name field using angle brackets. Ensure the type parameter name matches exactly (case-sensitive)."
     },
     {
@@ -149,7 +149,7 @@
       "matchCodes": ["Calor0204"],
       "description": "An extension function must declare its receiver as the first parameter with the this modifier.",
       "wrongExample": "func ToUpper () → string     // Missing this-parameter",
-      "correctExample": "func ToUpper (this string:self) → string\n  return self.ToUpper()",
+      "correctExample": "func ToUpper (this string:self) → string\n  !\n  return self.ToUpper()",
       "explanation": "Use this Type:name as the first parameter in a named static module. The receiver name need not be self. Preserve its type and extension-method identity."
     }
   ]

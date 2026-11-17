@@ -71,7 +71,7 @@ public sealed class S2ImplicationDefinednessTests
     }
 
     [Theory]
-    [InlineData("(>= (len s) INT:0)")]                 // R1-IMPL-ASSUMPTION-FORMS-001 and -005
+    [InlineData("(s.Length >= 0)")]                     // R1-IMPL-ASSUMPTION-FORMS-001 and -005
     [InlineData("((!string.IsNullOrEmpty(s)) || (s == \"\"))")]   // R1-IMPL-ASSUMPTION-FORMS-003
     public void NullableStringPrecondition_IsAssumedNotProven(string implementerPrecondition)
     {

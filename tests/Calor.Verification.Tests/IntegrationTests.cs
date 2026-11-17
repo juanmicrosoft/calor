@@ -141,13 +141,13 @@ module Test Test block
         Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
 
-        // Control: with ':ordinal' stated the model matches the emitted overload, so the solver
+        // Control: with StringComparison.Ordinal stated the model matches the emitted overload, so the solver
         // genuinely engages — the form is DEMOTED (Calor0720, conditional on the string model per
         // D3/D12) rather than REFUSED (Calor0718, outside the modeled surface). Both keep the
         // check, so the emitted-overload assertion is what pins that the fix is precise: a blanket
         // refusal of these three operations would fail here.
         var ordinal = Program.Compile(
-            source.Replace(@"""))", @""" :ordinal))"), "test.calr", NoCache());
+            source.Replace(@"""))", @""", StringComparison.Ordinal))"), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
         Assert.Contains("StringComparison.Ordinal", ordinal.GeneratedCode);

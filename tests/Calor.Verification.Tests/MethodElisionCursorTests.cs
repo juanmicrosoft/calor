@@ -140,9 +140,10 @@ module Test Test
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         // The #879 landing requirement: the fix opens elision to class methods, so the
-        // demotion/refusal machinery must govern the new surface. This array shape is
-        // REFUSED at translation (Calor0718 — `(len x)` models string length, not array
-        // length), which keeps the guard: the new surface must not over-elide it.
+        // demotion/refusal machinery must govern the new surface. In native syntax the body
+        // is `arr.Length`, which the translator now models, so the proof is DEMOTED to
+        // Assumed (Calor0720) rather than refused; either way the guard is kept: the new
+        // surface must not over-elide it.
         const string source = @"
 module Test Test
   class Calc public
@@ -158,7 +159,7 @@ module Test Test
         // The guard must be PRESENT even though verification could not model the body.
         Assert.Contains("ContractViolationException", result.GeneratedCode);
         Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
+            d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 
     [SkippableFact]

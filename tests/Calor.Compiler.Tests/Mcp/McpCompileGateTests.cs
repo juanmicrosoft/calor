@@ -252,8 +252,9 @@ public sealed class McpCompileGateTests : IDisposable
     [Fact]
     public async Task SingleFile_HonoursRequireDocs()
     {
-        var source = File.ReadAllText(Path.Combine(
-            CorpusRoot, "ES-07-persistent-finding", "step-00-finding-present", "violating.calr"));
+        var source = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(
+            CliTestHarness.FindRepoRoot(),
+            Path.Combine(CorpusRoot, "ES-07-persistent-finding", "step-00-finding-present", "violating.calr")));
 
         var strict = await CallTool(Path.GetTempPath(), "calor_compile", JsonSerializer.Serialize(new
         {
@@ -371,8 +372,11 @@ public sealed class McpCompileGateTests : IDisposable
 
     private static void SyncWorkspace(string workspace, string stepDirectory)
     {
+        // The corpus originals are frozen legacy text; compile the registered
+        // current-syntax mirror of each, as EditScriptCorpus.SyncWorkspace does.
         foreach (var source in Directory.GetFiles(stepDirectory, "*.calr"))
-            File.Copy(source, Path.Combine(workspace, Path.GetFileName(source)), overwrite: true);
+            File.Copy(ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(), source),
+                Path.Combine(workspace, Path.GetFileName(source)), overwrite: true);
     }
 
     private static EditScript LoadScript(string scriptName)

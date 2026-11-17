@@ -120,18 +120,18 @@ public class ConvertAutoFixIntegrationTests
     [Fact]
     public void Converter_NullConditionalChain_ProducesValidCalor()
     {
-        // Null-conditional chains now convert to valid Calor using (?. target "member") syntax
+        // Null-conditional chains convert to valid native Calor postfix ?. syntax
         var csharp = "public class Svc { public int? GetLen(string s) => s?.Trim()?.Length; }";
         var calor = ConvertCSharpToCalor(csharp);
         Assert.NotNull(calor);
         Assert.False(string.IsNullOrWhiteSpace(calor));
 
-        // Converter output should contain the (?. ...) syntax
-        Assert.Contains("(?.", calor);
+        // Converter output should contain the native postfix chain
+        Assert.Contains("s?.Trim()?.Length", calor);
 
         // This should now parse successfully
         var parseResult = CalorSourceHelper.Parse(calor, "null-cond.calr");
         Assert.True(parseResult.IsSuccess,
-            "Null-conditional chain should now produce valid Calor with (?. syntax)");
+            "Null-conditional chain should now produce valid Calor with postfix ?. syntax");
     }
 }

@@ -88,7 +88,7 @@ public class LlmTaskTests
             }
             """, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
         var provider = new MockProvider((_, language) => language == "calor"
-            ? "module OfflineScore\n  func ProbeValue public (int:value) → int\n    return 1\n"
+            ? "module OfflineScore\n  func ProbeValue public (int:value) → int\n    !\n    return 1\n"
             : "public static class Functions { public static int ProbeValue(int value) => 1; }");
         using var runner = new LlmTaskRunner(provider);
         var result = await runner.RunTaskAsync(task, new LlmTaskRunnerOptions { UseCache = false });

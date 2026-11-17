@@ -93,7 +93,7 @@ public class ToSurfaceSpellingTests
         Assert.NotNull(converted.Ast);
         Assert.Equal(Slots(source), Slots(new CSharpEmitter().Emit(converted.Ast)));
         var serialized = new Migration.CalorEmitter().Emit(converted.Ast);
-        Assert.Contains("(typeof ", serialized);
+        Assert.Contains("typeof(", serialized);
         Assert.DoesNotContain("§CS", serialized);
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
         var parsed = new Parser(new Lexer(serialized, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -299,7 +299,7 @@ public class ToSurfaceSpellingTests
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
         var formatted = new Migration.CalorEmitter().Emit(module);
         Assert.Contains($"({type}:value)", formatted.Replace(", ", ","));
-        Assert.Contains($"-> {type}", formatted.Replace(", ", ","));
+        Assert.Contains($"→ {type}", formatted.Replace(", ", ","));
         var compiled = Program.Compile(formatted, "canonical-types.calr",
             new CompilationOptions { EnforceEffects = false, EnableTypeChecking = true });
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));

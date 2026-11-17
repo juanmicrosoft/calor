@@ -249,11 +249,11 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
     }
 
     [Theory]
-    [InlineData("INT:1", "LONG:1")]
-    [InlineData("INT:1", "UINT:1")]
-    [InlineData("LONG:1", "ULONG:1")]
-    [InlineData("UINT:1", "ULONG:1")]
-    [InlineData("ULONG:18446744073709551615", "LONG:-1")]
+    [InlineData("1", "1L")]
+    [InlineData("1", "1U")]
+    [InlineData("1L", "1UL")]
+    [InlineData("1U", "1UL")]
+    [InlineData("18446744073709551615UL", "-1L")]
     public void CanonicalKey_DistinguishesLiteralTyping(string left, string right)
     {
         var hasher = new ContractHasher();
