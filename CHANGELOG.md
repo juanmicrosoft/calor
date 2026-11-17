@@ -161,6 +161,11 @@ no substitute tokenizer or estimated result is reported here.
   it, instead of "Undefined variable".
 - **Effects docs describe `Calor0417` correctly.** It fires for an exported `internal`
   function with no row. A `public` function without a row is the error `Calor0124`.
+- **Multi-file builds and project indexing attach declaration identities once per
+  project.** Declaration identities are the stable IDs that `calor ids` stores for
+  refactoring tools. Attaching them used to re-parse every registered source once per
+  file, so the cost grew with the square of the file count. On a 106-file project that
+  step drops from about 15 s to 0.3 s.
 - **Paid evaluation cost estimates account for prompt caching.** Claude cache
   reads no longer reduce the separate uncached-input charge, and five-minute
   cache writes include their surcharge. Reported input totals include cached
