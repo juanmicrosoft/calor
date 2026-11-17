@@ -114,6 +114,53 @@ no substitute tokenizer or estimated result is reported here.
   in a contract body came back "unsupported", and so did any body-local string
   binding. Z3 now checks them as it did for the retired `(substr s a b)` form, with
   the same UTF-16 length and range rules.
+- **Multi-file builds charge calls between modules precisely again.** Each file is
+  checked against copies of the other modules, and those copies did not qualify calls
+  into a third module. The copy failed to compile, so `a + b` and every module call in
+  the file were charged `unknown`, and a project where one module calls another
+  failed under `!`. The copies now qualify those calls the same way the real build does.
+- **Effect errors no longer hide contract type errors.** A precondition that is not a
+  `bool`, such as `requires Count(x)` where `Count` returns `int`, is now reported
+  even when the same function also has an effect error.
+- **Static field initializers convert natively in more cases.** An implicit static
+  initializer has no effect row, so anything charged `unknown` in it is the error
+  `Calor0422`, and C# conversion kept the whole file as C#. The effect checker now
+  resolves object and collection initializers (`new Point { X = 1 }`), field updates
+  (`++Counter.N`, charged `mut`), and lambdas or method groups (charged `alloc` plus
+  what the target does). Effects beyond `mut` and `alloc` are still rejected.
+  When a field initializer must stay C#, fields still initialize in source order.
+- **More C# converts natively.** These were kept as C#:
+  - a constructor holding one raw C# statement, such as `E += H;`. It now declares
+    `! unknown` and the rest of the file converts.
+  - `value?.Length ?? 0`, and `s.X += f()` on a struct local or by-value parameter.
+  - `int[] a = { Set(out var n) }`. The lowered `n` now starts as `null`.
+  - files that call a referenced assembly or import a namespace from another project
+    file. The converter now checks the generated C# with the project's references
+    and sibling files.
+  - a class in a file converted with a custom module name. Only the failing type is
+    now kept as C#.
+- **The converter parses its own two-word accessor visibility.** Properties with
+  `set protected internal` or `get private protected` failed parse validation.
+- **Generated C# imports `System.Linq` for native member calls** such as
+  `items.Any(...)`. Before, Roslyn rejected the output with CS1061.
+- **A `using` on the last line of a file with no trailing newline** no longer
+  reports `Calor0100`.
+- **Nullability fix hints use the current spelling.** `Calor0272`–`Calor0274`
+  suggest `string?` instead of the removed `?string`.
+- **Inferred lambda parameters keep the element's nullability.** In
+  `values.Select((value) ! => value.Length)` over `IEnumerable<string>`, `value` is
+  now non-null, so `Calor0274` no longer fires. It still fires for `string?` elements.
+- **`calor_help` no longer matches on a single shared word.** A query such as
+  `unknown_feature_xyz` used to return the `! unknown` effect row.
+- **`calor index` and `calor query` skip the contract `result` placeholder.** It was
+  listed as a parameter of every function, so a query for a symbol named `result`
+  was ambiguous.
+- **Editor fixes.** Go-to-definition and find-references work on the method name in a
+  native member call such as `worker.Pick(1)`. In a module with a namespace, using a
+  function as a value (`let x = Helper`) reports `Calor0202` with a quick fix to call
+  it, instead of "Undefined variable".
+- **Effects docs describe `Calor0417` correctly.** It fires for an exported `internal`
+  function with no row. A `public` function without a row is the error `Calor0124`.
 - **Paid evaluation cost estimates account for prompt caching.** Claude cache
   reads no longer reduce the separate uncached-input charge, and five-minute
   cache writes include their surcharge. Reported input totals include cached
