@@ -3,39 +3,24 @@
     "command": "calor convert Grid.cs -o Grid.calr",
     "exit": 0,
     "stdout": [
-      "Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
-      "  InteropPreserved: 1",
-      "    <dir>/Grid.cs:26 [array-element-block]",
-      "  Preservation paths: 1 by converter interop (unsupported construct)",
-      "Warnings (4):",
-      "  ⚠ Nested oblivious reference semantics for 'int[,]' are not modeled; preserving syntax-only type mapping.",
-      "  ⚠ Nested oblivious reference semantics for 'int[]' are not modeled; preserving syntax-only type mapping.",
-      "  ⚠ Nested oblivious reference semantics for 'object[]' are not modeled; preserving syntax-only type mapping.",
-      "  ⚠ Unsupported feature [array-element-block] escalated to §CSHARP interop preservation: new List<int> { 1 }",
+      "✓ Conversion successful",
       "Output: <dir>/Grid.calr"
     ],
     "stderr": [],
-    "calor": "module Grid overflow unchecked\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      raw member:array-element-block:Other:Statement%20preserved%20as%20raw%20C%23%3A%20object%5B%5D%20items%20%3D%20%7B%20new%20List%3Cint%3E%20%7B%201%20%7D%2C%202%20%7D%3B 53\n        object[] items = { new List<int> { 1 }, 2 };\n\n      return items.Length\n\n\n"
+    "calor": "module Grid overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items . Length\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Grid.cs -o Grid.calr --format json",
     "exit": 0,
     "success": true,
     "nativeConversionCount": 12,
-    "interopPreservationCount": 1,
-    "lossCount": 1,
-    "losses": [
-      {
-        "feature": "array-element-block",
-        "path": "interop",
-        "trigger": null,
-        "enabledBy": null
-      }
-    ],
+    "interopPreservationCount": 0,
+    "lossCount": 0,
+    "losses": [],
     "conversionPaths": {
       "schemaVersion": 2,
-      "outcome": "preserved",
-      "interop": 1,
+      "outcome": "native",
+      "interop": 0,
       "rescue": 0,
       "passthrough": 0,
       "lossy": 0,
@@ -45,25 +30,21 @@
       "passthroughOnError": false,
       "roundTrip": "verified"
     },
-    "diagnosticCodes": [
-      "Calor1343 x4"
-    ]
+    "diagnosticCodes": []
   },
   "cli-compile": {
     "command": "calor --input Grid.calr --output Grid.g.cs",
     "exit": 0,
     "errorCodes": [],
-    "warningCodes": [
-      "Calor0419 x1"
-    ]
+    "warningCodes": []
   },
   "cli-migrate": {
     "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
     "exit": 0,
     "conversionPaths": {
       "schemaVersion": 2,
-      "outcome": "preserved",
-      "interop": 1,
+      "outcome": "native",
+      "interop": 0,
       "rescue": 0,
       "passthrough": 0,
       "lossy": 0,
@@ -79,19 +60,12 @@
     "isError": false,
     "success": true,
     "nativeConversions": 12,
-    "interopPreservations": 1,
-    "locations": [
-      {
-        "feature": "array-element-block",
-        "path": "interop",
-        "trigger": null,
-        "enabledBy": null
-      }
-    ],
+    "interopPreservations": 0,
+    "locations": [],
     "paths": {
       "schemaVersion": 2,
-      "outcome": "preserved",
-      "interop": 1,
+      "outcome": "native",
+      "interop": 0,
       "rescue": 0,
       "passthrough": 0,
       "lossy": 0,
@@ -101,30 +75,20 @@
       "passthroughOnError": false,
       "roundTrip": "verified"
     },
-    "issueCodes": [
-      "warning:Calor1343:array-element-block",
-      "warning:Calor1343:nullable-oblivious-nested-shape"
-    ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      raw member:array-element-block:Other:Statement%20preserved%20as%20raw%20C%23%3A%20object%5B%5D%20items%20%3D%20%7B%20new%20List%3Cint%3E%20%7B%201%20%7D%2C%202%20%7D%3B 53\n        object[] items = { new List<int> { 1 }, 2 };\n\n      return items.Length\n\n\n"
+    "issueCodes": [],
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items . Length\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
     "isError": false,
     "success": true,
     "nativeConversions": 12,
-    "interopPreservations": 1,
-    "locations": [
-      {
-        "feature": "array-element-block",
-        "path": "interop",
-        "trigger": null,
-        "enabledBy": null
-      }
-    ],
+    "interopPreservations": 0,
+    "locations": [],
     "paths": {
       "schemaVersion": 2,
-      "outcome": "preserved",
-      "interop": 1,
+      "outcome": "native",
+      "interop": 0,
       "rescue": 0,
       "passthrough": 0,
       "lossy": 0,
@@ -134,10 +98,7 @@
       "passthroughOnError": true,
       "roundTrip": "verified"
     },
-    "issueCodes": [
-      "warning:Calor1343:array-element-block",
-      "warning:Calor1343:nullable-oblivious-nested-shape"
-    ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      raw member:array-element-block:Other:Statement%20preserved%20as%20raw%20C%23%3A%20object%5B%5D%20items%20%3D%20%7B%20new%20List%3Cint%3E%20%7B%201%20%7D%2C%202%20%7D%3B 53\n        object[] items = { new List<int> { 1 }, 2 };\n\n      return items.Length\n\n\n"
+    "issueCodes": [],
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items . Length\n\n\n"
   }
 }

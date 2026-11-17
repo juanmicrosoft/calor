@@ -8,14 +8,14 @@
       "    <dir>/Shapes.cs:9 [method]",
       "    {",
       "        int Scale(int v) =>...",
-      "  ⓘ 1 member preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.",
+      "  ⓘ 1 member preserved as raw C# block(s) — the output parses, but this C# still needs migrating.",
       "  Preservation paths: 1 by converter interop (unsupported construct)",
       "Warnings (1):",
-      "  ⚠ Unsupported feature [local-function] escalated to §CSHARP interop preservation: int Scale(int v) => v * factor;",
+      "  ⚠ Unsupported feature [local-function] escalated to raw C# preservation of the containing member: int Scale(int v) => v * factor;",
       "Output: <dir>/Shapes.calr"
     ],
     "stderr": [],
-    "calor": "module Shapes overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
+    "calor": "module Shapes overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      !\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Shapes.cs -o Shapes.calr --format json",
@@ -103,7 +103,7 @@
       "info:Calor1343:method",
       "warning:Calor1343:local-function"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      !\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -136,6 +136,6 @@
       "info:Calor1343:method",
       "warning:Calor1343:local-function"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      !\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
   }
 }

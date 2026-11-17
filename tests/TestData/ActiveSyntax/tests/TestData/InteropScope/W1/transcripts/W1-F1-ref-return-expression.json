@@ -9,17 +9,15 @@
       "    <dir>/Cells.cs:5 [method]",
       "    {",
       "        return ref a[a.Length - 1];...",
-      "  ⓘ 2 members preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.",
+      "  ⓘ 2 members preserved as raw C# block(s) — the output parses, but this C# still needs migrating.",
       "  Preservation paths: 2 by converter interop (unsupported construct)",
-      "Warnings (4):",
-      "  ⚠ Nested oblivious reference semantics for 'int[]' are not modeled; preserving syntax-only type mapping.",
-      "  ⚠ Unsupported feature [ref-parameter] escalated to §CSHARP interop preservation: ref a[0]",
-      "  ⚠ Nested oblivious reference semantics for 'int[]' are not modeled; preserving syntax-only type mapping.",
-      "  ⚠ Unsupported feature [ref-parameter] escalated to §CSHARP interop preservation: ref a[a.Length - 1]",
+      "Warnings (2):",
+      "  ⚠ Unsupported feature [ref-parameter] escalated to raw C# preservation of the containing member: ref a[0]",
+      "  ⚠ Unsupported feature [ref-parameter] escalated to raw C# preservation of the containing member: ref a[a.Length - 1]",
       "Output: <dir>/Cells.calr"
     ],
     "stderr": [],
-    "calor": "module Cells overflow unchecked\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
+    "calor": "module Cells overflow unchecked nullable oblivious\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Cells.cs -o Cells.calr --format json",
@@ -56,7 +54,7 @@
       "roundTrip": "verified"
     },
     "diagnosticCodes": [
-      "Calor1343 x6"
+      "Calor1343 x4"
     ]
   },
   "cli-compile": {
@@ -117,10 +115,9 @@
     },
     "issueCodes": [
       "info:Calor1343:method",
-      "warning:Calor1343:nullable-oblivious-nested-shape",
       "warning:Calor1343:ref-parameter"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -157,9 +154,8 @@
     },
     "issueCodes": [
       "info:Calor1343:method",
-      "warning:Calor1343:nullable-oblivious-nested-shape",
       "warning:Calor1343:ref-parameter"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  module Cells\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20First%28int%5B%5D%20a%29%20%3D%3E%20ref%20a%5B0%5D%3B 54\n    public static ref int First(int[] a) => ref a[0];\n\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20ref%20int%20Last%28int%5B%5D%20a%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20return%20ref%20a%5Ba.Length%20-%201%5D%3B... 89\n\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n\n\n\n"
   }
 }

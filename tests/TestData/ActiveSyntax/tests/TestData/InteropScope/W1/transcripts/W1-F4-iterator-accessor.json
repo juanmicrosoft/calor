@@ -10,10 +10,10 @@
       "        get",
       "        {",
       "            for (in...",
-      "  ⓘ 1 member preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.",
+      "  ⓘ 1 member preserved as raw C# block(s) — the output parses, but this C# still needs migrating.",
       "  Preservation paths: 1 by converter interop (unsupported construct)",
       "Warnings (1):",
-      "  ⚠ Unsupported feature [iterator-accessor] escalated to §CSHARP interop preservation: public IEnumerable<int> Steps",
+      "  ⚠ Unsupported feature [iterator-accessor] escalated to raw C# preservation of the containing member: public IEnumerable<int> Steps",
       "    {",
       "        get",
       "        {",
@@ -21,7 +21,7 @@
       "Output: <dir>/Countdown.calr"
     ],
     "stderr": [],
-    "calor": "module Countdown overflow unchecked\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
+    "calor": "module Countdown overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      !\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Countdown.cs -o Countdown.calr --format json",
@@ -109,7 +109,7 @@
       "info:Calor1343:iterator-accessor",
       "warning:Calor1343:iterator-accessor"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      !\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -142,6 +142,6 @@
       "info:Calor1343:iterator-accessor",
       "warning:Calor1343:iterator-accessor"
     ],
-    "calorSource": "module ConvertedModule overflow unchecked\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      !\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
   }
 }
