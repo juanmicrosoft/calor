@@ -540,7 +540,7 @@ does not edit a declaration or discharge an unknown call.
 |:-----|:------|:--------------|
 | `Calor0410` | Error | A function does something its `!` row does not list. The message often shows the chain of calls that got there. |
 | `Calor0411` | Warning | The compiler cannot look up what an outside call does. Add the method to a `.calor-effects.json` manifest. `--strict-effects` makes it an error. |
-| `Calor0417` | Warning | A public function has no `!` row at all, so callers in other files have nothing to check against. Raised by the cross-module pass, so it only appears when you compile more than one file together. |
+| `Calor0417` | Warning | No longer reported. A public function without a `!` row is now the `Calor0124` error in its own file, so the cross-module pass never sees one. |
 | `Calor0419` | Warning | The effects are assumed rather than checked — the body holds raw C# interop, or something the compiler does not recognise, or a call to a function whose own effects are assumed. `--strict-effects` makes it an error. |
 | `Calor0420` | Error | An override declares **more** effects than the method it overrides. Declaring fewer is fine. |
 | `Calor0421` | Error | An interface implementation declares **more** effects than the interface method. Declaring fewer is fine. |
