@@ -47,12 +47,18 @@ public class ForLoopConditionSemanticsTests
     [InlineData("int count = 0; for (int i = 0; i < 0 ? Bound() > 0 : false; i++) count++; return count;", "0", false)]
     [InlineData("int count = 0; for (byte i = 0; i < 3; i++) count++; return count;", "3", false)]
     [InlineData("int count = 0; for (short i = 0; i < 3; i += 1) count++; return count;", "3", false)]
-    [InlineData("int count = 0; for (int i = 0; i == i++;) { count++; if (count == 3) break; } return count;", "3", false)]
     [InlineData("int count = 0; for (int i = (count = Step()); i < 0; i++) { } return count;", "1:S", true)]
     [InlineData("int count = 0; for (int i = 0; i < 2; i.ToString(), i.ToString()) { i++; count++; } return count;", "2", false)]
     [InlineData("int count = 0; for (int i = 0; i < Bound(); i++) { int Bound = 1; Bound++; count += Bound; } return count;", "6:BBBB", false)]
     public void Migration_PreservesLoopObservations(string body, string expected, bool native)
         => AssertEquivalent(body, expected, native);
+
+    // 0.30 retired expression-hole interop: a condition that increments its own
+    // variable has no native form, so the containing member stays C#.
+    [Fact]
+    public void SelfIncrementingCondition_PreservesTheMemberAndItsObservations()
+        => AssertEquivalent("int count = 0; for (int i = 0; i == i++;) { count++; if (count == 3) break; } return count;",
+            "3", native: false, memberPreserved: true);
 
     [Theory]
     [InlineData("int start = 1; int n = 0; for (int i = start; i < 6; i += 2) n += i; return n;", "9")]
@@ -105,7 +111,10 @@ public class ForLoopConditionSemanticsTests
                 unchecked { {{mutation}} }
             }
             return count;
-            """, "2", native: false, memberPreserved: mutation.StartsWith("ref ", StringComparison.Ordinal), members: """
+            """, "2", native: false,
+            // A ref local or a TypedReference (__makeref/__refvalue) keeps its member as C#.
+            memberPreserved: mutation.StartsWith("ref ", StringComparison.Ordinal)
+                || mutation.StartsWith("System.TypedReference", StringComparison.Ordinal), members: """
             private static unsafe void Change(in int value)
             {
                 unchecked
@@ -173,7 +182,8 @@ public class ForLoopConditionSemanticsTests
     [InlineData("public static bool operator !(Truth x) => true;")]
     public void UserDefinedCondition_UsesTrueOperatorNotNegation(string negation)
         => AssertEquivalent(
-            "int n = 0; for (Truth t = default; t;) { n++; break; } return n;",
+            // Native source has no bare `default` for a struct (it keeps the member as C#).
+            "int n = 0; for (Truth t = new Truth(); t;) { n++; break; } return n;",
             "1", native: false, members: $$"""
             public struct Truth
             {

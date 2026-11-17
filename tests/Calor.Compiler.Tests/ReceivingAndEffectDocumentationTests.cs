@@ -200,12 +200,12 @@ public sealed class ReceivingAndEffectDocumentationTests
     private static void AssertOriginalCrossModuleRejection((int ExitCode, string StdOut, string StdErr) result)
     {
         Assert.Equal(1, result.ExitCode);
-        Assert.Equal(new[] { "Calor0410", "Calor0417" }, Codes(result.StdOut));
+        // Calor0124 requires a row on every public callable, so the
+        // undeclared-public warning Calor0417 can no longer accompany the error.
+        Assert.Equal(new[] { "Calor0410" }, Codes(result.StdOut));
         var diagnostics = JsonNode.Parse(result.StdOut)!["diagnostics"]!.AsArray();
         Assert.Equal("error", Assert.Single(diagnostics.Where(diagnostic =>
             diagnostic!["code"]!.GetValue<string>() == "Calor0410"))!["severity"]!.GetValue<string>());
-        Assert.Equal("warning", Assert.Single(diagnostics.Where(diagnostic =>
-            diagnostic!["code"]!.GetValue<string>() == "Calor0417"))!["severity"]!.GetValue<string>());
         Assert.Contains("via cross-module call", result.StdOut);
     }
 

@@ -21,8 +21,9 @@ public sealed class SafeConsumptionRuntimeTests
     [Fact]
     public void NominalEarlyReturnMigrationPreservesNullOrderingAtRuntime()
     {
-        // Reduced from MediatR/Internal/ObjectDetails.Compare: early-return
-        // guards are not a supported non-null transfer to the later call.
+        // Reduced from MediatR/Internal/ObjectDetails.Compare. Early-return
+        // guards on parameters now narrow them for the later call; a missing
+        // guard is still rejected.
         const string source = """
             module NominalMigration NominalMigration block
               class Widget
@@ -40,9 +41,19 @@ public sealed class SafeConsumptionRuntimeTests
                   return -1
                 return Take(x, y)
             """;
-        var rejected = Program.Compile(source, "nominal-early-return.calr");
+        var guarded = Program.Compile(source, "nominal-early-return.calr");
+        Assert.False(guarded.HasErrors, string.Join(Environment.NewLine, guarded.Diagnostics));
+        AssertCompareOrdering(guarded.GeneratedCode);
+
+        var unguarded = source.Replace("""
+                if (y == null)
+                  return -1
+
+            """.ReplaceLineEndings("\n"), "", StringComparison.Ordinal);
+        Assert.NotEqual(source, unguarded);
+        var rejected = Program.Compile(unguarded, "nominal-early-return-unguarded.calr");
         Assert.True(rejected.HasErrors);
-        Assert.Equal(2, rejected.Diagnostics.Count(diagnostic =>
+        Assert.Equal(1, rejected.Diagnostics.Count(diagnostic =>
             diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
         Assert.Empty(rejected.GeneratedCode);
 
@@ -55,14 +66,19 @@ public sealed class SafeConsumptionRuntimeTests
             """, StringComparison.Ordinal);
         var result = Program.Compile(migrated, "nominal-early-return-migrated.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
-        var assembly = Emit(result.GeneratedCode);
+        AssertCompareOrdering(result.GeneratedCode);
+        WithCli(migrated, (exit, _, error) => Assert.True(exit == 0, error));
+    }
+
+    private static void AssertCompareOrdering(string generatedCode)
+    {
+        var assembly = Emit(generatedCode);
         var widget = Activator.CreateInstance(assembly.GetType("NominalMigration.Widget")!);
         var compare = assembly.GetType("NominalMigration.NominalMigrationModule")!.GetMethod("Compare")!;
         Assert.Equal(1, compare.Invoke(null, [null, null]));
         Assert.Equal(1, compare.Invoke(null, [null, widget]));
         Assert.Equal(-1, compare.Invoke(null, [widget, null]));
         Assert.Equal(0, compare.Invoke(null, [widget, widget]));
-        WithCli(migrated, (exit, _, error) => Assert.True(exit == 0, error));
     }
 
     [Fact]
@@ -179,7 +195,8 @@ public sealed class SafeConsumptionRuntimeTests
         var (bound, diagnostics) = Bind(source);
         Assert.Empty(diagnostics.Errors);
         var matches = statement
-            ? Assert.IsType<BoundCallStatement>(bound.Functions[1].Body[0]).SelectedOverloadMatches
+            ? Assert.IsType<BoundCallExpression>(
+                Assert.IsType<BoundExpressionStatement>(bound.Functions[1].Body[0]).Expression).SelectedOverloadMatches
             : Assert.IsType<BoundCallExpression>(
                 Assert.IsType<BoundReturnStatement>(bound.Functions[1].Body[0]).Expression).SelectedOverloadMatches;
         var match = Assert.Single(matches);

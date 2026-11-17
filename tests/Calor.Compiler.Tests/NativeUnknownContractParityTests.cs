@@ -26,9 +26,16 @@ public sealed class NativeUnknownContractParityTests
                 !
                 return callback()
             """;
-        var expectedFailure = suffix == " ! cw" || suffix is "" or " ! unknown" && !permissive;
-        AssertParity(source, permissive, strictEffects, expectedFailure);
+        // D2: an omitted callback row is a hard Calor0407 under every policy.
+        var expectedFailure = suffix is "" or " ! cw" || suffix == " ! unknown" && !permissive;
+        var result = AssertParity(source, permissive, strictEffects, expectedFailure);
+        if (suffix == "")
+            AssertOnlyMissingRow(result);
     }
+
+    /// <summary>D2: an omitted callback row is rejected before any invocation charge.</summary>
+    private static void AssertOnlyMissingRow(CompilationResult result) =>
+        Assert.All(result.Diagnostics.Errors, d => Assert.Equal(DiagnosticCode.MissingCallableEffectRow, d.Code));
 
     [Theory]
     [InlineData("", false)]
@@ -43,9 +50,12 @@ public sealed class NativeUnknownContractParityTests
                 !
                 return callback
             """;
-        var result = AssertParity(source, permissive, strictEffects: true, expectedFailure: !permissive);
-        Assert.Equal(!permissive, result.Diagnostics.Any(d => d.Code == DiagnosticCode.EffectRowUnknown));
+        var omitted = suffix == "";
+        var result = AssertParity(source, permissive, strictEffects: true, expectedFailure: omitted || !permissive);
+        Assert.Equal(!omitted && !permissive, result.Diagnostics.Any(d => d.Code == DiagnosticCode.EffectRowUnknown));
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+        if (omitted)
+            AssertOnlyMissingRow(result);
     }
 
     [Theory]
@@ -64,8 +74,11 @@ public sealed class NativeUnknownContractParityTests
                 let Func<int>:third = second
                 return third()
             """;
-        var result = AssertParity(source, permissive, strictEffects: true, expectedFailure: !permissive);
-        if (!permissive)
+        var omitted = suffix == "";
+        var result = AssertParity(source, permissive, strictEffects: true, expectedFailure: omitted || !permissive);
+        if (omitted)
+            AssertOnlyMissingRow(result);
+        else if (!permissive)
         {
             Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
                 && d.Message.Contains("'unknown'"));
@@ -90,8 +103,11 @@ public sealed class NativeUnknownContractParityTests
                 let Callback:third ! = second
                 return third()
             """;
-        var result = AssertParity(source, permissive, strictEffects: true, expectedFailure: !permissive);
-        Assert.Equal(!permissive, result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.EffectRowUnknown));
+        var omitted = suffix == "";
+        var result = AssertParity(source, permissive, strictEffects: true, expectedFailure: omitted || !permissive);
+        Assert.Equal(!omitted && !permissive, result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.EffectRowUnknown));
+        if (omitted)
+            AssertOnlyMissingRow(result);
     }
 
     private static CompilationResult AssertParity(

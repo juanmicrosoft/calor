@@ -492,7 +492,7 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
             """;
         var result = Program.Compile(calor, "f2-interp-05.calr");
         var error = Assert.Single(result.Diagnostics.Errors, d => d.Code == "Calor0200");
-        Assert.Equal((3, 17), (error.Span.Line, error.Span.Column));
+        Assert.Equal((4, 21), (error.Span.Line, error.Span.Column));
     }
 
     [Fact]
@@ -507,7 +507,7 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
             """;
         var result = Program.Compile(calor, "f2-interp-05b.calr");
         var error = Assert.Single(result.Diagnostics.Errors, d => d.Code == "Calor0200");
-        Assert.Equal((4, 25), (error.Span.Line, error.Span.Column));
+        Assert.Equal((5, 29), (error.Span.Line, error.Span.Column));
     }
 
     // F2-INTERP-06: a call hole is analyzed as a call. A pure function that reads the console
