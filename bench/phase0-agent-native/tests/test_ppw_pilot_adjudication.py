@@ -351,7 +351,9 @@ class PilotAdjudicationTests(unittest.TestCase):
              "--epoch-id", self.epoch.name, "--stage", "pilot", "--epochs-root", str(self.epochs)],
             capture_output=True, text=True)
         self.assertEqual(2, result.returncode)
-        self.assertIn("analysis artifact changed: ppw-budget-gateway.py", result.stderr)
+        # harness-capture.py gained the opt-in initialized-workspace and canary commands after
+        # the analysis was registered, so it is now the first changed artifact reported.
+        self.assertRegex(result.stderr, r"analysis artifact changed: (harness-capture|ppw-budget-gateway)\.py")
 
     def test_epoch_changes_during_analysis_fail_closed(self):
         original = analysis.inventory
