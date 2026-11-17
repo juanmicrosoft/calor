@@ -413,10 +413,28 @@ internal sealed class MetadataContext : IDisposable
             // A future revision will emit a diagnostic here that the
             // auto-regen bot picks up; today we compute the SHA (verifying
             // the file is readable) and continue.
-            _ = ManifestAssemblyEntry.ComputeSha256(matched.FilePath);
+            _ = ReadReferenceSha256(matched.FilePath);
         }
 
         return filtered;
+    }
+
+    // Every binder creates a context, and hashing the whole reference set each time
+    // was about a quarter of effect-checking time. The hash is a function of the file's
+    // bytes, so it is computed once per process for a given path, length and
+    // last-write time. A changed file has a new key and is read (and hashed) again,
+    // and a missing file still throws when its length is read. Only a file that
+    // became unreadable without any change to its length or write time is no longer
+    // re-opened. The value is still discarded today (in-range drift is lenient); it is kept
+    // so the planned drift diagnostic can compare it without re-reading the file.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        (string Path, long Length, DateTime LastWriteUtc), string> ReferenceHashes = new();
+
+    private static string ReadReferenceSha256(string filePath)
+    {
+        var file = new FileInfo(filePath);
+        var key = (file.FullName, file.Length, file.LastWriteTimeUtc);
+        return ReferenceHashes.GetOrAdd(key, _ => ManifestAssemblyEntry.ComputeSha256(filePath));
     }
 
     private void ThrowIfDisposed()

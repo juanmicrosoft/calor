@@ -174,6 +174,12 @@ public sealed class Binder
     // enumeration order equal to declaration order without copying the whole
     // map at every loop.
     private readonly List<SymbolId> _symbolOrder = new();
+    // The TypeSymbol values of _symbolsById, in its enumeration order. Type lookups
+    // scan this on every variable reference; rebuilding it from the whole map (which
+    // also holds every local) each time made binding quadratic in module size.
+    // Reset whenever a TypeSymbol enters or leaves the map. Other entries can come
+    // and go without moving the TypeSymbols' relative enumeration order.
+    private TypeSymbol[]? _sourceTypeSymbols;
     private readonly Dictionary<SymbolId, int> _declarationIdOccurrences = new();
     private readonly Dictionary<(SymbolId Context, string Kind), SymbolId> _snapshotLocalContexts = new();
     private readonly System.Buffers.ArrayBufferWriter<byte> _localIdentityBytes = new(256);
@@ -461,7 +467,7 @@ public sealed class Binder
                 namespaceIdentity, namespaceScopeId).Handled)
             return null;
         if (ResolveClass(typeName) is not null
-            || _symbolsById.Values.OfType<TypeSymbol>().Any(type =>
+            || SourceTypeSymbols().Any(type =>
                 type.Name == typeName || type.QualifiedName == TypeIdentity.ToLookupName(typeName)))
             return null;
         if (typeName is "OBJECT" or "object")
@@ -675,7 +681,7 @@ public sealed class Binder
             || receiver.Type is not BoundTypes.NominalBoundType { Declaration: null }
             || _currentMemberTypeParameters?.Any(parameter => parameter.Name == variable.TypeName) == true
             || _currentClass?.TypeParameters.Any(parameter => parameter.Name == variable.TypeName) == true
-            || _symbolsById.Values.OfType<TypeSymbol>().Any(type => type.Name == variable.TypeName))
+            || SourceTypeSymbols().Any(type => type.Name == variable.TypeName))
             return null;
 
         var metadata = GetOrCreateMetadataBinder();
@@ -1243,6 +1249,7 @@ public sealed class Binder
         _memberFlowStorages.Clear();
         _topLevelFunctionLookupNames.Clear();
         _symbolsById.Clear();
+        _sourceTypeSymbols = null;
         _metadataTypeParameterScopes.Clear();
         _symbolOrder.Clear();
         _declarationIdOccurrences.Clear();
@@ -2385,12 +2392,17 @@ public sealed class Binder
             reference.Span);
     }
 
+    private TypeSymbol[] SourceTypeSymbols() =>
+        _sourceTypeSymbols ??= _symbolsById.Values.OfType<TypeSymbol>().ToArray();
+
     private void TrackSymbol(Symbol symbol)
     {
         if (!symbol.Id.IsNone)
         {
             _symbolsById.Add(symbol.Id, symbol);
             _symbolOrder.Add(symbol.Id);
+            if (symbol is TypeSymbol)
+                _sourceTypeSymbols = null;
         }
     }
 
@@ -3037,7 +3049,8 @@ public sealed class Binder
             RestoreFlowNarrowingState(flow);
             _diagnostics.RestoreCheckpoint(diagnostics);
             for (var index = _symbolOrder.Count - 1; index >= symbolCount; index--)
-                _symbolsById.Remove(_symbolOrder[index]);
+                if (_symbolsById.Remove(_symbolOrder[index], out var removed) && removed is TypeSymbol)
+                    _sourceTypeSymbols = null;
             _symbolOrder.RemoveRange(symbolCount, _symbolOrder.Count - symbolCount);
             _declarationOccurrenceJournal = null;
             for (var index = declarationJournal.Count - 1; index >= 0; index--)
@@ -5006,7 +5019,7 @@ public sealed class Binder
         var aliases = global ? [] : imports.Where(import => import.Alias == head).ToArray();
         if (aliases.Length > 1)
             return (true, null);
-        var types = _symbolsById.Values.OfType<TypeSymbol>().ToArray();
+        var types = SourceTypeSymbols();
         foreach (var lookup in ReferenceLookupNames(
             global ? "global::" + spelling : spelling, containingTypeName ?? namespaceIdentity))
         {
@@ -9128,7 +9141,7 @@ public sealed class Binder
                 return !declaredClass.IsStruct;
 
             var lookupName = TypeIdentity.ToLookupName(type);
-            var declaredTypes = _symbolsById.Values.OfType<TypeSymbol>()
+            var declaredTypes = SourceTypeSymbols()
                 .Where(symbol => symbol.QualifiedName == lookupName)
                 .Take(2)
                 .ToArray();
@@ -11714,6 +11727,11 @@ public sealed class Binder
     {
         if (ResolveSourceCallConversions && _asyncTypeModule is not null)
         {
+            // The projection's answer for a position whose emitted type can never be a
+            // delegate is always null (it stores the non-delegate type), so do not build
+            // the whole C# image just to learn that.
+            if (EmitsAsNonDelegateType(parameter.TypeName))
+                return null;
             SourceCallBindings();
             if (_sourceCallConversions.ParameterTypes.TryGetValue(parameter, out var type))
                 return type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
@@ -11735,6 +11753,8 @@ public sealed class Binder
             return null;
         if (ResolveSourceCallConversions && _asyncTypeModule is not null)
         {
+            if (EmitsAsNonDelegateType(output.TypeName))
+                return null;
             SourceCallBindings();
             if (_sourceCallConversions.OutputTypes.TryGetValue(output, out var type))
                 return type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
@@ -11747,6 +11767,57 @@ public sealed class Binder
                     : null;
         }
         return TryBuildFunctionType(output.TypeName, output.Row, binders, lexicalTypeContext);
+    }
+
+    /// <summary>
+    /// Whether the C# type the emitter writes for this declared spelling can never
+    /// denote a delegate, whatever the module declares: a C# keyword type
+    /// (<c>int</c>, <c>string</c>, <c>void</c>, ...), or a nullable, array or pointer
+    /// built only from one. Keywords cannot be redeclared or aliased in C#, so Roslyn
+    /// binds such a type to the same non-delegate symbol in every image.
+    /// <para>The source projection (<see cref="SourceCallBindings"/>) types a parameter or
+    /// return as a callback only when that emitted type is a delegate. For these
+    /// spellings it records the non-delegate type and the caller returns null, so
+    /// skipping the projection gives the same answer. That keeps a module whose
+    /// parameters are all scalars from paying for a full C# compilation at binding.
+    /// Anything else (a named type, a generic, a tuple) still asks the projection.</para>
+    /// <para>The spelling is mapped exactly as <c>CSharpEmitter.MapTypeName</c> maps it.
+    /// A head that names a module refinement or indexed type is erased to its base
+    /// type there, so it is never classified here. The check reads the emitted text
+    /// rather than parsing it: it runs for every parameter and return of the module.</para>
+    /// </summary>
+    private bool EmitsAsNonDelegateType(string? typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName) || _asyncTypeModule is null)
+            return false;
+        var spelling = typeName.Trim();
+        var generic = spelling.IndexOf('<');
+        var head = generic > 0 ? spelling[..generic] : spelling;
+        if (_asyncTypeModule.RefinementTypes.Any(type => type.Name == head)
+            || _asyncTypeModule.IndexedTypes.Any(type => type.Name == head))
+            return false;
+        var emitted = Migration.TypeMapper.CalorToCSharp(spelling);
+        if (string.IsNullOrWhiteSpace(emitted))
+            return false;
+        var core = emitted.AsSpan().Trim();
+        while (true)
+        {
+            if (core.EndsWith("?") || core.EndsWith("*"))
+                core = core[..^1].TrimEnd();
+            else if (core.EndsWith("]"))
+            {
+                var open = core.LastIndexOf('[');
+                if (open <= 0)
+                    return false;
+                foreach (var rank in core[(open + 1)..^1])
+                    if (rank != ',' && !char.IsWhiteSpace(rank))
+                        return false;
+                core = core[..open].TrimEnd();
+            }
+            else
+                break;
+        }
+        return SyntaxFacts.IsPredefinedType(SyntaxFacts.GetKeywordKind(core.ToString()));
     }
 
     /// <summary>

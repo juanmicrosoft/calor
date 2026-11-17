@@ -203,8 +203,7 @@ public sealed class CallGraphAnalysis
     {
         if (interpolation.Type?.SpecialType != SpecialType.System_String
             || interpolation.SemanticModel?.Compilation is not { } compilation
-            || compilation.GetDiagnostics().Any(diagnostic =>
-                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            || HasCompilationErrors(compilation))
             return false;
         for (var parent = interpolation.Parent; parent != null; parent = parent.Parent)
             if (parent is IInterpolatedStringHandlerCreationOperation or IAnonymousFunctionOperation
@@ -286,6 +285,28 @@ public sealed class CallGraphAnalysis
         _operatorBindings.RecordCopyConstructors.Contains(constructor);
     internal IReadOnlyList<Diagnostics.Diagnostic> SourceConstructionErrors =>
         _operatorBindings.SourceConstructionErrors;
+
+    // A compilation is immutable, so whether it has an error is computed once. Every
+    // GetDiagnostics() call compiles all method bodies again, including every companion
+    // module's, and the projection asked up to three times per image plus once per
+    // interpolated string.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Compilation,
+        System.Runtime.CompilerServices.StrongBox<bool>> CompilationErrorStates = new();
+
+    internal static bool HasCompilationErrors(Compilation compilation) =>
+        CompilationErrorStates.GetValue(compilation, image => new(image.GetDiagnostics().Any(diagnostic =>
+            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))).Value;
+
+    // A companion projection is emitted once per registry and contract mode, and every
+    // module of the project binds against it. Its parse depends only on its text, path
+    // and parse options (CSharpParseOptions compares by value, preprocessor symbols
+    // included), and a syntax tree may be shared by any number of compilations.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<SourceProjection,
+        System.Collections.Concurrent.ConcurrentDictionary<CSharpParseOptions, SyntaxTree>> CompanionTrees = new();
+
+    private static SyntaxTree ParseCompanion(SourceProjection companion, CSharpParseOptions options) =>
+        CompanionTrees.GetOrCreateValue(companion).GetOrAdd(options,
+            selected => CSharpSyntaxTree.ParseText(companion.Source, selected, companion.Path));
 
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
         ContractMode contractMode = ContractMode.Debug, bool singleModuleContext = true,
@@ -457,7 +478,7 @@ public sealed class CallGraphAnalysis
         }
         var options = new CSharpParseOptions(LanguageVersion.Preview);
         var initial = CSharpSyntaxTree.ParseText(source, options);
-        var symbols = companions.Select(companion => CSharpSyntaxTree.ParseText(companion.Source, options))
+        var symbols = companions.Select(companion => ParseCompanion(companion, options))
             .Prepend(initial).SelectMany(tree => tree.GetRoot().DescendantTrivia(descendIntoTrivia: true))
             .Select(trivia => trivia.GetStructure()).OfType<DirectiveTriviaSyntax>()
             .Select(directive => directive switch
@@ -489,8 +510,7 @@ public sealed class CallGraphAnalysis
         {
             var companionTrees = companions.Select(companion => (
                 Projection: companion,
-                Tree: CSharpSyntaxTree.ParseText(companion.Source, (CSharpParseOptions)tree.Options,
-                    companion.Path))).ToArray();
+                Tree: ParseCompanion(companion, (CSharpParseOptions)tree.Options))).ToArray();
             var compilation = CSharpCompilation.Create("CalorOperatorBindings",
                 companionTrees.Select(companion => (SyntaxTree)companion.Tree).Prepend(tree),
                 GeneratedCSharpCompiler.References,
@@ -683,14 +703,14 @@ public sealed class CallGraphAnalysis
                     ranges.Add((starts[endIndex], trivia.SpanStart, expressions[endIndex]));
             }
             ranges.Sort((left, right) => (left.End - left.Start).CompareTo(right.End - right.Start));
+            var origins = new ExpressionOriginIndex(ranges);
 
             if (bindInitialization)
                 BindInitializations();
             // This narrow initializer proof is independent of the header-only
             // signature projection gate. No other generated operations gain authority.
             if (initializerCreations.Count > 0 && symbols.Length == 0
-                && !compilation.GetDiagnostics().Any(diagnostic =>
-                    diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                && !HasCompilationErrors(compilation))
             {
                 var objectConstructor = compilation.GetSpecialType(SpecialType.System_Object)
                     .InstanceConstructors.SingleOrDefault(constructor => constructor.Parameters.Length == 0);
@@ -718,11 +738,10 @@ public sealed class CallGraphAnalysis
                 && !bindInterpolation && additions.Length == 0)
                 return;
 
-            var validProofContext = (bindMemberTypes || bindNullGuards || bindInterpolation || additions.Length > 0) && !compilation.GetDiagnostics().Any(diagnostic =>
-                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            var validProofContext = (bindMemberTypes || bindNullGuards || bindInterpolation || additions.Length > 0)
+                && !HasCompilationErrors(compilation);
             var validMemberContext = bindMemberTypes && validProofContext;
-            var validDispatchContext = !compilation.GetDiagnostics().Any(diagnostic =>
-                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            var validDispatchContext = !HasCompilationErrors(compilation);
             var selectedDispatchesInTree = new HashSet<TextSpan>();
             var selectedInTree = new HashSet<TextSpan>();
             var selectedNullGuardsInTree = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
@@ -1132,9 +1151,7 @@ public sealed class CallGraphAnalysis
                 bindings.SelectedCalls.Remove(site);
             }
 
-            AstNode? SyntaxOrigin(SyntaxNode syntax) =>
-                ranges.FirstOrDefault(range => range.Start <= syntax.SpanStart
-                    && range.End >= syntax.Span.End).Node;
+            AstNode? SyntaxOrigin(SyntaxNode syntax) => origins.Find(syntax.SpanStart, syntax.Span.End);
 
             AstNode? Origin(IOperation operation) => SyntaxOrigin(operation.Syntax);
 
@@ -1869,8 +1886,7 @@ public sealed class CallGraphAnalysis
                 if (method is null)
                     return;
                 var syntax = operation.Syntax.Span;
-                var origin = ranges.FirstOrDefault(range =>
-                    range.Start <= syntax.Start && range.End >= syntax.End).Node;
+                var origin = origins.Find(syntax.Start, syntax.End);
                 if (origin is null)
                 {
                     bindingFailures.Add($"A selected source operator '{method}' has no Calor expression origin.");
@@ -1907,6 +1923,75 @@ public sealed class CallGraphAnalysis
                         types[expression] = type;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// The smallest annotated expression range that contains a C# span: the first
+    /// match in <c>ranges</c>, which is sorted by length. A linear scan per lookup made
+    /// the projection quadratic, since every walked operation asks for its origin.
+    /// The emitter wraps each expression's text in a start/end marker pair, so the
+    /// ranges nest: any two are disjoint or one contains the other. Over such a
+    /// family the containing ranges of a span form a chain of strictly growing
+    /// length, all of them ancestors of the last range that starts at or before the
+    /// span. Walking that range's parents therefore returns the same unique
+    /// smallest range in O(log n + depth). Ranges that do not nest (or duplicate a
+    /// range) fall back to the original scan, so the answer never changes.
+    /// </summary>
+    internal sealed class ExpressionOriginIndex
+    {
+        private readonly IReadOnlyList<(int Start, int End, AstNode Node)> _byLength;
+        private readonly (int Start, int End, AstNode Node)[] _byStart = [];
+        private readonly int[] _parents = [];
+        private readonly bool _nested;
+
+        internal ExpressionOriginIndex(IReadOnlyList<(int Start, int End, AstNode Node)> byLength)
+        {
+            _byLength = byLength;
+            var byStart = byLength.ToArray();
+            Array.Sort(byStart, (left, right) => left.Start != right.Start
+                ? left.Start.CompareTo(right.Start) : right.End.CompareTo(left.End));
+            var parents = new int[byStart.Length];
+            var open = new Stack<int>();
+            for (var index = 0; index < byStart.Length; index++)
+            {
+                var range = byStart[index];
+                if (range.End < range.Start)
+                    return;
+                while (open.TryPeek(out var top) && byStart[top].End < range.Start)
+                    open.Pop();
+                if (open.TryPeek(out var container)
+                    && (byStart[container].End < range.End
+                        || byStart[container].Start == range.Start && byStart[container].End == range.End))
+                    return;
+                parents[index] = open.TryPeek(out container) ? container : -1;
+                open.Push(index);
+            }
+            _byStart = byStart;
+            _parents = parents;
+            _nested = true;
+        }
+
+        internal AstNode? Find(int start, int end)
+        {
+            if (!_nested)
+                return _byLength.FirstOrDefault(range => range.Start <= start && range.End >= end).Node;
+            int low = 0, high = _byStart.Length - 1, last = -1;
+            while (low <= high)
+            {
+                var middle = low + (high - low) / 2;
+                if (_byStart[middle].Start <= start)
+                {
+                    last = middle;
+                    low = middle + 1;
+                }
+                else
+                    high = middle - 1;
+            }
+            for (var index = last; index >= 0; index = _parents[index])
+                if (_byStart[index].End >= end)
+                    return _byStart[index].Node;
+            return null;
         }
     }
 

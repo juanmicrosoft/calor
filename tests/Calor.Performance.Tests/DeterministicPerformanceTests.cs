@@ -39,10 +39,15 @@ public sealed class DeterministicPerformanceTests(ITestOutputHelper output)
         for (var warmup = 0; warmup < 5; warmup++)
             Measure(source);
 
+        // Re-registered in 0.30 (g7) for the native workload. The earlier 11,266,312 was the legacy
+        // workload's. The same harness measures 11,424,056 at 1bc5faa31, the last commit before the
+        // source projection reached binding (bind 2,798,408 of it). Now: bind ~2,940,000, with no
+        // projection built. The +142 KB is linear in statements and sits in for-loop binding
+        // (loop-discovery flow state added by binder commits since 1bc5faa31); CFG and taint +6 KB.
 #if DEBUG
-        const long baselineBytes = 11_681_288;
+        const long baselineBytes = 12_047_536;
 #else
-        const long baselineBytes = 11_266_312;
+        const long baselineBytes = 11_564_224;
 #endif
         for (var run = 0; run < 5; run++)
         {

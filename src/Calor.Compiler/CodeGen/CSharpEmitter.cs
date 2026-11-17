@@ -110,6 +110,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
     private EmissionContext _emissionContext = new();
     private HashSet<string> _reservedGeneratedIdentifiers = new(StringComparer.Ordinal);
+    // Next suffix to try per base name in _reservedGeneratedIdentifiers; see ReserveGeneratedIdentifier.
+    private Dictionary<string, int> _generatedIdentifierCursors = new(StringComparer.Ordinal);
     private string? _currentClassName;
     private string? _currentClassIdentity;
     private HashSet<string> _currentModuleFunctionNames = new(StringComparer.Ordinal);
@@ -789,6 +791,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         _emissionContext = new EmissionContext();
         _canonicalLiteralReturns = IfStatementNode.GetCanonicalLiteralReturns(module);
         _reservedGeneratedIdentifiers = CollectReservedModuleIdentifiers(module);
+        _generatedIdentifierCursors = new Dictionary<string, int>(StringComparer.Ordinal);
         _currentClassName = null;
         _currentClassIdentity = null;
         _currentModuleFunctionNames = new HashSet<string>(StringComparer.Ordinal);
@@ -1104,6 +1107,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// <see cref="ReserveUniqueIdentifier"/> over the module-wide set, without re-probing
+    /// every earlier suffix. The set only grows during a module's emission, so a
+    /// candidate once found taken stays taken: resuming at the suffix after the last one
+    /// this base name reserved yields exactly the first free candidate a probe from the
+    /// bare name would. A per-loop probe from the start made emission quadratic in the
+    /// number of for loops in a module.
+    /// </summary>
+    private string ReserveGeneratedIdentifier(string baseName)
+    {
+        var suffix = _generatedIdentifierCursors.GetValueOrDefault(baseName);
+        while (!_reservedGeneratedIdentifiers.Add(suffix == 0 ? baseName : $"{baseName}_{suffix}"))
+            suffix++;
+        _generatedIdentifierCursors[baseName] = suffix + 1;
+        return suffix == 0 ? baseName : $"{baseName}_{suffix}";
     }
 
     private static string ReserveUniqueIdentifier(
@@ -3894,25 +3914,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         var to = node.To.Accept(this);
         var hasExplicitStep = node.Step != null;
         var step = node.Step?.Accept(this);
-        var fromTemp = ReserveUniqueIdentifier(
-            _reservedGeneratedIdentifiers,
-            "__calorForFrom");
-        var toTemp = ReserveUniqueIdentifier(
-            _reservedGeneratedIdentifiers,
-            "__calorForTo");
+        var fromTemp = ReserveGeneratedIdentifier("__calorForFrom");
+        var toTemp = ReserveGeneratedIdentifier("__calorForTo");
         var stepTemp = hasExplicitStep
-            ? ReserveUniqueIdentifier(
-                _reservedGeneratedIdentifiers,
-                "__calorForStep")
+            ? ReserveGeneratedIdentifier("__calorForStep")
             : null;
         var ascendingTemp = hasExplicitStep
-            ? ReserveUniqueIdentifier(
-                _reservedGeneratedIdentifiers,
-                "__calorForAscending")
+            ? ReserveGeneratedIdentifier("__calorForAscending")
             : null;
-        var firstTemp = ReserveUniqueIdentifier(
-            _reservedGeneratedIdentifiers,
-            "__calorForFirst");
+        var firstTemp = ReserveGeneratedIdentifier("__calorForFirst");
 
         AppendLine("{");
         Indent();
