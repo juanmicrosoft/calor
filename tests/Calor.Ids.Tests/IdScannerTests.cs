@@ -11,9 +11,9 @@ public class IdScannerTests
 {
     [Theory]
     [InlineData("", IdKind.Module, "TestModule")]
-    [InlineData("  func TestFunction () → void", IdKind.Function, "TestFunction")]
+    [InlineData("  func TestFunction () → void\n    !", IdKind.Function, "TestFunction")]
     [InlineData("  class TestClass", IdKind.Class, "TestClass")]
-    [InlineData("  class TestClass\n    func TestMethod () → void", IdKind.Method, "TestMethod")]
+    [InlineData("  class TestClass\n    func TestMethod () → void\n      !", IdKind.Method, "TestMethod")]
     [InlineData("  class TestClass\n    property int:TestProperty\n      get\n      set", IdKind.Property, "TestProperty")]
     [InlineData("  class TestClass\n    ctor ()", IdKind.Constructor, ".ctor")]
     [InlineData("  interface ITestInterface", IdKind.Interface, "ITestInterface")]
@@ -49,8 +49,10 @@ public class IdScannerTests
         const string source = """
             module TestModule
               func Func1 () → void
+                !
               class Class1
                 func Method1 () → void
+                  !
                 property int:Prop1
                   get
                 ctor ()
