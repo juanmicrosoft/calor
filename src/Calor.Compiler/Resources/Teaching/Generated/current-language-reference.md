@@ -529,7 +529,7 @@ Complete example: [TryDouble](#example-task_6).
 
 ## using statement
 
-Ordinary using imports a namespace or declares an alias at compilation-unit scope. Under a named module header, namespace using retains namespace-local lookup; it is an import marker, not a namespace block. Global using applies across compilation units. Resolved imports do not establish the effects of calls. Native scoped-import conversion requires ConvertProject or migrate --split-namespaces; default single-file conversion preserves that topology as whole-file C#.
+Ordinary using imports a namespace or declares an alias at compilation-unit scope. Under a named module header, namespace using retains namespace-local lookup; it is an import marker, not a namespace block. Global using applies across compilation units. Resolved imports do not establish the effects of calls. A file that is one named namespace with its own imports converts natively by default; other namespace topologies need ConvertProject or migrate --split-namespaces, and default single-file conversion preserves them as whole-file C#.
 
 In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.
 

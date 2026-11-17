@@ -341,7 +341,25 @@ public sealed class CSharpToCalorConverter
         string csharpSource,
         string? sourceFile,
         CancellationToken cancellationToken)
-        => ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext: false);
+        => ConvertSingleFile(csharpSource, sourceFile, cancellationToken, capturePreservationContext: false);
+
+    /// <summary>
+    /// 0.30: a file that is exactly one namespace with its own imports converts through the
+    /// scoped-import projection by default, as <c>calor convert</c> does (ConversionWriteTransaction).
+    /// That path compiles the original and certifies that declared metadata is unchanged; when it
+    /// refuses, the ordinary single-file path (preservation included) decides the file.
+    /// </summary>
+    private ConversionResult ConvertSingleFile(
+        string csharpSource, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
+    {
+        if (IsSingleScopedNamespace(csharpSource, sourceFile)
+            && ConvertProjectCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext)
+                .Outputs.Single().Conversion is { Success: true } scoped)
+            return scoped;
+        // The scoped path refuses an original it cannot compile (for example standalone code that
+        // relies on an implicit System import); the ordinary single-file path decides that file.
+        return ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+    }
 
     /// <summary>
     /// Explicitly allows native scoped imports and separate files for distinct top-level namespace blocks.

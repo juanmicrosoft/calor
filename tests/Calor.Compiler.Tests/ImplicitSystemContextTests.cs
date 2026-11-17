@@ -50,7 +50,17 @@ public sealed class ImplicitSystemContextTests(ITestOutputHelper output)
         }).Convert(source, "081_AsyncMethod.cs");
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
         Assert.Equal(implicitSystem, conversion.Metadata.IncludeImplicitSystemUsing);
-        Assert.Equal(1, conversion.InteropPreservationCount);
+        // Standalone, the original does not compile (CS0103), so it is preserved exactly. With the
+        // System-only project import it compiles and converts natively through the scoped imports.
+        Assert.Equal(implicitSystem ? 0 : 1, conversion.InteropPreservationCount);
+        if (implicitSystem)
+        {
+            var native = Program.Compile(conversion.CalorSource!, null, new CompilationOptions { IncludeImplicitSystemUsing = true });
+            Assert.False(native.HasErrors, string.Join("\n", native.Diagnostics.Errors));
+            Assert.True(GeneratedCSharpCompiler.Validate([new(native.GeneratedCode, "generated081.cs")],
+                new GeneratedCSharpCompilationContext { IncludeImplicitSystemUsing = true }).CompilationSuccess);
+            return;
+        }
         var compiled = Program.Compile(conversion.CalorSource!, null, new CompilationOptions
         {
             IncludeImplicitSystemUsing = implicitSystem

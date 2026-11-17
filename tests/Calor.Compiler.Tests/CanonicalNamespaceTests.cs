@@ -742,7 +742,6 @@ public sealed class CanonicalNamespaceTests
     [Theory]
     [InlineData("namespace A { class C {} } namespace A { class D {} }")]
     [InlineData("namespace A { namespace B { class C {} } }")]
-    [InlineData("namespace A { using System; class C {} }")]
     public void OtherLexicalTopologiesPreserveTheOriginalWholeFile(string source)
     {
         var conversion = new CSharpToCalorConverter().Convert(source);
@@ -752,6 +751,19 @@ public sealed class CanonicalNamespaceTests
         Assert.True(preserved.IsCompilationUnitPassthrough);
         Assert.Equal(source, preserved.CSharpCode);
         Compile(new CSharpEmitter().Emit(parsed));
+    }
+
+    [Fact]
+    public void SingleNamespaceWithLocalImports_ConvertsNativelyByDefault()
+    {
+        // 0.30: one named namespace with its own imports needs no split, so single-file
+        // conversion takes the scoped-import projection, as `calor convert` does.
+        const string source = "namespace A { using System; class C { public int F() => Math.Abs(-1); } }";
+        var conversion = new CSharpToCalorConverter().Convert(source, "A.cs");
+        Assert.True(conversion.Success, string.Join("\n", conversion.Context.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(Parse(conversion.CalorSource!).InteropBlocks);
+        Assert.Contains("namespace using System", conversion.CalorSource);
     }
 
     [Theory]

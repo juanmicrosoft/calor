@@ -7704,8 +7704,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // 0.30: native Calor has no compound-assignment statement (the retired §ASSIGN form
-        // printed one), so a shape that cannot be lowered to `set t t op v` stays C#.
-        if (bound == 0 && castType == null && !CanLowerPrimitiveVariableUpdate(site))
+        // printed one), so a shape that cannot be lowered to `set t (t op v)` stays C#. When no
+        // part was bound, the lowering evaluates the target twice: that is faithful for a fixed
+        // variable, and for a receiver and arguments that are all inert (C# evaluates them, and
+        // the read, before the right-hand side in both forms).
+        if (bound == 0 && castType == null && !CanLowerPrimitiveVariableUpdate(site,
+                reevaluableParts: parts is { HasParts: true } && allParts.All(IsInertExpression)))
             throw EscalateExpression(site, "compound-assignment-order");
 
         ExpressionNode result = new BinaryOperationNode(span, ToBinaryOperator(compound), read, value);
@@ -7714,7 +7718,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new AssignmentStatementNode(span, targetNode!, result);
     }
 
-    private bool CanLowerPrimitiveVariableUpdate(ExpressionSyntax site)
+    private bool CanLowerPrimitiveVariableUpdate(ExpressionSyntax site, bool reevaluableParts = false)
     {
         // decimal arithmetic binds decimal's own static operator; `t = t op v` binds the same one.
         static bool BuiltIn(IMethodSymbol? method) =>
@@ -7729,7 +7733,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 when BuiltIn(increment.OperatorMethod) => increment.Target,
             _ => null
         };
-        var fixedVariable = target switch
+        var fixedVariable = reevaluableParts && target != null || target switch
         {
             Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation local => local.Local.RefKind == RefKind.None,
             Microsoft.CodeAnalysis.Operations.IParameterReferenceOperation parameter =>
