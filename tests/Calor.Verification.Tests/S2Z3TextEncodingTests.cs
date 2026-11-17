@@ -217,7 +217,10 @@ public sealed class S2Z3TextEncodingTests
                 return ((s).Substring(i, 1)).Length
             """;
         // Review round 3: a range over a body local is not modeled (no substitution).
-        Assert.Equal(ProofStatus.Unsupported, VerifySinglePostcondition(source).EffectiveOutcome.Status);
+        // 0.30: pin the reason, so a Substring that is never lowered cannot pass as this case.
+        var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
+        Assert.Equal(ProofStatus.Unsupported, outcome.Status);
+        Assert.Contains("index range could not be modeled", outcome.Reason);
     }
 
     [Fact]
@@ -292,7 +295,9 @@ public sealed class S2Z3TextEncodingTests
                 => (result == 4)
                 return (c ? ((s).Substring(1, 1)).Length : 4)
             """;
-        Assert.Equal(ProofStatus.Unsupported, VerifySinglePostcondition(source).EffectiveOutcome.Status);
+        var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
+        Assert.Equal(ProofStatus.Unsupported, outcome.Status);
+        Assert.Contains("conditionally-evaluated position", outcome.Reason);
     }
 
     [Theory]

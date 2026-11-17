@@ -196,27 +196,55 @@ public sealed class ContractTranslator
     /// This is verifier-only: executable ASTs and evaluation order are not rewritten.
     /// </summary>
     internal ExpressionNode NormalizeBclExpression(ExpressionNode expression)
-        => NormalizeBclExpression(expression, _variables
+        => NormalizeBclExpression(expression, DeclaredBclVariables());
+
+    private IReadOnlyList<(string Name, string Type)> DeclaredBclVariables()
+        => _variables
             .Where(pair => !pair.Key.Contains('$'))
             .Select(pair => (pair.Key, pair.Value.Type.StartsWith("array<", StringComparison.Ordinal)
-                && pair.Value.Type.EndsWith('>') ? $"{pair.Value.Type[6..^1]}[]" : pair.Value.Type)).ToArray());
+                && pair.Value.Type.EndsWith('>') ? $"{pair.Value.Type[6..^1]}[]" : pair.Value.Type)).ToArray();
 
+    /// <summary>
+    /// Normalizes a function body for verification. A body-local binding is in scope for the
+    /// statements after it (and in their nested branches), so a typed local such as
+    /// <c>let string:t = …</c> resolves when a later <c>t.Length</c> is lowered; a branch-local
+    /// binding does not escape its branch. An untyped binding hides any outer name it shadows.
+    /// </summary>
     internal IReadOnlyList<StatementNode> NormalizeBclBody(IReadOnlyList<StatementNode> body)
-        => body.Select(statement => statement switch
+        => NormalizeBclBody(body, DeclaredBclVariables());
+
+    private IReadOnlyList<StatementNode> NormalizeBclBody(
+        IReadOnlyList<StatementNode> body, IReadOnlyList<(string Name, string Type)> variables)
+    {
+        var normalized = new List<StatementNode>(body.Count);
+        foreach (var statement in body)
         {
-            ReturnStatementNode { Expression: not null } ret => (StatementNode)new ReturnStatementNode(
-                ret.Span, NormalizeBclExpression(ret.Expression)),
-            BindStatementNode bind => new BindStatementNode(bind.Span, bind.Name, bind.TypeName,
-                bind.IsMutable, bind.Initializer == null ? null : NormalizeBclExpression(bind.Initializer),
-                bind.Attributes, bind.IdentifierSpan, bind.TypeNameSpan, bind.Row)
-                { IsCollectionStatementForm = bind.IsCollectionStatementForm },
-            IfStatementNode conditional => new IfStatementNode(conditional.Span, conditional.Id,
-                NormalizeBclExpression(conditional.Condition), NormalizeBclBody(conditional.ThenBody),
-                conditional.ElseIfClauses.Select(clause => new ElseIfClauseNode(clause.Span,
-                    NormalizeBclExpression(clause.Condition), NormalizeBclBody(clause.Body))).ToArray(),
-                conditional.ElseBody == null ? null : NormalizeBclBody(conditional.ElseBody), conditional.Attributes),
-            _ => statement
-        }).ToArray();
+            ExpressionNode Normalize(ExpressionNode expression) => NormalizeBclExpression(expression, variables);
+            normalized.Add(statement switch
+            {
+                ReturnStatementNode { Expression: not null } ret => new ReturnStatementNode(
+                    ret.Span, Normalize(ret.Expression)),
+                BindStatementNode bind => new BindStatementNode(bind.Span, bind.Name, bind.TypeName,
+                    bind.IsMutable, bind.Initializer == null ? null : Normalize(bind.Initializer),
+                    bind.Attributes, bind.IdentifierSpan, bind.TypeNameSpan, bind.Row)
+                    { IsCollectionStatementForm = bind.IsCollectionStatementForm },
+                IfStatementNode conditional => new IfStatementNode(conditional.Span, conditional.Id,
+                    Normalize(conditional.Condition), NormalizeBclBody(conditional.ThenBody, variables),
+                    conditional.ElseIfClauses.Select(clause => new ElseIfClauseNode(clause.Span,
+                        Normalize(clause.Condition), NormalizeBclBody(clause.Body, variables))).ToArray(),
+                    conditional.ElseBody == null ? null : NormalizeBclBody(conditional.ElseBody, variables),
+                    conditional.Attributes),
+                _ => statement
+            });
+            if (statement is BindStatementNode binding)
+            {
+                var scoped = variables.Where(variable => variable.Name != binding.Name);
+                variables = (binding.TypeName is { Length: > 0 } type
+                    ? scoped.Append((binding.Name, type)) : scoped).ToArray();
+            }
+        }
+        return normalized;
+    }
 
     private ExpressionNode NormalizeBclExpression(
         ExpressionNode expression, IReadOnlyList<(string Name, string Type)> variables)
@@ -300,7 +328,8 @@ public sealed class ContractTranslator
         ExpressionNode? modeled = receiverType switch
         {
             NominalBoundType { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String }
-                when member == "Length" => new StringOperationNode(original.Span, StringOp.Length, [receiver]),
+                when member == "Length" => new StringOperationNode(original.Span, StringOp.Length,
+                    [NormalizeBclExpression(receiver, variables)]),
             ArrayBoundType when member == "Length" && receiver is ReferenceNode
                 => new ArrayLengthNode(original.Span, receiver),
             GenericInstantiationBoundType
