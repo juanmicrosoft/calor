@@ -408,8 +408,13 @@ public sealed class StructuralBindingCompletenessTests
         public override void Accept(IAstVisitor visitor) =>
             throw new NotSupportedException();
 
+        // 0.30: binding emits the module once to build its source-dispatch proof context
+        // (CallGraphAnalysis.ResolveOperatorCalls). Give that emitter an opaque C#
+        // operand so the binder's own unsupported-node handling is what gets tested.
         public override T Accept<T>(IAstVisitor<T> visitor) =>
-            throw new NotSupportedException();
+            visitor is Calor.Compiler.CodeGen.CSharpEmitter
+                ? (T)(object)"default"
+                : throw new NotSupportedException();
     }
 
     [Fact]
