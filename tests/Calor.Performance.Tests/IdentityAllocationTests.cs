@@ -40,7 +40,7 @@ public sealed class IdentityAllocationTests(ITestOutputHelper output)
             var end = GC.GetAllocatedBytesForCurrentThread();
             Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
             Assert.Equal(64, fingerprint.Length);
-            Assert.Equal(4527, tokens.Count);
+            Assert.Equal(3427, tokens.Count);
             Assert.Equal(1351, BoundNodeHelpers.DescendantsAndSelf(bound).Count());
             Assert.Equal(580, graphs.Sum(graph => graph.Blocks.Count));
             Assert.Equal(760, graphs.Sum(graph => graph.Blocks.Sum(block => block.Successors.Count)));

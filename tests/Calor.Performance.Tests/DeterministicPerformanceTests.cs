@@ -50,8 +50,9 @@ public sealed class DeterministicPerformanceTests(ITestOutputHelper output)
             var actual = Measure(source);
             var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             output.WriteLine($"{actual}; allocated bytes: {allocated}");
-            // Source-ID removal changes tokens, not bound work or the allocation budget.
-            Assert.Equal(new Counters(4527, 1351, 580, 760, 580), actual);
+            // Native syntax lexes this workload into 3,427 tokens (legacy section syntax: 4,527);
+            // bound nodes, CFG blocks/edges and taint iterations are unchanged from the legacy workload.
+            Assert.Equal(new Counters(3427, 1351, 580, 760, 580), actual);
             Assert.InRange(allocated, baselineBytes * 98 / 100, baselineBytes * 102 / 100);
         }
     }
