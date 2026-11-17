@@ -76,7 +76,10 @@ public class EffectInferenceTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        Assert.Null(method.Effects);
+        // A public boundary must declare its row (Calor0124), so a pure method gets the
+        // explicit empty row `!` rather than no row.
+        Assert.NotNull(method.Effects);
+        Assert.Empty(method.Effects!.Effects);
     }
 
     [Fact]

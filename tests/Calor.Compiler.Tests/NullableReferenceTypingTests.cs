@@ -439,16 +439,16 @@ public class NullableReferenceTypingTests
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
     }
 
+    // 0.30 models rank arrays as real array types (6139e6a18), so a non-nullable rank array
+    // rejects null exactly like int[] (ArraysAndOrdinaryGenerics_KeepExistingNullRejection);
+    // only the explicitly nullable spelling accepts it. The rank suffix must still never be
+    // read as a bracket generic.
     [Theory]
-    [InlineData("int[,]", "int[,]")]
-    [InlineData("int[,,]", "int[,,]")]
-    [InlineData("int[,,,]", "int[,,,]")]
-    [InlineData("int[][,]", "int[][,]")]
-    [InlineData("int[,][,,]", "int[,][,,]")]
+    [InlineData("int[,]?", "int[,]?")]
     [InlineData("int[,][]?", "int[,][]?")]
-    [InlineData("string[,]", "string[,]")]
-    [InlineData("List<int>[,]", "List<int>[,]")]
-    public void ArrayRankSuffixes_AcceptNullWithDefaultChecking(string type, string emittedType)
+    [InlineData("string[,]?", "string[,]?")]
+    [InlineData("List<int>[,]?", "List<int>[,]?")]
+    public void NullableArrayRankSuffixes_AcceptNull(string type, string emittedType)
     {
         var result = Program.Compile($$"""
             module NullableTyping NullableTyping
@@ -466,6 +466,13 @@ public class NullableReferenceTypingTests
     [Theory]
     [InlineData("int[]")]
     [InlineData("int[,][]")]
+    [InlineData("int[,]")]
+    [InlineData("int[,,]")]
+    [InlineData("int[,,,]")]
+    [InlineData("int[][,]")]
+    [InlineData("int[,][,,]")]
+    [InlineData("string[,]")]
+    [InlineData("List<int>[,]")]
     [InlineData("Option<int>")]
     [InlineData("Result<int, string>")]
     [InlineData("Option<int[,]>")]

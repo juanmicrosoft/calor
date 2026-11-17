@@ -50,7 +50,7 @@ public class ClassMemberBindingTests
     public void BindMethod_SimpleMethod_ProducesMethod()
     {
         var source = @"
-module Test Test block
+module Test
   class Calculator
     func Add (int:x, int:y) → int
       !
@@ -63,7 +63,7 @@ module Test Test block
         Assert.NotNull(method);
         Assert.Equal(BoundMemberKind.Method, method.MemberKind);
         Assert.Equal("Calculator", method.ContainingTypeName);
-        Assert.Equal("i32", method.Symbol.ReturnType);
+        Assert.Equal("int", method.Symbol.ReturnType);
         Assert.Equal(2, method.Symbol.Parameters.Count);
     }
 
@@ -71,7 +71,7 @@ module Test Test block
     public void BindMethod_OverloadedMethods_AllBound()
     {
         var source = @"
-module Test Test block
+module Test
   class Converter
     func Convert (int:x) → string
       !
@@ -93,7 +93,7 @@ module Test Test block
     public void BindMethod_AbstractMethod_NotBound()
     {
         var source = @"
-module Test Test block
+module Test
   class Base abstract
     func DoWork abstract ()
       !
@@ -111,7 +111,7 @@ module Test Test block
     public void BindConstructor_WithFieldAssignment_FieldResolves()
     {
         var source = @"
-module Test Test block
+module Test
   class Widget
     field int:_count private
     ctor (int:count)
@@ -132,7 +132,7 @@ module Test Test block
     public void BindConstructor_FieldInScope_NoUndefinedReference()
     {
         var source = @"
-module Test Test block
+module Test
   class Widget
     field int:_count private
     func UseCount ()
@@ -152,7 +152,7 @@ module Test Test block
     public void InheritedFields_ResolveAcrossHierarchy_WithVisibilityAndIdentity()
     {
         var source = """
-            module Test Test block
+            module Test
               class Base
                 field int:shared protected
                 field int:publicValue
@@ -234,7 +234,7 @@ module Test Test block
     public void BindPropertyAccessor_Getter_ProducesPropertyGetter()
     {
         var source = @"
-module Test Test block
+module Test
   class Config
     field string:_name private
     property string:Name
@@ -253,7 +253,7 @@ module Test Test block
     public void BindPropertyAccessor_Setter_HasImplicitValueParam()
     {
         var source = @"
-module Test Test block
+module Test
   class Config
     field string:_name private
     property string:Name
@@ -271,7 +271,7 @@ module Test Test block
         // Setter should have implicit 'value' parameter
         var valueParam = Assert.Single(setter.Symbol.Parameters);
         Assert.Equal("value", valueParam.Name);
-        Assert.Equal("str", setter.Symbol.Parameters[0].TypeName);
+        Assert.Equal("string", setter.Symbol.Parameters[0].TypeName);
     }
     #endregion
     #region Operator Binding
@@ -335,7 +335,7 @@ module Test Test block
         // When a parameter has the same name as a field, bare name references
         // resolve to the parameter (innermost scope wins)
         var source = @"
-module Test Test block
+module Test
   class Foo
     field int:x private
     func Set (int:x)
@@ -379,7 +379,7 @@ module Test Test block
     public void BindAssignment_InMethod_ProducesBoundAssignment()
     {
         var source = @"
-module Test Test block
+module Test
   class Counter
     field int:_count private
     func Increment ()
@@ -400,7 +400,7 @@ module Test Test block
         // If we encounter an AST node type the Binder doesn't handle,
         // it should produce BoundUnsupportedStatement + Calor0931, not throw
         var source = @"
-module Test Test block
+module Test
   class MyClass
     func DoWork ()
       !
@@ -420,7 +420,7 @@ module Test Test block
     public void TopLevelFunction_HasCorrectMemberKind()
     {
         var source = @"
-module Test Test block
+module Test
   func add (int:x, int:y) → int
     !
     return (x + y)
@@ -436,7 +436,7 @@ module Test Test block
     public void AllMemberKinds_CorrectlyClassified()
     {
         var source = @"
-module Test Test block
+module Test
   class MyClass
     field int:_x private
     func Foo ()
@@ -473,7 +473,7 @@ module Test Test block
     public void ContractInference_SkipsClassMembers()
     {
         var source = @"
-module Test Test block
+module Test
   class Math
     func Divide (int:x, int:y) → int
       !
@@ -501,7 +501,7 @@ module Test Test block
         // If a class has methods that fail to bind, they should produce diagnostics
         // but not be added to the functions list
         var source = @"
-module Test Test block
+module Test
   class Good
     func WorkingMethod ()
       !
@@ -521,7 +521,7 @@ module Test Test block
     public void ConditionalExpression_BothBranchesPreserved()
     {
         var source = @"
-module Test Test block
+module Test
   func abs (int:x) → int
     !
     return ((x >= 0) ? x : (0 - x))
@@ -546,7 +546,7 @@ module Test Test block
     public void BindForeach_InMethod_ProducesBoundForeach()
     {
         var source = @"
-module Test Test block
+module Test
   class Processor
     func Process (List<string>:items)
       !
@@ -564,7 +564,7 @@ module Test Test block
     public void BindUsing_InMethod_ProducesBoundUsing()
     {
         var source = @"
-module Test Test block
+module Test
   class FileHandler
     func ReadFile (string:path) → string
       !
@@ -671,7 +671,7 @@ module Test Test block
     public void DecimalLiteral_NotMisparsedAsZero()
     {
         var source = @"
-module Test Test block
+module Test
   func convert (decimal:amount) → decimal
     !
     return (amount / 100m)
@@ -699,7 +699,7 @@ module Test Test block
         // End-to-end: parse → bind → analyze → assert Calor0920 found
         // Uses ReportOnlyVerified=false to see heuristic findings
         var source = @"
-module Test Test block
+module Test
   class Calculator
     func Divide (int:x, int:y) → int
       !
@@ -721,7 +721,7 @@ module Test Test block
     {
         // Constructor with : base(args) — initializer args should be visible to analysis
         var source = @"
-module Test Test block
+module Test
   class Widget
     field int:_value private
     ctor (int:v)
@@ -745,7 +745,7 @@ module Test Test block
     public void StaticMethod_BareInstanceFieldsAndProperties_AreRejectedButStaticMembersResolve()
     {
         var source = @"
-module Test Test block
+module Test
   class Utils
     field int:instanceField private
     field int:StaticField private static
@@ -784,7 +784,7 @@ module Test Test block
     public void StaticAndInstanceParameterlessConstructors_CoexistAndNewUsesInstanceConstructor()
     {
         var source = @"
-module Test Test block
+module Test
   class Widget
     ctor stat ()
       Console.WriteLine(""static"")
@@ -829,7 +829,7 @@ module Test Test block
     public void StaticMethod_ThisExpression_DoesNotResolve()
     {
         var source = @"
-module Test Test block
+module Test
   class Utils
     field int:_counter private
     func StaticMethod static ()
@@ -844,7 +844,9 @@ module Test Test block
             d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisIncomplete);
         Assert.Contains(diagnostics,
             d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisUnsupportedNode);
-        var thisBound = method!.Body.OfType<Compiler.Binding.BoundCallStatement>()
+        var thisBound = method!.Body.OfType<Compiler.Binding.BoundExpressionStatement>()
+            .Select(statement => statement.Expression)
+            .OfType<Compiler.Binding.BoundCallExpression>()
             .SelectMany(c => c.Arguments)
             .OfType<Compiler.Binding.BoundUnsupportedExpression>()
             .FirstOrDefault();

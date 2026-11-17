@@ -447,7 +447,7 @@ public class PostconditionReturnLoweringRuntimeTests
             ".Any(result => (result >= 0 && result < 1 && result == 0))",
             generatedCode);
         Assert.Contains(
-            "__calorPostconditionResult0 is int result) || (result >= 0)",
+            "!(__calorPostconditionResult0 is int result) || result >= 0",
             generatedCode);
         Assert.Contains(
             "if (!(__calorPostconditionResult",

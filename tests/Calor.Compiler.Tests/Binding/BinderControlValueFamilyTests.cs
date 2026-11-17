@@ -208,7 +208,7 @@ module Test Test block
         });
 
         Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.DivisionByZero && d.Span.Line == 4);
+            d => d.Code == DiagnosticCode.DivisionByZero && d.Span.Line == 5);
     }
 
     // ---- #908 adversarial-review pins (F1, F2, F4, F5, F3) ----

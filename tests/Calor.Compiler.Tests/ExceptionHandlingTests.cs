@@ -370,9 +370,9 @@ module Test Test block
     }
 
     [Fact]
-    public void Parse_TryWithoutCatchOrFinally_ParsesButMayWarn()
+    public void Parse_TryWithoutCatchOrFinally_IsRejected()
     {
-        // Try without catch or finally - syntactically allowed
+        // C# requires at least one catch or finally; the native parser reports it up front.
         var source = @"
 module Test Test block
   func NoHandler () → void
@@ -383,8 +383,8 @@ module Test Test block
 
         var module = Parse(source, out var diagnostics);
 
-        // Should parse, but C# requires at least catch or finally
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        Assert.Contains(diagnostics.Errors, d =>
+            d.Message.Contains("A try statement requires a catch or finally clause", StringComparison.Ordinal));
     }
 
     [Fact]

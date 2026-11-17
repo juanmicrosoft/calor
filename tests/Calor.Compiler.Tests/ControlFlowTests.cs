@@ -68,6 +68,7 @@ public class ControlFlowTests
         var source = $$"""
             module Test
               func Probe public (int:value) → object
+                !
                 return match value
                   case _ {{arrow}}(int:x) => x
             """;
@@ -229,7 +230,7 @@ public class ControlFlowTests
         var bindStmt = module.Functions[0].Body[0] as BindStatementNode;
         Assert.NotNull(bindStmt);
         Assert.Equal("x", bindStmt.Name);
-        Assert.Equal("INT", bindStmt.TypeName);  // i32 expands to INT internally
+        Assert.Equal("int", bindStmt.TypeName);
         Assert.NotNull(bindStmt.Initializer);
     }
 

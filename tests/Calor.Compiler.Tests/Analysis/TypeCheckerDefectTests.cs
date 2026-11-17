@@ -143,7 +143,7 @@ public class TypeCheckerDefectTests
     /// <summary>PUSH must stay silent on a receiver the checker cannot model, like its siblings.</summary>
     [Fact]
     public void PushOnUnmodeledReceiver_IsNotAnError()
-        => AssertNoErrors("module S S block\n  func Do (SomeUnknownBag:items) → void\n    ! mut\n    items.Add(1)\n    return\n");
+        => AssertNoErrors("module S S block\n  func Do (SomeUnknownBag:items) → void\n    ! unknown\n    items.Add(1)\n    return\n");
 
     [Theory]
     [InlineData("[str]")]   // the collection-literal spelling in the syntax reference

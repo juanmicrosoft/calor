@@ -151,18 +151,21 @@ public class MigrationLearningFixTests
     [InlineData("ushort")]
     public void ReservedIdentifier_LocalRebindAndParameter_Compile(string keyword)
     {
+        // `this` and `base` are native keywords, so source escapes them with '@'
+        // (backtick identifiers are retired); the C# type keywords stay bare.
+        var name = keyword is "this" or "base" ? "@" + keyword : keyword;
         var result = Program.Compile(
             $$"""
             module Keywords Keywords block
               func Local (int:input) → int
                 !
-                var int:{{keyword}} = input
-                var int:{{keyword}} = ({{keyword}} + 1)
-                return {{keyword}}
+                var int:{{name}} = input
+                var int:{{name}} = ({{name}} + 1)
+                return {{name}}
 
-              func Parameter (int:{{keyword}}) → int
+              func Parameter (int:{{name}}) → int
                 !
-                return {{keyword}}
+                return {{name}}
             """);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
@@ -425,8 +428,8 @@ public class MigrationLearningFixTests
             """;
 
         var result = _converter.Convert(csharpSource);
-        Assert.False(result.Success);
-        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
+        // 0.30 converts this natively; generated-Calor validation no longer rejects it.
+        Assert.True(result.Success, GetErrorMessage(result));
 
         var emitted = Emit(result.Ast!);
         // Keywords should be sanitized with @ prefix in emitted C#

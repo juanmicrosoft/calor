@@ -98,7 +98,7 @@ public class BinderConversionPatternFamilyTests
     {
         var (expr, diags) = BindReturn(new TypeOfExpressionNode(S, "MyClass"));
         var t = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("TYPE", t.Type.DisplayString);
+        Assert.Equal("System.Type", t.Type.DisplayString);
         Assert.Equal("MyClass", t.Metadata["OperandType"]);
         AssertComplete(diags);
     }

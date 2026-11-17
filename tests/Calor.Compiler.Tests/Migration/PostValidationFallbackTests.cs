@@ -70,8 +70,12 @@ public class PostValidationFallbackTests
     }
 
     [Fact]
-    public void CrossNamespaceSameNameTypes_RemainNativeAndDistinct()
+    public void CrossNamespaceSameNameTypes_RemainDistinct()
     {
+        // 0.30: default single-file conversion keeps a file with several namespace scopes
+        // as one whole-file C# boundary (namespace-topology; ConvertProject or
+        // `migrate --split-namespaces` converts it natively). The two Foo types must
+        // still come out distinct, each in its own namespace.
         const string src =
             "namespace N1 { public class Foo { public int A() => 1; } } " +
             "namespace N2 { public class Foo { public int B() => 2; } }";
@@ -80,8 +84,8 @@ public class PostValidationFallbackTests
         var result = converter.Convert(src);
 
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
-        Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-        Assert.Equal(2, result.Ast!.Classes.Count);
+        Assert.Equal(1, result.Context!.Stats.InteropBlocksEmitted);
+        Assert.Contains("namespace-topology", result.CalorSource!);
         Assert.Contains("class Foo", result.CalorSource!);
         var compiled = Program.Compile(result.CalorSource!);
         Assert.False(

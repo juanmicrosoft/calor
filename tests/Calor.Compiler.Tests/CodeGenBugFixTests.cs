@@ -810,7 +810,7 @@ module Test Test block
     [Fact]
     public void Array_BareElementInitialized_ParsesCorrectly()
     {
-        // §ARR{nums:i32} 1 2 3 §/ARR → 3 elements, no size
+        // new int[] { 1, 2, 3 } → 3 elements, no size
         var source = @"
 module Test Test block
   func Main () → void
@@ -824,7 +824,7 @@ module Test Test block
         var arr = (ArrayCreationNode)bind.Initializer!;
         Assert.Equal(3, arr.Initializer.Count);
         Assert.Null(arr.Size);
-        Assert.Equal("i32", arr.ElementType);
+        Assert.Equal("int", arr.ElementType);
     }
 
     [Fact]

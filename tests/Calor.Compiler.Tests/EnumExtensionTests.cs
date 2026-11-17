@@ -285,16 +285,21 @@ public class EnumExtensionTests
     [Fact]
     public void Parser_EnumExtension_EmptyExtension_NoError()
     {
-        // Empty extension is allowed (unusual but valid)
+        // Empty extension container is allowed (unusual but valid). With no `this Enum`
+        // method it is indistinguishable from an empty named static module, which is what
+        // the native parser records.
         var source = """
             module Test Test block
               module ColorExtensions
             """;
         var module = Parse(source, out var diagnostics);
 
-        Assert.False(diagnostics.HasErrors);
-        Assert.Single(module.EnumExtensions);
-        Assert.Empty(module.EnumExtensions[0].Methods);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.Empty(module.EnumExtensions);
+        var container = Assert.Single(module.Classes);
+        Assert.Equal("ColorExtensions", container.Name);
+        Assert.True(container.IsModule);
+        Assert.Empty(container.Methods);
     }
 
     #endregion
