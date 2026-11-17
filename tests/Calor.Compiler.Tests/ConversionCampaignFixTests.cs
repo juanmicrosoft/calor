@@ -481,11 +481,12 @@ public class Example
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         var source = result.CalorSource ?? "";
-        // Verbatim identifiers are wrapped in backticks in Calor
-        Assert.Contains("string:`class`", source);
-        Assert.Contains("int:`event`", source);
-        Assert.DoesNotContain("@class", source);
-        Assert.DoesNotContain("@event", source);
+        // 0.30: keyword-named identifiers are escaped with a single `@`, as in C#
+        // (the retired backtick form `class` is gone).
+        Assert.Contains("func Process (string:@class, int:@event)", source);
+        Assert.Contains("let x = @class", source);
+        Assert.DoesNotContain("`", source);
+        Assert.DoesNotContain("@@", source);
     }
 
     [Fact]
@@ -1200,6 +1201,29 @@ public class MyClass
         var compiled = Compile(calor);
         Assert.NotNull(compiled);
         Assert.Contains("protected internal", compiled!);
+    }
+
+    [Fact]
+    public void Parser_TwoWordAccessorVisibility_IsOneVisibility()
+    {
+        // 0.30: an accessor line takes the same two-word accessibilities as a declaration
+        // line (`set protected internal`, `get private protected`); the second word used to be
+        // parsed as a body statement, so the converter's own output failed to parse.
+        var calor = """
+            module Test Test block
+              class MyClass
+                property int:A
+                  get public
+                  set protected internal
+                property int:B protected
+                  get protected
+                  set private protected
+            """;
+
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        Assert.Contains("public int A { get; protected internal set; }", compiled!);
+        Assert.Contains("protected int B { get; private protected set; }", compiled);
     }
 
     [Fact]
@@ -2166,7 +2190,8 @@ public class Demo
         Assert.NotNull(result.CalorSource);
         var calor = result.CalorSource!;
 
-        Assert.DoesNotContain("new Builder()", calor);
+        // 0.30: `new Builder()` is the native creation spelling (the retired §NEW tag is gone);
+        // the computed target stays inline rather than hoisted to a `_new` temp.
         Assert.DoesNotContain("_new", calor);
         Assert.DoesNotContain("_chain", calor);
         Assert.Contains("(new Builder()).WithName", calor);
@@ -2663,7 +2688,8 @@ module Test Test block
     [Fact]
     public void Convert_AnonVerbatimProperty_StripsAt()
     {
-        // Fix 9.2: new { @class = "x" } should strip @ from property name
+        // Fix 9.2: new { @class = "x" } must not leak Roslyn's raw identifier text. 0.30: native
+        // Calor escapes a keyword-named member with a single `@` prefix, as C# does.
         var csharp = @"
 public class Foo {
     public object GetAttrs() {
@@ -2673,8 +2699,8 @@ public class Foo {
         var result = _converter.Convert(csharp);
         Assert.True(result.Success);
         Assert.NotNull(result.CalorSource);
-        Assert.DoesNotContain("@class", result.CalorSource);
-        Assert.Contains("class =", result.CalorSource);
+        Assert.Contains("return new { @class = \"container\", id = \"main\" }", result.CalorSource);
+        Assert.DoesNotContain("@@class", result.CalorSource);
     }
 
     [Fact]
