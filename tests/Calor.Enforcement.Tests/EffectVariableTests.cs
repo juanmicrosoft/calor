@@ -136,7 +136,7 @@ public class EffectVariableTests
 
         Assert.False(diagnostics.HasErrors);
         var parameter = Assert.Single(Assert.Single(module.Functions).Parameters);
-        Assert.Equal("List<Func<i32,i32>>", parameter.TypeName);
+        Assert.Equal("List<Func<int,int>>", parameter.TypeName);
         Assert.NotNull(parameter.Row);
     }
 
