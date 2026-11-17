@@ -126,7 +126,8 @@ public static class ProjectIndexBuilder
 
             foreach (var symbol in document.BoundModule.SymbolsById.Values)
             {
-                if (symbol.Id.IsNone || !declarationIds.Add(symbol.Id.Value))
+                if (symbol.Id.IsNone || IsSyntheticContractResult(symbol)
+                    || !declarationIds.Add(symbol.Id.Value))
                     continue;
 
                 var (line, column) = LineColumn(document.Source, symbol.DeclarationSpan.Start);
@@ -733,6 +734,14 @@ public static class ProjectIndexBuilder
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(text)))[..16];
     }
+
+    // The binder declares a `result` pseudo-variable for every non-void contract scope.
+    // It has no source declaration (empty span), so it is not a project declaration;
+    // indexing it made every `result` lookup ambiguous at 1:1 of each file.
+    private static bool IsSyntheticContractResult(Symbol symbol)
+        => symbol is VariableSymbol { IsParameter: true }
+            && symbol.DeclarationSpan.Length == 0
+            && symbol.Id.Value.Contains("/contract-result/", StringComparison.Ordinal);
 
     private static string KindOf(Symbol symbol) => symbol switch
     {
