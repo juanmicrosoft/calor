@@ -1812,18 +1812,24 @@ public sealed class CSharpToCalorConverter
     private static void CopyEffectRows(
         ModuleNode source, ModuleNode target, IReadOnlyDictionary<AstNode, int> declarationOffsets)
     {
+        // A record's header also starts its primary constructor; the declaration kind keeps
+        // a type's row and its members' rows apart.
         var rows = EnumerateRowSites(source)
-            .ToDictionary(site => site.Declaration.Span.Start);
+            .GroupBy(site => (site.Declaration.Span.Start, Kind: site.Declaration.GetType()))
+            .Where(group => group.Count() == 1)
+            .ToDictionary(group => group.Key, group => group.Single());
         var assignments = new List<Action>();
 
         foreach (var (declaration, _, assign) in EnumerateRowSites(target))
         {
             // A constructor printed without its own header (a record's synthesized one)
-            // has no row position; it keeps its intrinsic contract.
-            if (declaration is ConstructorNode && !declarationOffsets.ContainsKey(declaration))
+            // has no row position; it keeps its intrinsic contract. 0.30 (D1): so does an
+            // accessor or type the emitter printed without a recorded header.
+            if (declaration is ConstructorNode or PropertyAccessorNode or ClassDefinitionNode
+                && !declarationOffsets.ContainsKey(declaration))
                 continue;
             if (!declarationOffsets.TryGetValue(declaration, out var offset)
-                || !rows.TryGetValue(offset, out var synthesized))
+                || !rows.TryGetValue((offset, declaration.GetType()), out var synthesized))
             {
                 throw new InvalidOperationException(
                     $"Effect-row declaration at {declaration.Span} did not survive the probe emit/reparse.");
@@ -1893,8 +1899,18 @@ public sealed class CSharpToCalorConverter
                 yield return (method, method.Effects, row => method.Effects = row);
             foreach (var op in CallGraphAnalysis.EnumerateOperators(cls))
                 yield return (op, op.Effects, row => op.Effects = row);
-            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
-                yield return (ctor, ctor.Effects, row => ctor.Effects = row);
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
+                yield return (ctor, ctor.Effects, row => ctor.Effects = row);
+            // 0.30 (D1): accessor rows and the type's static-initialization row.
+            foreach (var property in CallGraphAnalysis.EnumerateProperties(cls))
+                foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer }.OfType<PropertyAccessorNode>())
+                    if (!accessor.IsAutoImplemented)
+                        yield return (accessor, accessor.Effects, row => accessor.Effects = row);
+            foreach (var indexer in CallGraphAnalysis.EnumerateIndexers(cls))
+                foreach (var accessor in new[] { indexer.Getter, indexer.Setter, indexer.Initer }.OfType<PropertyAccessorNode>())
+                    if (!accessor.IsAutoImplemented)
+                        yield return (accessor, accessor.Effects, row => accessor.Effects = row);
+            yield return (cls, cls.StaticInitializerEffects, row => cls.StaticInitializerEffects = row);
         }
 
         foreach (var iface in CallGraphAnalysis.EnumerateInterfaces(module))

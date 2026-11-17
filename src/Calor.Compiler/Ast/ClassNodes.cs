@@ -294,6 +294,16 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// </summary>
     public bool IsModule { get; }
 
+    /// <summary>
+    /// 0.30: the row of the type's implicit static initialization, written as a header
+    /// clause (<c>! codes</c> on its own line before the first member). It covers the static
+    /// field and property initializers C# runs when the type has no explicit static
+    /// constructor; no static constructor is synthesized, so <c>beforefieldinit</c> timing
+    /// is unchanged. A type with an explicit static constructor declares the row there.
+    /// Readers of the type's static fields are charged the initializers' effects and this row.
+    /// </summary>
+    public EffectsNode? StaticInitializerEffects { get; set; }
+
     public bool IsRecord { get; }
     public IReadOnlyList<ParameterNode>? RecordParameters { get; }
     public IReadOnlyList<ExpressionNode>? RecordBaseArguments { get; }

@@ -711,7 +711,10 @@ public class InitializerConversionTests
             """;
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
-        var parsed = AssertShape(result, 80, 2, 2, 7);
+        // 0.30 (D1): 80 before the type and constructor rows; Probe now declares its static
+        // initialization row instead of the file being preserved.
+        Assert.Contains("module Probe\n    ! unknown\n", result.CalorSource!.ReplaceLineEndings("\n"));
+        var parsed = AssertShape(result, 82, 2, 2, 7);
         AssertFieldAccesses(parsed, "ref(Probe).Sink", "ref(Probe).Sink", "ref(Probe).Log", "ref(Probe).Log",
             "ref(notice).Text", "ref(notice).Text", "ref(object).ReferenceEquals",
             "ref(Publisher).Send", "ref(Publisher).Send");
@@ -749,10 +752,15 @@ public class InitializerConversionTests
         Assert.Equal("receiver", call.Target);
         Assert.IsType<ThisExpressionNode>(call.Arguments[0]);
         Assert.Equal("notice", Assert.IsType<ReferenceNode>(call.Arguments[1]).Name);
+        // 0.30 (D1): the unproved initializers are declared as Probe's static-initialization
+        // row and every reader declares ! unknown, so the strict compile is clean. Without the
+        // type row the initializer is rejected again, as Unknown.
         var strict = Compile(result.CalorSource!, enforceEffects: true);
-        Assert.Equal(new[] { "Calor0410", "Calor0410", "Calor0422" },
-            strict.Diagnostics.Errors.Select(error => error.Code).OrderBy(code => code, StringComparer.Ordinal));
-        Assert.All(strict.Diagnostics.Errors, error =>
+        Assert.False(strict.HasErrors, string.Join("\n", strict.Diagnostics.Errors));
+        var undeclared = Compile(result.CalorSource!.ReplaceLineEndings("\n")
+            .Replace("module Probe\n    ! unknown\n", "module Probe\n", StringComparison.Ordinal), enforceEffects: true);
+        Assert.Equal(new[] { "Calor0422" }, undeclared.Diagnostics.Errors.Select(error => error.Code));
+        Assert.All(undeclared.Diagnostics.Errors, error =>
             Assert.Contains("'unknown'", error.Message, StringComparison.Ordinal));
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors));
@@ -874,7 +882,10 @@ public class InitializerConversionTests
         var loss = Assert.Single(result.Context.Losses,
             loss => loss.Feature == "conditional-expression-hoisting");
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
-        var parsed = AssertShape(result, 51, 2, 0, 6, "conditional-expression-hoisting");
+        // 0.30 (D1): the Items getter now declares its own row (one more node) instead of the
+        // file being preserved.
+        Assert.Matches(@"get( public)?\r?\n\s+! throw\r?\n", result.CalorSource);
+        var parsed = AssertShape(result, 52, 2, 0, 6, "conditional-expression-hoisting");
         AssertFieldAccesses(parsed, "ref(Probe).Log", "ref(Probe).Log", "ref(Probe).Log", "ref(Probe).Log", "ref(value).V");
         AssertOriginalPayloads(parsed, source);
         var probe = Assert.Single(parsed.Classes, type => type.Name == "Probe");

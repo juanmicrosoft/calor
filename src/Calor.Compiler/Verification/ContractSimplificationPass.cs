@@ -190,7 +190,10 @@ public sealed class ContractSimplificationPass
                 cls.Items,
                 cls.Methods,
                 simplifiedMethods),
-            isModule: cls.IsModule));
+            isModule: cls.IsModule)
+        {
+            StaticInitializerEffects = cls.StaticInitializerEffects
+        });
     }
 
     private InterfaceDefinitionNode SimplifyInterface(InterfaceDefinitionNode iface)

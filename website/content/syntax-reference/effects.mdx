@@ -65,11 +65,33 @@ This does not remove rows from callback types in its signature.
 
 Public/protected functions and methods, public operators, interface and abstract methods, extern
 methods, and delegate declarations require an explicit own row. A missing row
-reports `Calor0124`; write `!` for Pure. Accessors and initializers retain their implicit contracts. A constructor's
+reports `Calor0124`; write `!` for Pure. A constructor's
 body may always initialize (`mut`, `alloc`); anything more is `Calor0422` unless
 the constructor declares an optional own row after its header (for example
 `! throw` or `! unknown`), which then admits those effects too. Callers of `new`
 are charged what the constructor body actually does either way.
+
+Accessors work the same way since 0.30. A `get`, `set` or `init` body may always
+mutate and allocate; anything more is `Calor0423` unless the accessor declares an
+optional own row on its own line under the keyword. Readers and writers of the
+property are charged what the body does plus the declared row. An auto-implemented
+accessor has no body and takes no row. Event `add`/`remove` bodies still have no
+row and keep the intrinsic contract.
+
+```calor
+module Accessors
+  class Account
+    field int:balance private
+    property int:Balance
+      get
+        ! throw
+        if balance < 0
+          throw new InvalidOperationException("corrupt")
+        return balance
+```
+
+A type's static field initializers can have their own row too; see
+[Static initialization](#static-initialization).
 
 The C# converter omits synthesized own rows on private/internal bodies. Callback
 parameter and return rows stay explicit, as do existing abstract/extern contracts.
@@ -174,6 +196,8 @@ module Rows
 Rows are supported on:
 
 - function and method declarations,
+- constructors and property/indexer accessors (their own row, on its own line),
+- a type's implicit static initialization (a header line before its first member),
 - lambdas and delegates,
 - parameters in inline signatures,
 - return types after `→`,
@@ -280,7 +304,55 @@ every caller's effects precise; `! unknown` only records that nobody checked.
 
 Reading a native static field charges initialization of its entire declaring
 type, including sibling field and property initializers and its static
-constructor. A direct, zero-argument CLR `System.Object()` initializer can use
+constructor.
+
+**The static-initialization row.** A type without an explicit static constructor
+runs its static field and property initializers as an implicit type initializer.
+Those initializers may always mutate and allocate; anything more is `Calor0422`
+unless the type declares a row for them. Write the row as a header clause: an `!`
+line under the type's header, before its first member, next to `extends`,
+`implements` and `where`.
+
+```calor
+module Settings
+  class Defaults
+    ! fs:r
+    field string:Text static = Load()
+
+    func Load private static () → string
+      return System.IO.File.ReadAllText("settings.txt")
+
+  func Show public () → string
+    ! fs:r
+    return Defaults.Text
+```
+
+The row admits its effects in the initializers, and `! unknown` admits any effect.
+Whatever triggers the initialization (below) is charged the initializers' effects
+plus the row, so `Show` must declare `fs:r`. Calor does not synthesize a static
+constructor for this row. Adding one would drop the C# `beforefieldinit` flag and
+change when the initializers run. A type that has an explicit static constructor
+(`ctor stat`) declares the row on that constructor instead; a type row next to it
+is `Calor0405`. In a partial type each part carries its own row.
+
+**What triggers initialization.** The rules follow the C# specification
+(ECMA-334, "Static field initialization" and "Static constructors"):
+
+- A type with an explicit static constructor runs it, after its static field
+  initializers, before the first instance is created or any static member is
+  referenced. Calor charges the initialization at `new`, at every static field
+  read or write, and inside every static method, operator and static property
+  accessor of the type. A public static method of such a type must therefore
+  declare the static constructor's effects in its own row.
+- A type without one is `beforefieldinit`: its initializers run at some point
+  before the first static field access. Calor charges them at static field reads
+  and writes, including the hidden backing field of a static auto-property. Its
+  static methods are not charged; a method that reads a static field is charged
+  through that read.
+- A static field declared in a preserved raw C# member counts too. Reading it
+  charges the type's initialization, which is `unknown` when the preserved
+  initializer cannot be analyzed. Reading a raw property or other raw member that
+  native code cannot see is `unknown`. A direct, zero-argument CLR `System.Object()` initializer can use
 the existing constructor effect contract after successful C# projection and
 selection of that exact CLR constructor. This bounded proof requires an
 error-free projection with no preprocessor condition symbols.
@@ -328,7 +400,8 @@ fully qualified, imported, or aliased. Reading
 `System.Environment.CurrentDirectory`, for example, requires `env:r`; spelling
 the type's full name does not make the read pure.
 
-Static field access also accounts for declaring-type initialization. A
+Static field access also accounts for declaring-type initialization (see
+[Static initialization](#static-initialization)). A
 preserved ordinary method alone does not run during that initialization;
 calling it still requires its own effect proof. Preserved initializers,
 attributed methods, and unproven member shapes remain unknown boundaries.

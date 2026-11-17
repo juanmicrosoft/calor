@@ -119,7 +119,10 @@ public sealed class GenericStaticSourceCallTests
             module GenericStatic
               module Cache<T>
             {{initialization}}    func Use (int:value) → int
-                  {{(effectSite == "callee" ? "! mut\n      set Probe . log \"M\"" : "!")}}
+                  {{(effectSite == "callee" ? "! mut\n      set Probe . log \"M\""
+                      // 0.30 (gap A): a static method of a type with a static constructor may
+                      // run that constructor, so Use's own row carries its effects too.
+                      : effectSite == "constructor" ? "! mut" : "!")}}
                   return value
                 {{(effectSite == "overload" ? "func Use (string:value) → int\n      ! mut\n      set Probe . log value\n      return 7" : "")}}
               module Probe

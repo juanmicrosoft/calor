@@ -254,6 +254,15 @@ public sealed class PropertyAccessorNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
+    /// <summary>
+    /// 0.30: the accessor's optional own effect row, written on its own line under
+    /// <c>get</c>/<c>set</c>/<c>init</c>. Without one the body is held to the intrinsic
+    /// accessor contract (<c>mut</c>, <c>alloc</c>, Calor0423); with one it may also perform
+    /// the declared effects, and <c>! unknown</c> admits any effect. Readers are charged the
+    /// body's computed effects and the declared row.
+    /// </summary>
+    public EffectsNode? Effects { get; set; }
+
     public bool IsAutoImplemented => Body.Count == 0;
 
 

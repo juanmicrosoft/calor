@@ -679,11 +679,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 " (" + TryFormatInlineParams(node.RecordParameters) + ")";
             var baseCall = node.RecordBaseArguments == null ? "" :
                 $" : {TypeMapper.ToSurfaceType(node.BaseClass!)}({string.Join(", ", node.RecordBaseArguments.Select(argument => argument.Accept(this)))})";
-            AppendLine($"record {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}{positional}{baseCall}");
+            AppendEffectRowDeclaration(node, $"record {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}{positional}{baseCall}");
         }
         else
-            AppendLine($"{(node.IsModule ? "module" : "class")} {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}");
+            AppendEffectRowDeclaration(node, $"{(node.IsModule ? "module" : "class")} {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}");
         Indent();
+        // 0.30 (D1): the implicit static initialization row is the type's first header clause.
+        EmitEffects(node.StaticInitializerEffects);
 
         // Emit type parameter constraints
         EmitTypeParameterConstraints(node.TypeParameters);
@@ -995,8 +997,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else
         {
             // Full body: §GET ... §/GET
-            AppendLine($"{keyword}{visStr}");
+            AppendEffectRowDeclaration(node, $"{keyword}{visStr}");
             Indent();
+            EmitEffects(node.Effects);
             _memberBodyDepth++;
             foreach (var stmt in node.Body)
             {

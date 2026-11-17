@@ -10333,6 +10333,7 @@ public sealed class Parser
         var nestedEnums = new List<EnumDefinitionNode>();
         var nestedDelegates = new List<DelegateDefinitionNode>();
         var classItems = new List<AstNode>();
+        EffectsNode? staticInitializerEffects = null;
 
         // #1485: a class owns only the lines indented under it, so an empty
         // class does not adopt a same-column sibling type as a nested type.
@@ -10345,6 +10346,22 @@ public sealed class Parser
             if (Check(TokenKind.Where))
             {
                 ParseWhereClause(typeParameters);
+            }
+            else if (Check(TokenKind.Exclamation) || Check(TokenKind.Effects))
+            {
+                // 0.30 (D1): a row among a type's header clauses is the row of its implicit
+                // static initialization (static field and property initializers without an
+                // explicit static constructor). Only the header position carries it.
+                var rowToken = Current;
+                var row = ParseEffects();
+                if (classItems.Count > 0)
+                    _diagnostics.ReportError(rowToken.Span, DiagnosticCode.EffectRowMisplaced,
+                        "A type's static-initialization row is a header clause: write it before the first member.");
+                else if (staticInitializerEffects != null)
+                    _diagnostics.ReportError(rowToken.Span, DiagnosticCode.EffectRowMisplaced,
+                        "A type carries one static-initialization row. Put every permission in that row.");
+                else
+                    staticInitializerEffects = row;
             }
             else if (Check(TokenKind.Extends))
             {
@@ -10522,6 +10539,10 @@ public sealed class Parser
 
         }
 
+        // 0.30 (D1): an explicit static constructor carries the type's initialization row.
+        if (staticInitializerEffects != null && constructors.Any(constructor => constructor.IsStatic))
+            _diagnostics.ReportError(staticInitializerEffects.Span, DiagnosticCode.EffectRowMisplaced,
+                "This type has an explicit static constructor; declare the static-initialization row on 'ctor stat' instead.");
         var span = startToken.Span.Union(endToken.Span);
         var identifierSpan = GetIdentifierSpan(attrs, classNameKey, name);
         return WithDocumentation(new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
@@ -10540,7 +10561,10 @@ public sealed class Parser
             isModule: isModule,
             isRecord: isRecord,
             recordParameters: recordParameters,
-            recordBaseArguments: recordBaseArguments), startToken);
+            recordBaseArguments: recordBaseArguments)
+        {
+            StaticInitializerEffects = staticInitializerEffects
+        }, startToken);
     }
 
     private List<ExpressionNode>? ParseRecordBaseArguments()
@@ -12491,6 +12515,7 @@ public sealed class Parser
 
         var preconditions = new List<RequiresNode>();
         var body = new List<StatementNode>();
+        EffectsNode? accessorEffects = null;
 
         // Determine the end token for this accessor
         var endTokenKind = kind switch
@@ -12516,6 +12541,20 @@ public sealed class Parser
             {
                 preconditions.Add(ParseRequires());
             }
+            else if ((Check(TokenKind.Exclamation) || Check(TokenKind.Effects))
+                     && body.Count == 0 && preconditions.Count == 0)
+            {
+                // 0.30 (D1): an accessor's own row is a header clause on its own line,
+                // like a constructor's. It admits the declared effects beyond the
+                // intrinsic accessor contract; readers are charged the row.
+                var rowToken = Current;
+                var row = ParseEffects();
+                if (accessorEffects != null)
+                    _diagnostics.ReportError(rowToken.Span, DiagnosticCode.EffectRowMisplaced,
+                        "An accessor carries one effect row. Put every permission in that row.");
+                else
+                    accessorEffects = row;
+            }
             else
             {
                 var stmt = ParseStatement();
@@ -12534,7 +12573,13 @@ public sealed class Parser
             ExpectBlockEnd(endTokenKind);
         }
 
-        return new PropertyAccessorNode(startToken.Span, kind, visibility, preconditions, body, attrs);
+        if (accessorEffects != null && body.Count == 0)
+            _diagnostics.ReportError(accessorEffects.Span, DiagnosticCode.EffectRowMisplaced,
+                "An auto-implemented accessor has no body and cannot carry an effect row.");
+        return new PropertyAccessorNode(startToken.Span, kind, visibility, preconditions, body, attrs)
+        {
+            Effects = body.Count == 0 ? null : accessorEffects
+        };
     }
 
     /// <summary>
