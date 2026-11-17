@@ -68,12 +68,14 @@ public class DictionaryInitializerSemanticsTests
     }
 
     [Theory]
-    [InlineData("var d = new Dictionary<int, int>(Capacity()) { [Key()] = Value(), [Key()] = Value() }; return Trace + \":\" + d[1];", "CKVKV:2")]
-    [InlineData("var d = new Dictionary<int, int>(Capacity()) { {Key(), Value()}, {Key(), Value()}, {Key(), Value()} }; return Trace;", "throws:ArgumentException:CKVKV")]
-    [InlineData("var d = new Dictionary<int, int> { {Key(), Value()}, {2, Value()} }; return Trace;", "KVV")]
-    public void Migration_PreservesConstructorEntryOrderAndExceptionTiming(string body, string expected)
+    [InlineData("var d = new Dictionary<int, int>(Capacity()) { [Key()] = Value(), [Key()] = Value() }; return Trace + \":\" + d[1];", "CKVKV:2", true)]
+    [InlineData("var d = new Dictionary<int, int>(Capacity()) { {Key(), Value()}, {Key(), Value()}, {Key(), Value()} }; return Trace;", "throws:ArgumentException:CKVKV", true)]
+    // 0.30: a parameterless creation with Add entries is written natively (`{ { Key(), Value() }, … }`)
+    // and emits the same C# initializer, so the entry order and timing are C#'s own.
+    [InlineData("var d = new Dictionary<int, int> { {Key(), Value()}, {2, Value()} }; return Trace;", "KVV", false)]
+    public void Migration_PreservesConstructorEntryOrderAndExceptionTiming(string body, string expected, bool preserved)
     {
-        AssertEquivalent(body, expected, preserved: true);
+        AssertEquivalent(body, expected, preserved);
     }
 
     [Theory]
