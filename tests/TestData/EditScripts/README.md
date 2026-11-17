@@ -73,7 +73,7 @@ differently from a cross-module one under caching.
 | ES-01 | local edit | an edit leaking into an unrelated file's diagnostics |
 | ES-02 | file added | a new file's findings not reaching the report |
 | ES-03 | file deleted | a removed file's findings surviving in the cache |
-| ES-04 | callee's effects change | the **unedited** caller's cross-module violation (Calor0410) served stale from a cached effect summary — including the disappearing direction |
+| ES-04 | callee's effects change | the **unedited** caller's cross-module violation (Calor0410) served stale from a cached effect summary — including the disappearing direction. Since 0.30 the caller is recompiled after a callee edit (every source hash is in the cross-module fingerprint), so `bystander.calr` (never edited, never called) is the file served from cache; see `docs/plans/v0.13-freeze-registrations.md` F-3′ §7 |
 | ES-05 | option flipped | the #788 / #883 shape: a diagnostics-affecting option outside the options token, so a warm cache answers for the previous option set |
 | ES-06 | identical rewrite | diagnostics moving when nothing changed; also the anti-vacuity check that "identity" is not bought by rebuilding everything |
 | ES-07 | finding on an unedited file | a **per-file** diagnostic vanishing on warm builds, if diagnostic-bearing files were ever cached |

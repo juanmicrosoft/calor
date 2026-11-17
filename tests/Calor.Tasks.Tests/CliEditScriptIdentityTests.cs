@@ -16,7 +16,8 @@ namespace Calor.Tasks.Tests;
 public sealed class CliEditScriptIdentityTests : IDisposable
 {
     private readonly List<string> _workspaces = [];
-    private sealed record Outcome(IReadOnlyList<string> Diagnostics, bool AnyErrors, int Skipped);
+    private sealed record Outcome(IReadOnlyList<string> Diagnostics, bool AnyErrors, int Skipped,
+        IReadOnlyList<string>? SkippedOutputs = null);
     private sealed record ProcessResult(int ExitCode, string Stdout, string Stderr);
 
     public static TheoryData<string> RegisteredScripts()
@@ -55,6 +56,11 @@ public sealed class CliEditScriptIdentityTests : IDisposable
             reused += incremental.Skipped;
             if (scriptName == "ES-06-touch-noop" && sourceCount != 0)
                 Assert.Equal(sourceCount, incremental.Skipped);
+            // ES-04's reuseNote names the file it relies on (0.30 amendment, F-3' section 7 of
+            // v0.13-freeze-registrations.md), so the per-file claim is asserted, not just
+            // the aggregate witness below.
+            if (scriptName == "ES-04-cross-module-effect" && sourceCount != 0)
+                Assert.Contains("bystander.g.cs", incremental.SkippedOutputs!);
             sourceCount = Directory.GetFiles(workspace, "*.calr").Length;
 
             var incrementalCache = ReadCache(cachePath);
@@ -194,9 +200,12 @@ public sealed class CliEditScriptIdentityTests : IDisposable
             d => d.Contains($"|{DiagnosticCode.CliInternalError}|", StringComparison.Ordinal));
         var anyErrors = diagnostics.Any(d => d.Contains("|error|", StringComparison.Ordinal));
         Assert.Equal(anyErrors ? 1 : 0, result.ExitCode);
-        var skipped = result.Stderr.Split('\n')
-            .Count(line => line.StartsWith("Up-to-date (cached): ", StringComparison.Ordinal));
-        return new Outcome(diagnostics, anyErrors, skipped);
+        const string cachedPrefix = "Up-to-date (cached): ";
+        var skippedOutputs = result.Stderr.Split('\n')
+            .Where(line => line.StartsWith(cachedPrefix, StringComparison.Ordinal))
+            .Select(line => Path.GetFileName(line[cachedPrefix.Length..].TrimEnd('\r')))
+            .ToArray();
+        return new Outcome(diagnostics, anyErrors, skippedOutputs.Length, skippedOutputs);
     }
 
     private static ProcessResult RunProcess(string workspace, IEnumerable<string> arguments)

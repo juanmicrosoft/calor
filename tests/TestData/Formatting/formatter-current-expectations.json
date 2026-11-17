@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "purpose": "Current formatter regression expectations; original formatter-corpus-baseline.json is replayed with its producing compiler.",
-  "trackedFileCount": 958,
+  "trackedFileCount": 961,
   "successfulTransformationCount": 738,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",

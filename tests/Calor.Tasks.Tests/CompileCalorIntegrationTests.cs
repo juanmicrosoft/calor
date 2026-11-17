@@ -140,7 +140,6 @@ public class CompileCalorIntegrationTests : IDisposable
         }
     }
 
-    // Test 20: Full lifecycle: build → build (skip) → edit 1 → build (1 compiles) → clean → build (all)
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -169,52 +168,76 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.Empty(task.GeneratedFiles);
     }
 
+    // Test 20: Full lifecycle: build → build (skip) → edit 1 → build (all, global invalidation)
+    // → build (skip) → clean → build (all)
     [Fact]
     public void FullLifecycle_BuildSkipEditCleanBuild()
     {
         var src1 = CreateSourceFile("Foo.calr", ValidCalorSource);
         var src2 = CreateSourceFile("Bar.calr", ValidCalorSource.Replace("TestModule", "BarModule")
             .Replace("m001", "m002").Replace("f001", "f002"));
+        static int Count(TestBuildEngine engine, string prefix) =>
+            engine.Messages.Count(m => m.StartsWith(prefix, StringComparison.Ordinal));
+        const string compiling = "Compiling Calor:";
+        const string skipping = "Calor: skipping (up-to-date):";
 
         // First build — all compile
         var task1 = CreateTask(src1, src2);
         Assert.True(task1.Execute());
         Assert.Equal(2, task1.GeneratedFiles.Length);
+        Assert.Equal(2, Count((TestBuildEngine)task1.BuildEngine, compiling));
 
         // Second build — all skip (cache hit)
         var task2 = CreateTask(src1, src2);
         Assert.True(task2.Execute());
         Assert.Equal(2, task2.GeneratedFiles.Length);
         var engine2 = (TestBuildEngine)task2.BuildEngine;
-        Assert.Contains(engine2.Messages, m => m.Contains("skipping"));
+        Assert.Equal(2, Count(engine2, skipping));
+        Assert.Equal(0, Count(engine2, compiling));
 
-        // Edit one file — body-only: renaming a PUBLIC function changes the
-        // cross-module qualification map and (soundly, conservatively)
-        // invalidates every skip; that behavior is pinned separately in
+        // Edit one file, body only. Current contract (0.30): since 9ce37a970
+        // every source's content hash is in CrossModuleTypeRegistry's
+        // fingerprint, which the task folds into CrossModuleMapHash, so ANY
+        // edit in a multi-file build changes the map hash and invalidates
+        // every skip. Sound, but not incremental: the MSBuild task lacks the
+        // CLI's independence proof (CrossModuleFunctionMapHash +
+        // CanReuseIndependentOutput in CompilationDriver). When that proof is
+        // ported, this phase should pin "Bar skips, Foo compiles" again.
+        // Renaming a public function is pinned separately in
         // EditRenamingPublicFunction_InvalidatesAllSkips (G3/#809).
         Thread.Sleep(50); // ensure mtime changes
         var editedSource = ValidCalorSource.Replace("(a + b)", "(a - b)");
-        Assert.NotEqual(ValidCalorSource, editedSource); // the edit must land, or the skip is vacuous
+        Assert.NotEqual(ValidCalorSource, editedSource); // the edit must land, or this phase is vacuous
         File.WriteAllText(src1, editedSource);
 
-        // Third build — only edited file compiles
+        // Third build — global invalidation: both files recompile, nothing skips
         var task3 = CreateTask(src1, src2);
         Assert.True(task3.Execute());
         Assert.Equal(2, task3.GeneratedFiles.Length);
         var engine3 = (TestBuildEngine)task3.BuildEngine;
-        // Bar should be skipped, Foo should be compiled
-        var msgs3 = string.Join("\n", engine3.Messages);
-        Assert.Contains("skipping", msgs3);
-        Assert.Contains("Compiling", msgs3);
+        Assert.Contains(engine3.Messages,
+            m => m.Contains("global invalidation [cross-module-map-changed]", StringComparison.Ordinal));
+        Assert.Equal(0, Count(engine3, skipping));
+        Assert.Equal(2, Count(engine3, compiling));
+
+        // Fourth build — no edit: the rewritten cache is warm, everything skips again
+        var task4 = CreateTask(src1, src2);
+        Assert.True(task4.Execute());
+        var engine4 = (TestBuildEngine)task4.BuildEngine;
+        Assert.DoesNotContain(engine4.Messages, m => m.Contains("global invalidation", StringComparison.Ordinal));
+        Assert.Equal(2, Count(engine4, skipping));
+        Assert.Equal(0, Count(engine4, compiling));
 
         // Clean — delete output dir
         Directory.Delete(_outputDir, recursive: true);
         Directory.CreateDirectory(_outputDir);
 
-        // Fourth build — all compile (cache gone)
-        var task4 = CreateTask(src1, src2);
-        Assert.True(task4.Execute());
-        Assert.Equal(2, task4.GeneratedFiles.Length);
+        // Fifth build — all compile (cache gone)
+        var task5 = CreateTask(src1, src2);
+        Assert.True(task5.Execute());
+        Assert.Equal(2, task5.GeneratedFiles.Length);
+        Assert.Equal(2, Count((TestBuildEngine)task5.BuildEngine, compiling));
+        Assert.All(task5.GeneratedFiles, f => Assert.True(File.Exists(f.ItemSpec)));
     }
 
     /// <summary>
