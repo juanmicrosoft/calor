@@ -1052,10 +1052,12 @@ public sealed class NativeProjectCacheTests : IDisposable
     [Fact]
     public void FullySkippedOutputsStillEnforceTheirCachedDeclaredEffectRows()
     {
+        // 0.30: a public function must declare a row (Calor0124); an internal one may omit
+        // it, which is what the cross-module pass reports as Calor0417 on every build.
         Write("library", """
             module Store Storage
-              func Write public () → void
-                !
+              func Write internal () → void
+                return
             """);
         Write("caller", """
             module Caller Client

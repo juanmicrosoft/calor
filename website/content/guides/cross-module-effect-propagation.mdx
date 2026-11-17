@@ -216,7 +216,7 @@ Someone else (or an earlier session) edited the callee's `!` row. The cached sum
 **"Cross-module pass isn't catching a call I expect it to."**
 Check three things:
 1. The callee is public or internal (private functions aren't exported).
-2. The callee compiles on its own. A public callee must declare an `!` row; without one it fails with `Calor0124` in its own file.
+2. The callee has an `!` row. A `public` callee without one fails with `Calor0124` in its own file; an `internal` callee without one is excluded and a `Calor0417` warning is emitted.
 3. The bare name isn't ambiguous across modules — if two modules define the same public function name, use a qualified call.
 
 **"Cache seems stale after upgrading the compiler."**
