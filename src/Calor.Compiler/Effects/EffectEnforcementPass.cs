@@ -6169,20 +6169,9 @@ public sealed class EffectEnforcementPass
                     _context.CallGraph.SelectedMetadataGetter(field));
 
         private EffectSet InferFromMetadataField(CS.IFieldSymbol field, EffectSet receiverEffects, TextSpan span)
-        {
-            // Constants do not run a type initializer.
-            if (field.IsConst)
-                return receiverEffects;
-            // A static read may run the declaring type's initializer, so it needs that
-            // type's manifest contract (a name entry or the type default), as in 0.29
-            // (e.g. System.String.Empty). Other metadata fields have no getter contract.
-            if (field.IsStatic
-                && _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
-                    Binding.Metadata.MetadataBinderResult.ToNominalBoundType(field.ContainingType),
-                    field.Name, null, EffectMemberKind.Getter)) is { Status: not EffectResolutionStatus.Unknown } resolution)
-                return receiverEffects.Union(resolution.Effects);
-            return receiverEffects.Union(UnknownResolvedOperation(field.ToDisplayString(), span));
-        }
+            // Constants do not run a type initializer. Other metadata fields have no getter contract.
+            => field.IsConst ? receiverEffects
+                : receiverEffects.Union(UnknownResolvedOperation(field.ToDisplayString(), span));
 
         private EffectSet InferFromMemberAccess(ExpressionNode target, string memberName, TextSpan span,
             CallGraphAnalysis.MetadataGetterSelection? selectedGetter = null)
