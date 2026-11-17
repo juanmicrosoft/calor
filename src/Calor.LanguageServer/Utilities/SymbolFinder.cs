@@ -221,8 +221,12 @@ public static class SymbolFinder
                 {
                     return expressionReceiver.Id.IsNone ? null : expressionReceiver.Id;
                 }
+                // A native member call (`worker.Pick(1)`) binds with the synthetic target
+                // "<expression-call>"; its resolved callee carries the name instead.
                 if (expression.CalleeSpan.Contains(offset)
-                    && CallTargetMatchesName(expression.Target, result.Name)
+                    && (CallTargetMatchesName(expression.Target, result.Name)
+                        || expression.ResolvedSymbol is { } resolvedCallee
+                            && CallTargetMatchesName(resolvedCallee.Name, result.Name))
                     && expression.ResolvedSymbolId is { IsNone: false } expressionId)
                 {
                     return expressionId;

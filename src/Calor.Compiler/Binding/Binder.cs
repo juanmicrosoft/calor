@@ -7229,6 +7229,14 @@ public sealed class Binder
             if (lexicalMembers.Count != 0)
                 symbols = lexicalMembers;
         }
+        // Module functions in a namespaced module are declared under their qualified
+        // name. A bare reference to one is still a function used as a value: report it
+        // as such (with the call fix), not as an undefined variable.
+        if (symbols.Count == 0 && !refNode.Name.Contains('.')
+            && !string.IsNullOrEmpty(_currentNamespaceIdentity)
+            && _scope.LookupAll($"{_currentNamespaceIdentity}.{refNode.Name}") is { Count: > 0 } namespaced
+            && namespaced.All(symbol => symbol is FunctionSymbol))
+            symbols = namespaced;
 
         if (symbols.Count == 0)
         {

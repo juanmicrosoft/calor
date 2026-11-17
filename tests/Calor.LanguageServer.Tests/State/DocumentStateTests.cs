@@ -901,11 +901,13 @@ public class DocumentStateTests
     {
         var source = """
             module Test Test
-              func DoWork public () → void
-                !
-                let a = new System.Random()
+              func DoWork public (Widget:a) → void
+                ! unknown
                 a.b.Chain()
             """;
+        // 0.30: the receiver root must stay unresolved for this shape. On a metadata
+        // type such as System.Random, `a.b` is now resolved against metadata and a
+        // missing member is an actionable Calor0270 (CS1061), not a member chain.
 
         var state = LspTestHarness.CreateDocument(source);
 
