@@ -11772,17 +11772,19 @@ public sealed class Binder
     /// <summary>
     /// Whether the C# type the emitter writes for this declared spelling can never
     /// denote a delegate, whatever the module declares: a C# keyword type
-    /// (<c>int</c>, <c>string</c>, <c>void</c>, ...), an array, a pointer, a tuple, or a
-    /// nullable of one of those. Keywords cannot be redeclared or aliased in C#, so
-    /// Roslyn binds such a type to the same non-delegate symbol in every image.
+    /// (<c>int</c>, <c>string</c>, <c>void</c>, ...), or a nullable, array or pointer
+    /// built only from one. Keywords cannot be redeclared or aliased in C#, so Roslyn
+    /// binds such a type to the same non-delegate symbol in every image.
     /// <para>The source projection (<see cref="SourceCallBindings"/>) types a parameter or
     /// return as a callback only when that emitted type is a delegate. For these
     /// spellings it records the non-delegate type and the caller returns null, so
     /// skipping the projection gives the same answer. That keeps a module whose
-    /// parameters are all scalars from paying for a full C# compilation at binding.</para>
+    /// parameters are all scalars from paying for a full C# compilation at binding.
+    /// Anything else (a named type, a generic, a tuple) still asks the projection.</para>
     /// <para>The spelling is mapped exactly as <c>CSharpEmitter.MapTypeName</c> maps it.
     /// A head that names a module refinement or indexed type is erased to its base
-    /// type there, so it is never classified here.</para>
+    /// type there, so it is never classified here. The check reads the emitted text
+    /// rather than parsing it: it runs for every parameter and return of the module.</para>
     /// </summary>
     private bool EmitsAsNonDelegateType(string? typeName)
     {
@@ -11797,19 +11799,25 @@ public sealed class Binder
         var emitted = Migration.TypeMapper.CalorToCSharp(spelling);
         if (string.IsNullOrWhiteSpace(emitted))
             return false;
-        var syntax = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(emitted);
-        return !syntax.ContainsDiagnostics && syntax.FullSpan.Length == emitted.Length
-            && NeverDelegate(syntax);
-
-        static bool NeverDelegate(Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax type) => type switch
+        var core = emitted.AsSpan().Trim();
+        while (true)
         {
-            Microsoft.CodeAnalysis.CSharp.Syntax.PredefinedTypeSyntax => true,
-            Microsoft.CodeAnalysis.CSharp.Syntax.ArrayTypeSyntax => true,
-            Microsoft.CodeAnalysis.CSharp.Syntax.PointerTypeSyntax => true,
-            Microsoft.CodeAnalysis.CSharp.Syntax.TupleTypeSyntax => true,
-            Microsoft.CodeAnalysis.CSharp.Syntax.NullableTypeSyntax nullable => NeverDelegate(nullable.ElementType),
-            _ => false
-        };
+            if (core.EndsWith("?") || core.EndsWith("*"))
+                core = core[..^1].TrimEnd();
+            else if (core.EndsWith("]"))
+            {
+                var open = core.LastIndexOf('[');
+                if (open <= 0)
+                    return false;
+                foreach (var rank in core[(open + 1)..^1])
+                    if (rank != ',' && !char.IsWhiteSpace(rank))
+                        return false;
+                core = core[..open].TrimEnd();
+            }
+            else
+                break;
+        }
+        return SyntaxFacts.IsPredefinedType(SyntaxFacts.GetKeywordKind(core.ToString()));
     }
 
     /// <summary>
