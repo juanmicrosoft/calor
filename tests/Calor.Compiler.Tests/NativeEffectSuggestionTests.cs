@@ -72,7 +72,7 @@ public sealed class NativeEffectSuggestionTests
         if (existingRow)
             Assert.Contains("! cw, alloc // keep this row comment", amended);
         else
-            Assert.Contains("    ! cw" + (crlf ? "\r\n" : "\n") + "    requires", amended);
+            Assert.Contains("    ! cw" + (crlf ? "\r\n" : "\n") + "    // keep the contract comment", amended);
         var final = Program.Compile(amended, "native.calr");
         Assert.False(final.HasErrors, string.Join("\n", final.Diagnostics));
         Assert.Equal("7", InteropScope.RefOutImplementationTests.Run(final.GeneratedCode + """
@@ -98,14 +98,15 @@ public sealed class NativeEffectSuggestionTests
             + $"{indent}{unit}requires value >= 0\n"
             + $"{indent}{unit}System.Console.Write(value)\n"
             + $"{indent}{unit}return value\n";
+        // 0.30: a public method with no row is a missing boundary row (Calor0124),
+        // reported by the parser before effect inference can suggest a row.
         var compiled = Program.Compile(source, "native.calr");
-        var diagnostic = Assert.Single(compiled.Diagnostics.DiagnosticsWithFixes,
-            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
-        var edit = Assert.Single(diagnostic.Fix.Edits);
-        Assert.Equal(indent + unit + "! cw\n", edit.NewText);
-        var authorized = new DiagnosticWithFix(diagnostic.Code, diagnostic.Message, diagnostic.Span,
-            new SuggestedFix(diagnostic.Fix.Description, edit, isSafeToApply: true));
-        var amended = DiagnosticFixes.Apply(source, source, "native.calr", [authorized], out _);
+        var missing = Assert.Single(compiled.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.MissingBoundaryEffectRow);
+        Assert.Contains("'Echo'", missing.Message);
+        Assert.Equal(nested ? 3 : 2, missing.Span.Line);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        var amended = source.Replace("→ int\n", "→ int\n" + indent + unit + "! cw\n", StringComparison.Ordinal);
         var final = Program.Compile(amended, "native.calr");
         Assert.False(final.HasErrors, string.Join("\n", final.Diagnostics));
     }

@@ -84,6 +84,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         return "module " + moduleName + "\n"
             + "  module " + moduleName + "\n"
             + "    func answer public () → int\n"
+            + "      !\n"
             + "      return " + answer.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n";
     }
 
@@ -385,7 +386,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         var results = await RunScriptAsync(rebuildCount: 3, drive: (session, step) =>
         {
             File.WriteAllText(source, step == 1
-                ? safe + "    func answer public () → int\n      return 2\n"
+                ? safe + "    func answer public () → int\n      !\n      return 2\n"
                 : safe);
             session.InjectChange(source);
         });

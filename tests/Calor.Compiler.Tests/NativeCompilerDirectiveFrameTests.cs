@@ -24,7 +24,7 @@ public sealed class NativeCompilerDirectiveFrameTests
     public void DirectiveFrame_PreservesExactFeatureBytesAndFollowingItem(string feature, string payload)
     {
         var source = "module Directives\r\n" + Frame(feature, payload, "  ", "\r\n")
-            + "  func Next () \u2192 int\r\n    return 7\r\n";
+            + "  func Next () \u2192 int\r\n    !\r\n    return 7\r\n";
         var (module, diagnostics) = Parse(source);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var directive = Assert.IsType<CompilerDirectiveNode>(module.Items[0]);
@@ -116,9 +116,9 @@ public sealed class NativeCompilerDirectiveFrameTests
     public void DirectiveFrame_PreservesClassAndStatementOrderWithoutOpaqueEffects()
     {
         var source = "module Ordered\n  class Host\n"
-            + "    func Before () \u2192 int\n      return 1\n"
+            + "    func Before () \u2192 int\n      !\n      return 1\n"
             + Frame("pragma", "#pragma warning disable CS0168", "    ")
-            + "    func After () \u2192 int\n"
+            + "    func After () \u2192 int\n      !\n"
             + Frame("nullable-directive", "#nullable enable", "      ")
             + "      return 2\n"
             + Frame("pragma", "#pragma warning restore CS0168", "    ");
@@ -153,7 +153,7 @@ public sealed class NativeCompilerDirectiveFrameTests
     {
         var source = "module NullableState\n"
             + Frame("nullable-directive", "#nullable enable")
-            + "  func Probe (string:value) \u2192 string\n    return value\n";
+            + "  func Probe (string:value) \u2192 string\n    !\n    return value\n";
         var compiled = Program.Compile(source);
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
         var enabled = CSharpCompilation.Create("NullableEnabled",
@@ -201,7 +201,7 @@ public sealed class NativeCompilerDirectiveFrameTests
     {
         var source = "module Symbols\n  pp FEATURE\n"
             + Frame("symbol-directive", "#define INNER", "    ")
-            + "  func Probe () \u2192 int\n    return 1\n";
+            + "  func Probe () \u2192 int\n    !\n    return 1\n";
         var (module, diagnostics) = Parse(source);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var conditional = Assert.Single(module.TypePreprocessorBlocks);

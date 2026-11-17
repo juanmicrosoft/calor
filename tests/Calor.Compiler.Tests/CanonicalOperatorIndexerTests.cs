@@ -1095,8 +1095,10 @@ public sealed class CanonicalOperatorIndexerTests
         var source = Bag + """
 
                 func Touch () → void
+                  !
                   return
                 func Exercise () → int
+                  !
                   this.Touch()
                   return this[1]
             """;

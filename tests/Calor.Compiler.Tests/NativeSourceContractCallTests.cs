@@ -216,8 +216,7 @@ public sealed class NativeSourceContractCallTests
             module NegativeSourceContracts
               module Predicates
                 func Positive {{visibility}} ({{predicateParameters}}) → bool
-                  !
-                  return true
+                  {{(visibility == "private" ? "" : "!\n      ")}}return true
               func Identity ({{parameters}}) → int
                 !
                 {{contract}}
@@ -334,7 +333,7 @@ public sealed class NativeSourceContractCallTests
     [InlineData("ctor (int:x)\n      requires Predicates.Positive(x)", "constructor")]
     [InlineData("property int:Value\n      get\n        requires Predicates.Positive(1)\n        return 1", "accessor")]
     [InlineData("this [int:x] → int\n      get\n        requires Predicates.Positive(x)\n        return x", "indexer")]
-    [InlineData("op + (Box:left, Box:right) → Box\n      requires Predicates.Positive(1)\n      => Predicates.Positive(1)\n      return left", "operator")]
+    [InlineData("op + (Box:left, Box:right) → Box\n      !\n      requires Predicates.Positive(1)\n      => Predicates.Positive(1)\n      return left", "operator")]
     public void ExistingMemberContractSurfaces_BindSourcePredicates(string member, string kind)
     {
         var result = Program.Compile($$"""
@@ -408,7 +407,7 @@ public sealed class NativeSourceContractCallTests
     [InlineData("ctor (int:x)\n      requires Predicates.Positive(x)", "Calor0422")]
     [InlineData("property int:Value\n      get\n        requires Predicates.Positive(1)\n        return 1", "Calor0423")]
     [InlineData("this [int:x] → int\n      get\n        requires Predicates.Positive(x)\n        return x", "Calor0423")]
-    [InlineData("op + (Box:left, Box:right) → Box\n      requires Predicates.Positive(1)\n      return left", "Calor0423")]
+    [InlineData("op + (Box:left, Box:right) → Box\n      !\n      requires Predicates.Positive(1)\n      return left", "Calor0410")]
     public void MemberContracts_CannotHideSelectedConsoleEffects(string member, string expectedCode)
     {
         var result = Program.Compile($$"""

@@ -30,6 +30,7 @@ public sealed class LiteralRawSemanticsTests
 
         var source = "module NativeLiteralContext\n"
             + "  func Probe public (int:x) \u2192 string\n"
+            + "    !\n"
             + "    return \"${" + nativeHole + "}\"\n";
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
@@ -107,7 +108,7 @@ public sealed class LiteralRawSemanticsTests
         if (current != source)
             AssertRetiredTypedLiteral(source);
         var diagnostics = new DiagnosticBag();
-        var program = $"module Unsigned\n  func Value public () \u2192 object\n    return {current}";
+        var program = $"module Unsigned\n  func Value public () \u2192 object\n    !\n    return {current}";
         _ = new Parser(new Lexer(program, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
 
         Assert.Contains(
@@ -135,7 +136,7 @@ public sealed class LiteralRawSemanticsTests
             diagnostic => diagnostic.Code == DiagnosticCode.SignedIntegerLiteralOverflow);
 
         var compilation = Program.Compile(
-            $"module Overflow\n  func Value public () \u2192 long\n    return {current}",
+            $"module Overflow\n  func Value public () \u2192 long\n    !\n    return {current}",
             "signed-long-overflow.calr",
             new CompilationOptions { EnforceEffects = true });
         Assert.True(compilation.HasErrors);
@@ -453,7 +454,7 @@ public sealed class LiteralRawSemanticsTests
             Assert.Equal(TokenKind.Error, tokens[0].Kind);
 
             var result = Program.Compile(
-                $"module Utf8\n  func Value public (int:value) \u2192 object\n    return {literal}",
+                $"module Utf8\n  func Value public (int:value) \u2192 object\n    !\n    return {literal}",
                 "interpolated-u8.calr",
                 new CompilationOptions { EnforceEffects = true });
             Assert.True(result.HasErrors);
@@ -694,7 +695,7 @@ public sealed class LiteralRawSemanticsTests
     {
         diagnostics = new DiagnosticBag();
         var parser = new Parser(
-            new Lexer($"module Test\n  func Value public () \u2192 object\n    return {source}", diagnostics)
+            new Lexer($"module Test\n  func Value public () \u2192 object\n    !\n    return {source}", diagnostics)
                 .TokenizeAllForParser(),
             diagnostics);
         var module = parser.Parse();
@@ -757,7 +758,7 @@ public sealed class LiteralRawSemanticsTests
         Assert.False(frame.IsCompilerDirective);
 
         var module = new Parser(new Lexer(
-            $"module RawPayload\n  func Value () \u2192 void\n    {source}", diagnostics)
+            $"module RawPayload\n  func Value () \u2192 void\n    !\n    {source}", diagnostics)
             .TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
         var statement = Assert.IsType<RawCSharpNode>(Assert.Single(Assert.Single(module.Functions).Body));

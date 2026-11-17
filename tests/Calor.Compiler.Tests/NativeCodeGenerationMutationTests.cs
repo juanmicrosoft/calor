@@ -94,9 +94,9 @@ public class NativeCodeGenerationMutationTests
         Assert.True(rejected.HasErrors);
         var errors = rejected.Diagnostics.Errors.ToArray();
         Assert.All(errors, diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
-        Assert.Equal(new[] { "Record", caller }.Select(name =>
-                $"Function '{name}' uses effect 'mut' but does not declare it").Order(),
-            errors.Select(diagnostic => diagnostic.Message).Order());
+        // Record is private, so it infers its row; only the public caller's declared row is checked.
+        Assert.Equal($"Function '{caller}' uses effect 'mut' but does not declare it",
+            Assert.Single(errors).Message);
         Assert.DoesNotContain(rejected.Diagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
     }

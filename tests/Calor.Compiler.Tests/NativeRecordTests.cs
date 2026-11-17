@@ -348,8 +348,8 @@ public sealed class NativeRecordTests
                 ctor (int:x)
                   Console.WriteLine("ctor")
               func Make {{(visibility == "pub" ? "public" : "private")}} () → P
-                ! alloc
-                return new P(1)
+                {{(visibility == "pub" ? "! alloc\n    " : "")}}return new P(1)
+              {{(visibility == "pub" ? "" : "func Use public () → P\n    ! alloc\n    return Make()")}}
             """);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0422");

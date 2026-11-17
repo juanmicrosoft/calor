@@ -1,6 +1,7 @@
 module ContractZ3Test ContractZ3Test block
   interface IService
     func Process (int:value) → int
+      !
       requires value >= 0
 
   class ValidService

@@ -150,6 +150,7 @@ public sealed class CnfLoweringEquivalencePropertyTests
     {
         var source = "module BooleanProperties\n"
             + "  func Evaluate public (bool:a, bool:b, bool:c) → bool\n"
+            + "    !\n"
             + $"    return {Render(term)}\n";
         var (module, diagnostics) = GeneratedProductionPipelinePropertyTests.Parse(source);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors));

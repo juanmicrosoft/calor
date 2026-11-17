@@ -319,7 +319,7 @@ public class NullabilityIntegrationTests
         var findings = diagnostics.Where(candidate =>
             candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
         var diagnostic = Assert.Single(findings);
-        Assert.Equal(12, diagnostic.Span.Line);
+        Assert.Equal(13, diagnostic.Span.Line);
         Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
     }
 
@@ -755,8 +755,10 @@ public class NullabilityIntegrationTests
     {
         var members = unresolved ? "extends Missing" : """
             op == (Item?:left, Item?:right) → bool
+              !
               return false
             op != (Item?:left, Item?:right) → bool
+              !
               return true
             """;
         var source = $$"""

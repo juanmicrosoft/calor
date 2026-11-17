@@ -64,7 +64,7 @@ public class PrimerMistakesRejectedTests
         // Layer 1: rejected outright by Calor.
         if (result.Diagnostics.Any(d => d.IsError))
         {
-            var errorLine = name == "if-missing-condition" ? 4 : topLevel ? 2 : 3;
+            var errorLine = name == "if-missing-condition" ? 5 : topLevel ? 2 : 4;
             Assert.Contains(result.Diagnostics, d => d.IsError && d.Span.Line == errorLine);
             return;
         }

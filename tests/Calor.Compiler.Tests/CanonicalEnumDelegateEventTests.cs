@@ -1045,7 +1045,9 @@ public sealed class CanonicalEnumDelegateEventTests
         Assert.Contains("raw ", conversion.CalorSource);
         var header = $"func Main ({(isStatic ? "" : typeName + ":target")}) → int\n";
         Assert.Contains(header, conversion.CalorSource);
-        var source = conversion.CalorSource.Replace(header, header + "      !\n", StringComparison.Ordinal);
+        // The converter declares the opaque call as ! unknown; narrowing it to pure must be rejected.
+        var source = conversion.CalorSource.Replace(header + "      ! unknown\n", header + "      !\n", StringComparison.Ordinal);
+        Assert.NotEqual(conversion.CalorSource, source);
         var ast = Parse(source);
         var bound = BindNativeEnums(ast);
         var main = bound.Functions.Single(function => function.Symbol.Name.EndsWith(".Main", StringComparison.Ordinal));
@@ -1798,13 +1800,13 @@ public sealed class CanonicalEnumDelegateEventTests
 
     [Theory]
     [InlineData("class Source\n    event System.Action:Changed\n      add\n        return\n      remove\n        return\n    func Read () → void\n      !\n      let copy = Changed")]
-    [InlineData("class Source\n    event System.Action:Changed\n  class Derived\n    extends Source\n    func Read () → void\n      let copy = Changed")]
-    [InlineData("class Source\n    event System.Action:Changed\n  func Read (Source:value) → void\n    let copy = value.Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n  class Derived\n    extends Source\n    func Read () → void\n      !\n      let copy = Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n  func Read (Source:value) → void\n    !\n    let copy = value.Changed")]
     [InlineData("class Source\n    event System.Action:Changed\n    func Read static () → void\n      !\n      let copy = Changed")]
     [InlineData("class Source\n    event System.Action:Changed static\n    func Read (Source:value) → void\n      !\n      let copy = value.Changed")]
-    [InlineData("class Source\n    event System.Action:Changed static\n  func Read () → void\n    let copy = Source.Changed")]
-    [InlineData("class Source\n    event System.Action:Changed private\n  func Read (Source:value) → void\n    let copy = value.Changed")]
-    [InlineData("class Source\n    event System.Action:Changed\n    func Read () → void\n      let copy = Changed\n  class Source")]
+    [InlineData("class Source\n    event System.Action:Changed static\n  func Read () → void\n    !\n    let copy = Source.Changed")]
+    [InlineData("class Source\n    event System.Action:Changed private\n  func Read (Source:value) → void\n    !\n    let copy = value.Changed")]
+    [InlineData("class Source\n    event System.Action:Changed\n    func Read () → void\n      !\n      let copy = Changed\n  class Source")]
     [InlineData("func Read (System.ComponentModel.INotifyPropertyChanged:value) → void\n  !\n    let copy = value.PropertyChanged")]
     public void EventReadsOutsideLegalFieldLikeStorageDoNotAcquireCallableTypes(string declaration)
     {

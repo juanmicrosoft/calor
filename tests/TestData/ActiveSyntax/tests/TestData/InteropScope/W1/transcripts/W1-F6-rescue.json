@@ -7,7 +7,7 @@
       "Output: <dir>/Counter.calr"
     ],
     "stderr": [],
-    "calor": "module Counter overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      set Count (Count + 1)\n      return Count\n\n\n"
+    "calor": "module Counter overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      !\n      set Count (Count + 1)\n      return Count\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Counter.cs -o Counter.calr --format json",
@@ -81,7 +81,7 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "module ConvertedModule overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      set Count (Count + 1)\n      return Count\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      !\n      set Count (Count + 1)\n      return Count\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -104,6 +104,6 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "module ConvertedModule overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      set Count (Count + 1)\n      return Count\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      !\n      set Count (Count + 1)\n      return Count\n\n\n"
   }
 }

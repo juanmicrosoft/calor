@@ -1953,8 +1953,8 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("module Good\n  func Value () → int\n    !\n    return 1\n", false)]
-    [InlineData("// Header\nmodule Good\n  func Value () → int\n    return 1\n", false)]
-    [InlineData("// Header\nfunc Value () → int\n  return 1\n", true)]
+    [InlineData("// Header\nmodule Good\n  func Value () → int\n    !\n    return 1\n", false)]
+    [InlineData("// Header\nfunc Value () → int\n  !\n  return 1\n", true)]
     public void NativeReferenceExtraction_PreservesCommentsContextAndDocumentLine(string source, bool wrapped)
     {
         var doc = new DocFile("reference.md", "# Example\n```calor\n" + source + "```\n");

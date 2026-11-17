@@ -757,6 +757,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var source = $$"""
             module ArrayBcl
               func Caller public ({{sourceType}}:values) → void
+                ! fs:w
                 {{(locals ? "let first = values\n    let second = first" : "")}}
                 System.IO.File.WriteAllLines(contents: {{supplied}}, path: "not-executed.txt")
             """;
@@ -922,6 +923,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var source = $$"""
             module ExpandedArrays
               func Caller public ({{(nullable ? "string?" : "string")}}:later) → string
+                !
                 return System.IO.Path.Combine("a", "b", "c", "d", later)
             """;
         var (module, diagnostics) = Bind(source);
@@ -947,13 +949,16 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var source = $$"""
             module GenericArrayProducer
               func Take public (string[]:items) → int
+                !
                 return 1
               func Caller public ({{ArraySpelling(nullable ? 2 : 0)}}:values) → int
+                !
                 let string[]:legacy = System.Linq.Enumerable.ToArray(values)
                 let first = System.Linq.Enumerable.ToArray(values)
                 let second = first
                 return Take(second)
               func LegacyReturn public ({{ArraySpelling(nullable ? 2 : 0)}}:values) → string[]
+                !
                 return System.Linq.Enumerable.ToArray(values)
             """;
         var (module, diagnostics) = Bind(source);
@@ -1046,8 +1051,10 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
               class Foo public
                 field int:Value public
               func Take public ({{targetType}}:items) → int
+                !
                 return 1
               func Caller public ({{sourceType}}:value) → int
+                !
                 return Take(value)
             """;
         var (module, diagnostics) = Bind(source);
@@ -1071,8 +1078,10 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var source = $$"""
             module ArrayBoundaries
               func Take public ({{targetType}}:items) → int
+                !
                 return 1
               func Caller public ({{sourceType}}:value) → int
+                !
                 return Take(value)
             """;
         var (module, diagnostics) = Bind(source);

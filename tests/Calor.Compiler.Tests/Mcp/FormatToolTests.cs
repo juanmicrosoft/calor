@@ -73,7 +73,7 @@ public class FormatToolTests
             "module Test Test block\n" +
             "  func Foo () → void\n" +
             "    !\n" +
-            "    Console.WriteLine(\"missing effect\")\n";
+            "    Console.WriteLine(\"missing effect\")   \n";
 
         var result = await _checkTool.ExecuteAsync(CreateLintArgs(source, fix: false));
 

@@ -678,6 +678,7 @@ public class StructAndOperatorTests
                 field double:X public
                 field double:Y public
                 op + (int:a, int:b) → int
+                  ! unknown
                   requires a >= 0
                   return a + b
             """;
@@ -709,6 +710,7 @@ public class StructAndOperatorTests
               class Counter struct
                 field int:Value public
                 op + (int:a, int:b) → int
+                  ! unknown
                   => result >= 0
                   return a + b
             """;

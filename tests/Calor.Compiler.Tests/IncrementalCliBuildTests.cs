@@ -1275,7 +1275,7 @@ public sealed class NativeProjectCacheTests : IDisposable
         const string native = "module Left\n  func LeftValue public () → int\n    !\n    return 1\n";
         const string payload = "return 2;";
         var raw = "module Left\n  func LeftValue public () → int\n    !\n"
-            + $"    raw member:cache-proof:Other:opaque%20body {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+            + $"    raw member:post-validation-fallback:Other:opaque%20body {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
         Write("left", rawFirst ? raw : native);
         Write("right", "module Right\n  func RightValue public () → int\n    !\n    return 42\n");
         var initial = Run(enforceEffects: false);

@@ -134,7 +134,7 @@ public sealed class CrossModuleVarianceTests : IDisposable
     {
         var library = variant switch
         {
-            "private" => NativeLibrary.Replace("func Pick public (int:", "func Pick private (int:"),
+            "private" => NativeLibrary.Replace("func Pick public (int:value) → int\n      !\n", "func Pick private (int:value) → int\n"),
             "instance" => NativeLibrary.Replace("module Arithmetic public", "class Arithmetic public"),
             "static-initialization" => NativeLibrary.Replace("module Arithmetic public",
                 "module Arithmetic public\n    field string?:Seed public static = System.Console.ReadLine()"),
@@ -203,7 +203,7 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Write("caller", $$"""
             module Caller Consumer block
               module Entry public
-                func Probe public (Func<int>:callback {{(argumentRow is null ? "" : "! " + argumentRow)}}) → int
+                func Probe public (Func<int>:callback {{(argumentRow is null ? "! unknown" : "! " + argumentRow)}}) → int
                   ! cw
                   return Contracts.Callbacks.Apply(callback)
             """);
@@ -603,7 +603,7 @@ public sealed class CrossModuleVarianceTests : IDisposable
         Write("library", $$"""
             module Library Contracts block
               module Helpers public
-                func Write internal () → void
+                func Write {{(declared ? "public" : "internal")}} () → void
                   {{(declared ? "! cw" : "")}}
                   System.Console.WriteLine("value")
             """);
