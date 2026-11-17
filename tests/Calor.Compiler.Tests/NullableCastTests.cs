@@ -26,6 +26,7 @@ public class NullableCastTests
         return $$"""
             module Test
               func Main public (object:value) → object
+                !
                 {{body}}
             """;
     }

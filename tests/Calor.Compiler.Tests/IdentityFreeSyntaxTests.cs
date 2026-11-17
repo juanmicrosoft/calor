@@ -138,7 +138,7 @@ public sealed class IdentityFreeSyntaxTests
         Assert.All(lambdas, lambda => Assert.Single(lambda.StatementBody!));
         var inlineCreation = new NewExpressionNode(call.Span, call.TypeName, call.TypeArguments, lambdas);
         var inline = inlineCreation.Accept(new CalorEmitter());
-        var inlineModule = ParseCorpusShape("module Inline\n  func Build ()\n    let value = "
+        var inlineModule = ParseCorpusShape("module Inline\n  func Build ()\n    !\n    let value = "
             + inline.Replace("\n", "\n    ", StringComparison.Ordinal));
         var inlineCall = Assert.IsType<NewExpressionNode>(
             Assert.IsType<BindStatementNode>(Assert.Single(inlineModule.Functions).Body[0]).Initializer);

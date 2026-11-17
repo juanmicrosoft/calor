@@ -296,12 +296,10 @@ public sealed class ConfiguredAwaiterTests
               using System.Threading.Tasks
               using System.Collections.Generic
               func Receiver private (List<int>:trace) → Task<int>
-                ! mut{{(effectOnArgument ? "" : ", cw")}}
                 {{(effectOnArgument ? "" : "System.Console.Write(\"\")")}}
                 trace.Add(1)
                 return Task.FromResult(42)
               func Argument private (List<int>:trace) → bool
-                ! mut{{(effectOnArgument ? ", cw" : "")}}
                 {{(effectOnArgument ? "System.Console.Write(\"\")" : "")}}
                 trace.Add(2)
                 return false

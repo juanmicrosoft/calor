@@ -326,6 +326,7 @@ public class NullableReferenceTypingTests
             var module = new Parser(new Lexer($$"""
                 module NullableTyping NullableTyping
                   func Probe public ({{(nullable ? "string?" : "string")}}:value) → void
+                    ! alloc, mut
                     let List<string>:items = new List<string>{"seed"}
                 """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
             Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
@@ -786,6 +787,7 @@ public class NullableReferenceTypingTests
         var source = $$"""
             module Chain
               func Read (Node:input) → int?
+                !
                 return {{expression}}
             """;
         foreach (var text in RoundTrip(source))

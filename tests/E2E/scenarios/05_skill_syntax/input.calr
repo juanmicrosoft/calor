@@ -9,7 +9,6 @@ module SkillSyntax SkillSyntax block
       TestControlFlow()
 
     func TestArithmetic private () → void
-      ! cw
       Console.WriteLine("Testing arithmetic operators...")
 
     func Add (int:a, int:b) → int
@@ -25,7 +24,6 @@ module SkillSyntax SkillSyntax block
       return a * b
 
     func TestComparison private () → void
-      ! cw
       Console.WriteLine("Testing comparison operators...")
 
     func IsPositive (int:x) → bool
@@ -37,7 +35,6 @@ module SkillSyntax SkillSyntax block
       return x == 0
 
     func TestControlFlow private () → void
-      ! cw
       Console.WriteLine("Testing control flow...")
       for i from 1 to 5 step 1
         Console.WriteLine(i)

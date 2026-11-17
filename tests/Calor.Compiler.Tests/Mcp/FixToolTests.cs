@@ -186,7 +186,7 @@ public class FixToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "module Test\n  func Foo () → void\n    return\n"
+                "source": "module Test\n  func Foo () → void\n    !\n    return\n"
             }
             """).RootElement;
 

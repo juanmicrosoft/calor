@@ -750,6 +750,7 @@ public class ArrayToCollectionBindTests
         var source = $$"""
             module NativeBindings NativeBindings
               func Use () → void
+                !
                 let items = {{expression}}
             """;
         var diagnostics = Validate(source, strictInference);

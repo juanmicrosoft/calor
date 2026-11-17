@@ -33,6 +33,7 @@ public sealed class CanonicalParameterAttributeTests
             lines.Add(line);
             var header = line.TrimStart();
             if (header.StartsWith("func ", StringComparison.Ordinal)
+                || header.StartsWith("op ", StringComparison.Ordinal)
                 || header.StartsWith("delegate ", StringComparison.Ordinal))
                 lines.Add(new string(' ', line.Length - header.Length + (lines.Count == 1 ? 4 : 2))
                     + (header.StartsWith("delegate ", StringComparison.Ordinal) ? "! unknown" : "!"));

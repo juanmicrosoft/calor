@@ -97,6 +97,7 @@ public class AgentTaskReferenceTests
             // A complete module still needs semantic checking.
             module Wrong
               func Value () → int
+                !
                 return "wrong"
             ```
             """);
@@ -109,7 +110,7 @@ public class AgentTaskReferenceTests
         Assert.All(diagnostics, diagnostic =>
         {
             Assert.Equal(DiagnosticCode.DocDriftExampleCompileError, diagnostic.Code);
-            Assert.Equal(6, diagnostic.Span.Line);
+            Assert.Equal(7, diagnostic.Span.Line);
         });
     }
 

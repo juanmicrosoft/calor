@@ -175,8 +175,10 @@ public class OpaqueInteropOverloadTests
               class Logger
                 {{RawMember("public int Write(System.Exception? exception, params object?[]? values) => 1;")}}
                 func Write<T> public (System.Exception?:exception, T:values) → int
+                  !
                   return 2
                 func Probe public (object?[]?:values) → int
+                  !
                   {{(statement ? "" : "return ")}}this.Write((System.Exception?)null, values)
                   {{(statement ? "return 0" : "")}}
             """;
@@ -215,8 +217,10 @@ public class OpaqueInteropOverloadTests
               class Value
                 {{RawMember(preserved)}}
                 func Pick<T> public (T:value) → int
+                  !
                   return 2
                 func Probe public (int:value) → int
+                  !
                   return {{(explicitGeneric ? "Pick<int>" : "Pick")}}(value)
             """;
         var diagnostics = new DiagnosticBag();
@@ -247,8 +251,10 @@ public class OpaqueInteropOverloadTests
               class Value
                 {{RawMember("public int Pick(string value) => 1;")}}
                 func Pick<T> public (T:value) → int
+                  !
                   return 2
                 func Probe public () → int
+                  !
                   return Pick<int>("wrong")
             """;
         var diagnostics = new DiagnosticBag();
@@ -266,6 +272,7 @@ public class OpaqueInteropOverloadTests
                 pp true
                   {{RawMember("""public string Format(string? format, object? provider) => "";""")}}
                 func Format public () → string
+                  !
                   return Format(null, null)
             """;
         _ = Parse(source, new DiagnosticBag());
@@ -300,8 +307,10 @@ public class OpaqueInteropOverloadTests
               class Value
                 {{RawMember("string IFoo.Format(string value) => value;")}}
                 func Format public () → string
+                  !
                   return ""
                 func Probe public () → string
+                  !
                   return {{target}}("value")
             """;
         _ = Parse(source, new DiagnosticBag());
@@ -322,7 +331,7 @@ public class OpaqueInteropOverloadTests
     private static string RawMember(string payload)
     {
         // A synthetic SDK boundary, not a claim of converter-origin evidence.
-        var frame = new RawCSharpFrame(payload, "opaque-overload-fixture",
+        var frame = new RawCSharpFrame(payload, "method",
             "Synthetic SDK preservation boundary", InteropMemberKind.Method);
         return $"raw {frame.ReasonMarker} {Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
     }

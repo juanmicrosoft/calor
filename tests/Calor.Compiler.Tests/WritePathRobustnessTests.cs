@@ -19,11 +19,11 @@ public class WritePathRobustnessTests
     [Fact]
     public void CanonicalHealing_AlignsWordClausesAndReportsAmbiguity()
     {
-        const string source = "module M\n    func F () → int\n      !\n        if true\n            return 1\n            else\n            return 2";
+        const string source = "module M\n    func F () → int\n        !\n        if true\n            return 1\n            else\n            return 2";
         var healer = new SourceHealer();
         var healed = healer.Heal(source);
-        Assert.Equal("module M\n  func F () → int\n    if true\n      return 1\n    else\n      return 2", healed);
-        Assert.Contains(healer.Ambiguities, ambiguity => ambiguity.Line == 6);
+        Assert.Equal("module M\n  func F () → int\n    !\n    if true\n      return 1\n    else\n      return 2", healed);
+        Assert.Contains(healer.Ambiguities, ambiguity => ambiguity.Line == 7);
         Assert.Equal(healed, healer.Heal(healed));
         Assert.Empty(healer.Ambiguities);
     }
@@ -121,7 +121,7 @@ public class WritePathRobustnessTests
     [Fact]
     public void TabIndentation_ReportsSingleWarning_WithEditsForEveryTabLine()
     {
-        var source = "module T\n\tfunc Main () → void\n\t  !\n\t\tSystem.Console.WriteLine(\"x\")";
+        var source = "module T\n\tfunc Main () → void\n\t\t! cw\n\t\tSystem.Console.WriteLine(\"x\")";
 
         var diagnostics = ParseSource(source);
 
@@ -130,11 +130,11 @@ public class WritePathRobustnessTests
             d => d.Code == DiagnosticCode.TabIndentation);
         var withFix = Assert.Single(diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.TabIndentation);
-        Assert.Equal(2, withFix.Fix.Edits.Count);
-        Assert.Contains("2 line(s)", warning.Message);
+        Assert.Equal(3, withFix.Fix.Edits.Count);
+        Assert.Contains("3 line(s)", warning.Message);
 
         var healed = ApplyAllFixes(source, diagnostics);
-        Assert.Equal("module T\n  func Main () → void\n    System.Console.WriteLine(\"x\")", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"x\")", healed);
 
         var recheck = ParseSource(healed);
         Assert.False(recheck.HasErrors);
@@ -145,7 +145,7 @@ public class WritePathRobustnessTests
     public void MixedIndentation_ReportsError_WithFixThatHeals()
     {
         // Body line indented with tab + 2 spaces (3 columns, mixed).
-        var source = "module T\n  func Main () → void\n\t  System.Console.WriteLine(\"x\")";
+        var source = "module T\n  func Main () → void\n    ! cw\n\t  System.Console.WriteLine(\"x\")";
 
         var diagnostics = ParseSource(source);
 
@@ -155,24 +155,24 @@ public class WritePathRobustnessTests
         Assert.Single(withFix.Fix.Edits);
 
         var healed = ApplyAllFixes(source, diagnostics);
-        Assert.Equal("module T\n  func Main () → void\n    System.Console.WriteLine(\"x\")", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"x\")", healed);
         Assert.False(ParseSource(healed).HasErrors);
     }
 
     [Fact]
     public void NonStandardIndentWidth_FourSpaceFile_FixNormalizesInOnePass()
     {
-        var source = "module T\n    func Main () → void\n      !\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
+        var source = "module T\n    func Main () → void\n        ! cw\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
 
         var diagnostics = ParseSource(source);
 
         Assert.False(diagnostics.HasErrors); // 4-space parses; canonical width is advisory
         var withFix = Assert.Single(diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.NonStandardIndentWidth);
-        Assert.Equal(3, withFix.Fix.Edits.Count); // function line + both statement siblings
+        Assert.Equal(4, withFix.Fix.Edits.Count); // function line + effect row + both statement siblings
 
         var healed = ApplyAllFixes(source, diagnostics);
-        Assert.Equal("module T\n  func Main () → void\n    System.Console.WriteLine(\"a\")\n    System.Console.WriteLine(\"b\")", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"a\")\n    System.Console.WriteLine(\"b\")", healed);
 
         var recheck = ParseSource(healed);
         Assert.False(recheck.HasErrors);
@@ -184,7 +184,7 @@ public class WritePathRobustnessTests
     {
         // Third statement dedents to column 3 — matches no enclosing level
         // (levels are 0/2/4). The fix snaps to the deeper level (4).
-        var source = "module T\n  func Main () → void\n    System.Console.WriteLine(\"a\")\n   System.Console.WriteLine(\"b\")";
+        var source = "module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"a\")\n   System.Console.WriteLine(\"b\")";
 
         var diagnostics = ParseSource(source);
 
@@ -284,22 +284,22 @@ public class WritePathRobustnessTests
     [Fact]
     public void Heal_TabIndentation_NormalizesToTwoSpaces()
     {
-        var source = "module T\n\tfunc Main () → void\n\t  !\n\t\tSystem.Console.WriteLine(\"x\")";
+        var source = "module T\n\tfunc Main () → void\n\t\t! cw\n\t\tSystem.Console.WriteLine(\"x\")";
 
         var healed = new SourceHealer().Heal(source);
 
-        Assert.Equal("module T\n  func Main () → void\n    System.Console.WriteLine(\"x\")", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"x\")", healed);
         Assert.False(ParseSource(healed).HasErrors);
     }
 
     [Fact]
     public void Heal_FourSpaceIndentation_NormalizesToTwoSpaces()
     {
-        var source = "module T\n    func Main () → void\n      !\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
+        var source = "module T\n    func Main () → void\n        ! cw\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
 
         var healed = new SourceHealer().Heal(source);
 
-        Assert.Equal("module T\n  func Main () → void\n    System.Console.WriteLine(\"a\")\n    System.Console.WriteLine(\"b\")", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"a\")\n    System.Console.WriteLine(\"b\")", healed);
     }
 
     [Fact]
@@ -334,6 +334,7 @@ public class WritePathRobustnessTests
         var expected = string.Join('\n',
             "module T",
             "  func Main () → void",
+            "    !",
             "    if 1 == 1",
             "      System.Console.WriteLine(\"a\")",
             "    else if 1 == 2",
@@ -358,6 +359,7 @@ public class WritePathRobustnessTests
         var expected = string.Join('\n',
             "module T",
             "  func Main () → void",
+            "    !",
             "    if 1 == 1",
             "      System.Console.WriteLine(\"a\")",
             "    else if 1 == 2",
@@ -384,14 +386,15 @@ public class WritePathRobustnessTests
         var healed = healer.Heal(source);
 
         var ambiguity = Assert.Single(healer.Ambiguities);
-        Assert.Equal(6, ambiguity.Line);
+        Assert.Equal(7, ambiguity.Line);
         Assert.Contains("'else'", ambiguity.Message);
-        Assert.Contains("line 5", ambiguity.Message);
+        Assert.Contains("line 6", ambiguity.Message);
 
         // The guess itself: the call printing "b" healed into the else-if body.
         var expected = string.Join('\n',
             "module T",
             "  func Main () → void",
+            "    !",
             "    if 1 == 1",
             "      System.Console.WriteLine(\"a\")",
             "    else if 1 == 2",
@@ -459,7 +462,7 @@ public class WritePathRobustnessTests
 
         var healed = new SourceHealer().Heal(source);
 
-        Assert.Equal("module T\n  func Main () → void\n    System.Console.WriteLine(\"x\")\n", healed);
+        Assert.Equal("module T\n  func Main () → void\n    !\n    System.Console.WriteLine(\"x\")\n", healed);
     }
 
     [Fact]

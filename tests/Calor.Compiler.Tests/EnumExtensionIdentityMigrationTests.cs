@@ -301,7 +301,7 @@ public sealed class EnumExtensionIdentityMigrationTests : IDisposable
 
     [Theory]
     [InlineData("class Owner\n    module Nested\n      func Read (this Mode:self) → int\n        !\n        return 7")]
-    [InlineData("module Owner<T>\n    func Read (this Mode:self) → int\n      return 7")]
+    [InlineData("module Owner<T>\n    func Read (this Mode:self) → int\n      !\n      return 7")]
     public void NativeExtensionOwnersStillRejectNestedAndGenericContainers(string declaration)
     {
         var compiled = Program.Compile("module Native\n  enum Mode\n    First\n  " + declaration);

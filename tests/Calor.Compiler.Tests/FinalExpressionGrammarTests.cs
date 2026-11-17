@@ -960,7 +960,7 @@ public sealed class FinalExpressionGrammarTests
     {
         var source = $"""
             module NativeLambdaRows
-              func Build (Action<int>:log ! cw) → Action<int>
+              func Build (Action<int>:log ! cw) → Action<int> ! cw
                 ! cw
                 return (int:x) ! {row} => log(x)
             """;

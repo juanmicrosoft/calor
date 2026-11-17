@@ -168,7 +168,7 @@ public class LocalFunctionLanguageTests
                   return AddN(1)
             """;
         var compilation = CompileNative(source, "cap.calr",
-            new CompilationOptions { StatusWriter = TextWriter.Null });
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.Contains(compilation.Diagnostics.Errors,
             d => d.Code == "Calor1002" && d.Message.Contains("CS8820"));
     }
@@ -251,7 +251,7 @@ public class LocalFunctionLanguageTests
                   return L()
             """;
         var compilation = CompileNative(source, "r1b.calr",
-            new CompilationOptions { StatusWriter = TextWriter.Null });
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.Contains(compilation.Diagnostics.Errors,
             d => d.Code == "Calor1002" && d.Message.Contains("CS8820"));
     }
@@ -385,7 +385,7 @@ public class LocalFunctionLanguageTests
                   return L()
             """;
         var compilation = CompileNative(source, "r2b.calr",
-            new CompilationOptions { StatusWriter = TextWriter.Null });
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.Contains(compilation.Diagnostics.Errors,
             d => d.Code == "Calor1002" && d.Message.Contains("CS8820"));
     }

@@ -33,7 +33,7 @@ public class LspMcpToolsTests
     public async Task GotoDefinition_FindsFunction()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 13, column: 6, action: "definition"); // "greet" on function definition
+        var args = CreateArgs(SampleSource, line: 10, column: 9, action: "definition"); // "greet" on function definition
 
         var result = await tool.ExecuteAsync(args);
 
@@ -48,7 +48,7 @@ public class LspMcpToolsTests
     public async Task GotoDefinition_FindsParameter()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "definition"); // "total" parameter
+        var args = CreateArgs(SampleSource, line: 2, column: 32, action: "definition"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -63,7 +63,7 @@ public class LspMcpToolsTests
     public async Task GotoDefinition_FindsClass()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 8, column: 7, action: "definition"); // "Item" class
+        var args = CreateArgs(SampleSource, line: 6, column: 10, action: "definition"); // "Item" class
 
         var result = await tool.ExecuteAsync(args);
 
@@ -115,16 +115,14 @@ public class LspMcpToolsTests
         Assert.True(output.GetProperty("found").GetBoolean());
         Assert.Equal("calculateTotal", output.GetProperty("name").GetString());
         Assert.Equal("function", output.GetProperty("kind").GetString());
-        // Type can be returned as "FLOAT" or "f64" depending on normalization
-        var typeVal = output.GetProperty("type").GetString();
-        Assert.True(typeVal == "f64" || typeVal == "FLOAT", $"Expected f64 or FLOAT, got {typeVal}");
+        Assert.Equal("double", output.GetProperty("type").GetString());
     }
 
     [Fact]
     public async Task SymbolInfo_ReturnsClassInfo()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 8, column: 7, action: "info"); // "Item" class
+        var args = CreateArgs(SampleSource, line: 6, column: 10, action: "info"); // "Item" class
 
         var result = await tool.ExecuteAsync(args);
 
@@ -140,7 +138,7 @@ public class LspMcpToolsTests
     public async Task SymbolInfo_ReturnsFieldInfo()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 9, column: 17, action: "info"); // "Price" field
+        var args = CreateArgs(SampleSource, line: 7, column: 19, action: "info"); // "Price" field
 
         var result = await tool.ExecuteAsync(args);
 
@@ -149,9 +147,7 @@ public class LspMcpToolsTests
         Assert.True(output.GetProperty("found").GetBoolean());
         Assert.Equal("Price", output.GetProperty("name").GetString());
         Assert.Equal("field", output.GetProperty("kind").GetString());
-        // Type can be returned as "FLOAT" or "f64" depending on normalization
-        var typeVal = output.GetProperty("type").GetString();
-        Assert.True(typeVal == "f64" || typeVal == "FLOAT", $"Expected f64 or FLOAT, got {typeVal}");
+        Assert.Equal("double", output.GetProperty("type").GetString());
     }
 
     #endregion
@@ -339,7 +335,7 @@ public class LspMcpToolsTests
     public async Task FindReferences_FindsAllUsages()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "references"); // "total" parameter
+        var args = CreateArgs(SampleSource, line: 2, column: 32, action: "references"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -357,7 +353,7 @@ public class LspMcpToolsTests
     public async Task FindReferences_MarksDefinition()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "references"); // "total" parameter
+        var args = CreateArgs(SampleSource, line: 2, column: 32, action: "references"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -382,7 +378,7 @@ public class LspMcpToolsTests
     public async Task FindReferences_ExcludesDefinition_WhenRequested()
     {
         var tool = new NavigateTool();
-        var args = CreateFindReferencesArgs(SampleSource, 3, 17, includeDefinition: false);
+        var args = CreateFindReferencesArgs(SampleSource, 2, 32, includeDefinition: false);
 
         var result = await tool.ExecuteAsync(args);
 

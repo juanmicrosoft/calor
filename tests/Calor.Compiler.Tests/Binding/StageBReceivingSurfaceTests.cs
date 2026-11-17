@@ -136,6 +136,7 @@ public sealed class StageBReceivingSurfaceTests
             module UnsupportedPayload UnsupportedPayload block
               using System.Collections.Generic
               func Probe public ({{input}}:value) → void
+                !
                 let {{target}}:required = value
             """;
     }

@@ -9,22 +9,18 @@ module TypeSystem TypeSystem block
       TestFailure()
 
     func TestPresent private () → void
-      ! cw
       let int?:value = 42
       Console.WriteLine(value ?? 0)
 
     func TestMissing private () → void
-      ! cw
       let int?:value = null
       Console.WriteLine(value ?? -1)
 
     func TestSuccess private () → void
-      ! cw
       let int:value = 100
       Console.WriteLine(value)
 
     func TestFailure private () → void
-      ! cw, alloc, throw
       try
         throw new InvalidOperationException("Something went wrong")
       catch InvalidOperationException:error

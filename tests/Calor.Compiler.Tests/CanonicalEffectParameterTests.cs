@@ -115,7 +115,8 @@ public sealed class CanonicalEffectParameterTests
                 .InferredRow.ToCompactDisplayString());
         }
         var unknown = Program.Compile(AppendMethods(converted, $"""
-            func Unknown ({callbackType}:callback)
+            func Unknown ({callbackType}:callback ! unknown)
+              !
               Run(callback)
             """));
         Assert.True(unknown.HasErrors);
