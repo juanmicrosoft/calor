@@ -93,6 +93,12 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
         if (!_projections.TryGetValue(mode, out var projections))
         {
             var emitted = new List<SourceProjection>();
+            // Qualify cross-module calls exactly as the driver's emission does. An
+            // unqualified call into another module is CS0103 in its companion, and
+            // any companion error voids every Roslyn proof in the file being bound.
+            var crossModuleFunctions = _sourcePaths.Count > 1
+                ? CompilationDriver.BuildCrossModuleFunctionMap(_sourcePaths.Keys.ToList())
+                : null;
             foreach (var (module, path) in _sourcePaths)
             {
                 var callables = new List<AstNode>();
@@ -100,6 +106,7 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
                 var diagnostics = new DiagnosticBag();
                 var emitter = new CSharpEmitter(mode, null, null, diagnostics: diagnostics)
                 {
+                    CrossModuleFunctionModules = crossModuleFunctions,
                     AnnotateSource = (_, text) => text,
                     CallableOrigin = declaration =>
                     {

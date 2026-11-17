@@ -289,7 +289,8 @@ public sealed class CallGraphAnalysis
 
     internal static OperatorBindings ResolveOperatorCalls(ModuleNode module, DiagnosticBag? diagnostics = null,
         ContractMode contractMode = ContractMode.Debug, bool singleModuleContext = true,
-        ISourceBindingContext? crossModuleTypes = null, string? sourcePath = null)
+        ISourceBindingContext? crossModuleTypes = null, string? sourcePath = null,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions = null)
     {
         var bindings = new OperatorBindings();
         var types = bindings.ResultTypes;
@@ -420,6 +421,9 @@ public sealed class CallGraphAnalysis
         var emissionDiagnostics = new DiagnosticBag();
         var emitter = new CSharpEmitter(contractMode, null, null, diagnostics: emissionDiagnostics)
         {
+            // Qualify cross-module calls as the real emission does, so a call into a
+            // companion module binds instead of failing the whole projection.
+            CrossModuleFunctionModules = crossModuleFunctions,
             AnnotateSource = (expression, text) =>
             {
                 var index = expressions.Count;
@@ -2731,7 +2735,8 @@ public sealed class CallGraphAnalysis
 
         var operatorBindings = ResolveOperatorCalls(ast, contractMode: projectionContractMode,
             singleModuleContext: crossModuleFunctions == null,
-            crossModuleTypes: crossModuleTypes, sourcePath: sourcePath);
+            crossModuleTypes: crossModuleTypes, sourcePath: sourcePath,
+            crossModuleFunctions: crossModuleFunctions);
         foreach (var (site, call) in boundValues.ComputedMemberCalls)
         {
             if (call.SourceStaticMethodOwner is not { } owner)
