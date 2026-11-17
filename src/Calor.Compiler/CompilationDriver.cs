@@ -862,6 +862,7 @@ internal static class CompilationDriver
         var modules = new List<ModuleNode>();
         var parsedSources = new List<(ModuleNode Module, string Path)>();
         var sourceHashes = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
+        var texts = new List<string>();
         foreach (var file in sources)
         {
             try
@@ -877,14 +878,17 @@ internal static class CompilationDriver
                 {
                     continue;
                 }
-                Ids.DeclarationIdentityStore.AttachIfRegistered(file.FullName, text, module);
                 modules.Add(module);
                 parsedSources.Add((module, file.FullName));
+                texts.Add(text);
             }
             catch (IOException)
             {
             }
         }
+        // One reconciliation per identity store, not one per file (each re-parsed every source).
+        Ids.DeclarationIdentityStore.AttachAllIfRegistered(
+            parsedSources.Select((parsed, index) => (parsed.Path, texts[index], parsed.Module)));
 
         types = CrossModuleTypeRegistry.Build(parsedSources, sourceHashes);
         return BuildCrossModuleFunctionMap(modules);
