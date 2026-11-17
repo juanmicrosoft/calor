@@ -75,6 +75,7 @@ public sealed class CanonicalDeclarationIdentityTests : IDisposable
             module Native
               class Counter
                 op + (Counter:a, Counter:b) → Counter
+                  !
                   return a
                 this[int:i] → int
                   get

@@ -93,9 +93,16 @@ public sealed class InitializationBoundaryRegressionTests
             });
             if (staticInitializer)
             {
-                Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                // The preserved static initializer has no contract, so the converter writes the
+                // sound `! unknown` row on Run (0.30). A pure claim must still be refused, with
+                // the preserved type initializer named as the unknown operation.
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+                Assert.Contains("! unknown", source);
+                var pure = Program.Compile(source.Replace("! unknown", "!", StringComparison.Ordinal), null,
+                    new CompilationOptions { EnableTypeChecking = typed, StatusWriter = TextWriter.Null });
+                Assert.Contains(pure.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
                     && diagnostic.Message.Contains("Holder..cctor", StringComparison.Ordinal));
-                Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                Assert.Contains(pure.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
                     && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
             }
             else

@@ -36,12 +36,12 @@ public sealed class LoopDiscoveryRollbackTests
 
     private static string Local(string owner, string snapshot, string kind, string name, int start) =>
         owner + "/snapshot/" + snapshot + "/" + kind + "/" + Uri.EscapeDataString("name:" +
-            System.Text.Json.JsonSerializer.Serialize(new { name, typeName = "INT", Start = start }));
+            System.Text.Json.JsonSerializer.Serialize(new { name, typeName = "int", Start = start }));
 
     [Fact]
     public void NestedLoops_DoNotLeakDiscoveryDeclarationIds()
     {
-        var bound = Bind("""
+        const string source = """
             module Nested Nested block
               func Run (int:n) → int
                 !
@@ -55,7 +55,8 @@ public sealed class LoopDiscoveryRollbackTests
                   let int:a = k
                   set total (total + a)
                 return total
-            """);
+            """;
+        var bound = Bind(source);
 
         // Distinct source offsets distinguish the two locals named `a`.
         // Discovery must not register extra instances or duplicate suffixes.
@@ -65,13 +66,16 @@ public sealed class LoopDiscoveryRollbackTests
         [
             run + "/parameter/name%3An",
             run,
-            Local(run, snapshot, "local", "total", 48),
-            Local(run, snapshot, "for", "i", 68),
-            Local(run, snapshot, "local", "a", 86),
-            Local(run, snapshot, "for", "j", 104),
-            Local(run, snapshot, "local", "a2", 124),
-            Local(run, snapshot, "for", "k", 182),
-            Local(run, snapshot, "local", "a", 200),
+            // 0.30 binds the postcondition `result` pseudo-variable for every function.
+            run + "/snapshot/" + snapshot + "/contract-result/" + Uri.EscapeDataString("name:" +
+                System.Text.Json.JsonSerializer.Serialize(new { name = "result", typeName = "int", Start = 0 })),
+            Local(run, snapshot, "local", "total", source.IndexOf("total", StringComparison.Ordinal)),
+            Local(run, snapshot, "for", "i", source.IndexOf("i from", StringComparison.Ordinal)),
+            Local(run, snapshot, "local", "a", source.IndexOf("a = i", StringComparison.Ordinal)),
+            Local(run, snapshot, "for", "j", source.IndexOf("j from", StringComparison.Ordinal)),
+            Local(run, snapshot, "local", "a2", source.IndexOf("a2", StringComparison.Ordinal)),
+            Local(run, snapshot, "for", "k", source.IndexOf("k from", StringComparison.Ordinal)),
+            Local(run, snapshot, "local", "a", source.IndexOf("a = k", StringComparison.Ordinal)),
         ];
         Assert.True(expected.SequenceEqual(bound.SymbolsById.Keys.Select(id => id.Value)),
             string.Join("\n", bound.SymbolsById.Keys.Select(id => id.Value)));

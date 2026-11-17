@@ -52,9 +52,16 @@ public sealed class CanonicalMultiFileFunctionTests
     [Fact]
     public void MissingCrossModuleEffectRowsSuggestOnlyTheNativeSyntax()
     {
-        var result = Program.Compile("module Orders\n  func SaveOrder () → int\n    !\n    return 41");
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
-        var registry = CrossModuleEffectRegistry.Build([(result.Ast!, "Orders.calr")]);
+        // A public function without a row no longer compiles (Calor0124), so the registry's
+        // Calor0417 path is reached only from a parsed-but-rejected module (editor, index).
+        // Its suggestion must still teach the native row.
+        var parseDiagnostics = new DiagnosticBag();
+        var module = new Calor.Compiler.Parsing.Parser(
+            new Calor.Compiler.Parsing.Lexer("module Orders\n  func SaveOrder () → int\n    return 41", parseDiagnostics)
+                .TokenizeAllForParser(),
+            parseDiagnostics).Parse();
+        Assert.Contains(parseDiagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.MissingBoundaryEffectRow);
+        var registry = CrossModuleEffectRegistry.Build([(module, "Orders.calr")]);
         var diagnostic = Assert.Single(registry.BuildDiagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.UndeclaredPublicFunction);
         Assert.Contains("indented ! row", diagnostic.Message);
