@@ -1020,6 +1020,9 @@ public class Program
         var verifyRejectedRuntimeQuantifier = CanVerifyRejectedRuntimeQuantifier();
         if (diagnostics.HasErrors && !verifyRejectedRuntimeQuantifier)
         {
+            // Every earlier error returned above, so these came from effect enforcement.
+            // They must not hide contract type errors (a non-boolean precondition).
+            new ContractVerifier(diagnostics, binder).Verify(ast);
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
         }
