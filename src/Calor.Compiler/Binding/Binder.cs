@@ -4328,29 +4328,30 @@ public sealed class Binder
     /// Returns a pair (declared-shape label, fix-hint label) that mirrors
     /// the target's actual shape so messages read naturally at each of
     /// the three emit sites (S3 bind, S4 return, S4 call). Scalar STRING
-    /// yields <c>'string'</c> / <c>'?string'</c>, array yields
-    /// <c>'string[]'</c> / <c>'[?string]'</c>, generic yields
-    /// <c>'List&lt;string&gt;'</c> / <c>'List&lt;?string&gt;'</c>
+    /// yields <c>'string'</c> / <c>'string?'</c>, array yields
+    /// <c>'string[]'</c> / <c>'string?[]'</c>, generic yields
+    /// <c>'List&lt;string&gt;'</c> / <c>'List&lt;string?&gt;'</c>
     /// (spelled with the definition's short name so it matches what the
-    /// user wrote).
+    /// user wrote). Fix hints use the native suffix spelling (0.30); the
+    /// retired prefix form '?T' no longer parses.
     /// </summary>
     private static (string TargetShapeLabel, string FixHintLabel) DescribeStringTargetShape(BoundTypes.BoundType stringTarget)
     {
         return stringTarget switch
         {
-            BoundTypes.ArrayBoundType => ("'string[]'", "'[?string]'"),
+            BoundTypes.ArrayBoundType => ("'string[]'", "'string?[]'"),
             BoundTypes.GenericInstantiationBoundType g =>
                 (
                     $"'{ShortGenericName(g.Definition.QualifiedName)}<string>'",
-                    $"'{ShortGenericName(g.Definition.QualifiedName)}<?string>'"
+                    $"'{ShortGenericName(g.Definition.QualifiedName)}<string?>'"
                 ),
             // v0.14 §S8 — user-declared reference types echo their own name
-            // in the message so users see 'Foo' / '?Foo' rather than the
+            // in the message so users see 'Foo' / 'Foo?' rather than the
             // scalar-STRING boilerplate. Distinguished by QualifiedName not
             // matching the STRING aliases.
             BoundTypes.NominalBoundType n when n.QualifiedName is not ("STRING" or "string" or "str" or "System.String") =>
-                ($"'{n.QualifiedName}'", $"'?{n.QualifiedName}'"),
-            _ => ("'string'", "'?string'"),
+                ($"'{n.QualifiedName}'", $"'{n.QualifiedName}?'"),
+            _ => ("'string'", "'string?'"),
         };
     }
 
@@ -6486,10 +6487,11 @@ public sealed class Binder
         var parameters = new List<VariableSymbol>(lambda.Parameters.Count);
         foreach (var (parameter, index) in lambda.Parameters.Select((parameter, index) => (parameter, index)))
         {
+            var contextual = parameter.TypeName is null && targetType is not null
+                && index < targetType.ParameterTypes.Length ? targetType.ParameterTypes[index] : null;
             var symbol = CreateLocalVariable(
                 parameter.Name,
-                parameter.TypeName ?? (targetType is not null && index < targetType.ParameterTypes.Length
-                    ? targetType.ParameterTypes[index].DisplayString : "OBJECT"),
+                parameter.TypeName ?? contextual?.DisplayString ?? "OBJECT",
                 isMutable: false,
                 isParameter: true,
                 ParameterModifier.None,
@@ -6498,7 +6500,14 @@ public sealed class Binder
                 // v0.14 nullability workstream (task #3) — inherit
                 // declared STRING nullability on lambda parameters.
                 // Scoped to STRING per §D6; non-STRING keeps Oblivious.
-                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName));
+                // An untyped parameter takes the selected delegate's STRING
+                // annotation (0.30: String instance receivers must be proven).
+                nullableAnnotation: contextual is BoundTypes.NominalBoundType
+                    {
+                        QualifiedName: "STRING" or "string" or "str" or "System.String"
+                    } contextualString
+                    ? contextualString.NullableAnnotation
+                    : TryReadDeclaredStringAnnotation(parameter.TypeName));
             if (!_scope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
