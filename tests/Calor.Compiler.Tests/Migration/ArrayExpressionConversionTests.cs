@@ -2540,26 +2540,47 @@ public class ArrayExpressionConversionTests
     [InlineData("field int:Other public static = @null")]
     public void SourceStaticArrayFields_DoNotHideUnboundInitialization(string other)
     {
-        var source = $$"""
-            module StaticFields
-              class Holder
-                field int:Value public static = 9
-                field int:@null public static = 1
-                {{other}}
-                func Make public static () → int[]
-                  ! alloc
-                  return new int[1]
-              func Read () → int
-                !
-                return Holder.Value
-            """;
+        // 0.30: source initialization is now selected by bound declaration identity, so
+        // `Make()` (a source method declaring `! alloc`) and `@null` (the escaped field above)
+        // are bound like `new object()`: the read is charged exactly what initialization does.
+        // Only the metadata getter remains unproved and is charged Unknown.
+        if (other == "field int:Other public static = @null")
+        {
+            var bound = Program.Compile(UnboundInitializerSource(other), "bound-escaped-field.calr",
+                new CompilationOptions { StatusWriter = TextWriter.Null });
+            Assert.False(bound.HasErrors, string.Join(Environment.NewLine, bound.Diagnostics.Errors));
+            Assert.DoesNotContain(bound.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.Equal("9", Run(bound.GeneratedCode,
+                "public static class Probe { public static string Run() => GlobalModule.Read().ToString(); }"));
+            return;
+        }
+        AssertUnboundInitialization(other);
+    }
+
+    private static string UnboundInitializerSource(string other) => $$"""
+        module StaticFields
+          class Holder
+            field int:Value public static = 9
+            field int:@null public static = 1
+            {{other}}
+            func Make public static () → int[]
+              ! alloc
+              return new int[1]
+          func Read () → int
+            !
+            return Holder.Value
+        """;
+
+    private static void AssertUnboundInitialization(string other)
+    {
+        var source = UnboundInitializerSource(other);
         var parseDiagnostics = new DiagnosticBag();
         _ = new Parser(new Lexer(source, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics).Parse();
         Assert.False(parseDiagnostics.HasErrors, string.Join(Environment.NewLine, parseDiagnostics.Errors));
         var result = Program.Compile(source, "unbound-static-initializer.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);
-        if (other == "field object:Other public static = new object()")
+        if (other is "field object:Other public static = new object()" or "field int[]:Other public static = Make()")
         {
             var error = Assert.Single(result.Diagnostics.Errors);
             Assert.Equal(DiagnosticCode.ForbiddenEffect, error.Code);
@@ -2702,10 +2723,20 @@ public class ArrayExpressionConversionTests
         var conversion = new CSharpToCalorConverter().Convert(original);
         Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
         Assert.Empty(conversion.Losses);
+        // 0.30 (R1): the static constructor now declares its own row, so the converter writes
+        // `! cw` on it instead of failing Calor0422. Enforcement is retained: a static-field
+        // read still runs the constructor, so the reader must declare cw too.
+        Assert.Matches(@"(?m)^\s*ctor stat \(\)\r?\n\s*! cw\r?$", conversion.CalorSource!);
         var result = Program.Compile(conversion.CalorSource!, "static-constructor-field.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Contains(result.Diagnostics.Errors,
-            error => error.Code == DiagnosticCode.ConstructorEffectContractUnavailable);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        var undeclared = Regex.Replace(conversion.CalorSource!,
+            @"(func Read \(\) → int\r?\n\s*)! cw", "$1!");
+        Assert.NotEqual(conversion.CalorSource, undeclared);
+        var rejected = Program.Compile(undeclared, "static-constructor-field.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(rejected.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'cw'", StringComparison.Ordinal));
     }
 
     [Theory]

@@ -643,8 +643,9 @@ public class CSharpInteropBlockTests
         var healer = new Calor.Compiler.Formatting.SourceHealer();
         var healed = healer.Heal(source);
         var ambiguity = Assert.Single(healer.Ambiguities);
-        Assert.Equal(10, ambiguity.Line);
-        Assert.Contains("line 9", ambiguity.Message);
+        // The `!` row line (added in 0.30) moves the ambiguous `else if` to line 11.
+        Assert.Equal(11, ambiguity.Line);
+        Assert.Contains("line 10", ambiguity.Message);
         var tokens = new Lexer(healed, new DiagnosticBag()).TokenizeAll();
         Assert.Equal(payload, Assert.IsType<RawCSharpFrame>(
             Assert.Single(tokens.Where(t => t.Value is RawCSharpFrame)).Value).Code);

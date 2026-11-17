@@ -184,6 +184,7 @@ public class InitializerConversionTests
                 {{(inherited ? "extends Storage" : "field int:Value")}}
               class Source
                 op implicit (Source:value) → Box
+                  ! alloc, mut
                   return new Box() { Value = 7 }
             """;
         var generated = Compile(source, enforceEffects: true);
@@ -212,10 +213,16 @@ public class InitializerConversionTests
                 {{member}}
               class Source
                 op implicit (Source:value) → Box
+                  ! alloc, mut
                   return new Box() { Value = 7 }
             """;
+        // 0.30: the operator declares its own row (here the creation's intrinsic alloc, mut),
+        // so an effectful or unknown setter is an undeclared effect on the operator (Calor0410).
         var generated = Compile(source, enforceEffects: true);
-        Assert.Contains(generated.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0423");
+        Assert.Contains(generated.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0410"
+            && diagnostic.Message.Contains("op_Implicit", StringComparison.Ordinal)
+            && (diagnostic.Message.Contains("'cw'", StringComparison.Ordinal)
+                || diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal)));
     }
 
     [Theory]
@@ -236,10 +243,14 @@ public class InitializerConversionTests
                   return 7
               class Source
                 op implicit (Source:value) → Box
+                  ! alloc, mut
                   return new Box() { Value = {{(constructorEffect ? "7" : "Effects.Next()")}} }
             """;
+        // 0.30: the constructor's or the value's cw is charged to the operator's declared row.
         var generated = Compile(source, enforceEffects: true);
-        Assert.Contains(generated.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0423");
+        Assert.Contains(generated.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0410"
+            && diagnostic.Message.Contains("op_Implicit", StringComparison.Ordinal)
+            && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
     }
 
     // ---- #1595: parser -----------------------------------------------------------------------
@@ -311,7 +322,7 @@ public class InitializerConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         Assert.Empty(result.Context.Losses);
         var calor = result.CalorSource!;
-        var parsed = AssertShape(result, 38, 4, 0, 7);
+        var parsed = AssertShape(result, 39, 4, 0, 7); // 0.30: + the `!` row on Get
         var holder = Assert.Single(parsed.Classes, type => type.Name == "Holder");
         var nested = Assert.IsType<NewExpressionNode>(
             Assert.Single(holder.Fields, field => field.Name == "X").DefaultValue);
@@ -359,7 +370,8 @@ public class InitializerConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         var feature = reason is "dictionary-initializer" or "conditional-expression-hoisting"
             ? reason : "initializer-interop";
-        var parsed = AssertShape(result, 81, 3, 0, 14, "explicit-interface", feature);
+        // 0.30: the scaffold's three pure boundaries (GetEnumerator, Take, Take2) now print `!`.
+        var parsed = AssertShape(result, 84, 3, 0, 14, "explicit-interface", feature);
         AssertFieldAccesses(parsed, "ref(_items).Add", "ref(_items).GetEnumerator", "ref(o).V");
         AssertOriginalPayloads(parsed, ShapeSource(member));
         var holder = Assert.Single(parsed.Classes, type => type.Name == "Holder");
@@ -386,17 +398,18 @@ public class InitializerConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         var shape = member switch
         {
-            "public Outer O = new Outer { V = 3, W = -V0 };" => (86, 4, 15),
-            "public HashSet<string> H = new HashSet<string> { \"a\", \"a\" };" => (88, 4, 15),
-            "public static List<List<int>> L = new List<List<int>> { new List<int> { 1 }, new List<int>() };" => (95, 6, 15),
-            "public int M() { var o = new Outer { V = Next(), W = Next() }; return o.V; }" => (91, 4, 15),
-            "public int M() { var l = new List<int> { Next(), Next() }; return l[1]; }" => (95, 4, 15),
-            "public Outer O = new Outer { V = Next() };" => (84, 4, 15),
-            "public int M() { return Take(Next(), new Outer { V = Next() }); }" => (93, 4, 15),
-            "public List<int> L = new List<int> { Next(), Take(Next(), null) };" => (90, 4, 15),
+            "public Outer O = new Outer { V = 3, W = -V0 };" => (89, 4, 15),
+            "public HashSet<string> H = new HashSet<string> { \"a\", \"a\" };" => (91, 4, 15),
+            "public static List<List<int>> L = new List<List<int>> { new List<int> { 1 }, new List<int>() };" => (98, 6, 15),
+            "public int M() { var o = new Outer { V = Next(), W = Next() }; return o.V; }" => (94, 4, 15),
+            "public int M() { var l = new List<int> { Next(), Next() }; return l[1]; }" => (98, 4, 15),
+            "public Outer O = new Outer { V = Next() };" => (87, 4, 15),
+            "public int M() { return Take(Next(), new Outer { V = Next() }); }" => (96, 4, 15),
+            "public List<int> L = new List<int> { Next(), Take(Next(), null) };" => (93, 4, 15),
             _ => throw new InvalidOperationException(member)
         };
-        // The shared Bag scaffold alone retains its explicit-interface member.
+        // The shared Bag scaffold alone retains its explicit-interface member. 0.30: each count
+        // includes the three pure `!` rows the scaffold's boundaries now print.
         var parsed = AssertShape(result, shape.Item1, shape.Item2, 0, shape.Item3, "explicit-interface");
         AssertFieldAccesses(parsed,
             member == "public int M() { var o = new Outer { V = Next(), W = Next() }; return o.V; }"
@@ -490,7 +503,7 @@ public class InitializerConversionTests
                 public static string Run() => new Counter().Go().ToString();
             }
             """, true },
-        // The copied fixture now preserves Publisher after the retired subscription fails parsing.
+        // 0.30: Publisher converts natively; only the constructor's subscription is a raw statement.
         { "scorecard-092-delegate-this-argument", """
             using System;
             public class CustomEventArgs : EventArgs { public string Message { get; set; } }
@@ -599,15 +612,38 @@ public class InitializerConversionTests
             .Where(i => i.Severity == ConversionIssueSeverity.Error).Select(i => i.ToString())) + "\n" + result.CalorSource);
         // The event member is preserved through member escalation, which records its own feature.
         Assert.Equal(expectsLoss, result.Context.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved));
+        if (name == "scorecard-092-delegate-this-argument")
+        {
+            // 0.30: the subscription is kept as one raw C# statement and the constructor declares
+            // `! unknown` for it (R1), so Publisher is no longer rescued whole. The delegate
+            // invocation with `this` stays native and must run like the original.
+            var loss = Assert.Single(result.Context.Losses);
+            Assert.Equal(("event-subscription", ConversionLossKind.InteropPreserved, "interop"),
+                (loss.Feature, loss.Kind, loss.Path));
+            var module = ParseCalor(result.CalorSource!);
+            Assert.Empty(AllNodes(module).OfType<CSharpInteropBlockNode>());
+            var publisher = Assert.Single(module.Classes, type => type.Name == "Publisher");
+            var constructor = Assert.Single(publisher.Constructors);
+            Assert.True(constructor.Effects!.IsUnknown);
+            Assert.Equal("MessageSent += OnSent;",
+                Assert.IsType<RawCSharpNode>(Assert.Single(constructor.Body)).CSharpCode.Trim());
+            Assert.NotEmpty(AllNodes(publisher).OfType<ThisExpressionNode>());
+            var native = Compile(result.CalorSource!, enforceEffects: true);
+            Assert.False(native.HasErrors, string.Join("\n", native.Diagnostics.Errors.Select(e => e.Message)));
+            Assert.Equal(Run(source), Run(native.GeneratedCode));
+            return;
+        }
+        // 0.30 row policy: public boundaries print a row and private bodies do not, so the
+        // counts below moved only by EffectsNode (verified against the pre-0.30 output).
         var shape = name switch
         {
-            "ref-receiver" => (44, 2, 0, 5),
+            "ref-receiver" => (43, 2, 0, 5),
             "index-conversion" => (20, 1, 0, 2),
-            "struct-this" or "parenthesized-this" => (37, 1, 0, 5),
+            "struct-this" or "parenthesized-this" => (36, 1, 0, 5),
             "scorecard-092-delegate-this-argument" => (27, 1, 0, 2),
             "struct-local-mutated-by-call" => (32, 0, 0, 5),
-            "constructor-replaces-receiver" => (40, 0, 2, 5),
-            "event-then-property" => (50, 2, 0, 7),
+            "constructor-replaces-receiver" => (41, 0, 2, 5),
+            "event-then-property" => (51, 2, 0, 7),
             _ => throw new InvalidOperationException(name)
         };
         var parsed = AssertShape(result, shape.Item1, shape.Item2, shape.Item3, shape.Item4,
@@ -920,17 +956,18 @@ public class InitializerConversionTests
             """;
         var result = Convert(source);
         Assert.True(result.Success, name + ": " + result.CalorSource);
+        // 0.30: each count includes the `! unknown` row the public Probe.Make now declares.
         var shape = name switch
         {
-            "literal-user-conversion" => (37, 1, 6, new[] { "initializer-interop" }),
-            "instance-event-initializer" => (23, 0, 5, new[] { "initializer-interop", "initializer-interop" }),
-            "partial-property-definition" => (23, 0, 5, new[] { "partial-property", "partial-property", "initializer-interop" }),
-            "finalizer" => (23, 0, 5, new[] { "destructor", "initializer-interop" }),
-            "eventargs-symbol-spoof" => (31, 0, 6, new[] { "initializer-interop" }),
-            "static-constructor" => (30, 0, 6, new[] { "initializer-interop" }),
-            "static-field-initializer" => (23, 0, 5, new[] { "field", "initializer-interop" }),
-            "recursive-initializer" => (25, 1, 6, new[] { "initializer-interop" }),
-            "expanding-generic-initializer" => (29, 1, 6, new[] { "initializer-interop" }),
+            "literal-user-conversion" => (38, 1, 6, new[] { "initializer-interop" }),
+            "instance-event-initializer" => (24, 0, 5, new[] { "initializer-interop", "initializer-interop" }),
+            "partial-property-definition" => (24, 0, 5, new[] { "partial-property", "partial-property", "initializer-interop" }),
+            "finalizer" => (24, 0, 5, new[] { "destructor", "initializer-interop" }),
+            "eventargs-symbol-spoof" => (32, 0, 6, new[] { "initializer-interop" }),
+            "static-constructor" => (31, 0, 6, new[] { "initializer-interop" }),
+            "static-field-initializer" => (24, 0, 5, new[] { "field", "initializer-interop" }),
+            "recursive-initializer" => (26, 1, 6, new[] { "initializer-interop" }),
+            "expanding-generic-initializer" => (30, 1, 6, new[] { "initializer-interop" }),
             _ => throw new InvalidOperationException(name)
         };
         var parsed = AssertShape(result, shape.Item1, shape.Item2, 0, shape.Item3, shape.Item4);
