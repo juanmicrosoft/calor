@@ -151,5 +151,42 @@ public sealed class SourceProjectionScalingTests
         }
     }
 
+    /// <summary>
+    /// For-loop temporaries share one module-wide name set. Reserving them now resumes
+    /// at the last suffix instead of probing from the bare name for every loop (which
+    /// made emission quadratic in loop count); the names must be exactly the first free
+    /// ones, skipping any the source already uses.
+    /// </summary>
+    [Fact]
+    public void ForLoopTemporaries_TakeTheFirstFreeSuffixAcrossTheModule()
+    {
+        var source = """
+            module LoopTemps
+              func First public (int:n) → int
+                !
+                let int:__calorForFrom_1 = n
+                for i from 0 to n step 1
+                  let int:a = i * 2
+                for j from 0 to n step 2
+                  let int:b = j * 2
+                return __calorForFrom_1
+              func Second public (int:n) → int
+                !
+                for k from 1 to n step 1
+                  let int:c = k * 2
+                return n
+            """;
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var declared = System.Text.RegularExpressions.Regex.Matches(compiled.GeneratedCode, @"var (__calorFor(From|First)(_\d+)?) =")
+            .Select(match => match.Groups[1].Value).ToArray();
+        Assert.Equal(new[]
+        {
+            "__calorForFrom", "__calorForFirst",
+            "__calorForFrom_2", "__calorForFirst_1",
+            "__calorForFrom_3", "__calorForFirst_2",
+        }, declared);
+    }
+
     private static AstNode Node(int index) => new ReferenceNode(new TextSpan(index, 1, 1, 1), $"n{index}");
 }
