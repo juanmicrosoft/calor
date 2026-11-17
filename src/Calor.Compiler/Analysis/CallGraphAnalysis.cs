@@ -2395,6 +2395,8 @@ public sealed class CallGraphAnalysis
     /// </summary>
     public sealed class BoundValueIndex
     {
+        // The bound module the index was read from; null when binding threw.
+        internal BoundModule? Module { get; set; }
         internal Dictionary<string, FunctionNode> ExternalSourceFunctions { get; } = [];
         internal Dictionary<(string CallerId, int Start, int End), SourceArgumentSelection>
             SourceArguments
@@ -3215,8 +3217,32 @@ public sealed class CallGraphAnalysis
         analysis._boundValues = boundValues;
         analysis._operatorBindings = operatorBindings;
         analysis.ContractInheritance = contractInheritance;
+        if (crossModuleTypes is null && sourcePath is null && projectionContractMode == ContractMode.Debug
+            && boundValues.Module is { } plainModule)
+            analysis._plainBinding = (ast, crossModuleFunctions, contractInheritance, plainModule);
         return analysis;
     }
+
+    private (ModuleNode Ast, IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctions,
+        Verification.ModuleInheritanceResult? ContractInheritance, BoundModule Module)? _plainBinding;
+
+    /// <summary>
+    /// The module this analysis bound, when that binding is exactly the one
+    /// <c>new Binder(bag) { CrossModuleFunctionModules = crossModuleFunctions }
+    /// .Bind(ast, contractInheritance)</c> performs: the same module, the same
+    /// cross-module map and inheritance result, no source path, no project source
+    /// registry, and the default projection contract mode. Binding is a function of
+    /// those inputs (it does not change the AST), so a caller that would bind again
+    /// with them can read this result instead. Null otherwise, or when binding threw.
+    /// </summary>
+    internal BoundModule? PlainBoundModule(ModuleNode ast,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        Verification.ModuleInheritanceResult? contractInheritance) =>
+        _plainBinding is { } binding && ReferenceEquals(binding.Ast, ast)
+            && ReferenceEquals(binding.CrossModuleFunctions, crossModuleFunctions)
+            && ReferenceEquals(binding.ContractInheritance, contractInheritance)
+            ? binding.Module
+            : null;
 
     internal IReadOnlyDictionary<string, FunctionNode> ExternalSourceFunctions =>
         _boundValues.ExternalSourceFunctions;
@@ -3321,6 +3347,7 @@ public sealed class CallGraphAnalysis
             };
             var boundModule = binder.Bind(ast, contractInheritance);
             boundValues.Complete = true;
+            boundValues.Module = boundModule;
             var incompatibleCallSpans = diagnostics
                 .Where(diagnostic =>
                     diagnostic.Code is Calor.Compiler.Diagnostics.DiagnosticCode.NoMatchingOverload

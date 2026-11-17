@@ -161,7 +161,7 @@ public sealed class ExternalCallCollector
     {
         var collector = new ExternalCallCollector();
         var callGraph = CallGraphAnalysis.Build(module);
-        collector.IndexBoundCallReceivers(module, callGraph.ContractInheritance);
+        collector.IndexBoundCallReceivers(module, callGraph);
 
         foreach (var function in callGraph.Functions.Values)
         {
@@ -190,7 +190,7 @@ public sealed class ExternalCallCollector
             _crossModuleFunctions = crossModuleFunctions
         };
         callGraph ??= CallGraphAnalysis.Build(module, crossModuleFunctions);
-        collector.IndexBoundCallReceivers(module, callGraph.ContractInheritance);
+        collector.IndexBoundCallReceivers(module, callGraph);
         var methodNames = CallGraphAnalysis.EnumerateClasses(module)
             .SelectMany(cls => CallGraphAnalysis.EnumerateMethods(cls)
                 .Select(method => (Id: $"{cls.Name}.{method.Id}", Name: $"{cls.Name}.{method.Name}")))
@@ -346,14 +346,19 @@ public sealed class ExternalCallCollector
 
     private readonly Dictionary<(int Start, int End), BoundCallExpression> _computedMemberCalls = new();
 
-    private void IndexBoundCallReceivers(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance)
+    private void IndexBoundCallReceivers(ModuleNode module, CallGraphAnalysis callGraph)
     {
         try
         {
-            var bound = new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag())
-            {
-                CrossModuleFunctionModules = _crossModuleFunctions
-            }.Bind(module, contractInheritance);
+            // The call graph already bound this module with exactly these inputs when
+            // it was built without a source path or project registry; read that tree
+            // instead of binding the module a second time.
+            var contractInheritance = callGraph.ContractInheritance;
+            var bound = callGraph.PlainBoundModule(module, _crossModuleFunctions, contractInheritance)
+                ?? new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag())
+                {
+                    CrossModuleFunctionModules = _crossModuleFunctions
+                }.Bind(module, contractInheritance);
             foreach (var node in Descendants(bound))
             {
                 switch (node)

@@ -221,3 +221,76 @@ public sealed class SharedProjectionImageTests
     };
 }
 
+/// <summary>
+/// The effect summary's call collector used to bind every module a second time with
+/// exactly the inputs the call graph had just bound it with. It now reads the call
+/// graph's bound module; these tests pin that the collected calls are the ones its own
+/// binding collects, and that the reuse happens only for identical inputs.
+/// </summary>
+public sealed class EffectSummaryBoundModuleReuseTests
+{
+    public static IEnumerable<object[]> Subjects() =>
+    [
+        ["tests/TestData/Benchmarks/DesignPatterns"],
+        ["tests/TestData/Benchmarks/OOPGenerics"],
+        ["tests/TestData/Benchmarks/DataStructures"],
+        ["bench/phase0-agent-native/latency/fixture-10k/src"],
+    ];
+
+    [Theory]
+    [MemberData(nameof(Subjects))]
+    public void CollectedCalls_AreTheOnesASecondBindingCollects(string subject)
+    {
+        var directory = Path.Combine(ActiveSyntaxInputs.RepositoryRoot, ActiveSyntaxInputs.RelativeRoot, subject);
+        var modules = Directory.GetFiles(directory, "*.calr").Order(StringComparer.Ordinal)
+            .Select(path =>
+            {
+                var diagnostics = new DiagnosticBag();
+                return new Parser(new Lexer(File.ReadAllText(path), diagnostics).TokenizeAllForParser(),
+                    diagnostics).Parse();
+            })
+            .Where(module => module is not null)
+            .ToList();
+        var map = CompilationDriver.BuildCrossModuleFunctionMap(modules);
+        // Equal content, another instance: the call graph's binding is then not the
+        // collector's (the reuse is keyed by identity), so the collector binds itself.
+        var equalMap = CompilationDriver.BuildCrossModuleFunctionMap(modules);
+        var reused = 0;
+        foreach (var module in modules)
+        {
+            var graph = CallGraphAnalysis.Build(module, map);
+            if (graph.PlainBoundModule(module, map, graph.ContractInheritance) is not null)
+                reused++;
+            Assert.Null(graph.PlainBoundModule(module, equalMap, graph.ContractInheritance));
+            var withReuse = ExternalCallCollector.CollectPerFunctionWithBareNames(module, map, graph);
+            var withoutReuse = ExternalCallCollector.CollectPerFunctionWithBareNames(module, equalMap,
+                CallGraphAnalysis.Build(module, map));
+            Assert.Equal(withoutReuse, withReuse);
+        }
+        Assert.Equal(modules.Count, reused);
+    }
+
+    [Fact]
+    public void ProjectContextBinding_IsNeverReused()
+    {
+        var source = """
+            module Reuse
+              func Twice public (int:x) → int
+                !
+                return (x + x)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var path = Path.Combine(Path.GetTempPath(), "reuse.calr");
+        var registry = CrossModuleTypeRegistry.Build([module]);
+        var contextual = CallGraphAnalysis.Build(module, null, crossModuleTypes: registry);
+        Assert.Null(contextual.PlainBoundModule(module, null, contextual.ContractInheritance));
+        var withPath = CallGraphAnalysis.Build(module, null, sourcePath: path);
+        Assert.Null(withPath.PlainBoundModule(module, null, withPath.ContractInheritance));
+        var release = CallGraphAnalysis.Build(module, null, projectionContractMode: ContractMode.Release);
+        Assert.Null(release.PlainBoundModule(module, null, release.ContractInheritance));
+        var plain = CallGraphAnalysis.Build(module, null);
+        Assert.NotNull(plain.PlainBoundModule(module, null, plain.ContractInheritance));
+        Assert.Null(plain.PlainBoundModule(module, null, contextual.ContractInheritance));
+    }
+}
