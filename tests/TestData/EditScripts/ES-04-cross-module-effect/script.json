@@ -3,7 +3,7 @@
   "title": "A callee's effects change; the unedited caller's diagnostics change with them",
   "pins": "The hard case for any per-file cache: the file whose diagnostics change is not the file that was edited. Cross-module effect enforcement (Calor0410) runs over cached effect summaries, so a stale summary would let the caller's violation vanish on a warm build. Step 2 reverses the edit, pinning the direction a cache is most likely to get wrong (appearing findings are noticed; disappearing ones are not).",
   "expectsReuse": true,
-  "reuseNote": "The file set and options are constant, so the unedited caller stays a cache hit — which is the point: its cross-module violation has to surface from the cached effect summary.",
+  "reuseNote": "The file set and options are constant. Amended for 0.30: the CLI cache hit is bystander.calr, an independent module that is never edited and never called (added to all three steps); the unedited caller is NOT a cache hit any more: every source hash is in the cross-module fingerprint, so a callee edit invalidates every output the independence proof cannot spare, and the caller calls the callee; in step 2 the caller and callee are rebuilt again because step 1 failed (Calor0410), and a failed build keeps the old cache but deletes their outputs. bystander.calr is served from cache in steps 1 and 2. The caller's cross-module violation still has to appear on the warm build and disappear again in step 2, and the full-vs-incremental comparison still checks that. See v0.13-freeze-registrations.md F-3′ §7.",
   "steps": [
     {
       "dir": "step-00-clean",
