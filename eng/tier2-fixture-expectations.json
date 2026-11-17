@@ -3336,6 +3336,462 @@
       "errors": [
         "Session.calr|Calor0410|[\"Session.calr\",1,\"Session\",\"LookupSession\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"str\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"str\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"str\\\"}\"]|Function 'LookupSession' uses effect 'fs:w' but does not declare it Call chain: LookupSession → MarkActive → WriteIndex → File.WriteAllText"
       ]
+    },
+    {
+      "id": "active:samples",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group samples; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: samples/ are the public example programs; Tier 1 compiles them with default options.",
+      "files": [
+        "tests/TestData/ActiveSyntax/samples/Collections/collections.calr",
+        "tests/TestData/ActiveSyntax/samples/Contracts/contracts.calr",
+        "tests/TestData/ActiveSyntax/samples/FizzBuzz/fizzbuzz.calr",
+        "tests/TestData/ActiveSyntax/samples/Generics/generics.calr",
+        "tests/TestData/ActiveSyntax/samples/HelloWorld/hello.calr",
+        "tests/TestData/ActiveSyntax/samples/PatternMatching/matching.calr",
+        "tests/TestData/ActiveSyntax/samples/SdkSample/program.calr",
+        "tests/TestData/ActiveSyntax/samples/TypeSystem/typesystem.calr",
+        "tests/TestData/ActiveSyntax/samples/Verification/mixed-contracts.calr",
+        "tests/TestData/ActiveSyntax/samples/Verification/proven-contracts.calr",
+        "tests/TestData/ActiveSyntax/samples/Verification/violation-detected.calr"
+      ]
+    },
+    {
+      "id": "active:conversion-snapshots",
+      "expect": "compile",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group conversion-snapshots; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/01-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/01-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/01-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/01-04.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/02-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/02-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/03-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/03-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/03-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/03-04.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/04-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/05-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/05-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/05-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/06-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/06-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/06-04.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/07-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/07-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/07-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/08-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/08-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/08-04.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/09-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/09-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/10-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/10-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/10-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/11-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/11-04.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/12-01.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/12-02.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/12-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/12-04.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/12-05.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-04.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-06.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-08.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-09.approved.calr",
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-11.approved.calr"
+      ]
+    },
+    {
+      "id": "active:conversion-snapshots:09-03.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "09-03.approved.calr|Calor1002:CS8510|[\"09-03.approved.calr\",5,\"Test_09_03.ListPatternDemo`0\",\"Classify\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32[]\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"str\\\"}\"]|Generated C# failed compilation (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match."
+      ],
+      "defect": "Front end accepts the source; generated C# (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match.",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group conversion-snapshots:09-03.approved; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/09-03.approved.calr"
+      ]
+    },
+    {
+      "id": "active:conversion-snapshots:11-03.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "11-03.approved.g.cs|Calor1002:CS0050|-|Generated C# failed compilation (CS0050): Inconsistent accessibility: return type 'Container.Status' is less accessible than method 'Container.GetStatus()'"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0050): Inconsistent accessibility: return type 'Container.Status' is less accessible than method 'Container.GetStatus()'",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group conversion-snapshots:11-03.approved; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/11-03.approved.calr"
+      ]
+    },
+    {
+      "id": "active:conversion-snapshots:11-05.approved",
+      "expect": "compile",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group conversion-snapshots:11-05.approved; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: Generic receiver type aliases were repaired by 57408cb36: ImmutableDictionary<str, i32>.Empty now emits ImmutableDictionary<string, int>.Empty. Actual checkout-built CLI execution compiles this exact unchanged subject with its existing --permissive-effects option and generated-C# validation. It is now an ordinary positive obligation, not a waived codegen failure. Default strict compilation still rejects its unknown .Empty effect with Calor0410; the formatter therefore retains its existing semantic fallback. Original source, approved conversion text, formatter expectations and historical artifacts are unchanged.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/11-05.approved.calr"
+      ]
+    },
+    {
+      "id": "active:conversion-snapshots:13-02.approved",
+      "expect": "compile",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group conversion-snapshots:13-02.approved; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: Reserved value-identifier emission was repaired by 86ad513a5: Roslyn keyword escaping now preserves base/type-word locals, parameters and members without rewriting real receiver syntax. Original and registered current-source bytes are unchanged. This exact subject now compiles with default CLI options and generated-C# validation; Tier 2 preserves its existing consumer options and promotes it to an ordinary positive obligation. The former keyword-only codegen failure is resolved, not waived. SnapshotConversionTests retains the approved conversion text.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-02.approved.calr"
+      ]
+    },
+    {
+      "id": "active:conversion-snapshots:13-05.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "13-05.approved.calr|Calor1002:CS8510|[\"13-05.approved.calr\",5,\"Test_13_05.PatternDemo`0\",\"Classify\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"any\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"str\\\"}\"]|Generated C# failed compilation (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match.",
+        "13-05.approved.calr|Calor1002:CS8510|[\"13-05.approved.calr\",5,\"Test_13_05.PatternDemo`0\",\"Classify\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"any\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"str\\\"}\"]|Generated C# failed compilation (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match.",
+        "13-05.approved.calr|Calor1002:CS8510|[\"13-05.approved.calr\",5,\"Test_13_05.PatternDemo`0\",\"Classify\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"any\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"str\\\"}\"]|Generated C# failed compilation (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match."
+      ],
+      "defect": "Front end accepts the source; generated C# (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match.",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group conversion-snapshots:13-05.approved; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-05.approved.calr"
+      ]
+    },
+    {
+      "id": "active:conversion-snapshots:13-10.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "13-10.approved.calr|Calor1006|[\"13-10.approved.calr\",5,\"Test_13_10.MatchListDemo`0\",\"GetItems\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"List\\\\u003Cstr\\\\u003E\\\"}\"]|Expression-match arms must contain exactly one value-return expression. Multi-statement, empty, and valueless arms are not supported; use a statement match instead.",
+        "13-10.approved.calr|Calor1006|[\"13-10.approved.calr\",5,\"Test_13_10.MatchListDemo`0\",\"GetItems\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"i32\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"List\\\\u003Cstr\\\\u003E\\\"}\"]|Expression-match arms must contain exactly one value-return expression. Multi-statement, empty, and valueless arms are not supported; use a statement match instead."
+      ],
+      "defect": "Front end accepts the source; Expression-match arms must contain exactly one value-return expression. Multi-statement, empty, and valueless arms are not supported; use a statement match instead.",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group conversion-snapshots:13-10.approved; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/Calor.Conversion.Tests/Snapshots/13-10.approved.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-01-local-edit:step-00-baseline",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-01-local-edit:step-00-baseline; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-01-local-edit/step-00-baseline/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-01-local-edit/step-00-baseline/beta.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-01-local-edit:step-01-edit-body",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-01-local-edit:step-01-edit-body; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-01-local-edit/step-01-edit-body/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-01-local-edit/step-01-edit-body/beta.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-01-local-edit:step-02-introduce-violation",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "alpha.calr|Calor0410|[\"alpha.calr\",1,\"Alpha\",\"Greet\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Greet' uses effect 'cw' but does not declare it"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-01-local-edit:step-02-introduce-violation; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-01 step 2 introduces a violation (Calor0410).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-01-local-edit/step-02-introduce-violation/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-01-local-edit/step-02-introduce-violation/beta.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-02-add-file:step-00-baseline",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-02-add-file:step-00-baseline; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-00-baseline/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-00-baseline/beta.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-02-add-file:step-01-add-clean",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-02-add-file:step-01-add-clean; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/beta.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/gamma.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-02-add-file:step-02-add-violating",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "delta.calr|Calor0410|[\"delta.calr\",1,\"Delta\",\"Quiet\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Quiet' uses effect 'cw' but does not declare it"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-02-add-file:step-02-add-violating; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-02 step 2 adds a violating file (Calor0410).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/beta.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/delta.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/gamma.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-03-delete-file:step-00-baseline",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "noisy.calr|Calor0410|[\"noisy.calr\",1,\"Noisy\",\"Silent\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Silent' uses effect 'cw' but does not declare it"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-03-delete-file:step-00-baseline; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-03 starts with a violating file (noisy.calr, Calor0410) that step 1 deletes.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/beta.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/noisy.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-03-delete-file:step-01-delete-violating",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-03-delete-file:step-01-delete-violating; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-03-delete-file/step-01-delete-violating/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-03-delete-file/step-01-delete-violating/beta.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-03-delete-file:step-02-delete-clean",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-03-delete-file:step-02-delete-clean; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-03-delete-file/step-02-delete-clean/alpha.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-04-cross-module-effect:step-00-clean",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-00-clean; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/callee.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/caller.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-04-cross-module-effect:step-01-callee-gains-effect",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "caller.calr|Calor0410|[\"caller.calr\",1,\"App\",\"Main\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Main' uses effect 'net' via cross-module call to 'SaveOrder' (in module 'OrderService') but does not declare it."
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-01-callee-gains-effect; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-04 step 1 the callee gains an effect, so the unedited caller draws a cross-module Calor0410.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/callee.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/caller.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-04-cross-module-effect:step-02-callee-loses-effect",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-02-callee-loses-effect; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/callee.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/caller.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-05-options-flip:step-00-effects-on",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "service.calr|Calor0410|[\"service.calr\",1,\"Ledger\",\"Post\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Post' uses effect 'cw' but does not declare it"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-05-options-flip:step-00-effects-on; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-05 compiles identical files under effects-on (violation reported, Calor0410), effects-off (clean), effects-on again.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-05-options-flip/step-00-effects-on/beta.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-05-options-flip/step-00-effects-on/service.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-05-options-flip:step-01-effects-off",
+      "expect": "compile",
+      "mode": "together",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-05-options-flip:step-01-effects-off; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-05-options-flip/step-01-effects-off/beta.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-05-options-flip/step-01-effects-off/service.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-05-options-flip:step-02-effects-on-again",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "service.calr|Calor0410|[\"service.calr\",1,\"Ledger\",\"Post\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Post' uses effect 'cw' but does not declare it"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-05-options-flip:step-02-effects-on-again; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-05 compiles identical files under effects-on (violation reported, Calor0410), effects-off (clean), effects-on again.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-05-options-flip/step-02-effects-on-again/beta.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-05-options-flip/step-02-effects-on-again/service.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-06-touch-noop:step-00-baseline",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-06-touch-noop:step-00-baseline; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-06-touch-noop/step-00-baseline/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-06-touch-noop/step-00-baseline/beta.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-06-touch-noop:step-01-touch-identical",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-06-touch-noop:step-01-touch-identical; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-06-touch-noop/step-01-touch-identical/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-06-touch-noop/step-01-touch-identical/beta.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-06-touch-noop:step-02-touch-identical-again",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-06-touch-noop:step-02-touch-identical-again; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-06-touch-noop/step-02-touch-identical-again/alpha.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-06-touch-noop/step-02-touch-identical-again/beta.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-07-persistent-finding:step-00-finding-present",
+      "expect": "compile",
+      "mode": "together",
+      "options": [
+        "--require-docs"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-07-persistent-finding:step-00-finding-present; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/churn.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/stable.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/violating.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-07-persistent-finding:step-01-edit-neighbour",
+      "expect": "compile",
+      "mode": "together",
+      "options": [
+        "--require-docs"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-07-persistent-finding:step-01-edit-neighbour; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/churn.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/stable.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/violating.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-07-persistent-finding:step-02-edit-neighbour-again",
+      "expect": "compile",
+      "mode": "together",
+      "options": [
+        "--require-docs"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-07-persistent-finding:step-02-edit-neighbour-again; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/churn.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/stable.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/violating.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-08-effect-row-edit:step-00-clean",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-08-effect-row-edit:step-00-clean; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/app.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/bystander.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-08-effect-row-edit:step-01-callee-row-widens",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "app.calr|Calor0410|[\"app.calr\",1,\"App\",\"UsePure\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"[i32]\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"[i32]\\\"}\"]|Function 'UsePure' uses effect 'cw' via cross-module call to 'Map' (in module 'Combinators') but does not declare it."
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-08-effect-row-edit:step-01-callee-row-widens; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-08 step 1 the widened row makes the unedited UsePure draw Calor0410.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/app.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/bystander.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/combinators.calr"
+      ]
+    },
+    {
+      "id": "active:TestData:EditScripts:ES-08-effect-row-edit:step-02-callee-row-erased",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "combinators.calr|Calor0410|[\"combinators.calr\",1,\"Combinators\",\"Map\",\"{\\\"arity\\\":0,\\\"parameters\\\":[{\\\"type\\\":\\\"[i32]\\\",\\\"modifier\\\":\\\"None\\\"},{\\\"type\\\":\\\"Func\\\\u003Ci32,i32\\\\u003E\\\",\\\"modifier\\\":\\\"None\\\"}],\\\"output\\\":\\\"[i32]\\\"}\"]|Function 'Map' uses effect 'unknown' but does not declare it"
+      ],
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-08-effect-row-edit:step-02-callee-row-erased; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-08 step 2 the erased row draws Calor0425 (warning) plus the fail-closed Calor0410.",
+      "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/app.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/bystander.calr",
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/combinators.calr"
+      ]
     }
   ],
   "currentInputs": "tests/TestData/ActiveSyntax/inputs.json"
