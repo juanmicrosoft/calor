@@ -276,6 +276,12 @@ public sealed class ConstructorNode : AstNode
     public bool IsStatic { get; }
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public IReadOnlyList<RequiresNode> Preconditions { get; }
+    /// <summary>
+    /// 0.30: the constructor's optional own effect row. Without one the body is held to
+    /// the intrinsic initialization contract (<c>mut</c>, <c>alloc</c>); with one it may
+    /// also perform the declared effects, and <c>! unknown</c> admits any effect.
+    /// </summary>
+    public EffectsNode? Effects { get; set; }
     public ConstructorInitializerNode? Initializer { get; }
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }

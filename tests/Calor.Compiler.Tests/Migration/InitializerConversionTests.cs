@@ -951,15 +951,11 @@ public class InitializerConversionTests
         var source = TestDataLoader.LoadTestFile("Level5_Advanced/092_Events.cs");
         var result = Convert(source);
         Assert.True(result.Success, result.CalorSource);
-        // The frozen namespaced scorecard is a whole-unit preservation, not the copied fixture above.
-        var parsed = AssertShape(result, 2, 0, 0, 0, "namespace-topology");
-        AssertOriginalPayloads(parsed, source);
-        var block = Assert.Single(parsed.InteropBlocks);
-        Assert.True(block.IsCompilationUnitPassthrough);
-        Assert.Equal(InteropMemberKind.Other, block.MemberKind);
-        Assert.Equal("Multiple lexical namespace scopes are preserved as one whole-file interop boundary.", block.Reason);
-        Assert.Equal("Whole C# file preserved because lossless conversion does not split multi-namespace topology.",
-            Assert.Single(result.Context.Losses).Description);
+        // 0.30: one namespace with its own `using` converts natively through the scoped imports
+        // (as `calor convert` does); the runtime check below is unchanged.
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Empty(result.Context.Losses);
+        Assert.Empty(ParseCalor(result.CalorSource!).InteropBlocks);
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors.Select(error => error.Message)));
         const string caller = """

@@ -1020,8 +1020,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt == null)
             throw new InvalidOperationException("Canonical constructor parameters require an inline signature.");
-        AppendLine($"ctor{visibility}{attrs} ({inlineFmt})");
+        AppendEffectRowDeclaration(node, $"ctor{visibility}{attrs} ({inlineFmt})");
         Indent();
+        EmitEffects(node.Effects);
 
         if (inlineFmt == null)
             EmitParameterLines(node.Parameters);

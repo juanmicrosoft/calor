@@ -3405,7 +3405,7 @@ public sealed class CallGraphAnalysis
             ctor.Visibility,
             ctor.Parameters,
             output: null,
-            effects: null,
+            effects: ctor.Effects,
             ctor.Preconditions,
             Array.Empty<EnsuresNode>(),
             ctor.Body,

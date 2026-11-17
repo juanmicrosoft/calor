@@ -12574,6 +12574,7 @@ public sealed class Parser
         }
         var preconditions = new List<RequiresNode>();
         ConstructorInitializerNode? initializer = null;
+        EffectsNode? constructorEffects = null;
         var body = new List<StatementNode>();
 
         var bodyHadContent = false;
@@ -12582,6 +12583,11 @@ public sealed class Parser
             if (Check(TokenKind.In))
             {
                 parameters.Add(ParseParameter());
+                bodyHadContent = true;
+            }
+            else if (Check(TokenKind.Effects) || Check(TokenKind.Exclamation))
+            {
+                constructorEffects = ParseEffects();
                 bodyHadContent = true;
             }
             else if (Check(TokenKind.Requires))
@@ -12619,7 +12625,10 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return WithDocumentation(new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs, isStatic), startToken);
+        return WithDocumentation(new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs, isStatic)
+        {
+            Effects = constructorEffects
+        }, startToken);
     }
 
     /// <summary>

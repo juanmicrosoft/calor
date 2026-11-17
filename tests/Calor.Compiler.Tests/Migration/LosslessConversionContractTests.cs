@@ -341,7 +341,6 @@ public sealed class LosslessConversionContractTests
     [InlineData("int Value { get; } = System.Math.Abs(-1);")]
     [InlineData("static int value = System.Math.Abs(-1);")]
     [InlineData("static int Value { get; } = System.Math.Abs(-1);")]
-    [InlineData("public Item() { System.Console.WriteLine(\"constructor\"); }")]
     public void NamespaceSplitting_ConstructorEffectsCannotBorrowAnEqualNameOrGenericArity(string declaration)
     {
         var original = $$"""
@@ -364,13 +363,13 @@ public sealed class LosslessConversionContractTests
     // 0.30: the instance-initializer rows make Run's strict effects Unknown (the selected
     // constructor runs initializers without an effect contract), so the converter declares
     // ! unknown on Run and they compile honestly instead of failing. The static initializer
-    // and effectful constructor rows have no effect-contract surface and still fail closed.
+    // rows have no effect-contract surface and still fail closed. An explicit effectful
+    // constructor declares its own row (NamespaceSplitting_EffectfulConstructorDeclaresItsRow…).
     [Theory]
     [InlineData("int value = System.Math.Abs(-1);", true)]
     [InlineData("int Value { get; } = System.Math.Abs(-1);", true)]
     [InlineData("static int value = System.Math.Abs(-1);", false)]
     [InlineData("static int Value { get; } = System.Math.Abs(-1);", false)]
-    [InlineData("public Item() { System.Console.WriteLine(\"constructor\"); }", false)]
     public void NamespaceSplitting_SelectedConstructorFailsClosedOnRealParsedNativeCalor(string declaration,
         bool declaredUnknown)
     {
@@ -417,10 +416,34 @@ public sealed class LosslessConversionContractTests
             """;
         var result = new CSharpToCalorConverter().ConvertProject(original, "StaticConstructor.cs");
         Assert.True(result.Success);
-        Assert.False(result.IsSplit);
-        var preserved = Assert.Single(result.Outputs).Conversion;
-        Assert.True(preserved.InteropPreservationCount > 0);
-        Assert.Equal(original, Program.Compile(preserved.CalorSource!, null).GeneratedCode);
+        // 0.30: the static constructor declares its own row, so the split is native; it is
+        // not omitted, and the caller is charged its effect rather than Item<T>'s.
+        Assert.True(result.IsSplit);
+        var alpha = result.Outputs[0].Conversion.CalorSource!.Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Contains("ctor stat ()\n      ! cw\n", alpha);
+        Assert.Contains("func Run () → Item\n      ! cw, alloc\n", alpha);
+        Assert.All(result.Outputs, output => Assert.Equal(0, output.Conversion.InteropPreservationCount));
+    }
+
+    [Fact]
+    public void NamespaceSplitting_EffectfulConstructorDeclaresItsRowAndChargesTheCaller()
+    {
+        const string original = """
+            namespace Alpha
+            {
+                public class Item { public Item() { System.Console.WriteLine("constructor"); } }
+                public class Item<T> {}
+                public static class Probe { public static Item Run() => new Item(); }
+            }
+            namespace Beta { public class Marker {} }
+            """;
+        var result = new CSharpToCalorConverter().ConvertProject(original, "Constructors.cs");
+        Assert.True(result.Success);
+        Assert.True(result.IsSplit);
+        var alpha = result.Outputs[0].Conversion.CalorSource!;
+        Assert.Contains("ctor ()\n      ! cw\n", alpha.Replace("\r\n", "\n", StringComparison.Ordinal));
+        Assert.Contains("func Run () → Item\n      ! cw, alloc\n", alpha.Replace("\r\n", "\n", StringComparison.Ordinal));
+        Assert.False(Program.Compile(alpha, null).HasErrors);
     }
 
     [Fact]

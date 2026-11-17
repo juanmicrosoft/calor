@@ -1809,6 +1809,10 @@ public sealed class CSharpToCalorConverter
 
         foreach (var (declaration, _, assign) in EnumerateRowSites(target))
         {
+            // A constructor printed without its own header (a record's synthesized one)
+            // has no row position; it keeps its intrinsic contract.
+            if (declaration is ConstructorNode && !declarationOffsets.ContainsKey(declaration))
+                continue;
             if (!declarationOffsets.TryGetValue(declaration, out var offset)
                 || !rows.TryGetValue(offset, out var synthesized))
             {
@@ -1880,6 +1884,8 @@ public sealed class CSharpToCalorConverter
                 yield return (method, method.Effects, row => method.Effects = row);
             foreach (var op in CallGraphAnalysis.EnumerateOperators(cls))
                 yield return (op, op.Effects, row => op.Effects = row);
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
+                yield return (ctor, ctor.Effects, row => ctor.Effects = row);
         }
 
         foreach (var iface in CallGraphAnalysis.EnumerateInterfaces(module))

@@ -423,11 +423,7 @@ public sealed class EffectEnforcementPass
             if (_callGraphAnalysis.ExternalSourceFunctions.ContainsKey(function.Id))
                 continue;
             if (_constructorsByFunctionId.TryGetValue(function.Id, out var constructor))
-                CheckImplicitEffectBody(function, constructor.Constructor,
-                    DiagnosticCode.ConstructorEffectContractUnavailable,
-                    $"constructor '{constructor.OwnerName}.{constructor.Constructor.Id}'",
-                    EffectSet.From("mut", "alloc"),
-                    "intrinsic initialization mutation/allocation ('mut', 'alloc')");
+                CheckConstructorBody(function, constructor);
             else if (_implicitAccessorsByFunctionId.TryGetValue(function.Id, out var accessor))
                 CheckImplicitEffectBody(function, accessor.Declaration,
                     DiagnosticCode.AccessorEffectContractUnavailable,
@@ -462,12 +458,16 @@ public sealed class EffectEnforcementPass
             string mismatchCode;
             EffectSet declaredSet;
             bool hasDeclaration;
-            if (_constructorsByFunctionId.ContainsKey(function.Id))
+            if (_constructorsByFunctionId.TryGetValue(function.Id, out var constructorDeclaration))
             {
                 kind = "constructor";
-                mismatchCode = DiagnosticCode.ConstructorEffectContractUnavailable;
-                declaredSet = EffectSet.From("mut", "alloc");
-                hasDeclaration = false;
+                var ownRow = constructorDeclaration.Constructor.Effects;
+                mismatchCode = ownRow == null
+                    ? DiagnosticCode.ConstructorEffectContractUnavailable : DiagnosticCode.ForbiddenEffect;
+                declaredSet = ownRow == null ? ConstructorContract
+                    : GetDeclaredEffects(ownRow) is { IsUnknown: true } unknownRow ? unknownRow
+                    : ConstructorContract.Union(GetDeclaredEffects(ownRow));
+                hasDeclaration = ownRow != null;
             }
             else if (_implicitAccessorsByFunctionId.ContainsKey(function.Id))
             {
@@ -818,6 +818,42 @@ public sealed class EffectEnforcementPass
             declaration, diagnosticCode, displayName, intrinsicEffects, intrinsicDescription);
     }
 
+    /// <summary>
+    /// 0.30: a constructor may declare its own row. Without one its body is held to the
+    /// intrinsic initialization contract and Calor0422 reports anything else. With one the
+    /// body may use the intrinsic effects plus the declared row (<c>! unknown</c> admits
+    /// any effect), and an excess is the ordinary Calor0410. Callers of <c>new</c> are
+    /// charged the body's computed effects either way.
+    /// </summary>
+    private void CheckConstructorBody(FunctionNode function, ConstructorDeclaration constructor)
+    {
+        var name = $"constructor '{constructor.OwnerName}.{constructor.Constructor.Id}'";
+        if (constructor.Constructor.Effects is not { } row)
+        {
+            CheckImplicitEffectBody(function, constructor.Constructor,
+                DiagnosticCode.ConstructorEffectContractUnavailable, name, ConstructorContract,
+                "intrinsic initialization mutation/allocation ('mut', 'alloc')");
+            return;
+        }
+        var declared = GetDeclaredEffects(row);
+        if (declared.IsUnknown)
+            return;
+        var computed = _computedEffects.GetValueOrDefault(function.Id, EffectSet.Empty);
+        var permitted = ConstructorContract.Union(declared);
+        var forbidden = computed.Except(permitted).ToList();
+        if (forbidden.Count > 0)
+            _diagnostics.Report(constructor.Constructor.Span, DiagnosticCode.ForbiddenEffect,
+                $"The {name} uses effect(s) '{string.Join(", ", forbidden.Select(effect => EffectCodes.ToCompact(effect.Kind, effect.Value)))}' "
+                + "that its declared row does not cover. Add them to the row, or write '! unknown'.",
+                DiagnosticSeverity.Error);
+        var reasons = _assumedEffects.GetValueOrDefault(function.Id) ?? [];
+        if (reasons.Count > 0)
+            _diagnostics.Report(constructor.Constructor.Span, DiagnosticCode.ForbiddenEffect,
+                $"The {name} has unverifiable effects: {string.Join("; ", reasons.Take(3))}. "
+                + "Write '! unknown' on the constructor to declare that.",
+                DiagnosticSeverity.Error);
+    }
+
     private void CheckImplicitEffects(
         EffectSet computedEffects,
         IReadOnlyList<string> reasons,
@@ -835,9 +871,12 @@ public sealed class EffectEnforcementPass
             _diagnostics.Report(
                 declaration.Span,
                 diagnosticCode,
-                $"The {displayName} uses effect(s) '{codes}', but this declaration cannot declare an effect row. " +
-                $"Only {intrinsicDescription} is permitted. " +
-                "Move effectful work to a method with an explicit '!' effect row.",
+                diagnosticCode == DiagnosticCode.ConstructorEffectContractUnavailable
+                    ? $"The {displayName} uses effect(s) '{codes}' beyond {intrinsicDescription}. "
+                      + $"Declare them on the constructor (for example '! {codes}'), or move the work to a method."
+                    : $"The {displayName} uses effect(s) '{codes}', but this declaration cannot declare an effect row. " +
+                      $"Only {intrinsicDescription} is permitted. " +
+                      "Move effectful work to a method with an explicit '!' effect row.",
                 DiagnosticSeverity.Error);
         }
 
@@ -1007,6 +1046,8 @@ public sealed class EffectEnforcementPass
     /// <c>net</c>, <c>throw</c> — is still rejected and must move behind a declared
     /// method, which is the fail-closed stance this contract exists for.</para>
     /// </summary>
+    private static readonly EffectSet ConstructorContract = EffectSet.From("mut", "alloc");
+
     private static readonly EffectSet AccessorContract = EffectSet.From("mut", "alloc");
 
     private static bool UsesInferredEffects(FunctionNode function) =>
@@ -1228,6 +1269,8 @@ public sealed class EffectEnforcementPass
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(owner))
                 Declare($"{owner.Name}.{method.Id}", method.Effects, row => method.Effects = row, method.Span);
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(owner))
+                Declare($"{owner.Name}.{ctor.Id}", ctor.Effects, row => ctor.Effects = row, ctor.Span);
         }
         return changed;
     }
@@ -1410,6 +1453,14 @@ public sealed class EffectEnforcementPass
                 if (op.Effects != null)
                     changed |= WidenToInferredRow(
                         $"{cls.Name}.{op.Id}", op.Effects, row => op.Effects = row, op.Span);
+            }
+            // 0.30: a constructor declares only what exceeds its intrinsic contract.
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
+            {
+                if (_declarationFacts.TryGetValue($"{cls.Name}.{ctor.Id}", out var fact) && fact.Kind == "constructor")
+                    changed |= WidenRow(ctor.Effects,
+                        EffectSet.FromInternal(fact.InferredRow.ToEffectSet().Except(ConstructorContract)),
+                        row => ctor.Effects = row, ctor.Span);
             }
         }
 

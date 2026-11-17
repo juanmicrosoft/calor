@@ -65,8 +65,11 @@ This does not remove rows from callback types in its signature.
 
 Public/protected functions and methods, public operators, interface and abstract methods, extern
 methods, and delegate declarations require an explicit own row. A missing row
-reports `Calor0124`; write `!` for Pure. Constructors, accessors and initializers
-retain their implicit contracts.
+reports `Calor0124`; write `!` for Pure. Accessors and initializers retain their implicit contracts. A constructor's
+body may always initialize (`mut`, `alloc`); anything more is `Calor0422` unless
+the constructor declares an optional own row after its header (for example
+`! throw` or `! unknown`), which then admits those effects too. Callers of `new`
+are charged what the constructor body actually does either way.
 
 The C# converter omits synthesized own rows on private/internal bodies. Callback
 parameter and return rows stay explicit, as do existing abstract/extern contracts.
