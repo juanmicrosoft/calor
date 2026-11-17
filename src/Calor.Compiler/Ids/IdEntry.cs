@@ -99,11 +99,13 @@ public sealed class DeclarationIdentityStore
         return null;
     }
 
-    internal static DeclarationIdentityStore? FindForActiveInput(string file, string? projectRoot = null)
+    internal static DeclarationIdentityStore? FindForActiveInput(string file, string? projectRoot = null,
+        Dictionary<string, HashSet<string>>? registrations = null)
     {
         var store = Find(file);
         if (store == null) return null;
-        if (store.IncludesRegistration(file)) return store;
+        if (registrations == null ? store.IncludesRegistration(file) : store.IncludesRegistration(file, registrations))
+            return store;
         if (projectRoot != null)
             return CanonicalPath.IsUnder(CanonicalPath.Resolve(store.Root), CanonicalPath.Resolve(projectRoot)) ? store : null;
 
@@ -175,9 +177,12 @@ public sealed class DeclarationIdentityStore
         var common = projectRoot == null
             ? Incremental.BuildStateCache.ComputeCommonDirectory(files.Select(file => new FileInfo(file)).ToArray())
             : Path.GetFullPath(projectRoot);
+        // Every root is chosen before any group syncs, so one read of each store's
+        // registrations serves all inputs (re-reading it per input was quadratic).
+        var registrations = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         string RootFor(string file)
         {
-            return FindForActiveInput(file, projectRoot)?.Root ?? common;
+            return FindForActiveInput(file, projectRoot, registrations)?.Root ?? common;
         }
         foreach (var group in files.GroupBy(RootFor, StringComparer.Ordinal))
         {
@@ -234,6 +239,13 @@ public sealed class DeclarationIdentityStore
 
     private bool IncludesRegistration(string file) =>
         ReadRegisteredInputs().Contains(ValidatePath(Relative(file)), StringComparer.Ordinal);
+
+    private bool IncludesRegistration(string file, Dictionary<string, HashSet<string>> registrations)
+    {
+        if (!registrations.TryGetValue(Root, out var registered))
+            registrations[Root] = registered = ReadRegisteredInputs().ToHashSet(StringComparer.Ordinal);
+        return registered.Contains(ValidatePath(Relative(file)));
+    }
 
     private string Relative(string file)
     {
@@ -866,20 +878,98 @@ public sealed class DeclarationIdentityStore
             }
             return;
         }
+        AttachProjected(state, [(relative, source, parsed)]);
+    }
+
+    /// <summary>
+    /// Attaches every input of one project pass under one lock and one reconciliation
+    /// per store. Each input receives the identities a separate
+    /// <see cref="AttachIfRegistered"/> call gives it whenever the batch's in-memory
+    /// sources match the files on disk. The per-file form re-parses every registered
+    /// source once per input, which made project indexing quadratic in the file count.
+    /// </summary>
+    public static void AttachAllIfRegistered(IEnumerable<(string File, string Source, ModuleNode Module)> inputs)
+    {
+        var groups = new Dictionary<string, (DeclarationIdentityStore Store, List<(string File, string Source, ModuleNode Module)> Inputs)>(
+            StringComparer.Ordinal);
+        foreach (var (file, source, module) in inputs)
+        {
+            if (file == null || !file.EndsWith(".calr", StringComparison.OrdinalIgnoreCase) || !File.Exists(file)) continue;
+            var full = Path.GetFullPath(file);
+            try
+            {
+                var store = Find(full);
+                if (store == null) continue;
+                if (!groups.TryGetValue(store.Root, out var group))
+                    groups[store.Root] = group = (store, []);
+                group.Inputs.Add((full, source, module));
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or JsonException or UnauthorizedAccessException)
+            {
+                throw new DeclarationIdentityException($"Declaration identity unavailable: {ex.Message}", ex);
+            }
+        }
+        foreach (var (store, group) in groups.Values)
+        {
+            try
+            {
+                var registrations = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+                var included = group.Where(input => store.IncludesRegistration(input.File, registrations)).ToArray();
+                // A file named twice has two candidate sources; keep the per-file projection for each.
+                if (included.GroupBy(input => input.File, StringComparer.Ordinal).Any(same => same.Count() > 1))
+                {
+                    foreach (var (file, source, module) in included)
+                        store.Attach(file, source, module);
+                }
+                else if (included.Length > 0)
+                    store.AttachAll(included);
+            }
+            catch (DeclarationIdentityParseException) { throw; }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or JsonException or UnauthorizedAccessException)
+            {
+                throw new DeclarationIdentityException($"Declaration identity unavailable: {ex.Message}", ex);
+            }
+        }
+    }
+
+    private void AttachAll(IReadOnlyList<(string File, string Source, ModuleNode Module)> inputs)
+    {
+        using var gate = Acquire();
+        if (File.Exists(JournalPath))
+            throw new IOException("Incomplete identity transaction; run calor ids sync to recover.");
+        var state = Read();
+        var batch = inputs.Select(input => (Relative: Relative(input.File), input.Source, input.Module))
+            .Where(input => state.Files.Contains(input.Relative, StringComparer.Ordinal))
+            .Select(input => (input.Relative, input.Source, Describe(input.Relative, input.Module)))
+            .ToArray();
+        if (batch.Length > 0)
+            AttachProjected(state, batch);
+    }
+
+    private void AttachProjected(State state,
+        IReadOnlyList<(string Relative, string Source, IReadOnlyList<ParsedDeclaration> Parsed)> batch)
+    {
+        var inMemory = batch.ToDictionary(input => input.Relative, input => input.Source, StringComparer.Ordinal);
         var sources = state.Files.Where(f => File.Exists(ValidatePath(f)))
-            .ToDictionary(f => f, f => f == relative ? source : File.ReadAllText(ValidatePath(f)), StringComparer.Ordinal);
-        sources[relative] = source;
+            .ToDictionary(f => f, f => inMemory.TryGetValue(f, out var source) ? source : File.ReadAllText(ValidatePath(f)),
+                StringComparer.Ordinal);
+        foreach (var (relative, source) in inMemory)
+            sources[relative] = source;
         var projected = Reconcile(state, sources, []);
         var identities = projected.Declarations.ToDictionary(d => d.Key, StringComparer.Ordinal);
-        foreach (var declaration in parsed)
+        var persisted = state.Declarations.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var (_, _, parsed) in batch)
         {
-            var identity = identities[declaration.Identity.Key];
-            // Unsaved additions are not persisted identities. Never present a
-            // newly randomized projection as stable across independent reads.
-            if (state.Declarations.Any(d => d.Id == identity.Id))
+            foreach (var declaration in parsed)
             {
-                declaration.Node.ToolingId = identity.Id;
-                declaration.Node.ToolingIdAllocationKind = identity.AllocationKind;
+                var identity = identities[declaration.Identity.Key];
+                // Unsaved additions are not persisted identities. Never present a
+                // newly randomized projection as stable across independent reads.
+                if (persisted.Contains(identity.Id))
+                {
+                    declaration.Node.ToolingId = identity.Id;
+                    declaration.Node.ToolingIdAllocationKind = identity.AllocationKind;
+                }
             }
         }
     }
