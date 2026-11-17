@@ -83,6 +83,23 @@ public class BinderIncompleteRatchetTests
     private static string BaselinePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-incomplete-baseline.json");
 
+    private static string NativeCurrentExpectationsPath() => Path.Combine(RepoRoot(),
+        "tests", "TestData", "Binding", "binder-native-current-expectations.json");
+
+    /// <summary>
+    /// Why the current native counts differ from the historical baseline (523 parsed,
+    /// 3 failures, 0 incomplete, 5194 expressions bound, measured 2026-10-30 on the
+    /// section-marker spellings). 0.30: 511 parsed, 15 failures, 0 incomplete. The 12
+    /// new parse failures are exactly the retired-syntax inputs AllowedParseFailures
+    /// registers (no active mirror). ExpressionsBound 5194 -> 7386 because every other
+    /// input is now bound in native syntax, where member reads and calls are expression
+    /// nodes; it is recorded, not asserted, and is not a precision claim.
+    /// </summary>
+    private const string NativeCurrentNote =
+        "0.30 current native leg: 12 retired-syntax inputs registered in AllowedParseFailures no "
+        + "longer parse; all other in-repo inputs are bound in native syntax. Incomplete diagnostics "
+        + "remain zero. ExpressionsBound is informational.";
+
     // ONE scope string — the two regen writers previously hardcoded different texts,
     // making the committed file depend on writer order (review minor 5).
     private const string ScopeText =
@@ -327,29 +344,25 @@ public class BinderIncompleteRatchetTests
             "Files on the allowed-parse-failure list now PARSE — remove them from the list " +
             $"(and the F-2 amendment) in this PR:\n  {string.Join("\n  ", recovered)}");
 
-        var measured = new Baseline(incomplete, parsedFiles, parseFailures.Count, expressionsBound,
-            ScopeText);
+        var measured = new NativeCurrentExpectations(incomplete, parsedFiles, parseFailures.Count,
+            expressionsBound, NativeCurrentNote);
 
+        // 0.30: the native leg's counts live in their own current fixture. The original
+        // binder-incomplete-baseline.json is byte-pinned by the historical binder replay
+        // (ConversionLeg_IncompleteCount_MatchesBaseline), so regenerating its native
+        // fields there broke that replay. The hook now writes only the current fixture.
         if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
         {
-            // Preserve the conversion-leg section — the two regen writers run in
-            // nondeterministic order under one test invocation.
-            var existing = File.Exists(BaselinePath())
-                ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))
-                : null;
-            File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
-                measured with
-                {
-                    Conversion = existing?.Conversion,
-                    PreserveCoverage = existing?.PreserveCoverage
-                },
-                new JsonSerializerOptions { WriteIndented = true }) + "\n");
+            File.WriteAllText(NativeCurrentExpectationsPath(), JsonSerializer.Serialize(
+                measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
             return;
         }
 
-        Assert.True(File.Exists(BaselinePath()),
-            "Baseline missing — run once with CALOR_UPDATE_BINDER_BASELINE=1");
-        var baseline = JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!;
+        Assert.True(File.Exists(NativeCurrentExpectationsPath()),
+            "Current native expectations missing — run once with CALOR_UPDATE_BINDER_BASELINE=1");
+        var baseline = JsonSerializer.Deserialize<NativeCurrentExpectations>(
+            File.ReadAllText(NativeCurrentExpectationsPath()))!;
+        Assert.Equal(NativeCurrentNote, baseline.Note);
 
         Assert.True(parsedFiles == baseline.ParsedFiles && parseFailures.Count == baseline.ParseFailures,
             $"Parse coverage moved: {parsedFiles} parsed/{parseFailures.Count} failed vs baseline " +
@@ -1644,6 +1657,17 @@ public class BinderIncompleteRatchetTests
         NativeConversionLeg Conversion,
         PreserveCoverageLeg PreserveCoverage,
         SortedDictionary<string, SourceCoverageRecord> SourceCoverage);
+
+    /// <summary>
+    /// The in-repo native leg's current counts (tests/TestData/Binding). Separate from the
+    /// byte-pinned historical baseline; ExpressionsBound is recorded, not asserted.
+    /// </summary>
+    private sealed record NativeCurrentExpectations(
+        int IncompleteCount,
+        int ParsedFiles,
+        int ParseFailures,
+        int ExpressionsBound,
+        string Note);
 
     private sealed record Baseline(
         int IncompleteCount,

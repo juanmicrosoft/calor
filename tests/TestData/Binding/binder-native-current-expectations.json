@@ -1,0 +1,7 @@
+{
+  "IncompleteCount": 0,
+  "ParsedFiles": 511,
+  "ParseFailures": 15,
+  "ExpressionsBound": 7386,
+  "Note": "0.30 current native leg: 12 retired-syntax inputs registered in AllowedParseFailures no longer parse; all other in-repo inputs are bound in native syntax. Incomplete diagnostics remain zero. ExpressionsBound is informational."
+}
