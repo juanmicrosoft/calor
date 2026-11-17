@@ -3174,6 +3174,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
             items: preprocessorBlocks.Count > 0 || HasOrderSensitiveMemberInitializers(node)
+                    || PreservesAnOrderedInitializer(node, interopBlocks)
                 ? BuildSourceOrderedClassItems(
                     fields,
                     properties,
@@ -3745,6 +3746,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
             items: preprocessorBlocks.Count > 0 || HasOrderSensitiveMemberInitializers(node)
+                    || PreservesAnOrderedInitializer(node, interopBlocks)
                 ? BuildSourceOrderedClassItems(
                     fields,
                     properties,
@@ -7741,7 +7743,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Microsoft.CodeAnalysis.Operations.IFieldReferenceOperation field => field.Field.IsStatic
                 || field.Field.ContainingType.IsReferenceType
                     && field.Instance is Microsoft.CodeAnalysis.Operations.IInstanceReferenceOperation
-                    { ReferenceKind: Microsoft.CodeAnalysis.Operations.InstanceReferenceKind.ContainingTypeInstance },
+                    { ReferenceKind: Microsoft.CodeAnalysis.Operations.InstanceReferenceKind.ContainingTypeInstance }
+                || IsValueTypeVariable(field.Instance),
             // A non-indexed property of a type or of `this` (a class): `P op= v` and
             // `P = P op v` both get P, evaluate v, then set P, with no receiver to re-evaluate.
             Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation property =>
@@ -7750,6 +7753,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     || property.Property.ContainingType.IsReferenceType
                         && property.Instance is Microsoft.CodeAnalysis.Operations.IInstanceReferenceOperation
                         { ReferenceKind: Microsoft.CodeAnalysis.Operations.InstanceReferenceKind.ContainingTypeInstance }),
+            _ => false
+        };
+        // A field of a struct held in a local or by-value parameter (`s.X`, `s.Inner.X`) is
+        // itself a variable: both forms locate the same storage and read it before the
+        // right-hand side runs, with no receiver value to re-evaluate.
+        static bool IsValueTypeVariable(Microsoft.CodeAnalysis.IOperation? instance) => instance switch
+        {
+            Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation local =>
+                local.Local.RefKind == RefKind.None && local.Type?.IsValueType == true,
+            Microsoft.CodeAnalysis.Operations.IParameterReferenceOperation parameter =>
+                parameter.Parameter.RefKind == RefKind.None && parameter.Type?.IsValueType == true,
+            Microsoft.CodeAnalysis.Operations.IFieldReferenceOperation { Field.IsStatic: false } inner =>
+                inner.Type?.IsValueType == true && IsValueTypeVariable(inner.Instance),
             _ => false
         };
         return fixedVariable && target?.Type?.SpecialType is
@@ -11238,17 +11254,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var left = ConvertExpression(binary.Left);
             var right = ConvertExpression(binary.Right);
 
-            // If the left side is a NullConditionalNode (e.g., value?.Length.ToString()),
-            // hoist it to a temp bind to avoid emitting ?.  inside a Lisp expression,
-            // which the parser cannot handle.
-            if (left is NullConditionalNode)
-            {
-                var tempId = _context.GenerateId("_nc", "Tmp");
-                _pendingStatements.Add(new BindStatementNode(
-                    GetTextSpan(binary), tempId, null, false, left, new AttributeCollection()));
-                left = new ReferenceNode(GetTextSpan(binary), tempId);
-            }
-
+            // 0.30: native syntax writes `value?.Length ?? 0` inline, as it already does for a
+            // longer chain (`value?.Length.ToString() ?? x`). The retired Lisp form needed a
+            // temp here, and that hoist inside this conditional region preserved the member.
             return new NullCoalesceNode(GetTextSpan(binary), left, right);
         }
 
@@ -11628,8 +11636,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)))
                 : TypeMapper.CSharpToCalor(declaration.Type.ToString());
             // `default`, as for `int x;`: a bare binding would take a next-line `§C` as its initializer.
+            // Native `default(T)` takes only a built-in type, so another reference type (`out var
+            // int[] n`) starts as `null`, as a reference local does.
+            var initial = type is { IsReferenceType: true, TypeKind: not (TypeKind.Error or TypeKind.Dynamic),
+                SpecialType: not (SpecialType.System_String or SpecialType.System_Object) }
+                ? "null" : "default";
             result.Add(new BindStatementNode(GetTextSpan(declaration), name, typeName, isMutable: true,
-                new ReferenceNode(GetTextSpan(declaration), "default"), new AttributeCollection()));
+                new ReferenceNode(GetTextSpan(declaration), initial), new AttributeCollection()));
         }
         return result;
     }
@@ -14763,6 +14776,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// The grouped layout emits preserved members after the native ones. When a preserved
+    /// member carries an initializer and the type has another initialized member, that would
+    /// run the initializers out of declaration order, so the type keeps source order instead.
+    /// </summary>
+    private bool PreservesAnOrderedInitializer(TypeDeclarationSyntax type, IReadOnlyList<CSharpInteropBlockNode> interopBlocks)
+    {
+        static bool Initialized(MemberDeclarationSyntax member) => member switch
+        {
+            FieldDeclarationSyntax field => field.Declaration.Variables.Any(variable => variable.Initializer != null),
+            EventFieldDeclarationSyntax eventField => eventField.Declaration.Variables.Any(variable => variable.Initializer != null),
+            PropertyDeclarationSyntax { Initializer: not null } => true,
+            _ => false
+        };
+        if (interopBlocks.Count == 0)
+            return false;
+        var initialized = type.Members.Where(Initialized).ToList();
+        if (initialized.Count < 2)
+            return false;
+        var preservedStarts = interopBlocks.Select(block => block.Span.Start).ToHashSet();
+        return initialized.Any(member => preservedStarts.Contains(GetTextSpan(member).Start));
     }
 
     private static bool HasDictionaryMemberInitializer(TypeDeclarationSyntax type) =>

@@ -1247,14 +1247,21 @@ public sealed class EffectEnforcementPass
     /// or a callable that itself declares <c>! unknown</c>. Without this the
     /// permissively synthesised row would claim effects the body may exceed, and
     /// the converter's strict validation compile would reject the whole file.
+    /// A constructor also declares it when its body is unverifiable (a raw C# statement),
+    /// which is the row its own check asks for (R1).
     /// Returns whether any row changed, so callers reach a fixpoint across rounds.
     /// </summary>
     private bool DeclareUnknownRows(ModuleNode module)
     {
         var changed = false;
-        void Declare(string id, EffectsNode? row, Action<EffectsNode> assign, TextSpan span)
+        void Declare(string id, EffectsNode? row, Action<EffectsNode> assign, TextSpan span,
+            bool unverifiableIsUnknown = false)
         {
-            if (!_computedEffects.TryGetValue(id, out var computed) || !computed.IsUnknown)
+            // A constructor whose body is unverifiable (a raw C# statement) is rejected unless
+            // it declares `! unknown` (CheckConstructorBody); a method's row stays an assumption.
+            var unverifiable = unverifiableIsUnknown
+                && _assumedEffects.GetValueOrDefault(id) is { Count: > 0 };
+            if (!unverifiable && (!_computedEffects.TryGetValue(id, out var computed) || !computed.IsUnknown))
                 return;
             if (row != null && GetDeclaredEffects(row).IsUnknown)
                 return;
@@ -1270,7 +1277,8 @@ public sealed class EffectEnforcementPass
             foreach (var method in CallGraphAnalysis.EnumerateMethods(owner))
                 Declare($"{owner.Name}.{method.Id}", method.Effects, row => method.Effects = row, method.Span);
             foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(owner))
-                Declare($"{owner.Name}.{ctor.Id}", ctor.Effects, row => ctor.Effects = row, ctor.Span);
+                Declare($"{owner.Name}.{ctor.Id}", ctor.Effects, row => ctor.Effects = row, ctor.Span,
+                    unverifiableIsUnknown: true);
         }
         return changed;
     }
@@ -6310,7 +6318,8 @@ public sealed class EffectEnforcementPass
                 case IInstanceReferenceOperation:
                     return effects;
                 case IInvocationOperation call:
-                    effects = InferInitializationMethod(call.TargetMethod, preserved, span,
+                    effects = InferInitializationMethod(call.TargetMethod,
+                        preserved || IsConstructionMember(call, call.Instance, call.TargetMethod), span,
                         call.Instance, nonVirtualDispatch: !call.IsVirtual);
                     break;
                 case IObjectCreationOperation { Constructor: { } constructor }:
@@ -6343,13 +6352,66 @@ public sealed class EffectEnforcementPass
                     break;
                 case ISimpleAssignmentOperation
                     { Target: IPropertyReferenceOperation { Property.SetMethod: { } setter } target } assignment:
-                    effects = InferInitializationMethod(setter, preserved, span)
+                    effects = InferInitializationMethod(setter,
+                            preserved || IsConstructionMember(assignment, target.Instance, setter), span)
                         .Union(InferInitializationOperation(assignment.Value, preserved, span));
                     if (target.Instance != null)
                         effects = effects.Union(InferInitializationOperation(target.Instance, preserved, span));
                     foreach (var argument in target.Arguments)
                         effects = effects.Union(InferInitializationOperation(argument, preserved, span));
                     return effects;
+                // A field store (`x = v`, `++Probe.N`, `s += t`) mutates; its children charge the
+                // field's type initialization and the value. A property target also runs its
+                // setter, and a user-defined operator or conversion runs its body.
+                case ISimpleAssignmentOperation { Target: IFieldReferenceOperation }:
+                    effects = EffectSet.From("mut");
+                    break;
+                case IIncrementOrDecrementOperation or ICompoundAssignmentOperation:
+                {
+                    var (target, operatorMethod) = operation is IIncrementOrDecrementOperation increment
+                        ? (increment.Target, increment.OperatorMethod)
+                        : (((ICompoundAssignmentOperation)operation).Target,
+                            ((ICompoundAssignmentOperation)operation).OperatorMethod);
+                    effects = EffectSet.From("mut");
+                    if (operatorMethod != null)
+                        effects = effects.Union(InferInitializationMethod(operatorMethod, preserved, span));
+                    if (operation is ICompoundAssignmentOperation compound)
+                    {
+                        foreach (var conversion in new[] { compound.InConversion, compound.OutConversion })
+                            if (conversion.MethodSymbol is { } conversionMethod)
+                                effects = effects.Union(InferInitializationMethod(conversionMethod, preserved, span));
+                        // `s += v` on a string formats both operands, like `s + v`.
+                        if (compound is { OperatorKind: BinaryOperatorKind.Add, OperatorMethod: null,
+                                Type.SpecialType: CS.SpecialType.System_String })
+                            effects = effects
+                                .Union(InferFormattingEffects(CallGraphAnalysis.ConcatenationOperand(compound.Target),
+                                    "concatenation", span))
+                                .Union(InferFormattingEffects(CallGraphAnalysis.ConcatenationOperand(compound.Value),
+                                    "concatenation", span));
+                    }
+                    if (target is IPropertyReferenceOperation { Property.SetMethod: { } targetSetter } property)
+                        effects = effects.Union(InferInitializationMethod(targetSetter, preserved, span, property.Instance));
+                    else if (target is not IFieldReferenceOperation)
+                        return UnknownResolvedOperation($"source initializer operation '{operation.Kind}'", span);
+                    break;
+                }
+                // Creating a delegate allocates. As for a native lambda or method group, what
+                // the target does is charged to the creator, as if it ran; a body statement
+                // outside these kinds stays Unknown.
+                case IDelegateCreationOperation:
+                    effects = EffectSet.From("alloc");
+                    break;
+                case IMethodReferenceOperation reference:
+                    effects = InferInitializationMethod(reference.Method, preserved, span,
+                        reference.Instance, nonVirtualDispatch: !reference.IsVirtual);
+                    break;
+                case IAnonymousFunctionOperation:
+                case IBlockOperation:
+                case IExpressionStatementOperation:
+                case IReturnOperation:
+                case IParameterReferenceOperation:
+                case ILocalReferenceOperation:
+                    break;
                 case IArrayCreationOperation:
                     effects = EffectSet.From("alloc");
                     break;
@@ -6381,6 +6443,18 @@ public sealed class EffectEnforcementPass
                 effects = effects.Union(InferInitializationOperation(child, preserved, span));
             return effects;
         }
+
+        /// <summary>
+        /// An object- or collection-initializer member (<c>{ Capacity = 64 }</c>, a collection
+        /// <c>Add</c>, an indexer <c>[k] = v</c>) is part of the object-construction boundary: its
+        /// receiver is the object just created, so a metadata member whose dispatch is fixed
+        /// (nonvirtual, or a sealed created type) may use its effect contract. The member's
+        /// argument values are still analyzed on their own.
+        /// </summary>
+        private static bool IsConstructionMember(CS.IOperation operation, CS.IOperation? instance, CS.IMethodSymbol method) =>
+            operation.Parent is IObjectOrCollectionInitializerOperation
+            && instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ImplicitReceiver }
+            && CallGraphAnalysis.HasAuthoritativeSourceDispatch(method, instance.Type, nonVirtualDispatch: false);
 
         private EffectSet InferInitializationMethod(
             CS.IMethodSymbol method, bool metadataAllowed, TextSpan span,
@@ -6431,7 +6505,9 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferInitializationBodyDispatch(string functionId, TextSpan span)
         {
-            if (_context.CallGraph.InitializationBodies(functionId) is not { Count: > 0 } bodies)
+            // Null means no bound body was proved. An empty list is an auto accessor, which
+            // has no operations; every bodied callable records at least one bound body.
+            if (_context.CallGraph.InitializationBodies(functionId) is not { } bodies)
                 return UnknownResolvedOperation($"source initializer body '{functionId}'", span);
             if (!_activeInitializationBodies.Add(functionId))
                 return EffectSet.Empty;

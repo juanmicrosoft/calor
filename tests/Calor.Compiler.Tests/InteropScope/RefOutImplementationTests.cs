@@ -698,6 +698,21 @@ public class RefOutImplementationTests
             "var string:value = default(string)\n      Set(out @value)", StringComparison.Ordinal), calor);
     }
 
+    // 0.30: native default(T) takes only a built-in type, so `default(int[])` did not parse and
+    // the whole type was rescued as C# (P2-out-var-array-declaration); a reference type starts as null.
+    [Fact]
+    public void OutDeclaration_OfAnArrayType_StartsAsNullAndStaysNative()
+    {
+        const string source = "public static class Probe { static int Set(out int[] n) { n = new[] { 7 }; return 1; } public static string Run() { int[] a = new[] { Set(out var n) }; return n[0] + \":\" + a[0]; } }";
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+        Assert.Contains("var int[]:n = null\n", result.CalorSource!.Replace("\r\n", "\n"), StringComparison.Ordinal);
+        var compiled = Program.Compile(result.CalorSource!, "out-array.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        Assert.Equal(Run(source), Run(compiled.GeneratedCode));
+    }
+
     [Theory]
     [InlineData("static void Use(ref int x) { x++; } static void M(int[] a) { Use(ref a[Next()]); }", "ref-parameter")]
     [InlineData("static void Use<T>(ref T x) { } static void M(int[] a) { Use<int>(ref a[Next()]); }", "ref-parameter")]

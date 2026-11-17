@@ -170,7 +170,10 @@ public class ConverterCompoundAssignmentTests
     {
         var (_, source, allowed) = Rows().Single(row => row.Id == id);
         var original = RefOutImplementationTests.Run(source);
-        var (calor, losses) = await RefOutImplementationTests.ConvertForValueComparisonAsync(source, surface, original);
+        // A row that allows only preservation is judged on what the surface delivers, not on the
+        // optional native-shaped lowering candidate (as RefOutImplementationTests does).
+        var (calor, losses) = await RefOutImplementationTests.ConvertForValueComparisonAsync(source, surface, original,
+            includeLoweringCandidate: allowed.Split("-or-").Contains("native"));
         var interop = calor.Contains("§CSHARP{", StringComparison.Ordinal) || calor.Contains("§CS{", StringComparison.Ordinal)
             || calor.Contains("§RAW", StringComparison.Ordinal) || losses.Count > 0;
         var strict = Program.Compile(calor, id + ".calr", new CompilationOptions { StatusWriter = TextWriter.Null });

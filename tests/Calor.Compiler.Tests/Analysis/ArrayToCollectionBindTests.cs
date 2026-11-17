@@ -179,13 +179,15 @@ public class ArrayToCollectionBindTests
     {
         // Regression: the pass must recurse into §EACH bodies — file/dir iteration
         // is the exact idiom where this trap occurs (PR #726 review finding 1).
+        // 0.30: a native call is matched by its argument types (no name-only BCL fallback),
+        // and this pass does not type loop variables, so the call reads a typed parameter.
         var diags = Validate(
             "module Files Files block\n" +
             "  func Scan (string:dir) → int\n" +
             "    ! fs:rw\n" +
             "    let string[]:dirs = Directory.GetDirectories(dir)\n" +
             "    each d in dirs\n" +
-            "      let List<string>:lines = File.ReadAllLines(d)\n" +
+            "      let List<string>:lines = File.ReadAllLines(dir)\n" +
             "    return 0\n");
 
         Assert.True(HasArrayTrap(diags));

@@ -6761,17 +6761,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         // Auto-property with default value
         if (node.IsAutoProperty)
         {
+            // The semantic projection marks each accessor so initializer analysis can map
+            // a bound accessor symbol back to its declaration. Ordinary output is unchanged.
+            string Origin(PropertyAccessorNode? accessor) =>
+                CallableOrigin is { } origin && accessor != null ? origin(accessor) : "";
             var getVis = FormatAccessorVisibility(node.Getter?.Visibility, node.Visibility);
-            var accessors = "get;";
+            var accessors = $"{Origin(node.Getter)}get;";
             if (node.Setter != null)
             {
                 var setVis = FormatAccessorVisibility(node.Setter.Visibility, node.Visibility);
-                accessors = $"{getVis}get; {setVis}set;";
+                accessors = $"{Origin(node.Getter)}{getVis}get; {Origin(node.Setter)}{setVis}set;";
             }
             else if (node.Initer != null)
             {
                 var initVis = FormatAccessorVisibility(node.Initer.Visibility, node.Visibility);
-                accessors = $"{getVis}get; {initVis}init;";
+                accessors = $"{Origin(node.Getter)}{getVis}get; {Origin(node.Initer)}{initVis}init;";
             }
             if (node.DefaultValue != null)
             {
@@ -6917,6 +6921,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
 
         var visibilityPrefix = FormatAccessorVisibility(node.Visibility, ownerVisibility);
 
+        if (CallableOrigin is { } origin)
+            AppendLine(origin(node));
         if (node.IsAutoImplemented)
         {
             AppendLine($"{visibilityPrefix}{accessorKeyword};");

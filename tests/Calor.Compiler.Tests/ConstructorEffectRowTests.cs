@@ -88,4 +88,30 @@ public class ConstructorEffectRowTests
         Assert.Matches(@"ctor \(int:number\)\r?\n\s+! throw\r?\n", conversion.CalorSource);
         Assert.False(Program.Compile(conversion.CalorSource!, "Migrated.calr").HasErrors);
     }
+
+    [Fact]
+    public void Converter_DeclaresUnknownOnAConstructorWithARawStatement()
+    {
+        // An event subscription stays a raw C# statement. Its effects cannot be verified, so
+        // the constructor declares `! unknown` (as its own check asks) instead of the whole
+        // file being preserved; a method keeps its row as an assumption (Calor0419).
+        const string csharp = """
+            public class Publisher
+            {
+                public event System.EventHandler Sent;
+                public string Log = "";
+                public Publisher() { Sent += OnSent; }
+                void OnSent(object sender, System.EventArgs e) { Log = Log + ";"; }
+            }
+            """;
+
+        var conversion = new CSharpToCalorConverter().Convert(csharp, "Publisher.cs");
+
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.DoesNotContain(conversion.Losses, loss => loss.Feature == "whole-file-preservation");
+        Assert.Contains(conversion.Losses, loss => loss.Feature == "event-subscription");
+        Assert.Matches(@"ctor \(\)\r?\n\s+! unknown\r?\n", conversion.CalorSource);
+        var compiled = Program.Compile(conversion.CalorSource!, "Publisher.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+    }
 }

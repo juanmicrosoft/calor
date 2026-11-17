@@ -166,8 +166,14 @@ interpolation in method bodies. Proven string, char, Boolean and null holes are
 supported; operand and alignment operations retain their effect checks.
 Source instance calls also need dispatch proof: an open virtual call cannot use
 only the selected base declaration's effect row. Bound nonvirtual calls and
-sealed dispatch retain their existing contracts; unavailable getter-body proof
-still produces Unknown.
+sealed dispatch retain their existing contracts. A source property accessor
+reached from an initializer (an object-initializer setter, a static property
+read) is charged through its bound body like a method; unavailable body proof
+still produces Unknown. Field updates (`++Counter.N`, `x += v`) are mutation,
+and creating a delegate charges what its target does. Inside an object or
+collection initializer, the created object's own nonvirtual metadata members
+(a setter, `Add`, an indexer) use their effect contracts; other native metadata
+calls in an initializer remain unproved.
 The same check follows initializer-reachable source helpers transitively using
 their bound bodies, rather than trusting a source call graph's inferred purity.
 Ordinary open virtual source calls charge the selected declaration's effect row,

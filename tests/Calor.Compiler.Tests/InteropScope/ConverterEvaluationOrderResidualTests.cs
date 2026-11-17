@@ -213,8 +213,10 @@ public class ConverterEvaluationOrderResidualTests
     [InlineData("D-postfix-in-own-index-simple", null)]
     [InlineData("D-postfix-in-own-index-control", null)]
     [InlineData("E-put-collection-initializer", "initializer-interop")]
-    [InlineData("E-put-list-capacity", "compound-assignment-order")]
-    [InlineData("E-put-dictionary-capacity", "compound-assignment-order")]
+    // 0.30: `a[k] = new T(F())` is written in place (`set a[k] new T(F())`); the index
+    // conversion still runs before F, exactly as in C#, so nothing is preserved.
+    [InlineData("E-put-list-capacity", null)]
+    [InlineData("E-put-dictionary-capacity", null)]
     [InlineData("E-put-dictionary-initializer", "dictionary-initializer")]
     [InlineData("E-put-collection-initializer-control", null)]
     [InlineData("F-struct-path-null-receiver", "compound-assignment-order")]
