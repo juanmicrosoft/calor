@@ -211,13 +211,17 @@ module Test Test block
     [Fact]
     public void LinqStaticCall_Enumerable_Range_CompilesSuccessfully()
     {
-        // Static LINQ calls like Enumerable.Range should resolve via type mapping
+        // Static LINQ calls like Enumerable.Range resolve through the restored
+        // System.Linq contract. Native 0.30 binds against .NET metadata, so the
+        // generic Empty<T>() needs its type argument (a bare `Empty()` is not a
+        // valid call and stays Unknown).
         var source = @"
 module Test Test block
+  using System.Linq
   func MakeRange () → void
     !
     Enumerable.Range(1, 10)
-    Enumerable.Empty()
+    Enumerable.Empty<int>()
     Enumerable.Repeat(0, 5)
 ";
         var result = TestHarness.Compile(source);
@@ -229,13 +233,15 @@ module Test Test block
     [Fact]
     public void LinqOfType_CompilesSuccessfully()
     {
-        // OfType<T> calls should be recognized as pure
+        // OfType<T>/Cast<T> calls should be recognized as pure. As in C#, the
+        // extension methods need `using System.Linq` and an explicit type argument.
         var source = @"
 module Test Test block
+  using System.Linq
   func FilterTypes (List<object>:items) → void
     !
-    items.OfType()
-    items.Cast()
+    items.OfType<string>()
+    items.Cast<object>()
 ";
         var result = TestHarness.Compile(source);
 
@@ -918,14 +924,31 @@ module Test Test block
     {
         // A realistic function that calls multiple framework methods in STRICT mode.
         // This verifies the full pipeline: declared effects match computed effects.
+        //
+        // Native 0.30 shape: typed receivers and namespace imports (the old
+        // `ILogger.LogInformation(...)` spelling called instance members on a type
+        // name and only resolved through the retired short-name manifest fallback,
+        // which decision D3 does not restore).
+        //
+        // KNOWN GAP (left failing on purpose): native member calls are charged only
+        // when the binder selects a metadata method, and the binder's metadata set
+        // is restricted to System.* assemblies (MetadataAllowedNamePrefixes in
+        // Binding/Metadata/MetadataContext.cs). ILogger, IConfiguration and
+        // DbContext are therefore UnresolvedBoundType receivers, the Tier B
+        // entries in bcl-framework-interfaces.calor-effects.json are never
+        // consulted, and every call is Unknown (Calor0411 + Calor0410). `-r`
+        // references feed only the Roslyn validation of the generated C#.
         var source = @"
 module Test Test block
-  func HandleRequest () → void
+  using Microsoft.Extensions.Logging
+  using Microsoft.Extensions.Configuration
+  using Microsoft.EntityFrameworkCore
+  func HandleRequest (ILogger:logger, IConfiguration:config, DbContext:db) → void
     ! cw, db:w, env:r
-    ILogger.LogInformation(""Starting request"")
-    IConfiguration.GetSection(""AppSettings"")
-    DbContext.SaveChanges()
-    ILogger.LogInformation(""Request complete"")
+    logger.LogInformation(""Starting request"")
+    config.GetSection(""AppSettings"")
+    db.SaveChanges()
+    logger.LogInformation(""Request complete"")
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
