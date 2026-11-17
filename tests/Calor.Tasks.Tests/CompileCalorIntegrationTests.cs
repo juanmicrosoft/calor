@@ -38,14 +38,14 @@ internal sealed class TestBuildEngine : IBuildEngine
 public class CompileCalorIntegrationTests : IDisposable
 {
     [Theory]
-    [InlineData("module Gate\n  func Run () \u2192 void\n    ", "statement", "return;")]
+    [InlineData("module Gate\n  func Run () \u2192 void\n    !\n    ", "statement", "return;")]
     [InlineData("module Gate\n  class Host\n    ", "member", "public int Value => 7;")]
     [InlineData("module _global\n  ", "unit", "public class Kept { }")]
     public void InteropReasonGate_ChangedWarmSourceFailsEvenWithAllOptOuts(
         string prefix, string marker, string payload)
     {
         var source = CreateSourceFile("ReasonGate.calr",
-            "module Gate\n  func Value () \u2192 int\n    return 7\n");
+            "module Gate\n  func Value () \u2192 int\n    !\n    return 7\n");
         Assert.True(CreateTask(source).Execute());
         File.WriteAllText(source,
             $"{prefix}raw {marker} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n");
