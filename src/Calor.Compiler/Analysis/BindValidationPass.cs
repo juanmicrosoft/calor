@@ -96,23 +96,25 @@ public sealed class BindValidationPass
     /// <summary>
     /// Well-known generic factory calls whose return type cannot be inferred
     /// without an explicit type argument. The value is a placeholder type
-    /// template used in LSP quick-fixes (e.g. <c>Vec.empty</c> → <c>Vec&lt;object&gt;</c>).
+    /// template used in LSP quick-fixes (e.g. <c>Vec.empty</c> → <c>List&lt;object&gt;</c>).
     /// Matched on the call's target string ending -- so <c>Vec.empty</c>,
     /// <c>Vec&lt;T&gt;.empty</c>, and <c>some.module.Vec.empty</c> all match
-    /// <c>Vec.empty</c>. The placeholder uses <c>object</c> so the inserted
-    /// annotation compiles; users typically replace it with a concrete type.
+    /// <c>Vec.empty</c>. Templates are native (C#) type spellings, written without
+    /// blanks so they form one binding type token; the placeholder uses
+    /// <c>object</c> so the inserted annotation compiles, and users typically
+    /// replace it with a concrete type.
     /// </summary>
     private static readonly (string Target, string Template)[] GenericFactoryTargets =
     [
-        ("Vec.empty",        "Vec<object>"),
-        ("Vec.create",       "Vec<object>"),
+        ("Vec.empty",        "List<object>"),
+        ("Vec.create",       "List<object>"),
         ("List.empty",       "List<object>"),
         ("List.create",      "List<object>"),
-        ("Array.empty",      "Array<object>"),
-        ("Set.empty",        "Set<object>"),
-        ("Map.empty",        "Map<object, object>"),
-        ("Dictionary.empty", "Dictionary<object, object>"),
-        ("Dict.empty",       "Dict<object, object>"),
+        ("Array.empty",      "object[]"),
+        ("Set.empty",        "HashSet<object>"),
+        ("Map.empty",        "Dictionary<object,object>"),
+        ("Dictionary.empty", "Dictionary<object,object>"),
+        ("Dict.empty",       "Dictionary<object,object>"),
         ("Queue.empty",      "Queue<object>"),
         ("Stack.empty",      "Stack<object>"),
     ];
@@ -1742,9 +1744,8 @@ public sealed class BindValidationPass
         {
             var msg = $"Binding '{bind.Name}' is initialised to 'null' with no declared type. " +
                 "Inference cannot pick a concrete type. " +
-                "Add a nullable type annotation such as ':object?'.";
-            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferNullLiteral, msg,
-                "Annotate binding with ':object?'", ":object?");
+                $"Add a nullable type annotation, e.g. 'let object?:{bind.Name} = null'.";
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferNullLiteral, msg, "object?");
             return;
         }
 
@@ -1754,8 +1755,7 @@ public sealed class BindValidationPass
             var msg = $"Binding '{bind.Name}' is initialised from '{call.Target}' whose return type " +
                 "is generic and has no resolved type argument. " +
                 "Add an explicit type annotation, e.g. 'let List<int>:" + bind.Name + " = new List<int>()'.";
-            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferGenericReturn, msg,
-                $"Annotate binding with ':{template}'", $":{template}");
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferGenericReturn, msg, template);
             return;
         }
         if (init is ExpressionCallNode native && TryGetNamedCall(native, out var named)
@@ -1764,8 +1764,7 @@ public sealed class BindValidationPass
         {
             var msg = $"Binding '{bind.Name}' is initialised from '{named.Target}' whose return type " +
                 "is generic and has no resolved type argument. Add an explicit type annotation.";
-            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferGenericReturn, msg,
-                $"Annotate binding with ':{nativeTemplate}'", $":{nativeTemplate}");
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferGenericReturn, msg, nativeTemplate);
             return;
         }
 
@@ -1776,24 +1775,26 @@ public sealed class BindValidationPass
                 "integer and floating-point literals; widening could pick more than one type. " +
                 "Add an explicit numeric annotation, e.g. 'let double:" + bind.Name + " = ...' " +
                 "or 'let int:" + bind.Name + " = ...'.";
-            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindAmbiguousNumeric, msg,
-                "Annotate binding with ':f64' (widening default)", ":f64");
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindAmbiguousNumeric, msg, "double",
+                "Annotate binding with type 'double' (widening default)");
             return;
         }
     }
 
     /// <summary>
     /// Emits a strict-bind-inference diagnostic. If <see cref="_source"/> is
-    /// available and the bind's attribute block is in canonical
-    /// <c>§B{name}</c> / <c>§B{~name}</c> form, attaches a SuggestedFix that
-    /// inserts <paramref name="typeAnnotation"/> immediately before the
-    /// closing <c>}</c>. Otherwise emits the diagnostic without a fix.
+    /// available and the binding is a native untyped <c>let name</c> /
+    /// <c>var name</c> header, attaches a SuggestedFix that inserts the
+    /// <c>Type:</c> prefix in front of the name, producing the native typed
+    /// binding <c>let Type:name = ...</c>. Otherwise emits the diagnostic
+    /// without a fix.
     /// </summary>
     private void ReportStrictWithMaybeFix(
         BindStatementNode bind, string code, string message,
-        string fixDescription, string typeAnnotation)
+        string typeName, string? fixDescription = null)
     {
-        var fix = TryBuildBindTypeAnnotationFix(bind, fixDescription, typeAnnotation);
+        var fix = TryBuildBindTypeAnnotationFix(bind,
+            fixDescription ?? $"Annotate binding with type '{typeName}'", typeName);
         if (fix != null)
         {
             _diagnostics.ReportErrorWithFix(bind.Span, code, message, fix);
@@ -1805,97 +1806,45 @@ public sealed class BindValidationPass
     }
 
     /// <summary>
-    /// Builds a SuggestedFix that inserts a <c>:type</c> annotation right
-    /// before the closing <c>}</c> of a canonical bind attribute block.
-    /// Returns null when source is unavailable, the bind isn't in the
-    /// expected form, or the close brace can't be located safely.
+    /// Builds a SuggestedFix that inserts <c>typeName:</c> immediately before
+    /// the identifier of a native <c>let</c>/<c>var</c> binding. Returns null
+    /// when source is unavailable, the binding already declares a type, or the
+    /// header is not exactly the keyword, blanks, and the identifier on one line.
     /// </summary>
     private SuggestedFix? TryBuildBindTypeAnnotationFix(
-        BindStatementNode bind, string description, string typeAnnotation)
+        BindStatementNode bind, string description, string typeName)
     {
-        if (_source == null)
+        if (_source == null || bind.TypeName != null)
         {
             return null;
         }
 
         var start = bind.Span.Start;
-        if (start < 0 || start >= _source.Length)
+        var identifier = bind.IdentifierSpan;
+        if (start < 0 || identifier.Length == 0 || identifier.Start <= start
+            || identifier.End > _source.Length || identifier.Line != bind.Span.Line)
         {
             return null;
         }
 
-        // Locate the '{' that opens the bind attribute block. Must come right
-        // after '§B' and on the same line as bind.Span.
-        var openBrace = _source.IndexOf('{', start);
-        if (openBrace < 0)
+        var keyword = bind.IsMutable ? "var" : "let";
+        if (identifier.Start - start <= keyword.Length
+            || string.CompareOrdinal(_source, start, keyword, 0, keyword.Length) != 0)
         {
             return null;
         }
 
-        // Attribute blocks must not span lines per the lexer grammar.
-        var newlineBefore = _source.IndexOf('\n', start, openBrace - start);
-        if (newlineBefore >= 0)
+        for (var i = start + keyword.Length; i < identifier.Start; i++)
         {
-            return null;
-        }
-
-        // Find the matching '}' (attribute blocks don't nest).
-        var closeBrace = _source.IndexOf('}', openBrace + 1);
-        if (closeBrace < 0)
-        {
-            return null;
-        }
-
-        // Reject if the attribute block spans a newline.
-        var newlineInside = _source.IndexOf('\n', openBrace + 1, closeBrace - openBrace - 1);
-        if (newlineInside >= 0)
-        {
-            return null;
-        }
-
-        // Only fire on canonical shapes: optional '~' followed by identifier
-        // characters and no embedded ':' (no existing annotation) -- protects
-        // against unusual attribute forms that strict-mode might still reach.
-        var inside = _source.Substring(openBrace + 1, closeBrace - openBrace - 1);
-        if (!IsCanonicalBindAttribute(inside))
-        {
-            return null;
-        }
-
-        // Column math: bind.Span.Column is 1-indexed for the '§' character;
-        // closeBrace is char-offset of the '}' (UTF-16). Distance from start
-        // to closeBrace is the column delta on the same line.
-        var closeBraceColumn = bind.Span.Column + (closeBrace - start);
-
-        var filePath = _diagnostics.CurrentFilePath ?? "";
-        var edit = TextEdit.Insert(filePath, bind.Span.Line, closeBraceColumn, typeAnnotation);
-        return new SuggestedFix(description, edit);
-    }
-
-    private static bool IsCanonicalBindAttribute(string inside)
-    {
-        if (string.IsNullOrEmpty(inside))
-        {
-            return false;
-        }
-        var i = 0;
-        if (inside[0] == '~')
-        {
-            i = 1;
-        }
-        if (i >= inside.Length)
-        {
-            return false;
-        }
-        for (; i < inside.Length; i++)
-        {
-            var c = inside[i];
-            if (!(char.IsLetterOrDigit(c) || c == '_'))
+            if (_source[i] is not (' ' or '\t'))
             {
-                return false;
+                return null;
             }
         }
-        return true;
+
+        var filePath = _diagnostics.CurrentFilePath ?? "";
+        var edit = TextEdit.Insert(filePath, identifier.Line, identifier.Column, typeName + ":");
+        return new SuggestedFix(description, edit);
     }
 
     private static bool TryGetGenericFactoryTemplate(string target, out string template)

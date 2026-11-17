@@ -27,7 +27,7 @@ public class BindInferenceQuickfixTests
     }
 
     [Fact]
-    public void Calor0252_VecEmpty_SurfacesVecFix()
+    public void Calor0252_VecEmpty_SurfacesListTypeFix()
     {
         var source = """
             module Test Test block
@@ -39,11 +39,13 @@ public class BindInferenceQuickfixTests
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
 
         var fix = Assert.Single(fixes, f => f.Code == "Calor0252");
-        Assert.Equal(":Vec<object>", fix.Fix.Edits[0].NewText);
+        var edit = Assert.Single(fix.Fix.Edits);
+        Assert.Equal("List<object>:", edit.NewText);
+        Assert.Equal((4, 9), (edit.StartLine, edit.StartColumn));
     }
 
     [Fact]
-    public void Calor0253_AmbiguousNumeric_SurfacesF64Fix()
+    public void Calor0253_AmbiguousNumeric_SurfacesDoubleFix()
     {
         var source = """
             module Test Test block
@@ -55,7 +57,9 @@ public class BindInferenceQuickfixTests
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
 
         var fix = Assert.Single(fixes, f => f.Code == "Calor0253");
-        Assert.Equal(":f64", fix.Fix.Edits[0].NewText);
+        var edit = Assert.Single(fix.Fix.Edits);
+        Assert.Equal("double:", edit.NewText);
+        Assert.Equal((4, 9), (edit.StartLine, edit.StartColumn));
     }
 
     [Fact]

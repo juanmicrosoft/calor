@@ -39,6 +39,7 @@ public class SymbolFinderTests
             module CollectionReferences
               class Tracked extends System.Collections.Generic.List<int>
                 func Add (int:value) → void
+                  !
                   return
               func Make () → Tracked
                 ! alloc, mut
@@ -70,6 +71,7 @@ public class SymbolFinderTests
         var source = $$"""
             module Test
               func Probe (int[]:items, System.Collections.Generic.Dictionary<string,int>:pairs) → void
+                ! cw
                 {{firstHeader}}
                   let int:local = 1
                   System.Console.WriteLine(local)
@@ -99,6 +101,7 @@ public class SymbolFinderTests
         const string source = """
             module Test
               func Probe () → void
+                ! cw
                 for long:item = 0; item < 2; item = item + 1
                   System.Console.WriteLine(item)
             """;
@@ -181,11 +184,11 @@ public class SymbolFinderTests
                   return value
 
                 func Ping () → void
-                  !
+                  ! cw
                   Console.WriteLine("ping")
 
               func Use (Worker:worker) → int
-                !
+                ! cw
                 worker.Ping()
                 return worker.Pick(1)
             """;

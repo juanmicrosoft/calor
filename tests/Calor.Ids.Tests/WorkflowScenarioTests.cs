@@ -22,7 +22,7 @@ public class WorkflowScenarioTests : IDisposable
     [Fact]
     public void Sync_AssignsOnlySidecarIdentities()
     {
-        const string source = "module Module\n  func Calculate () → int\n    return 1\n";
+        const string source = "module Module\n  func Calculate () → int\n    !\n    return 1\n";
         var file = Write(source);
         var store = new DeclarationIdentityStore(_directory);
         var first = store.Sync([file]);
@@ -38,7 +38,7 @@ public class WorkflowScenarioTests : IDisposable
     [Fact]
     public void Sync_RenamePreservesIdentity()
     {
-        var file = Write("module Module\n  func OldName () → int\n    return 1\n");
+        var file = Write("module Module\n  func OldName () → int\n    !\n    return 1\n");
         var store = new DeclarationIdentityStore(_directory);
         var before = store.Sync([file]).Declarations.Single(d => d.Kind == IdKind.Function);
         var renamed = File.ReadAllText(file).Replace("OldName", "NewName", StringComparison.Ordinal);
@@ -53,7 +53,7 @@ public class WorkflowScenarioTests : IDisposable
     [Fact]
     public void Sync_AmbiguousRenamesLeaveSidecarAndSourceUntouched()
     {
-        const string source = "module Module\n  func A () → void\n  func B () → void\n";
+        const string source = "module Module\n  func A () → void\n    !\n  func B () → void\n    !\n";
         var file = Write(source);
         var store = new DeclarationIdentityStore(_directory);
         store.Sync([file]);

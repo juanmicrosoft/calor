@@ -25,6 +25,7 @@ public class CrossFileResolutionTests
         var source = """
             module Shared Shared
               func Same () → void
+                !
             """;
 
         var first = OpenDocument(workspace, firstUri, source);
@@ -44,13 +45,16 @@ public class CrossFileResolutionTests
         var definitions = """
             module Utils Utils
               func Pick (int:value) → int
+                !
                 return value
               func Pick (string:value) → string
+                !
                 return value
             """;
         var use = """
             module Main Main
               func Run () → int
+                !
                 return Pick(1)
             """;
         var definitionsState = OpenDocument(workspace,
@@ -94,11 +98,13 @@ public class CrossFileResolutionTests
             """
             module Utils Utils
               func Pick (string:value) → string
+                !
                 return value
             """);
         var use = """
             module Main Main
               func Run () → int
+                !
                 return Pick(1)
             """;
         var useState = OpenDocument(workspace,
@@ -216,6 +222,7 @@ public class CrossFileResolutionTests
         const string source = """
             module Shared Shared
               func Same () → void
+                !
             """;
         var first = new WorkspaceState("/checkout/one");
         var second = new WorkspaceState("/different/checkout");
@@ -238,6 +245,7 @@ public class CrossFileResolutionTests
         const string source = """
             module Shared Shared
               func Same () → void
+                !
             """;
         var firstWorkspace = new WorkspaceState();
         firstWorkspace.ConfigureWorkspaceRoots(
@@ -288,6 +296,7 @@ public class CrossFileResolutionTests
         var use = """
             module Main Main
               func Run () → int
+                !
                 return Hidden()
             """;
         var useState = OpenDocument(workspace,
@@ -313,11 +322,13 @@ public class CrossFileResolutionTests
             module Service Service
               class Worker
                 func Run () → int
+                  !
                   return 1
             """);
         var use = """
             module Main Main
               func RunMain () → int
+                !
                 return Run()
             """;
         var useState = OpenDocument(workspace,
@@ -343,6 +354,7 @@ public class CrossFileResolutionTests
                 func Hidden private () → int
                   return 1
               func Run () → int
+                !
                 return Worker.Hidden()
             """;
         var state = OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source);
@@ -366,6 +378,7 @@ public class CrossFileResolutionTests
                 func Hidden private () → int
                   return 1
                 func Run () → int
+                  !
                   return Hidden()
             """;
         var state = OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source);
@@ -392,12 +405,14 @@ public class CrossFileResolutionTests
             module BaseModule BaseModule
               class Base
                 func Pick (int:value) → int
+                  !
                   return value
             """);
         var source = """
             module DerivedModule DerivedModule
               class Derived extends Base
                 func Use () → int
+                  !
                   return base.Pick(1)
             """;
         var state = OpenDocument(workspace, DocumentUri.From("file:///derived.calr"), source);
@@ -426,6 +441,7 @@ public class CrossFileResolutionTests
         var use = """
             module Main Main
               func Make () → Widget
+                !
                 return new Widget()
             """;
         var useState = OpenDocument(workspace,
@@ -456,6 +472,7 @@ public class CrossFileResolutionTests
             """
             module Utils Utils
               func Pick () → int
+                !
                 return 1
             """);
         var oldSymbol = Assert.Single(definitions.BoundModule!.Functions).Symbol;
@@ -464,8 +481,10 @@ public class CrossFileResolutionTests
             """
             module Utils Utils
               func Before () → int
+                !
                 return 0
               func Pick () → int
+                !
                 let int:value = 1
                 return value
             """,
@@ -473,6 +492,7 @@ public class CrossFileResolutionTests
         var use = """
             module Main Main
               func Run () → int
+                !
                 return Pick()
             """;
         var useState = OpenDocument(workspace, DocumentUri.From("file:///main.calr"), use);
@@ -496,16 +516,16 @@ public class CrossFileResolutionTests
         var uri = DocumentUri.From("file:///state.calr");
         var state = OpenDocument(workspace,
             uri,
-            "module State State\n  func Value () → int\n    return 1\n",
+            "module State State\n  func Value () → int\n    !\n    return 1\n",
             version: 1);
         var captured = state.Snapshot;
         workspace.Update(
             uri,
-            "module State State\n  func Value () → int\n    return 2\n",
+            "module State State\n  func Value () → int\n    !\n    return 2\n",
             version: 2);
         workspace.Update(
             uri,
-            "module State State\n  func Value () → int\n    return 0\n",
+            "module State State\n  func Value () → int\n    !\n    return 0\n",
             version: 1);
 
         Assert.Equal(1, captured.Version);
@@ -525,6 +545,7 @@ public class CrossFileResolutionTests
         var source1 = """
             module Utils Utils
               func Add (int:a, int:b) → int
+                !
                 return a + b
             """;
         OpenDocument(workspace, DocumentUri.From("file:///utils.calr"), source1);
@@ -533,6 +554,7 @@ public class CrossFileResolutionTests
         var source2 = """
             module Main Main
               func Test () → int
+                !
                 let result = Add(1, 2)
                 return result
             """;
@@ -564,6 +586,7 @@ public class CrossFileResolutionTests
         var source2 = """
             module Main Main
               func CreatePerson () → Person
+                !
                 return new Person()
             """;
         OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source2);
@@ -585,6 +608,7 @@ public class CrossFileResolutionTests
             module Interfaces Interfaces
               interface IShape
                 func GetArea () → double
+                  !
             """;
         OpenDocument(workspace, DocumentUri.From("file:///interfaces.calr"), source1);
 
@@ -625,6 +649,7 @@ public class CrossFileResolutionTests
         var source = """
             module Test Test
               func Test () → void
+                !
                 return 42
             """;
         OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
@@ -643,8 +668,10 @@ public class CrossFileResolutionTests
         var source = """
             module Test Test
               func Helper () → void
+                !
                 return 42
               func Main () → void
+                !
                 let x = Helper()
                 return x
             """;
@@ -669,6 +696,7 @@ public class CrossFileResolutionTests
         var source = """
             module Test Test
               func PublicFunc () → void
+                !
                 return 42
               func PrivateFunc private () → void
                 return 0
@@ -707,6 +735,7 @@ public class CrossFileResolutionTests
             module Test Test
               interface IMyInterface
                 func DoSomething () → void
+                  !
             """;
         OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
@@ -741,6 +770,7 @@ public class CrossFileResolutionTests
         var source = """
             module Test Test
               delegate Callback (int:value) → void
+                !
             """;
         OpenDocument(workspace, DocumentUri.From("file:///test.calr"), source);
 
@@ -757,6 +787,7 @@ public class CrossFileResolutionTests
         var source1 = """
             module File1 File1
               func FuncA () → void
+                !
                 return 1
             """;
         OpenDocument(workspace, DocumentUri.From("file:///file1.calr"), source1);
@@ -764,6 +795,7 @@ public class CrossFileResolutionTests
         var source2 = """
             module File2 File2
               func FuncB () → void
+                !
                 return 2
             """;
         OpenDocument(workspace, DocumentUri.From("file:///file2.calr"), source2);
@@ -802,6 +834,7 @@ public class CrossFileResolutionTests
         var source2 = """
             module Service Service
               func GetCustomer () → int
+                !
                 return 0
             """;
         var doc2 = OpenDocument(workspace, DocumentUri.From("file:///service.calr"), source2);
@@ -823,6 +856,7 @@ public class CrossFileResolutionTests
         var source1 = """
             module Utils Utils
               func Calculate (int:x) → int
+                !
                 return x * 2
             """;
         OpenDocument(workspace, DocumentUri.From("file:///utils.calr"), source1);
@@ -831,6 +865,7 @@ public class CrossFileResolutionTests
         var source2 = """
             module Main Main
               func Test () → int
+                !
                 return 0
             """;
         var doc2 = OpenDocument(workspace, DocumentUri.From("file:///main.calr"), source2);
@@ -885,6 +920,7 @@ public class CrossFileResolutionTests
               class Animal
                 field string:name
                 func Speak () → string
+                  !
                   return "..."
             """;
         OpenDocument(workspace, DocumentUri.From("file:///base.calr"), source1);
@@ -926,6 +962,7 @@ public class CrossFileResolutionTests
         var source = """
             module Test Test
               func ToRemove () → void
+                !
                 return 42
             """;
         var uri = DocumentUri.From("file:///toremove.calr");
@@ -954,6 +991,7 @@ public class CrossFileResolutionTests
         var source1 = """
             module Test Test
               func OldName () → void
+                !
                 return 42
             """;
         OpenDocument(workspace, uri, source1);
@@ -966,6 +1004,7 @@ public class CrossFileResolutionTests
         var source2 = """
             module Test Test
               func NewName () → void
+                !
                 return 42
             """;
         workspace.Update(uri, source2, 2);
@@ -1013,6 +1052,7 @@ public class CrossFileResolutionTests
               class Person
                 field string:name
                 func GetName () → string
+                  !
                   return name
             """;
         OpenDocument(workspace, DocumentUri.From("file:///models.calr"), source);
@@ -1072,6 +1112,7 @@ public class CrossFileResolutionTests
             module Interfaces Interfaces
               interface IShape
                 func GetArea () → double
+                  !
             """;
         OpenDocument(workspace, DocumentUri.From("file:///interfaces.calr"), source);
 
@@ -1652,15 +1693,19 @@ public class CrossFileResolutionTests
         const string original = """
             module TestModule TestModule
               func Compute () → int
+                !
                 return 42
               func Use () → int
+                !
                 return Compute()
             """;
         const string updated = """
             module TestModule TestModule
               func Calculate () → int
+                !
                 return 42
               func Use () → int
+                !
                 return Calculate()
             """;
         var workspace = new WorkspaceState();
@@ -1962,6 +2007,7 @@ public class CrossFileResolutionTests
         var source1 = """
             module File1 File1
               func Helper () → void
+                !
                 return 1
             """;
         OpenDocument(workspace, DocumentUri.From("file:///file1.calr"), source1);
@@ -1970,6 +2016,7 @@ public class CrossFileResolutionTests
         var source2 = """
             module File2 File2
               func Helper () → void
+                !
                 return 2
             """;
         OpenDocument(workspace, DocumentUri.From("file:///file2.calr"), source2);

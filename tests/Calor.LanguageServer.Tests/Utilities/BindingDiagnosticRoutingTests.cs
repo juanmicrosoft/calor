@@ -157,8 +157,10 @@ public class BindingDiagnosticRoutingTests
         const string source = """
             module Routing
               func Helper () → int
+                !
                 return 42
               func Main () → int
+                !
                 let x = Helper
                 return x
             """;
@@ -223,7 +225,7 @@ public class BindingDiagnosticRoutingTests
         var compiler = Assert.Single(compiled.Diagnostics.Where(d => d.Code == code));
         Assert.Equal(diagnostic.Span, compiler.Span);
         Assert.Equal(diagnostic.Severity, compiler.Severity);
-        var update = await document.UpdateAsync("module Routing\n  func Probe () → string\n    return \"safe\"\n", 1);
+        var update = await document.UpdateAsync("module Routing\n  func Probe () → string\n    !\n    return \"safe\"\n", 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == code);
     }
@@ -234,8 +236,10 @@ public class BindingDiagnosticRoutingTests
         const string source = """
             module Routing
               func Probe () → int
+                !
                 return 1
               func Probe () → int
+                !
                 return 2
             """;
         var path = Path.Combine(Path.GetTempPath(), "routing-" + Guid.NewGuid().ToString("N") + ".calr");

@@ -200,7 +200,7 @@ public class DefinitionHandlerTests
             var location = link.Location!;
             Assert.Equal(definitionPath, location.Uri.ToUri().LocalPath);
             Assert.Equal(
-                definition.IndexOf("Pick:pub", StringComparison.Ordinal),
+                definition.IndexOf("Pick (", StringComparison.Ordinal),
                 PositionConverter.ToOffset(location.Range.Start, definition));
         }
         finally
@@ -274,7 +274,7 @@ public class DefinitionHandlerTests
         var location = Assert.Single(result).Location;
         Assert.NotNull(location);
         Assert.Equal(
-            source.IndexOf("Create:pub", StringComparison.Ordinal),
+            source.IndexOf("Create static", StringComparison.Ordinal),
             PositionConverter.ToOffset(location!.Range.Start, source));
     }
 

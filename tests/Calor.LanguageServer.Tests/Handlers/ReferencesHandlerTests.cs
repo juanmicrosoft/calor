@@ -27,14 +27,14 @@ public class ReferencesHandlerTests
                   return 2
 
               func Use () → int
-                !
+                ! alloc
                 let First:first = new First()
                 return first.Run()
             """;
         var uri = DocumentUri.From("file:///references-method-collision.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
-        var firstRun = source.IndexOf("Run:pub", StringComparison.Ordinal);
+        var firstRun = source.IndexOf("Run (", StringComparison.Ordinal);
         var references = await FindReferencesAsync(
             workspace,
             uri,
@@ -46,7 +46,7 @@ public class ReferencesHandlerTests
         Assert.DoesNotContain(
             references,
             location => PositionConverter.ToOffset(location.Range.Start, source)
-                == source.LastIndexOf("Run:pub", StringComparison.Ordinal));
+                == source.LastIndexOf("Run (", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -73,13 +73,13 @@ public class ReferencesHandlerTests
             workspace,
             uri,
             source,
-            source.IndexOf("Pick:pub", StringComparison.Ordinal));
+            source.IndexOf("Pick (", StringComparison.Ordinal));
 
         Assert.Equal(2, references.Length);
         Assert.DoesNotContain(
             references,
             location => PositionConverter.ToOffset(location.Range.Start, source)
-                == source.LastIndexOf("Pick:pub", StringComparison.Ordinal));
+                == source.LastIndexOf("Pick (", StringComparison.Ordinal));
         Assert.All(references, location => Assert.Equal("Pick", TextAt(source, location.Range)));
     }
 

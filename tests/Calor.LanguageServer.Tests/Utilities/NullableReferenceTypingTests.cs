@@ -12,7 +12,6 @@ public class NullableReferenceTypingTests
     [Theory]
     [InlineData("input", "Foo")]
     [InlineData("input", "string")]
-    [InlineData("input", "str")]
     public async Task LocalAndMemberReturnDiagnostic_UsesShapePolicyAndClearsOnSafeEditAsync(
         string value, string referenceType)
     {
@@ -34,7 +33,7 @@ public class NullableReferenceTypingTests
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
         Assert.Equal("calor", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
-        Assert.Equal(referenceType is "string" or "str"
+        Assert.Equal(referenceType == "string"
                 ? BindingReceivingShape.ScalarString
                 : BindingReceivingShape.Nominal,
             diagnostic.BindingContext?.Shape);
@@ -45,7 +44,7 @@ public class NullableReferenceTypingTests
         Assert.Equal(diagnostic.Span, compiler.Span);
         Assert.Equal(diagnostic.Severity, compiler.Severity);
         var update = await document.UpdateAsync(
-            source.Replace($"-> {referenceType}", $"-> ?{referenceType}", StringComparison.Ordinal), 1);
+            source.Replace($") → {referenceType}", $") → {referenceType}?", StringComparison.Ordinal), 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == diagnostic.Code);
     }
@@ -76,13 +75,14 @@ public class NullableReferenceTypingTests
         var result = Compiler.Program.Compile(source, path);
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics, d => d.Code == diagnostic.Code);
-        var update = await document.UpdateAsync(source.Replace("-> Foo", "-> ?Foo", StringComparison.Ordinal), 1);
+        var update = await document.UpdateAsync(source.Replace(
+            "Probe static (Foo?:input) → Foo", "Probe static (Foo?:input) → Foo?", StringComparison.Ordinal), 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == diagnostic.Code);
     }
 
     [Theory]
-    [InlineData("?str", "\"safe\"")]
+    [InlineData("string?", "\"safe\"")]
     public async Task SupportedNullableReferences_HaveNoSpuriousTypingDiagnosticsAsync(string type, string value)
     {
         var source = $$"""

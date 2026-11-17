@@ -141,23 +141,23 @@ public class HoverHandlerTests
     }
 
     [Theory]
-    [InlineData("module Demo\n  func Identity<T> (T:value) → T\n    return value",
+    [InlineData("module Demo\n  func Identity<T> (T:value) → T\n    !\n    return value",
         "Identity", "func Identity<T> (T:value) → T")]
     [InlineData("module Demo\n  class Person\n    field string:name",
         "Person", "class Person")]
     [InlineData("module Demo\n  class Person\n    field string:name",
         "name", "field string:name")]
-    [InlineData("module Demo\n  class Person\n    func Add (int:x) → int\n      return x",
+    [InlineData("module Demo\n  class Person\n    func Add (int:x) → int\n      !\n      return x",
         "Add", "func Add (int:x) → int")]
     [InlineData("module Demo\n  class Person\n    property int:Count\n      get\n        return 1",
         "Count", "property int:Count")]
-    [InlineData("module Demo\n  interface IShape\n    func Area () → double",
+    [InlineData("module Demo\n  interface IShape\n    func Area () → double\n      !",
         "IShape", "interface IShape")]
     [InlineData("module Demo\n  enum Color\n    Red",
         "Color", "enum Color")]
-    [InlineData("module Demo\n  func Identity (\n    int:value\n  ) → int\n    return value",
+    [InlineData("module Demo\n  func Identity (\n    int:value\n  ) → int\n    !\n    return value",
         "Identity", "func Identity (\n    int:value\n  ) → int")]
-    [InlineData("module Demo\n  func Text (\n    string:value = \"(value)\"\n  ) → string\n    return value",
+    [InlineData("module Demo\n  func Text (\n    string:value = \"(value)\"\n  ) → string\n    !\n    return value",
         "Text", "func Text (\n    string:value = \"(value)\"\n  ) → string")]
     public void NativeSymbolHover_RetainsExactAuthoredDeclarationWithoutSourceIds(
         string source, string name, string expectedHeader)
@@ -214,6 +214,7 @@ public class HoverHandlerTests
         const string source = """
             module Demo
               func Read (string:@func) → string
+                !
                 let string:text = "func"
                 return @func
             """;

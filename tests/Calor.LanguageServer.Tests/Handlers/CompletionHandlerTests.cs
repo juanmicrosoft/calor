@@ -61,7 +61,7 @@ public class CompletionHandlerTests
     [Fact]
     public async Task CanonicalCompletion_CallArgumentRetainsExpressionScopeAsync()
     {
-        const string source = "module M\n  func Echo (int:value) → int\n    return Echo(value)\n";
+        const string source = "module M\n  func Echo (int:value) → int\n    !\n    return Echo(value)\n";
         var workspace = new WorkspaceState();
         var uri = new Uri("file:///canonical-call-completion.calr");
         workspace.GetOrCreate(uri, source).Reanalyze();
@@ -83,7 +83,7 @@ public class CompletionHandlerTests
     [InlineData("invariant", "null")]
     public async Task CanonicalCompletion_EscapesCollisionSymbolsAsync(string function, string parameter)
     {
-        var source = $"module M\n  func @{function} (string:@{parameter}) → string\n    return @{parameter}\n";
+        var source = $"module M\n  func @{function} (string:@{parameter}) → string\n    !\n    return @{parameter}\n";
         var compilation = Compiler.Program.Compile(source);
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
         var workspace = new WorkspaceState();
@@ -117,7 +117,7 @@ public class CompletionHandlerTests
     [InlineData("base")]
     public void CanonicalCompletion_EscapedInstanceWordsResolveTheDeclaredParameter(string parameter)
     {
-        var source = $"module M\n  func Echo (string:@{parameter}) → string\n    return @{parameter}.Trim()\n";
+        var source = $"module M\n  func Echo (string:@{parameter}) → string\n    !\n    return @{parameter}.Trim()\n";
         var compilation = Compiler.Program.Compile(source);
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
 
@@ -132,8 +132,8 @@ public class CompletionHandlerTests
     [InlineData("@func().")]
     public void CanonicalCompletion_EscapedChainsPreserveTheReceiver(string expression)
     {
-        var source = $"module M\n  func @func () → string\n    return \"text\"\n"
-            + $"  func Echo (string:@let) → string\n    return {expression}Trim()\n";
+        var source = $"module M\n  func @func () → string\n    !\n    return \"text\"\n"
+            + $"  func Echo (string:@let) → string\n    !\n    return {expression}Trim()\n";
         var compilation = Compiler.Program.Compile(source);
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
 
@@ -146,8 +146,8 @@ public class CompletionHandlerTests
     [Fact]
     public async Task CanonicalCompletion_CrossFileCollisionsStayEscapedAsync()
     {
-        const string exported = "module Exported\n  func @func () → string\n    return \"text\"\n";
-        const string source = "module Local\n  func Echo (string:value) → string\n    return value\n";
+        const string exported = "module Exported\n  func @func () → string\n    !\n    return \"text\"\n";
+        const string source = "module Local\n  func Echo (string:value) → string\n    !\n    return value\n";
         Assert.False(Compiler.Program.Compile(exported).HasErrors);
         Assert.False(Compiler.Program.Compile(source).HasErrors);
         var workspace = new WorkspaceState();
@@ -193,8 +193,10 @@ public class CompletionHandlerTests
             module AsyncCompletion
               class Probe
                 func Produce async () → {{output}}
+                  !
                   return 42
               func Use (Probe:probe) → void
+                !
                 probe.Produce()
             """;
         var compilation = Compiler.Program.Compile(source, "async-completion.calr",
@@ -274,6 +276,7 @@ public class CompletionHandlerTests
             module TestModule
               interface IShape
                 func GetArea () → double
+                  !
             """;
 
         AssertNativeSource(source);
@@ -292,6 +295,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               delegate Callback (int:value) → void
+                !
             """;
 
         AssertNativeSource(source);
@@ -387,7 +391,6 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test private () → void
-                ! cw
                 for i from 0 to 10 step 1
                   System.Console.WriteLine(i)
             """;
@@ -1029,6 +1032,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test (int:myParam, string:anotherParam) → int
+                !
                 return myParam
             """;
 
@@ -1048,6 +1052,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → int
+                !
                 let x = 10
                 let y = 20
                 return x
@@ -1069,6 +1074,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → int
+                !
                 let first = 1
                 let second = 2
                 let third = 3
@@ -1110,6 +1116,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test (bool:condition) → int
+                !
                 let outer = 1
                 if condition
                   let inner = 2
@@ -1138,6 +1145,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test (int:myParam, string:otherParam) → int
+                !
                 return myParam
             """;
 
@@ -1155,6 +1163,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → int
+                !
                 let int:localVar = 42
                 let string:anotherVar = "hello"
                 return localVar
@@ -1174,8 +1183,10 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Helper () → int
+                !
                 return 42
               func Main () → int
+                !
                 return Helper()
             """;
 
@@ -1192,6 +1203,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → bool
+                !
                 return true
             """;
 
@@ -1208,6 +1220,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test (int:count) → int
+                !
                 return count
             """;
 
@@ -1227,6 +1240,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → string
+                !
                 let string:name = "test"
                 return name
             """;
@@ -1246,6 +1260,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → int
+                !
                 var int:sum = 0
                 for i from 0 to 10 step 1
                   set sum sum + i
@@ -1329,6 +1344,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → int
+                !
                 let int:immutable = 10
                 var int:mutable = 20
                 return immutable + mutable
@@ -1356,6 +1372,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → int
+                !
                 var int:counter = 0
                 do
                   set counter counter + 1
@@ -1398,6 +1415,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test (int:value) → string
+                !
                 match value
                   case var x when x > 0
                     return "positive"
@@ -1438,6 +1456,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test (int:param) → int
+                !
                 let int:outer = 1
                 if param > 0
                   let int:inner = 2
@@ -1462,6 +1481,7 @@ public class CompletionHandlerTests
         var source = """
             module TestModule
               func Test () → string
+                !
                 try
                   return "success"
                 catch System.Exception:ex
