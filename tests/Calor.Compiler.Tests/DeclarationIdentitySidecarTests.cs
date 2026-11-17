@@ -116,9 +116,11 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             ["TMP"] = ambientRoot,
             ["TEMP"] = ambientRoot
         };
+        // 0.30: convert refuses to overwrite an existing .calr that has no conversion generation
+        // (it may hold hand edits), so the converted output is a new file beside the active one.
         var arguments = convert
             ? new[] { "convert", Write("input.cs", "public static class Converted { public static int Value() => 1; }"),
-                "--output", file }
+                "--output", Path.Combine(Path.GetDirectoryName(file)!, "converted.calr") }
             : new[] { "--input", file };
         var result = CliTestHarness.RunCli(ambientRoot, environment, arguments);
         Assert.True(result.ExitCode == 0, result.StdOut + result.StdErr);
