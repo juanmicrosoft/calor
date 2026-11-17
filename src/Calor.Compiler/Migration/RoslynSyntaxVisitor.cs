@@ -11636,8 +11636,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)))
                 : TypeMapper.CSharpToCalor(declaration.Type.ToString());
             // `default`, as for `int x;`: a bare binding would take a next-line `§C` as its initializer.
+            // Native `default(T)` takes only a built-in type, so another reference type (`out var
+            // int[] n`) starts as `null`, as a reference local does.
+            var initial = type is { IsReferenceType: true, TypeKind: not (TypeKind.Error or TypeKind.Dynamic),
+                SpecialType: not (SpecialType.System_String or SpecialType.System_Object) }
+                ? "null" : "default";
             result.Add(new BindStatementNode(GetTextSpan(declaration), name, typeName, isMutable: true,
-                new ReferenceNode(GetTextSpan(declaration), "default"), new AttributeCollection()));
+                new ReferenceNode(GetTextSpan(declaration), initial), new AttributeCollection()));
         }
         return result;
     }
