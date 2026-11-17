@@ -109,6 +109,21 @@ public class EffectResolverKeyLedgerTests
 
     private static readonly string RepoRoot = CliTestHarness.FindRepoRoot();
 
+    /// <summary>
+    /// The current fixture (not the immutable historical ledger).
+    /// <para><b>0.30 refresh: bound 280 -> 2103, string 874 -> 688.</b> The inputs
+    /// themselves changed. (1) File set: +6 D-S1.5 fixtures (bb946729b: checked,
+    /// unchecked, record; 8 string keys); 14 inputs still written in the retired
+    /// <c>§</c> syntax with no native mirror no longer parse and are listed in
+    /// notMeasured (the 12 BinderIncompleteRatchetTests registers, plus
+    /// scripts/h2_deep_fixture.calr and h2_edit_fixture.calr). (2) Every other input is
+    /// now read in 0.30 native syntax, where a call is an expression on a bound
+    /// receiver (<c>Console.WriteLine(i)</c> binds <c>Console</c>) instead of a
+    /// <c>§C{Console.WriteLine}</c> string target, and output that <c>§P</c> wrote without
+    /// asking the resolver is now an ordinary call that does. Checked exactly on
+    /// samples/: the 2cc3cf3e5 compiler on the 5f3bc87bb sources gives 1 bound / 29
+    /// string, the current compiler on the native sources 71 / 5.</para>
+    /// </summary>
     [SkippableFact]
     public void CurrentCompiler_KeyOrigins_OverCommittedCalorCorpus_MatchExpectationsExactly()
     {

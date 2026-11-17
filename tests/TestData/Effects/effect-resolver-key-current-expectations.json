@@ -3,14 +3,14 @@
   "floor": 200,
   "floorRule": "Pre-registered with the ledger (v0.15 E1 slice 2c): keysFromBound + keysFromString across all subjects must be at least 200. The floor detects a collapsed denominator \u2014 a refactor that stops asking the resolver at all \u2014 which exact-equality alone cannot catch, because a regenerated ledger of zeroes is self-consistent. It is not a quality bar and is not re-tuned when the measurement moves.",
   "scope": "Every committed .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/, bench/corpus/ submodules, docs/design/spikes/ artifacts and the PP-W-rows measurement fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, roadmap v0.16 \u00a74.1) excluded; nothing else filtered), partitioned into subjects by top-level directory. Each file is lexed with TokenizeAllForParser and parsed, then run through EffectEnforcementPass with UnknownCallPolicy.Strict and a hermetic EffectResolver (built-in manifests only; ProjectDirectory and SolutionDirectory null). keysFromBound counts EffectResolverKey instances built by EffectResolverKey.FromBoundReceiver \u2014 the receiver's type came from the bound tree; keysFromString counts EffectResolverKey.FromStrings \u2014 the caller held only text. Both are counted per CALL SITE, before the resolver's cache, so the ledger measures how the compiler ASKS rather than how often an answer had to be computed. A key's parameter component is the inferred types of the ARGUMENTS, not the callee's resolved signature (design doc \u00a78.4), so this ledger measures declaring-type provenance only. Files that fail to lex/parse, or whose pass throws, contribute no keys and are listed by repo-relative path in notMeasured.",
-  "aggregateKeysFromBound": 280,
-  "aggregateKeysFromString": 874,
+  "aggregateKeysFromBound": 2103,
+  "aggregateKeysFromString": 688,
   "perSubject": [
     {
       "subject": "bench",
-      "keysFromBound": 233,
-      "keysFromString": 626,
-      "filesMeasured": 390,
+      "keysFromBound": 1671,
+      "keysFromString": 645,
+      "filesMeasured": 396,
       "notMeasured": [
         "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
         "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -49,15 +49,15 @@
     },
     {
       "subject": "benchmarks",
-      "keysFromBound": 16,
-      "keysFromString": 52,
+      "keysFromBound": 44,
+      "keysFromString": 4,
       "filesMeasured": 7,
       "notMeasured": []
     },
     {
       "subject": "samples",
-      "keysFromBound": 1,
-      "keysFromString": 29,
+      "keysFromBound": 71,
+      "keysFromString": 5,
       "filesMeasured": 11,
       "notMeasured": []
     },
@@ -65,22 +65,37 @@
       "subject": "scripts",
       "keysFromBound": 0,
       "keysFromString": 0,
-      "filesMeasured": 2,
-      "notMeasured": []
+      "filesMeasured": 0,
+      "notMeasured": [
+        "scripts/h2_deep_fixture.calr",
+        "scripts/h2_edit_fixture.calr"
+      ]
     },
     {
       "subject": "src",
-      "keysFromBound": 3,
-      "keysFromString": 27,
+      "keysFromBound": 41,
+      "keysFromString": 8,
       "filesMeasured": 10,
       "notMeasured": []
     },
     {
       "subject": "tests",
-      "keysFromBound": 27,
-      "keysFromString": 137,
-      "filesMeasured": 495,
+      "keysFromBound": 253,
+      "keysFromString": 25,
+      "filesMeasured": 483,
       "notMeasured": [
+        "tests/Calor.Conversion.Tests/Snapshots/02-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/02-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/04-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/04-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/04-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/11-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-07.approved.calr",
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-signature-calor/Signature.calr",
+        "tests/E2E/scenarios/07_collections/output.g.calr",
         "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",
         "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr",
         "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr"
@@ -88,8 +103,8 @@
     },
     {
       "subject": "tools",
-      "keysFromBound": 0,
-      "keysFromString": 3,
+      "keysFromBound": 23,
+      "keysFromString": 1,
       "filesMeasured": 1,
       "notMeasured": []
     }
