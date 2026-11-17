@@ -102,6 +102,16 @@ public sealed class TypeMapping
     public Dictionary<string, List<string>>? Setters { get; set; }
 
     /// <summary>
+    /// Field read effects, including any initialization of the declaring type a
+    /// static read can trigger. Key is the field name, value is list of effect codes.
+    /// Consulted only when the binder selected that exact metadata field; a field
+    /// without an entry stays unknown, and an entry never answers for a property,
+    /// a getter, or a method of the same name.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, List<string>>? Fields { get; set; }
+
+    /// <summary>
     /// Constructor effects.
     /// Key is parameter signature (e.g., "()" for parameterless, "(String)" for single string param).
     /// Value is list of effect codes.

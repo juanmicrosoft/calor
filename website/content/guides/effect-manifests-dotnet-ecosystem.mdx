@@ -165,6 +165,7 @@ Each manifest supports:
 
 - **`methods`** — Per-method effects (or `"*"` wildcard for all methods)
 - **`getters`** / **`setters`** — Property accessor effects
+- **`fields`** — Field read effects, for that exact field only (no fallback to `defaultEffects`)
 - **`constructors`** — Constructor effects (keyed by parameter signature)
 - **`defaultEffects`** — Fallback for any method not explicitly listed
 - **`namespaceDefaults`** — Default effects for entire namespaces

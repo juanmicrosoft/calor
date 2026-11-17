@@ -94,6 +94,7 @@ public sealed class EffectResolver
         {
             EffectMemberKind.Getter or EffectMemberKind.Setter => ResolveAccessorInternal(key),
             EffectMemberKind.Constructor => ResolveConstructorInternal(key),
+            EffectMemberKind.Field => ResolveFieldInternal(key),
             _ => ResolveMethodInternal(key),
         };
         _resolutionCache[key] = resolution;
@@ -294,6 +295,25 @@ public sealed class EffectResolver
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
 
+    /// <summary>
+    /// A metadata field read has exactly one source of authority: a
+    /// <c>fields</c> entry naming that field on that declaring type. Unlike
+    /// accessors it never falls back to <c>defaultEffects</c>, namespace
+    /// defaults, a getter of the same name or IL analysis. A field read runs no
+    /// accessor body, so a type's method or getter defaults say nothing about
+    /// it, and a static read may run the declaring type's initializer, which
+    /// only an explicit entry can vouch for. The caller asks only after the
+    /// binder selected the actual <c>IFieldSymbol</c>; there is no name-only
+    /// route into this table.
+    /// </summary>
+    private EffectResolution ResolveFieldInternal(EffectResolverKey key)
+    {
+        if (_typeCache.TryGetValue(key.DeclaringType, out var typeInfo)
+            && typeInfo.Members.TryGetValue(key.WithoutParameterList(), out var fieldEffects))
+            return CreateResolution(fieldEffects, typeInfo.Source);
+        return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
+    }
+
     private EffectResolution ResolveConstructorInternal(EffectResolverKey key)
     {
         // Check type cache from manifests
@@ -427,6 +447,15 @@ public sealed class EffectResolver
                     {
                         typeInfo.Members[EffectResolverKey.ForManifestEntry(
                             EffectMemberKind.Setter, mappingType, prop, null)] = effects;
+                    }
+                }
+
+                if (mapping.Fields != null)
+                {
+                    foreach (var (field, effects) in mapping.Fields)
+                    {
+                        typeInfo.Members[EffectResolverKey.ForManifestEntry(
+                            EffectMemberKind.Field, mappingType, field, null)] = effects;
                     }
                 }
 
@@ -704,6 +733,13 @@ public enum EffectMemberKind
 
     /// <summary>A constructor. <see cref="EffectResolverKey.MemberName"/> is <c>".ctor"</c>.</summary>
     Constructor,
+
+    /// <summary>
+    /// A read of a binder-selected metadata field. <see cref="EffectResolverKey.MemberName"/>
+    /// is the field name. Only a manifest <c>fields</c> entry answers it; see
+    /// <c>EffectResolver.ResolveFieldInternal</c>.
+    /// </summary>
+    Field,
 }
 
 /// <summary>
@@ -941,6 +977,51 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             ? string.Empty
             : declaringType.Trim().Replace("global::", "", StringComparison.Ordinal);
 
+    /// <summary>
+    /// The CLR metadata name a C# built-in type keyword denotes, or null. The
+    /// language defines these aliases, so <c>new object()</c> constructs exactly
+    /// <c>System.Object</c>. Only the exact lower-case keywords are mapped: the
+    /// binder's canonical <c>OBJECT</c> also stands for <c>any</c>/<c>unknown</c>,
+    /// and a capitalized <c>Object</c> may be a source type.
+    ///
+    /// <para>Deliberately NOT applied in <see cref="NormalizeDeclaringType"/>:
+    /// a method key on an <c>object</c>-typed receiver names a virtual call
+    /// (<c>Equals</c>, <c>GetHashCode</c>) that may dispatch to a user
+    /// override, so mapping it onto the <c>System.Object</c> entry would borrow
+    /// a contract the runtime target never promised. Constructors do not
+    /// dispatch, which is why the constructor path uses this.</para>
+    /// </summary>
+    internal static string? KeywordAliasMetadataName(string type) => type switch
+    {
+        "object" => "System.Object",
+        "string" => "System.String",
+        "bool" => "System.Boolean",
+        "char" => "System.Char",
+        "sbyte" => "System.SByte",
+        "byte" => "System.Byte",
+        "short" => "System.Int16",
+        "ushort" => "System.UInt16",
+        "int" => "System.Int32",
+        "uint" => "System.UInt32",
+        "long" => "System.Int64",
+        "ulong" => "System.UInt64",
+        "nint" => "System.IntPtr",
+        "nuint" => "System.UIntPtr",
+        "float" => "System.Single",
+        "double" => "System.Double",
+        "decimal" => "System.Decimal",
+        _ => null,
+    };
+
+    /// <summary>
+    /// The CLR metadata name of a named type: namespace, metadata name with
+    /// generic arity, nested types joined by <c>+</c>. This is the spelling
+    /// every manifest uses, unlike <c>ToDisplayString()</c>, which prints C#
+    /// keywords (<c>object</c>) and type-parameter lists (<c>List&lt;T&gt;</c>).
+    /// </summary>
+    internal static string MetadataTypeName(Microsoft.CodeAnalysis.INamedTypeSymbol type) =>
+        MetadataName(type.OriginalDefinition);
+
     private static IReadOnlyList<string> NormalizeParameters(IReadOnlyList<string> parameterTypes) =>
         parameterTypes.Count == 0
             ? Array.Empty<string>()
@@ -1081,6 +1162,7 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             EffectMemberKind.Getter => "g",
             EffectMemberKind.Setter => "s",
             EffectMemberKind.Constructor => "c",
+            EffectMemberKind.Field => "f",
             _ => "?",
         };
         return $"{prefix}:{DeclaringType}::{MemberName}{parameters}";

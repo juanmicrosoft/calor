@@ -5,6 +5,7 @@ using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -802,9 +803,10 @@ public sealed class NativeMetadataClosureTests
             Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
     }
 
+    // A metadata field without a manifest `fields` entry stays unknown.
+    // (System.String.Empty has one: NativeStringEmpty_IsPureThroughItsExactFieldContract.)
     [Theory]
     [InlineData("System.EventArgs.Empty", "System.EventArgs")]
-    [InlineData("string.Empty", "string")]
     public void NativeReadonlyMetadataFields_DoNotBorrowPropertyGetterContracts(string expression, string type)
     {
         var source = $$"""
@@ -828,6 +830,91 @@ public sealed class NativeMetadataClosureTests
             && diagnostic.Message.Contains(field.ToDisplayString(), StringComparison.Ordinal));
         Assert.DoesNotContain(effects, diagnostic => diagnostic.Message.Contains("get_Empty", StringComparison.Ordinal));
         Assert.True(Compile(source).HasErrors);
+    }
+
+    // String.Empty is pure through its exact `fields` entry in the BCL manifest, not
+    // through System.String's `defaultEffects` or a getter of the same name.
+    [Theory]
+    [InlineData("string.Empty")]
+    [InlineData("String.Empty")]
+    [InlineData("System.String.Empty")]
+    public void NativeStringEmpty_IsPureThroughItsExactFieldContract(string expression)
+    {
+        var source = $$"""
+            module ReadonlyField
+              func Probe public () → string
+                !
+                return {{expression}}
+            """;
+        var module = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var read = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundFieldAccessExpression>());
+        var field = Assert.IsAssignableFrom<IFieldSymbol>(read.ResolvedMetadataMember);
+        Assert.True(field is { IsStatic: true, IsReadOnly: true, IsConst: false });
+        Assert.Equal(SpecialType.System_String, field.ContainingType.SpecialType);
+        var resolver = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false));
+        var fieldKey = EffectResolverKey.FromBoundReceiver(
+            Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToNominalBoundType(field.ContainingType),
+            field.Name, null, EffectMemberKind.Field);
+        var resolution = resolver.Resolve(fieldKey);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+        Assert.Equal("embedded:Calor.Compiler.Manifests.bcl-system.calor-effects.json", resolution.Source);
+        // The entry is field-kind only: the method family on the same name is not it.
+        Assert.NotEqual(fieldKey, EffectResolverKey.FromBoundReceiver(
+            Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToNominalBoundType(field.ContainingType),
+            field.Name, null, EffectMemberKind.Getter));
+        var effects = new DiagnosticBag();
+        new EffectEnforcementPass(effects).Enforce(module);
+        Assert.DoesNotContain(effects, diagnostic => diagnostic.Code is DiagnosticCode.UnknownExternalCall
+            or DiagnosticCode.ForbiddenEffect);
+        var compiled = Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+    }
+
+    // A `fields` entry answers only a binder-selected field read: it is never consulted for
+    // a getter, a method, a constructor or a field the manifest does not name, and it does
+    // not fall back to the type's defaultEffects, a namespace default or a wildcard.
+    [Fact]
+    public void ManifestFieldEntries_AnswerOnlyTheExactFieldKind()
+    {
+        const string json = """
+            {
+              "version": "1.0",
+              "mappings": [
+                { "type": "Probe.Holder", "defaultEffects": [], "methods": { "*": [] },
+                  "getters": { "Shared": ["cw"] }, "fields": { "Shared": ["fs:r"] } },
+                { "type": "Probe.Defaults", "defaultEffects": [] }
+              ],
+              "namespaceDefaults": { "Probe": [] }
+            }
+            """;
+        var loader = new ManifestLoader(loadUserLevelManifests: false);
+        Assert.NotNull(loader.LoadFromJson(json, "field-kind"));
+        Assert.Empty(loader.ValidateManifests());
+        var resolver = new EffectResolver(loader);
+        var field = resolver.Resolve(EffectResolverKey.FromStrings(
+            "Probe.Holder", "Shared", null, EffectMemberKind.Field));
+        Assert.Equal(EffectSet.From("fs:r"), field.Effects);
+        Assert.Equal(EffectSet.From("cw"), resolver.Resolve(EffectResolverKey.FromStrings(
+            "Probe.Holder", "Shared", null, EffectMemberKind.Getter).WithoutParameterList()).Effects);
+        foreach (var key in new[]
+        {
+            EffectResolverKey.FromStrings("Probe.Holder", "Other", null, EffectMemberKind.Field),
+            EffectResolverKey.FromStrings("Probe.Defaults", "Shared", null, EffectMemberKind.Field),
+            EffectResolverKey.FromStrings("Probe.Absent", "Shared", null, EffectMemberKind.Field),
+            // Real BCL fields on types whose defaultEffects are [] stay unknown, although a
+            // getter key of the same name would borrow that default.
+            EffectResolverKey.FromStrings("System.Guid", "Empty", null, EffectMemberKind.Field),
+            EffectResolverKey.FromStrings("System.DateTime", "MinValue", null, EffectMemberKind.Field),
+        })
+            Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(key).Status);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolver.Resolve(EffectResolverKey.FromStrings(
+            "System.Guid", "Empty", null, EffectMemberKind.Getter).WithoutParameterList()).Status);
+        // The String.Empty entry names that field only, not String's other members.
+        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(EffectResolverKey.FromStrings(
+            "System.String", "Length", null, EffectMemberKind.Field)).Status);
     }
 
     [Fact]
@@ -1333,17 +1420,19 @@ public sealed class NativeMetadataClosureTests
         }
     }
 
+    // System.Version's constructors have no effect contract. (`new object()` is no longer
+    // a probe: it now reaches the System.Object() manifest entry by its metadata name.)
     [Fact]
-    public void NativeCastLambdaInvocation_DoesNotSuppressUnknownObjectConstructor()
+    public void NativeCastLambdaInvocation_DoesNotSuppressUnknownConstructor()
     {
         var result = Compile("""
-            module UnknownObjectConstructor
+            module UnknownConstructor
               func Pick (object:value) → int
                 !
                 return 7
               func Probe () → int
                 !
-                return Pick(((Func<object>)(() => new object()))())
+                return Pick(((Func<System.Version>)(() => new System.Version()))())
             """);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "Calor0411");
         Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
@@ -3538,10 +3627,10 @@ public sealed class NativeMetadataClosureTests
     }
 
     [Theory]
-    [InlineData("System . EventArgs . Empty", "System.EventArgs", "System.EventArgs")]
-    [InlineData("System . String . Empty", "string", "string")]
+    [InlineData("System . EventArgs . Empty", "System.EventArgs", "System.EventArgs", false)]
+    [InlineData("System . String . Empty", "string", "string", true)]
     public void QualifiedMetadataStaticFields_TransferTypesWithoutEffectPermission(
-        string expression, string type, string owner)
+        string expression, string type, string owner, bool fieldContract)
     {
         var source = $$"""
             module QualifiedFieldType
@@ -3584,11 +3673,13 @@ public sealed class NativeMetadataClosureTests
                 {
                     StrictApi = true, StrictEffects = true, EnableTypeChecking = typeChecking
                 });
-                Assert.True(strict.HasErrors);
-                Assert.Empty(strict.GeneratedCode);
                 Assert.DoesNotContain(strict.Diagnostics.Errors, item => item.Code == DiagnosticCode.UndefinedReference);
-                Assert.Contains(strict.Diagnostics, item => item.Code == DiagnosticCode.UnknownExternalCall
-                    && item.Message.Contains(field.ToDisplayString(), StringComparison.Ordinal));
+                // The type transfers either way; only an exact `fields` manifest entry
+                // (String.Empty) grants the read effect permission.
+                Assert.Equal(!fieldContract, strict.Diagnostics.Any(item => item.Code == DiagnosticCode.UnknownExternalCall
+                    && item.Message.Contains(field.ToDisplayString(), StringComparison.Ordinal)));
+                Assert.Equal(!fieldContract, strict.HasErrors);
+                Assert.Equal(!fieldContract, strict.GeneratedCode.Length == 0);
             }
         }
     }

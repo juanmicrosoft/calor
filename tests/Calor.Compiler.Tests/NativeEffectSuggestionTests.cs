@@ -116,9 +116,10 @@ public sealed class NativeEffectSuggestionTests
     [InlineData(true)]
     public async Task UnknownConstructorEffects_RemainErrorsWithoutAnInventedDeclaration(bool existingRow)
     {
-        var source = "module Native\n  func Make () → object\n    !\n"
+        // System.Version's constructors have no effect contract.
+        var source = "module Native\n  func Make () → System.Version\n    !\n"
             + (existingRow ? "    ! alloc\n" : "")
-            + "    return new object()\n";
+            + "    return new System.Version()\n";
         var compiled = Program.Compile(source);
         Assert.True(compiled.HasErrors);
         var diagnostic = Assert.Single(compiled.Diagnostics,

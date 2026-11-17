@@ -31,6 +31,8 @@ public class EffectResolverKeyTests
     [InlineData(EffectMemberKind.Method, EffectMemberKind.Constructor)]
     [InlineData(EffectMemberKind.Method, EffectMemberKind.Extension)]
     [InlineData(EffectMemberKind.Getter, EffectMemberKind.Setter)]
+    [InlineData(EffectMemberKind.Field, EffectMemberKind.Getter)]
+    [InlineData(EffectMemberKind.Field, EffectMemberKind.Method)]
     public void KindIsPartOfIdentity(EffectMemberKind left, EffectMemberKind right)
     {
         var a = EffectResolverKey.FromStrings("Vendor.Widget", "Value", kind: left);

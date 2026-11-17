@@ -48,6 +48,9 @@
       "getters": {
         "Length": []
       },
+      "fields": {
+        "Empty": []
+      },
       "constructors": {
         "(System.Char[])": []
       }
