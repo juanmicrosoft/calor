@@ -148,8 +148,10 @@ public sealed class NativeMetadataClosureTests
             Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
             Assert.Equal(expected, CompileAssembly(compiled.GeneratedCode).GetType("Probe")!
                 .GetMethod("Run")!.Invoke(null, null));
-            var withoutMutation = Compile(native.Replace("! mut", "!", StringComparison.Ordinal)
-                .Replace("! alloc, mut", "! alloc", StringComparison.Ordinal));
+            // Private helpers carry no row in 0.30 (Calor0125); Run declares the only one,
+            // `! throw, alloc, mut`. Dropping `mut` from it must be refused.
+            Assert.Contains("! throw, alloc, mut", native);
+            var withoutMutation = Compile(native.Replace("! throw, alloc, mut", "! throw, alloc", StringComparison.Ordinal));
             Assert.Contains(withoutMutation.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
         }
     }
@@ -765,8 +767,12 @@ public sealed class NativeMetadataClosureTests
     [Theory]
     [InlineData("char.IsDigit('A')", SpecialType.System_Char, true)]
     [InlineData("char.IsUpper('A')", SpecialType.System_Char, false)]
-    [InlineData("float.IsNaN(float . NaN)", SpecialType.System_Single, false)]
-    [InlineData("double.IsNaN(double . NaN)", SpecialType.System_Double, true)]
+    // The restored 0.29 BCL manifest (12b1adb3e) declares Single.IsNaN pure, so the
+    // discriminating pair is IsInfinity: covered for Double by its default row, not for Single.
+    [InlineData("float.IsNaN(float.NaN)", SpecialType.System_Single, true)]
+    [InlineData("float.IsInfinity(float.NaN)", SpecialType.System_Single, false)]
+    [InlineData("double.IsNaN(double.NaN)", SpecialType.System_Double, true)]
+    [InlineData("double.IsInfinity(double.NaN)", SpecialType.System_Double, true)]
     public void NativePrimitiveCalls_UseOnlyTheSelectedTypeContract(
         string expression, SpecialType expectedType, bool hasContract)
     {
@@ -2069,10 +2075,14 @@ public sealed class NativeMetadataClosureTests
     [Fact]
     public void NativeConstruction_SelectedInitializerMethodChargesOtherTypeInitialization()
     {
+        // 0.30 (D1): a static initializer's effects beyond mut/alloc must be declared on the
+        // type's static constructor row (otherwise Calor0422); `new Holder()` still charges them.
         const string authored = """
             module StaticInitializationDependency
               class Seed
                 field int:Value public static = Initialize()
+                ctor stat ()
+                  ! cw
                 func Initialize private static () → int
                   System.Console.WriteLine("static initialization")
                   return 7
