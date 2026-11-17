@@ -7508,10 +7508,6 @@ public sealed class EffectEnforcementPass
             return effects;
         }
 
-        private static readonly CS.SymbolDisplayFormat MetadataTypeDisplayFormat =
-            CS.SymbolDisplayFormat.CSharpErrorMessageFormat.RemoveMiscellaneousOptions(
-                CS.SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
-
         private bool IsTypeParameterConstruction(NewExpressionNode creation) =>
             creation.TypeArguments.Count == 0
             && _lexicalTypeScopes.OfType<FunctionNode>().SelectMany(function => function.TypeParameters)
@@ -7558,10 +7554,8 @@ public sealed class EffectEnforcementPass
             else
             {
                 var metadataType = _context.CallGraph.MetadataCreationType(_context.CurrentFunctionId, newExpr.Span);
-                // The manifest names a special type by its metadata name (`System.Object`), not
-                // by the C# keyword the default display format prints (`object`).
                 effects = effects.Union(ResolveConstructorEffects(
-                    metadataType?.OriginalDefinition.ToDisplayString(MetadataTypeDisplayFormat) ?? newExpr.TypeName,
+                    metadataType?.OriginalDefinition.ToDisplayString() ?? newExpr.TypeName,
                     newExpr.Arguments,
                     newExpr.TypeNameSpan));
             }
