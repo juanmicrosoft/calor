@@ -22,6 +22,9 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
     private readonly IReadOnlyDictionary<string, string>? _sourceHashes;
     private readonly IReadOnlyDictionary<ModuleNode, string> _sourcePaths;
     private readonly Dictionary<ContractMode, IReadOnlyList<SourceProjection>> _projections = [];
+    private readonly Dictionary<ContractMode, CallGraphAnalysis.SharedProjectionImage?> _sharedImages = [];
+    private IReadOnlyDictionary<string, CrossModuleFunctionTarget>? _crossModuleFunctions;
+    private bool _crossModuleFunctionsBuilt;
     private readonly Dictionary<ModuleNode, (Binder Binder, DiagnosticBag Diagnostics)> _declarationBinders = [];
 
     internal string Fingerprint { get; }
@@ -87,18 +90,56 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
 
     public IReadOnlyList<SourceProjection> CompanionSources(string? sourcePath, ContractMode mode)
     {
-        if (sourcePath is null || !_sourcePaths.Values.Contains(Path.GetFullPath(sourcePath),
-                BuildStateCache.GetPathComparer()))
+        if (!Contains(sourcePath))
             return [];
-        if (!_projections.TryGetValue(mode, out var projections))
+        return Projections(mode).Where(source =>
+            !BuildStateCache.GetPathComparer().Equals(source.Path, Path.GetFullPath(sourcePath!))).ToArray();
+    }
+
+    public CallGraphAnalysis.SharedProjectionImage? SharedImage(string? sourcePath, ContractMode mode)
+    {
+        if (!Contains(sourcePath))
+            return null;
+        var projections = Projections(mode);
+        lock (_sharedImages)
         {
+            if (!_sharedImages.TryGetValue(mode, out var image))
+                _sharedImages[mode] = image = CallGraphAnalysis.SharedProjectionImage.Create(
+                    projections, mode, CrossModuleFunctions());
+            return image;
+        }
+    }
+
+    private bool Contains(string? sourcePath) => sourcePath is not null
+        && _sourcePaths.Values.Contains(Path.GetFullPath(sourcePath), BuildStateCache.GetPathComparer());
+
+    // Qualify cross-module calls exactly as the driver's emission does. An
+    // unqualified call into another module is CS0103 in its companion, and
+    // any companion error voids every Roslyn proof in the file being bound.
+    private IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctions()
+    {
+        lock (_projections)
+        {
+            if (!_crossModuleFunctionsBuilt)
+            {
+                _crossModuleFunctions = _sourcePaths.Count > 1
+                    ? CompilationDriver.BuildCrossModuleFunctionMap(_sourcePaths.Keys.ToList())
+                    : null;
+                _crossModuleFunctionsBuilt = true;
+            }
+            return _crossModuleFunctions;
+        }
+    }
+
+    // Every module's plain projection for one contract mode, emitted once per registry.
+    private IReadOnlyList<SourceProjection> Projections(ContractMode mode)
+    {
+        var crossModuleFunctions = CrossModuleFunctions();
+        lock (_projections)
+        {
+            if (_projections.TryGetValue(mode, out var projections))
+                return projections;
             var emitted = new List<SourceProjection>();
-            // Qualify cross-module calls exactly as the driver's emission does. An
-            // unqualified call into another module is CS0103 in its companion, and
-            // any companion error voids every Roslyn proof in the file being bound.
-            var crossModuleFunctions = _sourcePaths.Count > 1
-                ? CompilationDriver.BuildCrossModuleFunctionMap(_sourcePaths.Keys.ToList())
-                : null;
             foreach (var (module, path) in _sourcePaths)
             {
                 var callables = new List<AstNode>();
@@ -123,9 +164,8 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
                 emitted.Add(new(module, path, text, marker, callables));
             }
             _projections[mode] = projections = emitted;
+            return projections;
         }
-        return projections.Where(source =>
-            !BuildStateCache.GetPathComparer().Equals(source.Path, Path.GetFullPath(sourcePath))).ToArray();
     }
 
     public SourceCallable? FindCallable(AstNode declaration)
