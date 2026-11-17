@@ -16,7 +16,7 @@ public sealed class IdentityFreeSyntaxTests
     [InlineData("public static object Run() { string? text = default; return text == null ? 7 : 0; }", null, 7)]
     [InlineData("public static object Run() { string? text = null; return text!.Length; }", "null-forgiving-expression", "throws:NullReferenceException")]
     [InlineData("public static object Run() { int value; value = 9; return value; }", null, 9)]
-    [InlineData("public static object Run() { System.Text.StringBuilder value; value = new System.Text.StringBuilder(); return value.Length; }", "default-expression", 0)]
+    [InlineData("public static object Run() { System.Text.StringBuilder value; value = new System.Text.StringBuilder(); return value.Length; }", null, 0)]
     [InlineData("public enum Level { Low, High } public static object Run() { Level value; value = Level.High; return (int)value; }", "default-expression", 1)]
     [InlineData("public static object Run() { var values = new System.Collections.Generic.Dictionary<int,int> { [1] = 2, [1] = 3 }; return values[1]; }", "dictionary-initializer", 3)]
     [InlineData("public static bool Enabled { get; } = !System.AppContext.TryGetSwitch(\"Calor.Shape.Absent\", out var enabled) || enabled; public static object Run() => Enabled ? 8 : 0;", "conditional-expression-hoisting", 8)]
