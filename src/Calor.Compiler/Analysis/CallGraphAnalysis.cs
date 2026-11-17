@@ -410,6 +410,10 @@ public sealed class CallGraphAnalysis
                 initializationIds[constructor] = $"{owner.Name}.{constructor.Id}";
             foreach (var op in EnumerateOperators(owner))
                 initializationIds[op] = $"{owner.Name}.{op.Id}";
+            foreach (var property in EnumerateProperties(owner))
+                foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer })
+                    if (accessor != null)
+                        initializationIds[accessor] = GetPropertyAccessorFunctionId(owner.Name, property, accessor);
         }
         string CallableOrigin(AstNode declaration)
         {
@@ -631,6 +635,36 @@ public sealed class CallGraphAnalysis
                             else if (!conflictingParameters.Contains(parameter))
                                 bindings.ParameterTypes[parameter] = type;
                         }
+                    }
+                }
+            }
+            // Property accessors reached from an initializer (an object-initializer setter, a
+            // static property read) resolve to their declarations like methods do. An auto
+            // accessor has no body, so it is recorded with no operations rather than none proved.
+            // An inline auto-accessor marker (`{ /*m*/get; /*m*/set; }`) is trailing trivia of
+            // the token before the accessor.
+            foreach (var declaration in root.DescendantNodes().OfType<AccessorDeclarationSyntax>())
+            {
+                foreach (var trivia in declaration.GetFirstToken().GetPreviousToken().TrailingTrivia
+                             .Concat(declaration.GetLeadingTrivia()))
+                {
+                    if (!TryReadMarker(trivia, callablePrefix, out var index)
+                        || emittedCallables[index] is not PropertyAccessorNode origin
+                        || !initializationIds.TryGetValue(origin, out var functionId)
+                        || model.GetDeclaredSymbol(declaration) is not IMethodSymbol accessor)
+                        continue;
+                    bindings.InitializationFunctions[accessor.OriginalDefinition] = functionId;
+                    if (!bindings.InitializationBodies.TryGetValue(functionId, out var bodies))
+                        bindings.InitializationBodies[functionId] = bodies = [];
+                    if (model.GetDiagnostics(declaration.Span).Any(diagnostic =>
+                            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                        bindings.InitializationBodies[functionId] = null;
+                    else if (declaration.Body != null || declaration.ExpressionBody != null)
+                    {
+                        if (model.GetOperation(declaration) is { } body)
+                            bodies?.Add(body);
+                        else
+                            bindings.InitializationBodies[functionId] = null;
                     }
                 }
             }
