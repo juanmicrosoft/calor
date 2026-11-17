@@ -291,6 +291,26 @@ public sealed class ComputedCallExpressionTests
         Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
     }
 
+    [Theory]
+    [InlineData("string", false)]
+    [InlineData("string?", true)]
+    public void ContextualLambdaParameter_TakesTheSelectedStringAnnotation(string element, bool rejected)
+    {
+        // An untyped lambda parameter takes the selected delegate's String annotation,
+        // so a nullable element still fails the String receiver boundary (Calor0274).
+        var compiled = Program.Compile($$"""
+            module ContextualAnnotations
+              using System.Linq
+              using System.Collections.Generic
+              func Use (IEnumerable<{{element}}>:values) → IEnumerable<int>
+                !
+                return values.Select((value) ! => value.Length)
+            """);
+        Assert.Equal(rejected, compiled.Diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(rejected, compiled.HasErrors);
+    }
+
     [Fact]
     public void ContextualMetadataExtension_PreservesTheStaticNamedArgumentMap()
     {
@@ -1239,9 +1259,14 @@ public sealed class ComputedCallExpressionTests
     [InlineData("null ?? (object)External.Make()", true)]
     public void WrapperResultInference_RetainsOnlyEstablishedAuthority(string initializer, bool knownResult)
     {
+        // External is deliberately undeclared, which makes the Roslyn projection invalid;
+        // declare it only where the row needs it so the other rows stay valid C#
+        // (and make Use async where the row awaits).
+        var usesExternal = initializer.Contains("External", StringComparison.Ordinal);
+        var awaits = initializer.StartsWith("await ", StringComparison.Ordinal);
         var (ast, bound, diagnostics) = Bind($$"""
             module Test
-              func Use public (object:input, Task<object>:task, ValueTask<object>:valueTask, External:External) → void
+              func Use public{{(awaits ? " async" : "")}} (object:input, Task<object>:task, ValueTask<object>:valueTask{{(usesExternal ? ", External:External" : "")}}) → void
                 !
                 let value = {{initializer}}
                 let alias = value
@@ -1279,8 +1304,12 @@ public sealed class ComputedCallExpressionTests
             Assert.Empty(CallGraphAnalysis.Build(ast).ResolveCallSites(ast.Functions[0].Id, "Pick", pick.Span));
         }
         new EffectEnforcementPass(diagnostics, policy: UnknownCallPolicy.Strict, strictEffects: true).Enforce(ast);
-        Assert.Equal(!knownResult, diagnostics.Errors.Any(diagnostic =>
-            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == pick.Span));
+        var pickUnknown = diagnostics.Errors.Any(diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Span == pick.Span);
+        // Without a valid projection a selected source call may stay an unproved
+        // dispatch, so a known row that still names External only pins binding.
+        if (!knownResult || !usesExternal)
+            Assert.Equal(!knownResult, pickUnknown);
     }
 
     [Theory]

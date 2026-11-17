@@ -88,8 +88,7 @@ public class ConditionalEvaluationMigrationTests
             .TokenizeAllForParser(), diagnostics).Parse();
         var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(reparsed);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
-        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
-            .Single(call => call.Target == "value.ToString");
+        var call = NativeCall(bound, "value", "ToString");
         var returnType = Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(call.Type);
         Assert.Equal(throughObject ? "string?" : "string", returnType.QualifiedName);
         if (throughObject)
@@ -122,10 +121,11 @@ public class ConditionalEvaluationMigrationTests
         Assert.Equal(throughObject ? 11 : 10, Execute(compiled.GeneratedCode));
         if (throughObject)
         {
-            var enforced = Program.Compile(conversion.CalorSource!, "object-virtual-effects.calr",
+            // The converter declares the sound `! unknown` row; a pure row is rejected.
+            var enforced = Program.Compile(WithPureRows(conversion.CalorSource!), "object-virtual-effects.calr",
                 new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
             Assert.Contains(enforced.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
-                && diagnostic.Message.Contains("value.ToString", StringComparison.Ordinal));
+                && diagnostic.Message.Contains("ToString", StringComparison.Ordinal));
         }
     }
 
@@ -158,8 +158,7 @@ public class ConditionalEvaluationMigrationTests
                 return value.Equals({{argument}})
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
-        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
-            .Single(call => call.Target == "value.Equals");
+        var call = NativeCall(bound, "value", "Equals");
         Assert.Null(call.ResolvedSymbol);
         if (resolves)
         {
@@ -254,8 +253,8 @@ public class ConditionalEvaluationMigrationTests
         Assert.Null(call.ResolvedMetadataMethod);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "Calor0270"
             && diagnostic.Span.Start == member.Span.Start && diagnostic.Span.Length == member.Span.Length
-            && diagnostic.Message.Contains("outside supported scalar reference reads", StringComparison.Ordinal));
-        var enforced = Program.Compile(conversion.CalorSource!, "metadata-value-receiver.calr",
+            && diagnostic.Message.Contains("outside supported scalar reads", StringComparison.Ordinal));
+        var enforced = Program.Compile(WithPureRows(conversion.CalorSource!), "metadata-value-receiver.calr",
             new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
         Assert.Contains(enforced.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
             && diagnostic.Message.Contains("ToString", StringComparison.Ordinal));
@@ -338,15 +337,14 @@ public class ConditionalEvaluationMigrationTests
         var ast = new Parsing.Parser(new Parsing.Lexer(conversion.CalorSource!, diagnostics)
             .TokenizeAllForParser(), diagnostics).Parse();
         var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
-        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
-            .Single(call => call.Target == $"chain.{method}");
+        var call = NativeCall(bound, "chain", method);
         Assert.Null(call.ResolvedSymbol);
         Assert.Null(call.ResolvedMetadataMethod);
         if (argument == "UnknownArgument()")
             Assert.Equal("UnknownArgument", Assert.IsType<BoundCallExpression>(Assert.Single(call.Arguments)).Target);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "Calor0270"
             && diagnostic.Message.Contains("chain", StringComparison.Ordinal));
-        var enforced = Program.Compile(conversion.CalorSource!, "custom-string-call.calr",
+        var enforced = Program.Compile(WithPureRows(conversion.CalorSource!), "custom-string-call.calr",
             new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
         Assert.Contains(enforced.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
             && diagnostic.Message.Contains($"chain.{method}", StringComparison.Ordinal));
@@ -497,6 +495,22 @@ public class ConditionalEvaluationMigrationTests
         Assert.Empty(Descendants(ast).OfType<StringOperationNode>());
         Assert.Contains(Descendants(ast).OfType<CallExpressionNode>(), call => call.Target == "text.ToString");
         Assert.Contains(Descendants(ast).OfType<CallExpressionNode>(), call => call.Target == "text.Contains");
+    }
+
+    /// <summary>
+    /// A native member call binds with the computed target; select it by its
+    /// receiver variable and method name.
+    /// </summary>
+    private static BoundCallExpression NativeCall(BoundNode bound, string receiver, string method) =>
+        BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.ResolvedMethodName == method
+                && call.Receiver is BoundVariableExpression { Variable.Name: var name } && name == receiver);
+
+    /// <summary>Replaces each converter-written `! unknown` row with a pure row.</summary>
+    private static string WithPureRows(string calor)
+    {
+        Assert.Contains("! unknown", calor, StringComparison.Ordinal);
+        return calor.Replace("! unknown", "!", StringComparison.Ordinal);
     }
 
     private static IEnumerable<AstNode> Descendants(AstNode node)
@@ -674,8 +688,11 @@ public class ConditionalEvaluationMigrationTests
     [InlineData(ConversionFidelity.Lossy)]
     public void StackAllocationSize_RemainsInsideTheRightOperand(ConversionFidelity fidelity)
     {
+        // 0.30 native Calor has no stackalloc form: the statement is preserved as C#
+        // interop, which must still keep the size inside the right operand.
         AssertRoundTrip("int ignored = Trace(1) + Consume(stackalloc int[Size()]); return Calls;",
-            123, false, members: """
+            123, false, interopFeature: fidelity == ConversionFidelity.Lossless ? "stackalloc" : "method",
+            members: """
                 private static int Calls;
                 public static int Trace(int id) { Calls = Calls * 10 + id; return id; }
                 public static int Size() { return Trace(2); }
@@ -854,8 +871,8 @@ public class ConditionalEvaluationMigrationTests
     }
 
     [Theory]
-    [InlineData("true", "(+ n 1)", 3)]
-    [InlineData("false", "(+ n 1)", 0)]
+    [InlineData("true", "n + 1", 3)]
+    [InlineData("false", "n + 1", 0)]
     [InlineData("true", "Size()", 3)]
     [InlineData("false", "Size()", 0)]
     public void NativeConditionalArraySizes_SurvivePrettyRoundTrip(string gate, string size, int expected)

@@ -32,7 +32,7 @@ public sealed class TaintAnalysisCfgTests
         var statement = bound.Functions.Single().Body[1];
         var parameterTypes = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).ResolvedParameterTypes
-            : Assert.IsType<BoundCallStatement>(statement).ResolvedParameterTypes;
+            : Assert.IsType<BoundCallExpression>(Assert.IsType<BoundExpressionStatement>(statement).Expression).ResolvedParameterTypes;
         Assert.Equal(Enumerable.Repeat("System.String", method == "WriteAllText" ? 2 : 1), parameterTypes);
         var diagnostics = new DiagnosticBag();
         new TaintAnalysisRunner(diagnostics).Analyze(bound);
@@ -119,14 +119,14 @@ public sealed class TaintAnalysisCfgTests
         var statement = bound.Functions[0].Body[0];
         var mappings = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).ArgumentParameterIndices
-            : Assert.IsType<BoundCallStatement>(statement).ArgumentParameterIndices;
+            : Assert.IsType<BoundCallExpression>(Assert.IsType<BoundExpressionStatement>(statement).Expression).ArgumentParameterIndices;
         Assert.Equal(new[] { 1, 0 }, mappings);
         if (wrapper)
         {
             var wrapperStatement = bound.Functions[1].Body[0];
             var selected = expression
                 ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(wrapperStatement).Initializer).SelectedOverloadMatches
-                : Assert.IsType<BoundCallStatement>(wrapperStatement).SelectedOverloadMatches;
+                : Assert.IsType<BoundCallExpression>(Assert.IsType<BoundExpressionStatement>(wrapperStatement).Expression).SelectedOverloadMatches;
             var match = Assert.Single(selected);
             Assert.Equal(bound.Functions[0].SymbolId, match.Function.Id);
             Assert.Equal(namedWrapper ? new[] { 1, 0 } : new[] { 0, 1 },

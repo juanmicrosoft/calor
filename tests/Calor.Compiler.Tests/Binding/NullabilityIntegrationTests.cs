@@ -2826,7 +2826,8 @@ public class NullabilityIntegrationTests
             d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
         Assert.NotNull(diag);
         Assert.Contains("'path'", diag!.Message);
-        Assert.Contains("'?string'", diag.Message);
+        Assert.Contains("'string?'", diag.Message);
+        Assert.DoesNotContain("'?string'", diag.Message);
         Assert.Contains("source annotation", diag.Message);
     }
 

@@ -2755,7 +2755,7 @@ public sealed class SafeConsumptionTypeCheckerTests
     {
         var result = Check($$"""
             module SafeConsumption
-              func Use public (Func<Func<{{targetType}}>>:factory) → void
+              func Use public (Func<Func<{{targetType}}>>:factory ! unknown) → void
                 !
               func Probe public () → void
                 !

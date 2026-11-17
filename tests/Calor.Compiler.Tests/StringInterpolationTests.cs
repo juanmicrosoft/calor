@@ -226,17 +226,14 @@ public static class NumberFormat
         Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(compilationResult.GeneratedCode + probe));
     }
 
+    // Formatting a hole calls the value's ToString(). Built-in types without a
+    // manifest contract (decimal, float, uint), object and type parameters stay
+    // unknown. The converter declares the sound `! unknown` row for them; the same
+    // body under a pure row must still be rejected.
     [Theory]
-    [InlineData("double", "value")]
-    [InlineData("double", "value:F2")]
-    [InlineData("double", "value,8")]
     [InlineData("decimal", "value,-10:N2")]
-    [InlineData("int", "value")]
-    [InlineData("long", "value:D3")]
-    [InlineData("uint", "value:X")]
+    [InlineData("uint", "value")]
     [InlineData("float", "value")]
-    [InlineData("double", "3.5")]
-    [InlineData("double", "value + 1")]
     [InlineData("object", "value")]
     [InlineData("T", "value")]
     public void StrictInterpolation_UnprovedFormattingIsUnknown(string type, string hole)
@@ -252,9 +249,13 @@ public static class NumberFormat
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
         Assert.Equal(0, conversion.InteropPreservationCount);
         Assert.Empty(conversion.Losses);
+        var pure = WithPureRow(conversion.CalorSource!);
         foreach (var typing in new[] { false, true })
         {
-            var result = Program.Compile(conversion.CalorSource!, "interpolation-boundary.calr",
+            var declared = Program.Compile(conversion.CalorSource!, "interpolation-boundary.calr",
+                StrictInterpolationOptions(typing));
+            Assert.False(declared.HasErrors, string.Join("\n", declared.Diagnostics));
+            var result = Program.Compile(pure, "interpolation-boundary.calr",
                 StrictInterpolationOptions(typing));
             Assert.Contains(result.Diagnostics.Errors, diagnostic =>
                 diagnostic.Code == DiagnosticCode.UnknownExternalCall
@@ -264,6 +265,71 @@ public static class NumberFormat
                 && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
             Assert.Empty(result.GeneratedCode);
         }
+    }
+
+    // The restored 0.29 BCL manifest records System.Int32, System.Int64 and
+    // System.Double ToString as pure, so their formatting is charged that contract
+    // (as in 0.29) rather than Unknown, and the converter writes a pure row.
+    [Theory]
+    [InlineData("double", "value", true)]
+    [InlineData("double", "value:F2", true)]
+    [InlineData("double", "value,8", true)]
+    [InlineData("int", "value", true)]
+    [InlineData("long", "value:D3", true)]
+    // Not a manifest row: f5cf0a0fd proves bounded X/x integral holes provider-independent.
+    [InlineData("uint", "value:X", true)]
+    [InlineData("double", "3.5", true)]
+    [InlineData("double", "value + 1", true)]
+    [InlineData("double", "return \"\" + value;", false)]
+    [InlineData("double", "return value + \"\";", false)]
+    [InlineData("double", "return \"v=\" + value;", false)]
+    [InlineData("double", "return \"[\" + value + \"]\";", false)]
+    [InlineData("double", "string result = \"\"; result += value; return result;", false)]
+    [InlineData("int", "return \"v=\" + value;", false)]
+    [InlineData("double", "return \"\" + 3.5;", false)]
+    public void StrictFormatting_ManifestContractIsCharged(string type, string code, bool interpolation)
+    {
+        var body = interpolation ? $$"""=> $"{{{code}}}";""" : $$"""{ {{code}} }""";
+        var source = $$"""
+            #nullable enable
+            public static class FormattingBoundary
+            {
+                public static string Render({{type}} value) {{body}}
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+        Assert.Equal(conversion.CalorSource, WithPureRow(conversion.CalorSource!, requireUnknown: false));
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "manifest-formatting.calr",
+                StrictInterpolationOptions(typing));
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the converter's single `! unknown` row with a pure row, or removes
+    /// it when <paramref name="removeRow"/> is set.
+    /// </summary>
+    private static string WithPureRow(string calor, bool requireUnknown = true, bool removeRow = false)
+    {
+        var lines = calor.Split('\n');
+        var rows = lines.Select((line, index) => (line, index))
+            .Where(item => item.line.TrimEnd('\r').Trim() == "! unknown").ToArray();
+        if (!requireUnknown)
+        {
+            Assert.Empty(rows);
+            return calor;
+        }
+        var row = Assert.Single(rows);
+        if (removeRow)
+            return string.Join('\n', lines.Where((_, index) => index != row.index));
+        lines[row.index] = row.line.Replace("! unknown", "!", StringComparison.Ordinal);
+        return string.Join('\n', lines);
     }
 
     [Theory]
@@ -322,17 +388,14 @@ public static class NumberFormat
         }
     }
 
+    // See StrictInterpolation_UnprovedFormattingIsUnknown: the converter declares
+    // `! unknown`, and a pure row over the same body is rejected.
     [Theory]
-    [InlineData("double", "return \"\" + value;")]
-    [InlineData("double", "return value + \"\";")]
-    [InlineData("double", "return \"v=\" + value;")]
-    [InlineData("double", "return \"[\" + value + \"]\";")]
-    [InlineData("double", "string result = \"\"; result += value; return result;")]
-    [InlineData("int", "return \"v=\" + value;")]
     [InlineData("decimal", "return \"v=\" + value;")]
+    [InlineData("decimal", "string result = \"\"; result += value; return result;")]
     [InlineData("float", "return \"v=\" + value;")]
     [InlineData("uint", "return \"v=\" + value;")]
-    [InlineData("double", "return \"\" + 3.5;")]
+    [InlineData("uint", "return value + \"\";")]
     [InlineData("object", "return \"\" + value;")]
     [InlineData("T", "return \"\" + value;")]
     public void StrictConcatenation_UnprovedFormattingIsUnknown(string type, string body)
@@ -348,9 +411,13 @@ public static class NumberFormat
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
         Assert.Equal(0, conversion.InteropPreservationCount);
         Assert.Empty(conversion.Losses);
+        var pure = WithPureRow(conversion.CalorSource!);
         foreach (var typing in new[] { false, true })
         {
-            var result = Program.Compile(conversion.CalorSource!, "concat-boundary.calr",
+            var declared = Program.Compile(conversion.CalorSource!, "concat-boundary.calr",
+                StrictInterpolationOptions(typing));
+            Assert.False(declared.HasErrors, string.Join("\n", declared.Diagnostics));
+            var result = Program.Compile(pure, "concat-boundary.calr",
                 StrictInterpolationOptions(typing));
             Assert.Contains(result.Diagnostics.Errors, diagnostic =>
                 diagnostic.Code == DiagnosticCode.UnknownExternalCall
@@ -534,8 +601,13 @@ public static class NumberFormat
         }
     }
 
+    // An explicit static constructor carries the type's initialization row. For
+    // unproved formatting the converter declares `! unknown` there; without that
+    // row the initializer is rejected (Calor0422). System.Double formatting is pure under the
+    // restored 0.29 manifest.
     [Theory]
-    [InlineData("double", "3.5", true)]
+    [InlineData("decimal", "3.5m", true)]
+    [InlineData("double", "3.5", false)]
     [InlineData("bool", "true", false)]
     public void StrictConcatenation_ExplicitTypeEntryChargesInitialization(
         string type, string value, bool unknown)
@@ -553,9 +625,15 @@ public static class NumberFormat
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
         Assert.Equal(0, conversion.InteropPreservationCount);
         Assert.Empty(conversion.Losses);
+        var checkedSource = unknown ? WithPureRow(conversion.CalorSource!, removeRow: true) : conversion.CalorSource!;
+        if (unknown)
+            Assert.Contains("ctor stat ()\n      ! unknown\n", conversion.CalorSource!.ReplaceLineEndings("\n"),
+                StringComparison.Ordinal);
         foreach (var typing in new[] { false, true })
         {
-            var result = Program.Compile(conversion.CalorSource!, "concat-type-entry.calr",
+            Assert.False(Program.Compile(conversion.CalorSource!, "concat-type-entry.calr",
+                StrictInterpolationOptions(typing)).HasErrors);
+            var result = Program.Compile(checkedSource, "concat-type-entry.calr",
                 StrictInterpolationOptions(typing));
             Assert.Equal(unknown, result.HasErrors);
             if (unknown)
@@ -573,9 +651,12 @@ public static class NumberFormat
     }
 
     [Theory]
-    [InlineData("string", "\"\" + 3.5", false, true)]
-    [InlineData("string", "\"\" + -1234", false, true)]
-    [InlineData("string", "\"\" + 3.5", true, true)]
+    // System.Double and System.Int32 formatting are pure under the restored 0.29
+    // manifest. An unproved implicit initializer is covered natively by
+    // StrictConcatenation_ImplicitStaticInitializationDoesNotNeedAnExecutableMethod.
+    [InlineData("string", "\"\" + 3.5", false, false)]
+    [InlineData("string", "\"\" + -1234", false, false)]
+    [InlineData("string", "\"\" + 3.5", true, false)]
     [InlineData("string", "\"\" + true", false, false)]
     [InlineData("string", "\"\" + default(bool)", false, false)]
     [InlineData("string", "\"\" + 'x'", false, false)]
@@ -650,9 +731,10 @@ public static class NumberFormat
     [InlineData("Value", "private static string? Value = null;", false)]
     [InlineData("true,6:unused", "", false)]
     [InlineData("Value,6:unused", "private static string Value = \"text\";", false)]
-    [InlineData("3.5", "", true)]
-    [InlineData("-1234", "", true)]
-    [InlineData("3.5,6:N2", "", true)]
+    // Pure under the restored 0.29 manifest (System.Double / System.Int32 ToString).
+    [InlineData("3.5", "", false)]
+    [InlineData("-1234", "", false)]
+    [InlineData("3.5,6:N2", "", false)]
     [InlineData("Value", "private static object Value = true;", true)]
     public void StrictInterpolation_ImplicitInitializationUsesBoundFormatting(
         string value, string member, bool unknown)

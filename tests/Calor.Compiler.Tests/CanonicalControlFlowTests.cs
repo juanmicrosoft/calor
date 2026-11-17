@@ -368,7 +368,7 @@ public sealed class CanonicalControlFlowTests
             private static int[] Store() { Trace += "A"; return Values; }
             private static int Key() { Trace += "K"; return 0; }
             private static int Value() { Trace += "V"; return 1; }
-            """);
+            """, effectCodes: "mut,alloc");
 
     [Fact]
     public void NativeSet_ComputedStoreEvaluatesReceiverIndexAndValueOnce()
@@ -381,7 +381,7 @@ public sealed class CanonicalControlFlowTests
             private static int[] Store() { Trace += "A"; return Values; }
             private static int Key() { Trace += "K"; return 0; }
             private static int Value() { Trace += "V"; return 1; }
-            """);
+            """, effectCodes: "mut,alloc");
 
     [Fact]
     public void NativeDo_PreservesUnassignedLocalAndFirstIteration()
@@ -454,7 +454,7 @@ public sealed class CanonicalControlFlowTests
             private static void Fail() { Trace += "X"; throw new System.InvalidOperationException(); }
             private static bool Filter(int n) { Trace += n.ToString(); return n == 2; }
             private static void Release() { Trace += "Z"; }
-            """, effectCodes: "mut,throw");
+            """, effectCodes: "mut,throw,alloc");
 
     [Fact]
     public void Using_ResourceExpressionRunsOnceAndDisposesOnReturn()
@@ -572,7 +572,7 @@ public sealed class CanonicalControlFlowTests
             public static string Trace = "";
             public static object GateValue = new object();
             private static object Gate() { Trace += "G"; return GateValue; }
-            """);
+            """, effectCodes: "mut,alloc");
 
     [Theory]
     [InlineData("object")]
@@ -650,7 +650,9 @@ public sealed class CanonicalControlFlowTests
     [InlineData("field string:Other public static = System.Environment.CurrentDirectory")]
     [InlineData("property string:Other static = System.Environment.CurrentDirectory\n      get public")]
     [InlineData("field object:Other public static = Make()")]
-    [InlineData("field System.Random:Other public static = new System.Random()")]
+    // System.Random's constructor has a manifest contract ('rand') since the 0.29
+    // manifest was restored; ArrayList's has none.
+    [InlineData("field System.Collections.ArrayList:Other public static = new System.Collections.ArrayList()")]
     public void StaticObjectInitializer_DoesNotHideUnprovedSiblingOperations(string other)
     {
         var source = $$"""
@@ -719,7 +721,13 @@ public sealed class CanonicalControlFlowTests
         {
             var parsed = Parse(candidate);
             Assert.Empty(CallGraphAnalysis.ResolveOperatorCalls(parsed).StaticInitializerConstructors);
-            AssertInitializationUnknown(candidate);
+            // The selected source constructor is the authority: its mutation is
+            // charged, which the CLR System.Object() contract (alloc only) would not.
+            _ = Compile(candidate);
+            var allocOnly = candidate.Replace("! alloc, mut", "! alloc", StringComparison.Ordinal)
+                .Replace("! alloc,mut", "! alloc", StringComparison.Ordinal);
+            Assert.NotEqual(candidate, allocOnly);
+            AssertMissingEffect(allocOnly, "Probe", "mut");
             var type = Load(new CSharpEmitter().Emit(parsed));
             Assert.Equal(9, type.GetMethod("Probe")!.Invoke(null, null));
             Assert.Equal(1, type.Assembly.GetType("Foreign.Object")!.GetField("Calls")!.GetValue(null));
@@ -1868,7 +1876,7 @@ public sealed class CanonicalControlFlowTests
                   set key this.key
                   set value this.value
 
-            """, nativeMethods: """
+            """, effectCodes: "mut,alloc", nativeMethods: """
               func Pairs private () → System.Collections.Generic.IEnumerable<Pair>
                 set Instrumentation.Trace Instrumentation.Trace + "E"
                 return Enumerate()
@@ -1908,7 +1916,7 @@ public sealed class CanonicalControlFlowTests
                 try { Trace += "B"; yield return (1, 10); }
                 finally { Trace += "F"; }
             }
-            """, effectCodes: "mut,throw", nativeMethods: """
+            """, effectCodes: "mut,throw,alloc", nativeMethods: """
               func Fail private () → void
                 set Instrumentation.Trace Instrumentation.Trace + "X"
                 throw new System.InvalidOperationException()

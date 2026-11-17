@@ -310,7 +310,9 @@ public sealed class ValidationLoopTests : IDisposable
         [
             new ExecutionWorkspace.CompiledUnit("Program.cs", """
                 using System.Diagnostics;
+                using System.IO;
                 using System.Reflection;
+                using System.Threading;
                 if (args[0] == "child")
                 {
                     Thread.Sleep(30000);

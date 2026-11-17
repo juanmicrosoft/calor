@@ -219,7 +219,8 @@ public class HigherOrderDemandLedgerTests
         var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
             .Where(call => call.Target == "EscapeField"));
         Assert.False(call.HasUnresolvedArguments);
-        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "EscapeField").Symbol,
+        // Functions in a nested module bind with their namespace-qualified name.
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "CsvRow.CsvRowModule.EscapeField").Symbol,
             call.ResolvedSymbol);
 
         var status = new StringWriter();

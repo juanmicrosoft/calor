@@ -43,7 +43,10 @@ public sealed class NativeQualifiedModuleCallTests
         try
         {
             File.WriteAllText(Path.Combine(root, "OrderService.calr"), Callee);
-            var caller = declared ? Caller : Caller.Replace("    ! db:w\n", "", StringComparison.Ordinal);
+            // Calor0124 rejects a public callable without a row, so the undeclared
+            // variant declares a pure row that omits the callee's 'db:w'.
+            var caller = declared ? Caller : Caller.Replace("    ! db:w\n", "    !\n", StringComparison.Ordinal);
+            Assert.True(declared || caller != Caller);
             File.WriteAllText(Path.Combine(root, "Handler.calr"), caller);
             var inputs = reverse ? new[] { "Handler.calr", "OrderService.calr" } : ["OrderService.calr", "Handler.calr"];
             string[]? previousOutput = null;
@@ -57,13 +60,13 @@ public sealed class NativeQualifiedModuleCallTests
                 Assert.DoesNotContain("INT.SaveOrder", result.StdOut + result.StdErr);
                 if (!declared)
                 {
+                    // Every public callable now declares a row (Calor0124), so the
+                    // undeclared-public warning Calor0417 can no longer fire here.
                     Assert.Equal(1, result.ExitCode);
-                    Assert.Equal(2, diagnostics.Length);
-                    var error = Assert.Single(diagnostics.Where(item => item.GetProperty("code").GetString() == "Calor0410"));
+                    var error = Assert.Single(diagnostics);
+                    Assert.Equal("Calor0410", error.GetProperty("code").GetString());
                     Assert.Equal("error", error.GetProperty("severity").GetString());
                     Assert.Contains("db:w", error.GetProperty("message").GetString());
-                    var warning = Assert.Single(diagnostics.Where(item => item.GetProperty("code").GetString() == "Calor0417"));
-                    Assert.Equal("warning", warning.GetProperty("severity").GetString());
                     continue;
                 }
 
@@ -238,26 +241,67 @@ public sealed class NativeQualifiedModuleCallTests
     [Fact]
     public void QualifiedModuleCallsRetainArgumentEvaluationEffects()
     {
-        var callee = Parse(Callee.Replace("SaveOrder ()", "SaveOrder (int:value)", StringComparison.Ordinal));
-        var caller = Parse("""
-            module Handler
-              func Observe () → int
-                ! cw
-                Console.WriteLine(1)
-                return 1
-              func HandleRequest () → void
-                ! db:w
-                OrderService.SaveOrder(Observe())
-            """);
-        var targets = CompilationDriver.BuildCrossModuleFunctionMap([callee, caller]);
-        var diagnostics = new DiagnosticBag();
-        new EffectEnforcementPass(diagnostics, crossModuleFunctionNames: targets.Keys)
+        // The real multi-file compile: the argument's selected source call is proved
+        // against the callee module's companion projection, so it is charged 'cw'
+        // rather than an unproved (unknown) dispatch.
+        var diagnostics = RunCliProject(
+            ("OrderService.calr", Callee.Replace("SaveOrder ()", "SaveOrder (int:value)", StringComparison.Ordinal)),
+            ("Handler.calr", """
+                module Handler
+                  func Observe () → int
+                    ! cw
+                    Console.WriteLine(1)
+                    return 1
+                  func HandleRequest () → void
+                    ! db:w
+                    OrderService.SaveOrder(Observe())
+                """ + "\n"));
+        var error = Assert.Single(diagnostics);
+        Assert.Equal("Calor0410", error.Code);
+        Assert.Equal("Function 'HandleRequest' uses effect 'cw' but does not declare it", error.Message);
+    }
+
+    [Fact]
+    public void MultiFileCompile_KeepsOperatorBindingsWhenAnotherModuleCallsIn()
+    {
+        // R8: a companion module's cross-module call used to project unqualified
+        // (CS0103), voiding every Roslyn proof in this file, so 'a + b' became an
+        // unresolved (unknown) addition.
+        var diagnostics = RunCliProject(
+            ("math.calr", """
+                module MathUtil MathUtil block
+                  func Add (int:a, int:b) → int
+                    !
+                    return (a + b)
+                """ + "\n"),
+            ("other.calr", """
+                module Other Other block
+                  func Sum () → int
+                    !
+                    return Add(2, 3)
+                """ + "\n"));
+        Assert.Empty(diagnostics);
+    }
+
+    private static (string Code, string Message)[] RunCliProject(params (string Name, string Source)[] files)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "calor-native-qualified-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
         {
-            CrossModuleFunctionModules = targets
-        }.Enforce(caller);
-        Assert.Contains(diagnostics, item => item.Code == DiagnosticCode.ForbiddenEffect
-            && item.Message.Contains("HandleRequest", StringComparison.Ordinal)
-            && item.Message.Contains("cw", StringComparison.Ordinal));
+            foreach (var (name, source) in files)
+                File.WriteAllText(Path.Combine(root, name), source);
+            var result = CliTestHarness.RunCli(root, files.SelectMany(file => new[] { "--input", file.Name })
+                .Concat(["--no-cache", "--format", "json"]).ToArray());
+            using var json = JsonDocument.Parse(result.StdOut);
+            return json.RootElement.GetProperty("diagnostics").EnumerateArray()
+                .Select(item => (item.GetProperty("code").GetString()!, item.GetProperty("message").GetString()!))
+                .ToArray();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

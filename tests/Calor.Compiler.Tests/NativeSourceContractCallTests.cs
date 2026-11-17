@@ -430,7 +430,7 @@ public sealed class NativeSourceContractCallTests
     [InlineData("ctor (int:x)\n      requires Predicates.Number(x)")]
     [InlineData("property int:Value\n      get\n        requires Predicates.Number(1)\n        return 1")]
     [InlineData("this [int:x] → int\n      get\n        requires Predicates.Number(x)\n        return x")]
-    [InlineData("op + (Box:left, Box:right) → Box\n      requires Predicates.Number(1)\n      return left")]
+    [InlineData("op + (Box:left, Box:right) → Box\n      !\n      requires Predicates.Number(1)\n      return left")]
     public void MemberContracts_RejectSelectedNonBooleanReturns(string member)
     {
         var result = Program.Compile($$"""

@@ -84,7 +84,7 @@ public sealed class NativeComputedMemberReadTests
 
     [Theory]
     [InlineData("(value ?? \"none\").Length", 3)]
-    [InlineData("(gate ? value : \"none\").Length", 3)]
+    [InlineData("(gate ? Text(value) : \"none\").Length", 3)]
     [InlineData("(gate ? \"first\" : \"none\").Length", 5)]
     [InlineData("(Text(value)).Length", 3)]
     [InlineData("(Text(value) ?? \"none\").Length", 3)]
@@ -93,11 +93,13 @@ public sealed class NativeComputedMemberReadTests
     [InlineData("(nameof(value)).Length", 5)]
     public void SupportedStringReceivers_UseActualStringProperty(string expression, int expected)
     {
+        // String instance receivers must be proven non-null (Calor0274), so Text
+        // returns a non-null string; nullable receivers are NullableResiduals below.
         var source = $$"""
             module ComputedStrings
-              func Text (string?:value) → string?
+              func Text (string?:value) → string
                 !
-                return value
+                return value ?? ""
               func Read (string?:value, bool:gate) → int
                 !
                 return {{expression}}
