@@ -193,7 +193,9 @@ public class CompileCalorIntegrationTests : IDisposable
         // invalidates every skip; that behavior is pinned separately in
         // EditRenamingPublicFunction_InvalidatesAllSkips (G3/#809).
         Thread.Sleep(50); // ensure mtime changes
-        File.WriteAllText(src1, ValidCalorSource.Replace("(+ a b)", "(- a b)"));
+        var editedSource = ValidCalorSource.Replace("(a + b)", "(a - b)");
+        Assert.NotEqual(ValidCalorSource, editedSource); // the edit must land, or the skip is vacuous
+        File.WriteAllText(src1, editedSource);
 
         // Third build — only edited file compiles
         var task3 = CreateTask(src1, src2);
@@ -1060,7 +1062,8 @@ public class CompileCalorIntegrationTests : IDisposable
     {
         var editPhase = (CompileCalorTestPhase)editPhaseValue;
         var original = ValidCalorSource;
-        var edited = ValidCalorSource.Replace("(+ a b)", "(- a b)");
+        var edited = ValidCalorSource.Replace("(a + b)", "(a - b)");
+        Assert.NotEqual(original, edited); // the edit must land, or the race is vacuous
         var src = CreateSourceFile("Race.calr", original);
         var task = CreateTask(src);
         var editedOnce = false;
