@@ -17,7 +17,6 @@
     <InternalsVisibleTo Include="Calor.RoundTrip.Harness.Tests" />
     <!-- 0.30: the one-off legacy-syntax rewriter vendors the pre-cutover parser,
          which builds AST nodes through internal constructors. -->
-    <InternalsVisibleTo Include="Calor.LegacySyntaxRewriter" />
   </ItemGroup>
 
   <PropertyGroup>

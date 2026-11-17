@@ -1,3 +1,4 @@
+using Calor.Compiler.Analysis.ContractInference;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
