@@ -140,6 +140,41 @@ internal sealed class MetadataContext : IDisposable
         return new MetadataContext(compilation, filtered, manifest);
     }
 
+    private static readonly Lazy<Task> WarmUp = new(() => Task.Run(RunWarmUp));
+
+    /// <summary>
+    /// Starts compiling Roslyn's metadata-lookup path on a thread-pool thread, once per
+    /// process. The binder resolves .NET names through a Roslyn semantic model (see
+    /// <c>Binder.ResolveScopedMetadataType</c>), and in a fresh CLI process the first
+    /// such lookup is dominated by JIT-compiling Roslyn itself: about half a second,
+    /// paid by every compile, accepted or rejected. Started at process entry, that work
+    /// overlaps command-line parsing, the declaration-identity sync, lexing and parsing.
+    /// The result is discarded and nothing is shared except what the process already
+    /// shares (the reference set, the reference-hash cache, compiled code), so no
+    /// diagnostic, output or cache key can depend on it. A failure here is ignored:
+    /// the binder repeats the same work and reports any real failure itself.
+    /// Returns the one warm-up task of the process; callers do not wait for it.
+    /// </summary>
+    internal static Task StartWarmUp() => WarmUp.Value;
+
+    private static void RunWarmUp()
+    {
+        try
+        {
+            using var context = Create();
+            var tree = CSharpSyntaxTree.ParseText(
+                "using System;\nusing System.Collections.Generic;\n"
+                + "class __CalorWarmUp { static global::System.Type Resolve() => typeof(List<>); }");
+            var model = context._hostCompilation.AddSyntaxTrees(tree).GetSemanticModel(tree);
+            _ = model.GetDiagnostics();
+            _ = model.GetTypeInfo(tree.GetRoot().DescendantNodes().OfType<TypeOfExpressionSyntax>().Single().Type);
+        }
+        catch
+        {
+            // Best effort only; see the summary.
+        }
+    }
+
     // -------- D3 typed lookup surface --------
 
     /// <summary>

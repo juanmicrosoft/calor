@@ -22,6 +22,15 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        // The root compile command (options first, with an input) binds every program that
+        // parses, and binding needs Roslyn: start JIT-compiling that path now, in parallel
+        // with the work before it. Output does not depend on it (see StartWarmUp).
+        if (args.Length > 0 && args[0].StartsWith('-')
+            && args.Any(arg => arg is "-i" or "--input" || arg.StartsWith("--input=", StringComparison.Ordinal)))
+        {
+            _ = Binding.Metadata.MetadataContext.StartWarmUp();
+        }
+
         var inputOption = new Option<FileInfo[]>(
             aliases: ["--input", "-i"],
             description: "The Calor source file(s) to compile. Pass multiple files to enable cross-module effect enforcement.")

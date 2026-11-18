@@ -412,4 +412,27 @@ public class MetadataContextLifecycleTests
         Assert.Equal("System.Console", results[0]);
         Assert.Equal("System.Console", results[1]);
     }
+
+    // CLI start-up warm-up (0.30 i6): one task per process, it never faults, and a
+    // context created afterwards resolves exactly as one created without it. The CLI
+    // output equivalence (same exit code, stdout, stderr and generated C# across the
+    // StageB flag modes) was checked against the pre-warm-up binary.
+    [Fact]
+    public async Task StartWarmUp_RunsOnceAndLeavesLookupsUnchanged()
+    {
+        string? Lookup(string name)
+        {
+            using var ctx = MetadataContext.Create();
+            return ctx.TryResolveType(name)?.ToDisplayString();
+        }
+        var before = new[] { Lookup("System.Collections.Generic.List`1"), Lookup("System.String") };
+
+        var first = MetadataContext.StartWarmUp();
+        Assert.Same(first, MetadataContext.StartWarmUp());
+        await first;
+        Assert.True(first.IsCompletedSuccessfully);
+
+        Assert.Equal(before,
+            new[] { Lookup("System.Collections.Generic.List`1"), Lookup("System.String") });
+    }
 }
