@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking changes
 
+- **Implicit numeric narrowing is a type error.** The type checker rejects the implicit numeric conversions C# rejects, such as `double` to `float`, `long` to `int`, `double` to `int`, `decimal` to or from `double`, and an integer constant that does not fit (`let byte:b = 300`). It reports `Calor0202` at the Calor expression, in bindings, returns, assignments, same-module call arguments and class members. Before, these failed only when the generated C# was compiled (CS0266), or showed up as a confusing `Calor0410`. Widening (`int` to `long`, `float` to `double`), constants that fit and `1.5f` literals still work.
+- **`System.Convert` methods that can run your code are charged `unknown`.** This covers `ToString(object)`, `ToInt32(object)` and the other `ToX(object)` overloads, `ChangeType`, `IsDBNull`, `GetTypeCode`, and the overloads that take an `IFormatProvider`. A function declared pure (`!`) that calls one now reports `Calor0410`. Declare `! unknown`, or convert from a primitive: `Convert.ToString(42)` and the other primitive overloads stay pure. Effect manifests may now use the code `"unknown"` for such members.
 - **Syntax help leads with complete examples.** MCP `calor_help` treats `query`
   and `feature` as aliases and returns at most two relevant programs from the
   compiler-checked teaching reference, rather than prose sections. Topics with
@@ -109,6 +111,15 @@ no substitute tokenizer or estimated result is reported here.
 
 ### Fixed
 
+- The binder read the C# keyword `float` as double precision. `Scale(1.5f)` against a `float` parameter no longer reports `Calor0208`.
+- Calling `ToString`, `Equals`, `GetHashCode` or `GetType` on a value of one of your interface types no longer fails with `Calor0208`. Their effects are `unknown`, because the runtime type may override them.
+- Calling a sibling module's function by its qualified name with a callback argument, such as `Lib.RunTwice(next)`, no longer marks the caller's effects as assumed (`Calor0419`). The callback is checked against the callee's declared row, as for a bare-name call.
+- Diagnostics and editor hover spell types the way you write them in 0.30: `int`, `string`, `double`, `long`, and `string?` for nullables, not the retired `i32`, `str`, `f64` or the prefix `?string`. `Calor0254` suggests `string[]` instead of `[str]`.
+- C# to Calor conversion no longer drops inactive `#if` branches when it keeps a whole file as C#. FluentValidation's `#if SYNC_ONLY` code, which a source generator reads, survives again.
+- The converter no longer writes C# that fails to compile: lambda arguments stay inline instead of in untyped temporaries (CS8917); `this(...)`/`base(...)` arguments are not hoisted; `x is not IDisposable` stays a type test; `?.Invoke` no longer adds `.Value` on delegates. A target-typed `new(...)` whose type the converter cannot see is kept as C#; it used to become `default`, which is null for a class.
+- Calor's printer no longer writes the retired `§CS{}` marker, and writes `this.X` and `f().X` without spaces.
+- `calor` compiles start about 20% faster: the CLI warms up Roslyn (the C# compiler library Calor uses to look up .NET types) in the background while it reads the command line and parses your file. The tool also runs with .NET's tiered PGO (profile-guided optimization) off, which shortens short runs; long-running `calor` processes may be slightly slower once warm. Output is unchanged.
+- The C# interoperability guide again says that it covers converter support introduced in 0.25.
 - **Signature help works on native calls.** The language server looked for the
   retired `§C{name}` call form, so it never showed parameter hints in 0.30 code. It
   now finds the `name(` call around the cursor, skips strings and comments, and
