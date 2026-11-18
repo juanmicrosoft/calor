@@ -617,6 +617,23 @@ public class ConditionalEvaluationMigrationTests
                 """);
     }
 
+    // 0.30: a C# const local becomes an ordinary Calor local, so its uses were no longer constant
+    // expressions and the generated C# called another overload: `G(k)` with `const int k = 1`
+    // calls G(byte) (constant conversion), `G(int local)` calls G(long). Uses of int and long
+    // const locals are now written as their values; a byte assignment of one compiles again.
+    [Fact]
+    public void ConstantLocals_KeepTheirConstantConversions()
+    {
+        AssertRoundTrip("const int k = 1; const long big = 5; const int neg = -1; byte b = k; "
+            + "return G(k) * 1000 + H(big) * 100 + G(neg) * 10 + b;",
+            1421, false, members: """
+                public static int G(byte x) => 1;
+                public static int G(long x) => 2;
+                public static int H(ulong x) => 3;
+                public static int H(long x) => 4;
+                """);
+    }
+
     // 0.30: a compound update of a field of `this` inside a struct's own member is lowered to
     // `set t (t op v)`, like a field of a struct local: `this` is the instance's storage (a
     // reference, not a copy), so locating it again changes nothing. It was kept as raw C#

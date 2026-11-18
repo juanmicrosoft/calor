@@ -11010,6 +11010,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return expression switch
             {
                 LiteralExpressionSyntax literal => ConvertLiteral(literal),
+                IdentifierNameSyntax identifier when ConstantLocalValue(identifier) is { } constant => constant,
                 IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText,
                     identifier.Identifier.Text.StartsWith('@')),
                 BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.LogicalAndExpression) ||
@@ -11238,6 +11239,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 new StringLiteralNode(GetTextSpan(literal), value)
             });
+    }
+
+    /// <summary>
+    /// 0.30: a C# `const int`/`const long` local becomes an ordinary Calor local, so a use of it
+    /// is no longer a constant expression. C# converts an int constant to byte, short and the
+    /// other narrower types by value, so `G(k)` with `const int k = 1` calls `G(byte)` while
+    /// `G(int local)` calls `G(long)`. A use of such a local is written as its value, which
+    /// keeps the constant (and the overload) the original had. Only int and long constants have
+    /// constant conversions; other const locals keep their name.
+    /// </summary>
+    private IntLiteralNode? ConstantLocalValue(IdentifierNameSyntax identifier)
+    {
+        if (_semanticModel == null || identifier.SyntaxTree != _semanticModel.SyntaxTree
+            || identifier.Parent is NameColonSyntax or NameEqualsSyntax
+            || _semanticModel.GetSymbolInfo(identifier).Symbol is not ILocalSymbol
+            {
+                IsConst: true, HasConstantValue: true, Type.SpecialType: SpecialType.System_Int32 or SpecialType.System_Int64
+            } local)
+            return null;
+        return local.ConstantValue switch
+        {
+            int value => new IntLiteralNode(GetTextSpan(identifier), value),
+            long value => new IntLiteralNode(GetTextSpan(identifier), value) { IsLong = true },
+            _ => null
+        };
     }
 
     private IntLiteralNode CreateIntLiteralNode(LiteralExpressionSyntax literal, long value, bool isLong = false)
