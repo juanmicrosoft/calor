@@ -126,7 +126,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 0.30 (#1730): with full history the two historical replays below rebuild an archived
+    # compiler each (formatter about 2.5 min, binder about 1 min locally). Main's green runs
+    # took 5-6 min without them; 0.30 runs reached 11-13 min before failing.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
@@ -137,6 +140,12 @@ jobs:
           # submodules — without this, leg 2's equality ratchet is enforced NOWHERE
           # in CI and a converter/binder regression moving its counts fails no pipeline.
           submodules: recursive
+          # 0.30 (#1730): LosslessFormattingTests.CheckedInCalorCorpus_* and
+          # BinderIncompleteRatchetTests.ConversionLeg_* (Category HistoricalReplay) run
+          # scripts/registered_ledger_historical_replay.py, which rebuilds the compiler at
+          # its registered producer commit (ab53adc37, 7daf2bc99). A shallow clone has
+          # neither, and the replay fails closed ("fetch full history before replay").
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -352,8 +361,8 @@ jobs:
           # It FAILS in a shallow clone (it used to skip), so every job that runs
           # the whole compiler project — this one, the `tests (compiler)` shard,
           # and publish-nuget's `test` and `release-quality` — checks out at
-          # fetch-depth 0. The `test` job runs only filtered compiler tests and
-          # stays shallow.
+          # fetch-depth 0. The `test` job runs filtered compiler tests, but two of
+          # them are historical replays (see that job's checkout), so it does too.
           fetch-depth: 0
 
       # #1417 (v0.24 §6): provenance identities resolve from fetched protected main,
