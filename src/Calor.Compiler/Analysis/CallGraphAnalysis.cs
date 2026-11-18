@@ -291,11 +291,101 @@ public sealed class CallGraphAnalysis
     // module's, and the projection asked up to three times per image plus once per
     // interpolated string.
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Compilation,
-        System.Runtime.CompilerServices.StrongBox<bool>> CompilationErrorStates = new();
+        CompilationErrorState> CompilationErrorStates = new();
 
     internal static bool HasCompilationErrors(Compilation compilation) =>
-        CompilationErrorStates.GetValue(compilation, image => new(image.GetDiagnostics().Any(diagnostic =>
-            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))).Value;
+        ErrorStateOf(compilation).HasErrors;
+
+    private static CompilationErrorState ErrorStateOf(Compilation compilation) =>
+        CompilationErrorStates.GetValue(compilation, image => new CompilationErrorState(image));
+
+    /// <summary>
+    /// Where an image's errors are. C# binds each method, accessor and expression body
+    /// against declaration symbols only; no body's contents can change how another body
+    /// binds. So when every error lies inside some member's body (no parse error, no
+    /// declaration, signature, initializer or compilation-level error), an operation in a
+    /// member whose own declaration is error-free binds exactly as in an error-free image,
+    /// and its proof stands. Any other error voids every proof in the image.
+    /// </summary>
+    private sealed class CompilationErrorState
+    {
+        private readonly HashSet<(SyntaxTree Tree, Microsoft.CodeAnalysis.Text.TextSpan Span)>? _erroneousMembers;
+
+        internal bool HasErrors { get; }
+
+        internal CompilationErrorState(Compilation compilation)
+        {
+            var errors = compilation.GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                .ToArray();
+            HasErrors = errors.Length > 0;
+            if (!HasErrors || compilation.SyntaxTrees.Any(tree => tree.GetDiagnostics().Any(diagnostic =>
+                    diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)))
+                return;
+            var members = new HashSet<(SyntaxTree, Microsoft.CodeAnalysis.Text.TextSpan)>();
+            foreach (var error in errors)
+            {
+                if (BodyOwner(error.Location) is not { } member)
+                    return;
+                members.Add((member.SyntaxTree, member.Span));
+            }
+            _erroneousMembers = members;
+        }
+
+        /// <summary>
+        /// True when operations under <paramref name="declaration"/> bind as they would in
+        /// an error-free image: no error at all, or only errors confined to other members' bodies.
+        /// </summary>
+        internal bool AdmitsProofsIn(SyntaxNode declaration)
+        {
+            if (!HasErrors)
+                return true;
+            return _erroneousMembers != null
+                && declaration.AncestorsAndSelf().OfType<MemberDeclarationSyntax>().FirstOrDefault() is
+                    (BaseMethodDeclarationSyntax or BasePropertyDeclarationSyntax or BaseFieldDeclarationSyntax)
+                    and { } member
+                && !_erroneousMembers.Contains((member.SyntaxTree, member.Span));
+        }
+
+        // The member whose body (block or expression body, never a signature, constructor
+        // initializer, attribute or property/field initializer) contains the location.
+        private static MemberDeclarationSyntax? BodyOwner(Location location)
+        {
+            if (!location.IsInSource || location.SourceTree is not { } tree)
+                return null;
+            var span = location.SourceSpan;
+            for (SyntaxNode? node = tree.GetRoot().FindNode(span, getInnermostNodeForTie: true);
+                 node != null; node = node.Parent)
+            {
+                MemberDeclarationSyntax? owner;
+                SyntaxNode? body, expressionBody;
+                switch (node)
+                {
+                    case BaseMethodDeclarationSyntax method:
+                        (owner, body, expressionBody) = (method, method.Body, method.ExpressionBody);
+                        break;
+                    case AccessorDeclarationSyntax accessor:
+                        (owner, body, expressionBody) = (accessor.Parent?.Parent as BasePropertyDeclarationSyntax,
+                            accessor.Body, accessor.ExpressionBody);
+                        break;
+                    case PropertyDeclarationSyntax property:
+                        (owner, body, expressionBody) = (property, null, property.ExpressionBody);
+                        break;
+                    case IndexerDeclarationSyntax indexer:
+                        (owner, body, expressionBody) = (indexer, null, indexer.ExpressionBody);
+                        break;
+                    case MemberDeclarationSyntax:
+                        return null;
+                    default:
+                        continue;
+                }
+                return owner != null
+                    && (body?.Span.Contains(span) == true || expressionBody?.Span.Contains(span) == true)
+                    ? owner : null;
+            }
+            return null;
+        }
+    }
 
     // A companion projection is emitted once per registry and contract mode, and every
     // module of the project binds against it. Its parse depends only on its text, path
@@ -1032,10 +1122,11 @@ public sealed class CallGraphAnalysis
                 && !bindInterpolation && additions.Length == 0)
                 return;
 
-            var validProofContext = (bindMemberTypes || bindNullGuards || bindInterpolation || additions.Length > 0)
-                && !HasCompilationErrors(compilation);
-            var validMemberContext = bindMemberTypes && validProofContext;
-            var validDispatchContext = !HasCompilationErrors(compilation);
+            // Proof contexts are scoped to the member whose body is being walked: an
+            // error confined to another member's body cannot change this body's binding.
+            var bindsProofs = bindMemberTypes || bindNullGuards || bindInterpolation || additions.Length > 0;
+            var errorState = ErrorStateOf(compilation);
+            bool validProofContext = false, validMemberContext = false, validDispatchContext = false;
             var selectedDispatchesInTree = new HashSet<TextSpan>();
             var selectedInTree = new HashSet<TextSpan>();
             var selectedNullGuardsInTree = new HashSet<BinaryOperationNode>(ReferenceEqualityComparer.Instance);
@@ -1056,6 +1147,9 @@ public sealed class CallGraphAnalysis
             {
                 if (model.GetOperation(declaration) is not { } body)
                     continue;
+                validDispatchContext = errorState.AdmitsProofsIn(declaration);
+                validProofContext = bindsProofs && validDispatchContext;
+                validMemberContext = bindMemberTypes && validProofContext;
                 var pending = new Stack<IOperation>();
                 pending.Push(body);
                 while (pending.TryPop(out var operation))
