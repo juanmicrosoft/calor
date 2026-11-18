@@ -162,7 +162,7 @@ public sealed class RenameHarnessTests : IDisposable
                 "RN-03-parameter-vs-field",
                 "RN-04-capture-refused",
                 "RN-05-overload-exact",
-                "RN-06-module-split-refused",
+                "RN-06-partial-type-split-refused",
             },
             EnumerateCaseDirectories().Select(Path.GetFileName).ToArray());
     }

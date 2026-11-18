@@ -1,4 +1,0 @@
-module Split Split block
-  func One () → int
-    !
-    return 1

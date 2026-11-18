@@ -1,0 +1,9 @@
+{
+  "id": "RN-06",
+  "title": "A partial class declared in two files",
+  "pins": "One type, two declarations, one identity per file, so the edit set would cover a single part and split the type: part-a would declare Renamed while part-b still declares Counter, splitting one class into two that both still compile. The engine refuses with SplitDeclaration. Until 0.30 this case was a module declared in two files; a 0.30 module header only labels its compilation unit, so two files with one label are two units, not one split declaration, and a partial type is the remaining declaration that spans files. Lifting this refusal is #922.",
+  "target": { "file": "part-a.calr", "marker": "Counter", "occurrence": 0 },
+  "newName": "Renamed",
+  "expect": "refuses",
+  "expectedRefusal": "SplitDeclaration"
+}
