@@ -330,6 +330,8 @@ public class ExemplarCompilesTests
         // layer's coverage shifts, but today the Calor layer catches this case.
         const string calor =
             "module Files\n" +
+            "  using System.Collections.Generic\n" +
+            "  using System.IO\n" +
             "  func CountLines (string:path) → int\n" +
             "    ! fs:r\n" +
             "    let List<string>:lines = File.ReadAllLines(path)\n" +

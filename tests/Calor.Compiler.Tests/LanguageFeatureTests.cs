@@ -108,7 +108,7 @@ public class LanguageFeatureTests
             module Test Test block
               func Run () → string
                 !
-                let string:result = new object() . GetType
+                let System.Type:result = new object() . GetType()
                 return result.Name
             """;
         var code = CompileToCode(source);
