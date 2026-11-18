@@ -105,17 +105,81 @@ public sealed class PrimitiveType : CalorType
     };
 
     /// <summary>
+    /// The exact C# numeric type of a value of this type — <c>i8</c>, <c>u8</c>, <c>i16</c>,
+    /// <c>u16</c>, <c>i32</c>, <c>u32</c>, <c>i64</c>, <c>u64</c>, <c>f32</c> or <c>f64</c> —
+    /// when the checker knows it, and <c>null</c> when it knows only the family.
+    /// </summary>
+    /// <remarks>
+    /// Equality ignores the width (every integer width is still <see cref="Int"/> for checking),
+    /// so this is consulted only by the implicit-numeric-conversion rule in
+    /// <see cref="TypeChecker"/>. The canonical instances (<see cref="Int"/>, <see cref="Float"/>)
+    /// carry NO width: they type results the checker computes without tracking width, and an
+    /// unknown width must never produce a narrowing error. Declared types, literals and
+    /// operator results over known widths carry one.
+    /// </remarks>
+    public string? NumericWidth { get; }
+
+    /// <summary>
+    /// True when a value of this type is an integer constant expression (C# §12.23), which C#
+    /// may convert implicitly to a narrower integer type when the value fits (§10.2.11).
+    /// </summary>
+    internal bool IsIntegerConstant { get; }
+
+    /// <summary>
+    /// The value of an integer constant, when known. <c>null</c> with
+    /// <see cref="IsIntegerConstant"/> means "a constant whose value the checker does not
+    /// compute" (a const field, constant arithmetic); such a value is never reported as narrowing.
+    /// </summary>
+    internal Int128? IntegerConstantValue { get; }
+
+    /// <summary>
     /// A width-carrying view of a collapsed primitive: equal to the canonical instance (equality
     /// and hashing are on <see cref="Name"/>, so <c>Sized("INT","long") == Int</c>) but rendering
     /// the spelling the user wrote.
     /// </summary>
-    private static PrimitiveType Sized(PrimitiveType canonical, string surface)
-        => new(canonical.Name, surface);
+    private static PrimitiveType Sized(PrimitiveType canonical, string surface, string width)
+        => new(canonical.Name, surface, width, false, null);
 
-    private PrimitiveType(string name, string? surfaceOverride)
+    /// <summary>The declared <c>int</c>: <see cref="Int"/> with a known 32-bit width.</summary>
+    private static readonly PrimitiveType ExactInt32 = new("INT", null, "i32", false, null);
+
+    /// <summary>The declared <c>double</c>: <see cref="Float"/> with a known 64-bit width.</summary>
+    private static readonly PrimitiveType ExactDouble = new("FLOAT", null, "f64", false, null);
+
+    /// <summary>
+    /// The primitive for an exact C# numeric width (<c>i8</c> … <c>u64</c>, <c>f32</c>, <c>f64</c>).
+    /// </summary>
+    internal static PrimitiveType ExactNumeric(string width) => width switch
+    {
+        "i32" => ExactInt32,
+        "f64" => ExactDouble,
+        "i8" => Sized(Int, "sbyte", width),
+        "u8" => Sized(Int, "byte", width),
+        "i16" => Sized(Int, "short", width),
+        "u16" => Sized(Int, "ushort", width),
+        "u32" => Sized(Int, "uint", width),
+        "i64" => Sized(Int, "long", width),
+        "u64" => Sized(Int, "ulong", width),
+        "f32" => Sized(Float, "float", width),
+        _ => throw new ArgumentOutOfRangeException(nameof(width), width, null),
+    };
+
+    /// <summary>This type, marked as an integer constant with the given value (null: unknown).</summary>
+    internal PrimitiveType AsIntegerConstant(Int128? value)
+        => new(Name, _surfaceOverride, NumericWidth, true, value);
+
+    /// <summary>This type without the integer-constant mark (a variable initialized by one).</summary>
+    internal PrimitiveType WithoutIntegerConstant()
+        => IsIntegerConstant ? new(Name, _surfaceOverride, NumericWidth, false, null) : this;
+
+    private PrimitiveType(string name, string? surfaceOverride, string? numericWidth,
+        bool isIntegerConstant, Int128? integerConstantValue)
     {
         Name = name;
         _surfaceOverride = surfaceOverride;
+        NumericWidth = numericWidth;
+        IsIntegerConstant = isIntegerConstant;
+        IntegerConstantValue = integerConstantValue;
     }
 
     private PrimitiveType(string name)
@@ -144,26 +208,27 @@ public sealed class PrimitiveType : CalorType
         };
         // The C# surface spelling is single precision; internal FLOAT stays double.
         if (name == "float")
-            return Sized(Float, "float");
+            return ExactNumeric("f32");
         return name.ToUpperInvariant() switch
         {
             "VOID" => Void,
-            // Every integer width collapses to one Int. That is the type system's existing
-            // choice (I32/I64 already did) and the sized-width checking lives in the verifier,
-            // not here — but the SPELLINGS have to resolve, or a documented type reads as
+            // Every integer width is one Int for equality. That is the type system's existing
+            // choice (I32/I64 already did); the width rides along in NumericWidth, which only
+            // the implicit-numeric-conversion rule reads (a declared `long` does not convert to
+            // `int`). The SPELLINGS have to resolve, or a documented type reads as
             // "Unknown type 'u32'". docs/syntax-reference/types.md is the authority for this list.
-            "INT" or "INT32" or "I32" => Int,
-            "I64" or "INT64" => Sized(Int, "long"),
-            "I8" => Sized(Int, "sbyte"),
-            "SBYTE" => Sized(Int, "sbyte"),
-            "I16" or "INT16" or "SHORT" => Sized(Int, "short"),
-            "U8" or "BYTE" => Sized(Int, "byte"),
-            "U16" or "UINT16" or "USHORT" => Sized(Int, "ushort"),
-            "U32" or "UINT" or "UINT32" => Sized(Int, "uint"),
-            "U64" or "UINT64" or "ULONG" => Sized(Int, "ulong"),
-            "LONG" => Sized(Int, "long"),
-            "FLOAT" or "FLOAT64" or "DOUBLE" or "F64" => Float,
-            "F32" or "SINGLE" => Sized(Float, "float"),
+            "INT" or "INT32" or "I32" => ExactInt32,
+            "I64" or "INT64" => ExactNumeric("i64"),
+            "I8" => ExactNumeric("i8"),
+            "SBYTE" => ExactNumeric("i8"),
+            "I16" or "INT16" or "SHORT" => ExactNumeric("i16"),
+            "U8" or "BYTE" => ExactNumeric("u8"),
+            "U16" or "UINT16" or "USHORT" => ExactNumeric("u16"),
+            "U32" or "UINT" or "UINT32" => ExactNumeric("u32"),
+            "U64" or "UINT64" or "ULONG" => ExactNumeric("u64"),
+            "LONG" => ExactNumeric("i64"),
+            "FLOAT" or "FLOAT64" or "DOUBLE" or "F64" => ExactDouble,
+            "F32" or "SINGLE" => ExactNumeric("f32"),
             "DECIMAL" => Decimal,
             "BOOL" or "BOOLEAN" => Bool,
             "STRING" or "STR" or "SYSTEM.STRING" => String,

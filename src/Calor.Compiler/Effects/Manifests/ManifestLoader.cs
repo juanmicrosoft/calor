@@ -311,7 +311,8 @@ public sealed class ManifestLoader
     }
 
     private static bool IsValidEffectCode(string code)
-        => EffectCodes.IsKnownCompactCode(code);
+        => EffectCodes.IsKnownCompactCode(code)
+            || string.Equals(code, EffectResolver.UnknownManifestCode, StringComparison.Ordinal);
 
     /// <summary>The variable that relocates Calor's user-level directory (normally <c>~/.calor</c>).</summary>
     internal const string CalorHomeVariable = "CALOR_HOME";

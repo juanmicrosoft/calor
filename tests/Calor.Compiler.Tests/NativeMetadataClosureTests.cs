@@ -424,7 +424,10 @@ public sealed class NativeMetadataClosureTests
             Assert.Equal(1, CompileAssembly(compiled.GeneratedCode).GetTypes()
                 .SelectMany(owner => owner.GetMethods()).Single(method => method.Name == "Run").Invoke(null, null));
         else
-            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+            // 0.30 i1: the type checker rejects the out-of-range constant at the argument
+            // (Calor0202) before the generated C# is compiled (where it was CS1503 → Calor0208).
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch
+                && diagnostic.Message.Contains($"the constant {argument} is outside the range of {type}"));
     }
 
     [Theory]
@@ -2710,6 +2713,11 @@ public sealed class NativeMetadataClosureTests
         }
     }
 
+    /// <remarks>
+    /// <c>ObjectText</c> selects <c>Convert.ToString(object)</c>, which calls the argument's
+    /// virtual <c>ToString</c>: since 0.30 i1 it is charged <c>unknown</c> (the overload, not the
+    /// null value, decides), so the function declares that row.
+    /// </remarks>
     [Fact]
     public void NativeReferenceDefaults_RetainSourceAndMetadataOverloadIdentityAfterReemission()
     {
@@ -2728,7 +2736,7 @@ public sealed class NativeMetadataClosureTests
                 !
                 return Pick(default(string))
               func ObjectText () → string?
-                !
+                ! unknown
                 return System.Convert.ToString(default(object))
               func StringText () → string?
                 !

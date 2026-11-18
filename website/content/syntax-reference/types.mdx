@@ -94,6 +94,19 @@ unit. Supplementary Unicode characters require strings; escaped surrogate
 code units remain representable. Character subtraction such as `'4' - '0'`
 produces an `int`.
 
+### Implicit numeric conversions
+
+Calor follows C#'s implicit numeric conversions. A value converts to a wider
+type of its family without a cast: `int` to `long`, `float` to `double`, and
+any integer type to `float`, `double` or `decimal`. A conversion that can lose
+information needs an explicit cast, such as `(float)value`. Examples are
+`double` to `float`, `long` to `int`, `double` to `int`, and `decimal` to or
+from `double`. The type checker reports `Calor0202` at the expression for a
+binding, return, assignment or same-module call argument that needs one.
+An integer constant converts to a narrower integer type when its value fits,
+so `let byte:mask = 255` is valid and `let byte:mask = 256` is not. A
+fractional literal without a suffix is a `double`; write `1.5f` for a `float`.
+
 ## Anonymous objects
 
 Use `new { Name = expression }` to create an anonymous object. Identifier and

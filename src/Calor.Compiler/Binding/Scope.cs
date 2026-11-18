@@ -578,6 +578,12 @@ public static class TypeIdentity
             "i64" or "long" or "int64" or "int[bits=64][signed=true]" => "LONG",
             "u64" or "ulong" or "uint64" or "int[bits=64][signed=false]" => "ULONG",
             "f32" or "single" or "float[bits=32]" => "FLOAT[bits=32]",
+            // The C# keyword `float` is single precision. The comparison is case-insensitive,
+            // so the canonical double spelling `FLOAT` also lowers to "float": only the exact
+            // lowercase keyword is the single-precision type. Mapping `float` to FLOAT made the
+            // binder read a declared `float` as double, so `Scale(1.5f)` against
+            // `Scale (float:x)` was Calor0208 and `celsius + 273.15` passed as double.
+            "float" when type == "float" => "FLOAT[bits=32]",
             "f64" or "float" or "double" => "FLOAT",
             "dec" or "decimal" => "DECIMAL",
             "char" when type is "char" or "CHAR" => "CHAR",
