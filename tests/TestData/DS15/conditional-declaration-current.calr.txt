@@ -53,4 +53,4 @@ module Fixture overflow unchecked
     func Get () → int
       ! unknown
       let ConditionalDelegate:d = (int:value) => (value + 1)
-      return ((((ConditionalClass.Value() + new ConditionalRecord(3) . Value) + d(4)) + ConditionalPartial.PartialValue()) + ConditionalPartial.Shared())
+      return ((((ConditionalClass.Value() + new ConditionalRecord(3).Value) + d(4)) + ConditionalPartial.PartialValue()) + ConditionalPartial.Shared())

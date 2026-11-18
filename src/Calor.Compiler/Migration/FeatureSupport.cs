@@ -864,6 +864,14 @@ public static class FeatureSupport
         },
 
         // Phase 4 features (C# 11-13)
+        ["untyped-block-lambda"] = new FeatureInfo
+        {
+            Name = "untyped-block-lambda",
+            Support = SupportLevel.Partial,
+            Description = "A block-bodied lambda passed as an argument is bound to a temp before the call; when a parameter type cannot be inferred the temp has no C# delegate type, so the containing member is preserved as C# interop",
+            Workaround = "Declare the lambda parameter types, or keep the counted interop"
+        },
+
         ["default-lambda-parameter"] = new FeatureInfo
         {
             Name = "default-lambda-parameter",
@@ -1369,7 +1377,8 @@ public static class FeatureSupport
             "unknown-literal", "unknown-pattern", "unsupported-binary-operator",
             "unsupported-compound-assignment", "unsupported-initializer",
             "unsupported-pattern-operator", "unsupported-prefix-operator",
-            "unsupported-slice-subpattern", "unsupported-switch-label", "whole-file-preservation"
+            "unsupported-slice-subpattern", "unsupported-switch-label", "untyped-block-lambda",
+            "whole-file-preservation"
         };
 
     private static readonly IReadOnlySet<string> SyntaxDerivedPreservationReasons =

@@ -58,6 +58,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// ConvertBlock and VisitGlobalStatement flush these before the containing statement.
     /// </summary>
     private readonly List<StatementNode> _pendingStatements = new();
+    // The C# lambda each converted block lambda came from, so a temp that cannot be typed escalates it.
+    private readonly Dictionary<LambdaExpressionNode, LambdaExpressionSyntax> _blockLambdaSyntax =
+        new(ReferenceEqualityComparer.Instance);
     // #1541: the source of each collection node, so an inline use can be preserved verbatim.
     private readonly Dictionary<ExpressionNode, SyntaxNode> _collectionCreationSyntax =
         new(ReferenceEqualityComparer.Instance);
@@ -217,9 +220,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         if (_wholeCompilationUnitFeature != null)
         {
+            // R9: a whole-unit boundary keeps the file as written, every #if branch included,
+            // never the text lossy active-branch selection left behind.
             var interop = new CSharpInteropBlockNode(
                 GetTextSpan(root),
-                root.ToFullString(),
+                _context.TakeWholeUnitPreservationSource(root.ToFullString()),
                 _wholeCompilationUnitFeature,
                 _wholeCompilationUnitReason,
                 InteropMemberKind.Other,
@@ -4086,12 +4091,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (node.Initializer != null)
         {
             var isBase = node.Initializer.ThisOrBaseKeyword.IsKind(SyntaxKind.BaseKeyword);
+            // A `this(…)`/`base(…)` argument list runs before the body, so a temp hoisted from
+            // it has no statement position: it used to land nowhere and leave the initializer
+            // naming an undeclared `_argN` (CS0103). 0.30 writes `new`, lambdas and literals in
+            // place, so the arguments stay inline; one that still needs a prelude is preserved.
+            var initializerMark = _pendingStatements.Count;
             var args = node.Initializer.ArgumentList.Arguments
                 .Select(a => ConvertExpression(a.Expression))
                 .ToList();
-
-            // Hoist §NEW, §LAM, §ARR from constructor initializer args — parser can't handle them nested
-            HoistComplexArguments(args, node.Initializer.ArgumentList.Arguments);
+            if (_pendingStatements.Count > initializerMark || args.Any(IsBlockLambda))
+            {
+                _pendingStatements.RemoveRange(initializerMark, _pendingStatements.Count - initializerMark);
+                throw EscalateExpression(node.Initializer, "conditional-expression-hoisting", preserveMember: true);
+            }
 
             initializer = new ConstructorInitializerNode(
                 GetTextSpan(node.Initializer),
@@ -8737,10 +8749,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 span, receiverName, null, false, receiver, new AttributeCollection()));
 
             var receiverType = _semanticModel?.GetTypeInfo(condAccess.Expression).Type;
-            var callReceiver = receiverType is INamedTypeSymbol
-                {
-                    OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
-                }
+            var nullableReceiver = receiverType is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+            } nullableType ? nullableType : null;
+            // `.Value` exists only on Nullable<T> of a resolved struct. With an unresolved type
+            // argument Roslyn can read `EventHandler<Missing>?` as Nullable<…> although the
+            // original is a nullable delegate, so `.Value.Invoke` would not compile (CS1061).
+            // A resolved reference type argument is a nullable reference annotation (no `.Value`);
+            // anything unresolved is preserved rather than guessed.
+            var valueReceiver = nullableReceiver is { TypeArguments: [{ IsValueType: true, TypeKind: not TypeKind.Error }] };
+            if (nullableReceiver != null && !valueReceiver
+                && nullableReceiver is not { TypeArguments: [{ IsReferenceType: true, TypeKind: not TypeKind.Error }] })
+                throw EscalateExpression(condAccess, "conditional-access-shape", preserveMember: true);
+            var callReceiver = valueReceiver
                 ? $"{receiverName}.Value"
                 : receiverName;
             var arguments = conditionalInvocation.ArgumentList.Arguments;
@@ -9517,11 +9539,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var args = ConvertOrderedExpressions(current.ArgumentList.Arguments.Select(a => a.Expression),
                 stageComplexArguments: true);
 
-            // Hoist complex arguments — prevents §LAM/§NEW nesting inside §C
+            // Hoist complex arguments. An expression-bodied lambda stays in place: 0.30 writes
+            // it inline (`xs.Where(x => x > 0)`), and an untyped `let _lam = x => …` temp has no
+            // natural delegate type in C# (CS8917). Only a block body needs a binding of its own.
             for (int i = 0; i < args.Count; i++)
             {
-                if (args[i] is LambdaExpressionNode)
+                if (IsBlockLambda(args[i]))
                 {
+                    RequireNaturallyTypedBlockLambda(args[i]);
                     var tempName = _context.GenerateId("_lam", methodName);
                     _pendingStatements.Add(new BindStatementNode(
                         span, tempName, null, false, args[i], new AttributeCollection()));
@@ -11303,20 +11328,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         return isPattern.Pattern switch
         {
+            // `x is IDisposable` / `x is not IDisposable`: a bare name in pattern position parses
+            // as a constant pattern even when it binds to a type. It is a type test, never `==`.
+            ConstantPatternSyntax constant when ConstantPatternDenotesType(constant) =>
+                new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left,
+                    TypeMapper.CSharpToCalor(constant.Expression.ToString())),
+            UnaryPatternSyntax { OperatorToken.Text: "not", Pattern: ConstantPatternSyntax notTypeName }
+                when ConstantPatternDenotesType(notTypeName) =>
+                new UnaryOperationNode(GetTextSpan(isPattern), UnaryOperator.Not,
+                    new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left,
+                        TypeMapper.CSharpToCalor(notTypeName.Expression.ToString()))),
             ConstantPatternSyntax constant =>
                 // "x is null" or "x is value"
                 new BinaryOperationNode(
                     GetTextSpan(isPattern),
                     BinaryOperator.Equal,
                     left,
-                    ConvertExpression(constant.Expression)),
+                    ConstantPatternValue(constant)),
             UnaryPatternSyntax { OperatorToken.Text: "not", Pattern: ConstantPatternSyntax notConstant } =>
                 // "x is not null" or "x is not value"
                 new BinaryOperationNode(
                     GetTextSpan(isPattern),
                     BinaryOperator.NotEqual,
                     left,
-                    ConvertExpression(notConstant.Expression)),
+                    ConstantPatternValue(notConstant)),
             TypePatternSyntax typePattern =>
                 // "x is SomeType" - convert to type operation
                 new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left,
@@ -11403,7 +11438,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     GetTextSpan(constant),
                     BinaryOperator.Equal,
                     subject,
-                    ConvertExpression(constant.Expression)),
+                    ConstantPatternValue(constant)),
             ParenthesizedPatternSyntax parenPattern =>
                 ConvertPatternToExpression(parenPattern.Pattern, subject),
             TypePatternSyntax typePattern =>
@@ -11842,7 +11877,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             ConstantPatternSyntax constant =>
                 new BinaryOperationNode(span, BinaryOperator.Equal, subject,
-                    ConvertExpression(constant.Expression)),
+                    ConstantPatternValue(constant)),
             RelationalPatternSyntax rel =>
                 ConvertPatternToExpression(rel, subject),
             BinaryPatternSyntax binary =>
@@ -12131,17 +12166,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits);
             }
-            // #1524: `default` would drop the initializer (and the object) entirely.
-            if (implicitNew.Initializer is { Expressions.Count: > 0 })
-                return PreserveInitializer(implicitNew, "target-typed-initializer");
-            return DefaultValue(implicitNew, GetTextSpan(implicitNew));
+            // #1524: `default` would drop the initializer (and the object) entirely. Without an
+            // initializer it still drops the object: `new()` of a class is an instance, `default`
+            // is null. An unknown target type is preserved, never guessed.
+            return PreserveInitializer(implicitNew, "target-typed-initializer");
         }
 
-        if (inferredType == null && implicitNew.Initializer is { Expressions.Count: > 0 })
+        // An unknown target is preserved: `new object(args)` names a type the original never
+        // created (CS1729, or a different constructor when one happens to match).
+        if (inferredType == null)
             return PreserveInitializer(implicitNew, "target-typed-initializer");
         _context.RecordFeatureUsage("target-typed-new");
         _context.IncrementConverted();
-        var typeName = inferredType ?? "object";
+        var typeName = inferredType;
         var args = ConvertOrderedExpressions(implicitNew.ArgumentList.Arguments.Select(a => a.Expression));
         for (var index = 0; index < args.Count; index++)
         {
@@ -13300,6 +13337,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // moves a user-defined conversion after the later arguments: preserve instead.
             if (!IsComplexArgument(args[i]) && syntax is { } typed && i < typed.Count && !KeepsMeaningInTemp(typed[i].Expression))
                 throw EscalateExpression(typed[i].Expression, "conditional-expression-hoisting");
+            RequireNaturallyTypedBlockLambda(args[i]);
             var tempName = args[i] switch
             {
                 NewExpressionNode newNode => _context.GenerateId("_new", newNode.TypeName),
@@ -13318,15 +13356,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private bool IsComplexArgument(ExpressionNode arg) =>
         !(_conditionalRegionDepth > 0 && IsInlineConditionalExpression(arg))
-        && (arg is NewExpressionNode or LambdaExpressionNode
-                or ListCreationNode or DictionaryCreationNode or SetCreationNode
+        && (arg is NewExpressionNode || IsBlockLambda(arg)
+                || arg is ListCreationNode or DictionaryCreationNode or SetCreationNode
             || arg is ConditionalExpressionNode cond
                 && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
 
     private static bool ContainsComplexNode(ExpressionNode node)
     {
-        return node is NewExpressionNode or LambdaExpressionNode
-            or ListCreationNode or DictionaryCreationNode or SetCreationNode
+        return node is NewExpressionNode || IsBlockLambda(node)
+            || node is ListCreationNode or DictionaryCreationNode or SetCreationNode
             || (node is ConditionalExpressionNode cond
                 && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
     }
@@ -13357,8 +13395,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
             return new ReferenceNode(span, tempName);
         }
-        if (node is LambdaExpressionNode)
+        if (IsBlockLambda(node))
         {
+            RequireNaturallyTypedBlockLambda(node);
             var tempName = _context.GenerateId("_lam");
             _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
             return new ReferenceNode(span, tempName);
@@ -13370,6 +13409,77 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new ReferenceNode(span, tempName);
         }
         return node;
+    }
+
+    /// <summary>
+    /// Whether a constant pattern's operand is a name that binds to a type. C# parses a bare
+    /// name in pattern position (`x is not IDisposable`) as a constant pattern and binds it as a
+    /// type test, so lowering it to `!=` would compare against a type (CS0119).
+    /// </summary>
+    private bool ConstantPatternDenotesType(ConstantPatternSyntax constant)
+    {
+        if (constant.Expression is not (NameSyntax or MemberAccessExpressionSyntax)
+            || _semanticModel == null || constant.SyntaxTree != _semanticModel.SyntaxTree)
+            return false;
+        var bound = _semanticModel.GetSymbolInfo(constant.Expression).Symbol;
+        if (bound is ITypeSymbol)
+            return true;
+        if (bound != null)
+            return false;
+        // C# reads the name as a value first and as a type otherwise. When the pattern did not
+        // bind (its subject's type is unresolved, say), ask whether the name denotes a type here.
+        var asType = _semanticModel.GetSpeculativeSymbolInfo(constant.Expression.SpanStart,
+            SyntaxFactory.ParseTypeName(constant.Expression.ToString()),
+            SpeculativeBindingOption.BindAsTypeOrNamespace).Symbol;
+        var asValue = _semanticModel.LookupSymbols(constant.Expression.SpanStart,
+            name: (constant.Expression as SimpleNameSyntax)?.Identifier.ValueText);
+        return asType is ITypeSymbol { TypeKind: not TypeKind.Error }
+            && (constant.Expression is not SimpleNameSyntax
+                || !asValue.Any(symbol => symbol is IFieldSymbol or ILocalSymbol or IParameterSymbol or IPropertySymbol));
+    }
+
+    /// <summary>
+    /// The value a constant pattern compares against when it is lowered to `==`. A nested
+    /// pattern whose name binds to a type is a type test, not an equality, so it is preserved.
+    /// </summary>
+    private ExpressionNode ConstantPatternValue(ConstantPatternSyntax constant)
+    {
+        if (ConstantPatternDenotesType(constant) || IsUnresolvedSimpleName(constant.Expression))
+            throw EscalateExpression(constant, "complex-is-pattern");
+        return ConvertExpression(constant.Expression);
+    }
+
+    /// <summary>
+    /// A bare name that binds to nothing here (`IDisposable` in a file that relies on a
+    /// project's implicit global usings). A value constant in pattern position is a local, a
+    /// parameter or a qualified member, so an unresolved bare name is most likely a type: it is
+    /// preserved rather than lowered to `==`.
+    /// </summary>
+    private bool IsUnresolvedSimpleName(ExpressionSyntax expression)
+        => expression is IdentifierNameSyntax identifier
+            && _semanticModel != null && identifier.SyntaxTree == _semanticModel.SyntaxTree
+            && _semanticModel.GetSymbolInfo(identifier) is { Symbol: null, CandidateSymbols.Length: 0 }
+            && _semanticModel.LookupSymbols(identifier.SpanStart, name: identifier.Identifier.ValueText).IsEmpty;
+
+    /// <summary>
+    /// A lambda with a statement body. Native syntax writes block lambdas only as a binding's
+    /// initializer, so they are the one lambda shape that still needs a temp; an
+    /// expression-bodied lambda is written in place wherever an expression may appear.
+    /// </summary>
+    private static bool IsBlockLambda(ExpressionNode node) => node is LambdaExpressionNode { ExpressionBody: null };
+
+    /// <summary>
+    /// A hoisted block lambda becomes an untyped <c>let</c>, which C# compiles only when the lambda
+    /// has a natural delegate type. With a parameter whose type the semantic model could not
+    /// infer it has none (CS8917), so the converter would write a file it cannot compile; the
+    /// containing member is preserved instead.
+    /// </summary>
+    private void RequireNaturallyTypedBlockLambda(ExpressionNode node)
+    {
+        if (node is LambdaExpressionNode { ExpressionBody: null } lambda
+            && lambda.Parameters.Any(parameter => parameter.TypeName == null)
+            && _blockLambdaSyntax.TryGetValue(lambda, out var origin))
+            throw EscalateExpression(origin, "untyped-block-lambda");
     }
 
     private static bool IsInlineConditionalExpression(ExpressionNode node) => node is
@@ -16252,7 +16362,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             stmtBody = ConvertFunctionBlock(block);
         }
 
-        return new LambdaExpressionNode(
+        var converted = new LambdaExpressionNode(
             GetTextSpan(lambda),
             id,
             parameters,
@@ -16262,6 +16372,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             stmtBody,
             new AttributeCollection(),
             isStatic);
+        if (exprBody == null)
+            _blockLambdaSyntax[converted] = lambda;
+        return converted;
     }
 
     // #1677: whether the lambda's delegate returns a value; null when that is not known (no

@@ -715,6 +715,45 @@ public sealed class ConversionContext
     }
 
     /// <summary>
+    /// The file exactly as written, before lossy active-branch selection removed inactive
+    /// <c>#if</c> branches, or null when nothing was selected. Whole compilation-unit
+    /// preservation writes this text, never the selected one: preserved C# must keep every
+    /// preprocessor branch, because a source generator or another build context can still
+    /// read a branch the current context leaves inactive (FluentValidation's
+    /// <c>#if SYNC_ONLY</c> throw, read by Zomp.SyncMethodGenerator).
+    /// </summary>
+    internal string? UnselectedSource { get; private set; }
+    private readonly List<ConversionLoss> _branchSelectionLosses = [];
+
+    /// <summary>Records the losses that lossy active-branch selection made to <paramref name="unselected"/>.</summary>
+    internal void RecordBranchSelection(string unselected, string selected, Action recordLosses)
+    {
+        if (string.Equals(unselected, selected, StringComparison.Ordinal))
+        {
+            recordLosses();
+            return;
+        }
+        UnselectedSource = unselected;
+        var mark = _losses.Count;
+        recordLosses();
+        _branchSelectionLosses.AddRange(_losses.Skip(mark));
+    }
+
+    /// <summary>
+    /// The text a whole compilation-unit preservation must write in place of
+    /// <paramref name="selected"/>. When branch selection changed the file, that is the
+    /// unselected original, and the selection losses are withdrawn because no branch is lost.
+    /// </summary>
+    internal string TakeWholeUnitPreservationSource(string selected)
+    {
+        if (UnselectedSource is not { } unselected)
+            return selected;
+        _losses.RemoveAll(loss => _branchSelectionLosses.Contains(loss));
+        _branchSelectionLosses.Clear();
+        return unselected;
+    }
+
+    /// <summary>
     /// Original C# source code.
     /// </summary>
     public string? OriginalSource
@@ -1102,6 +1141,8 @@ public sealed class ConversionContext
         EmittedPreservations.Clear();
         _issues.Clear();
         _losses.Clear();
+        _branchSelectionLosses.Clear();
+        UnselectedSource = null;
         _usedFeatures.Clear();
         _scopeStack.Clear();
         _unsupportedFeatures.Clear();

@@ -2306,7 +2306,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // `//` comment everything after it is swallowed. Drop comments first; if
         // anything comment-like survives (an unterminated block comment, a `//`
         // inside a string literal in the target) refuse to normalise and hand the
-        // original back, so the §CS{...} / §CSHARP fallbacks preserve the member
+        // original back, so the raw-frame fallbacks preserve the member
         // instead of the emitter shipping a corrupt one.
         var stripped = System.Text.RegularExpressions.Regex.Replace(
             target, @"/\*.*?\*/", " ", System.Text.RegularExpressions.RegexOptions.Singleline);
@@ -2429,8 +2429,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0 && !IsElementFieldPath(node.Target))
             target = HoistToTempVar(target);
         var fieldName = EscapeCalorIdentifier(node.FieldName);
-        return $"{target} . {fieldName}";
+        // 0.30 member access is C# punctuation. After a receiver that ends a token on its own
+        // (`f().X`, `a[0].X`, `this.X`, `"s".Length`) the unspaced `.` reparses as the same
+        // member access. After an identifier it would not: the lexer folds `x.Field` into one
+        // dotted name, which the binder does not yet type like a member read (metadata member
+        // typing, static-field selection, some scopes), so that receiver keeps the spaced form
+        // until dotted names bind identically. A numeric literal receiver is parenthesized so
+        // `1.F` cannot lex as a number.
+        if (node.Target is IntLiteralNode or FloatLiteralNode or DecimalLiteralNode)
+            target = $"({target})";
+        return EndsInIdentifier(target) ? $"{target} . {fieldName}" : $"{target}.{fieldName}";
     }
+
+    private static bool EndsInIdentifier(string target)
+        => target.Length > 0 && (char.IsLetterOrDigit(target[^1]) || target[^1] == '_')
+            && target is not ("this" or "base");
 
     public string Visit(NewExpressionNode node)
     {
@@ -3726,9 +3739,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     // Fallback nodes for unsupported C# constructs
 
     public string Visit(FallbackExpressionNode node)
-    {
-        return $"§CS{{{node.OriginalCSharp}}}";
-    }
+        => EmitRawCSharpExpression(node.OriginalCSharp, nameof(FallbackExpressionNode));
 
     public string Visit(ExpressionStatementNode node)
     {
@@ -3853,8 +3864,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(RawCSharpExpressionNode node)
+        => EmitRawCSharpExpression(node.CSharpCode, nameof(RawCSharpExpressionNode));
+
+    /// <summary>
+    /// 0.30 has no inline raw C# expression form: the retired <c>§CS{…}</c> marker is a lexer
+    /// error. An interpolation hole is itself C# source (the parser reads <c>${…}</c> as a C#
+    /// expression), so a raw hole is written back verbatim. Anywhere else a raw expression
+    /// cannot be spelled; the converter preserves the enclosing statement or member instead
+    /// (<c>raw reason N</c>), so reaching this is an emitter contract violation, not output.
+    /// </summary>
+    private string EmitRawCSharpExpression(string code, string nodeKind)
     {
-        return $"§CS{{{node.CSharpCode}}}";
+        if (_inInterpolation)
+            return code;
+        throw new InvalidOperationException(
+            $"{nodeKind} has no native 0.30 spelling outside an interpolation hole; "
+            + "preserve the enclosing statement or member as a raw frame instead.");
     }
 
     public string Visit(PreprocessorDirectiveNode node)
