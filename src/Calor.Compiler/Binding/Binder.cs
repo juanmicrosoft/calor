@@ -7266,6 +7266,7 @@ public sealed class Binder
         if (symbols.Count == 0)
         {
             BoundExpression? unresolvedMember = null;
+            var receiverReportedError = false;
             // The lexer also accepts a dotted reference as one token. Route the
             // resolved external form through the same member binder as explicit dots.
             var lastDot = refNode.Name.LastIndexOf('.');
@@ -7278,10 +7279,45 @@ public sealed class Binder
                 BoundExpression? receiver = TryBindSourceEnumTypeReceiver(receiverNode)
                     ?? TryBindMetadataTypeReceiver(receiverNode)
                     ?? TryBindSourceStaticFieldReference(receiverNode);
+                // As in C#, a variable in scope wins simple-name lookup over a namespace or
+                // type, so `x.F` and `x.F.G` read members of x exactly like `x . F . G`.
+                var variableRoot = false;
                 if (receiver is null && (_scope.Lookup(receiverName) is VariableSymbol
-                    || _scope.Lookup(receiverName.Split('.')[0]) is VariableSymbol { AnonymousObjectMembers: not null }))
+                    || _scope.Lookup(receiverName.Split('.')[0]) is VariableSymbol))
+                {
+                    var errorsBefore = _diagnostics.Errors.Count;
                     receiver = BindReferenceExpression(receiverNode);
-                if (receiver is BoundTypeReferenceExpression { ResolvedType.IsEnum: true }
+                    variableRoot = true;
+                    // A dotted receiver already reported its own undefined prefix.
+                    receiverReportedError = receiverName.Contains('.') && _diagnostics.Errors.Count != errorsBefore;
+                }
+                // The member read binds exactly as the spaced form does. On a user type the
+                // member must exist (a declared field or property), or the undefined-name
+                // report below still applies; past an unknown-typed member read in the
+                // chain, the spaced form's binding is all there is to know.
+                var memberName = refNode.Name[(lastDot + 1)..];
+                ClassDefinitionNode? receiverClass = null;
+                if (variableRoot && !receiverReportedError
+                    && (receiver is BoundVariableExpression or BoundFieldAccessExpression
+                            && receiver.Type is BoundTypes.NominalBoundType { Declaration: { } receiverType, RoslynSymbol: null }
+                            && _classesByQualifiedName.TryGetValue(receiverType.QualifiedName, out receiverClass)
+                        || receiver is BoundFieldAccessExpression
+                            {
+                                HasUnknownInferredType: true, ResolvedField: null, IsAnonymousPropertyRead: false
+                            } and not { Type: BoundTypes.UnresolvedBoundType }))
+                {
+                    var memberSpan = new Parsing.TextSpan(
+                        refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
+                        refNode.Span.Line, refNode.Span.Column + lastDot + 1);
+                    var member = BindFieldAccess(new FieldAccessNode(
+                        refNode.Span, receiverNode, memberName, memberSpan), receiver);
+                    if (receiverClass is null
+                            ? member.Type is not BoundTypes.UnresolvedBoundType
+                            : ResolveAccessibleMembers(receiverClass, memberName).Any(symbol => symbol is VariableSymbol))
+                        return member;
+                    unresolvedMember = member;
+                }
+                else if (!receiverReportedError && (receiver is BoundTypeReferenceExpression { ResolvedType.IsEnum: true }
                     || receiver is BoundVariableExpression tupleVariable
                         && tupleVariable.Variable.TypeName.StartsWith('(')
                         && SyntaxFactory.ParseTypeName(tupleVariable.Variable.TypeName)
@@ -7293,7 +7329,7 @@ public sealed class Binder
                     || receiver is not null && ResolveMetadataScalarArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
                     || refNode.Name[(lastDot + 1)..] == "Length"
                         && receiver is not null && (IsArrayReceiver(receiver)
-                            || receiver is BoundVariableExpression { Variable.MetadataArrayResultType: not null }))
+                            || receiver is BoundVariableExpression { Variable.MetadataArrayResultType: not null })))
                 {
                     var memberSpan = new Parsing.TextSpan(
                         refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
@@ -7307,7 +7343,11 @@ public sealed class Binder
             }
 
             var similarName = _scope.FindSimilarName(refNode.Name);
-            if (similarName != null)
+            if (receiverReportedError)
+            {
+                // The receiver prefix already carries the undefined-name report.
+            }
+            else if (similarName != null)
             {
                 // Create a fix to replace the undefined reference with the similar name
                 var fix = new SuggestedFix(
