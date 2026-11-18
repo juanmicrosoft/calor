@@ -109,14 +109,14 @@ public class HigherOrderDemandLedgerTests
         + "All seven #901 benchmark subjects now reach the effect pass.";
 
     private const string CurrentNotReachingEffectPassNote =
-        "Current compiler over 958 logical subjects (the original 952 plus the six D-S1.5 "
-        + "checked/unchecked/record fixtures), resolving explicitly registered active copies. "
-        + "66 files fail before the effect pass; the w5-parity-002 treatment run-3 "
+        "Current compiler over 961 logical subjects (the original 952, the six D-S1.5 "
+        + "checked/unchecked/record fixtures and the three ES-04 bystander steps), resolving explicitly registered active copies. "
+        + "65 files fail before the effect pass; the w5-parity-002 treatment run-3 "
         + "CSV subject now reaches it with authoritative List<str> indexed element typing. Intentionally obsolete "
         + "MCP inputs retain their original bytes and, like the 14 inputs still written in the retired "
         + "section-marker syntax with no native mirror, first fail on that marker (Calor0006). "
-        + "benchmarks/null-safety/null-deref.calr fails on its seeded string? dereferences (Calor0274, "
-        + "599021cf3). Every named first error remains exact.";
+        + "benchmarks/null-safety/null-deref.calr reaches it again: its seeds moved from string? to a user T? "
+        + "(29c8755c1). Every named first error remains exact.";
 
     /// <summary>
     /// The D-B classification, pinned as data: identifiers a declared type syntax
