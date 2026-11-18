@@ -570,6 +570,15 @@ public class ArchitectureTests
                 ("Value-sensitive overload applicability recognizes only integer literals and " +
                     "their signed unary forms; other expressions explicitly return false.",
                     "return false"),
+            ["Binding/Binder.cs:ClassifyIntegralConstant"] =
+                ("0.30 constant classifier for overload applicability, not traversal; operator " +
+                    "and cast forms recurse into their operands, unknown forms that may be constants " +
+                    "are Unknown (the call declines), and every unlisted kind is not a constant.",
+                    "return IntegralConstant.NotConstant"),
+            ["Binding/Binder.cs:TryGetCSharpArgumentType"] =
+                ("0.30 argument-type trust classifier for overload betterness, not traversal; every " +
+                    "unlisted expression explicitly has no known C# type, so the comparison is unknown.",
+                    "_ => null"),
             ["Analysis/Security/TaintAnalysis.cs:GetExpressionName"] =
                 ("Display-only classifier; unsupported expressions explicitly return null.",
                     "_ => null"),
