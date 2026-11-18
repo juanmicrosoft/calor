@@ -148,30 +148,5 @@
     "SourceOperationStart": 14954,
     "SourceOperationEnd": 14980,
     "SourceOperation": "() => RuleLevelCascadeMode"
-  },
-  {
-    "Original": {
-      "File": "MediatR/src/MediatR/Registration/ServiceRegistrar.cs",
-      "SourceStart": 8082,
-      "SourceEnd": 8291,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "concreteGenericTRequest.GetInterfaces()\n            .FirstOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IRequest<>))\n            ?.GetGenericArguments()\n            .FirstOrDefault()",
-      "CarrierKind": "ExpressionCallNode",
-      "CarrierStart": 8239,
-      "CarrierEnd": 8291,
-      "CarrierCode": "((concreteGenericTRequest.GetInterfaces() is var _chainGetInterfaces074 ? _chainGetInterfaces074.FirstOrDefault((System.Type x) => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IRequest<>)) : throw new System.InvalidOperationException(\"Unreachable conditional capture\")))?.GetGenericArguments().FirstOrDefault()"
-    },
-    "OriginalGeneratedName": "_chainGetInterfaces074",
-    "CurrentGeneratedName": "_chainGetInterfaces071",
-    "CurrentCarrierCode": "((concreteGenericTRequest.GetInterfaces() is var _chainGetInterfaces071 ? _chainGetInterfaces071.FirstOrDefault((System.Type x) => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IRequest<>)) : throw new System.InvalidOperationException(\"Unreachable conditional capture\")))?.GetGenericArguments().FirstOrDefault()",
-    "DeclarationKind": "VarPattern",
-    "DeclarationStart": null,
-    "DeclarationEnd": null,
-    "DeclarationCode": "concreteGenericTRequest.GetInterfaces() is var _chainGetInterfaces071",
-    "OperationCarrierKind": null,
-    "SourceOperationKind": "InvocationExpression",
-    "SourceOperationStart": 8082,
-    "SourceOperationEnd": 8121,
-    "SourceOperation": "concreteGenericTRequest.GetInterfaces()"
   }
 ]

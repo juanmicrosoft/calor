@@ -94,11 +94,24 @@ public class BinderIncompleteRatchetTests
     /// registers (no active mirror). ExpressionsBound 5194 -> 7386 because every other
     /// input is now bound in native syntax, where member reads and calls are expression
     /// nodes; it is recorded, not asserted, and is not a precision claim.
+    /// <para>Follow-up refresh after i8: 511 → 514 parsed, failures still 15, incomplete
+    /// still 0, ExpressionsBound 7386 → 7425. Measured per file with the compiler at
+    /// 1ea0a1280 (where the fixture was pinned; it reproduces 511/15/7386) and at each later
+    /// binder or parser change. Inputs: +3 files, the ES-04 <c>bystander.calr</c> at steps
+    /// 00, 01 and 02 (h3, 5a9d7e7c8; one bound expression each); the null-deref benchmark
+    /// subject re-seeded on a user <c>T?</c> (h2, 723c52dc0) binds 39 → 35. Compiler: +40,
+    /// all from i7 (a9f260a6f), which parses unspaced <c>x.Field</c> on a value as a
+    /// member-access node over a reference (two expressions where the dotted name was one),
+    /// across 18 files (largest: StringContracts +10, bounds-violation +6, null-deref +6,
+    /// 12-03 snapshot +4). 7386 + 3 - 4 + 40 = 7425.</para>
     /// </summary>
     private const string NativeCurrentNote =
         "0.30 current native leg: 12 retired-syntax inputs registered in AllowedParseFailures no "
         + "longer parse; all other in-repo inputs are bound in native syntax. Incomplete diagnostics "
-        + "remain zero. ExpressionsBound is informational.";
+        + "remain zero. ExpressionsBound is informational. Follow-up: the 3 added parsed inputs are "
+        + "the ES-04 bystander.calr steps (h3); ExpressionsBound 7386 to 7425 is 3 bystander "
+        + "expressions, 4 fewer in the re-seeded null-deref benchmark (h2) and 40 more from i7 "
+        + "member-access parsing of x.Field.";
 
     // ONE scope string — the two regen writers previously hardcoded different texts,
     // making the committed file depend on writer order (review minor 5).
@@ -211,16 +224,113 @@ public class BinderIncompleteRatchetTests
         JsonSerializer.Deserialize<CurrentSourceCarrier[]>(File.ReadAllText(Path.Combine(RepoRoot(),
             "tests", "TestData", "Binding", "current-source-carrier-compatibility.json")))!);
 
+    /// <summary>
+    /// 0.30 current dispositions of the immutable carrier evidence
+    /// (tests/TestData/Binding/current-source-carrier-dispositions.json). The evidence file is
+    /// byte-pinned by the historical binder replay, so moves are recorded here, never there:
+    /// <list type="bullet">
+    /// <item><c>Refusals</c>: evidence files the converter now refuses under the leg's one-file
+    /// Lossy/SelectActiveBranchLossy options (no Calor at all; maintainer decision 2026-11-18:
+    /// refusals are kept and counted). The cause is the sorted, distinct features of the
+    /// conversion errors, as in the Calor0270 leg. Their carriers resume when the file converts
+    /// again (the refusal pin then fails and must be re-adjudicated).</item>
+    /// <item><c>Cases</c>: a single identity that moved in a converted file, with its cause.
+    /// <c>preserved-member</c>: the source expression is now inside a member kept as C#.
+    /// <c>native-carrier</c>: a native carrier of the stated kind, span and tokens.</item>
+    /// </list>
+    /// </summary>
+    private static readonly Lazy<CurrentCarrierDispositions> CarrierDispositions = new(() =>
+        JsonSerializer.Deserialize<CurrentCarrierDispositions>(File.ReadAllText(Path.Combine(RepoRoot(),
+            "tests", "TestData", "Binding", "current-source-carrier-dispositions.json")))!);
+
     [Fact]
-    public void CurrentSourceCarrierCompatibility_RegistersOnlySevenExactHistoricalIdentities()
+    public void CurrentSourceCarrierCompatibility_RegistersOnlySixExactHistoricalIdentities()
     {
-        Assert.Equal(7, CurrentSourceCarriers.Value.Count);
-        Assert.Equal(7, CurrentSourceCarriers.Value.Select(current => current.Original).Distinct().Count());
+        // 0.30: the seventh (ServiceRegistrar's renamed _chainGetInterfaces capture) has no
+        // capture at all now; it is a native-carrier disposition instead.
+        Assert.Equal(6, CurrentSourceCarriers.Value.Count);
+        Assert.Equal(6, CurrentSourceCarriers.Value.Select(current => current.Original).Distinct().Count());
         foreach (var current in CurrentSourceCarriers.Value)
         {
             Assert.Contains(current.Original, SourceCarrierCases.Value);
             AssertCurrentCarrierTokenTransition(current);
         }
+    }
+
+    [Fact]
+    public void CurrentSourceCarrierDispositions_NameEveryRefusalAndMovedIdentity()
+    {
+        var dispositions = CarrierDispositions.Value;
+        var evidenceFiles = SourceCarrierCases.Value.Concat(PreservedCarrierCases.Value)
+            .Select(evidence => evidence.File).ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(20, dispositions.Refusals.Count);
+        Assert.All(dispositions.Refusals, refusal =>
+        {
+            Assert.Contains(refusal.Key, evidenceFiles);
+            Assert.False(string.IsNullOrWhiteSpace(refusal.Value));
+        });
+        Assert.Equal(2, dispositions.Cases.Count);
+        Assert.Equal(dispositions.Cases.Count, dispositions.Cases
+            .Select(moved => (moved.File, moved.SourceStart, moved.SourceEnd)).Distinct().Count());
+        foreach (var moved in dispositions.Cases)
+        {
+            var evidence = Assert.Single(SourceCarrierCases.Value, evidence => evidence.File == moved.File
+                && evidence.SourceStart == moved.SourceStart && evidence.SourceEnd == moved.SourceEnd);
+            Assert.DoesNotContain(moved.File, dispositions.Refusals.Keys);
+            Assert.DoesNotContain(CurrentSourceCarriers.Value, current => current.Original == evidence);
+            Assert.False(string.IsNullOrWhiteSpace(moved.Cause));
+            switch (moved.Disposition)
+            {
+                case "preserved-member":
+                    Assert.Null(moved.CarrierKind);
+                    Assert.Null(moved.CarrierCode);
+                    break;
+                case "native-carrier":
+                    Assert.NotNull(moved.CarrierKind);
+                    Assert.NotNull(moved.CarrierStart);
+                    Assert.NotNull(moved.CarrierEnd);
+                    Assert.NotNull(moved.CarrierCode);
+                    Assert.NotEqual(evidence.CarrierCode, moved.CarrierCode);
+                    break;
+                default:
+                    Assert.Fail($"Unknown carrier disposition '{moved.Disposition}'.");
+                    break;
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("preserved", false)]
+    [InlineData("preserved-but-native", true)]
+    [InlineData("native", false)]
+    [InlineData("native-wrong-code", true)]
+    [InlineData("native-wrong-span", true)]
+    public void CurrentSourceCarrierDisposition_RequiresTheStatedCurrentForm(string shape, bool fails)
+    {
+        const string source = "class C { object Run(object x) => F(x); }";
+        var start = source.IndexOf("F(x)", StringComparison.Ordinal);
+        var span = new TextSpan(start, "F(x)".Length, 1, start + 1);
+        var evidence = new SourceCarrierCase("control.cs", span.Start, span.End, "InvocationExpression",
+            "F(x)", nameof(CallExpressionNode), span.Start, span.End, "F(_old)");
+        var moved = shape.StartsWith("preserved", StringComparison.Ordinal)
+            ? new CarrierDisposition("control.cs", span.Start, span.End, "preserved-member", "control",
+                null, null, null, null)
+            : new CarrierDisposition("control.cs", span.Start, span.End, "native-carrier", "control",
+                nameof(CallExpressionNode), span.Start, span.End, shape == "native-wrong-code" ? "G(x)" : "F(x)");
+        var call = new CallExpressionNode(
+            shape == "native-wrong-span" ? new TextSpan(span.Start, span.Length + 1, 1, span.Column) : span,
+            "F", [new ReferenceNode(new TextSpan(start + 2, 1, 1, start + 3), "x")]);
+        var module = shape == "preserved"
+            ? new ModuleNode(default, "m", "Control", [], [], [], [], [], [], [], new AttributeCollection(),
+                [], [], [], [], null,
+                interopBlocks: [new CSharpInteropBlockNode(default, "object Run(object x) => F(x);")])
+            : MeasurementModule(call);
+        void Check() => AssertCarrierDisposition(module, Walk(module).OfType<ExpressionNode>().ToArray(),
+            source, evidence, moved);
+        if (fails)
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+        else
+            Check();
     }
 
     [Theory]
@@ -388,9 +498,20 @@ public class BinderIncompleteRatchetTests
         Skip.IfNot(files.All(File.Exists), "corpus submodules not initialized");
         Assert.Multiple(files.Select(file => (Action)(() =>
         {
+            var relative = Path.GetRelativePath(Path.Combine(RepoRoot(), "bench", "corpus"), file)
+                .Replace('\\', '/');
             var coverage = new NativeConversionCoverage();
             MeasureNative(file, File.ReadAllText(file).Replace("\r\n", "\n"), coverage);
-            Assert.NotNull(coverage.LastSourceCoverage);
+            // A refused file produces no Calor, so its carriers cannot be checked. The refusal
+            // must be the pinned one; a refusal that ends or changes cause fails here.
+            var pinned = CarrierDispositions.Value.Refusals.GetValueOrDefault(relative);
+            Assert.True(pinned == coverage.LastRefusal,
+                $"Conversion refusal moved for {relative}: pinned '{pinned ?? "<converted>"}', measured "
+                + $"'{coverage.LastRefusal ?? "<converted>"}'. Re-adjudicate its carriers.");
+            if (pinned is null)
+                Assert.NotNull(coverage.LastSourceCoverage);
+            else
+                Assert.Null(coverage.LastSourceCoverage);
         })).ToArray());
     }
 
@@ -975,6 +1096,7 @@ public class BinderIncompleteRatchetTests
         coverage.FilesSeen++;
         coverage.LastSourceCoverage = null;
         coverage.LastBindingSites = null;
+        coverage.LastRefusal = null;
         var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
             Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
             Microsoft.CodeAnalysis.DocumentationMode.Parse,
@@ -1005,6 +1127,7 @@ public class BinderIncompleteRatchetTests
         if (string.IsNullOrEmpty(conversion.CalorSource))
         {
             coverage.EmptyOutput++;
+            coverage.LastRefusal = RefusalOf(conversion, file);
             return;
         }
         var diagnostics = new DiagnosticBag();
@@ -1336,7 +1459,11 @@ public class BinderIncompleteRatchetTests
             .Select(evidence => (Action)(() =>
             {
                 var compatibility = current.SingleOrDefault(c => c.Original == evidence);
-                if (compatibility is null)
+                var moved = CarrierDispositions.Value.Cases.SingleOrDefault(c => c.File == evidence.File
+                    && c.SourceStart == evidence.SourceStart && c.SourceEnd == evidence.SourceEnd);
+                if (moved is not null)
+                    AssertCarrierDisposition(module, nodes, source, evidence, moved);
+                else if (compatibility is null)
                     AssertSourceCarrierPreserved(nodes, source, evidence);
                 else
                     AssertCurrentSourceCarrier(module, source, evidence, compatibility, bindingModel!);
@@ -1344,6 +1471,56 @@ public class BinderIncompleteRatchetTests
             .ToArray());
         foreach (var evidence in PreservedCarrierCases.Value.Where(c => c.File == relative))
             AssertSourceCarrierPreservedOrInMember(module, source, evidence);
+    }
+
+    /// <summary>
+    /// A registered 0.30 move of one carrier identity. <c>preserved-member</c>: the exact source
+    /// expression is inside a member kept as C#, and no native carrier of the original kind and
+    /// span survives beside it. <c>native-carrier</c>: a native node of the stated kind, span
+    /// and emitted tokens carries the source expression.
+    /// </summary>
+    private static void AssertCarrierDisposition(ModuleNode module, IReadOnlyList<ExpressionNode> nodes,
+        string source, SourceCarrierCase evidence, CarrierDisposition moved)
+    {
+        Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
+        switch (moved.Disposition)
+        {
+            case "preserved-member":
+                Assert.True(Walk(module).OfType<CSharpInteropBlockNode>().Any(block =>
+                        block.CSharpCode.Contains(evidence.SourceExpression, StringComparison.Ordinal)),
+                    $"Carrier for {evidence.File}:{evidence.SourceStart}..{evidence.SourceEnd} is pinned as "
+                    + "preserved in a C# member, but no preserved member contains the source expression.");
+                Assert.DoesNotContain(nodes, node => node.GetType().Name == evidence.CarrierKind
+                    && node.Span.Start == evidence.CarrierStart && node.Span.End == evidence.CarrierEnd);
+                break;
+            case "native-carrier":
+                AssertSourceCarrierPreserved(nodes, source, evidence with
+                {
+                    CarrierKind = moved.CarrierKind!,
+                    CarrierStart = moved.CarrierStart!.Value,
+                    CarrierEnd = moved.CarrierEnd!.Value,
+                    CarrierCode = moved.CarrierCode!
+                });
+                break;
+            default:
+                Assert.Fail($"Unknown carrier disposition '{moved.Disposition}'.");
+                break;
+        }
+    }
+
+    /// <summary>
+    /// The sorted, distinct features of a refused conversion's errors (the Calor0270 leg's rule).
+    /// </summary>
+    private static string RefusalOf(Compiler.Migration.ConversionResult conversion, string file)
+    {
+        var features = conversion.Issues
+            .Where(issue => issue.Severity == Compiler.Migration.ConversionIssueSeverity.Error)
+            .Select(issue => issue.Feature ?? "unattributed")
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.True(features.Length > 0, $"Empty conversion without a conversion error: {file}");
+        return string.Join(",", features);
     }
 
     private static SemanticModel CreateCarrierBindingModel(ModuleNode module)
@@ -1568,6 +1745,21 @@ public class BinderIncompleteRatchetTests
         int CarrierEnd,
         string CarrierCode);
 
+    private sealed record CurrentCarrierDispositions(
+        IReadOnlyDictionary<string, string> Refusals,
+        IReadOnlyList<CarrierDisposition> Cases);
+
+    private sealed record CarrierDisposition(
+        string File,
+        int SourceStart,
+        int SourceEnd,
+        string Disposition,
+        string Cause,
+        string? CarrierKind,
+        int? CarrierStart,
+        int? CarrierEnd,
+        string? CarrierCode);
+
     private sealed record CurrentSourceCarrier(
         SourceCarrierCase Original,
         string OriginalGeneratedName,
@@ -1594,6 +1786,7 @@ public class BinderIncompleteRatchetTests
         public int OutputParseFailures;
         public SourceCoverageRecord? LastSourceCoverage;
         public BindingDiagnosticSites? LastBindingSites;
+        public string? LastRefusal;
         public NativeConversionLeg ToRecord() => new(
             Incomplete,
             LegacySourceOrderAttempted,
