@@ -7324,7 +7324,7 @@ public sealed class EffectEnforcementPass
             {
                 effects = effects.Union(InferFromPattern(matchCase.Pattern,
                     _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, matchStmt.Target.Span),
-                    matchStmt.Target));
+                    PatternInputType(matchStmt.Target)));
                 effects = effects.Union(InferFromCaseBody(matchCase));
             }
             return effects;
@@ -7396,13 +7396,6 @@ public sealed class EffectEnforcementPass
                 : targetEffects;
         }
 
-        /// <summary>
-        /// 0.30: a bare-name access to a static field (inside its class, a nested class or a
-        /// derived class) is a static field access like <c>Type.Field</c>, so it charges the
-        /// declaring type's initialization (C# spec, "Static field initialization": the
-        /// initializers run before the first use of a static field). Constants and enum
-        /// members run no initializer. A declaring type this module cannot name is Unknown.
-        /// </summary>
         /// <summary>A qualified read of a source constant (<c>Holder.Max</c>) runs no initializer.</summary>
         private static bool IsSourceConstant(BoundFieldAccessExpression access) =>
             access.SourceStaticFieldOwner is { } owner
@@ -7410,6 +7403,13 @@ public sealed class EffectEnforcementPass
                 is { } declared
             && declared.Modifiers.HasFlag(MethodModifiers.Const);
 
+        /// <summary>
+        /// 0.30: a bare-name access to a static field (inside its class, a nested class or a
+        /// derived class) is a static field access like <c>Type.Field</c>, so it charges the
+        /// declaring type's initialization (C# spec, "Static field initialization": the
+        /// initializers run before the first use of a static field). Constants and enum
+        /// members run no initializer. A declaring type this module cannot name is Unknown.
+        /// </summary>
         private EffectSet BareStaticFieldInitialization(ReferenceNode reference)
         {
             if (reference.Name.Contains('.')
@@ -8009,14 +8009,14 @@ public sealed class EffectEnforcementPass
             {
                 effects = effects.Union(InferFromPattern(matchCase.Pattern,
                     _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, match.Target.Span),
-                    match.Target));
+                    PatternInputType(match.Target)));
                 effects = effects.Union(InferFromCaseBody(matchCase));
             }
             return effects;
         }
 
         private EffectSet InferFromPattern(
-            PatternNode pattern, Binding.BoundTypes.ArrayBoundType? arrayType, ExpressionNode? input = null)
+            PatternNode pattern, Binding.BoundTypes.ArrayBoundType? arrayType, string? input = null)
         {
             switch (pattern)
             {
@@ -8035,17 +8035,21 @@ public sealed class EffectEnforcementPass
                     return InferFromPattern(either.Left, arrayType, input)
                         .Union(InferFromPattern(either.Right, arrayType, input));
                 case AndPatternNode both:
+                    // `T name and { … }` narrows the right side's input to T.
                     return InferFromPattern(both.Left, arrayType, input)
-                        .Union(InferFromPattern(both.Right, arrayType, input));
+                        .Union(InferFromPattern(both.Right, arrayType,
+                            both.Left is TypePatternNode typed ? typed.TypeName : input));
                 case PropertyPatternNode property:
                     // 0.30: each `Member: pattern` reads the member (C# calls its getter), so the
                     // read is charged like `value . Member`.
                     var propertyEffects = EffectSet.Empty;
+                    var owner = property.TypeName ?? input;
                     foreach (var member in property.Matches)
                         propertyEffects = propertyEffects
-                            .Union(InferPatternMemberRead(property, member, input))
+                            .Union(InferPatternMemberRead(member, owner))
                             .Union(InferFromPattern(member.Pattern,
-                                _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, member.Span)));
+                                _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, member.Span),
+                                owner is null ? null : SourceMemberType(owner, member.PropertyName)));
                     return propertyEffects;
                 case PositionalPatternNode positional:
                     var positionalEffects = InferDeconstruction(positional, input);
@@ -8063,7 +8067,7 @@ public sealed class EffectEnforcementPass
         /// manifest getter), else the source class the pattern names or its input has; a member
         /// nothing resolves is unknown.
         /// </summary>
-        private EffectSet InferPatternMemberRead(PropertyPatternNode property, PropertyMatchNode member, ExpressionNode? input)
+        private EffectSet InferPatternMemberRead(PropertyMatchNode member, string? inputType)
         {
             var span = member.Span;
             if (_context.CallGraph.IsTupleElementRead(_context.CurrentFunctionId, span)
@@ -8078,9 +8082,7 @@ public sealed class EffectEnforcementPass
                     ? UnknownResolvedOperation($"{metadata.DisplayString}.get_{member.PropertyName}", span)
                     : resolution.Effects;
             }
-            var owner = _context.CallGraph.SourceMemberOwner(_context.CurrentFunctionId, span)
-                ?? property.TypeName
-                ?? (input is null ? null : InferExpressionType(input));
+            var owner = _context.CallGraph.SourceMemberOwner(_context.CurrentFunctionId, span) ?? inputType;
             return owner is not null && TryResolveClass(owner, out _)
                 ? InferGetterEffects(owner, member.PropertyName, span)
                 : UnknownResolvedOperation($"pattern member '{member.PropertyName}'", span);
@@ -8091,13 +8093,10 @@ public sealed class EffectEnforcementPass
         /// type's own <c>Deconstruct</c> (or, for a record without one, its positional
         /// properties' getters); anything else may run user code and is unknown.
         /// </summary>
-        private EffectSet InferDeconstruction(PositionalPatternNode positional, ExpressionNode? input)
+        private EffectSet InferDeconstruction(PositionalPatternNode positional, string? inputType)
         {
-            var typeName = positional.TypeName.Length > 0
-                ? positional.TypeName
-                : input is null ? null : InferExpressionType(input);
-            if (positional.TypeName.Length == 0
-                && (input is TupleLiteralNode || typeName is { } inputType && IsTupleTypeName(inputType)))
+            var typeName = positional.TypeName.Length > 0 ? positional.TypeName : inputType;
+            if (positional.TypeName.Length == 0 && typeName is not null && IsTupleTypeName(typeName))
                 return EffectSet.Empty;
             if (typeName is not null && TryResolveClass(typeName, out var cls))
             {
@@ -8108,6 +8107,45 @@ public sealed class EffectEnforcementPass
                         effects.Union(InferGetterEffects(cls.Name, property.Name, positional.Span)));
             }
             return UnknownResolvedOperation($"{typeName ?? "?"}.Deconstruct", positional.Span);
+        }
+
+        /// <summary>The type a pattern's input has, as far as this pass can name it; a tuple literal is <c>(…)</c>.</summary>
+        private string PatternInputType(ExpressionNode input) =>
+            input is TupleLiteralNode ? "(tuple)" : InferExpressionType(input);
+
+        /// <summary>
+        /// The declared type of a source field or property, with the owner's type arguments
+        /// substituted (<c>Value</c> of <c>Option&lt;int&gt;</c> is <c>int</c>); null when unknown.
+        /// </summary>
+        private string? SourceMemberType(string ownerType, string member)
+        {
+            if (!TryResolveClass(ownerType, out var cls))
+                return null;
+            var declared = FindClassProperty(cls, member)?.Property.TypeName
+                ?? cls.Fields.FirstOrDefault(field => field.Name.Equals(member, StringComparison.Ordinal))?.TypeName;
+            if (declared is null)
+                return null;
+            var parameter = cls.TypeParameters.Select((type, index) => (type.Name, index))
+                .FirstOrDefault(candidate => candidate.Name == declared.TrimEnd('?'));
+            if (parameter.Name is null)
+                return declared;
+            var open = ownerType.IndexOf('<');
+            if (open < 0 || !ownerType.EndsWith('>'))
+                return null;
+            var arguments = new List<string>();
+            var depth = 0;
+            var start = open + 1;
+            for (var index = start; index < ownerType.Length - 1; index++)
+            {
+                depth += ownerType[index] switch { '<' or '(' or '[' => 1, '>' or ')' or ']' => -1, _ => 0 };
+                if (ownerType[index] == ',' && depth == 0)
+                {
+                    arguments.Add(ownerType[start..index].Trim());
+                    start = index + 1;
+                }
+            }
+            arguments.Add(ownerType[start..^1].Trim());
+            return arguments.Count == cls.TypeParameters.Count ? arguments[parameter.index] : null;
         }
 
         private static bool IsTupleTypeName(string typeName) =>
