@@ -8064,8 +8064,8 @@ public sealed class EffectEnforcementPass
         /// <summary>
         /// The getter a property sub-pattern runs (<c>{ Name: "x" }</c> reads <c>Name</c>): the
         /// binder's member selection for a source field (pure) or a metadata receiver (the
-        /// manifest getter), else the source class the pattern names or its input has; a member
-        /// nothing resolves is unknown.
+        /// manifest getter), else the getter on the type the pattern tests or its input has; a
+        /// member nothing resolves is unknown.
         /// </summary>
         private EffectSet InferPatternMemberRead(PropertyMatchNode member, string? inputType)
         {
@@ -8083,7 +8083,9 @@ public sealed class EffectEnforcementPass
                     : resolution.Effects;
             }
             var owner = _context.CallGraph.SourceMemberOwner(_context.CurrentFunctionId, span) ?? inputType;
-            return owner is not null && TryResolveClass(owner, out _)
+            // The pattern's tested type (or its input's) names the getter: a source property's
+            // own row, or the manifest entry for a metadata type (`string { Length: 0 }`).
+            return owner is not null && owner != "?"
                 ? InferGetterEffects(owner, member.PropertyName, span)
                 : UnknownResolvedOperation($"pattern member '{member.PropertyName}'", span);
         }
