@@ -2184,12 +2184,12 @@ public class TranslatorTests
         using var ctx = Z3ContextFactory.Create();
         var translator = new ContractTranslator(ctx);
 
-        // (forall ((x f32)) (>= x 0)) - f32 is unsupported
+        // forall float:x: x >= 0 - float is unsupported
         var forallExpr = new ForallExpressionNode(
             TextSpan.Empty,
             new List<QuantifierVariableNode>
             {
-                new QuantifierVariableNode(TextSpan.Empty, "x", "f32")
+                new QuantifierVariableNode(TextSpan.Empty, "x", "float")
             },
             new BinaryOperationNode(
                 TextSpan.Empty,
@@ -2203,7 +2203,7 @@ public class TranslatorTests
         var diagnostic = translator.DiagnoseTranslationFailure(forallExpr);
 
         Assert.NotNull(diagnostic);
-        Assert.Contains("f32", diagnostic);
+        Assert.Contains("'float'", diagnostic);
         Assert.Contains("Unsupported type", diagnostic);
     }
 

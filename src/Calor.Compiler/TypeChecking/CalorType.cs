@@ -15,9 +15,11 @@ public abstract class CalorType : IEquatable<CalorType>
     public abstract string Name { get; }
 
     /// <summary>
-    /// The compact surface spelling agents actually write (<c>i32</c>, <c>str</c>,
-    /// <c>bool</c>, <c>List&lt;str&gt;</c>) — the form every diagnostic that echoes a
-    /// type must use, so the message never teaches an un-writable internal spelling.
+    /// The native surface spelling agents actually write (<c>int</c>, <c>string</c>,
+    /// <c>bool</c>, <c>List&lt;string&gt;</c>, <c>string?</c>) — the form every diagnostic
+    /// that echoes a type must use, so the message never teaches an un-writable internal
+    /// or retired spelling (#741; 0.30 retired <c>i32</c>/<c>str</c>/<c>f64</c> and the
+    /// <c>?T</c> prefix).
     /// Defaults to <see cref="Name"/> (correct for user/record/union/param types whose
     /// name is already what the user wrote); primitives and composites override to
     /// surface-spell themselves and recurse (#741).
@@ -48,8 +50,8 @@ public sealed class PrimitiveType : CalorType
 
     /// <summary>
     /// <c>char</c>. Distinct from <see cref="Int"/> deliberately: collapsing it would make
-    /// `char + i32` type-check, and C# does promote there, but it would also make a `char`
-    /// silently satisfy an `i32` parameter, which is the error worth catching.
+    /// `char + int` type-check, and C# does promote there, but it would also make a `char`
+    /// silently satisfy an `int` parameter, which is the error worth catching.
     /// </summary>
     public static readonly PrimitiveType Char = new("CHAR");
 
@@ -72,7 +74,7 @@ public sealed class PrimitiveType : CalorType
     /// The spelling the user actually wrote, when it differs from the canonical one for this
     /// type's family. Every integer width collapses to <see cref="Int"/> for CHECKING — that is
     /// the type system's existing design, and width analysis lives in the verifier — but a
-    /// diagnostic must still echo `i64` for an `i64` binding. Without this, resolving the sized
+    /// diagnostic must still echo `long` for a `long` binding. Without this, resolving the sized
     /// spellings (which previously failed outright with a spurious "Unknown type 'i64'") would
     /// have traded a false error for a message that quietly reports the wrong width.
     /// </summary>
@@ -82,18 +84,18 @@ public sealed class PrimitiveType : CalorType
     /// The surface spelling for a diagnostic. Note the type system collapses every integer
     /// width into a single <see cref="Int"/> primitive and every float width into
     /// <see cref="Float"/> (see <see cref="FromName"/>), so a collapsed primitive carries no
-    /// width — it renders as the canonical default (<c>i32</c>/<c>f64</c>). This is exact for
+    /// width — it renders as the canonical default (<c>int</c>/<c>double</c>). This is exact for
     /// the only case that reaches here today: an <em>inferred</em> value (an integer literal
-    /// is i32, a float literal is f64). A sized annotation like <c>i64</c> does NOT collapse
-    /// to <c>i32</c> here — the opt-in checker does not resolve sized types at all, so they
+    /// is int, a float literal is double). A sized annotation like <c>long</c> does NOT collapse
+    /// to <c>int</c> here — the opt-in checker does not resolve sized types at all, so they
     /// surface from their carried width string via <c>ToSurfaceSpelling</c>, not this map.
     /// </summary>
     public override string SurfaceName => _surfaceOverride ?? Name switch
     {
-        "INT" => "i32",
-        "FLOAT" => "f64",
+        "INT" => "int",
+        "FLOAT" => "double",
         "BOOL" => "bool",
-        "STRING" => "str",
+        "STRING" => "string",
         "VOID" => "void",
         "UNIT" => "unit",
         "CHAR" => "char",
@@ -132,11 +134,11 @@ public sealed class PrimitiveType : CalorType
 
     /// <summary>
     /// A width-carrying view of a collapsed primitive: equal to the canonical instance (equality
-    /// and hashing are on <see cref="Name"/>, so <c>Sized("INT","i64") == Int</c>) but rendering
+    /// and hashing are on <see cref="Name"/>, so <c>Sized("INT","long") == Int</c>) but rendering
     /// the spelling the user wrote.
     /// </summary>
-    private static PrimitiveType Sized(PrimitiveType canonical, string surface)
-        => new(canonical.Name, surface, surface, false, null);
+    private static PrimitiveType Sized(PrimitiveType canonical, string surface, string width)
+        => new(canonical.Name, surface, width, false, null);
 
     /// <summary>The declared <c>int</c>: <see cref="Int"/> with a known 32-bit width.</summary>
     private static readonly PrimitiveType ExactInt32 = new("INT", null, "i32", false, null);
@@ -151,8 +153,14 @@ public sealed class PrimitiveType : CalorType
     {
         "i32" => ExactInt32,
         "f64" => ExactDouble,
-        "i8" or "u8" or "i16" or "u16" or "u32" or "i64" or "u64" => Sized(Int, width),
-        "f32" => Sized(Float, width),
+        "i8" => Sized(Int, "sbyte", width),
+        "u8" => Sized(Int, "byte", width),
+        "i16" => Sized(Int, "short", width),
+        "u16" => Sized(Int, "ushort", width),
+        "u32" => Sized(Int, "uint", width),
+        "i64" => Sized(Int, "long", width),
+        "u64" => Sized(Int, "ulong", width),
+        "f32" => Sized(Float, "float", width),
         _ => throw new ArgumentOutOfRangeException(nameof(width), width, null),
     };
 
@@ -200,7 +208,7 @@ public sealed class PrimitiveType : CalorType
         };
         // The C# surface spelling is single precision; internal FLOAT stays double.
         if (name == "float")
-            return Sized(Float, "f32");
+            return ExactNumeric("f32");
         return name.ToUpperInvariant() switch
         {
             "VOID" => Void,
@@ -210,17 +218,17 @@ public sealed class PrimitiveType : CalorType
             // `int`). The SPELLINGS have to resolve, or a documented type reads as
             // "Unknown type 'u32'". docs/syntax-reference/types.md is the authority for this list.
             "INT" or "INT32" or "I32" => ExactInt32,
-            "I64" or "INT64" => Sized(Int, "i64"),
-            "I8" => Sized(Int, "i8"),
-            "SBYTE" => Sized(Int, "i8"),
-            "I16" or "INT16" or "SHORT" => Sized(Int, "i16"),
-            "U8" or "BYTE" => Sized(Int, "u8"),
-            "U16" or "UINT16" or "USHORT" => Sized(Int, "u16"),
-            "U32" or "UINT" or "UINT32" => Sized(Int, "u32"),
-            "U64" or "UINT64" or "ULONG" => Sized(Int, "u64"),
-            "LONG" => Sized(Int, "i64"),
+            "I64" or "INT64" => ExactNumeric("i64"),
+            "I8" => ExactNumeric("i8"),
+            "SBYTE" => ExactNumeric("i8"),
+            "I16" or "INT16" or "SHORT" => ExactNumeric("i16"),
+            "U8" or "BYTE" => ExactNumeric("u8"),
+            "U16" or "UINT16" or "USHORT" => ExactNumeric("u16"),
+            "U32" or "UINT" or "UINT32" => ExactNumeric("u32"),
+            "U64" or "UINT64" or "ULONG" => ExactNumeric("u64"),
+            "LONG" => ExactNumeric("i64"),
             "FLOAT" or "FLOAT64" or "DOUBLE" or "F64" => ExactDouble,
-            "F32" or "SINGLE" => Sized(Float, "f32"),
+            "F32" or "SINGLE" => ExactNumeric("f32"),
             "DECIMAL" => Decimal,
             "BOOL" or "BOOLEAN" => Bool,
             "STRING" or "STR" or "SYSTEM.STRING" => String,
@@ -266,8 +274,8 @@ public sealed class ExternalType : CalorType
 
 /// <summary>
 /// An array, <c>T[]</c> or <c>T[,]</c>. A distinct kind rather than a <see cref="GenericInstanceType"/> named
-/// "Array" so diagnostics echo <c>i32[]</c> — a spelling the user can actually write — instead of
-/// <c>Array&lt;i32&gt;</c>, which is the #741 rule this file already applies to primitives.
+/// "Array" so diagnostics echo <c>int[]</c> — a spelling the user can actually write — instead of
+/// <c>Array&lt;int&gt;</c>, which is the #741 rule this file already applies to primitives.
 /// </summary>
 public sealed class ArrayType : CalorType
 {
@@ -308,7 +316,7 @@ public sealed class NullableReferenceType : CalorType
 {
     public CalorType ReferentType { get; }
     public override string Name => $"?{ReferentType.Name}";
-    public override string SurfaceName => $"?{ReferentType.SurfaceName}";
+    public override string SurfaceName => $"{ReferentType.SurfaceName}?";
 
     // Preserve the old checker's rejection of expanded nullable locals until #1385 can
     // take ownership. Raw inline annotations were previously unmodeled, not enforced.
@@ -337,13 +345,13 @@ public sealed class NullableReferenceType : CalorType
 }
 
 /// <summary>
-/// A nullable value type such as <c>?i32</c>.
+/// A nullable value type such as <c>int?</c>.
 /// </summary>
 public sealed class NullableValueType : CalorType
 {
     public CalorType UnderlyingType { get; }
     public override string Name => $"?{UnderlyingType.Name}";
-    public override string SurfaceName => $"?{UnderlyingType.SurfaceName}";
+    public override string SurfaceName => $"{UnderlyingType.SurfaceName}?";
 
     public NullableValueType(CalorType underlyingType)
     {
@@ -524,11 +532,11 @@ public sealed class FunctionType : CalorType
 
 /// <summary>
 /// Represents a refinement type: a base type constrained by a predicate.
-/// E.g., NatInt is i32 where # >= 0.
+/// E.g., NatInt is int where # >= 0.
 /// At runtime, refinement types erase to their base type.
 ///
 /// <para>A named refinement (<c>§RTYPE</c>) is nominal: its identity includes
-/// <see cref="RefinementName"/>, so <c>Nat</c> and <c>Pos</c> over the same <c>i32</c> are
+/// <see cref="RefinementName"/>, so <c>Nat</c> and <c>Pos</c> over the same <c>int</c> are
 /// different types and neither is assignable to the other. Before #1530 every named refinement's
 /// <see cref="PredicateText"/> was <c>#&lt;base&gt;</c>, so any two refinements of one base compared
 /// equal and one could be bound or passed where the other was expected.</para>

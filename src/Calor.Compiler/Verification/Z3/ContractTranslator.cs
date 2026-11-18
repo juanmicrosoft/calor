@@ -2815,7 +2815,7 @@ public sealed class ContractTranslator
             {
                 var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
                 if (z3Var == null)
-                    return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in forall expression";
+                    return $"Unsupported type '{Parsing.AttributeHelper.ToSurfaceSpelling(bv.TypeName)}' for bound variable '{bv.Name}' in forall expression";
                 _variables[bv.Name] = (z3Var, bv.TypeName);
             }
 
@@ -2836,7 +2836,7 @@ public sealed class ContractTranslator
             {
                 var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
                 if (z3Var == null)
-                    return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in exists expression";
+                    return $"Unsupported type '{Parsing.AttributeHelper.ToSurfaceSpelling(bv.TypeName)}' for bound variable '{bv.Name}' in exists expression";
                 _variables[bv.Name] = (z3Var, bv.TypeName);
             }
 
@@ -3059,7 +3059,7 @@ public static class ModeledForms
                 {
                     if (s_floatTypeSpellings.Contains(bv.TypeName))
                     {
-                        offending = $"quantifier bound variable of floating-point type '{bv.TypeName}'";
+                        offending = $"quantifier bound variable of floating-point type '{Parsing.AttributeHelper.ToSurfaceSpelling(bv.TypeName)}'";
                         return false;
                     }
                 }
@@ -3070,7 +3070,7 @@ public static class ModeledForms
                 {
                     if (s_floatTypeSpellings.Contains(bv.TypeName))
                     {
-                        offending = $"quantifier bound variable of floating-point type '{bv.TypeName}'";
+                        offending = $"quantifier bound variable of floating-point type '{Parsing.AttributeHelper.ToSurfaceSpelling(bv.TypeName)}'";
                         return false;
                     }
                 }

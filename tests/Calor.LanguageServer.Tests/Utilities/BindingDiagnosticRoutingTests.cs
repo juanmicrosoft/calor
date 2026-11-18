@@ -79,7 +79,7 @@ public class BindingDiagnosticRoutingTests
     [Theory]
     [InlineData("string[]?", "container")]
     [InlineData("string?[]", "elements")]
-    [InlineData("string?[]?", "container and STRING elements")]
+    [InlineData("string?[]?", "container and string elements")]
     public async Task StageB_ArrayInputs_UseActiveArrayContextAndExactSpanAsync(string sourceType, string component)
     {
         var source = $$"""

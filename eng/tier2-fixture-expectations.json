@@ -1348,8 +1348,9 @@
       "id": "TestData:EditScripts:ES-04-cross-module-effect:step-00-clean",
       "expect": "compile",
       "mode": "together",
-      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). 0.30 h3 (5a9d7e7c8): the unedited, independent bystander.calr is part of the step's workspace and compiles with it (CliEditScriptIdentityTests asserts it is served from cache in steps 1 and 2).",
       "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/bystander.calr",
         "tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/callee.calr",
         "tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/caller.calr"
       ]
@@ -1362,8 +1363,9 @@
       "errors": [
         "caller.calr|Calor0410|[\"caller.calr\",1,\"App\",\"Main\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Main' uses effect 'net' via cross-module call to 'SaveOrder' (in module 'OrderService') but does not declare it."
       ],
-      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-04 step 1 the callee gains an effect, so the unedited caller draws a cross-module Calor0410.",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-04 step 1 the callee gains an effect, so the unedited caller draws a cross-module Calor0410. 0.30 h3 (5a9d7e7c8): the unedited, independent bystander.calr is part of the step's workspace and compiles with it (CliEditScriptIdentityTests asserts it is served from cache in steps 1 and 2).",
       "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/bystander.calr",
         "tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/callee.calr",
         "tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/caller.calr"
       ]
@@ -1372,8 +1374,9 @@
       "id": "TestData:EditScripts:ES-04-cross-module-effect:step-02-callee-loses-effect",
       "expect": "compile",
       "mode": "together",
-      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). 0.30 h3 (5a9d7e7c8): the unedited, independent bystander.calr is part of the step's workspace and compiles with it (CliEditScriptIdentityTests asserts it is served from cache in steps 1 and 2).",
       "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/bystander.calr",
         "tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/callee.calr",
         "tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/caller.calr"
       ]
@@ -3609,8 +3612,9 @@
       "id": "active:TestData:EditScripts:ES-04-cross-module-effect:step-00-clean",
       "expect": "compile",
       "mode": "together",
-      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-00-clean; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-00-clean; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). 0.30 h3 (5a9d7e7c8): the unedited, independent bystander.calr is part of the step's workspace and compiles with it (CliEditScriptIdentityTests asserts it is served from cache in steps 1 and 2).",
       "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/bystander.calr",
         "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/callee.calr",
         "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/caller.calr"
       ]
@@ -3623,8 +3627,9 @@
       "errors": [
         "caller.calr|Calor0410|[\"caller.calr\",1,\"App\",\"Main\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Main' uses effect 'net' via cross-module call to 'SaveOrder' (in module 'OrderService') but does not declare it."
       ],
-      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-01-callee-gains-effect; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-04 step 1 the callee gains an effect, so the unedited caller draws a cross-module Calor0410.",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-01-callee-gains-effect; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-04 step 1 the callee gains an effect, so the unedited caller draws a cross-module Calor0410. 0.30 h3 (5a9d7e7c8): the unedited, independent bystander.calr is part of the step's workspace and compiles with it (CliEditScriptIdentityTests asserts it is served from cache in steps 1 and 2).",
       "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/bystander.calr",
         "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/callee.calr",
         "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/caller.calr"
       ]
@@ -3633,8 +3638,9 @@
       "id": "active:TestData:EditScripts:ES-04-cross-module-effect:step-02-callee-loses-effect",
       "expect": "compile",
       "mode": "together",
-      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-02-callee-loses-effect; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "evidence": "0.30 (#1730): native ActiveSyntax mirror of group TestData:EditScripts:ES-04-cross-module-effect:step-02-callee-loses-effect; same expectation and options as its original (test_all_current_copies_have_explicit_consumer_expectations). Original evidence: tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). 0.30 h3 (5a9d7e7c8): the unedited, independent bystander.calr is part of the step's workspace and compiles with it (CliEditScriptIdentityTests asserts it is served from cache in steps 1 and 2).",
       "files": [
+        "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/bystander.calr",
         "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/callee.calr",
         "tests/TestData/ActiveSyntax/tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/caller.calr"
       ]

@@ -67,7 +67,7 @@ a non-null parameter, used as a receiver, returned or bound without a `Calor0274
 diagnostic. The module's own nulls are still checked. A value whose type carries an
 explicit `?` (anywhere, including array elements and generic arguments), a `null`
 literal, and a local the module may have set to null keep the ordinary receiving
-check. That last case covers a local initialized or assigned from `null` or a `?T`
+check. That last case covers a local initialized or assigned from `null` or a `T?`
 value, and a local whose non-null proof was lost: a `ref`/`out` write, or a deferred
 body that captured and rebound it. Outside a `nullable oblivious` module, oblivious
 metadata values are still treated as possibly null. This is a file-wide annotation

@@ -142,6 +142,13 @@ public class ToSurfaceSpellingTests
     [InlineData("NULLABLE[inner=STRING[]]", "string[]?")]
     [InlineData("NULLABLE[inner=STRING][]?", "string?[]?")]
     [InlineData("Customer", "Customer")] // unknown/user type passes through
+    // The binder's canonical names reach diagnostics through bound variable types (0.30).
+    [InlineData("LONG", "long")]
+    [InlineData("UINT", "uint")]
+    [InlineData("ULONG", "ulong")]
+    [InlineData("DECIMAL", "decimal")]
+    [InlineData("OBJECT", "object")]
+    [InlineData("List<LONG>", "List<long>")]
     public void MapsExpandedToSurface(string expanded, string expected)
         => Assert.Equal(expected, AttributeHelper.ToSurfaceSpelling(expanded));
 

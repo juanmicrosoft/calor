@@ -30,6 +30,9 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     strategy:
+      # The two base paths are independent builds of the same site. Without this, the
+      # default fail-fast cancels the other leg when one fails, so its result is lost.
+      fail-fast: false
       matrix:
         base-path: ['', '/calor']
     env:

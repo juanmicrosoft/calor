@@ -957,7 +957,7 @@ public sealed class Binder
 
         var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(target);
         if (target is BoundTypes.ArrayBoundType)
-            targetShapeLabel = $"'{target.DisplayString}'";
+            targetShapeLabel = $"'{AttributeHelper.ToSurfaceSpelling(target.DisplayString)}'";
         if (!reported.Add((argument.Span, parameterName, targetShapeLabel)))
             return;
         var receivingPosition = isExpandedParams ? "Expanded argument to element of params parameter" : "Argument to parameter";
@@ -974,8 +974,8 @@ public sealed class Binder
             var components = arrayMismatch switch
             {
                 NullabilityChecker.ArrayMismatch.Container => "array container",
-                NullabilityChecker.ArrayMismatch.Elements => "STRING array elements",
-                _ => "array container and STRING elements"
+                NullabilityChecker.ArrayMismatch.Elements => "string array elements",
+                _ => "array container and string elements"
             };
             var supplied = NullabilityChecker.GetMethodInputArrayType(argument)!;
             message = $"{receivingPosition} '{parameterName}' requires non-null {components} of {targetShapeLabel}, " +
@@ -3283,8 +3283,8 @@ public sealed class Binder
                 _diagnostics.ReportError(
                     bind.IdentifierSpan,
                     DiagnosticCode.BindRebindTypeMismatch,
-                    $"Mutable binding '{bind.Name}' has type '{rebindTarget.TypeName}' and cannot be " +
-                    $"rebound with '{annotatedType ?? valueType}'.");
+                    $"Mutable binding '{bind.Name}' has type '{AttributeHelper.ToSurfaceSpelling(rebindTarget.TypeName)}' and cannot be " +
+                    $"rebound with '{AttributeHelper.ToSurfaceSpelling(bind.TypeName ?? valueType!)}'.");
             }
 
             if (initializer != null)
@@ -10805,7 +10805,7 @@ public sealed class Binder
                 // The code after the block has one variable, so its type (and any refinement
                 // the emitter guards writes with) must not depend on which branch is active.
                 conflict = $"Variable '{visible.Name}' is declared with different types in the branches " +
-                    $"of a pp block ({string.Join(", ", alternatives.Select(variable => $"'{variable.TypeName}'").Distinct())}); " +
+                    $"of a pp block ({string.Join(", ", alternatives.Select(variable => $"'{AttributeHelper.ToSurfaceSpelling(variable.TypeName)}'").Distinct())}); " +
                     "declare it with the same type in every branch";
             }
             if (conflict != null)
