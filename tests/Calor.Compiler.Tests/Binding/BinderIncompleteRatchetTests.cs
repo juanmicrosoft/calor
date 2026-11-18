@@ -94,11 +94,24 @@ public class BinderIncompleteRatchetTests
     /// registers (no active mirror). ExpressionsBound 5194 -> 7386 because every other
     /// input is now bound in native syntax, where member reads and calls are expression
     /// nodes; it is recorded, not asserted, and is not a precision claim.
+    /// <para>Follow-up refresh after i8: 511 → 514 parsed, failures still 15, incomplete
+    /// still 0, ExpressionsBound 7386 → 7425. Measured per file with the compiler at
+    /// 1ea0a1280 (where the fixture was pinned; it reproduces 511/15/7386) and at each later
+    /// binder or parser change. Inputs: +3 files, the ES-04 <c>bystander.calr</c> at steps
+    /// 00, 01 and 02 (h3, 5a9d7e7c8; one bound expression each); the null-deref benchmark
+    /// subject re-seeded on a user <c>T?</c> (h2, 723c52dc0) binds 39 → 35. Compiler: +40,
+    /// all from i7 (a9f260a6f), which parses unspaced <c>x.Field</c> on a value as a
+    /// member-access node over a reference (two expressions where the dotted name was one),
+    /// across 18 files (largest: StringContracts +10, bounds-violation +6, null-deref +6,
+    /// 12-03 snapshot +4). 7386 + 3 - 4 + 40 = 7425.</para>
     /// </summary>
     private const string NativeCurrentNote =
         "0.30 current native leg: 12 retired-syntax inputs registered in AllowedParseFailures no "
         + "longer parse; all other in-repo inputs are bound in native syntax. Incomplete diagnostics "
-        + "remain zero. ExpressionsBound is informational.";
+        + "remain zero. ExpressionsBound is informational. Follow-up: the 3 added parsed inputs are "
+        + "the ES-04 bystander.calr steps (h3); ExpressionsBound 7386 to 7425 is 3 bystander "
+        + "expressions, 4 fewer in the re-seeded null-deref benchmark (h2) and 40 more from i7 "
+        + "member-access parsing of x.Field.";
 
     // ONE scope string — the two regen writers previously hardcoded different texts,
     // making the committed file depend on writer order (review minor 5).
