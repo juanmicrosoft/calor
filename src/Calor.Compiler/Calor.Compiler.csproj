@@ -33,6 +33,12 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>See https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md</PackageReleaseNotes>
+
+    <!-- A CLI run is short and JIT-bound: one compile JIT-compiles ~14,000 methods, most of
+         them Roslyn's, and calls few of them often enough to gain from profile-guided
+         re-optimization. Turning tiered PGO off removes its instrumentation cost from that
+         startup. It changes no output. -->
+    <TieredPGO>false</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>
