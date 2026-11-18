@@ -862,7 +862,10 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 EffectSummary? summary = null;
                 if (result.Ast != null)
                 {
-                    summary = Calor.Compiler.Effects.EffectSummaryBuilder.Build(result.Ast);
+                    // Same map as CompilationDriver: without it a call written with the
+                    // callee's namespace is not recognized as cross-module, and the
+                    // cached summary would hide its Calor0410 on warm builds.
+                    summary = Calor.Compiler.Effects.EffectSummaryBuilder.Build(result.Ast, crossModuleMap);
                     moduleSummaries.Add((summary, inputPath));
                 }
 

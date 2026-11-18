@@ -219,6 +219,39 @@ public sealed class IncrementalSurfaceAgreementTests : IDisposable
     }
 
     [Fact]
+    public void QualifiedCrossModuleCall_IsInTheCachedSummary_OnBothSurfaces()
+    {
+        // Warm builds enforce Calor0410 from the CACHED effect summaries of
+        // skipped files, so both surfaces must cache the same summary. The task
+        // used to build it without the cross-module function map. A call written
+        // with the callee's namespace (`Library.Save()` into `module Store
+        // Library block`) then stayed `Library.Save`, which the cross-module
+        // registry (keyed by module name) does not know; with the map it is
+        // `Store.Save`, as on the CLI.
+        var files = new Dictionary<string, string>(Baseline)
+        {
+            ["library"] = Library.Replace("module Library Library block", "module Store Library block",
+                StringComparison.Ordinal)
+        };
+        var cli = NewWorkspace(files);
+        var task = NewWorkspace(files);
+        Assert.True(BuildCli(cli, clear: false).Success);
+        Assert.True(BuildTask(task, clear: false).Success);
+        var cliState = BuildStateCache.Load(cli)!;
+        var taskState = BuildStateCache.Load(Path.Combine(task, "obj"))!;
+
+        var callerCalls = cliState.Files["caller.calr"].EffectSummary!.Callers
+            .SelectMany(caller => caller.Calls).Select(call => call.Target).ToArray();
+        _output.WriteLine("cli caller calls: " + string.Join(", ", callerCalls));
+        Assert.Contains("Store.Save", callerCalls);
+        Assert.Equal(cliState.Files.Keys.Order(StringComparer.Ordinal), taskState.Files.Keys.Order(StringComparer.Ordinal));
+        foreach (var key in cliState.Files.Keys)
+            Assert.Equal(
+                System.Text.Json.JsonSerializer.Serialize(cliState.Files[key].EffectSummary),
+                System.Text.Json.JsonSerializer.Serialize(taskState.Files[key].EffectSummary));
+    }
+
+    [Fact]
     public void HandWrittenPartialOfASkippedWrapper_StillFailsTheBuild()
     {
         // The soundness argument for namespaced partial wrappers (#1732) does not
