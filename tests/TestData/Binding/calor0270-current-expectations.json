@@ -2,30 +2,30 @@
   "Volume": {
     "Scope": "Calor0270 (SignatureUnresolved) emitted by Binder.Bind over the three A-1.5.3 conversion subjects at their pinned submodule commits, converted in-process with Lossy/SelectActiveBranchLossy and genuinely empty default preprocessor symbols; modules that fail conversion or whose converted output fails to parse are excluded from the denominator and counted separately",
     "BindRule": "parsed",
-    "AggregateDiagnostics": 260,
-    "AggregateModulesWithDiagnostics": 48,
-    "AggregateModulesBound": 364,
+    "AggregateDiagnostics": 14,
+    "AggregateModulesWithDiagnostics": 7,
+    "AggregateModulesBound": 204,
     "PerSubject": [
       {
         "Subject": "MediatR",
-        "Diagnostics": 29,
-        "ModulesWithDiagnostics": 4,
-        "ModulesBound": 36,
-        "ModulesNotMeasured": 0
+        "Diagnostics": 2,
+        "ModulesWithDiagnostics": 1,
+        "ModulesBound": 24,
+        "ModulesNotMeasured": 12
       },
       {
         "Subject": "serilog",
-        "Diagnostics": 17,
-        "ModulesWithDiagnostics": 9,
-        "ModulesBound": 112,
-        "ModulesNotMeasured": 0
+        "Diagnostics": 12,
+        "ModulesWithDiagnostics": 6,
+        "ModulesBound": 111,
+        "ModulesNotMeasured": 1
       },
       {
         "Subject": "FluentValidation",
-        "Diagnostics": 214,
-        "ModulesWithDiagnostics": 35,
-        "ModulesBound": 216,
-        "ModulesNotMeasured": 0
+        "Diagnostics": 0,
+        "ModulesWithDiagnostics": 0,
+        "ModulesBound": 69,
+        "ModulesNotMeasured": 147
       }
     ]
   },
@@ -36,1313 +36,268 @@
     },
     "FluentValidation/src/FluentValidation.DependencyInjectionExtensions/ServiceCollectionExtensions.cs": {
       "SourceHash": "28d2ff669045f4ebe567c0a24b5593dcca9ba0ae0729471768d19e3836afd6ae",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.DependencyInjectionExtensions/ServiceProviderValidatorFactory.cs": {
       "SourceHash": "15d782db52ddb23a76725a0f399b76da3c6e02727e7fa9a2a0e9952a7815bc8c",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests.Benchmarks/AccessorCacheBenchmark.cs": {
       "SourceHash": "cf7c5b4c0ab4d144827cf03861fa7b1c5e2022e15f75ef3e74dcc8d2c724a585",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests.Benchmarks/DataSet.cs": {
       "SourceHash": "568b63401efdbad7a05c1e355f1d9c65597cb502488af048f326283f81d39378",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests.Benchmarks/EngineOnlyBenchmark.cs": {
       "SourceHash": "91e2607bbfaa65cf1f5c06116e843e9aef650648b319ed1476b962fb14bc86fc",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests.Benchmarks/InitializationBenchmark.cs": {
       "SourceHash": "008469305f73b18514a37cf0374a8a626c7a7433be510258d863db73286b184e",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests.Benchmarks/Models.cs": {
       "SourceHash": "aabeb512834bc0c26940afdd2666792a1c393e041bf22a7c08a53d21d6968035",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests.Benchmarks/Program.cs": {
       "SourceHash": "ed1378a57554205676017757e64a06e54c9589e8ae04d034d1cf0b450bc65432",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests.Benchmarks/ValidationBenchmark.cs": {
       "SourceHash": "85c0e5cf4a74a75df8024d5a262bbb18efb74c90b87a4136bf49a4e57f8e3070",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/AbstractValidatorTester.cs": {
       "SourceHash": "508805f21388de8b3e18d82a6be608c0880e996f7be8fa76ac34cffdf27e9538",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/AccessorCacheTests.cs": {
       "SourceHash": "dec98b049ad43d371e78e494d63192b08865797bac589de6fa0ac4f600726e5a",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 4100,
-          "End": 4109,
-          "Line": 85,
-          "Column": 30,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "s.Elapsed"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/AssemblyScannerTester.cs": {
       "SourceHash": "9df7b8ae43e86f1696c7fa5188773264e2a8370fd1727e1fb1df2d5df294d721",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/CascadingFailuresTester.cs": {
       "SourceHash": "bc9e905abaff00dbeec3a8eee0f3446bb21e2a874320f37c607c4d21c0325716",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation.Tests/ChainedValidationTester.cs": {
       "SourceHash": "2985f8a3bced69ffae25a937147801c8a274b17396939e7018bea4d491a7cfa9",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 3184,
-          "End": 3193,
-          "Line": 67,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4530,
-          "End": 4540,
-          "Line": 106,
-          "Column": 25,
-          "Message": "Receiver \u0027descriptor\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "descriptor"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ChainingValidatorsTester.cs": {
       "SourceHash": "6f4f307c747bf10b4f336a535f8803483b6bbd4ea4a4e28a27c4fb63e6495bcd",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ChildRulesTests.cs": {
       "SourceHash": "d1f377c28adf72abdd2ea40b505e848c04d2b4cebd866d6c0e929b5bbe492c1a",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/CollectionValidatorWithParentTests.cs": {
       "SourceHash": "677cc30284b2ac303e88b28200bf7f6430aadccdf3e61a3490d69f4b0177fd15",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 993,
-          "End": 1002,
-          "Line": 26,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1490,
-          "End": 1499,
-          "Line": 36,
-          "Column": 31,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3900,
-          "End": 3909,
-          "Line": 81,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4341,
-          "End": 4350,
-          "Line": 90,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4798,
-          "End": 4807,
-          "Line": 99,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5164,
-          "End": 5173,
-          "Line": 106,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5546,
-          "End": 5555,
-          "Line": 113,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5911,
-          "End": 5920,
-          "Line": 123,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6226,
-          "End": 6235,
-          "Line": 130,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6564,
-          "End": 6573,
-          "Line": 139,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6882,
-          "End": 6891,
-          "Line": 147,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ComplexValidationTester.cs": {
       "SourceHash": "db7f4ed5f6b9979f229d54d1ab641e7091abe65840f12d14751de649d132ba63",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 1269,
-          "End": 1278,
-          "Line": 33,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3212,
-          "End": 3221,
-          "Line": 66,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3557,
-          "End": 3566,
-          "Line": 73,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3910,
-          "End": 3919,
-          "Line": 80,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4273,
-          "End": 4282,
-          "Line": 87,
-          "Column": 31,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4714,
-          "End": 4723,
-          "Line": 97,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation.Tests/ConditionTests.cs": {
       "SourceHash": "d3e61a0068ce7b0a7b9508a9a5750161d28acc2b52adf33e7d7e0c98b5f7d13f",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 2829,
-          "End": 2838,
-          "Line": 66,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3231,
-          "End": 3240,
-          "Line": 75,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3691,
-          "End": 3700,
-          "Line": 87,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4152,
-          "End": 4161,
-          "Line": 96,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4637,
-          "End": 4646,
-          "Line": 105,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation.Tests/CreditCardValidatorTests.cs": {
       "SourceHash": "0420337e58dc7ddbec0942eefe1f30bdc1c0cf9f0594cd22a773b5bdd10694b7",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/CultureScope.cs": {
       "SourceHash": "f784f4faec50a2332bf8b451d68636f3e5c14877b24a8b9e8a0a834236009c88",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-fidelity"
     },
     "FluentValidation/src/FluentValidation.Tests/CustomMessageFormatTester.cs": {
       "SourceHash": "5d11fe9fc86d6747060624e4b8773561fd43c2eeb0b17d644e62a51c76912379",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/CustomValidatorTester.cs": {
       "SourceHash": "f3e1f719a49fe3307048db27722c24a2a1e6bd60036bffb205a33a496ca761c1",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/DefaultValidatorExtensionTester.cs": {
       "SourceHash": "754ff72b9261eafa4a01804d4e1ca5055619ea034b58c530010849b059e6295c",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation.Tests/DependencyInjectionExtensions/ServiceCollectionExtensionsTests.cs": {
       "SourceHash": "0e64f34ce23797dca9a63dfc377c970e74095c74abc88c12467c0acd9dad7fee",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 1724,
-          "End": 1732,
-          "Line": 26,
-          "Column": 34,
-          "Message": "Receiver \u0027services\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "services"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2635,
-          "End": 2643,
-          "Line": 39,
-          "Column": 34,
-          "Message": "Receiver \u0027services\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "services"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/EmailValidatorTests.cs": {
       "SourceHash": "966df0cb7472cada8574fa6c432903a06f5d7455c994fba9ad8fc5d94218ef30",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 624,
-          "End": 633,
-          "Line": 15,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1569,
-          "End": 1578,
-          "Line": 23,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation.Tests/EmptyTester.cs": {
       "SourceHash": "fd2b49c5c181d253070a74670b5dfa123d2354124e99591d33aa68d0668dfdd6",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 419,
-          "End": 428,
-          "Line": 15,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 699,
-          "End": 708,
-          "Line": 22,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 985,
-          "End": 994,
-          "Line": 29,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1268,
-          "End": 1277,
-          "Line": 36,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1578,
-          "End": 1587,
-          "Line": 43,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1874,
-          "End": 1883,
-          "Line": 50,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1986,
-          "End": 1995,
-          "Line": 52,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2244,
-          "End": 2253,
-          "Line": 59,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2538,
-          "End": 2547,
-          "Line": 66,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2967,
-          "End": 2976,
-          "Line": 75,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/EnumValidatorTests.cs": {
       "SourceHash": "f9953eb2e110700f83e92db45e721cde0bb535c9b51196fcaa5e775612a6d379",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/EqualValidatorTests.cs": {
       "SourceHash": "2f744066af250a0502540de2a9a5bcbb3021f7b7731422e0dadbb77089719cf9",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 427,
-          "End": 436,
-          "Line": 14,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 720,
-          "End": 729,
-          "Line": 19,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1009,
-          "End": 1018,
-          "Line": 24,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1357,
-          "End": 1366,
-          "Line": 29,
-          "Column": 27,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1430,
-          "End": 1440,
-          "Line": 30,
-          "Column": 46,
-          "Message": "Receiver \u0027descriptor\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "descriptor"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2031,
-          "End": 2040,
-          "Line": 40,
-          "Column": 27,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2104,
-          "End": 2114,
-          "Line": 41,
-          "Column": 46,
-          "Message": "Receiver \u0027descriptor\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "descriptor"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2671,
-          "End": 2680,
-          "Line": 50,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3289,
-          "End": 3298,
-          "Line": 59,
-          "Column": 25,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3741,
-          "End": 3750,
-          "Line": 66,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4086,
-          "End": 4095,
-          "Line": 71,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ExactLengthValidatorTester.cs": {
       "SourceHash": "45a0404166cdbade8771f235493825d649207b0a33879c258699ae0c15e8d567",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 421,
-          "End": 430,
-          "Line": 13,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 715,
-          "End": 724,
-          "Line": 18,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1009,
-          "End": 1018,
-          "Line": 23,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1303,
-          "End": 1312,
-          "Line": 28,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1938,
-          "End": 1947,
-          "Line": 39,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2144,
-          "End": 2149,
-          "Line": 42,
-          "Column": 12,
-          "Message": "Receiver \u0027error\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "error"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ExclusiveBetweenValidatorTests.cs": {
       "SourceHash": "da9b120e7e563aa09bd8cac23132b4d30a6db2a61fc208ed73a018353cc3bf93",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 668,
-          "End": 677,
-          "Line": 19,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 975,
-          "End": 984,
-          "Line": 24,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1281,
-          "End": 1290,
-          "Line": 29,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1603,
-          "End": 1612,
-          "Line": 34,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1925,
-          "End": 1934,
-          "Line": 39,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2482,
-          "End": 2491,
-          "Line": 48,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3165,
-          "End": 3174,
-          "Line": 58,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3504,
-          "End": 3513,
-          "Line": 63,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ExtensionTester.cs": {
       "SourceHash": "d4a60279956df9d17c4a82aa4c1c1e0c91592fe77bd31c67f06f295c88d2ed12",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs": {
       "SourceHash": "0dcf22e5d80d64364036f4b8aadedb1e7c20f29510d8732649eca7e7997cf695",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 850,
-          "End": 859,
-          "Line": 29,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1189,
-          "End": 1198,
-          "Line": 39,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1699,
-          "End": 1708,
-          "Line": 54,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2271,
-          "End": 2280,
-          "Line": 69,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2777,
-          "End": 2786,
-          "Line": 80,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3189,
-          "End": 3198,
-          "Line": 90,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 10861,
-          "End": 10870,
-          "Line": 233,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 11467,
-          "End": 11476,
-          "Line": 244,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 11903,
-          "End": 11912,
-          "Line": 253,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 12355,
-          "End": 12364,
-          "Line": 262,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 12716,
-          "End": 12725,
-          "Line": 269,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 13093,
-          "End": 13102,
-          "Line": 276,
-          "Column": 30,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 13454,
-          "End": 13463,
-          "Line": 286,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 13764,
-          "End": 13773,
-          "Line": 293,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 14105,
-          "End": 14114,
-          "Line": 302,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 14488,
-          "End": 14497,
-          "Line": 311,
-          "Column": 31,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 14897,
-          "End": 14906,
-          "Line": 320,
-          "Column": 31,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 15255,
-          "End": 15264,
-          "Line": 328,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/GreaterThanOrEqualToValidatorTester.cs": {
       "SourceHash": "bd1c478825a6466893dc517118553a66e87852ead01e973f17bcaf3f50de663d",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 6593,
-          "End": 6596,
-          "Line": 135,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/GreaterThanValidatorTester.cs": {
       "SourceHash": "69edb956a700baaf06a52126edb6baec56dbefe48bc428f834c052578454010b",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/InclusiveBetweenValidatorTests.cs": {
       "SourceHash": "9dfb8f6f710baf2165c4bc3e8f3cd225c0084e3e0ecb0bd45cc560a2ffa7a125",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/InheritanceValidatorTest.cs": {
       "SourceHash": "8b4cb29b264a5aa92391cc9c2867dc332c96fb42d522b8a81efddca9f7ec8088",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/InlineValidatorTester.cs": {
       "SourceHash": "24d8e7c15ec810a0a05077881cfe12e7cfbdc75f017365d8d4d3ba5d6eb8c018",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/JsonSerializationTests.cs": {
       "SourceHash": "384e59464e51f6613c90e200dec593ade0e8f8f2adc21fa924f52e9c61f1cfd6",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/LanguageManagerTests.cs": {
       "SourceHash": "f36438a0a08c4bea81595f6947526df9f9d195b24ef458ef10d7a3b6d10a8f80",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 691,
-          "End": 694,
-          "Line": 21,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 998,
-          "End": 1001,
-          "Line": 27,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1369,
-          "End": 1372,
-          "Line": 33,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1714,
-          "End": 1717,
-          "Line": 39,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1964,
-          "End": 1967,
-          "Line": 45,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2240,
-          "End": 2243,
-          "Line": 51,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2412,
-          "End": 2415,
-          "Line": 54,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2663,
-          "End": 2666,
-          "Line": 60,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2914,
-          "End": 2917,
-          "Line": 66,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3179,
-          "End": 3182,
-          "Line": 72,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3452,
-          "End": 3455,
-          "Line": 78,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3740,
-          "End": 3743,
-          "Line": 84,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4109,
-          "End": 4112,
-          "Line": 92,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4347,
-          "End": 4350,
-          "Line": 98,
-          "Column": 12,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5067,
-          "End": 5070,
-          "Line": 110,
-          "Column": 12,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5371,
-          "End": 5374,
-          "Line": 117,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5665,
-          "End": 5668,
-          "Line": 124,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6034,
-          "End": 6037,
-          "Line": 132,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6133,
-          "End": 6136,
-          "Line": 134,
-          "Column": 14,
-          "Message": "Receiver \u0027msg\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "msg"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation.Tests/LengthValidatorTests.cs": {
       "SourceHash": "3f457d5e1a5d3cb9b419771547c3f32a3ab8d62fe17a6700b128068d622d02fe",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 7396,
-          "End": 7405,
-          "Line": 165,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/LessThanOrEqualToValidatorTester.cs": {
       "SourceHash": "97889f7044f1b157ad098a04121c66f9818337636836244f6a3cdd28a26d26ee",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/LessThanValidatorTester.cs": {
       "SourceHash": "535eee153f137a8746c5be1ba48e693efa098bdb91db1b63fb98c3bdbd6b12c5",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/LocalisedMessagesTester.cs": {
       "SourceHash": "ad8ebce1ea9ed68f48158b15c2978d6b3d85385047de67b3aca8095cf33ce385",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/LocalisedNameTester.cs": {
       "SourceHash": "039eed920cb52bdcc81ef1aa79a71d5e531ab1190b28cb101a4a0ed80a866c4e",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 574,
-          "End": 583,
-          "Line": 22,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 978,
-          "End": 987,
-          "Line": 31,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/MessageFormatterTests.cs": {
       "SourceHash": "ebe5f51f77e861e1ff44f50281fb949e1ef7831538876ac03537013a132d9c45",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ModelLevelValidatorTests.cs": {
       "SourceHash": "37fea4392292ced100c4bf8f72018110a725954ea3690abd86dd8044fedd6cc1",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/NameResolutionPluggabilityTester.cs": {
       "SourceHash": "cc775aa97fd61949fdf2f736e5265a3a03aa794bdd35b726fcada222254e1397",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 507,
-          "End": 516,
-          "Line": 17,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 796,
-          "End": 805,
-          "Line": 24,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1368,
-          "End": 1377,
-          "Line": 35,
-          "Column": 40,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2230,
-          "End": 2239,
-          "Line": 50,
-          "Column": 40,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3091,
-          "End": 3100,
-          "Line": 63,
-          "Column": 40,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/NotEmptyTester.cs": {
       "SourceHash": "2df318cde0f59ad3d59427d9d76b41c8c7fd74189b1f981f72df3a0b662e624b",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 425,
-          "End": 434,
-          "Line": 15,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 707,
-          "End": 716,
-          "Line": 22,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 997,
-          "End": 1006,
-          "Line": 29,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1284,
-          "End": 1293,
-          "Line": 36,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1598,
-          "End": 1607,
-          "Line": 43,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1898,
-          "End": 1907,
-          "Line": 50,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2011,
-          "End": 2020,
-          "Line": 52,
-          "Column": 24,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2270,
-          "End": 2279,
-          "Line": 59,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2568,
-          "End": 2577,
-          "Line": 66,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3002,
-          "End": 3011,
-          "Line": 75,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/NotEqualValidatorTests.cs": {
       "SourceHash": "778ca344a7146359ebcf35695f1609cae422558798163557001c824aaaf5628e",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/NotNullTester.cs": {
       "SourceHash": "3cdb81b9768c67ce9333b91f6a6e99c4a59b47aed39f8d295831c701536d1369",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/NullTester.cs": {
       "SourceHash": "9cc0185e102e6897b459d4e5a261acdf2aef576260bf8d48a425eb3370954d03",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/OnFailureHookTester.cs": {
       "SourceHash": "179a08ebe5578dd8fda27d01af8e9e0ab0bb5d89a88271589fae1092bdddbf4e",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/Person.cs": {
       "SourceHash": "c099a326492ce6dead96c9a22967488c83f0e311a2b90ebe68d7042ffabfb20f",
@@ -1350,651 +305,118 @@
     },
     "FluentValidation/src/FluentValidation.Tests/PrecisionScaleValidatorTests.cs": {
       "SourceHash": "3419c8cd4470d31f1a2cd79af7554d682d02348ca0b581dec9b25e58d02ebd45",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/PredicateValidatorTester.cs": {
       "SourceHash": "f973c84c815255b8f366e90ca1b348d172a0ad6791fe8a5894a879c24db68510",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 1800,
-          "End": 1809,
-          "Line": 46,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1916,
-          "End": 1921,
-          "Line": 48,
-          "Column": 12,
-          "Message": "Receiver \u0027error\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "error"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/PropertyChainTests.cs": {
       "SourceHash": "011654764c8ad65c029e8c59cf5cbbd103c2d0d6b74b9b20ae540efb4b5b1240",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 2036,
-          "End": 2041,
-          "Line": 53,
-          "Column": 13,
-          "Message": "Receiver \u0027chain\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "chain"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/RegularExpressionValidatorTests.cs": {
       "SourceHash": "96cfc98cd4166ad6f2af126cbfd2c1fd82967644968579508e28a125b7e5254d",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/RuleBuilderTests.cs": {
       "SourceHash": "d19cfe42c1503b9dcbe0f3b41ca05d95052d726cdb8005a62a74ffc841a549bd",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 2628,
-          "End": 2635,
-          "Line": 60,
-          "Column": 12,
-          "Message": "Receiver \u0027builder\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "builder"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3024,
-          "End": 3031,
-          "Line": 68,
-          "Column": 12,
-          "Message": "Receiver \u0027builder\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "builder"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3063,
-          "End": 3070,
-          "Line": 69,
-          "Column": 13,
-          "Message": "Receiver \u0027builder\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "builder"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4301,
-          "End": 4308,
-          "Line": 90,
-          "Column": 12,
-          "Message": "Receiver \u0027builder\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "builder"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6150,
-          "End": 6157,
-          "Line": 126,
-          "Column": 12,
-          "Message": "Receiver \u0027builder\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "builder"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6296,
-          "End": 6303,
-          "Line": 129,
-          "Column": 12,
-          "Message": "Receiver \u0027builder\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "builder"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/RuleDependencyTests.cs": {
       "SourceHash": "83f3865a9c9208fe54045b90f255d5f2d75b99a8b628600271fbaae2ce0b8683",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation.Tests/RulesetTests.cs": {
       "SourceHash": "9766c337f07111305d37daf2f4921006284f2e21beb6e269477310bed32f89db",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/SharedConditionTests.cs": {
       "SourceHash": "430e6707cfaf1f408b0c0ab951de05029ac0418bc66134dd12a93c13550f610a",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation.Tests/StreetNumberComparer.cs": {
       "SourceHash": "0687ad8e11486e5dc62092cfb13c7ad20098e9c06d69f0ab6cdd83ba9a8cbb73",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/StringEnumValidatorTests.cs": {
       "SourceHash": "4b858856050345734cd76019c32a5580909cb71145e187fdbcd74ed0bc59449c",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/TestExtensions.cs": {
       "SourceHash": "8b53c2c78d4ba11ecf47aacd8f657d65bf9cf9d7eaf819bd5191d7fef467be7f",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/TestMessages.Designer.cs": {
       "SourceHash": "79937170bb1cf2aa632e80bb6821561630fefbac834ccd1697b4e158bf50fc3c",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-fidelity"
     },
     "FluentValidation/src/FluentValidation.Tests/TestValidator.cs": {
       "SourceHash": "1ddb14b807065dec4263350521465e6f80293b20dd1a7ed5f9ea8abd3eb239b5",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/TestValidatorWithPreValidate.cs": {
       "SourceHash": "c04454afcf26801c246ec7a0b0ed873283180372aa2768c1ad649b413868dd49",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/TrackingCollectionTests.cs": {
       "SourceHash": "09bf7ca990dd5dbc01ab68293a972bd92b076bd4b29d959be89083b75729c305",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/UserSeverityTester.cs": {
       "SourceHash": "c460c717525d1b2b8d350a9014533a9bf406fdefed5c0c29a1a50192745266a1",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/UserStateTester.cs": {
       "SourceHash": "7c2f68501f42023f7b7ae44296a625fc462a01149c9e024db1ca987df4f796af",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ValidateAndThrowTester.cs": {
       "SourceHash": "c3803c436813bca555fc27f0185536c7395811f3d9f9a80e9780484db535a645",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 646,
-          "End": 655,
-          "Line": 23,
-          "Column": 35,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 744,
-          "End": 753,
-          "Line": 26,
-          "Column": 12,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1038,
-          "End": 1047,
-          "Line": 30,
-          "Column": 14,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1316,
-          "End": 1325,
-          "Line": 38,
-          "Column": 12,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1715,
-          "End": 1724,
-          "Line": 48,
-          "Column": 35,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1813,
-          "End": 1822,
-          "Line": 51,
-          "Column": 12,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2128,
-          "End": 2137,
-          "Line": 57,
-          "Column": 12,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2350,
-          "End": 2359,
-          "Line": 63,
-          "Column": 25,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2761,
-          "End": 2770,
-          "Line": 73,
-          "Column": 35,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2859,
-          "End": 2868,
-          "Line": 76,
-          "Column": 12,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3187,
-          "End": 3196,
-          "Line": 82,
-          "Column": 25,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ValidationResultTests.cs": {
       "SourceHash": "688acf849caa167d70fe469da3c9bd3680fef4d2686cee3fe70279a28544dac3",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ValidatorDescriptorTester.cs": {
       "SourceHash": "8dcc40a0a86ff9bab0f03fae92b5f8cb138c4f8f4f8e5af8630e1e98af36a57a",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 699,
-          "End": 709,
-          "Line": 20,
-          "Column": 21,
-          "Message": "Receiver \u0027descriptor\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "descriptor"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 741,
-          "End": 745,
-          "Line": 21,
-          "Column": 12,
-          "Message": "Receiver \u0027name\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "name"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 932,
-          "End": 942,
-          "Line": 25,
-          "Column": 27,
-          "Message": "Receiver \u0027descriptor\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "descriptor"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 996,
-          "End": 1006,
-          "Line": 26,
-          "Column": 13,
-          "Message": "Receiver \u0027validators\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validators"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1319,
-          "End": 1329,
-          "Line": 33,
-          "Column": 12,
-          "Message": "Receiver \u0027descriptor\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "descriptor"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1683,
-          "End": 1693,
-          "Line": 40,
-          "Column": 13,
-          "Message": "Receiver \u0027descriptor\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "descriptor"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1766,
-          "End": 1776,
-          "Line": 41,
-          "Column": 13,
-          "Message": "Receiver \u0027descriptor\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "descriptor"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ValidatorSelectorTests.cs": {
       "SourceHash": "a7f2c9a1798b97d92f2fadb45facb9142e3964aed5a514ca29e358ca7b0554d3",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 567,
-          "End": 576,
-          "Line": 15,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1019,
-          "End": 1028,
-          "Line": 25,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1506,
-          "End": 1515,
-          "Line": 35,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2012,
-          "End": 2021,
-          "Line": 45,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2584,
-          "End": 2593,
-          "Line": 56,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3032,
-          "End": 3041,
-          "Line": 65,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3575,
-          "End": 3584,
-          "Line": 75,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation.Tests/ValidatorTesterTester.cs": {
       "SourceHash": "6b96c5f9a3e5d7d316018ae3967c65172ee1d344c66a5c4162dd26527fe74d63",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 11946,
-          "End": 11952,
-          "Line": 213,
-          "Column": 73,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 12625,
-          "End": 12631,
-          "Line": 226,
-          "Column": 73,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 13312,
-          "End": 13318,
-          "Line": 239,
-          "Column": 73,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 14080,
-          "End": 14086,
-          "Line": 252,
-          "Column": 80,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 15241,
-          "End": 15247,
-          "Line": 273,
-          "Column": 80,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 17987,
-          "End": 17993,
-          "Line": 321,
-          "Column": 46,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 18781,
-          "End": 18787,
-          "Line": 336,
-          "Column": 48,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 19098,
-          "End": 19104,
-          "Line": 341,
-          "Column": 46,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 19584,
-          "End": 19593,
-          "Line": 351,
-          "Column": 38,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 20580,
-          "End": 20589,
-          "Line": 370,
-          "Column": 38,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 26508,
-          "End": 26517,
-          "Line": 477,
-          "Column": 23,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 26551,
-          "End": 26557,
-          "Line": 478,
-          "Column": 13,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 26625,
-          "End": 26631,
-          "Line": 479,
-          "Column": 13,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 26877,
-          "End": 26886,
-          "Line": 485,
-          "Column": 34,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 26974,
-          "End": 26983,
-          "Line": 486,
-          "Column": 37,
-          "Message": "Receiver \u0027validator\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validator"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 27062,
-          "End": 27082,
-          "Line": 487,
-          "Column": 31,
-          "Message": "Receiver \u0027resultWithoutFailure\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "resultWithoutFailure"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 27210,
-          "End": 27227,
-          "Line": 489,
-          "Column": 31,
-          "Message": "Receiver \u0027resultWithFailure\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "resultWithFailure"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 27342,
-          "End": 27359,
-          "Line": 491,
-          "Column": 12,
-          "Message": "Receiver \u0027resultWithFailure\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "resultWithFailure"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 27399,
-          "End": 27419,
-          "Line": 492,
-          "Column": 12,
-          "Message": "Receiver \u0027resultWithoutFailure\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "resultWithoutFailure"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 27974,
-          "End": 27980,
-          "Line": 503,
-          "Column": 59,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 28131,
-          "End": 28137,
-          "Line": 506,
-          "Column": 14,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 28926,
-          "End": 28932,
-          "Line": 524,
-          "Column": 12,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 28982,
-          "End": 28988,
-          "Line": 525,
-          "Column": 12,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 29742,
-          "End": 29748,
-          "Line": 541,
-          "Column": 12,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 30528,
-          "End": 30534,
-          "Line": 557,
-          "Column": 12,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 31147,
-          "End": 31153,
-          "Line": 569,
-          "Column": 12,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 31765,
-          "End": 31771,
-          "Line": 580,
-          "Column": 67,
-          "Message": "Receiver \u0027result\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "result"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/AbstractValidator.cs": {
       "SourceHash": "2db04f5c82a97ed9844b032680182e9b42417824f663e1090d808441eab277f2",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/AssemblyInfo.FluentValidation.cs": {
       "SourceHash": "b099229f419c71f685b59208044a6ae3b2ec21b50ad1d27f4be05bd959da25cf",
@@ -2002,7 +424,8 @@
     },
     "FluentValidation/src/FluentValidation/AssemblyScanner.cs": {
       "SourceHash": "d3da97c821a0da86bf551748c96102affd9258138c23908d40f7e7418335f27b",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/AsyncValidatorInvokedSynchronouslyException.cs": {
       "SourceHash": "457b0c5499c8c027afbe8d3e7321dd19131edff41a215cc07a8412d2719377d2",
@@ -2010,34 +433,18 @@
     },
     "FluentValidation/src/FluentValidation/DefaultValidatorExtensions.cs": {
       "SourceHash": "8a48cfe3f0ca26a2a05f1d2699007e5ebc85ba1e4711eb5e1e069e0f5a5e994e",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 69065,
-          "End": 69077,
-          "Line": 888,
-          "Column": 41,
-          "Message": "Receiver \u0027originalRule\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "originalRule"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 69166,
-          "End": 69180,
-          "Line": 889,
-          "Column": 12,
-          "Message": "Receiver \u0027collectionRule\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "collectionRule"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation/DefaultValidatorExtensions_Validate.cs": {
       "SourceHash": "fd222bd1a81bc6c27f6438d0efeac575f148a8944930da1161c61b20aed75b93",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/DefaultValidatorOptions.cs": {
       "SourceHash": "f436b1526a160101fcf891e9a26eb949b92d833ffcb95df0eccb8aa221caab80",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Enums.cs": {
       "SourceHash": "2cf48f1be6316631572ff3be17b767256c40103b0d2a1ef61c68473191ca7ffd",
@@ -2045,39 +452,48 @@
     },
     "FluentValidation/src/FluentValidation/ICollectionRule.cs": {
       "SourceHash": "c98eb9f389d0d7b84340105fc67cf6fb1dba198a8a194241f71ec4b26cded840",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/IValidationContext.cs": {
       "SourceHash": "febd63ddf46608186c5a6ca8a1e0bcf81196027003df049e2c05c1fa758907c5",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/IValidationRule.cs": {
       "SourceHash": "c20e9259f8207ba86942077614fdf13ae817230fdc3e9abb5f98d3a4cb391056",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/IValidationRuleInternal.cs": {
       "SourceHash": "8a57e7f088aca445ef7bb930d1b3fa748c91aeacc443d2eb75b14d5fd6c56bc1",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/IValidator.cs": {
       "SourceHash": "f69267078791230eed8ad9c2370acdf24bb6c601ad6a882533ffbee334983287",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/IValidatorDescriptor.cs": {
       "SourceHash": "038500133e40f5eefbf3b537c71ca502a7f7df1ea54d169792daf7dcf5ff6556",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/IValidatorFactory.cs": {
       "SourceHash": "5ad00feb63d057657cccfef0f3d8a5049f11b6a3f4e003aec120d556b1b621d8",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/InlineValidator.cs": {
       "SourceHash": "38e5210297e5d6cdd7d58d7535f8a9ccfd93014b75478b17adaaf4f9c40c0037",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/AccessorCache.cs": {
       "SourceHash": "293f842e731f4ac4d0175578eb6ea363891c6c67bbe58bca4a8b0423ebdd37a5",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/ChildRulesContainer.cs": {
       "SourceHash": "6ba4753ec8fa16b4a67ba759267a1647e3d094eaa4e0dd06785d70cf9e26ae2d",
@@ -2085,105 +501,38 @@
     },
     "FluentValidation/src/FluentValidation/Internal/CollectionPropertyRule.cs": {
       "SourceHash": "6a29e2aa7046366890540663fadcd88e552e9ac6eebdf2cfb4e1199d03279f3f",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 5342,
-          "End": 5351,
-          "Line": 105,
-          "Column": 41,
-          "Message": "Receiver \u0027component\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "component"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6155,
-          "End": 6168,
-          "Line": 118,
-          "Column": 29,
-          "Message": "Receiver \u0027dependentRule\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "dependentRule"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6821,
-          "End": 6830,
-          "Line": 129,
-          "Column": 43,
-          "Message": "Receiver \u0027component\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "component"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6916,
-          "End": 6926,
-          "Line": 131,
-          "Column": 18,
-          "Message": "Receiver \u0027validators\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validators"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 7024,
-          "End": 7033,
-          "Line": 133,
-          "Column": 38,
-          "Message": "Receiver \u0027component\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "component"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 7134,
-          "End": 7144,
-          "Line": 135,
-          "Column": 18,
-          "Message": "Receiver \u0027validators\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "validators"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/CompositeValidatorSelector.cs": {
       "SourceHash": "189ca73d1a55e7693162d88f617a6bbed1927db3e76cb5b904945bc6fa904ac2",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/ConditionBuilder.cs": {
       "SourceHash": "16ba6d74422fb56bf01a6b08609cceddbb05b5bf73daac53000bdde0948b2eec",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 6166,
-          "End": 6170,
-          "Line": 158,
-          "Column": 14,
-          "Message": "Receiver \u0027rule\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "rule"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 7120,
-          "End": 7124,
-          "Line": 180,
-          "Column": 14,
-          "Message": "Receiver \u0027rule\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "rule"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/DefaultValidatorSelector.cs": {
       "SourceHash": "0b4d1bb1a0ab87616f0558564a27838a30f5d0cf73dfedde19d12c18ca562abc",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/Extensions.cs": {
       "SourceHash": "72b537cf1f283e13d03037ae10098a090e857e71f0d25d718d167e80a64a4904",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/ExtensionsInternal.cs": {
       "SourceHash": "bd3dcd48ff1d64d4d7ecea3491862e7d1bc76af35779a29027dd7af0265fffd6",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/IRuleComponent.cs": {
       "SourceHash": "a313f07f0e00e7f8b468e95beacb4801f097fe2c7ac24bc57a4791c973631083",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/IValidatorSelector.cs": {
       "SourceHash": "fd925f422855efd6be10b131e3957f6eaf9d50b196e77fed15355a331f8fd912",
@@ -2191,156 +540,68 @@
     },
     "FluentValidation/src/FluentValidation/Internal/IncludeRule.cs": {
       "SourceHash": "86c82a52c36cb33cbf57053108c90959bae59e92b819bdac82cc3111917b779c",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/MemberNameValidatorSelector.cs": {
       "SourceHash": "461f2db028e049abd2f91ec2e57532aed334f39a85d3c228d64164cb01af9a24",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/MessageBuilderContext.cs": {
       "SourceHash": "75d51e1e5f58d9de58a475378d750f79d861cba79770c8774bf22962e44ef4d0",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/MessageFormatter.cs": {
       "SourceHash": "942cf4e655627a95b793b8a41de81d7b8f45818df05157dcfd713e0ccc4c392d",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/PropertyChain.cs": {
       "SourceHash": "8cdc44af86bf57e604b546022b9b5d93d6ab96bc5776bb15b98c22f44d77168c",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/PropertyRule.cs": {
       "SourceHash": "78e190d780b23caa480fceee7845497ff3e043ca43828c28d95569a7c9742aa7",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 2867,
-          "End": 2876,
-          "Line": 63,
-          "Column": 41,
-          "Message": "Receiver \u0027component\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "component"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3038,
-          "End": 3047,
-          "Line": 67,
-          "Column": 38,
-          "Message": "Receiver \u0027component\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "component"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3589,
-          "End": 3598,
-          "Line": 76,
-          "Column": 37,
-          "Message": "Receiver \u0027component\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "component"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4230,
-          "End": 4243,
-          "Line": 86,
-          "Column": 29,
-          "Message": "Receiver \u0027dependentRule\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "dependentRule"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/RuleBase.cs": {
       "SourceHash": "4d31865a98825f42054e109fd77a2e3be703b43b01d8c32392661559b41e2833",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/RuleBuilder.cs": {
       "SourceHash": "fca81def58989422dec1f1380d67978ac8a518ea4e33a626d2b3b3fc7680db67",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/RuleComponent.cs": {
       "SourceHash": "6d601d04ed618e5644015d38fc1d00ebac4329e733634936dcdd0c86e63eb1f1",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/RuleComponentForNullableStruct.cs": {
       "SourceHash": "b52e2ff5660600c89b10a389008ced655eb61f78425a1900f7fe0436bf057589",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/RulesetValidatorSelector.cs": {
       "SourceHash": "7cffb3c3dc9ad48eaa74f5fdf26b0866c1b6229ea6da1e3556256b608ffee722",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 1830,
-          "End": 1838,
-          "Line": 41,
-          "Column": 14,
-          "Message": "Receiver \u0027executed\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "executed"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2258,
-          "End": 2266,
-          "Line": 47,
-          "Column": 16,
-          "Message": "Receiver \u0027executed\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "executed"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2616,
-          "End": 2628,
-          "Line": 52,
-          "Column": 29,
-          "Message": "Receiver \u0027intersection\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "intersection"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2702,
-          "End": 2710,
-          "Line": 54,
-          "Column": 44,
-          "Message": "Receiver \u0027executed\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "executed"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2746,
-          "End": 2758,
-          "Line": 55,
-          "Column": 16,
-          "Message": "Receiver \u0027intersection\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "intersection"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2989,
-          "End": 2997,
-          "Line": 60,
-          "Column": 16,
-          "Message": "Receiver \u0027executed\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "executed"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3092,
-          "End": 3100,
-          "Line": 63,
-          "Column": 18,
-          "Message": "Receiver \u0027executed\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "executed"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Internal/TrackingCollection.cs": {
       "SourceHash": "e00c235475934e582f093791cf21d0c28d341ab1d58547a83d15f2908d792545",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-fidelity"
     },
     "FluentValidation/src/FluentValidation/Internal/ValidationStrategy.cs": {
       "SourceHash": "d70c4b814c179231f5f588a3b892419b6a376493ffb3cf473713cf52c3e9449e",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Resources/ILanguageManager.cs": {
       "SourceHash": "df7f81a570f0d0bc9d35bcc588c315849807f7f86d9e1edffd8b5c1d3fdea5f8",
@@ -2348,7 +609,8 @@
     },
     "FluentValidation/src/FluentValidation/Resources/LanguageManager.cs": {
       "SourceHash": "15cc24a504b4bbfec566c97d4ea2e21eeb9105f822906a4c8a8254e73a0619d5",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Resources/Languages/AlbanianLanguage.cs": {
       "SourceHash": "a1560c5aa42a1e25b6f52e9419cb3e48fc881fcd9c411b88bb7da4211327b6ea",
@@ -2580,166 +842,78 @@
     },
     "FluentValidation/src/FluentValidation/Results/ValidationFailure.cs": {
       "SourceHash": "04a09bb87203ab5783e1a9729ef031fe5d95e93f58d11d2e0d2e1640d156f865",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Results/ValidationResult.cs": {
       "SourceHash": "62ac80130dcba0d893c678e894176e1046668deea65141a75fbb3005df0ecc2a",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Syntax.cs": {
       "SourceHash": "26919f06be72e00570bc003c5404ed0c83cd065985b4e729b50f00265bc48bad",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/TestHelper/ITestValidationContinuation.cs": {
       "SourceHash": "6160ed7ef52d0d9cddf4ec44de26ecb26e2f560f811a7733f683a2b35ddf1459",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/TestHelper/TestValidationResult.cs": {
       "SourceHash": "7bde1b39c818df8bef70fef33e31932acfb82f1684bb170b2e8ce7ce3cfe5a79",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 4194,
-          "End": 4202,
-          "Line": 83,
-          "Column": 27,
-          "Message": "Receiver \u0027failures\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "failures"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/TestHelper/ValidationTestException.cs": {
       "SourceHash": "9084d080cfa6cc84b2f6bbb94ca495d97404ffeedc303d8484a69518c63ee32e",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation/TestHelper/ValidatorTestExtensions.cs": {
       "SourceHash": "c3fd11cf55e66b97aa23f781b55e0b13b1d568ff9510a298ed3a2a47584502d8",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 1469,
-          "End": 1487,
-          "Line": 28,
-          "Column": 32,
-          "Message": "Receiver \u0027matchingValidators\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "matchingValidators"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1668,
-          "End": 1686,
-          "Line": 30,
-          "Column": 32,
-          "Message": "Receiver \u0027matchingValidators\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "matchingValidators"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1873,
-          "End": 1892,
-          "Line": 33,
-          "Column": 27,
-          "Message": "Receiver \u0027childValidatorTypes\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "childValidatorTypes"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2094,
-          "End": 2113,
-          "Line": 37,
-          "Column": 42,
-          "Message": "Receiver \u0027childValidatorTypes\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "childValidatorTypes"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2139,
-          "End": 2158,
-          "Line": 37,
-          "Column": 87,
-          "Message": "Receiver \u0027childValidatorTypes\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "childValidatorTypes"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 3754,
-          "End": 3759,
-          "Line": 56,
-          "Column": 31,
-          "Message": "Receiver \u0027rules\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "rules"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation/ValidationException.cs": {
       "SourceHash": "bd24954da64ee11f8002b54f6c0af6d12d3be06444ada7af5bfda9e9301ebbcf",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/ValidatorDescriptor.cs": {
       "SourceHash": "a75056e857ed2c3671278cb858c516d33268ad530b1f958affa50e46ddd39dcb",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 1483,
-          "End": 1488,
-          "Line": 37,
-          "Column": 15,
-          "Message": "Receiver \u0027query\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "query"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 1954,
-          "End": 1959,
-          "Line": 46,
-          "Column": 15,
-          "Message": "Receiver \u0027query\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "query"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 2660,
-          "End": 2665,
-          "Line": 63,
-          "Column": 15,
-          "Message": "Receiver \u0027query\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "query"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/ValidatorFactoryBase.cs": {
       "SourceHash": "a0711594147b0549e676efa04d6358e293c7e5dae38ed734215bca131d43963e",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/ValidatorOptions.cs": {
       "SourceHash": "6b4662f193864e3d20c4436a97124247da825f6f867a167f8f93ad3cc80dfff9",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 3662,
-          "End": 3667,
-          "Line": 69,
-          "Column": 19,
-          "Message": "Receiver \u0027chain\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "chain"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/AbstractComparisonValidator.cs": {
       "SourceHash": "901fb597939347fde2ca068e529e4eec603521f360ce4db6cc254b71a4cdb627",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "FluentValidation/src/FluentValidation/Validators/AsyncPredicateValidator.cs": {
       "SourceHash": "889cb6934a4ecfab1753142f3c3bd42827de75efea9e75a973fae5807aa9cfe5",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/AsyncPropertyValidator.cs": {
       "SourceHash": "63b94ee8b9bbb35a8280e01a51f6c26c4d00b8bb12a74b98ebfa6aa4245b7dd7",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/ChildValidatorAdaptor.cs": {
       "SourceHash": "f03cf9860e5e392125ba3edae017fb95a85b3bf67290a761e861006e3565abd3",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/ComparableComparer.cs": {
       "SourceHash": "ac5d928099ff909690783b2e4b75c4765042393416b3859ec3e692b4e3c3f9c0",
@@ -2747,65 +921,68 @@
     },
     "FluentValidation/src/FluentValidation/Validators/CreditCardValidator.cs": {
       "SourceHash": "586b09d60acad4cc77b729f57f0773b4d1560a7363c261268cce63de5bff06d4",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/EmailValidator.cs": {
       "SourceHash": "4267afb51390b54335ddc47489f49dcca834cf2116230db6b431d9c031df99a2",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/EmptyValidator.cs": {
       "SourceHash": "3923276738c1551d06fb39323f257fe172c20dbfffe786c08577ade6520fdec8",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/EnumValidator.cs": {
       "SourceHash": "103dccb07425581c754ebd36b6c6f60ab4cd719568c998ebd7f176f8e0cce6fb",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 893,
-          "End": 911,
-          "Line": 29,
-          "Column": 42,
-          "Message": "Receiver \u0027underlyingEnumType\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "underlyingEnumType"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/EqualValidator.cs": {
       "SourceHash": "881bee6c6a751230d9f37ec574a15db4e76f0c1a6412db201e038ef4a80c8a2d",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/ExclusiveBetweenValidator.cs": {
       "SourceHash": "8c2d9a678ee4b789737d6aedc89482518b49f097d4b9b53be3e7ca6642586ce6",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/GreaterThanOrEqualValidator.cs": {
       "SourceHash": "c3886f3698146d39251d58ac88b5dd5ac64b2de04cf82a2df1e2958408eec11a",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/GreaterThanValidator.cs": {
       "SourceHash": "dd91d6603cfa5cb95103e5a83decb33a9d0b3bb862660907db62374200bddf5e",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/IPropertyValidator.cs": {
       "SourceHash": "9a7712ee39e0952d15030e63837eb44f4a0275779ea04aeabfb2aecb72e1a49b",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/InclusiveBetweenValidator.cs": {
       "SourceHash": "6bd1bd55b8a545998bfd7d5a5aeb1d2a384e29df55c5f63dd2fb6dc70d6040d1",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/LengthValidator.cs": {
       "SourceHash": "0aecf3d1eca8988f4ebf44b12e77cb0a0058ae8d723b0b36901d8d24cd529369",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/LessThanOrEqualValidator.cs": {
       "SourceHash": "2830de37ef19aa5ce7fb2a608aaf3f98b594c1337b4da48c457d16775c4f118d",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/LessThanValidator.cs": {
       "SourceHash": "6c3ccf2f356bb770a481097f32f79e5dd91f72f0bc128963df3187ea319d3a49",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/NoopPropertyValidator.cs": {
       "SourceHash": "56bfc6abcc0f5e38a0892be88a9a7b2ff3391906b148a7c26fd991a1a57f1e2e",
@@ -2813,11 +990,13 @@
     },
     "FluentValidation/src/FluentValidation/Validators/NotEmptyValidator.cs": {
       "SourceHash": "675d1d063d6d1b170b193ecca962e10b1c9556db412d10359e6ff50719686511",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/NotEqualValidator.cs": {
       "SourceHash": "4129e34ae99c428535e815abccf5cde00b8644b437ee96c0f455b428808151a7",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/NotNullValidator.cs": {
       "SourceHash": "7d3ae8d71f7c0fbf6ee8a934ea77a92d7eacf859a0426742eae9a3c4c040ea4c",
@@ -2829,31 +1008,38 @@
     },
     "FluentValidation/src/FluentValidation/Validators/PolymorphicValidator.cs": {
       "SourceHash": "9843646b736f3a1f91a0f719fd1bbb1f33d789ecffd4a5cf25f6391879782f57",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/PrecisionScaleValidator.cs": {
       "SourceHash": "05dc13aa823ff5472e6433a9cecf2aee173b1d4eb40d21b31c634a8147968bd9",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/PredicateValidator.cs": {
       "SourceHash": "4c04a9133579ef45908675bb757b2ae7caa4bf58a430ffda2cdccab1b7ccc7a0",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/PropertyValidator.cs": {
       "SourceHash": "9699b396c2f9cb5cb507ebe8e7fe4a2f6f0e6c5bfbbeddedbd2ee0dfb52917f0",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/RangeValidator.cs": {
       "SourceHash": "a454e540f552d965ab134a04622c4589812ae1aae2c6f8763793a167b2dd0c84",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/RegularExpressionValidator.cs": {
       "SourceHash": "b3630b3abeadecc1b138a208f5c6424c1720245e206efffb0a195fe37380f50d",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "FluentValidation/src/FluentValidation/Validators/StringEnumValidator.cs": {
       "SourceHash": "d9cb40b0013e61712c5367eca70f82cf26582a592c04abb29d837766e68b7853",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR.Contracts/INotification.cs": {
       "SourceHash": "7e749babf379dd54bf0326985427753e2857112b16720bfff8401add190ba8a2",
@@ -2869,7 +1055,8 @@
     },
     "MediatR/src/MediatR.Contracts/Unit.cs": {
       "SourceHash": "b66888f0634c1a24d6fdde42ef94cfbe78f1e2f35877b30ba517693e07256104",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-fidelity"
     },
     "MediatR/src/MediatR/IMediator.cs": {
       "SourceHash": "a62d52e4cd3e5325829357cce9d4e0b145cf712db36e988d1579943c90130160",
@@ -2885,7 +1072,8 @@
     },
     "MediatR/src/MediatR/IPipelineBehavior.cs": {
       "SourceHash": "057ef264888488357640f23a308ccecd818012805b7b56dd32bd469a819f56ee",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-fidelity"
     },
     "MediatR/src/MediatR/IPublisher.cs": {
       "SourceHash": "7e2caa691f922874c7485c6d8f135dc8107f7cfbbff86ef949a4d55ec9ee63c3",
@@ -2901,7 +1089,8 @@
     },
     "MediatR/src/MediatR/IStreamPipelineBehavior.cs": {
       "SourceHash": "5111318c20a81bb9ec43a1306d0485fcd84c9cbe6f1e0ea48f3dbdbd57f8b447",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-fidelity"
     },
     "MediatR/src/MediatR/IStreamRequestHandler.cs": {
       "SourceHash": "5ceb3d7dbbee393ff77a8d9b3615167426d2b23faaeae6d6c176758f0a81c2aa",
@@ -2909,17 +1098,8 @@
     },
     "MediatR/src/MediatR/Internal/HandlersOrderer.cs": {
       "SourceHash": "2c8757c74e5ced59c6b621c10f2c24c0de3f7146b0d7889bcc8cafed7640516f",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 902,
-          "End": 916,
-          "Line": 20,
-          "Column": 32,
-          "Message": "Receiver \u0027uniqueHandlers\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "uniqueHandlers"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR/Internal/ObjectDetails.cs": {
       "SourceHash": "2a1b205fe7b1f740f936a30a177ef1f06471bf40681bfdfb3bb317e39aa18649",
@@ -2927,148 +1107,12 @@
     },
     "MediatR/src/MediatR/Mediator.cs": {
       "SourceHash": "f1fa815127f7f382c00f3c2c51ebf667c066d4394373c10e28b9e94c44162b85",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 4129,
-          "End": 4144,
-          "Line": 81,
-          "Column": 68,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "i.IsGenericType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 4969,
-          "End": 4989,
-          "Line": 92,
-          "Column": 38,
-          "Message": "Receiver \u0027requestInterfaceType\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "requestInterfaceType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5519,
-          "End": 5526,
-          "Line": 99,
-          "Column": 15,
-          "Message": "Receiver \u0027handler\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "handler"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 7930,
-          "End": 7937,
-          "Line": 141,
-          "Column": 15,
-          "Message": "Receiver \u0027handler\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "handler"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 9531,
-          "End": 9546,
-          "Line": 169,
-          "Column": 68,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "i.IsGenericType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 9935,
-          "End": 9955,
-          "Line": 173,
-          "Column": 36,
-          "Message": "Receiver \u0027requestInterfaceType\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "requestInterfaceType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 10507,
-          "End": 10514,
-          "Line": 180,
-          "Column": 22,
-          "Message": "Receiver \u0027handler\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "handler"
-        }
-      ]
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs": {
       "SourceHash": "ab3aa9da188fbe633632369c3cad3e8213e9d2ddcb043c3224ce94eebbb93aab",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 8496,
-          "End": 8511,
-          "Line": 139,
-          "Column": 46,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "i.IsGenericType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 8869,
-          "End": 8897,
-          "Line": 144,
-          "Column": 27,
-          "Message": "Receiver \u0027implementedGenericInterfaces\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "implementedGenericInterfaces"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 13446,
-          "End": 13461,
-          "Line": 216,
-          "Column": 46,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "i.IsGenericType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 13825,
-          "End": 13853,
-          "Line": 221,
-          "Column": 27,
-          "Message": "Receiver \u0027implementedGenericInterfaces\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "implementedGenericInterfaces"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 18490,
-          "End": 18505,
-          "Line": 293,
-          "Column": 46,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "i.IsGenericType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 18864,
-          "End": 18892,
-          "Line": 298,
-          "Column": 27,
-          "Message": "Receiver \u0027implementedGenericInterfaces\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "implementedGenericInterfaces"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 23591,
-          "End": 23606,
-          "Line": 370,
-          "Column": 46,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "i.IsGenericType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 23968,
-          "End": 23996,
-          "Line": 375,
-          "Column": 27,
-          "Message": "Receiver \u0027implementedGenericInterfaces\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "implementedGenericInterfaces"
-        }
-      ]
+      "Sites": []
     },
     "MediatR/src/MediatR/MicrosoftExtensionsDI/RequestExceptionActionProcessorStrategy.cs": {
       "SourceHash": "18ffb5076fec417d854b85d1fcd3a9ef6982e344415753a75997f5555aad5e28",
@@ -3096,7 +1140,8 @@
     },
     "MediatR/src/MediatR/Pipeline/IRequestExceptionHandler.cs": {
       "SourceHash": "2be6c637f4dd59b082edcd0a254eb26a3eb210b9681460ef7c9b804e66d39a70",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR/Pipeline/IRequestPostProcessor.cs": {
       "SourceHash": "898ef8184dbcb78a11e6b1b6b2e51127647417ffecd22f9a441273b258dece9e",
@@ -3108,7 +1153,8 @@
     },
     "MediatR/src/MediatR/Pipeline/RequestExceptionActionProcessorBehavior.cs": {
       "SourceHash": "6ae08b9d5d181886fcf43b9d68cc3dfc64c0a940a0789ec6d11b3e3b2b8d5335",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR/Pipeline/RequestExceptionHandlerState.cs": {
       "SourceHash": "a1b64de2bb87f48d41e3dd366407f0f32ca1a6762fc37ff42a09cee23dff724c",
@@ -3116,135 +1162,39 @@
     },
     "MediatR/src/MediatR/Pipeline/RequestExceptionProcessorBehavior.cs": {
       "SourceHash": "edd372f635af6dbb10768bd605e84ceb3da88427cb41b5592ca49a354b12307c",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR/Pipeline/RequestPostProcessorBehavior.cs": {
       "SourceHash": "3192c3639b77d39d69ae0158e51fa6ba1848a62f01aaa3de455f2cf186a15768",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR/Pipeline/RequestPreProcessorBehavior.cs": {
       "SourceHash": "2ffdea72127ffeec57f34fcc65de35c399bd9a7c222bd869f169e5c6deca8d23",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR/Registration/ServiceRegistrar.cs": {
       "SourceHash": "a2a8c61469fdccb85822956207af597d83ca3d16c5fe193ea5977ca57ff15c0b",
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 3638,
-          "End": 3654,
-          "Line": 59,
-          "Column": 38,
-          "Message": "Receiver \u0027assembliesToScan\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "assembliesToScan"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5124,
-          "End": 5138,
-          "Line": 83,
-          "Column": 66,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "a.DefinedTypes"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 5294,
-          "End": 5321,
-          "Line": 85,
-          "Column": 68,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "t.ContainsGenericParameters"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6026,
-          "End": 6030,
-          "Line": 92,
-          "Column": 41,
-          "Message": "Receiver \u0027type\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "type"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 6133,
-          "End": 6137,
-          "Line": 93,
-          "Column": 39,
-          "Message": "Receiver \u0027type\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "type"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 7102,
-          "End": 7114,
-          "Line": 113,
-          "Column": 18,
-          "Message": "Receiver \u0027exactMatches\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "exactMatches"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 7283,
-          "End": 7292,
-          "Line": 116,
-          "Column": 39,
-          "Message": "Receiver \u0027interface\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "@interfac"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 8570,
-          "End": 8574,
-          "Line": 138,
-          "Column": 63,
-          "Message": "Receiver \u0027type\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "type"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 9147,
-          "End": 9162,
-          "Line": 144,
-          "Column": 194,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "x.IsGenericType"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 10588,
-          "End": 10600,
-          "Line": 158,
+          "Start": 1207,
+          "End": 1218,
+          "Line": 28,
           "Column": 54,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "type.IsClass"
+          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reads.",
+          "SpanText": "cts . Token"
         },
         {
           "Code": "Calor0270",
-          "Start": 10604,
-          "End": 10619,
-          "Line": 158,
-          "Column": 70,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "type.IsAbstract"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 10960,
-          "End": 10987,
-          "Line": 163,
-          "Column": 32,
-          "Message": "Receiver \u0027constraintsForEachParameter\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "constraintsForEachParameter"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 20914,
-          "End": 20932,
-          "Line": 309,
-          "Column": 49,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "type.IsGenericType"
+          "Start": 2081,
+          "End": 2085,
+          "Line": 47,
+          "Column": 48,
+          "Message": "Receiver \u0027type\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
+          "SpanText": "type"
         }
       ]
     },
@@ -3254,7 +1204,8 @@
     },
     "MediatR/src/MediatR/Wrappers/NotificationHandlerWrapper.cs": {
       "SourceHash": "0b4cc99d93dd770df4bd96956b50aed7b8e18d994130e2d8a85c9cddb01391ef",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "MediatR/src/MediatR/Wrappers/RequestHandlerWrapper.cs": {
       "SourceHash": "78c860a4a0696d27b2942ef6996b8ceec84aec6b56a42201bd8ce801cc42954d",
@@ -3262,7 +1213,8 @@
     },
     "MediatR/src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs": {
       "SourceHash": "b78a9dcd3cacee680215aacafbb86f5b7b30d564db3b09fcc1da45f8701ad467",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "scoped-namespace-source-validation"
     },
     "serilog/src/Serilog/Capturing/DepthLimiter.cs": {
       "SourceHash": "08f48cc4ae93b3f41301cafb95c2f8e1f0c131448d9664459af08cc629209300",
@@ -3278,26 +1230,7 @@
     },
     "serilog/src/Serilog/Capturing/PropertyValueConverter.cs": {
       "SourceHash": "231053e6bc7e8a6c271b75c95fa74eefa7a68659b02252e1f1319146a572a14e",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 4740,
-          "End": 4750,
-          "Line": 86,
-          "Column": 27,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "array.Rank"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 7091,
-          "End": 7096,
-          "Line": 138,
-          "Column": 35,
-          "Message": "Receiver \u0027field\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "field"
-        }
-      ]
+      "Sites": []
     },
     "serilog/src/Serilog/Capturing/TrimConfiguration.cs": {
       "SourceHash": "2825d5fb35ef622acb4a7f54f8de3f157b45db1e90704e8c3ce0455c958ce514",
@@ -3340,10 +1273,10 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 6851,
-          "End": 6853,
-          "Line": 110,
-          "Column": 26,
+          "Start": 6381,
+          "End": 6383,
+          "Line": 91,
+          "Column": 23,
           "Message": "Receiver \u0027lc\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "lc"
         }
@@ -3358,10 +1291,10 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 6990,
-          "End": 6998,
-          "Line": 112,
-          "Column": 14,
+          "Start": 6726,
+          "End": 6734,
+          "Line": 111,
+          "Column": 9,
           "Message": "Receiver \u0027enricher\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "enricher"
         }
@@ -3500,10 +1433,10 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 3525,
-          "End": 3528,
-          "Line": 53,
-          "Column": 29,
+          "Start": 3371,
+          "End": 3374,
+          "Line": 51,
+          "Column": 26,
           "Message": "Receiver \u0027now\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "now"
         }
@@ -3559,7 +1492,17 @@
     },
     "serilog/src/Serilog/Debugging/SelfLog.cs": {
       "SourceHash": "e220b628d5c4d27858f421e17157d4757c66c5f59dd913c7c48c8016bd1f74cc",
-      "Sites": []
+      "Sites": [
+        {
+          "Code": "Calor0270",
+          "Start": 2016,
+          "End": 2033,
+          "Line": 44,
+          "Column": 52,
+          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reads.",
+          "SpanText": "DateTime . UtcNow"
+        }
+      ]
     },
     "serilog/src/Serilog/Events/DictionaryValue.cs": {
       "SourceHash": "1c95dff73b65e0fc65c87ee459dda254f570136bd325baff5baabdcf7c96101e",
@@ -3643,7 +1586,8 @@
     },
     "serilog/src/Serilog/Guard.cs": {
       "SourceHash": "7cbaf2e185c487f94f062fde7db4aedca045dabdc1520faf6066b8d53d101425",
-      "Sites": []
+      "Sites": [],
+      "Refusal": "namespace-topology"
     },
     "serilog/src/Serilog/ILogger.cs": {
       "SourceHash": "6ca13ef5b677f9db20b08ab195bc049f280082829062f914ef57b9dc7b209285",
@@ -3739,63 +1683,53 @@
     },
     "serilog/src/Serilog/Rendering/ReusableStringWriter.cs": {
       "SourceHash": "45990d9b41e5c4a2470775a7a5f3c7ecf907bedd715a2a8ea1a1587d07baf48d",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 1452,
-          "End": 1454,
-          "Line": 38,
-          "Column": 12,
-          "Message": "Receiver \u0027sb\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "sb"
-        }
-      ]
+      "Sites": []
     },
     "serilog/src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs": {
       "SourceHash": "b4861827ef20897030d64d754666168d766002f0d44223bd12711a33105ccf89",
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 1122,
-          "End": 1129,
-          "Line": 13,
-          "Column": 14,
+          "Start": 819,
+          "End": 826,
+          "Line": 10,
+          "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         },
         {
           "Code": "Calor0270",
-          "Start": 1257,
-          "End": 1264,
-          "Line": 15,
-          "Column": 14,
+          "Start": 947,
+          "End": 954,
+          "Line": 12,
+          "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         },
         {
           "Code": "Calor0270",
-          "Start": 1393,
-          "End": 1400,
-          "Line": 17,
-          "Column": 14,
+          "Start": 1076,
+          "End": 1083,
+          "Line": 14,
+          "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         },
         {
           "Code": "Calor0270",
-          "Start": 1531,
-          "End": 1538,
-          "Line": 19,
-          "Column": 14,
+          "Start": 1207,
+          "End": 1214,
+          "Line": 16,
+          "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         },
         {
           "Code": "Calor0270",
-          "Start": 1667,
-          "End": 1674,
-          "Line": 21,
-          "Column": 14,
+          "Start": 1336,
+          "End": 1343,
+          "Line": 18,
+          "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         }
@@ -3803,54 +1737,35 @@
     },
     "serilog/src/Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs": {
       "SourceHash": "d1dd2067053193624525943b12e60e2ca4285a8783b536bf7c5a813669114cd7",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 13146,
-          "End": 13169,
-          "Line": 223,
-          "Column": 14,
-          "Message": "Receiver \u0027configurationAssemblies\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "configurationAssemblies"
-        },
-        {
-          "Code": "Calor0270",
-          "Start": 13227,
-          "End": 13250,
-          "Line": 224,
-          "Column": 15,
-          "Message": "Receiver \u0027configurationAssemblies\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
-          "SpanText": "configurationAssemblies"
-        }
-      ]
+      "Sites": []
     },
     "serilog/src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs": {
       "SourceHash": "92f0196b4b4c88488e6193d9c31c11ec4f69cda0e955bf6ff67c9097a2c0770b",
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 5719,
-          "End": 5732,
-          "Line": 135,
-          "Column": 33,
+          "Start": 5999,
+          "End": 6012,
+          "Line": 133,
+          "Column": 24,
           "Message": "Receiver \u0027rawMemberName\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "rawMemberName"
         },
         {
           "Code": "Calor0270",
-          "Start": 5780,
-          "End": 5801,
-          "Line": 136,
-          "Column": 42,
+          "Start": 6050,
+          "End": 6071,
+          "Line": 134,
+          "Column": 31,
           "Message": "Receiver \u0027shortAccessorTypeName\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "shortAccessorTypeName"
         },
         {
           "Code": "Calor0270",
-          "Start": 5815,
-          "End": 5830,
-          "Line": 136,
-          "Column": 77,
+          "Start": 6081,
+          "End": 6096,
+          "Line": 134,
+          "Column": 62,
           "Message": "Receiver \u0027extraQualifiers\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "extraQualifiers"
         }
@@ -3862,17 +1777,7 @@
     },
     "serilog/src/Serilog/Util/TimeProvider.cs": {
       "SourceHash": "f4bc61462efb35c32c11fa7701a95e6c940bc8f5be8af0ea42cd41ed0f5c5a26",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 411,
-          "End": 430,
-          "Line": 10,
-          "Column": 14,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
-          "SpanText": "Stopwatch.Frequency"
-        }
-      ]
+      "Sites": []
     }
   }
 }

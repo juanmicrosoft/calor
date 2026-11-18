@@ -83,6 +83,23 @@ public class BinderIncompleteRatchetTests
     private static string BaselinePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-incomplete-baseline.json");
 
+    private static string NativeCurrentExpectationsPath() => Path.Combine(RepoRoot(),
+        "tests", "TestData", "Binding", "binder-native-current-expectations.json");
+
+    /// <summary>
+    /// Why the current native counts differ from the historical baseline (523 parsed,
+    /// 3 failures, 0 incomplete, 5194 expressions bound, measured 2026-10-30 on the
+    /// section-marker spellings). 0.30: 511 parsed, 15 failures, 0 incomplete. The 12
+    /// new parse failures are exactly the retired-syntax inputs AllowedParseFailures
+    /// registers (no active mirror). ExpressionsBound 5194 -> 7386 because every other
+    /// input is now bound in native syntax, where member reads and calls are expression
+    /// nodes; it is recorded, not asserted, and is not a precision claim.
+    /// </summary>
+    private const string NativeCurrentNote =
+        "0.30 current native leg: 12 retired-syntax inputs registered in AllowedParseFailures no "
+        + "longer parse; all other in-repo inputs are bound in native syntax. Incomplete diagnostics "
+        + "remain zero. ExpressionsBound is informational.";
+
     // ONE scope string — the two regen writers previously hardcoded different texts,
     // making the committed file depend on writer order (review minor 5).
     private const string ScopeText =
@@ -327,29 +344,25 @@ public class BinderIncompleteRatchetTests
             "Files on the allowed-parse-failure list now PARSE — remove them from the list " +
             $"(and the F-2 amendment) in this PR:\n  {string.Join("\n  ", recovered)}");
 
-        var measured = new Baseline(incomplete, parsedFiles, parseFailures.Count, expressionsBound,
-            ScopeText);
+        var measured = new NativeCurrentExpectations(incomplete, parsedFiles, parseFailures.Count,
+            expressionsBound, NativeCurrentNote);
 
+        // 0.30: the native leg's counts live in their own current fixture. The original
+        // binder-incomplete-baseline.json is byte-pinned by the historical binder replay
+        // (ConversionLeg_IncompleteCount_MatchesBaseline), so regenerating its native
+        // fields there broke that replay. The hook now writes only the current fixture.
         if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
         {
-            // Preserve the conversion-leg section — the two regen writers run in
-            // nondeterministic order under one test invocation.
-            var existing = File.Exists(BaselinePath())
-                ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))
-                : null;
-            File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
-                measured with
-                {
-                    Conversion = existing?.Conversion,
-                    PreserveCoverage = existing?.PreserveCoverage
-                },
-                new JsonSerializerOptions { WriteIndented = true }) + "\n");
+            File.WriteAllText(NativeCurrentExpectationsPath(), JsonSerializer.Serialize(
+                measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
             return;
         }
 
-        Assert.True(File.Exists(BaselinePath()),
-            "Baseline missing — run once with CALOR_UPDATE_BINDER_BASELINE=1");
-        var baseline = JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!;
+        Assert.True(File.Exists(NativeCurrentExpectationsPath()),
+            "Current native expectations missing — run once with CALOR_UPDATE_BINDER_BASELINE=1");
+        var baseline = JsonSerializer.Deserialize<NativeCurrentExpectations>(
+            File.ReadAllText(NativeCurrentExpectationsPath()))!;
+        Assert.Equal(NativeCurrentNote, baseline.Note);
 
         Assert.True(parsedFiles == baseline.ParsedFiles && parseFailures.Count == baseline.ParseFailures,
             $"Parse coverage moved: {parsedFiles} parsed/{parseFailures.Count} failed vs baseline " +
@@ -672,11 +685,15 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(3, coverage.OpaqueSourceExpressions); // Invocation, callee, argument.
         Assert.Equal(0, coverage.ExactExpressionSourceSpans);
 
-        var calor = new Compiler.Migration.CalorEmitter().Emit(module);
-        var diagnostics = new DiagnosticBag();
-        var reparsed = new Parser(new Lexer(calor, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.False(diagnostics.HasErrors);
-        AssertOpaqueSerializationPreserved(module, reparsed, "expression.cs");
+        // 0.30 (af5d914ab): native syntax has no inline raw C# expression form, and
+        // the converter no longer builds RawCSharpExpressionNode; an expression it
+        // cannot express natively is preserved at its member boundary instead (see
+        // SelectedBranchMode_UsesRoslynBooleanConditions). So this node no longer
+        // round-trips through CalorEmitter (which still prints the retired `§CS{}`
+        // marker). The identity guard below is exercised directly; converted corpus
+        // output, whose opaque boundaries are raw members, is reparsed in MeasureNative.
+        AssertOpaqueSerializationPreserved(module, MeasurementModule(
+            new RawCSharpExpressionNode(expression.Span, "Call(1)")), "expression.cs");
         Assert.Throws<Xunit.Sdk.TrueException>(() =>
             AssertOpaqueSerializationPreserved(module, MeasurementModule(), "dropped.cs"));
         Assert.Throws<Xunit.Sdk.TrueException>(() =>
@@ -901,7 +918,13 @@ public class BinderIncompleteRatchetTests
         Assert.NotEqual(shifted.SourceHash, shifted.SelectedSourceHash);
         Assert.Equal(identity.SourceHash, identity.SelectedSourceHash);
         Assert.Equal(1, shifted.OpaqueBoundaries);
-        Assert.Equal(selectedInvocation.DescendantNodesAndSelf()
+        // 0.30 (af5d914ab): native syntax has no inline raw C# expression, so the
+        // out-var call inside `&&` (conditional-expression-hoisting) is preserved at
+        // its member boundary, not as the invocation alone: the opaque expressions are
+        // every expression of the selected method (its types, `&&`, `gate`, the call).
+        var selectedMethod = Assert.Single(selectedInvocation.Ancestors()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>());
+        Assert.Equal(selectedMethod.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax>().Count(),
             shifted.OpaqueSourceExpressions);
         Assert.Equal(identity.OpaqueSourceExpressionIdentityHash, shifted.OpaqueSourceExpressionIdentityHash);
@@ -1634,6 +1657,17 @@ public class BinderIncompleteRatchetTests
         NativeConversionLeg Conversion,
         PreserveCoverageLeg PreserveCoverage,
         SortedDictionary<string, SourceCoverageRecord> SourceCoverage);
+
+    /// <summary>
+    /// The in-repo native leg's current counts (tests/TestData/Binding). Separate from the
+    /// byte-pinned historical baseline; ExpressionsBound is recorded, not asserted.
+    /// </summary>
+    private sealed record NativeCurrentExpectations(
+        int IncompleteCount,
+        int ParsedFiles,
+        int ParseFailures,
+        int ExpressionsBound,
+        string Note);
 
     private sealed record Baseline(
         int IncompleteCount,

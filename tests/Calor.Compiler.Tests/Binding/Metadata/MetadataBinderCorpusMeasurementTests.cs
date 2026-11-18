@@ -37,11 +37,23 @@ public class MetadataBinderCorpusMeasurementTests
     [SkippableFact]
     public void ResolvedFraction_OverPinnedCorpus_Measured()
     {
-        var subjects = new (string Name, string SubmodulePath, string SrcSubpath)[]
+        // ImplicitUsings: the subject's own project setting (project context).
+        // Serilog's Directory.Build.props enables the SDK implicit global usings
+        // and its sources rely on them: most files have no `using System;`.
+        // Without them most of Serilog's BCL calls did not bind in this model and
+        // never became candidates, and `logEvent.Exception?` was Nullable<error
+        // type>, so Roslyn's "truth" for `.ToString()`/`.GetType()` was
+        // Nullable<T>.ToString / object.GetType. In 0.30 the binder answers those
+        // two with System.Exception's members, which counted as
+        // ResolvedButDifferentSymbol (1197 -> 1195). With the project's usings:
+        // Serilog 110/113 -> 507/521, aggregate 1197/1248 -> 1594/1656 (96.26%),
+        // and no different-symbol results. MediatR and FluentValidation do not
+        // enable implicit usings and are unchanged.
+        var subjects = new (string Name, string SubmodulePath, string SrcSubpath, bool ImplicitUsings)[]
         {
-            ("MediatR",          "bench/corpus/MediatR",          "src"),
-            ("Serilog",          "bench/corpus/serilog",          "src"),
-            ("FluentValidation", "bench/corpus/FluentValidation", "src"),
+            ("MediatR",          "bench/corpus/MediatR",          "src", false),
+            ("Serilog",          "bench/corpus/serilog",          "src", true),
+            ("FluentValidation", "bench/corpus/FluentValidation", "src", false),
         };
 
         var perSubject = new List<CorpusSubjectResult>();
@@ -55,7 +67,7 @@ public class MetadataBinderCorpusMeasurementTests
                 $"Corpus submodule '{subject.Name}' not initialized at {srcRoot}. " +
                 "Run `git submodule update --init --depth=1 " + subject.SubmodulePath + "` first.");
 
-            var result = MeasureSubject(subject.Name, srcRoot, binder);
+            var result = MeasureSubject(subject.Name, srcRoot, binder, subject.ImplicitUsings);
             perSubject.Add(result);
             Console.WriteLine(
                 $"S5-corpus {subject.Name}: {result.ResolvedCount} / {result.CandidateCount} " +
@@ -140,7 +152,8 @@ public class MetadataBinderCorpusMeasurementTests
             }).ToArray(),
         };
 
-    private static CorpusSubjectResult MeasureSubject(string name, string srcRoot, MetadataBinder binder)
+    private static CorpusSubjectResult MeasureSubject(
+        string name, string srcRoot, MetadataBinder binder, bool implicitUsings)
     {
         var candidateCount = 0;
         var resolvedCount = 0;
@@ -174,7 +187,7 @@ public class MetadataBinderCorpusMeasurementTests
 
         var compilation = CSharpCompilation.Create(
             $"CorpusMeasurement_{name}",
-            syntaxTrees,
+            GeneratedCSharpCompiler.AddImplicitUsings(syntaxTrees, includeSystem: false, includeSdk: implicitUsings),
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                 .WithNullableContextOptions(NullableContextOptions.Enable));
