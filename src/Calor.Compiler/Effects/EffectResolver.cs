@@ -514,8 +514,20 @@ public sealed class EffectResolver
             ParseParameterSignature(signature));
     }
 
+    /// <summary>
+    /// The manifest code that charges <see cref="EffectSet.Unknown"/>: the member can run code
+    /// the manifest cannot name (a user's virtual <c>ToString</c>, an <c>IConvertible</c>
+    /// implementation, an <c>IFormatProvider</c>). The answer is still definitive, so the
+    /// resolution is <see cref="EffectResolutionStatus.Resolved"/>: no later fallback (a
+    /// wildcard, a namespace default, IL analysis) may replace it with something weaker.
+    /// </summary>
+    public const string UnknownManifestCode = "unknown";
+
     private static EffectResolution CreateResolution(List<string> effectCodes, string source)
     {
+        if (effectCodes.Contains(UnknownManifestCode, StringComparer.Ordinal))
+            return new EffectResolution(EffectResolutionStatus.Resolved, EffectSet.Unknown, source);
+
         var effectSet = effectCodes.Count == 0
             ? EffectSet.Empty
             : EffectSet.From(effectCodes.ToArray());
