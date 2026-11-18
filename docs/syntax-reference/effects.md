@@ -357,7 +357,9 @@ is `Calor0405`. A type declared in several parts carries the row on each part.
 - A static field declared in a preserved raw C# member counts too. Reading it
   charges the type's initialization, which is `unknown` when the preserved
   initializer cannot be analyzed. Reading a raw property or other raw member that
-  native code cannot see is `unknown`. A direct, zero-argument CLR `System.Object()` initializer can use
+  native code cannot see is `unknown`.
+
+A direct, zero-argument CLR `System.Object()` initializer can use
 the existing constructor effect contract after successful C# projection and
 selection of that exact CLR constructor. This bounded proof requires an
 error-free projection with no preprocessor condition symbols.
@@ -372,9 +374,12 @@ does not expand operation analysis of generated method bodies.
 
 Selected metadata constants such as `decimal.One` and `double.NaN` do not run
 a type initializer. Their reads retain the declared CLR type; a `float`
-constant does not become a `double`. Other metadata fields, including
-`System.EventArgs.Empty`, are not property getters and cannot borrow a getter's
-effect contract. Unproved field initialization remains Unknown.
+constant does not become a `double`. Other metadata fields are not property
+getters and cannot borrow a getter's effect contract. A read of such a field is
+charged only from a manifest `fields` entry for that exact field, and the entry
+must cover the declaring type's initialization. The built-in manifest declares
+`System.String.Empty` pure, so `return string.Empty` needs no effect row. Fields
+without an entry, such as `System.EventArgs.Empty`, remain Unknown.
 
 ## Generic construction
 
@@ -391,6 +396,8 @@ row syntax or new permission. A same-spelled source type or manifest entry
 cannot supply the generic parameter's missing constructor contract.
 
 Known concrete constructors retain their existing source or metadata rules.
+A metadata constructor is looked up by its CLR name, so `new object()` uses the
+`System.Object()` contract and needs only `alloc`.
 Source constructors still permit only intrinsic initialization mutation and
 allocation. Allocation, argument evaluation, and initializers keep their own
 effects. Arrays and primitive `default(int)` do not invoke an open generic

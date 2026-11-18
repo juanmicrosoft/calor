@@ -19,7 +19,7 @@ public sealed class ReceivingAndEffectDocumentationTests
     [Theory]
     [InlineData(Nullability, 10, 3, 10)]
     [InlineData(CrossModule, 3, 1, 6)]
-    [InlineData(Effects, 4, 0, 19)]
+    [InlineData(Effects, 6, 0, 21)]
     public void CompleteExamples_PreserveCoverageAndExactNegativeContracts(string page, int programs, int negatives,
         int fences)
     {
@@ -185,6 +185,32 @@ public sealed class ReceivingAndEffectDocumentationTests
         Assert.Equal(5, NativeMethod("HigherOrder", "Twice", Effects).Invoke(null, [increment, 3]));
         Assert.Same(increment, NativeMethod("Rows", "Use", Effects).Invoke(null, [increment, 3]));
     }
+
+    // The accessor and static-initialization examples each claim a row is required. Removing the
+    // row the prose names must draw the code the prose names, and nothing else.
+    [Theory]
+    [InlineData("Accessors", "      get\n        ! throw\n", "      get\n", "Calor0423")]
+    [InlineData("Settings", "  class Defaults\n    ! fs:r\n", "  class Defaults\n", "Calor0422")]
+    [InlineData("Settings", "  func Show public () → string\n    ! fs:r\n", "  func Show public () → string\n    !\n",
+        "Calor0410")]
+    public void AccessorAndStaticInitializationExamples_RequireTheRowsTheyDeclare(
+        string module, string withRow, string withoutRow, string code)
+    {
+        var source = Assert.Single(ExemplarCompileChecker.ExtractCompletePrograms(Page(Effects))
+            .Where(program => program.Source.StartsWith($"module {module}\n", StringComparison.Ordinal))).Source;
+        var options = new CompilationOptions
+        {
+            EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null
+        };
+        Assert.False(Program.Compile(source, module + ".calr", options).HasErrors);
+        Assert.Equal(1, CountOccurrences(source, withRow));
+        var mutated = Program.Compile(source.Replace(withRow, withoutRow, StringComparison.Ordinal),
+            module + ".calr", options);
+        Assert.Equal(code, Assert.Single(mutated.Diagnostics.Errors).Code);
+    }
+
+    private static int CountOccurrences(string text, string value) =>
+        (text.Length - text.Replace(value, "", StringComparison.Ordinal).Length) / value.Length;
 
     private static string PagePath(string page) => $"website/content/{page}.mdx";
     private static string Page(string page) => File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), PagePath(page)));

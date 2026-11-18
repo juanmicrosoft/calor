@@ -26,10 +26,16 @@ public class MarkdownReferenceTests
             "GlobalModule.Main()" },
         new[] { "33", "4", "31", "55", "5", "FizzBuzz:Fizz:Buzz:7", "3", "120",
             "Not Found:A:large positive", "two", "3" })]
-    [InlineData("effects", 4, 0,
-        new[] { "GlobalModule.Apply(x => x + 1, 41)", "GlobalModule.Use(x => x + 1, 41)(1)",
-            "GlobalModule.Twice(x => x + 1, 40)", "GlobalModule.Encode(\"a b&c\")" },
-        new[] { "42", "2", "42", "a+b%26c" })]
+    // Accessors: the getter's declared `! throw` admits the throw that a corrupt balance reaches.
+    // Settings: reading Defaults.Text runs the type's static initializer, which reads the file;
+    // with no settings.txt the initializer's FileNotFoundException surfaces through Show.
+    [InlineData("effects", 6, 0,
+        new[] {
+            "((System.Func<string>)(() => { var account = new Account(); var before = account.Balance; typeof(Account).GetField(\"balance\", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(account, -1); try { return before + \":\" + account.Balance; } catch (System.InvalidOperationException e) { return before + \":\" + e.Message; } }))()",
+            "GlobalModule.Apply(x => x + 1, 41)", "GlobalModule.Use(x => x + 1, 41)(1)",
+            "GlobalModule.Twice(x => x + 1, 40)", "GlobalModule.Encode(\"a b&c\")",
+            "((System.Func<string>)(() => { if (System.IO.File.Exists(\"settings.txt\")) return \"settings.txt exists\"; try { return GlobalModule.Show(); } catch (System.TypeInitializationException e) { return e.TypeName + \":\" + e.InnerException!.GetType().Name; } }))()" },
+        new[] { "0:corrupt", "42", "2", "42", "a+b%26c", "Defaults:FileNotFoundException" })]
     [InlineData("expressions", 7, 0,
         new[] { "GlobalModule.Main()", "GlobalModule.Main()",
             "GlobalModule.Wrap(int.MaxValue) + \":\" + GlobalModule.Narrow(42L)", "GlobalModule.Main()",
