@@ -36,6 +36,16 @@ All notable changes to this project will be documented in this file.
   option and the MCP `explicitCallClosers` argument chose between two spellings of
   the retired `§C` call form. Native calls are always written `name(args)`, so the
   option had no effect. Remove it from scripts: the CLI now rejects it as unknown.
+- **Static members are charged their type's initialization.** C# runs a static
+  constructor before any static member of its type is used. Calor now checks that:
+  a static method, operator or static property of a class with a static constructor
+  (`ctor stat`) must cover that constructor's effects in its own row. The check
+  sits on the member, not on each call, because method groups and delegates have
+  no call site to charge. Three more reads are charged the type's static
+  initialization: a static field read by its bare name inside its own class (as
+  `Type.Field` already was), a static auto-property, and a static field declared in
+  preserved raw C# (charged `unknown` when its initializer cannot be analyzed).
+  Programs that left these effects out now fail with `Calor0410`.
 
 ### Added
 
@@ -45,8 +55,22 @@ All notable changes to this project will be documented in this file.
   conversion kept the whole file as C#. A constructor can now write a row after its
   header, for example `! throw` or `! unknown`, and the converter writes it for you.
   Code that calls `new` is still charged what the constructor body really does.
-  Field and static initializers in a class without an explicit constructor still
-  have no row and fail closed.
+  Static field initializers use the type's own row, described below.
+- **Property accessors and static initializers can declare an effect row.** Write
+  the row on its own line under `get`, `set` or `init`, for example `! throw`. For a
+  type's static field initializers, write an `!` line directly under `class Name`,
+  before the first member. Without a row, an accessor body may only mutate and
+  allocate (`Calor0423`), and so may static initializers (`Calor0422`); both messages
+  now say where the row goes. Code that reads the property, or first touches the
+  type, is charged the row. Calor does not generate a static constructor for the
+  type row, so C# `beforefieldinit` timing does not change. `calor convert` writes
+  these rows (`! unknown` when it cannot tell) instead of keeping the whole file as
+  C#. Event `add`/`remove` accessors still have no row.
+- **Effect manifests can describe fields.** A new `fields` table gives a contract to
+  one exact field, consulted only when the code reads that field, never for a
+  getter of the same name. `System.String.Empty` is now pure, so
+  `return string.Empty` needs no row. Fields without an entry, such as
+  `EventArgs.Empty`, are still charged `unknown`.
 - **Functions can declare `! unknown`.** A function or method may write
   `! unknown` as its own effect row when it calls an API with no effect contract.
   Calls in its body are accepted, and every caller is charged `unknown`, so a
@@ -173,6 +197,27 @@ no substitute tokenizer or estimated result is reported here.
   reference, and naming for-loop temporaries. Indexing a 106-file project drops from
   about 48 s to 26 s; 0.29 took under a second, so that work continues. No diagnostics
   or effect results change.
+- **Project indexing scales with project size again.** Each module used to compile
+  its own C# image of the whole project, so `calor index build`, `calor query` and
+  multi-file builds slowed down with the square of the file count. One image per
+  build is now shared, and each module's effect summary is built once. On a
+  106-file project the index build drops from about 24 s to about 4 s with
+  identical output.
+- **One C# error no longer hides operator proofs in other functions.** Calor
+  proves the effects of `+` and other operators on the generated C#. One error
+  anywhere in a module used to void every proof, so a single ill-typed function
+  (for example one returning a `double` from a `float` function) gave every other
+  function a false `Calor0410` and hid the real C# error. An error inside one
+  function's body now voids only that function's proofs. Errors in signatures,
+  initializers or parsing still void the whole module.
+- **`x.Field` binds like `x . Field`.** When `x` is a variable, the unspaced form
+  now reads the member for nullable and non-nullable user classes, including
+  chains such as `x.Next.Value`. Before, it reported "Undefined variable" and a
+  false `Calor0900` under `--analyze`.
+- **`new object()` needs only `alloc`.** Constructor effects are now looked up by
+  the CLR type name (`System.Object`, ``System.Lazy`1``), so keyword spellings and
+  generic types reach their manifest entries. Messages about constructors with no
+  contract print that name.
 - **Paid evaluation cost estimates account for prompt caching.** Claude cache
   reads no longer reduce the separate uncached-input charge, and five-minute
   cache writes include their surcharge. Reported input totals include cached
@@ -212,6 +257,20 @@ no substitute tokenizer or estimated result is reported here.
   source text but generate UTF-8; their original encoding and bytes are not retained.
 
 ### Test and CI health
+
+- **`dotnet build` recompiles every Calor file after any edit.** Since each file's
+  content became part of the cross-module fingerprint, the MSBuild task can no
+  longer prove that an unedited file is unaffected. Results are correct; builds are
+  less incremental than in 0.29. `calor build` still skips files it can prove
+  independent, but only modules without a namespace header. Restoring incremental
+  MSBuild builds is tracked as follow-up work.
+- **The null-dereference benchmark seeds its bugs on a user class.** Since 0.30,
+  dereferencing a `string?` without a check is the hard error `Calor0274`, which
+  stops compilation before bug-pattern analysis runs. The benchmark keeps its 3
+  seeded bugs and 5 safe controls, now on a user-defined nullable class.
+- **Corpus tests count refused files.** The corpus measurements now pin, by name
+  and cause, the 160 of 364 corpus files that the strict conversion legs refuse,
+  instead of skipping them silently.
 
 - **Default migration has a separate corpus report.** CI reports failed,
   converted-but-blocked, written and fully native written files for pinned
