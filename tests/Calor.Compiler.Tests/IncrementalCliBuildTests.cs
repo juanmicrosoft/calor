@@ -1223,6 +1223,80 @@ public sealed class NativeProjectCacheTests : IDisposable
         }
     }
 
+    private static string Namespaced(string module, string ns, string function, int value) =>
+        $"module {module} {ns} block\n  func {function} public () → int\n    !\n    return {value}\n";
+
+    [Fact]
+    public void NamespacedModuleWrappersKeepRealHitsAndExactColdArtifacts()
+    {
+        // #1732: `module Alpha Alpha block` emits
+        // `namespace Alpha { public static partial class AlphaModule }`. The
+        // independence proof accepts that wrapper, so an edit to one namespaced
+        // module spares an unrelated one, byte for byte.
+        Write("alpha", Namespaced("Alpha", "Alpha", "Greet", 1));
+        Write("beta", Namespaced("Beta", "Beta", "Wave", 2));
+        Assert.Equal(2, Run().Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var betaPath = Path.Combine(_root, "beta.g.cs");
+        var beta = File.ReadAllText(betaPath);
+        Assert.Contains("public static partial class BetaModule", beta);
+
+        Write("alpha", Namespaced("Alpha", "Alpha", "Greet", 11));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal("alpha.calr", Assert.Single(changed.Result.Compiled).File.Name);
+        Assert.Equal("beta.calr", Assert.Single(changed.Result.Skipped).Name);
+        Assert.Equal(beta, File.ReadAllText(betaPath));
+        var generated = Directory.GetFiles(_root, "*.g.cs").ToDictionary(path => path, File.ReadAllText);
+        var state = CanonicalState();
+
+        var cold = Run(clear: true);
+        Assert.Empty(cold.Result.Skipped);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+        Assert.All(generated, output => Assert.Equal(output.Value, File.ReadAllText(output.Key)));
+        Assert.Equal(state, CanonicalState());
+
+        string CanonicalState()
+        {
+            var loaded = BuildStateCache.Load(_root)!;
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                loaded.CrossModuleMapHash,
+                loaded.CrossModuleFunctionMapHash,
+                Files = loaded.Files.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => new { pair.Key, pair.Value.ContentHash, pair.Value.OutputContentHash }),
+                Evidence = loaded.ValidatedOutputs.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => new { pair.Key, pair.Value.OutputContentHash, pair.Value.IsNativeGlobalModule })
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData("same-namespace")]
+    [InlineData("nested-namespace")]
+    public void SharedNamespacedWrapperIsNeverSpared(string shape)
+    {
+        // Two modules with the same namespace emit the SAME partial class
+        // (Alpha.AlphaModule): an edit to one can change member lookup in the
+        // other, so the other is recompiled. A nested namespace ending in the same
+        // segment emits a different type (Outer.Alpha.AlphaModule) but the proof
+        // compares simple names, so it is not spared either.
+        Write("alpha", Namespaced("Alpha", "Alpha", "Greet", 1));
+        Write("gamma", Namespaced("Gamma", shape == "same-namespace" ? "Alpha" : "Outer.Alpha", "Other", 3));
+        Write("beta", Namespaced("Beta", "Beta", "Wave", 2));
+        Assert.Equal(3, Run().Result.Compiled.Count);
+        Assert.Equal(3, Run().Result.Skipped.Count);
+
+        Write("gamma", Namespaced("Gamma", shape == "same-namespace" ? "Alpha" : "Outer.Alpha", "Other", 4));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal(new[] { "alpha.calr", "gamma.calr" },
+            changed.Result.Compiled.Select(item => item.File.Name).Order(StringComparer.Ordinal));
+        Assert.Equal("beta.calr", Assert.Single(changed.Result.Skipped).Name);
+        var cold = Run(clear: true);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+    }
+
     [Theory]
     [InlineData("row")]
     [InlineData("alias")]

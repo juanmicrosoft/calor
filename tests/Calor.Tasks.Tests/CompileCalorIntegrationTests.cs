@@ -168,7 +168,7 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.Empty(task.GeneratedFiles);
     }
 
-    // Test 20: Full lifecycle: build → build (skip) → edit 1 → build (all, global invalidation)
+    // Test 20: Full lifecycle: build → build (skip) → edit 1 → build (1 compiled, 1 skipped)
     // → build (skip) → clean → build (all)
     [Fact]
     public void FullLifecycle_BuildSkipEditCleanBuild()
@@ -195,14 +195,12 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.Equal(2, Count(engine2, skipping));
         Assert.Equal(0, Count(engine2, compiling));
 
-        // Edit one file, body only. Current contract (0.30): since 9ce37a970
-        // every source's content hash is in CrossModuleTypeRegistry's
-        // fingerprint, which the task folds into CrossModuleMapHash, so ANY
-        // edit in a multi-file build changes the map hash and invalidates
-        // every skip. Sound, but not incremental: the MSBuild task lacks the
-        // CLI's independence proof (CrossModuleFunctionMapHash +
-        // CanReuseIndependentOutput in CompilationDriver). When that proof is
-        // ported, this phase should pin "Bar skips, Foo compiles" again.
+        // Edit one file, body only. Every source's content hash is in
+        // CrossModuleMapHash (9ce37a970), so the edit changes it; the function
+        // map is unchanged, so the task takes the CLI's independence proof
+        // (CrossModuleCacheReuse, #1732). Bar's output names nothing Foo
+        // declares, and the namespaced `static partial` module wrappers differ
+        // (TestModuleModule vs BarModuleModule), so Bar is proven independent.
         // Renaming a public function is pinned separately in
         // EditRenamingPublicFunction_InvalidatesAllSkips (G3/#809).
         Thread.Sleep(50); // ensure mtime changes
@@ -210,15 +208,18 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.NotEqual(ValidCalorSource, editedSource); // the edit must land, or this phase is vacuous
         File.WriteAllText(src1, editedSource);
 
-        // Third build — global invalidation: both files recompile, nothing skips
+        // Third build — Foo recompiles, Bar is skipped
         var task3 = CreateTask(src1, src2);
         Assert.True(task3.Execute());
         Assert.Equal(2, task3.GeneratedFiles.Length);
         var engine3 = (TestBuildEngine)task3.BuildEngine;
+        Assert.DoesNotContain(engine3.Messages, m => m.Contains("global invalidation", StringComparison.Ordinal));
         Assert.Contains(engine3.Messages,
-            m => m.Contains("global invalidation [cross-module-map-changed]", StringComparison.Ordinal));
-        Assert.Equal(0, Count(engine3, skipping));
-        Assert.Equal(2, Count(engine3, compiling));
+            m => m.Contains("[cross-module-sources-changed]", StringComparison.Ordinal));
+        Assert.Equal(new[] { src2 }, engine3.Messages.Where(m => m.StartsWith(skipping, StringComparison.Ordinal))
+            .Select(m => m[skipping.Length..].Trim()).ToArray());
+        Assert.Equal(new[] { src1 }, engine3.Messages.Where(m => m.StartsWith(compiling, StringComparison.Ordinal))
+            .Select(m => m[compiling.Length..].Split(" -> ")[0].Trim()).ToArray());
 
         // Fourth build — no edit: the rewritten cache is warm, everything skips again
         var task4 = CreateTask(src1, src2);

@@ -27,7 +27,8 @@ internal sealed class BuildState
     /// <summary>
     /// Fingerprint of the cross-module function map and complete source snapshot.
     /// Target-map changes invalidate every warm skip; source-only changes require
-    /// an independence proof before reusing a cached output and effect summary.
+    /// an independence proof before reusing a cached output and effect summary
+    /// (<see cref="CrossModuleCacheReuse"/>, shared by the CLI and the MSBuild task).
     /// Null/empty when single-module.
     /// </summary>
     public string? CrossModuleMapHash { get; set; }
@@ -122,7 +123,10 @@ internal enum FileCacheMissReason
     OutputContentChanged,
     SourceMissing,
     SourceContentChanged,
-    CacheValidationFailed
+    CacheValidationFailed,
+    // The file is unchanged but another module's source changed, and the
+    // independence proof could not show its cached output is unaffected (#1732).
+    CrossModuleDependencyChanged
 }
 
 internal static class BuildStateCache
@@ -557,6 +561,7 @@ internal static class BuildStateCache
         FileCacheMissReason.SourceMissing => "source-missing",
         FileCacheMissReason.SourceContentChanged => "source-content-changed",
         FileCacheMissReason.CacheValidationFailed => "cache-validation-failed",
+        FileCacheMissReason.CrossModuleDependencyChanged => "cross-module-dependency-changed",
         _ => throw new ArgumentOutOfRangeException(nameof(reason))
     };
 
