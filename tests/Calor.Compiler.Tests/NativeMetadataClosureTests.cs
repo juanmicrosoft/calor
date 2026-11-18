@@ -2713,6 +2713,11 @@ public sealed class NativeMetadataClosureTests
         }
     }
 
+    /// <remarks>
+    /// <c>ObjectText</c> selects <c>Convert.ToString(object)</c>, which calls the argument's
+    /// virtual <c>ToString</c>: since 0.30 i1 it is charged <c>unknown</c> (the overload, not the
+    /// null value, decides), so the function declares that row.
+    /// </remarks>
     [Fact]
     public void NativeReferenceDefaults_RetainSourceAndMetadataOverloadIdentityAfterReemission()
     {
@@ -2731,7 +2736,7 @@ public sealed class NativeMetadataClosureTests
                 !
                 return Pick(default(string))
               func ObjectText () → string?
-                !
+                ! unknown
                 return System.Convert.ToString(default(object))
               func StringText () → string?
                 !

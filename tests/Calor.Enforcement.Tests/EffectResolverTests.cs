@@ -2200,11 +2200,11 @@ public class EffectResolverTests
     }
 
     // Formerly "ConvertContracts_CallbackOverloadsAreUnknownAndNeverExecuteAfterRefusal". 0.30
-    // restored the 0.29 System.Convert contract (`"*": []`), so the numeric provider overloads now
-    // resolve PureExplicit and compile; the original culture/provider dispatch still happens and the
-    // native translation must reproduce it exactly. The former `object?` row (Convert.ToString
-    // invoking a user ToString that writes to the console) was removed: under the restored wildcard
-    // it compiles, and pinning that as expected behavior would pin the documented soundness gap.
+    // restored the 0.29 System.Convert contract (`"*": []`). 0.30 i1 keeps that wildcard but charges
+    // `unknown` to the overloads that reach user code: a numeric `ToString(value, provider)` calls
+    // the provider's GetFormat, so it resolves to Unknown, is refused in a pure function, and
+    // compiles with parity under `! unknown`. The provider-free `ToString(value)` stays
+    // PureExplicit. The `object?` case is pinned in ConvertUserCodeEffectTests.
     [Theory]
     [InlineData("int", "-1234", "-1234")]
     [InlineData("long", "-1234L", "-1234")]
@@ -2226,7 +2226,9 @@ public class EffectResolverTests
             Assert.False(IsProvedConvertOverload(selected));
             var resolution = new EffectResolver(new ManifestLoader(loadUserLevelManifests: false))
                 .Resolve(NumericKey(selected));
-            Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+            Assert.Equal(provider ? EffectResolutionStatus.Resolved : EffectResolutionStatus.PureExplicit,
+                resolution.Status);
+            Assert.Equal(provider, resolution.Effects.IsUnknown);
             Assert.Contains("embedded:Calor.Compiler.Manifests.bcl-system", resolution.Source);
             var witnesses = new List<string>();
             foreach (var throws in new[] { false, true })
@@ -2243,9 +2245,16 @@ public class EffectResolverTests
                 module ConvertContracts
                   module Target
                     func Apply ({{type}}:value, System.IFormatProvider:provider) → string?
-                      !
+                      {{(provider ? "! unknown" : "!")}}
                       return {{expression}}
                 """;
+            if (provider)
+            {
+                var refused = Calor.Compiler.Program.Compile(direct.Replace("! unknown", "!"), "refused-convert.calr",
+                    new Calor.Compiler.CompilationOptions { VerifyContracts = false, StatusWriter = TextWriter.Null });
+                Assert.Contains(refused.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0410"
+                    && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
+            }
             foreach (var native in StringEmissions(direct).Concat(StringEmissions(conversion.CalorSource!)))
             foreach (var typing in new[] { false, true })
             {

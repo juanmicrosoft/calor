@@ -204,8 +204,9 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// Checks a class's members and keeps ONLY the refinement-soundness errors that produces
-    /// (#1676). The checker has no member table: inherited fields, members of an external base
+    /// Checks a class's members and keeps ONLY the soundness errors that produces: refinement
+    /// errors (#1676) and numeric conversions C# rejects between two known types (0.30 i1,
+    /// reported through the same channel). The checker has no member table: inherited fields, members of an external base
     /// class, events, indexers and user-defined operators are all invisible to it, so its other
     /// diagnostics inside class members are mostly about its own model, not the program. The
     /// binder and Roslyn keep owning those, exactly as before this pass existed.
