@@ -109,6 +109,41 @@ public class DottedChainAndMatchGuardEffectTests
         AssertClean(source.Replace("! mut", "! mut, alloc", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The receiver is found by C# simple-name lookup: a base class's nested type
+    /// (<c>Limits</c> inherited from <c>Storage</c>), even though another class of the module
+    /// has a nested type of the same name, and a nearer nested type shadows an enclosing
+    /// class's field. Reading <c>Limits.Min</c> charges the whole type's static initialization
+    /// (pure, or <c>alloc</c> when a sibling field allocates).
+    /// </summary>
+    [Theory]
+    [InlineData(false, false, "!")]
+    [InlineData(true, false, "!")]
+    [InlineData(false, true, "! alloc")]
+    [InlineData(true, true, "! alloc")]
+    public void NestedTypeThroughABaseClass_ResolvesAsCSharpLookupDoes(bool outerField, bool allocates, string row)
+    {
+        var source = string.Join("\n",
+            "module Scope Scope block",
+            "  class Outer public",
+            outerField ? "    field int:Limits public static = 10" : null,
+            "    class Storage public",
+            "      class Limits public",
+            "        field int:Min public static = 0",
+            allocates ? "        field object:Token public static = new object()" : null,
+            "    class Base public",
+            "      extends Storage",
+            "      func Get public (int:x) → int",
+            "        ROW",
+            "        return x + Limits.Min",
+            "  class Elsewhere public",
+            "    class Limits public",
+            "      field int:Min public static = -10").Replace("\n\n", "\n", StringComparison.Ordinal);
+        AssertClean(source.Replace("ROW", row, StringComparison.Ordinal));
+        if (row != "!")
+            AssertUses(source.Replace("ROW", "!", StringComparison.Ordinal), "Get", "alloc");
+    }
+
     [Fact]
     public void UnresolvableDottedName_IsUnknownNotPure()
     {
