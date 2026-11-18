@@ -1147,18 +1147,38 @@ public sealed class CrossModuleVarianceTests : IDisposable
     }
 
     [Fact]
-    public void BodyOnlyEditsDoNotInvalidateUnchangedDerivedContracts()
+    public void DerivedRecompilesOnAnyBaseEdit_AndItsContractStaysCorrect()
     {
+        // 0.30 (maintainer decision, option A): a body-only edit to Base still
+        // recompiles Derived. Every source hash is in the cross-module
+        // fingerprint, and the independence proof (CrossModuleCacheReuse,
+        // #1732) spares only outputs that name nothing another module declares:
+        // Derived names Base (`: Base`), and Base is an instance class the proof
+        // does not model. Sound, not incremental. A declaration-surface proof
+        // (Base's declarations and rows unchanged, and Derived's compile reads
+        // only declarations) would let Derived be skipped; that is follow-up
+        // work, recorded in docs/plans/2026-11-16-milestone-0.30-ci-triage.md.
         Write("base", Base("cw"));
         Write("derived", Derived);
         Assert.False(Compile(cache: true).Diagnostics.HasErrors);
+        var derivedOutput = File.ReadAllText(Path.Combine(_directory, "derived.g.cs"));
         Write("base", Base("cw").Replace("      return", "      System.Console.WriteLine(\"body only\")\n      return"));
 
         var (result, diagnostics) = Compile(cache: true);
 
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal("base.calr", Assert.Single(result.Compiled).File.Name);
-        Assert.Equal("derived.calr", Assert.Single(result.Skipped).Name);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Equal(new[] { "base.calr", "derived.calr" },
+            result.Compiled.Select(item => item.File.Name).Order(StringComparer.Ordinal));
+        Assert.Empty(result.Skipped);
+        // The override's contract is unchanged by a body-only edit to its base:
+        // the recompiled output is byte-identical and the diagnostics match a cold build.
+        Assert.Equal(derivedOutput, File.ReadAllText(Path.Combine(_directory, "derived.g.cs")));
+        var warm = diagnostics.Select(d => $"{d.FilePath}|{d.Code}|{d.Span}|{d.Message}").Order(StringComparer.Ordinal).ToArray();
+        Calor.Compiler.Incremental.BuildStateCache.Delete(_directory);
+        var (coldResult, coldDiagnostics) = Compile(cache: true);
+        Assert.Empty(coldResult.Skipped);
+        Assert.Equal(warm,
+            coldDiagnostics.Select(d => $"{d.FilePath}|{d.Code}|{d.Span}|{d.Message}").Order(StringComparer.Ordinal).ToArray());
     }
 
     private static string Base(string effects) => $$"""
