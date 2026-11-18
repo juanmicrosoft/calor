@@ -231,6 +231,14 @@ That list is the **residual**: everything the index could not account for. In
 is `true`. It holds `unresolvedCalls`, `ambiguousCallees`, `unreadableFiles`,
 and `effectRowsUnavailable`.
 
+A call to a .NET library member that the binder resolves, such as
+`Console.WriteLine(s)` or `s.ToUpper()`, is not a call into your project, so it
+is not in the residual. A member call the index cannot place is listed as
+`<expression-call>`. That covers three cases: an invocation of a delegate or
+other computed value, a call on a receiver that did not bind, and a call to an
+overridable library member (`o.ToString()`, an interface method) that one of
+your own types might override or implement.
+
 "3 callers" printed over a silently dropped fourth is the mistake this is here
 to prevent. Read the residual before you trust a count.
 

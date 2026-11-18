@@ -1680,8 +1680,16 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.Equal("External.Log", unresolved.Target);
     }
 
+    /// <summary>
+    /// 0.30: a computed-receiver call the binder resolves to a non-virtual metadata
+    /// member is attributed to metadata. It is no edge to a project declaration, so
+    /// neither graph lists it as unresolved (it used to stay "explicitly unresolved",
+    /// which made every caller's query answers partial). The constructor of a metadata
+    /// type is untouched by that rule. MetadataCallResidualTests pins the calls that
+    /// stay unresolved.
+    /// </summary>
     [Fact]
-    public void ResolvedCallGraph_BinderExpressionCall_RemainsExplicitlyUnresolved()
+    public void ResolvedCallGraph_BinderMetadataExpressionCall_IsNotUnresolved()
     {
         const string source = """
             module Test
@@ -1696,15 +1704,13 @@ public sealed class SymbolAndOverloadBindingTests
             BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>());
         Assert.NotNull(expressionCall.EvaluatedReceiver);
         Assert.Equal("GetType", expressionCall.ResolvedMetadataMethod?.Name);
+        Assert.Equal("<expression-call>", expressionCall.Target);
         var graph = CallGraphAnalysis.BuildResolved(bound);
-        var unresolved = Assert.Single(graph.UnresolvedCalls.Where(call =>
-            call.Target == "<expression-call>"));
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         Assert.Empty(graph.ForwardGraph[use.SymbolId]);
-        Assert.Equal(use.SymbolId, unresolved.Caller);
-        Assert.Equal("<expression-call>", unresolved.Target);
-        Assert.Equal(expressionCall.Span, unresolved.Span);
+        Assert.DoesNotContain(graph.UnresolvedCalls, call => call.Target == "<expression-call>");
+        Assert.Contains(graph.UnresolvedCalls, call => call.Target == "object..ctor");
 
         var astDiagnostics = new DiagnosticBag();
         var ast = Parse(source, astDiagnostics);
@@ -1712,10 +1718,9 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.False(
             astDiagnostics.HasErrors,
             string.Join(", ", astDiagnostics.Select(diagnostic => diagnostic.Message)));
-        Assert.Contains(astGraph.UnresolvedCalls, call =>
+        Assert.DoesNotContain(astGraph.UnresolvedCalls, call =>
             call.CallerId == Assert.Single(ast.Functions).Id
-            && call.Target == "<expression-call>"
-            && call.Span == expressionCall.Span);
+            && call.Target == "<expression-call>");
     }
 
     private static bool IsOverloadDiagnostic(Diagnostic diagnostic) =>

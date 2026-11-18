@@ -361,17 +361,31 @@ public sealed class ProjectSymbolIndex
                             (target, resolved, calleeSpan) =
                                 (statement.Target, statement.ResolvedSymbols, statement.CalleeSpan);
                             break;
+                        case BoundExpressionCall valueCall:
+                            // 0.30: invoking a computed value (`pick()(x)`, an event) calls
+                            // whatever it holds, so the site is unknown, never absent.
+                            (target, resolved, calleeSpan) =
+                                ("<expression-call>", Array.Empty<FunctionSymbol>(), valueCall.Span);
+                            break;
                         default:
                             continue;
                     }
 
                     var callee = resolved.Count > 0
                         ? resolved[0]
-                        : ResolveAcrossDocuments(target);
+                        : node is BoundExpressionCall ? null : ResolveAcrossDocuments(target);
                     if (callee is { Id.IsNone: false })
                     {
                         _callEdges.Add(new ProjectCallEdge(
                             function.Symbol.Id, callee.Id, document.FilePath, calleeSpan));
+                    }
+                    else if (node is BoundCallExpression metadataCall
+                        && Calor.Compiler.Analysis.CallGraphAnalysis.IsProvablyMetadataCall(metadataCall))
+                    {
+                        // 0.30: `Console.WriteLine(s)` binds to a metadata member. It is
+                        // attributed — to the BCL, not to a declaration of this project —
+                        // so it neither adds an edge nor makes the caller's answers partial.
+                        continue;
                     }
                     else
                     {

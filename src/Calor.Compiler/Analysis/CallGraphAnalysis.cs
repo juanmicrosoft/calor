@@ -2635,6 +2635,11 @@ public sealed class CallGraphAnalysis
         /// <summary>0.25 F3 (#847): local-function calls, keyed by the enclosing callable.</summary>
         public HashSet<(string CallerId, int Start, int End)> LocalFunctionCalls { get; } = new();
 
+        /// <summary>0.30: calls the binder proved target a metadata member
+        /// (<see cref="IsProvablyMetadataCall"/>), keyed by the enclosing callable.
+        /// They are no edge to a project declaration, and no unresolved call either.</summary>
+        public HashSet<(string CallerId, int Start, int End)> MetadataCalls { get; } = new();
+
         /// <summary>False when binding threw: no call site is known to be local.</summary>
         public bool Complete { get; set; }
     }
@@ -2827,7 +2832,7 @@ public sealed class CallGraphAnalysis
                         callers.Add(function.SymbolId);
                     }
                 }
-                else
+                else if (node is not BoundCallExpression call || !IsProvablyMetadataCall(call))
                 {
                     unresolved.Add(new UnresolvedCallSite(function.SymbolId, target, span));
                 }
@@ -2842,6 +2847,52 @@ public sealed class CallGraphAnalysis
                 pair => pair.Key,
                 pair => (IReadOnlyList<SymbolId>)pair.Value),
             unresolved);
+    }
+
+    /// <summary>
+    /// 0.30: whether a bound call that selected no source callee provably targets a
+    /// member of referenced metadata (the BCL or another assembly), so that it cannot
+    /// be an edge to a project declaration. Such a call is attributed, to metadata, and
+    /// does not belong in the unresolved residual: before this, every native member call
+    /// such as <c>Console.WriteLine(s)</c> marked its caller's callees, effects and
+    /// impact answers partial.
+    /// <para>Fails closed. A call stays unresolved when the binder selected nothing,
+    /// when a source or opaque (raw C#) candidate took part, when an argument did not
+    /// bind, when the member belongs to a delegate (an invocation calls whatever the
+    /// value holds), and when the selected member is overridable and the receiver's
+    /// static type is not a sealed or value metadata type: a project type may override
+    /// or implement that member, so the call may dispatch into project code.</para>
+    /// <para>Not modelled, as for source calls: project code that the metadata member
+    /// itself calls back into (an argument's override, a delegate argument).</para>
+    /// </summary>
+    internal static bool IsProvablyMetadataCall(BoundCallExpression call)
+    {
+        if (call is BoundIncompleteExpression
+            || call.ResolvedSymbols.Count > 0
+            || call.SelectedSourceMethod is not null
+            || call.IsSourceExtensionCall
+            || call.HasOpaqueOverloads
+            || call.HasUnresolvedArguments
+            || call.IsInaccessibleCall
+            || call.ResolvedMetadataMethod is not { } method
+            || !IsMetadataSymbol(method)
+            || !IsMetadataSymbol(method.ContainingType))
+            return false;
+        if (method.ContainingType.TypeKind == TypeKind.Delegate
+            || method.ContainingType.SpecialType is SpecialType.System_Delegate
+                or SpecialType.System_MulticastDelegate)
+            return false;
+        var overridable = method.IsAbstract || method.IsVirtual || method.IsOverride && !method.IsSealed;
+        if (!overridable)
+            return true;
+        return !method.IsStatic
+            && call.ResolvedMetadataReceiverType is { } receiverType
+            && receiverType.TypeKind is not (TypeKind.TypeParameter or TypeKind.Interface)
+            && (receiverType.IsValueType || receiverType.IsSealed)
+            && IsMetadataSymbol(receiverType);
+
+        static bool IsMetadataSymbol(ISymbol symbol) =>
+            symbol.Locations.Length > 0 && symbol.Locations.All(location => location.IsInMetadata);
     }
 
     private static IEnumerable<BoundNode> DescendantsAndSelf(BoundNode node)
@@ -3309,7 +3360,8 @@ public sealed class CallGraphAnalysis
                             functionNameToId,
                             methodNameToIds);
                 if (calleeIds.Count == 0
-                    && !boundValues.LocalFunctionCalls.Contains((function.Id, span.Start, span.End)))
+                    && !boundValues.LocalFunctionCalls.Contains((function.Id, span.Start, span.End))
+                    && !boundValues.MetadataCalls.Contains((function.Id, span.Start, span.End)))
                 {
                     unresolvedCalls.Add(new AstUnresolvedCallSite(function.Id, callee, span));
                 }
@@ -3785,6 +3837,8 @@ public sealed class CallGraphAnalysis
                                 expressionTargetCall = true;
                                 boundValues.ComputedMemberCalls[(callerId, node.Span.Start, node.Span.End)] = expression;
                             }
+                            if (IsProvablyMetadataCall(expression))
+                                boundValues.MetadataCalls.Add((callerId, node.Span.Start, node.Span.End));
                             RecordReceiver(callerId, expression.Target, expression.Receiver);
                             if (receiver != null && !target.Contains('.'))
                                 boundValues.Declarations[(callerId, node.Span.Start, node.Span.End)] =
