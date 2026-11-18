@@ -52,15 +52,41 @@ public class BclLoweringPrerequisiteTests
     [Fact]
     public void MetadataArrayResult_IsInvalidatedByMutableRebinding()
     {
-        var source = """
+        // 0.30 fixes a local's storage type at its declaration, so the 0.29 program that rebound
+        // `values` from Type[] to int is now rejected outright (CS0029 at the rebind): no stale
+        // array fact can reach an accepted program through an inferred local.
+        var rejected = Program.Compile("""
+            module MetadataArrays MetadataArrays block
+              func Run (System.Type:receiver) → int
+                ! unknown
+                var values = receiver.GetGenericArguments()
+                set values 3
+                return values.Length
+            """, "retyped-array.calr",
+            new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
+        Assert.Contains(rejected.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.CodeGenCompilationError && diagnostic.Message.Contains("CS0029"));
+
+        // `dynamic` storage still admits a value of another type, so the invariant is exercised
+        // there: the producer's Type[] fact makes `values.Length` an array length only until the
+        // variable is rebound. Without the rebind, Length is the array's (only the producing
+        // call is unknown); after it, Length is a dynamic member read with no contract.
+        const string template = """
             module MetadataArrays MetadataArrays block
               func Run (System.Type:receiver) → int
                 !
-                var values = receiver.GetGenericArguments()
-                var values = 3
+                var dynamic:values = receiver.GetGenericArguments()
+            REBIND
                 return values.Length
             """;
-        var compiled = Program.Compile(source, "rebound-array.calr",
+        var unchanged = Program.Compile(template.Replace("REBIND\n", ""), "kept-array.calr",
+            new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
+        Assert.Contains(unchanged.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("GetGenericArguments"));
+        Assert.DoesNotContain(unchanged.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
+
+        var compiled = Program.Compile(template.Replace("REBIND", "    set values 3"), "rebound-array.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
         Assert.Contains(compiled.Diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
@@ -69,20 +95,33 @@ public class BclLoweringPrerequisiteTests
     [Fact]
     public void MutableCapturedArrayResult_IsNotADeferredTypeGuarantee()
     {
-        var source = """
+        // A lambda runs later, after any rebind of a mutable capture, so the capture does not
+        // carry the producer's array fact into it. `dynamic` storage is the 0.30 spelling that
+        // can still be rebound to another type (an inferred local's type is fixed).
+        const string template = """
             module MetadataArrays MetadataArrays block
               func Run (System.Type:receiver) → int
                 !
-                var values = receiver.GetGenericArguments()
+                BINDING dynamic:values = receiver.GetGenericArguments()
                 let read = () => values.Length
-                var values = 3
+            REBIND
                 return read()
             """;
-        var compiled = Program.Compile(source, "captured-array.calr",
+        var compiled = Program.Compile(
+            template.Replace("BINDING", "var").Replace("REBIND", "    set values 3"), "captured-array.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
         Assert.DoesNotContain(compiled.Diagnostics, diagnostic =>
             diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal));
         Assert.Contains(compiled.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
+
+        // Control: an immutable capture cannot be rebound, so it keeps the array fact.
+        var immutable = Program.Compile(
+            template.Replace("BINDING", "let").Replace("REBIND\n", ""), "captured-immutable-array.calr",
+            new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
+        Assert.DoesNotContain(immutable.Diagnostics, diagnostic =>
+            diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal));
+        Assert.DoesNotContain(immutable.Diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
     }
 
@@ -109,8 +148,12 @@ public class BclLoweringPrerequisiteTests
     }
 
     [Fact]
-    public void MetadataArrayCallWithArguments_RemainsUnknown()
+    public void MetadataArrayCallWithArguments_RemainsUnknownWithoutExactOverload()
     {
+        // 0.29 established array results only for zero-argument calls, so any call with
+        // arguments left `.Length` unknown. 0.30 binds `receiver.M(args)` by Roslyn overload
+        // resolution: an exactly selected overload's array return type is a fact, and a call
+        // whose overload cannot be selected exactly still establishes nothing.
         var converted = new CSharpToCalorConverter().Convert("""
             using System;
             public static class Sample
@@ -119,8 +162,30 @@ public class BclLoweringPrerequisiteTests
             }
             """);
         Assert.NotNull(converted.Ast);
-        Assert.DoesNotContain("(len ", converted.CalorSource);
-        var compiled = Program.Compile(converted.CalorSource!, "unsupported-array-call.calr",
+        var method = Assert.Single(Assert.Single(converted.Ast.Classes).Methods);
+        var length = Assert.IsType<FieldAccessNode>(Assert.IsType<ReturnStatementNode>(method.Body[^1]).Expression);
+        Assert.Equal("Length", length.FieldName);
+        Assert.Contains("! unknown", converted.CalorSource);
+
+        // With the row tightened to pure, only the producing call is unknown: the selected
+        // GetCustomAttributes(bool) returns object[], whose Length is the array's.
+        var tightened = Program.Compile(
+            System.Text.RegularExpressions.Regex.Replace(converted.CalorSource!, @"(?m)^(\s*)! unknown$", "$1!"),
+            "exact-array-call.calr",
+            new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
+        Assert.Contains(tightened.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("GetCustomAttributes"));
+        Assert.DoesNotContain(tightened.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
+
+        // An argument of unknown type selects no overload, so no array type is established
+        // and `.Length` stays an unknown member read.
+        var compiled = Program.Compile("""
+            module MetadataArrays MetadataArrays block
+              func Run (System.Type:receiver, Missing:inherit) → int
+                !
+                return receiver.GetCustomAttributes(inherit).Length
+            """, "unsupported-array-call.calr",
             new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
         Assert.Contains(compiled.Diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
@@ -193,7 +258,7 @@ public class BclLoweringPrerequisiteTests
             new() { ValidateRoundTripCSharp = false }).Convert(missingSource);
         Assert.NotNull(missingInput.Ast);
         Assert.Equal(0, missingInput.InteropPreservationCount);
-        Assert.Contains("(len ", missingInput.CalorSource);
+        AssertLegacyLengthWithoutMetadataProof(missingInput);
         const string typedSource = """
             using System.Linq;
             public static class Sample
@@ -207,7 +272,7 @@ public class BclLoweringPrerequisiteTests
             new() { ValidateRoundTripCSharp = false }).Convert(typedSource);
         Assert.NotNull(converted.Ast);
         Assert.Equal(0, converted.InteropPreservationCount);
-        Assert.Contains("(len ", converted.CalorSource);
+        AssertLegacyLengthWithoutMetadataProof(converted);
         var generated = new CSharpEmitter().Emit(converted.Ast!);
         var context = """
             public static class External
@@ -230,6 +295,27 @@ public class BclLoweringPrerequisiteTests
         Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
         var assembly = System.Reflection.Assembly.Load(assemblyStream.ToArray());
         Assert.Equal(1, assembly.GetType("Sample")!.GetMethod("Run")!.Invoke(null, null));
+
+        // The receiver's type is a nameless error type, so the converter keeps the legacy
+        // string-length node in its AST. 0.30 prints that node as native `.Length` (the old
+        // `(len x)` spelling is gone), so the claim is checked on the AST and by compiling:
+        // with the row tightened to pure, the Length read is still an unknown member read.
+        static void AssertLegacyLengthWithoutMetadataProof(ConversionResult conversion)
+        {
+            Assert.Contains(EnumerateNodes(conversion.Ast!), node =>
+                node is StringOperationNode { Operation: StringOp.Length });
+            Assert.Contains(").Length == 2", conversion.CalorSource);
+            Assert.Contains("! unknown", conversion.CalorSource);
+            var tightened = Program.Compile(
+                System.Text.RegularExpressions.Regex.Replace(conversion.CalorSource!, @"(?m)^(\s*)! unknown$", "$1!"),
+                "missing-lambda-type.calr",
+                new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
+            Assert.Contains(tightened.Diagnostics, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
+        }
+
+        static IEnumerable<AstNode> EnumerateNodes(AstNode node) =>
+            new[] { node }.Concat(Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node).SelectMany(EnumerateNodes));
 
         static void AssertDefaultPreservation(string original)
         {
