@@ -352,7 +352,9 @@ is `Calor0405`. A type declared in several parts carries the row on each part.
 - A static field declared in a preserved raw C# member counts too. Reading it
   charges the type's initialization, which is `unknown` when the preserved
   initializer cannot be analyzed. Reading a raw property or other raw member that
-  native code cannot see is `unknown`. A direct, zero-argument CLR `System.Object()` initializer can use
+  native code cannot see is `unknown`.
+
+A direct, zero-argument CLR `System.Object()` initializer can use
 the existing constructor effect contract after successful C# projection and
 selection of that exact CLR constructor. This bounded proof requires an
 error-free projection with no preprocessor condition symbols.

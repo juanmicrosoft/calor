@@ -480,7 +480,7 @@ module Countdown overflow unchecked nullable oblivious
     field int:Start = 3
 
     func First () → int
-      !
+      ! unknown
       each s in Steps
         return s
       return 0
@@ -503,6 +503,9 @@ module Countdown overflow unchecked nullable oblivious
 The C# compiler still builds the iterator, so laziness, `finally` on dispose, and the
 timing of exceptions do not change. The result is the same on every surface, with or
 without passthrough, because the converter does it itself (feature `iterator-accessor`).
+`First` gets the row `! unknown`: Calor cannot see the preserved getter's body, so reading
+`Steps` from native code is an unknown effect, and a caller that declares a known row
+reports `Calor0410`.
 `--no-fallback` disables TODO substitution, not faithful C# preservation. To make the member native, move the loop into an
 iterator method and return its result from the getter; see
 [Iterator Properties and Indexers](/docs/cli/convert/#iterator-properties-and-indexers).
