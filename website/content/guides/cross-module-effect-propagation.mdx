@@ -131,7 +131,7 @@ they do not acquire a public cross-module contract.
 
 On warm builds, the cross-module pass runs using a mix of **fresh summaries** (from files that just recompiled) and **cached summaries** (from files that the incremental cache skipped). This means:
 
-- If you edit a callee's `!` row and its file recompiles, the pass still sees every unchanged caller's call sites (because they're cached) and can still flag new violations.
+- In a multi-file build, an edit recompiles the edited file and every file whose generated C# names something another module declares, such as a caller. A file is skipped only when its cached output is proven independent of every other module. So if you edit a callee's `!` row, the callee and its callers recompile, and the pass flags any new violation. The proof only understands functions and static modules: while one module declares a class, an interface or raw C#, no other module's output can be proven independent, so any edit recompiles all of them.
 - If no file changed, both summaries come from the cache; the pass runs quickly and produces the same result as a cold build.
 - The cache stores each module's: public function effect declarations, internal function/method names, and per-caller call-target listings with diagnostic spans.
 
@@ -157,7 +157,7 @@ When compiling multiple files, the CLI writes `{input}.g.cs` next to each input.
 
 ## MSBuild integration
 
-MSBuild projects using `Calor.Sdk` get cross-module enforcement automatically — no new configuration. The `CompileCalor` task collects every `.calr` file in the project, compiles each one, and runs the cross-module pass over the set. Incremental builds remain fast: only changed files recompile, but cross-module correctness is preserved through the cached summaries.
+MSBuild projects using `Calor.Sdk` get cross-module enforcement automatically — no new configuration. The `CompileCalor` task collects every `.calr` file in the project, compiles each one, and runs the cross-module pass over the set. Incremental builds make the same skip decision as the CLI cache (`calor --cache` and `calor watch`): an edit recompiles the edited file and the files that refer to other modules, and skips the files proven independent. Cross-module correctness is preserved through the cached summaries.
 
 ---
 
