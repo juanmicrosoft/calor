@@ -7,8 +7,12 @@ namespace Calor.Compiler.Tests;
 /// Built-in additions are charged <c>unknown</c> unless the module's C# projection proves
 /// which operator they select. A C# error confined to one member's body cannot change how
 /// any other body binds, so it voids only that member's proofs. Before, one ill-typed
-/// function (here an implicit double → float return) made every integer addition in the
-/// module "unresolved addition", and the false Calor0410 hid the real C# error.
+/// function made every integer addition in the module "unresolved addition", and the false
+/// Calor0410 hid the real C# error. The ill-typed body here returns an <c>int[]</c> as a
+/// <c>long[]</c>: Calor's type checker does not compare array element widths yet, so only
+/// C# reports it (CS0029). (Calor0202 now catches the original double → float example
+/// before the projection is built.) If the checker learns element widths, pick another
+/// error that only C# reports.
 /// </summary>
 public sealed class ProjectionErrorScopeTests
 {
@@ -24,16 +28,16 @@ public sealed class ProjectionErrorScopeTests
     {
         var result = Program.Compile("""
             module M
-              func Avg public (int:count, int:total) → float
+              func Widen public (int[]:values) → long[]
                 !
-                return (double)total / (double)count
+                return values
             """ + Sum, "projection-scope.calr");
 
         Assert.DoesNotContain(result.Diagnostics, diagnostic =>
             diagnostic.Code is DiagnosticCode.ForbiddenEffect or DiagnosticCode.UnknownExternalCall);
         var error = Assert.Single(result.Diagnostics.Errors);
         Assert.Equal(DiagnosticCode.CodeGenCompilationError, error.Code);
-        Assert.Contains("CS0266", error.Message, StringComparison.Ordinal);
+        Assert.Contains("CS0029", error.Message, StringComparison.Ordinal);
         Assert.Equal(4, error.Span.Line);
     }
 
@@ -42,9 +46,9 @@ public sealed class ProjectionErrorScopeTests
     {
         var result = Program.Compile("""
             module M
-              func Avg public (int:count, int:total) → double
+              func Widen public (int[]:values) → int[]
                 !
-                return (double)total / (double)count
+                return values
             """ + Sum, "projection-scope-clean.calr");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
@@ -57,14 +61,15 @@ public sealed class ProjectionErrorScopeTests
         // Within one body an error can retype later operations, so the proof is void.
         var result = Program.Compile("""
             module M
-              func ToKelvin public (float:celsius) → float
+              func Widen public (int[]:values, int:extra) → long[]
                 !
-                return celsius + 273.15
+                let int:count = extra + 1
+                return values
             """ + Sum, "projection-scope-same.calr");
 
         var forbidden = Assert.Single(result.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
-        Assert.Contains("'ToKelvin'", forbidden.Message, StringComparison.Ordinal);
+        Assert.Contains("'Widen'", forbidden.Message, StringComparison.Ordinal);
         Assert.Contains(result.Diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnknownExternalCall
             && diagnostic.Message.Contains("unresolved addition", StringComparison.Ordinal)
