@@ -7,7 +7,7 @@ module MediatR.Pipeline MediatR.Pipeline
       !
 
   interface IPipelineBehavior<TRequest,TResponse>
-    func Handle (TRequest:request, RequestHandlerDelegate<TResponse>:next, CancellationToken:cancellationToken) → Task<TResponse>
+    func Handle (TRequest:request, RequestHandlerDelegate<TResponse>:next ! unknown, CancellationToken:cancellationToken) → Task<TResponse>
       !
 
   class RequestPreProcessorBehavior<TRequest,TResponse>
@@ -17,7 +17,7 @@ module MediatR.Pipeline MediatR.Pipeline
     ctor (IEnumerable<IRequestPreProcessor<TRequest>>:preProcessors)
       set _preProcessors preProcessors
 
-    func Handle async (TRequest:request, RequestHandlerDelegate<TResponse>:next, CancellationToken:cancellationToken) → TResponse
+    func Handle async (TRequest:request, RequestHandlerDelegate<TResponse>:next ! unknown, CancellationToken:cancellationToken) → TResponse
       !
       each processor in _preProcessors
         let _chainProcess010 = processor.Process(request, cancellationToken)
@@ -26,6 +26,6 @@ module MediatR.Pipeline MediatR.Pipeline
       return await _chainNext011.ConfigureAwait(false)
 
 
-  raw member 68
+  raw member:delegate-semantics:Other:Unsupported%20Other%3A%20public%20delegate%20Task%3CTResponse%3E%20RequestHandlerDelegate%3CTResponse%3E%28%29%3B 68
 public delegate Task<TResponse> RequestHandlerDelegate<TResponse>();
 

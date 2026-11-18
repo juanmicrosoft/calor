@@ -46,7 +46,31 @@ public sealed class BinderErrorEmissionCatalogTests
 
         var binderRoutes = routes.Where(route =>
             route.SiteId.StartsWith("src/Calor.Compiler/Binding/Binder.cs::", StringComparison.Ordinal)).ToArray();
-        Assert.Equal(30, binderRoutes.Count(route => // #1617 removes one Option site; #1619 adds four module/extension sites.
+        // #1617 removes one Option site; #1619 adds four module/extension sites.
+        // 0.30 review (30 -> 44). Each new site reports and returns an unresolved or
+        // NoMatch result (none drops or binds silently), its code is in the semantic
+        // 0200-0299 range (Calor0407 in the 0400-0499 effects range), and its trigger is
+        // pinned in BinderErrorEmissionNewSiteTests:
+        //   BindFieldAccess#01            Calor0200 analysis-only  missing source enum member (C# CS0117 still fails it)
+        //   BindFieldAccess#02            Calor0200 analysis-only  `this.E` base event read from a derived class (CS0070)
+        //   BindNewExpression#02          Calor0202 analysis-only  collection initializer on a non-IEnumerable source class
+        //   BindNewExpression#03          Calor0208 error          collection initializer entry with no applicable Add
+        //   BindNewExpression#04          Calor0202 analysis-only  collection initializer on a non-IEnumerable metadata type
+        //   BindReferenceExpression#03    Calor0200 analysis-only  bare base event read from a derived class (CS0070)
+        //   CheckMetadataArrayToCollection#01 Calor0254 error      array-returning metadata member into List<T> etc.
+        //   Declare#01                    Calor0201 error          `each k, k in d` names one local twice
+        //   RegisterClassTree#05          Calor0201 error          two events with one name
+        //   ResolveCall#01                Calor0208 error          interface receiver lacks the method; review fix:
+        //                                                          System.Object members bind opaque, not NoMatch
+        //   ResolveCallReceiver#01        Calor0200 analysis-only  event call target when the event-storage projection
+        //                                                          is off (only CrossModuleTypeRegistry; bag discarded)
+        //   ResolveSourceEnumExtension#01 Calor0208 error          no matching source extension on an enum
+        //   ResolveSourceEnumExtension#02 Calor0207 error          ambiguous source extension on an enum
+        //   ValidateCallableEffectRows#01 Calor0407 error          omitted callback row (decision D2)
+        // The other moved golden entries are ordinal renumberings (ResolveCall#02/#03,
+        // ResolveCallReceiver#02, BindReferenceExpression#04, RegisterClassTree#06) and
+        // policy reason text refreshed in Scope.cs; no reviewed site changed code or route.
+        Assert.Equal(44, binderRoutes.Count(route =>
             route.Sink is "DiagnosticBag.ReportError" or "DiagnosticBag.ReportErrorWithFix"));
         Assert.Equal(4, binderRoutes.Count(route => route.Sink == "DiagnosticBag.Report"));
         Assert.Equal(3, binderRoutes

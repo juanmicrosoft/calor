@@ -575,11 +575,18 @@ public sealed class Issue1401NullableContextConversionTests
             result.CalorSource);
     }
 
+    // 0.30: a return-target flow attribute ([return: MaybeNull], [return: NotNull]) keeps the
+    // file preserved as C#. Calor carries the attribute verbatim (`func Read[@return:MaybeNull]`,
+    // see ReturnTargetFlowAttribute_ParsesAndEmitsVerbatim), but its nullability checker does not
+    // model it: written verbatim, `return null` under `[return: MaybeNull] string` is Calor0273
+    // and `let string:value = Read()` under `[return: NotNull] string?` is Calor0272. Folding the
+    // attribute into the declared return type instead (`→ string?`) changes the method's
+    // nullability metadata, which certification refuses. Either way the delivered code must be
+    // the original C#, byte for byte, never a conversion with different metadata.
     [Fact]
     public void InvocationInitializedVarRetainsFlowNullabilityAttributes()
     {
-        var result = Convert(
-            """
+        const string source = """
             using System.Diagnostics.CodeAnalysis;
             public static class Fixture
             {
@@ -591,17 +598,15 @@ public sealed class Issue1401NullableContextConversionTests
                 [return: MaybeNull]
                 private static string Read() => null;
             }
-            """,
-            NullableContextOptions.Enable);
+            """;
 
-        Assert.Contains("let string?:value", result.CalorSource);
+        AssertPreservedWithUnchangedMetadata(Convert(source, NullableContextOptions.Enable), source);
     }
 
     [Fact]
     public void InvocationInitializedVarRetainsNotNullFlowAttribute()
     {
-        var result = Convert(
-            """
+        const string source = """
             using System.Diagnostics.CodeAnalysis;
             public static class Fixture
             {
@@ -613,11 +618,39 @@ public sealed class Issue1401NullableContextConversionTests
                 [return: NotNull]
                 private static string? Read() => "value";
             }
-            """,
-            NullableContextOptions.Enable);
+            """;
 
-        Assert.Contains("let string:value", result.CalorSource);
-        Assert.DoesNotContain("string?:value", result.CalorSource);
+        AssertPreservedWithUnchangedMetadata(Convert(source, NullableContextOptions.Enable), source);
+    }
+
+    private static void AssertPreservedWithUnchangedMetadata(ConversionResult result, string source)
+    {
+        Assert.Equal("whole-file-preservation", Assert.Single(result.Losses).Feature);
+        Assert.DoesNotContain("func Read", result.CalorSource, StringComparison.Ordinal);
+        var compiled = Program.Compile(result.CalorSource!, "preserved.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Equal(source, compiled.GeneratedCode);
+    }
+
+    // The syntax half of #1401's follow-up: Calor already parses a return-target attribute
+    // on a function and emits it verbatim, leaving the declared return type alone.
+    [Theory]
+    [InlineData("MaybeNull", "string", "string")]
+    [InlineData("NotNull", "string?", "string?")]
+    public void ReturnTargetFlowAttribute_ParsesAndEmitsVerbatim(string attribute, string calorType, string csharpType)
+    {
+        var compiled = Program.Compile($$"""
+            module Fixture
+              using System.Diagnostics.CodeAnalysis
+
+              module Fixture
+                func Read[@return:{{attribute}}] private () → {{calorType}}
+                  return "value"
+            """, "flow.calr");
+
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        Assert.Matches($@"\[return: {attribute}\]\s*private static {System.Text.RegularExpressions.Regex.Escape(csharpType)} Read\(\)",
+            compiled.GeneratedCode);
     }
 
     [Fact]
