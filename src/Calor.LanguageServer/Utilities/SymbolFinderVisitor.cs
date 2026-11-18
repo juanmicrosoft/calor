@@ -1143,19 +1143,27 @@ public sealed class SymbolFinderVisitor
 
             case IntLiteralNode intLit:
                 _result = new SymbolLookupResult(
-                    intLit.Value.ToString(), "integer literal", "i32",
+                    intLit.Value.ToString(), "integer literal",
+                    (intLit.IsUnsigned, intLit.IsLong) switch
+                    {
+                        (true, true) => "ulong",
+                        (true, false) => "uint",
+                        (false, true) => "long",
+                        _ => "int",
+                    },
                     intLit.Span, null, intLit);
                 break;
 
             case FloatLiteralNode floatLit:
                 _result = new SymbolLookupResult(
-                    floatLit.Value.ToString(), "float literal", "f64",
+                    floatLit.Value.ToString(), "float literal",
+                    floatLit.IsDecimal ? "decimal" : floatLit.IsSingle ? "float" : "double",
                     floatLit.Span, null, floatLit);
                 break;
 
             case StringLiteralNode strLit:
                 _result = new SymbolLookupResult(
-                    $"\"{strLit.Value}\"", "string literal", "str",
+                    $"\"{strLit.Value}\"", "string literal", "string",
                     strLit.Span, null, strLit);
                 break;
 
@@ -1349,7 +1357,7 @@ public sealed class SymbolFinderVisitor
                 else
                 {
                     _result = new SymbolLookupResult(
-                        "Length", "array length", "i32",
+                        "Length", "array length", "int",
                         arrayLen.Span, null, arrayLen);
                 }
                 break;
@@ -1500,7 +1508,7 @@ public sealed class SymbolFinderVisitor
                     break;
                 }
                 _result = new SymbolLookupResult(
-                    "Count", "count", "i32",
+                    "Count", "count", "int",
                     countNode.Span, null, countNode);
                 break;
 

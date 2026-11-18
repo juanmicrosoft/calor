@@ -1280,7 +1280,7 @@ internal sealed class TypedBugPatternAnalysis
                 ReportUnknown(
                     TypedBugPatternKind.IntegerOverflow,
                     unary.Span,
-                    "Unary negation is not defined for u64");
+                    "Unary negation is not defined for ulong");
             }
             return;
         }
@@ -2444,14 +2444,14 @@ internal sealed class TypedBugPatternAnalysis
         var canonical = TypeIdentity.Canonicalize(typeName);
         type = canonical switch
         {
-            "INT[bits=8][signed=true]" => IntegralType.Create(8, true, canonical, "i8"),
-            "INT[bits=8][signed=false]" => IntegralType.Create(8, false, canonical, "u8"),
-            "INT[bits=16][signed=true]" => IntegralType.Create(16, true, canonical, "i16"),
-            "INT[bits=16][signed=false]" => IntegralType.Create(16, false, canonical, "u16"),
-            "INT" => IntegralType.Create(32, true, canonical, "i32"),
-            "UINT" => IntegralType.Create(32, false, canonical, "u32"),
-            "LONG" => IntegralType.Create(64, true, canonical, "i64"),
-            "ULONG" => IntegralType.Create(64, false, canonical, "u64"),
+            "INT[bits=8][signed=true]" => IntegralType.Create(8, true, canonical, "sbyte"),
+            "INT[bits=8][signed=false]" => IntegralType.Create(8, false, canonical, "byte"),
+            "INT[bits=16][signed=true]" => IntegralType.Create(16, true, canonical, "short"),
+            "INT[bits=16][signed=false]" => IntegralType.Create(16, false, canonical, "ushort"),
+            "INT" => IntegralType.Create(32, true, canonical, "int"),
+            "UINT" => IntegralType.Create(32, false, canonical, "uint"),
+            "LONG" => IntegralType.Create(64, true, canonical, "long"),
+            "ULONG" => IntegralType.Create(64, false, canonical, "ulong"),
             _ => default,
         };
         return type.Bits != 0;
@@ -2517,7 +2517,7 @@ internal sealed class TypedBugPatternAnalysis
 
     private static IntegralType PromoteNarrowIntegral(IntegralType type) =>
         type.Bits < 32
-            ? IntegralType.Create(32, true, "INT", "i32")
+            ? IntegralType.Create(32, true, "INT", "int")
             : type;
 
     private static string GetUintArithmeticType(

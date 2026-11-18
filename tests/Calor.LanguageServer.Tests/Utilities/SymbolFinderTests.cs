@@ -473,6 +473,29 @@ public class SymbolFinderTests
         Assert.Equal("integer literal", result.Kind);
     }
 
+    [Theory]
+    [InlineData("42", "integer literal", "int")]
+    [InlineData("42L", "integer literal", "long")]
+    [InlineData("42U", "integer literal", "uint")]
+    [InlineData("1.5", "float literal", "double")]
+    [InlineData("1.5f", "float literal", "float")]
+    [InlineData("\"hi\"", "string literal", "string")]
+    public void FindSymbol_AtLiteral_ReportsNativeType(string literal, string kind, string type)
+    {
+        // 0.30: hover names the native type (`int`, `double`, `string`), never a retired alias.
+        var (source, line, column) = LspTestHarness.FindMarker($$"""
+            module TestModule
+              func Test () → object
+                return /*cursor*/{{literal}}
+            """);
+
+        var result = LspTestHarness.FindSymbol(source, line, column);
+
+        Assert.NotNull(result);
+        Assert.Equal(kind, result.Kind);
+        Assert.Equal(type, result.Type);
+    }
+
     [Fact]
     public void FindSymbol_OutsideModule_ReturnsNull()
     {

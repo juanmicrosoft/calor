@@ -1599,7 +1599,7 @@ public class TypedBugPatternAnalysisTests
 
         Assert.Contains(diagnostics, diagnostic =>
                 diagnostic.Code == DiagnosticCode.IntegerOverflow
-                && diagnostic.Message.Contains("u32", StringComparison.Ordinal));
+                && diagnostic.Message.Contains("uint", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1660,7 +1660,7 @@ public class TypedBugPatternAnalysisTests
 
         Assert.Contains(diagnostics, diagnostic =>
                 diagnostic.Code == DiagnosticCode.IntegerOverflow
-                && diagnostic.Message.Contains("u64", StringComparison.Ordinal));
+                && diagnostic.Message.Contains("ulong", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -138,7 +138,7 @@ public sealed class ContractVerifier
                             != PrimitiveType.Int.Name)
                     {
                         diagnostics.ReportError(variable.Span, DiagnosticCode.NamedRefinementNotClosed,
-                            $"Named refinement '{name}' requires simple integer quantifier binders; '{variable.Name}: {variable.TypeName}' is not modeled.");
+                            $"Named refinement '{name}' requires simple integer quantifier binders; '{variable.Name}: {AttributeHelper.ToSurfaceSpelling(variable.TypeName)}' is not modeled.");
                         return;
                     }
                     nested.Add(variable.Name);
@@ -236,7 +236,7 @@ public sealed class ContractVerifier
             var bound = _contractBinder.BoundContractExpressions.GetValueOrDefault(condition);
             if (bound is null || PrimitiveType.FromName(bound.Type.DisplayString) != PrimitiveType.Bool)
                 _diagnostics.Report(span, DiagnosticCode.TypeMismatch,
-                    $"{kind} must be a boolean expression, got {bound?.Type.DisplayString ?? "unknown"}");
+                    $"{kind} must be a boolean expression, got {(bound is null ? "unknown" : AttributeHelper.ToSurfaceSpelling(bound.Type.DisplayString))}");
             VerifyQuantifierTypes(condition);
         }
     }
@@ -411,7 +411,7 @@ public sealed class ContractVerifier
                 _diagnostics.Report(
                     span,
                     DiagnosticCode.QuantifierNonIntegerType,
-                    $"Quantifier variable '{bv.Name}' has type '{bv.TypeName}' which may not support finite range iteration. Consider using an integer type (i32, i64, etc.).",
+                    $"Quantifier variable '{bv.Name}' has type '{AttributeHelper.ToSurfaceSpelling(bv.TypeName)}' which may not support finite range iteration. Consider using an integer type (int, long, etc.).",
                     DiagnosticSeverity.Warning);
             }
         }
