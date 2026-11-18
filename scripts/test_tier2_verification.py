@@ -590,10 +590,20 @@ class RepositoryGuards(unittest.TestCase):
     def test_benchmark_known_failures_match_the_bulk_test(self):
         src = (REPO_ROOT / "tests/Calor.Compiler.Tests/"
                "BulkBenchmarkCompilationTests.cs").read_text(encoding="utf-8")
-        block = src[src.index("KnownGeneratedCSharpFailures ="):]
         bench = "tests/TestData/Benchmarks/"
-        bulk = {bench + m for m in re.findall(r'"([^"]+\.calr)"',
-                                             block[:block.index("];")])}
+
+        def known_set(name):
+            block = src[src.index(name + " ="):]
+            return {bench + m for m in re.findall(r'"([^"]+\.calr)"',
+                                                 block[:block.index("];")])}
+
+        # 0.30 i1: the narrowing set holds former generated-C# failures that the
+        # type checker now rejects first (Calor0202); tier2 keeps them as known
+        # failures. HashMap is in it too, but tier2 registers it as a Calor0213
+        # reject (KnownWriteToReadOnlyLocal), not as a known failure.
+        bulk = ((known_set("KnownGeneratedCSharpFailures")
+                 | known_set("KnownNumericNarrowing"))
+                - known_set("KnownWriteToReadOnlyLocal"))
         listed = json.loads((REPO_ROOT / bench / "manifest.json").read_text())
         listed = {bench + b["calorFile"] for b in listed["benchmarks"]}
         known = {f for g in self.manifest["groups"]
