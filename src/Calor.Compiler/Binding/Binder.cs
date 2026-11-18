@@ -8946,6 +8946,15 @@ public sealed class Binder
                 pending.Enqueue(inherited);
             }
         }
+        // Every interface-typed value is an object, so C# also binds System.Object's
+        // public instance members on it. They are not interface members, and their
+        // implementation is whatever the runtime type overrides: opaque, never NoMatch.
+        if (candidates.Count == 0
+            && methodName is nameof(ToString) or nameof(Equals) or nameof(GetHashCode) or nameof(GetType))
+        {
+            opaque = true;
+            return [];
+        }
         return candidates.DistinctBy(candidate => candidate.Id).ToArray();
     }
 
