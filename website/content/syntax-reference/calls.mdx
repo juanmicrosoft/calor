@@ -81,12 +81,30 @@ This is bounded receiving-boundary enforcement, not whole-program null safety.
 It does not implicitly unwrap library generic types or enforce constructor
 inputs. See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/#calor0274-method-input).
 
-Source-method lookup retains integer literal values, including unary minus.
-A `byte` value parameter accepts `255` but rejects `256`. This does not turn an
-immutable `int` local into a constant or permit conversions of `ref`/`out` storage.
-Literal-overload selection compares conversions argument by argument; a better
-conversion for one argument cannot cancel a worse conversion for another.
-General constant-expression evaluation is not implemented here.
+Source-method lookup follows C#'s conversions for constants and nullable
+value types:
+
+- An `int` constant converts to `sbyte`, `byte`, `short`, `ushort`, `uint` or
+  `ulong` when its value fits, and a non-negative `long` constant converts to
+  `ulong`. A constant is an integer literal (with unary minus) or a `const`
+  field whose initializer is one. A `byte` parameter accepts `255` and a
+  `const int` field equal to 1, but rejects `256`. An immutable `int` local is
+  not a constant, and `ref`/`out` storage never converts.
+- `T` converts to `T?`, and to `U?` when `T` converts to `U` (`int` → `long?`).
+  `T?` converts to `U?` the same way. `null` converts to every `T?`.
+
+When several overloads apply, the binder uses C#'s better-function-member rule.
+It compares conversions argument by argument: a better conversion for one
+argument cannot cancel a worse conversion for another. For example, `F(1)`
+calls `F(byte)` rather than `F(int?)`, and `F(i)` with an `int` is ambiguous
+between `F(int?)` and `F(long)` (`Calor0207`), as in C#.
+
+The binder never guesses a different overload from C#. If it cannot evaluate a
+constant argument that a constant conversion could affect (for example
+`C + 1`), or it cannot compare two candidates, it leaves the call unresolved.
+The call's effects are then `unknown`. The binder also checks its choice against
+the overload Roslyn selects in the module's C# projection, and leaves the call
+unresolved when the two differ.
 
 ## Unknown receiver types
 
