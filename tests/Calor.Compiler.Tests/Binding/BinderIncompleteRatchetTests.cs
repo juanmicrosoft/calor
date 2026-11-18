@@ -208,6 +208,21 @@ public class BinderIncompleteRatchetTests
         + "counts, source and representation identities, binder visits and preserve-all "
         + "coverage are unchanged";
 
+    /// <summary>
+    /// The note in the current conversion fixture. The per-phase attribution is on
+    /// <see cref="CurrentCompiler_ConversionLeg_MatchesCoverageAndDiagnosticSitesExactly"/>.
+    /// </summary>
+    private const string CurrentConversionNote =
+        "Current fixture for the 0.30 conversion leg (schema 2). This file pins the native leg "
+        + "(206 converted records, with diagnostic sites in binder-current-diagnostic-sites.json) and the "
+        + "preserve-mode leg exactly: 291 opaque boundaries / 76752 opaque expressions, the 0.30 opacity "
+        + "budget the maintainer accepted on 2026-11-18. The 158 refused files have no record; their names "
+        + "and causes are pinned in current-source-carrier-dispositions.json. The historical cap is "
+        + "bench/phase0-agent-native/binder-incomplete-baseline.json (preserve at most 914 boundaries / "
+        + "17068 expressions); it is immutable and is checked only by its original-compiler replay "
+        + "(ConversionLeg_IncompleteCount_MatchesBaseline). Refreshed from the 2026-11-09 fixture "
+        + "(9e1160ad2) phase by phase; every phase is attributed to its commits on the conversion-leg test.";
+
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
 
@@ -229,11 +244,12 @@ public class BinderIncompleteRatchetTests
     /// (tests/TestData/Binding/current-source-carrier-dispositions.json). The evidence file is
     /// byte-pinned by the historical binder replay, so moves are recorded here, never there:
     /// <list type="bullet">
-    /// <item><c>Refusals</c>: evidence files the converter now refuses under the leg's one-file
+    /// <item><c>Refusals</c>: every corpus file the converter now refuses under the leg's one-file
     /// Lossy/SelectActiveBranchLossy options (no Calor at all; maintainer decision 2026-11-18:
-    /// refusals are kept and counted). The cause is the sorted, distinct features of the
-    /// conversion errors, as in the Calor0270 leg. Their carriers resume when the file converts
-    /// again (the refusal pin then fails and must be re-adjudicated).</item>
+    /// refusals are kept and counted). The conversion leg checks all of them; the carrier test
+    /// checks the 20 that hold evidence. The cause is the sorted, distinct features of the
+    /// conversion errors, as in the Calor0270 leg. A refused file's carriers and native record
+    /// resume when it converts again (the refusal pin then fails and must be re-adjudicated).</item>
     /// <item><c>Cases</c>: a single identity that moved in a converted file, with its cause.
     /// <c>preserved-member</c>: the source expression is now inside a member kept as C#.
     /// <c>native-carrier</c>: a native carrier of the stated kind, span and tokens.</item>
@@ -263,10 +279,13 @@ public class BinderIncompleteRatchetTests
         var dispositions = CarrierDispositions.Value;
         var evidenceFiles = SourceCarrierCases.Value.Concat(PreservedCarrierCases.Value)
             .Select(evidence => evidence.File).ToHashSet(StringComparer.Ordinal);
-        Assert.Equal(20, dispositions.Refusals.Count);
+        var corpusFiles = JsonSerializer.Deserialize<SortedDictionary<string, SourceCoverageRecord>>(
+            File.ReadAllText(SourceCoveragePath()))!.Keys.ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(158, dispositions.Refusals.Count);
+        Assert.Equal(20, dispositions.Refusals.Keys.Count(evidenceFiles.Contains));
         Assert.All(dispositions.Refusals, refusal =>
         {
-            Assert.Contains(refusal.Key, evidenceFiles);
+            Assert.Contains(refusal.Key, corpusFiles);
             Assert.False(string.IsNullOrWhiteSpace(refusal.Value));
         });
         Assert.Equal(2, dispositions.Cases.Count);
@@ -526,6 +545,52 @@ public class BinderIncompleteRatchetTests
             $"Historical binder conversion replay failed (exit {result.ExitCode}).\n{result.Output}");
     }
 
+    /// <summary>
+    /// <para><b>0.30 refresh (schema 2).</b> The fixture was pinned on 2026-11-09 at 9e1160ad2:
+    /// 364 converted, 25865 binder visits, preserve 909 / 17054. Now: 206 converted, 158 refused,
+    /// 6496 visits, preserve 291 / 76752. Measured by running this leg's converter and binder
+    /// (Lossy/SelectActiveBranchLossy, module Leg2, LF input) at 9e1160ad2, which reproduces
+    /// the old fixture, and at later commits, file by file. Change points inside a phase were
+    /// found by bisecting the per-file state (refusal cause, visits, raw error count,
+    /// conversion success, output text, error sites). "Visits" and "errors" below are summed
+    /// over the files that changed.</para>
+    /// <list type="number">
+    /// <item><b>Native-syntax cutover, 9e1160ad2..5784ac9ca (293 commits, 2026-11-09/10).</b>
+    /// The converter emits native syntax instead of section markers, so all 196 outputs that
+    /// still convert change text and every representation hash moves. Commits inside this range
+    /// emit output their own parser cannot always read (94 files at 246f8508a), so finer
+    /// attribution is not meaningful except for two bisected moves: c58dc67d2 (native namespace
+    /// headers) refuses 168 files as <c>namespace-topology</c> (be8ff56f7 refuses none), and
+    /// 5dad9f937 drops the ServiceRegistrar receiver capture (see the carrier dispositions).
+    /// Preserve mode keeps the same namespace topologies whole: whole-file units 15 → 184.</item>
+    /// <item><b>047dd14b8</b> (<c>class-unresolved-base-kind</c>): 55 files keep classes whose base
+    /// kind cannot be resolved in a one-file model as C#: visits −2784, errors −231; 8 more
+    /// whole-file units in preserve mode.</item>
+    /// <item><b>047dd14b8..372cf7bac, bisected change points.</b> 85b6aa11c: 29 files, visits +275,
+    /// errors −122. 7b09e0302: ObjectDetails errors +10. e0c91e22b: CallableConfigurationMethodFinder
+    /// visits +1. f31a8fe8d: 1 file's text. affcec04f and 0502c9a16: ObjectDetails errors −6 and
+    /// −10; it now converts successfully. 8b8de9215: 3 files, visits −1 each. 9d3e8807f: 1 file's
+    /// sites. 92b4d8c42 (validated scoped imports): of the 168 refusals, 141 become
+    /// <c>scoped-namespace-source-validation</c>, 7 <c>scoped-namespace-fidelity</c>,
+    /// 1 <c>generated-calor-validation</c>, and 6 convert. 599021cf3 (string receivers must be
+    /// proven non-null): LevelOutputFormat errors +3 (Calor0274 after an unresolved name, where the
+    /// guard has no projection proof; sound). 9262062e4 (slot rows): 7 files' text. 11d236798
+    /// (no synthesized rows on non-public bodies): 7. 3b439c47a (explicit <c>!</c> rows): 111.
+    /// b93fbe618 (<c>! unknown</c> own rows): 27, and ComparableComparer converts. 010b3fde1: 11.</item>
+    /// <item><b>af5d914ab</b> (native printing only): ServiceRegistrar visits −291 and LogEvent −33,
+    /// errors −6; TrackingCollection's refusal cause becomes <c>scoped-namespace-fidelity</c>.</item>
+    /// <item><b>Merges after af5d914ab.</b> a21ac1c46 (R1, constructor rows): 15 files' text, and
+    /// AsyncValidatorInvokedSynchronouslyException converts. 7f6b4379e (g3, native nullable hints):
+    /// 57 Calor0273 messages. 0c049e2b0 (g1): 1 file's text. adb832055 (h1, accessor and type
+    /// rows): 16 files' text, and TestMessages.Designer converts. 1fa1a4140 (i5, no uncompilable
+    /// temporaries or guesses): CultureScope converts; 15 files visits −228 and errors −27.
+    /// 1b2c0cb67 (i7, unspaced member access): 15 files visits −83, errors −1; enum reads such as
+    /// <c>LogEventLevel.Fatal</c> now report as one dotted name (13 files' messages). 1b1fc16e4
+    /// (i8): LogContext's row returns. No other merge moves this leg.</item>
+    /// </list>
+    /// <para>Every source identity (SourceHash, SelectedSourceHash, SourceExpressions) still equals
+    /// the immutable binder-source-coverage.json, and incomplete diagnostics stay zero.</para>
+    /// </summary>
     [SkippableFact]
     public void CurrentCompiler_ConversionLeg_MatchesCoverageAndDiagnosticSitesExactly()
     {
@@ -558,6 +623,7 @@ public class BinderIncompleteRatchetTests
         var unconvertedIdentities = new HashSet<string>(StringComparer.Ordinal);
         var sourceCoverage = new SortedDictionary<string, SourceCoverageRecord>(StringComparer.Ordinal);
         var diagnosticSites = new SortedDictionary<string, BindingDiagnosticSites>(StringComparer.Ordinal);
+        var refusals = new SortedDictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var file in files)
         {
@@ -565,9 +631,20 @@ public class BinderIncompleteRatchetTests
             MeasureNative(file, source, native);
             var relative = Path.GetRelativePath(Path.Combine(root, "bench", "corpus"), file)
                 .Replace('\\', '/');
-            sourceCoverage.Add(relative, native.LastSourceCoverage!);
-            Assert.NotNull(native.LastBindingSites);
-            diagnosticSites.Add(relative, native.LastBindingSites);
+            if (native.LastRefusal is { } refusal)
+            {
+                // 0.30: a refused file produces no Calor (maintainer decision 2026-11-18:
+                // refusals are kept and counted). It has no native record; its name and
+                // cause are pinned in current-source-carrier-dispositions.json.
+                Assert.Null(native.LastSourceCoverage);
+                refusals.Add(relative, refusal);
+            }
+            else
+            {
+                sourceCoverage.Add(relative, native.LastSourceCoverage!);
+                Assert.NotNull(native.LastBindingSites);
+                diagnosticSites.Add(relative, native.LastBindingSites);
+            }
             MeasurePreserve(
                 file,
                 source,
@@ -586,10 +663,14 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(0, measuredPreserve.OpaqueUnmapped);
         Assert.Equal(measuredPreserve.OpaqueBoundaries, measuredPreserve.OpaqueIdentityCount);
         Assert.Equal(measuredPreserve.UnconvertedFiles, measuredPreserve.UnconvertedIdentityCount);
-        Assert.Equal(files.Length, measuredNative.ConvertedAndBound);
+        Assert.Equal(files.Length, measuredNative.ConvertedAndBound + refusals.Count);
         Assert.Equal(0, measuredNative.ConvertExceptions);
-        Assert.Equal(0, measuredNative.EmptyOutput);
+        Assert.Equal(refusals.Count, measuredNative.EmptyOutput);
         Assert.Equal(0, measuredNative.OutputParseFailures);
+        // Every refusal is pinned by name and cause; a refusal that appears, ends or
+        // changes cause is a move to adjudicate, never a smaller denominator.
+        Assert.Equal(CarrierDispositions.Value.Refusals.OrderBy(pair => pair.Key, StringComparer.Ordinal),
+            refusals);
         var recorded = JsonSerializer.Deserialize<Baseline>(
             File.ReadAllText(BaselinePath()))!;
         Assert.NotNull(recorded.Conversion);
@@ -598,13 +679,18 @@ public class BinderIncompleteRatchetTests
             LegacySourceOrderAttempted,
             measuredNative.LegacySourceOrderAttempted);
         var current = ReadCurrentConversionExpectations();
-        // Preserved async-void methods replace former lambda-only boundaries;
-        // native records remove opaque boundaries without proving expression source coverage.
+        // The current fixture (tests/TestData/Binding/binder-current-conversion-expectations.json)
+        // pins both legs exactly, the preserve-mode leg included. The historical cap in
+        // bench/phase0-agent-native/binder-incomplete-baseline.json (preserve at most 914
+        // boundaries / 17068 expressions) is immutable and is checked only by its replay,
+        // ConversionLeg_IncompleteCount_MatchesBaseline; 0.30 accepted a larger opacity
+        // budget (CurrentConversionNote).
         AssertCurrentConversionTotals(current, measuredNative, measuredPreserve);
         var recordedSources = JsonSerializer.Deserialize<
             SortedDictionary<string, SourceCoverageRecord>>(
                 File.ReadAllText(SourceCoveragePath()))!;
-        Assert.Equal(recordedSources.Keys.Order(StringComparer.Ordinal), sourceCoverage.Keys);
+        Assert.Equal(recordedSources.Keys.Order(StringComparer.Ordinal),
+            sourceCoverage.Keys.Concat(refusals.Keys).Order(StringComparer.Ordinal));
         Assert.Equal(sourceCoverage.Keys, current.SourceCoverage.Keys);
         var expectedSites = ReadCurrentDiagnosticSites();
         Assert.Equal(sourceCoverage.Keys, expectedSites.Keys);
@@ -619,12 +705,6 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(
             measuredPreserve.UnconvertedFiles,
             measuredPreserve.UnconvertedIdentityCount);
-        Assert.True(
-            measuredPreserve.OpaqueBoundaries <= recorded.PreserveCoverage.OpaqueBoundaries
-            && measuredPreserve.OpaqueExpressions <= recorded.PreserveCoverage.OpaqueExpressions
-            && measuredPreserve.UnconvertedFiles <= recorded.PreserveCoverage.UnconvertedFiles,
-            $"Preserve-mode opaque coverage regressed: measured {measuredPreserve} "
-            + $"vs baseline {recorded.PreserveCoverage}.");
     }
 
     private static CurrentConversionExpectations ReadCurrentConversionExpectations()
@@ -633,6 +713,7 @@ public class BinderIncompleteRatchetTests
             "tests", "TestData", "Binding", "binder-current-conversion-expectations.json")));
         Assert.False(document.RootElement.TryGetProperty("measuredCommit", out _));
         var current = document.RootElement.Deserialize<CurrentConversionExpectations>()!;
+        Assert.Equal(CurrentConversionNote, current.Note);
         return current with
         {
             SourceCoverage = new SortedDictionary<string, SourceCoverageRecord>(
@@ -643,7 +724,7 @@ public class BinderIncompleteRatchetTests
     private static void AssertCurrentConversionTotals(
         CurrentConversionExpectations expected, NativeConversionLeg native, PreserveCoverageLeg preserve)
     {
-        Assert.Equal(1, expected.SchemaVersion);
+        Assert.Equal(2, expected.SchemaVersion);
         Assert.Equal(expected.Conversion, native);
         Assert.Equal(expected.PreserveCoverage, preserve);
     }
@@ -1847,6 +1928,7 @@ public class BinderIncompleteRatchetTests
 
     private sealed record CurrentConversionExpectations(
         int SchemaVersion,
+        string Note,
         NativeConversionLeg Conversion,
         PreserveCoverageLeg PreserveCoverage,
         SortedDictionary<string, SourceCoverageRecord> SourceCoverage);
