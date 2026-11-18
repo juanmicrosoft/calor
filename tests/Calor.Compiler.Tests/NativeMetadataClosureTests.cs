@@ -424,7 +424,10 @@ public sealed class NativeMetadataClosureTests
             Assert.Equal(1, CompileAssembly(compiled.GeneratedCode).GetTypes()
                 .SelectMany(owner => owner.GetMethods()).Single(method => method.Name == "Run").Invoke(null, null));
         else
-            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+            // 0.30 i1: the type checker rejects the out-of-range constant at the argument
+            // (Calor0202) before the generated C# is compiled (where it was CS1503 → Calor0208).
+            Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch
+                && diagnostic.Message.Contains($"the constant {argument} is outside the range of {type}"));
     }
 
     [Theory]

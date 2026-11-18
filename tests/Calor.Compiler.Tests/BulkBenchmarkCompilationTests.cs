@@ -13,6 +13,19 @@ public class BulkBenchmarkCompilationTests
 {
     private static readonly HashSet<string> KnownGeneratedCSharpFailures =
     [
+        "DesignPatterns/Visitor.calr",
+        "DesignPatterns/TemplateMethod.calr",
+    ];
+
+    /// <summary>
+    /// 0.30 i1: benchmarks whose `float` (the original's `f32`) receives a `double` value, such
+    /// as `celsius + 273.15`. They were known generated-C# failures (CS0266/CS0664, Calor1002) and
+    /// are now rejected earlier by the type checker (Calor0202 at the Calor expression). Like the
+    /// Calor0213 set they are registered B1 inputs and stay byte for byte. HashMap also writes an
+    /// immutable local (Calor0213, a later phase); the type checker now stops it first.
+    /// </summary>
+    private static readonly HashSet<string> KnownNumericNarrowing =
+    [
         "TokenEconomics/TemperatureConverter.calr",
         "DesignPatterns/Factory.calr",
         "TokenEconomics/Average.calr",
@@ -26,11 +39,10 @@ public class BulkBenchmarkCompilationTests
         "DomainProblems/ScoreBoard.calr",
         "DomainProblems/TaxCalculator.calr",
         "DomainProblems/CurrencyConverter.calr",
-        "DesignPatterns/Visitor.calr",
-        "DesignPatterns/TemplateMethod.calr",
         "OOPGenerics/InterfaceImpl.calr",
         "OOPGenerics/Composition.calr",
         "OOPGenerics/Polymorphism.calr",
+        "DataStructures/HashMap.calr",
     ];
 
     /// <summary>
@@ -100,6 +112,20 @@ public class BulkBenchmarkCompilationTests
         };
 
         var result = Program.Compile(source, fullPath, options);
+
+        if (KnownNumericNarrowing.Contains(calorFile))
+        {
+            Assert.True(result.HasErrors, $"Known narrowing fixture unexpectedly validated: {calorFile}");
+            Assert.All(
+                result.Diagnostics.Where(d => d.IsError),
+                diagnostic =>
+                {
+                    Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticCode.TypeMismatch, diagnostic.Code);
+                    Assert.Contains("Cannot implicitly convert", diagnostic.Message);
+                });
+            _output.WriteLine($"KNOWN NARROWING [{id}] {category}/{name}");
+            return;
+        }
 
         if (KnownWriteToReadOnlyLocal.Contains(calorFile))
         {

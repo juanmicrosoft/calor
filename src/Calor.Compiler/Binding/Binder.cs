@@ -10287,6 +10287,9 @@ public sealed class Binder
             "int[bits=64][signed=false]" => "ULONG",
             "f32" or "single" => "FLOAT[bits=32]",
             "float[bits=32]" => "FLOAT[bits=32]",
+            // Only the lowercase C# keyword is single precision; `FLOAT` is the canonical double
+            // (see TypeIdentity.Canonicalize).
+            "float" when trimmed == "float" => "FLOAT[bits=32]",
             "f64" or "float" or "double" => "FLOAT",
             "dec" or "decimal" => "DECIMAL",
             "str" or "string" => "STRING",

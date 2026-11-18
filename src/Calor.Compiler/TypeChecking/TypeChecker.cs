@@ -181,9 +181,10 @@ public sealed class TypeChecker
         }
 
         // Third pass (#1676): class members. Before this the checker never looked inside a
-        // §CL, so inside methods only the runtime refinement guards applied. Only a module with
-        // §RTYPE declarations has named refinements to protect.
-        if (_hasNamedRefinements)
+        // §CL, so inside methods only the runtime refinement guards applied. Only the soundness
+        // errors are kept: refinement errors (in a module with §RTYPE declarations) and numeric
+        // conversions C# rejects between two known types (every module; nested `module`
+        // containers are classes too).
         {
             // A base class is resolved only when its simple name names exactly one non-generic
             // module class; otherwise its members stay unknown to the checker (#1676 review).
@@ -655,7 +656,14 @@ public sealed class TypeChecker
     private void DefineClassMemberVariables(ClassDefinitionNode cls)
     {
         foreach (var field in cls.Fields)
-            _env.DefineVariable(field.Name, ResolveTypeName(field.TypeName, field.TypeNameSpan));
+        {
+            var fieldType = ResolveTypeName(field.TypeName, field.TypeNameSpan);
+            // A const field is a constant expression in C#: `byte b = Limit` is valid when the
+            // value fits, so its value (not computed here) must never read as a narrowing.
+            _env.DefineVariable(field.Name, field.Modifiers.HasFlag(MethodModifiers.Const)
+                ? AsIntegerConstant(fieldType, null)
+                : fieldType);
+        }
         foreach (var property in cls.Properties)
             _env.DefineVariable(property.Name, ResolveTypeName(property.TypeName, property.TypeNameSpan));
     }
@@ -794,10 +802,13 @@ public sealed class TypeChecker
                 CheckDictionaryForeachStatement(dictForeach);
                 break;
             case AssignmentStatementNode assignment:
-                CheckRefinedAssignment(assignment);
+                if (_hasNamedRefinements)
+                    CheckRefinedAssignment(assignment);
+                else
+                    CheckNumericAssignment(assignment.Target, assignment.Value, "an assignment");
                 break;
-            case CompoundAssignmentStatementNode compound when _hasNamedRefinements:
-                _ = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
+            case CompoundAssignmentStatementNode compound:
+                CheckCompoundAssignment(compound);
                 break;
             case PreprocessorDirectiveNode preprocessor:
                 CheckPreprocessorDirective(preprocessor);
@@ -937,6 +948,58 @@ public sealed class TypeChecker
     /// local is rejected, and so is one nested in the value (a call passing a Nat where a Pos is
     /// expected). Every other assignment diagnostic stays with the binder and Roslyn, as before.
     /// </summary>
+    /// <summary>
+    /// The declared type of an assignment target the checker can name: a local, a parameter or
+    /// a member of the enclosing class (bare or through <c>this</c>). Null for anything else.
+    /// </summary>
+    private CalorType? LookupAssignmentTargetType(ExpressionNode target) => target switch
+    {
+        ReferenceNode reference when TryGetThisMemberName(reference.Name, out var memberName)
+            => LookupThisMember(memberName),
+        ReferenceNode reference => _env.LookupVariable(reference.Name),
+        FieldAccessNode { Target: ThisExpressionNode or ReferenceNode { Name: "this" } } thisField
+            => LookupThisMember(thisField.FieldName),
+        _ => null,
+    };
+
+    /// <summary>
+    /// An assignment into a numeric local, parameter or member: the right-hand side must convert
+    /// implicitly, as in C#. The checker otherwise leaves assignment right-hand sides to C#, so
+    /// only the numeric-conversion verdict (and nominal-refinement errors) are kept from it.
+    /// </summary>
+    private void CheckNumericAssignment(ExpressionNode target, ExpressionNode value, string position)
+    {
+        if (LookupAssignmentTargetType(target) is not { } targetType
+            || EraseRefinement(targetType) is not PrimitiveType numericTarget
+            || !HasExactNumericType(numericTarget))
+            return;
+        var valueType = InferKeepingOnlyNominalRefinementDiagnostics(value, numericTarget);
+        if (IsRejectedNumericConversion(numericTarget, valueType))
+            ReportNumericConversion(value.Span, numericTarget, valueType, position);
+    }
+
+    /// <summary>
+    /// C# accepts <c>x op= y</c> when <c>y</c> converts implicitly to the type of <c>x</c> (or the
+    /// operator is a shift), even though <c>x op y</c> may be wider (§12.21.4): <c>b += 1</c> on a
+    /// byte is valid, <c>f += someDouble</c> on a float is CS0266.
+    /// </summary>
+    private void CheckCompoundAssignment(CompoundAssignmentStatementNode compound)
+    {
+        if (compound.Operator is not (CompoundAssignmentOperator.LeftShift
+                or CompoundAssignmentOperator.RightShift or CompoundAssignmentOperator.NullCoalesce)
+            && LookupAssignmentTargetType(compound.Target) is { } targetType
+            && EraseRefinement(targetType) is PrimitiveType numericTarget
+            && HasExactNumericType(numericTarget))
+        {
+            var valueType = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
+            if (IsRejectedNumericConversion(numericTarget, valueType))
+                ReportNumericConversion(compound.Value.Span, numericTarget, valueType, "a compound assignment");
+            return;
+        }
+        if (_hasNamedRefinements)
+            _ = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
+    }
+
     private void CheckRefinedAssignment(AssignmentStatementNode assignment)
     {
         if (!_hasNamedRefinements)
@@ -985,6 +1048,11 @@ public sealed class TypeChecker
             ReportDistinctNamedRefinement(assignment.Span, targetType, valueType,
                 $"assignment to '{targetName}'");
         }
+        else if (targetType != null && IsRejectedNumericConversion(EraseRefinement(targetType), valueType))
+        {
+            ReportNumericConversion(assignment.Value.Span, EraseRefinement(targetType), valueType,
+                "an assignment");
+        }
     }
 
     /// <summary>
@@ -1032,6 +1100,11 @@ public sealed class TypeChecker
                     {
                         ReportDistinctNamedRefinement(ret.Expression.Span, _currentReturnType, returnType, "a return");
                     }
+                    else if (IsRejectedNumericConversion(EraseRefinement(_currentReturnType), returnType))
+                    {
+                        ReportNumericConversion(ret.Expression.Span, EraseRefinement(_currentReturnType),
+                            returnType, "a return");
+                    }
                     else
                     {
                         _diagnostics.ReportError(ret.Expression.Span, DiagnosticCode.TypeMismatch,
@@ -1039,6 +1112,17 @@ public sealed class TypeChecker
                             + _currentReturnType.SurfaceName);
                     }
                 }
+            }
+            else if (_currentReturnType != null
+                && !_suppressContextualDiagnostics
+                && !(_validateReturnAssignments || ret.Expression is CallExpressionNode or OverflowContextExpressionNode)
+                && IsRejectedNumericConversion(EraseRefinement(_currentReturnType), returnType))
+            {
+                // Other returns are left to C#, but a numeric conversion between two known types
+                // is decided exactly here, at the Calor expression (`return celsius + 273.15` in a
+                // float function is f64 → f32).
+                ReportNumericConversion(ret.Expression.Span, EraseRefinement(_currentReturnType),
+                    returnType, "a return");
             }
         }
     }
@@ -1397,6 +1481,11 @@ public sealed class TypeChecker
                 {
                     ReportDistinctNamedRefinement(bind.Span, varType, initType, $"the binding of '{bind.Name}'");
                 }
+                else if (ClassifyImplicitNumericConversion(EraseRefinement(varType), initType) == false)
+                {
+                    ReportNumericConversion(bind.Initializer.Span, EraseRefinement(varType), initType,
+                        $"the binding of '{bind.Name}'");
+                }
                 else if (!IsAssignable(varType, initType)
                     && !IsBinderOwnedNullabilityMismatch(varType, initType)
                     && _boundGenericReceivingFailures?.Contains(bind.Initializer.Span) != true)
@@ -1409,7 +1498,7 @@ public sealed class TypeChecker
             {
                 var initType = InferExpressionType(bind.Initializer);
                 initializerType = initType;
-                varType = initType;
+                varType = WithoutIntegerConstant(initType);
                 // #1529: the inferred local keeps the named refinement; record it so the emitter
                 // and obligation generator guard every later write exactly as for §B{x:Nat}.
                 // Speculative passes are rolled back (BeginSpeculation), so the last committed
@@ -1880,15 +1969,30 @@ public sealed class TypeChecker
         if (_boundSourceEnumConstants?.TryGetValue(expr, out var constant) == true)
             return new ExternalType(constant.Type.DisplayString);
         if (_boundSourceStaticFieldReads?.TryGetValue(expr, out var selectedStaticField) == true)
-            return ResolveTypeName(selectedStaticField.Type.DisplayString, expr.Span);
+        {
+            var fieldType = ResolveTypeName(selectedStaticField.Type.DisplayString, expr.Span);
+            return selectedStaticField.SourceStaticFieldOwner?.Fields.Any(field =>
+                    field.Name == selectedStaticField.FieldName
+                    && field.Modifiers.HasFlag(MethodModifiers.Const)) == true
+                ? AsIntegerConstant(fieldType, null)
+                : fieldType;
+        }
         if (_boundMetadataConstants?.TryGetValue(expr, out var metadataConstant) == true)
-            return ResolveTypeName(metadataConstant.Type.DisplayString, expr.Span);
+            return AsIntegerConstant(
+                ResolveTypeName(metadataConstant.Type.DisplayString, expr.Span),
+                metadataConstant.ResolvedMetadataMember is Microsoft.CodeAnalysis.IFieldSymbol
+                    { HasConstantValue: true, ConstantValue: { } constantValue }
+                    ? constantValue
+                    : null);
         if (_boundMetadataStaticFieldReads?.TryGetValue(expr, out var metadataStaticField) == true)
             return ResolveTypeName(metadataStaticField.Type.DisplayString, expr.Span);
         return expr switch
         {
-            IntLiteralNode => PrimitiveType.Int,
-            FloatLiteralNode => PrimitiveType.Float,
+            IntLiteralNode literal => IntegerLiteralType(literal),
+            FloatLiteralNode literal => literal.IsDecimal
+                ? PrimitiveType.Decimal
+                : PrimitiveType.ExactNumeric(literal.IsSingle ? "f32" : "f64"),
+            DecimalLiteralNode => PrimitiveType.Decimal,
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode or NameOfExpressionNode => PrimitiveType.String,
             NullCoalesceNode coalesce => InferNullCoalesceType(coalesce),
@@ -1929,6 +2033,49 @@ public sealed class TypeChecker
             _ => InferUnknownExpressionType(expr)
         };
     }
+
+    /// <summary>
+    /// An integer literal has the C# type the emitter gives it (an unsuffixed literal outside
+    /// <c>int</c> is emitted with <c>L</c>), and is a constant: <c>let byte:b = 200</c> is the
+    /// implicit constant conversion C# accepts, while <c>let byte:b = 300</c> is CS0031.
+    /// </summary>
+    private static PrimitiveType IntegerLiteralType(IntLiteralNode literal)
+    {
+        var width = literal.IsUnsigned
+            ? literal.IsLong ? "u64" : "u32"
+            : literal.IsLong ? "i64" : "i32";
+        Int128 value = literal.IsUnsigned || literal.Sign == IntegerLiteralSign.Positive
+            ? literal.Magnitude
+            : -(Int128)literal.Magnitude;
+        return PrimitiveType.ExactNumeric(width).AsIntegerConstant(value);
+    }
+
+    /// <summary>
+    /// Marks an integer-typed value as a constant expression. <paramref name="value"/> is the
+    /// constant when known (an integral <see cref="object"/> from metadata), else unknown.
+    /// </summary>
+    private static CalorType AsIntegerConstant(CalorType type, object? value)
+    {
+        if (type is not PrimitiveType primitive || !primitive.Equals(PrimitiveType.Int))
+            return type;
+        Int128? known = value switch
+        {
+            sbyte v => v,
+            byte v => v,
+            short v => v,
+            ushort v => v,
+            int v => v,
+            uint v => v,
+            long v => v,
+            ulong v => v,
+            _ => null,
+        };
+        return primitive.AsIntegerConstant(known);
+    }
+
+    /// <summary>A local initialized by a constant is not itself a constant in the emitted C#.</summary>
+    private static CalorType WithoutIntegerConstant(CalorType type)
+        => type is PrimitiveType primitive ? primitive.WithoutIntegerConstant() : type;
 
     private IEnumerable<string> AsyncCarrierTypeParameters()
         => new[] { "Task", "ValueTask" }.Where(name => _env.LookupType(name) is TypeParameterType);
@@ -2140,8 +2287,8 @@ public sealed class TypeChecker
         return unary.Operator switch
         {
             UnaryOperator.Not => PrimitiveType.Bool,
-            UnaryOperator.Negate => IsNumericType(operandType) ? operandType : ErrorType.Instance,
-            UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PrimitiveType.Int : ErrorType.Instance,
+            UnaryOperator.Negate => IsNumericType(operandType) ? PromoteUnaryOperand(operandType, negate: true) : ErrorType.Instance,
+            UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PromoteUnaryOperand(operandType, negate: false) : ErrorType.Instance,
             UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
                 or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
                 => IsNumericType(operandType) ? incDecResultType : ErrorType.Instance,
@@ -2225,6 +2372,8 @@ public sealed class TypeChecker
             _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
                 $"No overload of '{call.Target}' matches the supplied argument names, modifiers, and types");
         }
+        if (!reportedNominal && candidates.Length == 0)
+            ReportNumericArgumentConversions(call, functionCandidates, argumentTypes);
         var bestCandidates = candidates
             .Where(candidate => !candidates.Any(other =>
                 !ReferenceEquals(candidate, other) && IsBetterConversion(other, candidate)))
@@ -2235,6 +2384,36 @@ public sealed class TypeChecker
             && bestCandidates.All(candidate => candidate.Type.ReturnType.Equals(bestCandidates[0].Type.ReturnType))
                 ? bestCandidates[0].Type.ReturnType
                 : ErrorType.Instance;
+    }
+
+    /// <summary>
+    /// A call to the only function of its name, positional and by value, whose arguments fail
+    /// to convert: each argument C# would reject as a numeric conversion between two known types
+    /// is reported at the argument (<c>Scale(someDouble)</c> into a <c>float</c> parameter). Other
+    /// mismatches, overload sets and generic functions stay with C#, as before.
+    /// </summary>
+    private void ReportNumericArgumentConversions(
+        CallExpressionNode call, IReadOnlyList<FunctionCandidate> functionCandidates, IReadOnlyList<CalorType> argumentTypes)
+    {
+        if (functionCandidates.Count != 1 || _suppressContextualDiagnostics)
+            return;
+        var candidate = functionCandidates[0];
+        var parameterTypes = candidate.Type.ParameterTypes;
+        if (candidate.TypeParameterNames.Count != 0
+            || parameterTypes.Count != call.Arguments.Count
+            || candidate.ParameterModifiers.Any(modifier => modifier != ParameterModifier.None)
+            || call.ArgumentNames?.Any(name => !string.IsNullOrEmpty(name)) == true
+            || call.ArgumentModifiers?.Any(modifier => !string.IsNullOrEmpty(modifier)) == true)
+            return;
+        for (var index = 0; index < parameterTypes.Count; index++)
+        {
+            var parameterType = EraseRefinement(parameterTypes[index]);
+            if (IsRejectedNumericConversion(parameterType, argumentTypes[index]))
+            {
+                ReportNumericConversion(call.Arguments[index].Span, parameterType, argumentTypes[index],
+                    $"argument {index + 1} of '{call.Target}'");
+            }
+        }
     }
 
     private CalorType InferExpressionCallType(ExpressionCallNode call)
@@ -4950,9 +5129,16 @@ public sealed class TypeChecker
             return ErrorType.Instance;
         }
 
+        // `**` lowers to Math.Pow, which only exists for double.
+        if (binOp.Operator == BinaryOperator.Power
+            && !leftType.Equals(PrimitiveType.Decimal) && !rightType.Equals(PrimitiveType.Decimal))
+        {
+            return PrimitiveType.ExactNumeric("f64");
+        }
+
         if (leftType.Equals(PrimitiveType.Float) || rightType.Equals(PrimitiveType.Float))
         {
-            return PrimitiveType.Float;
+            return PromoteFloatingOperands(leftType, rightType);
         }
 
         // decimal op (decimal | integer | char) is decimal in C#. Falling through to Int typed
@@ -4969,8 +5155,110 @@ public sealed class TypeChecker
                 : PrimitiveType.Decimal;
         }
 
-        return PrimitiveType.Int;
+        return PromoteIntegerOperands(binOp.Operator, leftType, rightType);
     }
+
+    /// <summary>
+    /// C# binary numeric promotion (§12.4.7.3) when a floating operand is involved: double if
+    /// either side is double, otherwise float (every integer type converts to float). An operand
+    /// of unknown width or an unmodeled operand gives the width-less <see cref="PrimitiveType.Float"/>.
+    /// </summary>
+    private static CalorType PromoteFloatingOperands(CalorType left, CalorType right)
+    {
+        var sawUnknown = false;
+        foreach (var operand in new[] { left, right })
+        {
+            if (operand is not PrimitiveType primitive)
+            {
+                sawUnknown = true;
+                continue;
+            }
+            if (!primitive.Equals(PrimitiveType.Float))
+                continue;
+            if (primitive.NumericWidth == "f64")
+                return PrimitiveType.ExactNumeric("f64");
+            if (primitive.NumericWidth == null)
+                sawUnknown = true;
+        }
+        return sawUnknown ? PrimitiveType.Float : PrimitiveType.ExactNumeric("f32");
+    }
+
+    /// <summary>
+    /// C# binary numeric promotion over integer operands (§12.4.7.3), and the shift rule (the
+    /// result is the promoted LEFT operand, §12.11). Gives the width-less
+    /// <see cref="PrimitiveType.Int"/> whenever the C# result depends on what the checker does not
+    /// track: an unknown width, an unmodeled operand, or a constant operand beside <c>uint</c> or
+    /// <c>ulong</c> (C# then converts the constant, so <c>u + 1</c> is <c>uint</c>). Two constant
+    /// operands give a constant of unknown value, which never reports a narrowing.
+    /// </summary>
+    private static CalorType PromoteIntegerOperands(BinaryOperator op, CalorType left, CalorType right)
+    {
+        if (left is not PrimitiveType leftPrimitive || right is not PrimitiveType rightPrimitive)
+            return PrimitiveType.Int;
+        var leftWidth = IntegerPromotionWidth(leftPrimitive);
+        var rightWidth = IntegerPromotionWidth(rightPrimitive);
+        if (leftWidth is null || rightWidth is null)
+            return PrimitiveType.Int;
+        var bothConstant = leftPrimitive.IsIntegerConstant && rightPrimitive.IsIntegerConstant;
+
+        string? width;
+        if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift)
+        {
+            width = PromoteUnaryIntegerWidth(leftWidth);
+        }
+        else
+        {
+            var anyConstant = leftPrimitive.IsIntegerConstant || rightPrimitive.IsIntegerConstant;
+            static bool IsSigned(string width) => width is "i8" or "i16" or "i32" or "i64";
+            if (leftWidth == "u64" || rightWidth == "u64")
+                width = anyConstant || IsSigned(leftWidth) || IsSigned(rightWidth) ? null : "u64";
+            else if (leftWidth == "i64" || rightWidth == "i64")
+                width = "i64";
+            else if (leftWidth == "u32" || rightWidth == "u32")
+                width = anyConstant ? null : IsSigned(leftWidth) || IsSigned(rightWidth) ? "i64" : "u32";
+            else
+                width = "i32";
+        }
+
+        if (width is null)
+            return PrimitiveType.Int;
+        var result = PrimitiveType.ExactNumeric(width);
+        return bothConstant ? result.AsIntegerConstant(null) : result;
+    }
+
+    /// <summary>
+    /// The C# result type of unary <c>-</c> or <c>~</c> (§12.9.3, §12.9.5): operands narrower than
+    /// int (char included) promote to int, and <c>-</c> on a uint is a long. A constant operand
+    /// gives a width-less result, which never reports a narrowing (<c>let sbyte:s = -(128)</c>
+    /// is a valid constant conversion the checker does not fold).
+    /// </summary>
+    private static CalorType PromoteUnaryOperand(CalorType operand, bool negate)
+    {
+        if (operand is not PrimitiveType primitive)
+            return operand;
+        if (primitive.IsIntegerConstant)
+            return PrimitiveType.Int;
+        if (primitive.Equals(PrimitiveType.Float) || primitive.Equals(PrimitiveType.Decimal))
+            return primitive;
+        if (IntegerPromotionWidth(primitive) is not { } width)
+            return primitive.Equals(PrimitiveType.Int) ? PrimitiveType.Int : primitive;
+        return width switch
+        {
+            "u32" when negate => PrimitiveType.ExactNumeric("i64"),
+            "u64" when negate => PrimitiveType.Int,
+            _ => PrimitiveType.ExactNumeric(PromoteUnaryIntegerWidth(width)),
+        };
+    }
+
+    /// <summary>The integer width an operand promotes from: char behaves as ushort.</summary>
+    private static string? IntegerPromotionWidth(PrimitiveType operand)
+        => operand.Equals(PrimitiveType.Char) ? "u16"
+            : operand.Equals(PrimitiveType.Int) ? operand.NumericWidth
+            : null;
+
+    /// <summary>Unary numeric promotion (§12.4.7.2): the types narrower than int become int.</summary>
+    private static string PromoteUnaryIntegerWidth(string width)
+        => width is "i8" or "u8" or "i16" or "u16" ? "i32" : width;
 
     private CalorType InferRecordCreationType(RecordCreationNode rec)
     {
@@ -5538,6 +5826,8 @@ public sealed class TypeChecker
 
     private static bool IsAssignable(CalorType target, CalorType source)
     {
+        if (ClassifyImplicitNumericConversion(target, source) is { } numericConversion)
+            return numericConversion;
         if (target.Equals(source)) return true;
         if (target is GenericInstanceType targetGeneric && source is GenericInstanceType sourceGeneric
             && Binding.NullabilityChecker.SameGenericDefinition(targetGeneric.BaseName, sourceGeneric.BaseName)
@@ -5603,6 +5893,161 @@ public sealed class TypeChecker
         // Refined type is a subtype of its base type (erasure)
         if (source is RefinedType refinedSource && IsAssignable(target, refinedSource.BaseType)) return true;
         return false;
+    }
+
+    /// <summary>
+    /// C#'s implicit numeric conversions (§10.2.3) and implicit constant expression conversions
+    /// (§10.2.11) between primitives whose exact widths are known. Returns <c>null</c> when this
+    /// rule does not decide — a width is unknown, or the pair crosses families (int → float,
+    /// float → int, decimal), which <see cref="IsAssignable"/> already decides.
+    /// </summary>
+    /// <remarks>
+    /// Equality collapses every integer width into one <see cref="PrimitiveType.Int"/> and both
+    /// binary floating types into one <see cref="PrimitiveType.Float"/>, so without this rule
+    /// <c>let float:x = someDouble</c> and <c>let int:y = someLong</c> passed the checker and
+    /// failed only as C# CS0266 (and, inside the same function, as an "unresolved" operator
+    /// charged <c>unknown</c>: Calor0410). An unknown width never rejects: the canonical
+    /// <see cref="PrimitiveType.Int"/> and <see cref="PrimitiveType.Float"/> type values whose
+    /// width the checker does not track.
+    /// </remarks>
+    internal static bool? ClassifyImplicitNumericConversion(CalorType target, CalorType source)
+    {
+        if (target is not PrimitiveType targetPrimitive || source is not PrimitiveType sourcePrimitive
+            || targetPrimitive.NumericWidth is not { } targetWidth)
+            return null;
+
+        // char → ushort, int, uint, long, ulong (and the floating and decimal types, decided by
+        // IsAssignable). Not to sbyte, byte or short, and a char constant has no constant
+        // conversion.
+        if (sourcePrimitive.Equals(PrimitiveType.Char))
+            return targetPrimitive.Equals(PrimitiveType.Int)
+                ? targetWidth is "u16" or "i32" or "u32" or "i64" or "u64"
+                : null;
+
+        if (sourcePrimitive.NumericWidth is not { } sourceWidth)
+            return null;
+        var targetIsFloat = targetPrimitive.Equals(PrimitiveType.Float);
+        var sourceIsFloat = sourcePrimitive.Equals(PrimitiveType.Float);
+        if (targetIsFloat && sourceIsFloat)
+            return sourceWidth == "f32" || targetWidth == "f64";
+        if (targetIsFloat || sourceIsFloat)
+            return null;
+
+        if (IsImplicitIntegerConversion(sourceWidth, targetWidth))
+            return true;
+        if (!sourcePrimitive.IsIntegerConstant)
+            return false;
+        // A constant whose value the checker does not compute is left to C#.
+        if (sourcePrimitive.IntegerConstantValue is not { } value)
+            return true;
+        return sourceWidth switch
+        {
+            "i32" => targetWidth is "i8" or "u8" or "i16" or "u16" or "u32" or "u64"
+                && FitsIntegerWidth(value, targetWidth),
+            "i64" => targetWidth == "u64" && value >= 0,
+            _ => false,
+        };
+    }
+
+    private static (bool Signed, int Bits)? IntegerWidthShape(string width) => width switch
+    {
+        "i8" => (true, 8),
+        "u8" => (false, 8),
+        "i16" => (true, 16),
+        "u16" => (false, 16),
+        "i32" => (true, 32),
+        "u32" => (false, 32),
+        "i64" => (true, 64),
+        "u64" => (false, 64),
+        _ => null,
+    };
+
+    /// <summary>
+    /// C# §10.2.3 between integer types: a wider type of the same signedness, or a wider signed
+    /// type for an unsigned source. Never signed → unsigned.
+    /// </summary>
+    private static bool IsImplicitIntegerConversion(string sourceWidth, string targetWidth)
+    {
+        if (sourceWidth == targetWidth)
+            return true;
+        if (IntegerWidthShape(sourceWidth) is not { } source || IntegerWidthShape(targetWidth) is not { } target)
+            return false;
+        if (source.Signed && !target.Signed)
+            return false;
+        return target.Bits > source.Bits;
+    }
+
+    private static bool FitsIntegerWidth(Int128 value, string width) => width switch
+    {
+        "i8" => value >= sbyte.MinValue && value <= sbyte.MaxValue,
+        "u8" => value >= byte.MinValue && value <= byte.MaxValue,
+        "i16" => value >= short.MinValue && value <= short.MaxValue,
+        "u16" => value >= ushort.MinValue && value <= ushort.MaxValue,
+        "i32" => value >= int.MinValue && value <= int.MaxValue,
+        "u32" => value >= uint.MinValue && value <= uint.MaxValue,
+        "i64" => value >= long.MinValue && value <= long.MaxValue,
+        "u64" => value >= ulong.MinValue && value <= ulong.MaxValue,
+        _ => false,
+    };
+
+    /// <summary>
+    /// True when C# rejects the implicit conversion between two numeric primitives whose exact
+    /// types the checker knows: a narrowing (<c>double</c> → <c>float</c>, <c>long</c> →
+    /// <c>int</c>), a floating value into an integer, or <c>decimal</c> ↔ <c>double</c>. Used at
+    /// the positions the checker did not otherwise validate (returns, assignments, compound
+    /// assignments, call arguments): an unknown width or an unmodeled operand never reports.
+    /// </summary>
+    private static bool IsRejectedNumericConversion(CalorType target, CalorType source)
+        => target is PrimitiveType targetPrimitive && source is PrimitiveType sourcePrimitive
+            && HasExactNumericType(targetPrimitive) && HasExactNumericType(sourcePrimitive)
+            && !IsAssignable(targetPrimitive, sourcePrimitive);
+
+    private static bool HasExactNumericType(PrimitiveType type)
+        => type.NumericWidth != null || type.Equals(PrimitiveType.Decimal) || type.Equals(PrimitiveType.Char);
+
+    /// <summary>The C# keyword for a numeric primitive, for the cast in a diagnostic's hint.</summary>
+    private static string NumericCSharpKeyword(PrimitiveType type)
+    {
+        if (type.Equals(PrimitiveType.Decimal)) return "decimal";
+        if (type.Equals(PrimitiveType.Char)) return "char";
+        return type.NumericWidth switch
+        {
+            "i8" => "sbyte",
+            "u8" => "byte",
+            "i16" => "short",
+            "u16" => "ushort",
+            "u32" => "uint",
+            "i64" => "long",
+            "u64" => "ulong",
+            "f32" => "float",
+            "f64" => "double",
+            _ => "int",
+        };
+    }
+
+    /// <summary>
+    /// Reports a numeric conversion C# would reject (CS0266/CS0664), at the Calor expression.
+    /// Kept like a refinement-soundness error: it survives the flow cache of structural
+    /// statements and the class-member pass that keeps only soundness errors, because the
+    /// verdict is exact (both types are known) and C# would reject the program anyway.
+    /// </summary>
+    private void ReportNumericConversion(Parsing.TextSpan span, CalorType target, CalorType source, string position)
+    {
+        var sourcePrimitive = (PrimitiveType)source;
+        var sourceKeyword = NumericCSharpKeyword(sourcePrimitive);
+        var targetKeyword = NumericCSharpKeyword((PrimitiveType)target);
+        var targetWidth = ((PrimitiveType)target).NumericWidth;
+        var reason = sourcePrimitive is { IsIntegerConstant: true, IntegerConstantValue: { } value }
+            && (sourcePrimitive.NumericWidth == "i32"
+                    && targetWidth is "i8" or "u8" or "i16" or "u16" or "u32" or "u64"
+                || sourcePrimitive.NumericWidth == "i64" && targetWidth == "u64")
+                ? $"the constant {value} is outside the range of {targetKeyword}"
+                : ClassifyImplicitNumericConversion(target, source) == false
+                    ? "the conversion narrows and can lose information"
+                    : $"C# has no implicit conversion from {sourceKeyword} to {targetKeyword}";
+        ReportRefinementSoundnessError(span,
+            $"Cannot implicitly convert {sourceKeyword} to {targetKeyword} in {position}: {reason}. "
+            + $"Write an explicit cast, such as ({targetKeyword})value, or change the declared type.");
     }
 
     private static bool HaveSameArrayRuntimeType(ArrayType target, ArrayType source)
