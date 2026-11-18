@@ -44,12 +44,19 @@ public class BindingRoutingCliTests : IDisposable
     {
         var source = NativeCounterpart(BindingReceivingCases.Source(sourceType, targetType, boundary),
             NativeReceivingSource(sourceType, targetType, boundary));
-        var file = Path.Combine(_directory, "stage-b.calr");
-        var output = Path.Combine(_directory, "stage-b.cs");
-        var api = Assert.Single(Program.Compile(source, file).Diagnostics.Errors);
+        var api = Assert.Single(Program.Compile(source, Path.Combine(_directory, "stage-b.calr")).Diagnostics.Errors);
         Assert.Equal(shape, api.BindingContext?.Shape);
-        foreach (var mode in Enumerable.Range(0, 33))
+        var safeSource = NativeCounterpart(BindingReceivingCases.Source(targetType, targetType, boundary),
+            NativeReceivingSource(targetType, targetType, boundary));
+        // Each mode is two independent CLI processes with their own directory and an explicit
+        // child environment (nothing process-wide), so the 33 modes run in parallel. Calor.Tasks.Tests
+        // links this file and disables xUnit parallelism, so this is where the wall time is won.
+        Parallel.ForEach(Enumerable.Range(0, 33), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, mode =>
         {
+            var modeDirectory = Path.Combine(_directory, "mode-" + mode);
+            Directory.CreateDirectory(modeDirectory);
+            var file = Path.Combine(modeDirectory, "stage-b.calr");
+            var output = Path.Combine(modeDirectory, "stage-b.cs");
             var arguments = new List<string>
             {
                 "-i", file, "-o", output, "--format", "json", "--no-cache", "--no-telemetry"
@@ -63,14 +70,13 @@ public class BindingRoutingCliTests : IDisposable
             {
                 ["CALOR_NO_TYPE_CHECK"] = mode == 32 ? "1" : "0"
             };
-            File.WriteAllText(file, NativeCounterpart(BindingReceivingCases.Source(targetType, targetType, boundary),
-                NativeReceivingSource(targetType, targetType, boundary)));
-            var safe = CliTestHarness.RunCli(_directory, environment, arguments.ToArray());
+            File.WriteAllText(file, safeSource);
+            var safe = CliTestHarness.RunCli(modeDirectory, environment, arguments.ToArray());
             Assert.Equal(0, safe.ExitCode);
             Assert.True(File.Exists(output));
             File.Delete(output);
             File.WriteAllText(file, source);
-            var rejected = CliTestHarness.RunCli(_directory, environment, arguments.ToArray());
+            var rejected = CliTestHarness.RunCli(modeDirectory, environment, arguments.ToArray());
             Assert.Equal(1, rejected.ExitCode);
             Assert.False(File.Exists(output));
             using var json = JsonDocument.Parse(rejected.StdOut);
@@ -81,7 +87,7 @@ public class BindingRoutingCliTests : IDisposable
             Assert.Equal(api.Span.Line, location.GetProperty("line").GetInt32());
             Assert.Equal(api.Span.Column, location.GetProperty("column").GetInt32());
             Assert.Equal(api.Span.Length, location.GetProperty("length").GetInt32());
-        }
+        });
     }
 
     [Theory]
