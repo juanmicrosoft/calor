@@ -226,7 +226,33 @@ public sealed class EffectEnforcementPass
         string OwnerName,
         string MemberName,
         string Kind,
-        AstNode Declaration);
+        AstNode Declaration)
+    {
+        /// <summary>0.30 (D1): a property or indexer accessor's own row; event accessors have none.</summary>
+        public EffectsNode? Row => (Declaration as PropertyAccessorNode)?.Effects;
+    }
+
+    /// <summary>
+    /// 0.30 (D1): what a type's implicit static initialization was inferred to do, recorded by
+    /// <see cref="CheckImplicitStaticInitializers"/> so converter row synthesis can write the
+    /// type's static-initialization row.
+    /// </summary>
+    private readonly Dictionary<ClassDefinitionNode, (EffectSet Effects, IReadOnlyList<string> Assumptions)>
+        _implicitStaticInitializations = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// 0.30 (gap A): static members whose execution may run their type's initialization —
+    /// members of a type with an explicit static constructor (see
+    /// <see cref="CallGraphAnalysis.StaticConstructorTriggers"/>), and static auto-property
+    /// accessors, which read or write a static backing field.
+    /// </summary>
+    private Dictionary<string, ClassDefinitionNode> _typeInitializationTriggers = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// 0.30: an accessor's own effects, before its type's initialization is added for its
+    /// readers. The accessor's own row covers only what its body does.
+    /// </summary>
+    private readonly Dictionary<string, EffectSet> _accessorBodyEffects = new(StringComparer.Ordinal);
 
     public EffectEnforcementPass(
         DiagnosticBag diagnostics,
@@ -315,6 +341,15 @@ public sealed class EffectEnforcementPass
                 _declarationOnlyRows[$"{declaration.Name}.{method.Id}"] = method.Effects;
         _constructorsByFunctionId = new Dictionary<string, ConstructorDeclaration>(StringComparer.Ordinal);
         _implicitAccessorsByFunctionId = new Dictionary<string, ImplicitAccessorDeclaration>(StringComparer.Ordinal);
+        _accessorBodyEffects.Clear();
+        _typeInitializationTriggers = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
+        foreach (var (id, owner) in CallGraphAnalysis.StaticConstructorTriggers(module))
+            _typeInitializationTriggers[id] = owner;
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
+            foreach (var property in CallGraphAnalysis.EnumerateProperties(cls))
+                if ((cls.IsModule || property.IsStatic) && property.IsAutoProperty)
+                    foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer }.OfType<PropertyAccessorNode>())
+                        _typeInitializationTriggers[CallGraphAnalysis.GetPropertyAccessorFunctionId(cls.Name, property, accessor)] = cls;
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
@@ -425,11 +460,7 @@ public sealed class EffectEnforcementPass
             if (_constructorsByFunctionId.TryGetValue(function.Id, out var constructor))
                 CheckConstructorBody(function, constructor);
             else if (_implicitAccessorsByFunctionId.TryGetValue(function.Id, out var accessor))
-                CheckImplicitEffectBody(function, accessor.Declaration,
-                    DiagnosticCode.AccessorEffectContractUnavailable,
-                    $"{accessor.Kind} accessor '{accessor.OwnerName}.{accessor.MemberName}'",
-                    AccessorContract,
-                    "intrinsic accessor mutation/allocation ('mut', 'alloc')");
+                CheckAccessorBody(function, accessor);
             else
                 CheckEffects(function);
         }
@@ -469,12 +500,16 @@ public sealed class EffectEnforcementPass
                     : ConstructorContract.Union(GetDeclaredEffects(ownRow));
                 hasDeclaration = ownRow != null;
             }
-            else if (_implicitAccessorsByFunctionId.ContainsKey(function.Id))
+            else if (_implicitAccessorsByFunctionId.TryGetValue(function.Id, out var accessorDeclaration))
             {
                 kind = "accessor";
-                mismatchCode = DiagnosticCode.AccessorEffectContractUnavailable;
-                declaredSet = AccessorContract;
-                hasDeclaration = false;
+                var ownRow = accessorDeclaration.Row;
+                mismatchCode = ownRow == null
+                    ? DiagnosticCode.AccessorEffectContractUnavailable : DiagnosticCode.ForbiddenEffect;
+                declaredSet = ownRow == null ? AccessorContract
+                    : GetDeclaredEffects(ownRow) is { IsUnknown: true } unknownRow ? unknownRow
+                    : AccessorContract.Union(GetDeclaredEffects(ownRow));
+                hasDeclaration = ownRow != null;
             }
             else
             {
@@ -493,7 +528,9 @@ public sealed class EffectEnforcementPass
             // it is empty exactly when the subset test there passes, so the
             // body-vs-declaration relation is asked once, in phase 4 (P16 counts
             // its call sites).
-            var computed = _computedEffects.GetValueOrDefault(function.Id, EffectSet.Empty);
+            var computed = kind == "accessor"
+                ? AccessorBodyEffects(function.Id)
+                : _computedEffects.GetValueOrDefault(function.Id, EffectSet.Empty);
             var forbidden = computed.Except(declaredSet)
                 .Select(effect => EffectSetExtensions.ToSurfaceCode(effect.Kind, effect.Value))
                 .OrderBy(code => code, StringComparer.Ordinal)
@@ -698,6 +735,17 @@ public sealed class EffectEnforcementPass
         var effects = inferrer.InferFromFunction(function);
         if (declarationOnly)
             effects = effects.Union(GetDeclaredEffects(row));
+        if (_implicitAccessorsByFunctionId.TryGetValue(function.Id, out var accessorDeclaration))
+        {
+            // 0.30 (D1): readers are charged an accessor's declared row, as callers of a
+            // method are; the body is checked against intrinsic + row separately.
+            if (accessorDeclaration.Row is { } accessorRow)
+                effects = effects.Union(GetDeclaredEffects(accessorRow));
+            _accessorBodyEffects[function.Id] = effects;
+        }
+        // 0.30 (gap A): running a static member may run its type's initialization.
+        if (_typeInitializationTriggers.TryGetValue(function.Id, out var initializedType))
+            effects = effects.Union(inferrer.InferTypeInitializationTrigger(initializedType, function.Span));
         if (context.CurrentConstructor is { } initializing
             && (initializing.Constructor.IsStatic
                 || !_callGraphAnalysis.IsRecordCopyConstructor(initializing.Constructor)))
@@ -768,19 +816,32 @@ public sealed class EffectEnforcementPass
 
     private void CheckImplicitStaticInitializers(ModuleNode module)
     {
+        _implicitStaticInitializations.Clear();
         foreach (var owner in CallGraphAnalysis.EnumerateClasses(module))
         {
             if (_callGraphAnalysis.Initialization(owner) is { HasImplicitStaticConstructor: false })
                 continue;
+            var name = $"implicit static initializer '{owner.Name}..cctor'";
+            // 0.30 (D1): `! unknown` as the type's static-initialization row admits every
+            // effect; its initializers are not analyzed, so they report no Calor0411.
+            if (owner.StaticInitializerEffects is { IsUnknown: true })
+            {
+                _implicitStaticInitializations[owner] = (EffectSet.Unknown, []);
+                continue;
+            }
             var assumptions = new List<string>();
             var context = CreateInferenceContext($"{owner.Name}..cctor", [], owner, null, assumptions);
             var effects = new EffectInferrer(context).InferConstructorInitialization(
                 owner, isStatic: true, owner.Span);
-            CheckImplicitEffects(effects, assumptions, owner,
-                DiagnosticCode.ConstructorEffectContractUnavailable,
-                $"implicit static initializer '{owner.Name}..cctor'",
-                EffectSet.From("mut", "alloc"),
-                "intrinsic initialization mutation/allocation ('mut', 'alloc')");
+            _implicitStaticInitializations[owner] = (effects, assumptions);
+            if (owner.StaticInitializerEffects is { } row)
+                CheckDeclaredIntrinsicRow(effects, assumptions, row, ConstructorContract, owner, name,
+                    "type (its static-initialization row)");
+            else
+                CheckImplicitEffects(effects, assumptions, owner,
+                    DiagnosticCode.ConstructorEffectContractUnavailable, name,
+                    ConstructorContract,
+                    "intrinsic initialization mutation/allocation ('mut', 'alloc')");
         }
     }
 
@@ -835,22 +896,62 @@ public sealed class EffectEnforcementPass
                 "intrinsic initialization mutation/allocation ('mut', 'alloc')");
             return;
         }
+        CheckDeclaredIntrinsicRow(_computedEffects.GetValueOrDefault(function.Id, EffectSet.Empty),
+            _assumedEffects.GetValueOrDefault(function.Id) ?? [], row, ConstructorContract,
+            constructor.Constructor, name, "constructor");
+    }
+
+    /// <summary>
+    /// 0.30 (D1): an accessor may declare its own row, written like a constructor's. Without
+    /// one its body is held to the intrinsic accessor contract (Calor0423). With one the body
+    /// may use the intrinsic effects plus the declared row (<c>! unknown</c> admits any
+    /// effect), and readers are charged the row as well as what the body does.
+    /// Event accessors have no row surface and keep the intrinsic contract.
+    /// </summary>
+    private void CheckAccessorBody(FunctionNode function, ImplicitAccessorDeclaration accessor)
+    {
+        var name = $"{accessor.Kind} accessor '{accessor.OwnerName}.{accessor.MemberName}'";
+        if (accessor.Row is not { } row)
+        {
+            CheckImplicitEffects(AccessorBodyEffects(function.Id),
+                _assumedEffects.GetValueOrDefault(function.Id) ?? [], accessor.Declaration,
+                DiagnosticCode.AccessorEffectContractUnavailable, name, AccessorContract,
+                "intrinsic accessor mutation/allocation ('mut', 'alloc')");
+            return;
+        }
+        CheckDeclaredIntrinsicRow(AccessorBodyEffects(function.Id),
+            _assumedEffects.GetValueOrDefault(function.Id) ?? [], row, AccessorContract,
+            accessor.Declaration, name, "accessor");
+    }
+
+    /// <summary>
+    /// The shared check for a declaration whose own row is optional and extends an intrinsic
+    /// contract (constructors, accessors, a type's implicit static initialization): the body
+    /// may use the intrinsic effects plus the row; an excess or an unverifiable effect is
+    /// Calor0410. <c>! unknown</c> admits everything.
+    /// </summary>
+    private EffectSet AccessorBodyEffects(string functionId) =>
+        _accessorBodyEffects.TryGetValue(functionId, out var body)
+            ? body : _computedEffects.GetValueOrDefault(functionId, EffectSet.Empty);
+
+    private void CheckDeclaredIntrinsicRow(
+        EffectSet computed, IReadOnlyList<string> reasons, EffectsNode row, EffectSet intrinsic,
+        AstNode declaration, string name, string where)
+    {
         var declared = GetDeclaredEffects(row);
         if (declared.IsUnknown)
             return;
-        var computed = _computedEffects.GetValueOrDefault(function.Id, EffectSet.Empty);
-        var permitted = ConstructorContract.Union(declared);
+        var permitted = intrinsic.Union(declared);
         var forbidden = computed.Except(permitted).ToList();
         if (forbidden.Count > 0)
-            _diagnostics.Report(constructor.Constructor.Span, DiagnosticCode.ForbiddenEffect,
+            _diagnostics.Report(declaration.Span, DiagnosticCode.ForbiddenEffect,
                 $"The {name} uses effect(s) '{string.Join(", ", forbidden.Select(effect => EffectCodes.ToCompact(effect.Kind, effect.Value)))}' "
                 + "that its declared row does not cover. Add them to the row, or write '! unknown'.",
                 DiagnosticSeverity.Error);
-        var reasons = _assumedEffects.GetValueOrDefault(function.Id) ?? [];
         if (reasons.Count > 0)
-            _diagnostics.Report(constructor.Constructor.Span, DiagnosticCode.ForbiddenEffect,
+            _diagnostics.Report(declaration.Span, DiagnosticCode.ForbiddenEffect,
                 $"The {name} has unverifiable effects: {string.Join("; ", reasons.Take(3))}. "
-                + "Write '! unknown' on the constructor to declare that.",
+                + $"Write '! unknown' on the {where} to declare that.",
                 DiagnosticSeverity.Error);
     }
 
@@ -871,9 +972,16 @@ public sealed class EffectEnforcementPass
             _diagnostics.Report(
                 declaration.Span,
                 diagnosticCode,
-                diagnosticCode == DiagnosticCode.ConstructorEffectContractUnavailable
+                declaration is ClassDefinitionNode
+                    ? $"The {displayName} uses effect(s) '{codes}' beyond {intrinsicDescription}. "
+                      + $"Declare them as the type's static-initialization row (a header line such as '! {codes}' "
+                      + "before the first member), or move the work to a method."
+                    : diagnosticCode == DiagnosticCode.ConstructorEffectContractUnavailable
                     ? $"The {displayName} uses effect(s) '{codes}' beyond {intrinsicDescription}. "
                       + $"Declare them on the constructor (for example '! {codes}'), or move the work to a method."
+                    : declaration is PropertyAccessorNode
+                    ? $"The {displayName} uses effect(s) '{codes}' beyond {intrinsicDescription}. "
+                      + $"Declare them on the accessor (for example '! {codes}' on its own line under it), or move the work to a method."
                     : $"The {displayName} uses effect(s) '{codes}', but this declaration cannot declare an effect row. " +
                       $"Only {intrinsicDescription} is permitted. " +
                       "Move effectful work to a method with an explicit '!' effect row.",
@@ -886,7 +994,9 @@ public sealed class EffectEnforcementPass
                 declaration.Span,
                 diagnosticCode,
                 $"The {displayName} has unverifiable effects: {string.Join("; ", reasons.Take(3))}. " +
-                "Declarations that cannot declare an effect row fail closed.",
+                (declaration is ClassDefinitionNode or ConstructorNode or PropertyAccessorNode
+                    ? "Declare '! unknown' as its row to state that."
+                    : "Declarations that cannot declare an effect row fail closed."),
                 DiagnosticSeverity.Error);
         }
     }
@@ -1279,8 +1389,45 @@ public sealed class EffectEnforcementPass
             foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(owner))
                 Declare($"{owner.Name}.{ctor.Id}", ctor.Effects, row => ctor.Effects = row, ctor.Span,
                     unverifiableIsUnknown: true);
+            // 0.30 (D1): accessors and a type's implicit static initialization declare
+            // `! unknown` the way constructors do, instead of preserving the whole file.
+            foreach (var (id, accessor) in RowedAccessors(owner))
+            {
+                var body = AccessorBodyEffects(id);
+                if (accessor.Effects is { IsUnknown: true }
+                    || !body.IsUnknown && _assumedEffects.GetValueOrDefault(id) is not { Count: > 0 })
+                    continue;
+                accessor.Effects = UnknownRow(accessor.Effects?.Span ?? accessor.Span);
+                changed = true;
+            }
+            if (_implicitStaticInitializations.TryGetValue(owner, out var initialization)
+                && owner.StaticInitializerEffects is not { IsUnknown: true }
+                && (initialization.Effects.IsUnknown || initialization.Assumptions.Count > 0))
+            {
+                owner.StaticInitializerEffects = UnknownRow(owner.StaticInitializerEffects?.Span ?? owner.Span);
+                changed = true;
+            }
         }
         return changed;
+    }
+
+    private static EffectsNode UnknownRow(TextSpan span) =>
+        new(span, new Dictionary<string, string>(StringComparer.Ordinal) { ["unknown"] = "*" });
+
+    /// <summary>
+    /// 0.30 (D1): the property and indexer accessors that can carry an own row (those with
+    /// a body), keyed by their effect-pass function id.
+    /// </summary>
+    private static IEnumerable<(string Id, PropertyAccessorNode Accessor)> RowedAccessors(ClassDefinitionNode owner)
+    {
+        foreach (var property in CallGraphAnalysis.EnumerateProperties(owner))
+            foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer }.OfType<PropertyAccessorNode>())
+                if (!accessor.IsAutoImplemented)
+                    yield return (CallGraphAnalysis.GetPropertyAccessorFunctionId(owner.Name, property, accessor), accessor);
+        foreach (var indexer in CallGraphAnalysis.EnumerateIndexers(owner))
+            foreach (var accessor in new[] { indexer.Getter, indexer.Setter, indexer.Initer }.OfType<PropertyAccessorNode>())
+                if (!accessor.IsAutoImplemented)
+                    yield return ($"{owner.Name}.{indexer.Id}.{accessor.Kind.ToString().ToLowerInvariant()}", accessor);
     }
 
     private readonly Dictionary<string, PolyRow> _returnedRows = new(StringComparer.Ordinal);
@@ -1470,6 +1617,18 @@ public sealed class EffectEnforcementPass
                         EffectSet.FromInternal(fact.InferredRow.ToEffectSet().Except(ConstructorContract)),
                         row => ctor.Effects = row, ctor.Span);
             }
+            // 0.30 (D1): so do accessors and the type's implicit static initialization.
+            foreach (var (id, accessor) in RowedAccessors(cls))
+            {
+                if (_declarationFacts.TryGetValue(id, out var fact) && fact.Kind == "accessor")
+                    changed |= WidenRow(accessor.Effects,
+                        EffectSet.FromInternal(fact.InferredRow.ToEffectSet().Except(AccessorContract)),
+                        row => accessor.Effects = row, accessor.Span);
+            }
+            if (_implicitStaticInitializations.TryGetValue(cls, out var initialization))
+                changed |= WidenRow(cls.StaticInitializerEffects,
+                    EffectSet.FromInternal(initialization.Effects.Except(ConstructorContract)),
+                    row => cls.StaticInitializerEffects = row, cls.Span);
         }
 
         // Then the declaration-local variance relation (sites 4 and 5), using the
@@ -6221,7 +6380,8 @@ public sealed class EffectEnforcementPass
                 var resolved = FindClassProperty(cls, memberName);
                 var getter = resolved?.Property.Getter;
                 if (getter == null)
-                    return effects.Union(MethodGroupEffects(cls, memberName) ?? EffectSet.Empty);
+                    return effects.Union(MethodGroupEffects(cls, memberName)
+                        ?? (resolved == null ? PreservedMemberRead(cls, memberName, span) : EffectSet.Empty));
 
                 var id = CallGraphAnalysis.GetPropertyAccessorFunctionId(
                     resolved!.Value.OwnerName,
@@ -6246,11 +6406,34 @@ public sealed class EffectEnforcementPass
                 : effects.Union(resolution.Effects);
         }
 
+        /// <summary>
+        /// 0.30 (gap A): what running a static member of <paramref name="owner"/> may cost
+        /// in type initialization — the same charge as reading one of its static fields.
+        /// </summary>
+        public EffectSet InferTypeInitializationTrigger(ClassDefinitionNode owner, TextSpan span) =>
+            InferStaticFieldInitialization(owner, span);
+
+        /// <summary>
+        /// 0.30 (D1): a type's declared static-initialization row. <c>! unknown</c> is charged
+        /// as Unknown without re-analyzing (and re-reporting) the initializers it admits.
+        /// </summary>
+        private static EffectSet? DeclaredStaticInitialization(ClassDefinitionNode owner) =>
+            owner.StaticInitializerEffects is { } row ? GetDeclaredEffects(row) : null;
+
         private EffectSet InferStaticFieldInitialization(ClassDefinitionNode owner, TextSpan span)
         {
             if (_context.CurrentConstructor is { Constructor.IsStatic: true } current
                 && ReferenceEquals(current.Owner, owner))
                 return EffectSet.Empty;
+            if (DeclaredStaticInitialization(owner) is { } declaredRow)
+                return declaredRow.IsUnknown
+                    ? declaredRow
+                    : declaredRow.Union(InferUndeclaredStaticFieldInitialization(owner, span));
+            return InferUndeclaredStaticFieldInitialization(owner, span);
+        }
+
+        private EffectSet InferUndeclaredStaticFieldInitialization(ClassDefinitionNode owner, TextSpan span)
+        {
             var selection = _context.CallGraph.Initialization(owner);
             // A read may initialize the entire declaring type, not just this field.
             // Selected construction facts do not close a partial, conditional or
@@ -6299,6 +6482,11 @@ public sealed class EffectEnforcementPass
                 && _context.CurrentConstructor is { Constructor.IsStatic: true } current
                 && ReferenceEquals(current.Owner, owner))
                 return EffectSet.Empty;
+            // 0.30 (D1): a type's declared static-initialization row is charged to whatever
+            // triggers that initialization; `! unknown` stands in for its initializers.
+            var declaredRow = isStatic && !initializingConstructor ? DeclaredStaticInitialization(owner) : null;
+            if (declaredRow is { IsUnknown: true })
+                return declaredRow;
             var selection = _context.CallGraph.Initialization(owner);
             var operations = isStatic ? selection?.Static : selection?.Instance;
             if (operations == null)
@@ -6312,7 +6500,7 @@ public sealed class EffectEnforcementPass
                 if (isStatic && !initializingConstructor)
                     effects = effects.Union(InferFromInternalFunctions(owner.Constructors
                         .Where(constructor => constructor.IsStatic).Select(constructor => $"{owner.Name}.{constructor.Id}")));
-                return effects;
+                return declaredRow is null ? effects : effects.Union(declaredRow);
             }
             finally
             {
@@ -6607,6 +6795,40 @@ public sealed class EffectEnforcementPass
             _ => false
         };
 
+        /// <summary>
+        /// 0.30 (soundness gap B): a member that no native declaration of the class chain
+        /// names may be declared in a preserved raw C# member. A raw static field charges its
+        /// type's initialization, as a native one does; a raw property, event or anything the
+        /// raw text does not show is Unknown. A native or absent member costs nothing here.
+        /// </summary>
+        private EffectSet PreservedMemberRead(ClassDefinitionNode cls, string member, TextSpan span)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            for (var current = cls; current != null && visited.Add(current.Name); current = ResolveBaseClass(current))
+            {
+                if (current.Fields.Any(field => field.Name.Equals(member, StringComparison.Ordinal))
+                    || CallGraphAnalysis.EnumerateProperties(current).Any(property => property.Name.Equals(member, StringComparison.Ordinal))
+                    || CallGraphAnalysis.EnumerateMethods(current).Any(method => method.Name.Equals(member, StringComparison.Ordinal))
+                    || current.Events.Any(evt => evt.Name.Equals(member, StringComparison.Ordinal)))
+                    return EffectSet.Empty;
+                foreach (var block in current.InteropBlocks)
+                {
+                    switch (CallGraphAnalysis.FindPreservedMember(block, member))
+                    {
+                        case CallGraphAnalysis.PreservedMemberKind.None:
+                        case CallGraphAnalysis.PreservedMemberKind.ConstantField:
+                        case CallGraphAnalysis.PreservedMemberKind.InstanceField:
+                            continue;
+                        case CallGraphAnalysis.PreservedMemberKind.StaticField:
+                            return InferStaticFieldInitialization(current, span);
+                        default:
+                            return UnknownResolvedOperation($"preserved member '{current.Name}.{member}'", span);
+                    }
+                }
+            }
+            return EffectSet.Empty;
+        }
+
         private EffectSet InferSetterEffects(FieldAccessNode field)
         {
             var targetType = InferExpressionType(field.Target);
@@ -6615,7 +6837,7 @@ public sealed class EffectEnforcementPass
             {
                 var resolved = FindClassProperty(cls, field.FieldName);
                 if (resolved == null)
-                    return EffectSet.Empty;
+                    return PreservedMemberRead(cls, field.FieldName, field.Span);
 
                 var setter = resolved.Value.Property.Setter ?? resolved.Value.Property.Initer;
                 if (setter == null)
@@ -6694,6 +6916,13 @@ public sealed class EffectEnforcementPass
             }
             if (!TrySplitMemberReference(reference.Name, out var receiver, out var member))
             {
+                var bareInitialization = BareStaticFieldInitialization(reference);
+                if (!bareInitialization.IsEmpty)
+                    return bareInitialization;
+                // Gap B: an unbound bare name may be a member of a preserved raw C# block.
+                var preserved = BarePreservedMemberAccess(reference);
+                if (!preserved.IsEmpty)
+                    return preserved;
                 if (!chargeMethodGroup
                     || IsLocalFunctionName(reference.Name)
                     || _context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span) is { Id.IsNone: false })
@@ -6799,6 +7028,8 @@ public sealed class EffectEnforcementPass
             {
                 var resolved = FindClassProperty(cls, member);
                 var getter = resolved?.Property.Getter;
+                if (resolved == null)
+                    return PreservedMemberRead(cls, member, span);
                 if (getter == null)
                     return EffectSet.Empty;
                 var id = CallGraphAnalysis.GetPropertyAccessorFunctionId(
@@ -6842,7 +7073,7 @@ public sealed class EffectEnforcementPass
             {
                 var resolved = FindClassProperty(cls, member);
                 if (resolved == null)
-                    return EffectSet.Empty;
+                    return PreservedMemberRead(cls, member, span);
                 var setter = resolved.Value.Property.Setter ?? resolved.Value.Property.Initer;
                 if (setter == null)
                     return UnknownResolvedOperation(
@@ -6982,13 +7213,49 @@ public sealed class EffectEnforcementPass
                     .Union(InferSetterEffects(receiver, member, reference.Span));
             }
             if (target is ReferenceNode bare && IsBareMutationTarget(bare, ownedStore))
-                return EffectSet.From("mut");
+                return EffectSet.From("mut").Union(BareStaticFieldInitialization(bare));
+            if (target is ReferenceNode rawBare && BarePreservedMemberAccess(rawBare) is { IsEmpty: false } rawAccess)
+                return EffectSet.From("mut").Union(rawAccess);
 
             var targetEffects = InferFromExpression(target);
             return target is ArrayAccessNode or MultiDimArrayAccessNode
                 ? targetEffects.Union(EffectSet.From("mut"))
                 : targetEffects;
         }
+
+        /// <summary>
+        /// 0.30: a bare-name access to a static field (inside its class, a nested class or a
+        /// derived class) is a static field access like <c>Type.Field</c>, so it charges the
+        /// declaring type's initialization (C# spec, "Static field initialization": the
+        /// initializers run before the first use of a static field). Constants and enum
+        /// members run no initializer. A declaring type this module cannot name is Unknown.
+        /// </summary>
+        private EffectSet BareStaticFieldInitialization(ReferenceNode reference)
+        {
+            if (reference.Name.Contains('.')
+                || _context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span)
+                    is not { IsField: true, IsStatic: true, IsProperty: false, IsEnumMember: false } field)
+                return EffectSet.Empty;
+            var declaring = field.DeclaringTypeName;
+            var simple = declaring == null ? null : StripGenericArguments(declaring[(declaring.LastIndexOf('.') + 1)..]);
+            if (simple == null || !_context.ClassesByName.TryGetValue(simple, out var owner))
+                return UnknownResolvedOperation($"{declaring ?? reference.Name}..cctor", reference.Span);
+            if (owner.Fields.FirstOrDefault(candidate => candidate.Name.Equals(reference.Name, StringComparison.Ordinal))
+                is { } declared && declared.Modifiers.HasFlag(MethodModifiers.Const))
+                return EffectSet.Empty;
+            return InferStaticFieldInitialization(owner, reference.Span);
+        }
+
+        /// <summary>
+        /// 0.30 (soundness gap B): a bare name the binder did not resolve, inside a class
+        /// whose preserved raw members declare it (see <see cref="PreservedMemberRead"/>).
+        /// </summary>
+        private EffectSet BarePreservedMemberAccess(ReferenceNode reference) =>
+            reference.Name.Contains('.') || _context.OwnerClass is not { } owner
+            || _context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span) is { Id.IsNone: false }
+            || IsLocalFunctionName(reference.Name)
+                ? EffectSet.Empty
+                : PreservedMemberRead(owner, reference.Name, reference.Span);
 
         private bool IsBareMutationTarget(ReferenceNode reference, bool ownedStore)
         {

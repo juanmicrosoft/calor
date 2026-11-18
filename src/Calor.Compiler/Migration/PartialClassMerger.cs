@@ -237,7 +237,11 @@ public sealed class PartialClassMerger
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
             identifierSpan: primary.IdentifierSpan,
             items: items.Count > 0 ? items : null,
-            isModule: partials.Any(part => part.IsModule)));
+            isModule: partials.Any(part => part.IsModule))
+        {
+            // One type has one implicit static initialization; its parts' rows combine.
+            StaticInitializerEffects = MergeRows(partials.Select(part => part.StaticInitializerEffects))
+        });
 
         // Tag with source files
         if (sourceFiles.Count > 0)
@@ -245,6 +249,22 @@ public sealed class PartialClassMerger
             merged.SourceFile = string.Join(", ", sourceFiles);
         }
         return merged;
+    }
+
+    private static EffectsNode? MergeRows(IEnumerable<EffectsNode?> rows)
+    {
+        var declared = rows.OfType<EffectsNode>().ToList();
+        if (declared.Count <= 1)
+            return declared.FirstOrDefault();
+        if (declared.FirstOrDefault(row => row.IsUnknown) is { } unknown)
+            return unknown;
+        var codes = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (category, values) in declared.SelectMany(row => row.Effects))
+            codes[category] = string.Join(",", (codes.TryGetValue(category, out var existing)
+                    ? existing.Split(',') : Array.Empty<string>())
+                .Concat(values.Split(',')).Select(value => value.Trim()).Where(value => value.Length > 0)
+                .Distinct(StringComparer.Ordinal));
+        return new EffectsNode(declared[0].Span, codes);
     }
 
     private static int VisibilityRank(Visibility v) => v switch

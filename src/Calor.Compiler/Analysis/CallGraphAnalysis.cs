@@ -2337,6 +2337,95 @@ public sealed class CallGraphAnalysis
                 System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out index);
     }
 
+    /// <summary>
+    /// 0.30: the explicit static constructors of a type, across every part of a partial type
+    /// declared in this module.
+    /// </summary>
+    internal static IEnumerable<ConstructorNode> StaticConstructorsOf(ModuleNode module, ClassDefinitionNode owner) =>
+        (owner.IsPartial
+            ? EnumerateClasses(module).Where(part => part.IsPartial
+                && part.Name.Equals(owner.Name, StringComparison.Ordinal))
+            : [owner])
+        .SelectMany(part => part.Constructors).Where(constructor => constructor.IsStatic);
+
+    /// <summary>
+    /// 0.30 (soundness gap A): the static members whose execution can trigger a type's
+    /// explicit static constructor. C# runs a class's static constructor before the first
+    /// instance is created or any static member is referenced (ECMA-334, "Static
+    /// constructors"), so calling a static method or operator, or running a static property
+    /// accessor, of such a type may run it. Instance creation is charged at <c>new</c>.
+    /// A type without an explicit static constructor is <c>beforefieldinit</c>: its
+    /// initializers run only before the first static field access ("Static field
+    /// initialization"), so its static methods are not charged here.
+    /// </summary>
+    internal static IEnumerable<(string FunctionId, ClassDefinitionNode Owner)> StaticConstructorTriggers(ModuleNode module)
+    {
+        foreach (var cls in EnumerateClasses(module))
+        {
+            if (!StaticConstructorsOf(module, cls).Any())
+                continue;
+            foreach (var method in EnumerateMethods(cls))
+                if (cls.IsModule || method.IsStatic)
+                    yield return ($"{cls.Name}.{method.Id}", cls);
+            foreach (var op in EnumerateOperators(cls))
+                yield return ($"{cls.Name}.{op.Id}", cls);
+            foreach (var property in EnumerateProperties(cls))
+            {
+                if (!(cls.IsModule || property.IsStatic))
+                    continue;
+                foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer }.OfType<PropertyAccessorNode>())
+                    yield return (GetPropertyAccessorFunctionId(cls.Name, property, accessor), cls);
+            }
+        }
+    }
+
+    /// <summary>0.30 (soundness gap B): what a preserved raw C# member declares under a name.</summary>
+    internal enum PreservedMemberKind { None, ConstantField, StaticField, InstanceField, Opaque }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpInteropBlockNode,
+        ClassDeclarationSyntax?> PreservedMemberHosts = new();
+
+    /// <summary>
+    /// 0.30 (soundness gap B): whether a preserved raw C# member declares <paramref name="name"/>,
+    /// and as what. A raw block that does not parse as members, or holds preprocessor
+    /// directives, answers <see cref="PreservedMemberKind.Opaque"/>: it may declare anything.
+    /// </summary>
+    internal static PreservedMemberKind FindPreservedMember(CSharpInteropBlockNode block, string name)
+    {
+        var host = PreservedMemberHosts.GetValue(block, static block =>
+        {
+            var root = CSharpSyntaxTree.ParseText(
+                $"class __CalorPreservedHost\n{{\n{block.CSharpCode}\n}}",
+                new CSharpParseOptions(LanguageVersion.Preview)).GetCompilationUnitRoot();
+            return root.ContainsDiagnostics || root.ContainsDirectives
+                || root.Members is not [ClassDeclarationSyntax owner] ? null : owner;
+        });
+        if (host == null)
+            return PreservedMemberKind.Opaque;
+        var result = PreservedMemberKind.None;
+        foreach (var member in host.Members)
+        {
+            var kind = member switch
+            {
+                BaseFieldDeclarationSyntax field when field.Declaration.Variables.Any(variable =>
+                        variable.Identifier.ValueText == name) =>
+                    field is EventFieldDeclarationSyntax ? PreservedMemberKind.Opaque
+                    : field.Modifiers.Any(SyntaxKind.ConstKeyword) ? PreservedMemberKind.ConstantField
+                    : field.Modifiers.Any(SyntaxKind.StaticKeyword) ? PreservedMemberKind.StaticField
+                    : PreservedMemberKind.InstanceField,
+                PropertyDeclarationSyntax property when property.Identifier.ValueText == name => PreservedMemberKind.Opaque,
+                EventDeclarationSyntax evt when evt.Identifier.ValueText == name => PreservedMemberKind.Opaque,
+                MethodDeclarationSyntax method when method.Identifier.ValueText == name => PreservedMemberKind.Opaque,
+                BaseTypeDeclarationSyntax type when type.Identifier.ValueText == name => PreservedMemberKind.Opaque,
+                DelegateDeclarationSyntax type when type.Identifier.ValueText == name => PreservedMemberKind.Opaque,
+                _ => PreservedMemberKind.None
+            };
+            if (kind != PreservedMemberKind.None)
+                result = result == PreservedMemberKind.None || result == kind ? kind : PreservedMemberKind.Opaque;
+        }
+        return result;
+    }
+
     internal static bool PreservedMemberMayInitializeType(CSharpInteropBlockNode block)
     {
         var root = CSharpSyntaxTree.ParseText(
@@ -3066,7 +3155,7 @@ public sealed class CallGraphAnalysis
                     var wrapped = new FunctionNode(accessor.Span,
                         $"{cls.Name}.{indexer.Id}.{accessor.Kind.ToString().ToLowerInvariant()}",
                         $"{cls.Name}.this[].{accessor.Kind.ToString().ToLowerInvariant()}",
-                        accessor.Visibility ?? indexer.Visibility, parameters, output: null, effects: null,
+                        accessor.Visibility ?? indexer.Visibility, parameters, output: null, effects: accessor.Effects,
                         accessor.Preconditions, Array.Empty<EnsuresNode>(), accessor.Body, accessor.Attributes);
                     functions[wrapped.Id] = wrapped;
                     calleeToCallers[wrapped.Id] = [];
@@ -3172,6 +3261,26 @@ public sealed class CallGraphAnalysis
                 callerToCallees[site.CallerId].Add((initializer.Name, call.Span));
                 calleeToCallers[id].Add(site.CallerId);
                 var key = new AstCallKey(site.CallerId, initializer.Name, call.Span.Start, call.Span.End);
+                resolvedCallIds[key] = [id];
+                boundCallSites.Add(key);
+            }
+        }
+        // 0.30: a static member of a type with an explicit static constructor may run that
+        // constructor (C# spec, static constructors: a static member reference triggers it),
+        // and the effect pass charges the member for it. The edge keeps the pair in one SCC
+        // when the constructor calls the member back.
+        foreach (var (memberId, owner) in StaticConstructorTriggers(ast))
+        {
+            if (!functions.TryGetValue(memberId, out var member))
+                continue;
+            foreach (var constructor in StaticConstructorsOf(ast, owner))
+            {
+                var id = $"{owner.Name}.{constructor.Id}";
+                if (!functions.TryGetValue(id, out var initializer) || id == memberId)
+                    continue;
+                callerToCallees[memberId].Add((initializer.Name, member.Span));
+                calleeToCallers[id].Add(memberId);
+                var key = new AstCallKey(memberId, initializer.Name, member.Span.Start, member.Span.End);
                 resolvedCallIds[key] = [id];
                 boundCallSites.Add(key);
             }
@@ -3902,7 +4011,7 @@ public sealed class CallGraphAnalysis
             accessor.Visibility ?? property.Visibility,
             parameters,
             output: null,
-            effects: null,
+            effects: accessor.Effects,
             accessor.Preconditions,
             Array.Empty<EnsuresNode>(),
             accessor.Body,

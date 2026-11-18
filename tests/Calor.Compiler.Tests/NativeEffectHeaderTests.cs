@@ -98,7 +98,9 @@ public sealed class NativeEffectHeaderTests
     public void OrdinarySourceDispatchPreservesSlotAndImplementationRows(
         string dispatch, bool chain, bool consoleWriteCaller)
     {
-        var callerRow = consoleWriteCaller ? "cw" : "";
+        // 0.30: Render reads Holder's static field Source (through ReadSource), which may run
+        // Holder's static initialization (`new Derived()`), so it declares alloc as well.
+        var callerRow = consoleWriteCaller ? "cw, alloc" : "alloc";
         var derivedRow = dispatch is "virtual" or "base-qualified" ? "cw" : "";
         var source = $$"""
             module OrdinaryDispatch

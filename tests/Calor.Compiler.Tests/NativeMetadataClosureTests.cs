@@ -2166,6 +2166,7 @@ public sealed class NativeMetadataClosureTests
     {
         // 0.30 (D1): a static initializer's effects beyond mut/alloc must be declared on the
         // type's static constructor row (otherwise Calor0422); `new Holder()` still charges them.
+        // 0.30 (gap A): Read may run Seed's static constructor, so its own row declares cw.
         const string authored = """
             module StaticInitializationDependency
               class Seed
@@ -2176,7 +2177,7 @@ public sealed class NativeMetadataClosureTests
                   System.Console.WriteLine("static initialization")
                   return 7
                 func Read public static () → int
-                  !
+                  ! cw
                   return 42
               class Holder
                 field int:Value public = Seed.Read()

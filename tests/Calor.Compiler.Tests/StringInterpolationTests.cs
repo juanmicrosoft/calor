@@ -315,6 +315,29 @@ public static class NumberFormat
     /// Replaces the converter's single `! unknown` row with a pure row, or removes
     /// it when <paramref name="removeRow"/> is set.
     /// </summary>
+    /// <summary>
+    /// 0.30 (D1): the converter declares a type's static-initialization row (a header-clause
+    /// `!` line under `class`/`module`) instead of preserving the file. Removing that row
+    /// restores the undeclared program, whose initializer must still be rejected.
+    /// </summary>
+    private static string WithoutTypeRows(string calor, out int removed)
+    {
+        var lines = calor.ReplaceLineEndings("\n").Split('\n').ToList();
+        removed = 0;
+        for (var index = lines.Count - 1; index > 0; index--)
+        {
+            var header = lines[index - 1].TrimStart();
+            if (lines[index].TrimStart().StartsWith('!')
+                && (header.StartsWith("class ", StringComparison.Ordinal)
+                    || header.StartsWith("module ", StringComparison.Ordinal) && lines[index - 1].StartsWith("  ", StringComparison.Ordinal)))
+            {
+                lines.RemoveAt(index);
+                removed++;
+            }
+        }
+        return string.Join('\n', lines);
+    }
+
     private static string WithPureRow(string calor, bool requireUnknown = true, bool removeRow = false)
     {
         var lines = calor.Split('\n');
@@ -625,10 +648,17 @@ public static class NumberFormat
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
         Assert.Equal(0, conversion.InteropPreservationCount);
         Assert.Empty(conversion.Losses);
-        var checkedSource = unknown ? WithPureRow(conversion.CalorSource!, removeRow: true) : conversion.CalorSource!;
+        var normalized = conversion.CalorSource!.ReplaceLineEndings("\n");
+        var checkedSource = unknown
+            ? normalized.Replace("ctor stat ()\n      ! unknown\n", "ctor stat ()\n", StringComparison.Ordinal)
+            : conversion.CalorSource!;
         if (unknown)
-            Assert.Contains("ctor stat ()\n      ! unknown\n", conversion.CalorSource!.ReplaceLineEndings("\n"),
+        {
+            Assert.Contains("ctor stat ()\n      ! unknown\n", normalized, StringComparison.Ordinal);
+            // 0.30 (gap A): Render may run the static constructor, so it is charged too.
+            Assert.Contains("func Render static (double:unused) → string\n      ! unknown\n", normalized,
                 StringComparison.Ordinal);
+        }
         foreach (var typing in new[] { false, true })
         {
             Assert.False(Program.Compile(conversion.CalorSource!, "concat-type-entry.calr",
@@ -752,9 +782,18 @@ public static class NumberFormat
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
         Assert.Equal(0, conversion.InteropPreservationCount);
         Assert.Empty(conversion.Losses);
+        // 0.30 (D1): an unproved initializer is declared on the type (`! unknown`), so the file
+        // converts natively; without that row it is still rejected.
+        var undeclared = WithoutTypeRows(conversion.CalorSource!, out var typeRows);
+        Assert.Equal(unknown ? 1 : 0, typeRows);
+        if (unknown)
+            Assert.Contains("class InterpolationInitializationBoundary\n    ! unknown\n",
+                conversion.CalorSource!.ReplaceLineEndings("\n"), StringComparison.Ordinal);
         foreach (var typing in new[] { false, true })
         {
-            var result = Program.Compile(conversion.CalorSource!, "interpolation-static-initializer.calr",
+            Assert.False(Program.Compile(conversion.CalorSource!, "interpolation-static-initializer.calr",
+                StrictInterpolationOptions(typing)).HasErrors);
+            var result = Program.Compile(undeclared, "interpolation-static-initializer.calr",
                 StrictInterpolationOptions(typing));
             Assert.Equal(unknown, result.HasErrors);
             if (unknown)
@@ -813,9 +852,16 @@ public static class NumberFormat
         Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
         Assert.Equal(0, conversion.InteropPreservationCount);
         Assert.Empty(conversion.Losses);
+        // 0.30 (D1): the initializer's cw is declared on the type; without the row it is rejected.
+        Assert.Contains("class InterpolationInitializationBoundary\n    ! cw\n",
+            conversion.CalorSource!.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        var undeclared = WithoutTypeRows(conversion.CalorSource!, out var typeRows);
+        Assert.Equal(1, typeRows);
         foreach (var typing in new[] { false, true })
         {
-            var result = Program.Compile(conversion.CalorSource!, "interpolation-static-effects.calr",
+            Assert.False(Program.Compile(conversion.CalorSource!, "interpolation-static-effects.calr",
+                StrictInterpolationOptions(typing)).HasErrors);
+            var result = Program.Compile(undeclared, "interpolation-static-effects.calr",
                 StrictInterpolationOptions(typing));
             Assert.Contains(result.Diagnostics.Errors, diagnostic =>
                 diagnostic.Code == DiagnosticCode.ConstructorEffectContractUnavailable
@@ -871,11 +917,21 @@ public static class NumberFormat
         Assert.Empty(conversion.Losses);
         Assert.Equal(0, conversion.DropCount);
         Assert.Equal(0, conversion.LossySubstitutionCount);
+        // 0.30 (D1): what the initializer cannot prove is declared as Holder's static-
+        // initialization row; removing the row restores the rejected program.
+        var undeclared = WithoutTypeRows(conversion.CalorSource!, out var typeRows);
+        // A source getter now resolves through its bound accessor body, like a method, so an
+        // authoritative (fixed-dispatch) pure getter is proved rather than failing closed; the
+        // "getter always fails" expectation predates that and was already failing before D1.
+        var rejected = !authoritative || effectful;
+        Assert.Equal(rejected, typeRows > 0);
         foreach (var typing in new[] { false, true })
         {
-            var result = Program.Compile(conversion.CalorSource!, "initializer-dispatch.calr",
+            Assert.False(Program.Compile(conversion.CalorSource!, "initializer-dispatch.calr",
+                StrictInterpolationOptions(typing)).HasErrors);
+            var result = Program.Compile(undeclared, "initializer-dispatch.calr",
                 StrictInterpolationOptions(typing));
-            Assert.Equal(getter || !authoritative || effectful, result.HasErrors);
+            Assert.Equal(rejected, result.HasErrors);
             if (!authoritative)
                 Assert.Contains(result.Diagnostics.Errors, diagnostic =>
                     diagnostic.Code == DiagnosticCode.UnknownExternalCall
@@ -932,9 +988,15 @@ public static class NumberFormat
         Assert.Equal(0, conversion.DropCount);
         Assert.Equal(0, conversion.LossySubstitutionCount);
         Assert.Empty(conversion.Losses);
+        // 0.30 (D1): unproved dispatch is declared as Holder's static-initialization row;
+        // removing the row restores the rejected program.
+        var undeclared = WithoutTypeRows(conversion.CalorSource!, out var typeRows);
+        Assert.Equal(dispatch == "virtual", typeRows > 0);
         foreach (var typing in new[] { false, true })
         {
-            var result = Program.Compile(conversion.CalorSource!, "initializer-helper-dispatch.calr",
+            Assert.False(Program.Compile(conversion.CalorSource!, "initializer-helper-dispatch.calr",
+                StrictInterpolationOptions(typing)).HasErrors);
+            var result = Program.Compile(undeclared, "initializer-helper-dispatch.calr",
                 StrictInterpolationOptions(typing));
             Assert.Equal(dispatch == "virtual", result.HasErrors);
             if (dispatch == "virtual")
