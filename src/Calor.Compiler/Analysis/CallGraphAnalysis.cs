@@ -2611,6 +2611,7 @@ public sealed class CallGraphAnalysis
         internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.ISymbol>
             UnsupportedMetadataMembers
         { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), string> SourceMemberOwners { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), VariableSymbol>
             SourceEnumConstants
         { get; } = new();
@@ -2697,6 +2698,10 @@ public sealed class CallGraphAnalysis
     /// </summary>
     internal Microsoft.CodeAnalysis.ISymbol? UnsupportedMetadataMember(string callerId, TextSpan span) =>
         _boundValues.UnsupportedMetadataMembers.GetValueOrDefault((callerId, span.Start, span.End));
+
+    /// <summary>The source type whose member the binder read at <paramref name="span"/>.</summary>
+    internal string? SourceMemberOwner(string callerId, TextSpan span) =>
+        _boundValues.SourceMemberOwners.GetValueOrDefault((callerId, span.Start, span.End));
 
     /// <summary>Whether the binder read the name at <paramref name="span"/> as a type (<c>System.Console</c>).</summary>
     internal bool IsTypeReference(string callerId, TextSpan span) =>
@@ -3708,6 +3713,13 @@ public sealed class CallGraphAnalysis
                         boundValues.TypeQualifiedMemberReads.Add((callerId, node.Span.Start, node.Span.End));
                     if (node is BoundTypeReferenceExpression)
                         boundValues.TypeReferences.Add((callerId, node.Span.Start, node.Span.End));
+                    if (node is BoundFieldAccessExpression
+                        {
+                            Target.Type: Binding.BoundTypes.NominalBoundType
+                                { Declaration: { } memberOwner, RoslynSymbol: null }
+                        })
+                        boundValues.SourceMemberOwners.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End), memberOwner.Name);
                     if (node is BoundFieldAccessExpression { UnsupportedMetadataMember: { } unsupportedMember })
                         boundValues.UnsupportedMetadataMembers.TryAdd(
                             (callerId, node.Span.Start, node.Span.End), unsupportedMember);
