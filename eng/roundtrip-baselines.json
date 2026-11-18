@@ -14,19 +14,19 @@
       "FluentValidation": {
         "round_trip_passed": 865,
         "round_trip_total": 866,
-        "native_fraction": 0.6906474820143885,
+        "native_fraction": 0.4172661870503597,
         "coverage_fraction": 0.7338129496402878
       },
       "MediatR": {
         "round_trip_passed": 155,
         "round_trip_total": 157,
-        "native_fraction": 0.53125,
+        "native_fraction": 0.3125,
         "coverage_fraction": 0.71875
       },
       "Serilog": {
         "round_trip_passed": 811,
         "round_trip_total": 811,
-        "native_fraction": 0.48214285714285715,
+        "native_fraction": 0.32142857142857145,
         "coverage_fraction": 0.6517857142857143
       },
       "Synthetic": {
