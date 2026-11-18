@@ -85,6 +85,56 @@ public sealed class S2ImplicationDefinednessTests
         AssertPreconditionWeakeningAssumed(diagnostics, "string-model");
     }
 
+    // 0.30: `s.Length` is a native member read, which the verifier lowers to the same string
+    // length (and string-model assumption) the retired `(len s)` operation had. The lowered
+    // length is a .NET int, so it also carries the bound `Length <= int.MaxValue`; the
+    // implication prover must assert that bound, or the solver answers `unknown` and the
+    // weakening falls back to a Calor0810 error instead of an Assumed verdict.
+    [Fact]
+    public void NativeStringLength_StrongerPrecondition_IsNotAssumed()
+    {
+        // Control for the bound: (x >= 0) does not imply (s.Length > 3) even for non-null s,
+        // so the weakening must still fail, never become Assumed or proven.
+        var diagnostics = Compile(StringSourceTemplate.Replace("IMPLPRE", "(s.Length > 3)"));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationAssumed);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+        var violation = Assert.Single(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
+        Assert.Equal(DiagnosticSeverity.Error, violation.Severity);
+    }
+
+    [Fact]
+    public void NullableReferenceString_NativeLength_IsRejectedNotAssumed()
+    {
+        // On a `string?` parameter the read itself is rejected (Calor0274), and the verifier
+        // reads `s` as a nullable reference, not a string, so nothing is proven or assumed.
+        var source = StringSourceTemplate.Replace("string:s", "string?:s")
+            .Replace("IMPLPRE", "(s.Length >= 0)");
+        var diagnostics = Compile(source);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && d.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationAssumed);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+    }
+
+    [Fact]
+    public void NullableReferenceString_ComparedWithLiteral_IsRefusedNotACrash()
+    {
+        // A `string?` is a reference sort in the solver and "" is a string-sort literal.
+        // Equating them used to throw a Z3Exception out of Program.Compile; it is refused.
+        var source = StringSourceTemplate.Replace("string:s", "string?:s")
+            .Replace("IMPLPRE", "((!string.IsNullOrEmpty(s)) || (s == \"\"))");
+        var diagnostics = Compile(source);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationAssumed);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationUnknown
+            && d.Message.StartsWith("Could not establish precondition weakening", StringComparison.Ordinal));
+        var violation = Assert.Single(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
+        Assert.Equal(DiagnosticSeverity.Error, violation.Severity);
+    }
+
     private static void AssertPreconditionWeakeningRefuted(List<Diagnostic> diagnostics, string witness)
     {
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");

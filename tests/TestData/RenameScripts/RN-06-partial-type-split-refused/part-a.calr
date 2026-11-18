@@ -1,0 +1,5 @@
+module PartA Split
+  class Counter partial
+    func One () → int
+      !
+      return 1

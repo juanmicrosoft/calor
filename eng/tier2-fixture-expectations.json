@@ -1795,17 +1795,13 @@
       ]
     },
     {
-      "id": "TestData:RenameScripts:RN-06-module-split-refused",
-      "expect": "reject",
-      "negativeKind": "designed",
+      "id": "TestData:RenameScripts:RN-06-partial-type-split-refused",
+      "expect": "compile",
       "mode": "together",
-      "errors": [
-        "part-b.g.cs|Calor1002:CS0101|-|Generated C# failed compilation (CS0101): The namespace 'Split' already contains a definition for 'SplitModule'"
-      ],
-      "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together. RN-06 script.json: \"One module, two declarations ... Calor reports nothing for the split (each file still binds); the break appears only in generated C#.\" The rename engine must refuse. Lifting the refusal is #922.",
+      "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together. RN-06 is a partial class declared in two files: a valid program the rename engine must refuse to rename (SplitDeclaration), because the edit set would cover only one part. Before 0.30 it was a module declared in two files (RN-06-module-split-refused), which 0.30 compiles as two compilation units. Lifting the refusal is #922.",
       "files": [
-        "tests/TestData/RenameScripts/RN-06-module-split-refused/part-a.calr",
-        "tests/TestData/RenameScripts/RN-06-module-split-refused/part-b.calr"
+        "tests/TestData/RenameScripts/RN-06-partial-type-split-refused/part-a.calr",
+        "tests/TestData/RenameScripts/RN-06-partial-type-split-refused/part-b.calr"
       ]
     },
     {

@@ -37,7 +37,14 @@ this corpus was being written.
 | RN-03 | a parameter shadowing a field, with a second file reading that field | applies |
 | RN-04 | renaming a local onto a name already bound in its scope | refuses (`NameCollision`) |
 | RN-05 | one overload renamed, its same-named sibling untouched | applies |
-| RN-06 | a module declared in two files | refuses (`SplitDeclaration`) |
+| RN-06 | a partial class declared in two files | refuses (`SplitDeclaration`) |
+
+RN-06 was "a module declared in two files" until 0.30 (directory
+`RN-06-module-split-refused`). A 0.30 `module` header only labels its compilation
+unit, so two files with the same label are two units, not one declaration split
+across files. Renaming one file's label edits that file alone, and calls from
+the other file still resolve through the cross-module map. A `partial` class is
+the declaration that still spans files, so RN-06 now pins the same guard on it.
 
 ## Why behaviour alone is not enough
 
