@@ -7769,9 +7769,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         };
         // A field of a struct held in a local or by-value parameter (`s.X`, `s.Inner.X`) is
         // itself a variable: both forms locate the same storage and read it before the
-        // right-hand side runs, with no receiver value to re-evaluate.
+        // right-hand side runs, with no receiver value to re-evaluate. So is a field of `this`
+        // inside a struct's own member (`Value += 1`): `this` is then a reference to the
+        // instance's storage, not a copy, and evaluating it again has no effect.
         static bool IsValueTypeVariable(Microsoft.CodeAnalysis.IOperation? instance) => instance switch
         {
+            Microsoft.CodeAnalysis.Operations.IInstanceReferenceOperation
+                { ReferenceKind: Microsoft.CodeAnalysis.Operations.InstanceReferenceKind.ContainingTypeInstance } self =>
+                self.Type?.IsValueType == true,
             Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation local =>
                 local.Local.RefKind == RefKind.None && local.Type?.IsValueType == true,
             Microsoft.CodeAnalysis.Operations.IParameterReferenceOperation parameter =>
