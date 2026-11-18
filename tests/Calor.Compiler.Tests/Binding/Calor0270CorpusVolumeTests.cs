@@ -184,7 +184,7 @@ public class Calor0270CorpusVolumeTests
         // Anti-vacuity: a ledger that measured nothing would pass every equality
         // below. Every one of the 364 inputs is either bound or a pinned refusal, and
         // the bound side is still the majority of the corpus. 0.30: the denominator
-        // is the CONVERTED modules (204), not all 364. Files the converter refuses
+        // is the CONVERTED modules (206), not all 364. Files the converter refuses
         // under the legs' options (no Calor at all) are counted in ModulesNotMeasured
         // and pinned by name and cause in the current fixture; before 0.30 every
         // input converted, so the old "> 250 bound" guard measured the same set.
@@ -302,26 +302,56 @@ public class Calor0270CorpusVolumeTests
     /// leg's output at 2cc3cf3e5 (where the fixture was pinned) against the current
     /// output, file by file.</item>
     /// </list>
+    /// <para><b>0.30 follow-up refresh (after i8): 14 / 7 / 204 bound + 160 refused became
+    /// 13 / 6 / 206 bound + 158 refused.</b> Attributed by running this leg's converter and
+    /// binder at 75a17bd5a (where the fixture was pinned; it reproduces the fixture exactly)
+    /// and at every later merge on <c>milestone-0.30</c>, file by file. Nine files move:</para>
+    /// <list type="number">
+    /// <item><b>Two refusals end (160 → 158; FluentValidation 69/147 → 71/145).</b> Both had
+    /// cause <c>scoped-namespace-fidelity</c> and convert with zero sites.
+    /// TestMessages.Designer.cs: its getters call <c>ResourceManager</c>, and a getter could
+    /// not declare a row (h1, 06f6f63fc, lets accessors declare one). CultureScope.cs: the
+    /// converter hoisted a constructor-initializer argument into a temporary with no
+    /// statement position (CS0103); i5 (5427061f0) keeps such arguments inline.</item>
+    /// <item><b>One site leaves (serilog 12/6 → 11/5).</b> SelfLog <c>DateTime . UtcNow</c>:
+    /// its method, WriteLine, is now kept as C#. Its native form called
+    /// <c>_nullcond.Value.Invoke(…)</c> on a delegate, which does not compile; i5
+    /// (5427061f0) adds <c>.Value</c> only for a <c>Nullable&lt;T&gt;</c> struct and
+    /// otherwise preserves the member. The receiver is no longer bound, so no Info.</item>
+    /// <item><b>Spelling only.</b> ServiceRegistrar <c>cts . Token</c> is now <c>cts.Token</c>,
+    /// same line, column and message: i7 (a9f260a6f) prints member access unspaced.</item>
+    /// <item><b>Positions only</b> (same span text and message):
+    /// SettingValueConversions +1 line and FailureAwareBatchScheduler +2: h1 (06f6f63fc)
+    /// writes a type's static-initialization row and accessor rows (<c>! unknown</c>).
+    /// LogContext +3 (h1), -1 (i7: a dotted read of <c>EnricherStack.Empty</c> charged
+    /// nothing, so a <c>! unknown</c> row became <c>!</c>), +1 (i8, b19dccc4d, charges that
+    /// read again and restores the row): net +3. CallableConfigurationMethodFinder -3:
+    /// i5 inlines an untyped hoisted lambda (<c>let _lam = …</c> is CS8917).
+    /// LoggerSinkConfiguration -20: i5 keeps <c>Sink(ILogEventSink, …)</c> as C# because
+    /// its native form built <c>new object(…)</c> for a target-typed <c>new</c> (CS1729).
+    /// ServiceRegistrar's <c>type</c> moves by offset only: i5 inlines a foreach lambda
+    /// whose hoisted temporary had been dropped (CS0103), and i7 unspaces member access.</item>
+    /// </list>
     /// </summary>
     [Fact]
     public void CurrentExpectation_PinsOriginalInputsAndExactVolumes()
     {
         var expected = ReadCurrentExpectation();
-        Assert.Equal(14, expected.Volume.AggregateDiagnostics);
-        Assert.Equal(7, expected.Volume.AggregateModulesWithDiagnostics);
-        Assert.Equal(204, expected.Volume.AggregateModulesBound);
+        Assert.Equal(13, expected.Volume.AggregateDiagnostics);
+        Assert.Equal(6, expected.Volume.AggregateModulesWithDiagnostics);
+        Assert.Equal(206, expected.Volume.AggregateModulesBound);
         Assert.Equal(new[]
         {
             new SubjectVolume("MediatR", 2, 1, 24, 12),
-            new SubjectVolume("serilog", 12, 6, 111, 1),
-            new SubjectVolume("FluentValidation", 0, 0, 69, 147)
+            new SubjectVolume("serilog", 11, 5, 111, 1),
+            new SubjectVolume("FluentValidation", 0, 0, 71, 145)
         }, expected.Volume.PerSubject);
-        // The 160 refusals, by cause. Each is a file the converter returns no Calor for
+        // The 158 refusals, by cause. Each is a file the converter returns no Calor for
         // under the legs' options (see the 0.30 note on AggregateDiagnostics below).
         Assert.Equal(new Dictionary<string, int>
         {
             ["namespace-topology"] = 13,
-            ["scoped-namespace-fidelity"] = 6,
+            ["scoped-namespace-fidelity"] = 4,
             ["scoped-namespace-source-validation"] = 141,
         }, expected.Files.Values.Where(file => file.Refusal != null)
             .GroupBy(file => file.Refusal!).ToDictionary(group => group.Key, group => group.Count()));

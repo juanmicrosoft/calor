@@ -2,9 +2,9 @@
   "Volume": {
     "Scope": "Calor0270 (SignatureUnresolved) emitted by Binder.Bind over the three A-1.5.3 conversion subjects at their pinned submodule commits, converted in-process with Lossy/SelectActiveBranchLossy and genuinely empty default preprocessor symbols; modules that fail conversion or whose converted output fails to parse are excluded from the denominator and counted separately",
     "BindRule": "parsed",
-    "AggregateDiagnostics": 14,
-    "AggregateModulesWithDiagnostics": 7,
-    "AggregateModulesBound": 204,
+    "AggregateDiagnostics": 13,
+    "AggregateModulesWithDiagnostics": 6,
+    "AggregateModulesBound": 206,
     "PerSubject": [
       {
         "Subject": "MediatR",
@@ -15,8 +15,8 @@
       },
       {
         "Subject": "serilog",
-        "Diagnostics": 12,
-        "ModulesWithDiagnostics": 6,
+        "Diagnostics": 11,
+        "ModulesWithDiagnostics": 5,
         "ModulesBound": 111,
         "ModulesNotMeasured": 1
       },
@@ -24,8 +24,8 @@
         "Subject": "FluentValidation",
         "Diagnostics": 0,
         "ModulesWithDiagnostics": 0,
-        "ModulesBound": 69,
-        "ModulesNotMeasured": 147
+        "ModulesBound": 71,
+        "ModulesNotMeasured": 145
       }
     ]
   },
@@ -136,8 +136,7 @@
     },
     "FluentValidation/src/FluentValidation.Tests/CultureScope.cs": {
       "SourceHash": "f784f4faec50a2332bf8b451d68636f3e5c14877b24a8b9e8a0a834236009c88",
-      "Sites": [],
-      "Refusal": "scoped-namespace-fidelity"
+      "Sites": []
     },
     "FluentValidation/src/FluentValidation.Tests/CustomMessageFormatTester.cs": {
       "SourceHash": "5d11fe9fc86d6747060624e4b8773561fd43c2eeb0b17d644e62a51c76912379",
@@ -360,8 +359,7 @@
     },
     "FluentValidation/src/FluentValidation.Tests/TestMessages.Designer.cs": {
       "SourceHash": "79937170bb1cf2aa632e80bb6821561630fefbac834ccd1697b4e158bf50fc3c",
-      "Sites": [],
-      "Refusal": "scoped-namespace-fidelity"
+      "Sites": []
     },
     "FluentValidation/src/FluentValidation.Tests/TestValidator.cs": {
       "SourceHash": "1ddb14b807065dec4263350521465e6f80293b20dd1a7ed5f9ea8abd3eb239b5",
@@ -1180,17 +1178,17 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 1207,
-          "End": 1218,
+          "Start": 1199,
+          "End": 1208,
           "Line": 28,
           "Column": 54,
           "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reads.",
-          "SpanText": "cts . Token"
+          "SpanText": "cts.Token"
         },
         {
           "Code": "Calor0270",
-          "Start": 2081,
-          "End": 2085,
+          "Start": 2126,
+          "End": 2130,
           "Line": 47,
           "Column": 48,
           "Message": "Receiver \u0027type\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
@@ -1273,9 +1271,9 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 6381,
-          "End": 6383,
-          "Line": 91,
+          "Start": 5113,
+          "End": 5115,
+          "Line": 71,
           "Column": 23,
           "Message": "Receiver \u0027lc\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "lc"
@@ -1291,9 +1289,9 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 6726,
-          "End": 6734,
-          "Line": 111,
+          "Start": 6762,
+          "End": 6770,
+          "Line": 114,
           "Column": 9,
           "Message": "Receiver \u0027enricher\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "enricher"
@@ -1433,9 +1431,9 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 3371,
-          "End": 3374,
-          "Line": 51,
+          "Start": 3387,
+          "End": 3390,
+          "Line": 53,
           "Column": 26,
           "Message": "Receiver \u0027now\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "now"
@@ -1492,17 +1490,7 @@
     },
     "serilog/src/Serilog/Debugging/SelfLog.cs": {
       "SourceHash": "e220b628d5c4d27858f421e17157d4757c66c5f59dd913c7c48c8016bd1f74cc",
-      "Sites": [
-        {
-          "Code": "Calor0270",
-          "Start": 2016,
-          "End": 2033,
-          "Line": 44,
-          "Column": 52,
-          "Message": "Metadata member resolution incomplete: The member result is outside supported scalar reads.",
-          "SpanText": "DateTime . UtcNow"
-        }
-      ]
+      "Sites": []
     },
     "serilog/src/Serilog/Events/DictionaryValue.cs": {
       "SourceHash": "1c95dff73b65e0fc65c87ee459dda254f570136bd325baff5baabdcf7c96101e",
@@ -1690,45 +1678,45 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 819,
-          "End": 826,
-          "Line": 10,
+          "Start": 755,
+          "End": 762,
+          "Line": 7,
           "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         },
         {
           "Code": "Calor0270",
-          "Start": 947,
-          "End": 954,
-          "Line": 12,
+          "Start": 881,
+          "End": 888,
+          "Line": 9,
           "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         },
         {
           "Code": "Calor0270",
-          "Start": 1076,
-          "End": 1083,
-          "Line": 14,
+          "Start": 1008,
+          "End": 1015,
+          "Line": 11,
           "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         },
         {
           "Code": "Calor0270",
-          "Start": 1207,
-          "End": 1214,
-          "Line": 16,
+          "Start": 1137,
+          "End": 1144,
+          "Line": 13,
           "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
         },
         {
           "Code": "Calor0270",
-          "Start": 1336,
-          "End": 1343,
-          "Line": 18,
+          "Start": 1264,
+          "End": 1271,
+          "Line": 15,
           "Column": 9,
           "Message": "Receiver \u0027methods\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "methods"
@@ -1744,27 +1732,27 @@
       "Sites": [
         {
           "Code": "Calor0270",
-          "Start": 5999,
-          "End": 6012,
-          "Line": 133,
+          "Start": 6013,
+          "End": 6026,
+          "Line": 134,
           "Column": 24,
           "Message": "Receiver \u0027rawMemberName\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "rawMemberName"
         },
         {
           "Code": "Calor0270",
-          "Start": 6050,
-          "End": 6071,
-          "Line": 134,
+          "Start": 6064,
+          "End": 6085,
+          "Line": 135,
           "Column": 31,
           "Message": "Receiver \u0027shortAccessorTypeName\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "shortAccessorTypeName"
         },
         {
           "Code": "Calor0270",
-          "Start": 6081,
-          "End": 6096,
-          "Line": 134,
+          "Start": 6095,
+          "End": 6110,
+          "Line": 135,
           "Column": 62,
           "Message": "Receiver \u0027extraQualifiers\u0027 is an inferred local whose type the binder could not determine, so the call\u0027s receiver type is unresolved. Analyses that need the type report the call as unresolved rather than guess one; give the binding an explicit type, or call through the declaring type.",
           "SpanText": "extraQualifiers"
