@@ -7291,13 +7291,30 @@ public sealed class Binder
                     // A dotted receiver already reported its own undefined prefix.
                     receiverReportedError = receiverName.Contains('.') && _diagnostics.Errors.Count != errorsBefore;
                 }
+                // 0.30: a receiver that is itself a member read on a type (`DateTime.Now` in
+                // `DateTime.Now.Year`, `Outer.Holder.Instance` in `Outer.Holder.Instance.Size`)
+                // binds as that member read, so the chain reads members exactly like the
+                // spaced `DateTime . Now . Year`.
+                var typeRootedChain = false;
+                if (receiver is null && IsTypeRootedMemberRead(receiverNode))
+                {
+                    var errorsBefore = _diagnostics.Errors.Count;
+                    receiver = BindReferenceExpression(receiverNode);
+                    typeRootedChain = true;
+                    // A selected metadata member whose result type the binder cannot carry
+                    // (`DateTime.Now`) reports itself unresolved, but it is not undefined.
+                    receiverReportedError = _diagnostics.Errors.Count != errorsBefore
+                        && receiver is not BoundFieldAccessExpression { UnsupportedMetadataMember: not null };
+                }
+                else if (receiver is BoundFieldAccessExpression { SourceStaticFieldOwner: not null })
+                    typeRootedChain = true;
                 // The member read binds exactly as the spaced form does. On a user type the
                 // member must exist (a declared field or property), or the undefined-name
                 // report below still applies; past an unknown-typed member read in the
                 // chain, the spaced form's binding is all there is to know.
                 var memberName = refNode.Name[(lastDot + 1)..];
                 ClassDefinitionNode? receiverClass = null;
-                if (variableRoot && !receiverReportedError
+                if ((variableRoot || typeRootedChain) && !receiverReportedError
                     && (receiver is BoundVariableExpression or BoundFieldAccessExpression
                             && receiver.Type is BoundTypes.NominalBoundType { Declaration: { } receiverType, RoslynSymbol: null }
                             && _classesByQualifiedName.TryGetValue(receiverType.QualifiedName, out receiverClass)
@@ -7339,6 +7356,17 @@ public sealed class Binder
                     if (member.Type is not BoundTypes.UnresolvedBoundType)
                         return member;
                     unresolvedMember = member;
+                }
+                else if (typeRootedChain && !receiverReportedError
+                    && receiver is BoundFieldAccessExpression { Type: BoundTypes.UnresolvedBoundType })
+                {
+                    // As the spaced `(DateTime.Now) . Year`: a member of a value whose type the
+                    // binder cannot carry stays unresolved, but the qualifier's own read (and
+                    // its selected metadata member) stays in the tree for later passes.
+                    var memberSpan = new Parsing.TextSpan(
+                        refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
+                        refNode.Span.Line, refNode.Span.Column + lastDot + 1);
+                    return BindFieldAccess(new FieldAccessNode(refNode.Span, receiverNode, memberName, memberSpan), receiver);
                 }
             }
 
@@ -7430,6 +7458,29 @@ public sealed class Binder
         return new BoundVariableExpression(
             refNode.Span,
             CreateUnresolvedVariable(refNode));
+    }
+
+    /// <summary>
+    /// Whether a dotted name is a member read on a type (<c>DateTime.Now</c>,
+    /// <c>System.DateTime.Now</c>, <c>Outer.Holder.Instance</c>): a proper prefix names a
+    /// source or metadata type, the name itself is not a type, and no value in scope
+    /// shadows its first segment (that is a member read on the value instead).
+    /// </summary>
+    private bool IsTypeRootedMemberRead(ReferenceNode reference)
+    {
+        var segments = reference.Name.Split('.');
+        if (segments.Length < 2 || segments.Any(segment => segment.Length == 0)
+            || IsTypeReceiverHeadShadowed(segments[0], allowDeclaredTypes: true)
+            || IsTypeName(reference.Name))
+            return false;
+        for (var count = segments.Length - 1; count >= 1; count--)
+            if (IsTypeName(string.Join('.', segments[..count])))
+                return true;
+        return false;
+
+        bool IsTypeName(string name) =>
+            ResolveSourceType(name, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId).Type is not null
+            || TryBindMetadataTypeReceiver(new ReferenceNode(reference.Span, name, reference.IsVerbatim)) is not null;
     }
 
     private BoundExpression? TryBindSourceStaticFieldReference(ReferenceNode refNode)

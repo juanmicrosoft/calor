@@ -2606,6 +2606,12 @@ public sealed class CallGraphAnalysis
             MetadataFields
         { get; } = new();
         internal HashSet<(string CallerId, int Start, int End)> TypeQualifiedMetadataFields { get; } = new();
+        internal HashSet<(string CallerId, int Start, int End)> TypeQualifiedMemberReads { get; } = new();
+        internal HashSet<(string CallerId, int Start, int End)> TypeReferences { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.ISymbol>
+            UnsupportedMetadataMembers
+        { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), string> SourceMemberOwners { get; } = new();
         internal Dictionary<(string CallerId, int Start, int End), VariableSymbol>
             SourceEnumConstants
         { get; } = new();
@@ -2683,6 +2689,28 @@ public sealed class CallGraphAnalysis
     /// </summary>
     internal bool IsTypeQualifiedMetadataField(string callerId, TextSpan span) =>
         _boundValues.TypeQualifiedMetadataFields.Contains((callerId, span.Start, span.End));
+
+    /// <summary>
+    /// Whether the binder read the member at <paramref name="span"/> on a type
+    /// (<c>System.DateTime.Now</c>, <c>Outer.Holder.Instance</c>): its qualifier evaluates nothing.
+    /// </summary>
+    internal bool IsTypeQualifiedMemberRead(string callerId, TextSpan span) =>
+        _boundValues.TypeQualifiedMemberReads.Contains((callerId, span.Start, span.End));
+
+    /// <summary>
+    /// The metadata member the binder selected at <paramref name="span"/> whose result type it
+    /// cannot carry (a non-builtin struct such as <c>DateTime</c> from <c>DateTime.Now</c>).
+    /// </summary>
+    internal Microsoft.CodeAnalysis.ISymbol? UnsupportedMetadataMember(string callerId, TextSpan span) =>
+        _boundValues.UnsupportedMetadataMembers.GetValueOrDefault((callerId, span.Start, span.End));
+
+    /// <summary>The source type whose member the binder read at <paramref name="span"/>.</summary>
+    internal string? SourceMemberOwner(string callerId, TextSpan span) =>
+        _boundValues.SourceMemberOwners.GetValueOrDefault((callerId, span.Start, span.End));
+
+    /// <summary>Whether the binder read the name at <paramref name="span"/> as a type (<c>System.Console</c>).</summary>
+    internal bool IsTypeReference(string callerId, TextSpan span) =>
+        _boundValues.TypeReferences.Contains((callerId, span.Start, span.End));
 
     internal VariableSymbol? SourceEnumConstant(string callerId, TextSpan span) =>
         _boundValues.SourceEnumConstants.GetValueOrDefault((callerId, span.Start, span.End));
@@ -3733,6 +3761,20 @@ public sealed class CallGraphAnalysis
                             ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol { IsStatic: true }
                         })
                         boundValues.TypeQualifiedMetadataFields.Add((callerId, node.Span.Start, node.Span.End));
+                    if (node is BoundFieldAccessExpression { Target: BoundTypeReferenceExpression })
+                        boundValues.TypeQualifiedMemberReads.Add((callerId, node.Span.Start, node.Span.End));
+                    if (node is BoundTypeReferenceExpression)
+                        boundValues.TypeReferences.Add((callerId, node.Span.Start, node.Span.End));
+                    if (node is BoundFieldAccessExpression
+                        {
+                            Target.Type: Binding.BoundTypes.NominalBoundType
+                                { Declaration: { } memberOwner, RoslynSymbol: null }
+                        })
+                        boundValues.SourceMemberOwners.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End), memberOwner.Name);
+                    if (node is BoundFieldAccessExpression { UnsupportedMetadataMember: { } unsupportedMember })
+                        boundValues.UnsupportedMetadataMembers.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End), unsupportedMember);
                     if (node is BoundFieldAccessExpression
                         {
                             Target: BoundTypeReferenceExpression { ResolvedType.IsEnum: true },

@@ -596,6 +596,14 @@ cannot look up is never quietly treated as harmless.
 Collection mutators such as `Add`, `Remove`, `Clear`, `Insert`, `Sort`, and
 `CopyTo` are not on the known-pure list.
 
+Reading a property runs its getter, so every read is charged the getter's
+effects. That includes each step of a chain rooted at a type: in
+`DateTime.Now.Year`, the `Now` read is charged `time` and the `Year` read is
+pure. It also includes a property sub-pattern such as `{ Balance: > 0 }`, which
+reads `Balance`. A match case's `when` guard is charged like the case body. A
+dotted name the compiler cannot resolve to a type, member, constant or enum
+member is charged `unknown`, never treated as pure.
+
 ### Asking the index
 
 `calor query effects Name` reports a callable's declared row, inferred body

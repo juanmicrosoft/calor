@@ -192,6 +192,92 @@ public sealed class UnspacedMemberAccessEquivalenceTests
         }
     }
 
+    /// <summary>
+    /// 0.30 (i8): a chain rooted at a type whose qualifier is itself a member read stays one
+    /// dotted name when written unspaced (the parser cannot tell where the type name ends),
+    /// so the trees differ; the binder and the effect pass must still read it exactly as the
+    /// spaced member access, and produce the same diagnostics, effects and C#.
+    /// </summary>
+    public static TheoryData<string, string> TypeRootedChains => new()
+    {
+        { "metadata-struct-result", """
+            module Clock
+              func Year public () → int
+                ! time
+                return DateTime.Now~Year
+
+              func YearPure public () → int
+                !
+                return DateTime.Now~Year
+
+              func Qualified public () → int
+                ! time
+                return System.DateTime.Now~Year
+            """ },
+        { "metadata-reference-result", """
+            module Writer
+              func Width public () → int
+                ! unknown
+                return Console.Out~NewLine~Length
+
+              func WidthPure public () → int
+                !
+                return Console.Out~NewLine~Length
+            """ },
+        { "nested-source-static", """
+            module Nested
+              class Outer
+                class Inner public
+                  field Inner:Instance public static = new Inner()
+                  field int:Size public
+
+              func Read public () → int
+                ! alloc
+                return Outer.Inner~Instance~Size
+
+              func ReadPure public () → int
+                !
+                return Outer.Inner~Instance~Size
+            """ },
+    };
+
+    [Theory]
+    [MemberData(nameof(TypeRootedChains))]
+    public void TypeRootedChains_BothSpellings_CompileIdentically(string name, string template)
+    {
+        var unspaced = template.Replace("~", ".", StringComparison.Ordinal);
+        var spaced = template.Replace("~", " . ", StringComparison.Ordinal);
+        // The unspaced spelling keeps the dotted name: this is the case the parser cannot lower.
+        Assert.Contains(Nodes(Parse(unspaced)), node => node is ReferenceNode reference
+            && reference.Name.Count(c => c == '.') >= 2);
+        // The type checker warns that it cannot type the spaced `Outer.Inner . Instance`
+        // (Calor0200, a nested type); that warning is not about effects and is set aside.
+        static string WithoutTypeWarnings(string observed) => string.Join("\n", observed.Split('\n')
+            .Where(line => !line.StartsWith("Calor0200 Warning", StringComparison.Ordinal)));
+        foreach (var options in Options())
+            Assert.Equal(WithoutTypeWarnings(Observe(spaced, options())),
+                WithoutTypeWarnings(Observe(unspaced, options())));
+        var strict = Observe(unspaced, Options()[1]());
+        switch (name)
+        {
+            case "metadata-struct-result":
+                // DateTime.Now is `time` in the manifest and DateTime.Year is pure.
+                Assert.Contains("Function 'YearPure' uses effect 'time'", strict, StringComparison.Ordinal);
+                Assert.DoesNotContain("Function 'Year' uses", strict, StringComparison.Ordinal);
+                Assert.DoesNotContain("Function 'Qualified' uses", strict, StringComparison.Ordinal);
+                break;
+            case "metadata-reference-result":
+                Assert.Contains("TextWriter.get_NewLine", strict, StringComparison.Ordinal);
+                Assert.Contains("Function 'WidthPure' uses effect 'unknown'", strict, StringComparison.Ordinal);
+                Assert.DoesNotContain("Function 'Width' uses", strict, StringComparison.Ordinal);
+                break;
+            case "nested-source-static":
+                Assert.Contains("Function 'ReadPure' uses effect 'alloc'", strict, StringComparison.Ordinal);
+                Assert.DoesNotContain("Function 'Read' uses", strict, StringComparison.Ordinal);
+                break;
+        }
+    }
+
     [Fact]
     public void NamespaceTypeAndEnumHeads_KeepTheirQualifiedNames()
     {
