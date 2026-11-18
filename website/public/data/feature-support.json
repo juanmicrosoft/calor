@@ -514,11 +514,6 @@
           "workaround": "Use an existing lambda binding with calls after its declaration, or let the converter preserve the original C# member"
         },
         {
-          "name": "untyped-block-lambda",
-          "description": "A block-bodied lambda passed as an argument is bound to a temp before the call; when a parameter type cannot be inferred the temp has no C# delegate type, so the containing member is preserved as C# interop",
-          "workaround": "Declare the lambda parameter types, or keep the counted interop"
-        },
-        {
           "name": "complex-is-pattern",
           "description": "Simple is-pattern checks and declaration patterns convert natively; property and positional patterns preserve C# to retain evaluation and binding semantics"
         },
@@ -704,6 +699,11 @@
           "name": "partial-property",
           "description": "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as converter-owned C# interop; Calor has no partial members",
           "workaround": "Merge the defining and implementing declarations into one ordinary property before migration, or let the converter preserve both original C# declarations"
+        },
+        {
+          "name": "untyped-block-lambda",
+          "description": "A block-bodied lambda passed as an argument is bound to a temp before the call; when a parameter type cannot be inferred the temp has no C# delegate type, so the containing member is preserved as C# interop",
+          "workaround": "Declare the lambda parameter types, or keep the counted interop"
         },
         {
           "name": "default-lambda-parameter",

@@ -867,7 +867,7 @@ public static class FeatureSupport
         ["untyped-block-lambda"] = new FeatureInfo
         {
             Name = "untyped-block-lambda",
-            Support = SupportLevel.Partial,
+            Support = SupportLevel.NotSupported,
             Description = "A block-bodied lambda passed as an argument is bound to a temp before the call; when a parameter type cannot be inferred the temp has no C# delegate type, so the containing member is preserved as C# interop",
             Workaround = "Declare the lambda parameter types, or keep the counted interop"
         },
