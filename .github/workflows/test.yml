@@ -126,7 +126,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 0.30 (#1730): with full history the two historical replays below rebuild an archived
+    # compiler each (formatter about 2.5 min, binder about 1 min locally). Main's green runs
+    # took 5-6 min without them; 0.30 runs reached 11-13 min before failing.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
