@@ -498,6 +498,51 @@ public class Issue769NamespaceTopologyTests
         Assert.Null(compilation.GetTypeByMetadataName("Alpha.Beta.Survivor"));
     }
 
+    // 0.30: parts of a namespace-less partial class sit in the module's global scope, whose
+    // usings the parser keeps at module level (no scope). The merger tagged the donor's usings
+    // with the global scope id, which duplicated the target's own using and made native module
+    // emission throw ("cannot flatten distinct namespace or using scopes"), failing the whole
+    // `migrate --merge-partials` run. They now merge at module level, once each.
+    [Fact]
+    public void PartialMerge_GlobalScopeUsings_MergeAtModuleLevel()
+    {
+        var target = ParseCalor("""
+            module First
+              using System.Collections.Generic
+
+              class Bag partial
+                func A () → int
+                  !
+                  return 1
+
+            """);
+        var donor = ParseCalor("""
+            module Second
+              using System.Collections.Generic
+              using System.Text
+
+              class Bag partial
+                func B () → int
+                  !
+                  return 2
+
+            """);
+        var targetClass = Assert.Single(target.Classes);
+        Assert.Contains(target.NamespaceScopes, scope => scope.IsGlobal && scope.Id == targetClass.NamespaceScopeId);
+
+        var merged = new PartialClassMerger().Merge([target, donor]);
+        Assert.Equal(2, Assert.Single(merged[0].Classes).Methods.Count);
+        Assert.Empty(merged[1].Classes);
+        Assert.All(merged[0].Usings, directive => Assert.Null(directive.NamespaceScopeId));
+        Assert.Equal(new[] { "System.Collections.Generic", "System.Text" },
+            merged[0].Usings.Select(directive => directive.Namespace).ToArray());
+
+        var calor = new CalorEmitter(new ConversionContext()).Emit(merged[0]);
+        var generated = new CSharpEmitter().Emit(ParseCalor(calor));
+        Assert.Single(generated.Split('\n'), line => line.Trim() == "using System.Collections.Generic;");
+        AssertNoCompilationErrors(CreateCompilation(generated));
+    }
+
     [Fact]
     public void SimplifiableContracts_PreserveOneNamespaceAndDeclarationMetadata()
     {
