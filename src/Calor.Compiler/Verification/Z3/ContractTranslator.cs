@@ -989,6 +989,14 @@ public sealed class ContractTranslator
                 return Refuse(refusal);
         }
 
+        // Equality across solver sorts has no model (a `string?` reads as a reference sort, a
+        // string literal as the string sort); Z3 would throw on it, so refuse it instead.
+        if (node.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
+            && !(left is BitVecExpr && right is BitVecExpr)
+            && !(left is ArithExpr && right is ArithExpr)
+            && !left.Sort.Equals(right.Sort))
+            return Refuse($"'{node.Operator}' compares values of different solver sorts ({left.Sort} and {right.Sort}).");
+
         return node.Operator switch
         {
             // Arithmetic operations (require BitVecExpr for fixed-width semantics)
