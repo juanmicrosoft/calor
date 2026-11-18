@@ -743,7 +743,9 @@ public sealed class WebsiteExampleCheckerTests
     // (complete 152 -> 275, negative 7 -> 23, illustrative 34 -> 31), mostly in the syntax
     // reference and current-language pages rewritten between the cutover and the 3b439c47a
     // checkpoint. Re-pinned in the 0.30 stale-test triage; no page is skipped.
-    private const string Pinned = "pages=98 complete=275 negative=23 grouped=3 checkedOutputs=2 illustrative=31";
+    // 0.30 D1 (h1): complete 275 -> 277, the Accessors and Settings (static-initialization row)
+    // examples in syntax-reference/effects.mdx; both are also executed by MarkdownReferenceTests.
+    private const string Pinned = "pages=98 complete=277 negative=23 grouped=3 checkedOutputs=2 illustrative=31";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]
