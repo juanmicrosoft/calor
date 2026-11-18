@@ -218,6 +218,7 @@ public static class BindingDiagnosticPolicy
                 "Invalid module instance shapes and extension declaration containers must fail before C# emission.", 1619),
             Active(DiagnosticCode.EffectRowMisplaced, "Effect-row declaration placement is already enforced."),
             Active(DiagnosticCode.EffectVariableScope, "Unbound effect-row variables are already enforced."),
+            Active(DiagnosticCode.MissingCallableEffectRow, "0.30 decision D2: an omitted callback parameter or return row is a hard error before the effect pass; '! unknown' is the explicit spelling."),
             new(DiagnosticCode.InvalidByReferenceOperand, BindingDiagnosticDisposition.CompilationError,
                 "A ref/out/in operand C# cannot pass by reference would otherwise fail only in generated C# (Calor1002); D1 RO-LV-2/RO-DECL-2.", 943),
             new(DiagnosticCode.WriteToReadOnlyLocal, BindingDiagnosticDisposition.CompilationError,

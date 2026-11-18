@@ -49,7 +49,8 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void EveryCatalogEntry_HasAnExplicitDispositionReasonAndOwner()
     {
-        Assert.Equal(22, BindingDiagnosticPolicy.Catalog.Count); // Native metadata calls retain the array-to-collection error.
+        // Native metadata calls retain the array-to-collection error; 0.30 adds Calor0407 (D2).
+        Assert.Equal(23, BindingDiagnosticPolicy.Catalog.Count);
         Assert.DoesNotContain(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticPolicy.Catalog.Keys);
         foreach (var (code, rule) in BindingDiagnosticPolicy.Catalog)
         {

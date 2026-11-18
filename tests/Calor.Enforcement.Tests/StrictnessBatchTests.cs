@@ -2281,6 +2281,51 @@ module E E block
             || d.Code == DiagnosticCode.ForbiddenEffect);
     }
 
+    /// <summary>
+    /// A3-middleware's native shape: a class method passes its rowed callback to a
+    /// row-polymorphic function of a sibling module, which C# requires to be
+    /// qualified (<c>Lib.RunTwice(next)</c>). The qualified call resolves to Calor
+    /// source, so the callback is charged through RunTwice's parameter row — the
+    /// same as the bare-name call — and is verified, not assumed (no Calor0419).
+    /// The negative half pins that this is not a waiver: a caller narrower than
+    /// the instantiated row is still Calor0410.
+    /// </summary>
+    [Fact]
+    public void Invocation_QualifiedSourceCallee_ChargesTheCallbackRow_NotAnAssumption()
+    {
+        static string Source(string handleRow) => $$"""
+            module Mid Mid block
+              class Retry
+                func Handle <! e> (int:request, Func<int>:next ! e) → int
+                  {{handleRow}}
+                  return Lib.RunTwice(next)
+
+              module Lib partial
+                func RunTwice <! e> (Func<int>:g ! e) → int
+                  ! e
+                  return (g() + g())
+            """;
+
+        var verified = TestHarness.Compile(Source("! e"));
+        Assert.False(verified.HasErrors, string.Join("; ", verified.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.DoesNotContain(verified.Diagnostics, d => d.Code == DiagnosticCode.AssumedEffects);
+
+        var narrowed = TestHarness.Compile(Source("!"));
+        Assert.Contains(narrowed.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+            && d.Message.Contains("RunTwice's row instantiates to e", StringComparison.Ordinal));
+
+        // A metadata receiver may still invoke the value invisibly: assumed.
+        var metadata = TestHarness.Compile("""
+            module Ext Ext block
+              module M partial
+                func Keep (Action:g ! cw, System.Collections.Generic.List<Action>:sink) → void
+                  ! cw, mut
+                  sink.Add(g)
+            """);
+        Assert.Contains(metadata.Diagnostics, d => d.Code == DiagnosticCode.AssumedEffects
+            && d.Message.Contains("passes function-typed value 'g'", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void MessageTexts_Calor0410_InvocationProvenance_IsTheDesignDocSample()
     {

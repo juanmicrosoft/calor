@@ -1,5 +1,5 @@
 module AllowlistAudit AllowlistAudit block
-  module AllowlistAuditModule partial
+  module AllowlistAuditModule
     func StartsWith private (string:text, string:prefix) → bool
       let int:n = prefix.Length
       if (n > text.Length)
@@ -33,21 +33,21 @@ module AllowlistAudit AllowlistAudit block
       return false
 
     func Report private (string:entry, string:problem) → void
-      System.Console.WriteLine(("  " + (entry + (" — " + problem))))
+      Console.WriteLine(("  " + (entry + (" — " + problem))))
 
     func Main () → int
       ! fs:r, cw, mut, alloc
       let string:file = ".calor-csharp-allowlist"
       let bool:present = File.Exists(file)
       if (!present)
-        System.Console.WriteLine("allowlist-audit: .calor-csharp-allowlist not found (run from the repository root).")
+        Console.WriteLine("allowlist-audit: .calor-csharp-allowlist not found (run from the repository root).")
         return 2
       let string[]:lines = File.ReadAllLines(file)
-      let List<string>:seen = new System.Collections.Generic.List<string>()
+      let List<string>:seen = new List<string>()
       var int:findings = 0
       var int:entries = 0
       var bool:pending = false
-      System.Console.WriteLine("allowlist-audit: checking .calor-csharp-allowlist")
+      Console.WriteLine("allowlist-audit: checking .calor-csharp-allowlist")
       each @raw in lines
         let bool:skip = IsSkippable(@raw)
         if skip
@@ -80,12 +80,12 @@ module AllowlistAudit AllowlistAudit block
                   set findings (findings + 1)
               if (!onDisk)
                 if pending
-                  System.Console.WriteLine(("  " + (entry + " — pending: pre-registered, file not merged yet")))
+                  Console.WriteLine(("  " + (entry + " — pending: pre-registered, file not merged yet")))
                 if (!pending)
                   Report(entry, "does not exist; a stale entry keeps permission alive for a path nothing occupies")
                   set findings (findings + 1)
           set pending false
-      System.Console.WriteLine((((("allowlist-audit: " + entries) + " entries, ") + findings) + " finding(s)"))
+      Console.WriteLine((((("allowlist-audit: " + entries) + " entries, ") + findings) + " finding(s)"))
       if (findings > 0)
         return 1
       return 0
