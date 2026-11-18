@@ -258,11 +258,15 @@ public sealed class SpikeVerdictTests
     /// rather than assumed. If it fails, E2 does not ship — monomorphic or not.
     ///
     /// <para>Two legs. <b>Leg 1 checks current semantics</b>: A1's and A2's
-    /// explicitly translated active copies are emitted with the CURRENT compiler
-    /// and diffed against the committed <c>before/*.g.cs</c>. This checks that
-    /// syntax migration preserves codegen; it does not recompile historical raw
-    /// input or remeasure the original experiment. <b>Leg 2 compares</b> the committed
-    /// before/after pairs, which needs no compiler.</para>
+    /// explicitly translated active copies are emitted with the CURRENT compiler.
+    /// 1a compares the before/ and after/ copies (modulo #line numbers), which is
+    /// G-CODEGEN recomputed on the 0.30 compiler. 1b diffs the before/ copy against
+    /// the committed <c>before/*.g.cs</c> under three named 0.30 layout differences
+    /// (#line numbers, blank lines, the archived emitter's fixed using set). This
+    /// checks that syntax migration preserves codegen; it does not recompile
+    /// historical raw input or remeasure the original experiment. <b>Leg 2
+    /// compares</b> the committed before/after pairs byte-strictly, which needs no
+    /// compiler.</para>
     ///
     /// <para>A <c>#line N "&lt;source&gt;.calr"</c> directive tracks the SOURCE,
     /// so it necessarily moves when the author adds an annotation line. That is
@@ -275,29 +279,53 @@ public sealed class SpikeVerdictTests
     {
         var failures = new List<string>();
 
-        // Leg 1 — compare active-copy codegen to the archived BEFORE artifact.
+        // Leg 1 — current semantics, on the explicitly translated active copies.
         foreach (var artifact in BlockingArtifacts)
         {
             var committed = Path.Combine(SpikeDirectory(), "before", artifact + ".g.cs.txt");
             Assert.True(File.Exists(committed), $"Missing before/{artifact}.g.cs");
 
-            var active = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(),
+            var activeBefore = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(),
                 Path.Combine(SpikeDirectory(), "before", artifact + ".calr"));
-            var reEmitted = ReEmit(active);
-            if (reEmitted == null)
+            var activeAfter = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(),
+                Path.Combine(SpikeDirectory(), "after", artifact + ".calr"));
+            var reEmittedBefore = ReEmit(activeBefore);
+            var reEmittedAfter = ReEmit(activeAfter);
+            if (reEmittedBefore == null || reEmittedAfter == null)
             {
                 failures.Add(
-                    $"{artifact}: active migration copy {active} did not emit with this compiler.");
+                    $"{artifact}: active migration copy {(reEmittedBefore == null ? activeBefore : activeAfter)} "
+                    + "did not emit with this compiler.");
                 continue;
             }
 
-            if (!string.Equals(Normalize(File.ReadAllText(committed)), Normalize(reEmitted),
-                    StringComparison.Ordinal))
+            // 1a — G-CODEGEN recomputed by the current compiler: the rowed AFTER copy
+            // and the row-less BEFORE copy emit the same C# outside #line numbers.
+            if (!NormalizeLineDirectives(Normalize(reEmittedBefore).Split('\n'))
+                    .SequenceEqual(NormalizeLineDirectives(Normalize(reEmittedAfter).Split('\n')), StringComparer.Ordinal))
             {
                 failures.Add(
-                    $"{artifact}: active migration copy {active} no longer reproduces the committed "
-                    + $"before/{artifact}.g.cs. Investigate syntax migration or codegen without "
-                    + "rewriting the historical artifact or its measurement.");
+                    $"{artifact}: the current compiler emits different C# for the active before/ and "
+                    + "after/ copies outside #line directives — a row changed codegen.");
+            }
+
+            // 1b — the translation preserves the archived codegen. The 0.30 emitter
+            // differs from the archived one in layout only, and each difference is named:
+            // #line numbers follow the translated source's lines; blank lines are dropped
+            // (the 0.30 emitter follows a native call statement with one); and the
+            // archived emitter added a
+            // fixed set of using directives, so the current set must be a subset of it.
+            // Every other line is compared byte for byte.
+            var (archivedLines, archivedUsings) = CurrentEmitterLayout(File.ReadAllText(committed));
+            var (currentLines, currentUsings) = CurrentEmitterLayout(reEmittedBefore);
+            if (!archivedLines.SequenceEqual(currentLines, StringComparer.Ordinal)
+                || !currentUsings.IsSubsetOf(archivedUsings))
+            {
+                failures.Add(
+                    $"{artifact}: active migration copy {activeBefore} no longer reproduces the committed "
+                    + $"before/{artifact}.g.cs outside the named 0.30 layout differences. Investigate "
+                    + "syntax migration or codegen without rewriting the historical artifact or its "
+                    + "measurement.");
             }
         }
 
@@ -552,6 +580,21 @@ public sealed class SpikeVerdictTests
         => left.Zip(right).Count(pair => pair.First != pair.Second)
            + Math.Abs(left.Length - right.Length);
 
+    /// <summary>
+    /// Leg 1b's comparison form: #line numbers normalised, blank lines dropped, and
+    /// using directives split out as a set (see the leg's comment for why each).
+    /// </summary>
+    private static (string[] Lines, HashSet<string> Usings) CurrentEmitterLayout(string emitted)
+    {
+        var lines = NormalizeLineDirectives(Normalize(emitted).Split('\n'))
+            .Where(line => line.Length > 0)
+            .ToArray();
+        static bool IsUsing(string line)
+            => line.StartsWith("using ", StringComparison.Ordinal) && line.EndsWith(';');
+        return (lines.Where(line => !IsUsing(line)).ToArray(),
+            lines.Where(IsUsing).ToHashSet(StringComparer.Ordinal));
+    }
+
     private static string[] NormalizeLineDirectives(string[] lines)
         => lines
             .Select(line => System.Text.RegularExpressions.Regex.Replace(
@@ -798,9 +841,10 @@ public sealed class SpikeVerdictTests
 
         var failures = new List<string>();
 
-        foreach (var (fixture, expectedExitCode, expected) in PpE1PostE4Baselines)
+        foreach (var (fixture, expectedExitCode, registered) in PpE1PostE4Baselines)
         {
             var (exitCode, actual) = CompileControlFixture(fixture);
+            var expected = ActiveControlTranslation(fixture, registered);
 
             foreach (var diagnostic in actual)
             {
@@ -819,10 +863,21 @@ public sealed class SpikeVerdictTests
             }
         }
 
+        // A-1.11.1 registers A2's error as Calor0410 'unknown'; the translated
+        // position alone would not tell 'unknown' from another effect.
+        var a2Source = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(),
+            Path.Combine(SpikeDirectory(), "after", "A2.calr")));
+        var a2 = Compiler.Program.Compile(a2Source, "A2.calr",
+            new Compiler.CompilationOptions { UnsafeTranspileOnly = true });
+        if (!a2.Diagnostics.Any(d => d.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("'unknown'", StringComparison.Ordinal)))
+            failures.Add("A2: the registered Calor0410 is no longer the 'unknown' one");
+
         Assert.True(failures.Count == 0,
             "PP-E1 leg A's negative control is FROZEN: an unmutated fixture must draw no "
             + "row-family diagnostic under the pinned invocation, and its multiset must be "
-            + "A-1.11.1's registered post-E4 one. A row-family emission here means the L5/L7 "
+            + "A-1.11.1's registered post-E4 one, translated onto the active copy entry by "
+            + "entry (ActiveControlTranslation). A row-family emission here means the L5/L7 "
             + "detection cells can no longer discriminate the feature under test. STOP and "
             + "report before pushing — do not regenerate the baseline.\n  "
             + string.Join("\n  ", failures));
@@ -938,6 +993,41 @@ public sealed class SpikeVerdictTests
     ];
 
     /// <summary>
+    /// The registered multiset above, translated onto the native active copy the
+    /// current compiler reads — the control-side analogue of the L7 cells' explicit
+    /// anchor/line translation. <see cref="PpE1PostE4Baselines"/> stays the frozen
+    /// A-1.11.1 table for the frozen original, untouched; this is NOT a regenerated
+    /// baseline, and every A2 entry is accounted for one by one:
+    /// <list type="bullet">
+    ///   <item><c>error Calor0410@23,9</c> → <c>@21,7</c>: the same declaration (m008,
+    ///   Handle), on its row line in the native copy; still exactly one error, still
+    ///   'unknown' (asserted on the message below).</item>
+    ///   <item><c>warning Calor0411@26,24</c> → <c>@24,23</c>: the same call,
+    ///   <c>_chainProcess010.ConfigureAwait</c>.</item>
+    ///   <item><c>warning Calor0411@28,19</c> (<c>_chainNext011.ConfigureAwait</c>) is no
+    ///   longer drawn: the 0.30 binder types <c>next()</c> as <c>Task&lt;TResponse&gt;</c>
+    ///   through the raw delegate declaration, so the call reaches
+    ///   <c>Task`1.ConfigureAwait</c>'s manifest contract.</item>
+    ///   <item><c>warning Calor0411@23,32</c> (<c>IRequestPreProcessor&lt;TRequest&gt;.Process</c>)
+    ///   is new: a call on a GENERIC source interface does not resolve to the source
+    ///   member's row in 0.30 (sound — Unknown — but a precision loss, reported as a
+    ///   follow-up). It is also why <c>_chainProcess010.ConfigureAwait</c> stays Unknown.</item>
+    /// </list>
+    /// The four A3 fixtures translate to themselves: exit 0, zero diagnostics.
+    /// </summary>
+    private static string[] ActiveControlTranslation(string fixture, string[] registered)
+        => fixture switch
+        {
+            "A2" when registered.SequenceEqual(
+                ["error Calor0410@23,9", "warning Calor0411@26,24", "warning Calor0411@28,19"],
+                StringComparer.Ordinal) =>
+                ["error Calor0410@21,7", "warning Calor0411@23,32", "warning Calor0411@24,23"],
+            "A3-map" or "A3-match" or "A3-middleware" or "A3-callback" when registered.Length == 0 => [],
+            _ => throw new InvalidOperationException(
+                $"{fixture}: no active-copy translation registered for [{string.Join(", ", registered)}]."),
+        };
+
+    /// <summary>
     /// PP-E1 leg A's five <b>L7 row-erasure</b> cells (annex A-1.11's mutation
     /// catalogue, quoted): <i>"delete the row from a function-typed position
     /// that is then invoked … registered code Calor0425 in every case … `L7`
@@ -981,38 +1071,69 @@ public sealed class SpikeVerdictTests
         // copy is native syntax, so each cell's anchor, replacement and invocation
         // line are translated explicitly to that copy; the registered values above
         // still apply to the frozen original.
-        var (activeAnchor, activeReplacement, activeLine) = cell switch
+        //
+        // 0.30 (decision D2) made an OMITTED callback-parameter row a hard Calor0407 at
+        // the callable's declaration, before the effect pass runs. So the four parameter
+        // cells get two mutants each:
+        //   * the registered diff, deleted literally, must be REJECTED with Calor0407 at
+        //     the declaration (`declarationLine`). That is the right rejection: it names
+        //     exactly the erased row, and no row-less callback parameter compiles any more;
+        //   * the erased row in its 0.30 spelling, `! unknown` (§3.5: no row means
+        //     Unknown; D2 only makes it written), must still draw Calor0425 at the
+        //     registered invocation, rising above the control. This keeps what L7 measured
+        //     — invoking a row-less value is caught AT THE INVOCATION — reachable, which a
+        //     declaration-level Calor0407 alone would mask.
+        // A field row is not a callback parameter, so L7-CB's literal deletion still
+        // reaches the invocation and draws Calor0425 itself.
+        var (activeAnchor, activeReplacement, unknownReplacement, declarationLine, activeLine) = cell switch
         {
             "L7-A2" => ("next ! e, CancellationToken:cancellationToken) → TResponse",
-                "next, CancellationToken:cancellationToken) → TResponse", 25),
-            "L7-MAP" => ("Func<int, int>:f ! e", "Func<int, int>:f", 8),
-            "L7-MATCH" => ("Func<int, int>:onSome ! e", "Func<int, int>:onSome", 6),
-            "L7-MID" => ("(Func<int>:g ! e)", "(Func<int>:g)", 17),
-            "L7-CB" => ("field Action<int>:onChange private ! cw", "field Action<int>:onChange private", 6),
+                "next, CancellationToken:cancellationToken) → TResponse",
+                "next ! unknown, CancellationToken:cancellationToken) → TResponse", (int?)20, 25),
+            "L7-MAP" => ("Func<int, int>:f ! e", "Func<int, int>:f", "Func<int, int>:f ! unknown", 3, 8),
+            "L7-MATCH" => ("Func<int, int>:onSome ! e", "Func<int, int>:onSome",
+                "Func<int, int>:onSome ! unknown", 3, 6),
+            "L7-MID" => ("(Func<int>:g ! e)", "(Func<int>:g)", "(Func<int>:g ! unknown)", 15, 17),
+            "L7-CB" => ("field Action<int>:onChange private ! cw", "field Action<int>:onChange private",
+                (string?)null, null, 6),
             _ => throw new InvalidOperationException($"{cell}: no active-copy translation registered.")
         };
         Assert.True(CountOccurrences(source, activeAnchor) == 1,
             $"{cell}: the translation of the registered diff '{anchor}' → '{replacement}' must occur "
             + $"exactly once in active input {path}");
 
+        var (_, baseline) = CompileControlFixture(fixture);
+        var registeredPrefix = $"Calor0425@{activeLine},";
+        Assert.Equal(0, baseline.Count(d => d.Contains(registeredPrefix, StringComparison.Ordinal)));
+
+        var deleted = CompileMutant(cell, source.Replace(activeAnchor, activeReplacement, StringComparison.Ordinal));
+        Assert.DoesNotContain(deleted, d => d.Contains("Calor0418", StringComparison.Ordinal));
+        if (declarationLine is { } line)
+        {
+            var rejection = $"error {Compiler.Diagnostics.DiagnosticCode.MissingCallableEffectRow}@{line},";
+            Assert.DoesNotContain(baseline, d => d.StartsWith(rejection, StringComparison.Ordinal));
+            Assert.True(deleted.Any(d => d.StartsWith(rejection, StringComparison.Ordinal)),
+                $"{cell}: the deleted callback row must be rejected with Calor0407 at line {line} (D2); "
+                + $"mutant drew [{string.Join(", ", deleted)}]");
+        }
+
+        var invoked = unknownReplacement is null
+            ? deleted
+            : CompileMutant(cell, source.Replace(activeAnchor, unknownReplacement, StringComparison.Ordinal));
+        Assert.True(invoked.Count(d => d.Contains(registeredPrefix, StringComparison.Ordinal)) > 0,
+            $"{cell}: expected Calor0425 at line {activeLine} (registered line {invocationLine} "
+            + "in the frozen original) to RISE above the unmutated fixture's 0; "
+            + $"mutant drew [{string.Join(", ", invoked)}]");
+        Assert.DoesNotContain(invoked, d => d.Contains("Calor0418", StringComparison.Ordinal));
+    }
+
+    private static string[] CompileMutant(string cell, string text)
+    {
         var mutant = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{cell}-{Guid.NewGuid():N}.calr");
         try
         {
-            File.WriteAllText(mutant, source.Replace(activeAnchor, activeReplacement, StringComparison.Ordinal));
-
-            var (_, baseline) = CompileControlFixture(fixture);
-            var (_, mutated) = CompileControlSource(mutant);
-
-            var registeredPrefix = $"Calor0425@{activeLine},";
-            var baselineCount = baseline.Count(d => d.Contains(registeredPrefix, StringComparison.Ordinal));
-            var mutantCount = mutated.Count(d => d.Contains(registeredPrefix, StringComparison.Ordinal));
-
-            Assert.Equal(0, baselineCount);
-            Assert.True(mutantCount > baselineCount,
-                $"{cell}: expected Calor0425 at line {activeLine} (registered line {invocationLine} "
-                + $"in the frozen original) to RISE above the unmutated "
-                + $"fixture's {baselineCount}; mutant drew [{string.Join(", ", mutated)}]");
-            Assert.DoesNotContain(mutated, d => d.Contains("Calor0418", StringComparison.Ordinal));
+            File.WriteAllText(mutant, text);
+            return CompileControlSource(mutant).Diagnostics;
         }
         finally
         {

@@ -4159,9 +4159,12 @@ public sealed class EffectEnforcementPass
         ///   charges its effects, closing the ConvertAll/Select laundering path);
         /// - a function-typed VALUE argument passed to an external receiver call is
         ///   surfaced as a Calor0419 assumption — the callee may invoke it invisibly.
+        ///   <paramref name="sourceCallee"/> is true when the call resolved to Calor
+        ///   source functions; their parameter rows charge the value, so no assumption.
         /// </summary>
         private EffectSet InferFromCallArguments(
-            string callTarget, IEnumerable<ExpressionNode> arguments, IReadOnlyList<string?>? modifiers = null)
+            string callTarget, IEnumerable<ExpressionNode> arguments, IReadOnlyList<string?>? modifiers = null,
+            bool sourceCallee = false)
         {
             var effects = EffectSet.Empty;
             var index = -1;
@@ -4195,7 +4198,8 @@ public sealed class EffectEnforcementPass
                         effects = effects.Union(CallableEffects(internalFunc));
                     }
                 }
-                else if (IsFunctionValued(reference.Name, valueType)
+                else if (!sourceCallee
+                         && IsFunctionValued(reference.Name, valueType)
                          && callTarget.Contains('.'))
                 {
                     RecordAssumption(
@@ -7535,8 +7539,14 @@ public sealed class EffectEnforcementPass
                 var receiverEffects = bound?.Receiver is Binding.BoundTypeReferenceExpression
                     ? EffectSet.Empty
                     : InferFromExpression(member.Target);
+                // A member call that resolves to Calor source functions (ids) is not an
+                // external receiver: each function-typed parameter of a source callee carries
+                // a row (Calor0407), and the argument's row is charged through that row's
+                // instantiation and fits check, exactly as on the bare-name path. Only an
+                // unresolved or metadata receiver may invoke the value invisibly (Calor0419).
                 var evaluated = receiverEffects
-                    .Union(InferFromCallArguments($"<expression>.{member.FieldName}", call.Arguments, call.ArgumentModifiers));
+                    .Union(InferFromCallArguments($"<expression>.{member.FieldName}", call.Arguments,
+                        call.ArgumentModifiers, sourceCallee: ids.Count > 0));
                 if (ids.Count > 0)
                 {
                     if (InferSourceDispatchCharge(call.Span, ids) is { } dispatch)
