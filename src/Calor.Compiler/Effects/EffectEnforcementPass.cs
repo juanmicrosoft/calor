@@ -5165,6 +5165,18 @@ public sealed class EffectEnforcementPass
                 arity = int.TryParse(shortType[(tick + 1)..], out var count) ? count : -1;
                 shortType = shortType[..tick];
             }
+            // Inside a type's own members its simple name binds to that type (C# looks in the
+            // enclosing type before the namespace). ClassesByName drops names declared more than
+            // once, as a type in both arms of `#if`/`#else` is, so this keeps a record's own
+            // `this.Value` store resolving to its own accessor instead of an unknown call.
+            // Generic names are left to the lookup below: arity decides which type they name.
+            if (shortType != null && _context.OwnerClass is { TypeParameters.Count: 0 } owner
+                && arity is null or 0 && !typeName.Contains('<')
+                && string.Equals(owner.Name, shortType, StringComparison.Ordinal))
+            {
+                cls = owner;
+                return true;
+            }
             if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out cls!)
                 && (arity is null || cls.TypeParameters.Count == arity))
                 return true;

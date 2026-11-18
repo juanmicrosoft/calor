@@ -1734,6 +1734,13 @@ public class ArrayExpressionConversionTests
         var (calor, losses) = await ConvertAsync(R0Fixture("F5-ARRAY-03"), Surface.McpDefault);
         Assert.Empty(losses);
         RawFrameAssertions.AssertFramed(calor, present: false);
+        // 0.30: the fixture has no nullable context, so the module now records it as oblivious
+        // (`nullable oblivious`, C# `#nullable disable annotations`). The historical output did
+        // not record a nullable context at all; compare the array code in the same context.
+        Assert.Contains("module ConvertedModule overflow unchecked nullable oblivious\n", calor);
+        baseline = baseline.Replace("module ConvertedModule overflow unchecked\n",
+            "module ConvertedModule overflow unchecked nullable oblivious\n", StringComparison.Ordinal);
+        Assert.Contains(" nullable oblivious\n", baseline);
         var old = Program.Compile(baseline, "arrays.calr");
         var current = Program.Compile(calor, "arrays.calr");
         Assert.False(old.HasErrors, string.Join("\n", old.Diagnostics.Errors));

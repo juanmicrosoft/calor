@@ -617,6 +617,31 @@ public class ConditionalEvaluationMigrationTests
                 """);
     }
 
+    // 0.30: a compound update of a field of `this` inside a struct's own member is lowered to
+    // `set t (t op v)`, like a field of a struct local: `this` is the instance's storage (a
+    // reference, not a copy), so locating it again changes nothing. It was kept as raw C#
+    // (compound-assignment-order). The element is mutated in place, so the array sees it.
+    [Theory]
+    [InlineData("Value += 2;", 2)]
+    [InlineData("this.Value += 2;", 2)]
+    [InlineData("Value++;", 1)]
+    [InlineData("--this.Value;", -1)]
+    [InlineData("Inner.X += 3;", 3)]
+    [InlineData("this.Inner.X *= 3;", 0)]
+    public void StructThisFieldUpdate_LowersNatively_AndMutatesTheElement(string update, int expected)
+    {
+        AssertRoundTrip("Counter[] items = new Counter[1]; items[0].Bump(); return items[0].Value + items[0].Inner.X;",
+            expected, false, members: $$"""
+                public struct Cell { public int X; }
+                public struct Counter
+                {
+                    public int Value;
+                    public Cell Inner;
+                    public void Bump() { {{update}} }
+                }
+                """);
+    }
+
     [Fact]
     public void ReturnedDelegate_ReceiverAndArgumentsRunOnce()
     {

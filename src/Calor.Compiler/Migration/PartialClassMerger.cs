@@ -301,6 +301,11 @@ public sealed class PartialClassMerger
         var targetApplicable = GetApplicableUsings(targetModule, targetClass)
             .Select(GetUsingKey)
             .ToHashSet();
+        // A class in the module's global (namespace-less) scope takes its usings at module
+        // level, where the parser puts them (scope null). Tagging them with the global scope id
+        // duplicated the target's own usings and failed native module emission.
+        var targetScopeIsGlobal = targetModule.NamespaceScopes.Any(scope =>
+            scope.IsGlobal && scope.Id == targetClass.NamespaceScopeId);
         foreach (var usingDirective in applicable.Where(item => !item.IsGlobal))
         {
             var clone = new UsingDirectiveNode(
@@ -310,7 +315,7 @@ public sealed class PartialClassMerger
                 usingDirective.IsStatic,
                 isGlobal: false,
                 namespaceIdentity: targetClass.NamespaceIdentity,
-                namespaceScopeId: string.IsNullOrEmpty(targetClass.NamespaceScopeId)
+                namespaceScopeId: string.IsNullOrEmpty(targetClass.NamespaceScopeId) || targetScopeIsGlobal
                     ? null
                     : targetClass.NamespaceScopeId);
             if (targetApplicable.Add(GetUsingKey(clone)))
