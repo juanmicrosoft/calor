@@ -1,24 +1,24 @@
-module MixedContracts MixedContracts block
-  func SafeDivide (int:a, int:b) → int
+module MixedContracts MixedContracts
+  func SafeDivide public (int:a, int:b) → int
     !
-    requires (b != 0)
-    => (b != 0)
-    return (a / b)
+    requires b != 0
+    => b != 0
+    return a / b
 
-  func SumArray (int:n) → int
+  func SumArray public (int:n) → int
     !
-    requires (n >= 0)
+    requires n >= 0
     return 0
 
-  func Increment (int:x) → int
+  func Increment public (int:x) → int
     !
-    => (result == (x + 1))
-    return (x + 1)
+    => result == x + 1
+    return x + 1
 
-  func ClampPositive (int:x) → int
+  func ClampPositive public (int:x) → int
     !
-    => (result >= 0)
-    if (x < 0)
+    => result >= 0
+    if x < 0
       return 0
     else
       return x

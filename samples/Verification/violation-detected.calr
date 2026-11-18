@@ -1,16 +1,16 @@
-module ViolationDetected ViolationDetected block
-  func BadPostcondition (int:x) → int
+module ViolationDetected ViolationDetected
+  func BadPostcondition public (int:x) → int
     !
-    => (result > x)
+    => result > x
     return x
 
-  func ImpossibleContract (int:x) → int
+  func ImpossibleContract public (int:x) → int
     !
-    => ((x + 1) > (x + 2))
-    return (x + 1)
+    => x + 1 > x + 2
+    return x + 1
 
-  func DivisionBug (int:a, int:b) → int
+  func DivisionBug public (int:a, int:b) → int
     !
-    requires (b != 0)
-    => ((a / b) > a)
-    return (a / b)
+    requires b != 0
+    => a / b > a
+    return a / b
