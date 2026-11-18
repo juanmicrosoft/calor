@@ -7,7 +7,7 @@
       "Output: <dir>/Grid.calr"
     ],
     "stderr": [],
-    "calor": "module Grid overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items . Length\n\n\n"
+    "calor": "module Grid overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items.Length\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Grid.cs -o Grid.calr --format json",
@@ -76,7 +76,7 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items . Length\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items.Length\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -99,6 +99,6 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items . Length\n\n\n"
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Grid\n    func Pick (bool:wide, int:v) → int[,]\n      ! alloc\n      return (wide ? new int[,] { { v, (v + 1) } } : new int[,] { { v } })\n\n    func Sum (int[]:xs, int:start) → int\n      !\n      var int:s = start\n      each x in xs\n        set s (s + x)\n      return s\n\n    func Total (int:v) → int\n      ! alloc\n      return Sum(new int[] { v, (v * 2) }, (Pick(true, v))[0, 1])\n\n    func Mixed () → int\n      ! alloc\n      let object[]:items = new object[] { new System.Collections.Generic.List<int>() { 1 }, 2 }\n      return items.Length\n\n\n"
   }
 }

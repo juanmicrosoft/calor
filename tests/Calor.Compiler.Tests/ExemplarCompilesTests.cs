@@ -335,7 +335,11 @@ public class ExemplarCompilesTests
             "  func CountLines (string:path) → int\n" +
             "    ! fs:r\n" +
             "    let List<string>:lines = File.ReadAllLines(path)\n" +
-            "    return lines.Count\n";
+            "    return 0\n";
+        // 0.30: `lines.Count` would now be a typed member read. With the binding already
+        // ill-typed, the C# projection cannot select Count, so the type checker reports it
+        // (Calor0202) and stops before the binder's Calor0254. The trap is the binding, so
+        // the body does not read the list. (Follow-up: report binder errors alongside.)
 
         // #722: the binder now catches the binding-position case directly.
         var result = Program.Compile(calor, "mutation.calr");
