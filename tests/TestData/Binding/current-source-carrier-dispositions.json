@@ -1,0 +1,48 @@
+{
+  "Refusals": {
+    "FluentValidation/src/FluentValidation.DependencyInjectionExtensions/ServiceCollectionExtensions.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation.Tests.Benchmarks/AccessorCacheBenchmark.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation.Tests/AccessorCacheTests.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation.Tests/DefaultValidatorExtensionTester.cs": "namespace-topology",
+    "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation.Tests/TestValidatorWithPreValidate.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/AbstractValidator.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/DefaultValidatorExtensions.cs": "namespace-topology",
+    "FluentValidation/src/FluentValidation/DefaultValidatorExtensions_Validate.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/DefaultValidatorOptions.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/Internal/CollectionPropertyRule.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/Internal/MessageFormatter.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/Internal/PropertyRule.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/Internal/RuleBase.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/Internal/RuleComponent.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/TestHelper/TestValidationResult.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/TestHelper/ValidatorTestExtensions.cs": "namespace-topology",
+    "FluentValidation/src/FluentValidation/ValidatorOptions.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/Validators/ChildValidatorAdaptor.cs": "scoped-namespace-source-validation",
+    "FluentValidation/src/FluentValidation/Validators/PolymorphicValidator.cs": "scoped-namespace-source-validation"
+  },
+  "Cases": [
+    {
+      "File": "MediatR/src/MediatR/Registration/ServiceRegistrar.cs",
+      "SourceStart": 8082,
+      "SourceEnd": 8291,
+      "Disposition": "native-carrier",
+      "Cause": "5dad9f937 (computed-call fragments convert in place) stopped capturing the receiver in GetInterfaces() is var _chainGetInterfaces071 ? ... : throw; the carrier is now the source chain itself, same kind and span, so GetInterfaces() still runs once and FirstOrDefault(predicate), ?.GetGenericArguments() and FirstOrDefault() are retained. Bisected between 9e1160ad2 and 5784ac9ca (82ebf3aa4 still captures). Replaces the renamed-capture compatibility entry.",
+      "CarrierKind": "ExpressionCallNode",
+      "CarrierStart": 8239,
+      "CarrierEnd": 8291,
+      "CarrierCode": "concreteGenericTRequest.GetInterfaces().FirstOrDefault((System.Type x) =\u003E x.IsGenericType \u0026\u0026 x.GetGenericTypeDefinition() == typeof(IRequest\u003C\u003E))?.GetGenericArguments().FirstOrDefault()"
+    },
+    {
+      "File": "serilog/src/Serilog/Events/ScalarValue.cs",
+      "SourceStart": 2777,
+      "SourceEnd": 2828,
+      "Disposition": "preserved-member",
+      "Cause": "047dd14b8 (class-unresolved-base-kind) keeps class ScalarValue as C#: its base LogEventPropertyValue does not resolve in the one-file semantic model, so the converter cannot tell a class base from an interface. The source expression is unchanged inside the preserved class.",
+      "CarrierKind": null,
+      "CarrierStart": null,
+      "CarrierEnd": null,
+      "CarrierCode": null
+    }
+  ]
+}
