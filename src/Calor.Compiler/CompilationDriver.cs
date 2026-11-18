@@ -252,6 +252,178 @@ internal static class GeneratedValidationScope
 }
 
 /// <summary>
+/// The warm-skip decision for multi-file builds, shared by
+/// <see cref="CompilationDriver.CompileAll"/> and the MSBuild <c>CompileCalor</c>
+/// task (#1732) so the two surfaces skip exactly the same files for the same
+/// inputs.
+///
+/// <para><b>Two fingerprints.</b> <see cref="MapHash"/> covers the
+/// cross-module function map, every declared type contract and every source's
+/// content hash (<see cref="CrossModuleTypeRegistry.Fingerprint"/>), so ANY edit
+/// in a multi-file build changes it. <see cref="FunctionMapHash"/> covers only
+/// the function map (call target → emitted namespace and class) and the sorted
+/// source paths: the inputs that decide how a cached output qualifies its
+/// cross-module calls.</para>
+///
+/// <para><b>Three outcomes</b> (<see cref="Mode"/>):</para>
+/// <list type="bullet">
+///   <item><see cref="CrossModuleReuseMode.Unchanged"/>: no prior state, a
+///     single-file build, or an unchanged <see cref="MapHash"/>. The ordinary
+///     per-file checks decide.</item>
+///   <item><see cref="CrossModuleReuseMode.Invalidated"/>: the function map, the
+///     source set, or the evidence below changed or is missing. Every cached
+///     output may carry stale qualification, so nothing is reused.</item>
+///   <item><see cref="CrossModuleReuseMode.RequiresIndependenceProof"/>: only
+///     source contents changed. A file whose own source is unchanged is reused
+///     only when <see cref="CanReuse"/> proves its cached output independent
+///     of the old AND new declarations of every other module
+///     (<see cref="CrossModuleTypeRegistry.CanReuseIndependentOutput"/>).</item>
+/// </list>
+///
+/// <para><b>Evidence.</b> The proof needs every module's previous output text.
+/// It comes from <see cref="BuildState.ValidatedOutputs"/>: the hash of each
+/// output the producing build published (warning-bearing ones included). Every
+/// output is re-read and re-hashed here; a missing, corrupted or unrecorded
+/// output turns the whole decision into <see cref="CrossModuleReuseMode.Invalidated"/>.
+/// Cross-module effect enforcement (Calor0410) never depends on this decision:
+/// it re-runs every build over fresh and cached effect summaries.</para>
+/// </summary>
+internal sealed class CrossModuleCacheReuse
+{
+    private readonly CrossModuleTypeRegistry? _types;
+    private readonly Dictionary<string, string>? _previousOutputs;
+    private readonly HashSet<string> _previousNativeGlobalModules;
+
+    private CrossModuleCacheReuse(
+        string? mapHash,
+        string? functionMapHash,
+        CrossModuleReuseMode mode,
+        CrossModuleTypeRegistry? types,
+        Dictionary<string, string>? previousOutputs,
+        HashSet<string> previousNativeGlobalModules)
+    {
+        MapHash = mapHash;
+        FunctionMapHash = functionMapHash;
+        Mode = mode;
+        _types = types;
+        _previousOutputs = previousOutputs;
+        _previousNativeGlobalModules = previousNativeGlobalModules;
+    }
+
+    internal string? MapHash { get; }
+    internal string? FunctionMapHash { get; }
+    internal CrossModuleReuseMode Mode { get; }
+
+    /// <summary>
+    /// Builds the decision. <paramref name="locate"/> maps a source's full path to
+    /// its cache key and output path, exactly as the calling surface stores them.
+    /// <paramref name="priorFiles"/> is the prior state's reusable entries after the
+    /// surface's own global checks (null when those already invalidated).
+    /// </summary>
+    internal static CrossModuleCacheReuse Evaluate(
+        IReadOnlyList<FileInfo> sources,
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? map,
+        CrossModuleTypeRegistry? types,
+        BuildState? priorState,
+        IReadOnlyDictionary<string, BuildFileEntry>? priorFiles,
+        Func<string, (string Key, string OutputPath)> locate)
+    {
+        string? mapHash = null;
+        string? functionMapHash = null;
+        if (map is not null)
+        {
+            mapHash = CompilationDriver.ComputeCrossModuleMapHash(map, types);
+            functionMapHash = CompilationDriver.ComputeCrossModuleMapHash(map,
+                sourcePaths: sources.Select(file => file.FullName));
+        }
+        var nativeGlobal = new HashSet<string>(BuildStateCache.GetPathComparer());
+        // Compared UNCONDITIONALLY (#823 review m1): a single-file rebuild of a
+        // formerly-multi project (hash → null) must also invalidate — its cached
+        // output may carry qualification against modules no longer in the build.
+        if (priorFiles is null || priorState?.CrossModuleMapHash == mapHash)
+            return new(mapHash, functionMapHash, CrossModuleReuseMode.Unchanged, types, null, nativeGlobal);
+
+        CrossModuleCacheReuse Invalidated() =>
+            new(mapHash, functionMapHash, CrossModuleReuseMode.Invalidated, types, null, nativeGlobal);
+        // A changed emitted target still invalidates globally. Source-only
+        // changes may spare outputs proven independent of old AND new
+        // companion declarations; missing evidence remains a cache miss.
+        if (priorState?.CrossModuleFunctionMapHash != functionMapHash || types is null)
+            return Invalidated();
+
+        var previousOutputs = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
+        foreach (var source in sources)
+        {
+            var (key, outputPath) = locate(source.FullName);
+            var evidence = priorState?.ValidatedOutputs?.GetValueOrDefault(key);
+            var outputHash = evidence?.OutputContentHash
+                ?? (priorFiles.Count == sources.Count
+                    ? priorFiles.GetValueOrDefault(key)?.OutputContentHash : null);
+            if (string.IsNullOrEmpty(outputHash) || !File.Exists(outputPath))
+                return Invalidated();
+            byte[] bytes;
+            try
+            {
+                bytes = File.ReadAllBytes(outputPath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return Invalidated();
+            }
+            if (BuildStateCache.ComputeContentHash(bytes) != outputHash)
+                return Invalidated();
+            previousOutputs[source.FullName] = CompilationDriver.DecodeSource(bytes);
+            if (evidence?.IsNativeGlobalModule == true)
+                nativeGlobal.Add(source.FullName);
+        }
+        return new(mapHash, functionMapHash, CrossModuleReuseMode.RequiresIndependenceProof,
+            types, previousOutputs, nativeGlobal);
+    }
+
+    /// <summary>
+    /// Whether a cached output that already passed every per-file check (source,
+    /// output and effect-summary hashes) may be reused under this decision.
+    /// <paramref name="cachedOutput"/> is the verified output text.
+    /// </summary>
+    internal bool CanReuse(string sourcePath, string cachedOutput, ContractMode mode) => Mode switch
+    {
+        CrossModuleReuseMode.Unchanged => true,
+        CrossModuleReuseMode.RequiresIndependenceProof => _types!.CanReuseIndependentOutput(
+            sourcePath, cachedOutput, _previousOutputs!, mode, _previousNativeGlobalModules),
+        _ => false
+    };
+
+    /// <summary>Writes both fingerprints into the state the build will save.</summary>
+    internal void Record(BuildState state)
+    {
+        state.CrossModuleMapHash = MapHash;
+        state.CrossModuleFunctionMapHash = FunctionMapHash;
+    }
+
+    /// <summary>
+    /// The proof evidence for a published output, or null when the module is not
+    /// all native (raw C# carries no provenance the proof can use) and the next
+    /// source-only change must therefore invalidate globally.
+    /// </summary>
+    internal static ValidatedOutputEntry? Evidence(ModuleNode? ast, string generatedCode) =>
+        ast is not null && CrossModuleTypeRegistry.HasOnlyNativeNodes(ast)
+            ? new ValidatedOutputEntry
+            {
+                OutputContentHash = BuildStateCache.ComputeContentHash(
+                    System.Text.Encoding.UTF8.GetBytes(generatedCode)),
+                IsNativeGlobalModule = CrossModuleTypeRegistry.IsNativeGlobalModule(ast)
+            }
+            : null;
+}
+
+internal enum CrossModuleReuseMode
+{
+    Unchanged,
+    Invalidated,
+    RequiresIndependenceProof
+}
+
+/// <summary>
 /// Shared multi-file compile orchestration used by the top-level compile command
 /// (<see cref="Program"/>), <c>calor watch</c>, and <c>calor run</c> / <c>calor test</c>
 /// (<c>ExecutionWorkspace</c>). One place owns the loop semantics:
@@ -409,63 +581,18 @@ internal static class CompilationDriver
         // by effect variance. A changed base row must recheck cached overrides.
         IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap = null;
         CrossModuleTypeRegistry? crossModuleTypes = null;
-        string? crossModuleMapHash = null;
-        string? crossModuleFunctionMapHash = null;
-        Dictionary<string, string>? previousProjectOutputs = null;
-        var previousNativeGlobalModules = new HashSet<string>(BuildStateCache.GetPathComparer());
         if (sources.Count > 1)
-        {
             crossModuleMap = BuildCrossModuleFunctionMap(sources, out crossModuleTypes);
-            crossModuleMapHash = ComputeCrossModuleMapHash(crossModuleMap, crossModuleTypes);
-            crossModuleFunctionMapHash = ComputeCrossModuleMapHash(crossModuleMap,
-                sourcePaths: sources.Select(file => file.FullName));
-        }
+        // The reuse decision (both fingerprints, ValidatedOutputs evidence, the
+        // per-file independence proof) is shared with the MSBuild task.
+        var crossModuleReuse = CrossModuleCacheReuse.Evaluate(
+            sources, crossModuleMap, crossModuleTypes, priorState, priorFiles,
+            path => (BuildStateCache.ComputeRelativePathFromFullProjectDir(path, fullStateDir!).Item1,
+                cache!.OutputPathFor(new FileInfo(path))));
         if (newState != null)
-        {
-            newState.CrossModuleMapHash = crossModuleMapHash;
-            newState.CrossModuleFunctionMapHash = crossModuleFunctionMapHash;
-        }
-        // Compared UNCONDITIONALLY (#823 review m1): a single-file rebuild of a
-        // formerly-multi project (hash → null) must also invalidate — its cached
-        // output may carry qualification against modules no longer in the build.
-        if (priorFiles != null && priorState?.CrossModuleMapHash != crossModuleMapHash)
-        {
-            // A changed emitted target still invalidates globally. Source-only
-            // changes may spare outputs proven independent of old AND new
-            // companion declarations; missing evidence remains a cache miss.
-            if (priorState?.CrossModuleFunctionMapHash != crossModuleFunctionMapHash
-                || crossModuleTypes is null
-                || cache is null || fullStateDir is null)
-                priorFiles = null;
-            else
-            {
-                previousProjectOutputs = new(BuildStateCache.GetPathComparer());
-                foreach (var source in sources)
-                {
-                    var (key, _) = BuildStateCache.ComputeRelativePathFromFullProjectDir(
-                        source.FullName, fullStateDir);
-                    var outputPath = cache.OutputPathFor(source);
-                    var evidence = priorState?.ValidatedOutputs?.GetValueOrDefault(key);
-                    var outputHash = evidence?.OutputContentHash
-                        ?? (priorFiles.Count == sources.Count
-                            ? priorFiles.GetValueOrDefault(key)?.OutputContentHash : null);
-                    if (string.IsNullOrEmpty(outputHash) || !File.Exists(outputPath))
-                    {
-                        priorFiles = null;
-                        break;
-                    }
-                    var bytes = File.ReadAllBytes(outputPath);
-                    if (BuildStateCache.ComputeContentHash(bytes) != outputHash)
-                    {
-                        priorFiles = null;
-                        break;
-                    }
-                    previousProjectOutputs[source.FullName] = DecodeSource(bytes);
-                    if (evidence?.IsNativeGlobalModule == true)
-                        previousNativeGlobalModules.Add(source.FullName);
-                }
-            }
-        }
+            crossModuleReuse.Record(newState);
+        if (crossModuleReuse.Mode == CrossModuleReuseMode.Invalidated)
+            priorFiles = null;
 
         var compilationOptions = sources.ToDictionary(
             file => file.FullName, optionsFactory, BuildStateCache.GetPathComparer());
@@ -502,11 +629,8 @@ internal static class CompilationDriver
                         var outputBytes = File.ReadAllBytes(outputPath);
                         var generated = DecodeSource(outputBytes);
                         if (BuildStateCache.ComputeContentHash(outputBytes) == cachedEntry.OutputContentHash
-                            && (previousProjectOutputs is null
-                                || crossModuleTypes?.CanReuseIndependentOutput(
-                                    file.FullName, generated, previousProjectOutputs,
-                                    compilationOptions[file.FullName].ContractMode,
-                                    previousNativeGlobalModules) == true))
+                            && crossModuleReuse.CanReuse(file.FullName, generated,
+                                compilationOptions[file.FullName].ContractMode))
                         {
                             newState.Files[relativeKey] = cachedEntry;
                             if (priorState?.ValidatedOutputs?.TryGetValue(relativeKey, out var evidence) == true)
@@ -804,14 +928,9 @@ internal static class CompilationDriver
                 onCompiled?.Invoke(item.File, item.Result);
 
                 if (newState != null && item.RelativeKey != null && !item.Options.UnsafeTranspileOnly
-                    && item.Result.Ast is { } ast && CrossModuleTypeRegistry.HasOnlyNativeNodes(ast))
+                    && CrossModuleCacheReuse.Evidence(item.Result.Ast, item.Result.GeneratedCode) is { } evidence)
                 {
-                    newState.ValidatedOutputs[item.RelativeKey] = new ValidatedOutputEntry
-                    {
-                        OutputContentHash = BuildStateCache.ComputeContentHash(
-                            System.Text.Encoding.UTF8.GetBytes(item.Result.GeneratedCode)),
-                        IsNativeGlobalModule = CrossModuleTypeRegistry.IsNativeGlobalModule(item.Result.Ast)
-                    };
+                    newState.ValidatedOutputs[item.RelativeKey] = evidence;
                 }
 
                 // Only diagnostic-clean files are cached: a skipped file emits nothing,

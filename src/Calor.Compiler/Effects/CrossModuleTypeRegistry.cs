@@ -244,6 +244,45 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
             && cls.TypeParameterList is null && cls.BaseList is null
             && cls.AttributeLists.Count == 0;
 
+        // The wrapper the emitter writes for a namespaced module's top-level
+        // functions: `namespace N.M { public static partial class MModule { ... } }`
+        // (#1732). A companion declaring it is accepted like a non-partial static
+        // class: its own name, its namespace's names and every member name go into
+        // `names`, and its members must pass the same per-member rules.
+        //
+        // Why `partial` does not break the proof. A partial type gains members only
+        // from other declarations of the SAME type: same namespace, same name.
+        // - Other Calor outputs. If the output being reused declares or mentions
+        //   that type, its simple name is in `names` (collected from the old AND new
+        //   text of every companion), so the BaseTypeDeclaration and SimpleName
+        //   checks below reject it. Only the shared GlobalModule may be exempt, and
+        //   only with native provenance in both snapshots; a namespaced wrapper never
+        //   is. So no reused output can share a partial wrapper with an edited
+        //   module, and the test is by simple name, coarser than namespace + name.
+        // - Hand-written C# partials in an MSBuild project. They cannot change Calor
+        //   emission or Calor diagnostics: the per-file compile reads only Calor
+        //   sources, the companion projections built here, options and referenced
+        //   assemblies (all fingerprinted); CompileCalor passes project .cs files
+        //   only to generated-output validation. That validation, and csc, run over
+        //   every output, cached or fresh, plus the project sources on every build,
+        //   so a conflict with a hand-written partial still fails the build that
+        //   introduces it. This premise is not new: a single-file build has never
+        //   keyed its cache on hand-written C#.
+        // A user-declared `partial` module (any other class name) keeps the
+        // conservative rejection, as do generic, based or attributed wrappers.
+        static bool IsNamespacedModuleWrapper(ClassDeclarationSyntax type) =>
+            type.Parent is BaseNamespaceDeclarationSyntax ns
+            && type.Modifiers.Any(SyntaxKind.PartialKeyword)
+            && type.Identifier.ValueText == RightmostName(ns.Name) + "Module";
+
+        static string RightmostName(NameSyntax name) => name switch
+        {
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            AliasQualifiedNameSyntax alias => alias.Name.Identifier.ValueText,
+            _ => ""
+        };
+
         static bool CollectContainerNames(string source, HashSet<string> names, bool shared)
         {
             var root = CSharpSyntaxTree.ParseText(source,
@@ -265,7 +304,8 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
                         return ns.Members.All(Collect);
                     case ClassDeclarationSyntax type when type.Modifiers.Any(SyntaxKind.StaticKeyword)
                         && (!type.Modifiers.Any(SyntaxKind.PartialKeyword)
-                            || shared && IsSharedContainer(type))
+                            || shared && IsSharedContainer(type)
+                            || IsNamespacedModuleWrapper(type))
                         && type.TypeParameterList is null && type.BaseList is null
                         && type.AttributeLists.Count == 0:
                         names.Add(type.Identifier.ValueText);
