@@ -544,7 +544,9 @@ public static class AttributeHelper
     /// the measured C# surface spelling (<c>INT</c> → <c>int</c>,
     /// <c>STRING</c> → <c>string</c>, <c>ARRAY[element=STRING]</c> → <c>string[]</c>). Use in
     /// any diagnostic that echoes a type so the message never teaches an internal
-    /// spelling the user can't write. Idempotent on already-compact input.
+    /// spelling the user can't write. Idempotent on already-compact input. Also maps the
+    /// binder's canonical names (<c>LONG</c>, <c>UINT</c>, <c>ULONG</c>, <c>DECIMAL</c>,
+    /// <c>OBJECT</c>), which reach diagnostics through bound variable and type names.
     /// </summary>
     public static string ToSurfaceSpelling(string expandedType)
     {
@@ -625,6 +627,11 @@ public static class AttributeHelper
             "INT[bits=16][signed=false]" or "u16" => "ushort",
             "INT[bits=32][signed=false]" or "u32" => "uint",
             "INT[bits=64][signed=false]" or "u64" => "ulong",
+            "LONG" => "long",
+            "UINT" => "uint",
+            "ULONG" => "ulong",
+            "DECIMAL" => "decimal",
+            "OBJECT" => "object",
             "FLOAT" or "f64" => "double",
             "FLOAT[bits=32]" or "f32" => "float",
             "STRING" or "str" => "string",

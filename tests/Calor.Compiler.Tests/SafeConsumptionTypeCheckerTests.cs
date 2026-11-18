@@ -85,7 +85,7 @@ public sealed class SafeConsumptionTypeCheckerTests
             """);
 
         var diagnostic = SingleErrorAt(rejected, 5);
-        Assert.Contains("?str", diagnostic.Message);
+        Assert.Contains("string?", diagnostic.Message);
         Assert.DoesNotContain("<error>", diagnostic.Message);
     }
 
@@ -100,7 +100,7 @@ public sealed class SafeConsumptionTypeCheckerTests
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
-        Assert.Contains("?str", diagnostic.Message);
+        Assert.Contains("string?", diagnostic.Message);
         Assert.DoesNotContain("<error>", diagnostic.Message);
     }
 
@@ -290,8 +290,8 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         var diagnostic = SingleErrorAt(rejected, 4);
         Assert.Contains("not compatible", diagnostic.Message);
-        Assert.Contains("str", diagnostic.Message);
-        Assert.Contains("i32", diagnostic.Message);
+        Assert.Contains("string", diagnostic.Message);
+        Assert.Contains("int", diagnostic.Message);
     }
 
     [Theory]

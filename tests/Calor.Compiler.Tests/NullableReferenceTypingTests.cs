@@ -548,10 +548,10 @@ public class NullableReferenceTypingTests
     public void NullableAndNominalGenericTypeModels_HaveDistinctIdentitiesAndHashes()
     {
         var nullable = new NullableReferenceType(PrimitiveType.String);
-        var option = new ExternalType("Option<str>");
+        var option = new ExternalType("Option<string>");
         Assert.NotEqual<CalorType>(nullable, option);
-        Assert.Equal("?str", nullable.SurfaceName);
-        Assert.Equal("Option<str>", option.SurfaceName);
+        Assert.Equal("string?", nullable.SurfaceName);
+        Assert.Equal("Option<string>", option.SurfaceName);
         Assert.Equal(2, new HashSet<CalorType> { nullable, option }.Count);
         Assert.NotEqual(TypeIdentity.Canonicalize("?Option<str>"), TypeIdentity.Canonicalize("Option<?str>"));
         Assert.NotEqual(TypeIdentity.Canonicalize("str?[]"), TypeIdentity.Canonicalize("?str[]"));
@@ -560,7 +560,7 @@ public class NullableReferenceTypingTests
         Assert.Equal("Option<str>", TypeIdentity.MapShortTypeNameToFullName("?Option<str>"));
         Assert.Equal("Option<str>", TypeIdentity.MapShortTypeNameToFullName("Option<str>"));
         Assert.Throws<ArgumentException>(() => new NullableReferenceType(PrimitiveType.Int));
-        Assert.Equal("?Option<str>", new NullableReferenceType(option).SurfaceName);
+        Assert.Equal("Option<string>?", new NullableReferenceType(option).SurfaceName);
     }
 
     [Fact]

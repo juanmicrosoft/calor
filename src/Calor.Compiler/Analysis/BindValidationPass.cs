@@ -907,7 +907,7 @@ public sealed class BindValidationPass
     /// binding, return, and assignment positions; <paramref name="subject"/> names
     /// the offending declaration (e.g. "Binding 'lines'"). The message references
     /// the collection by name only -- it never echoes the internal normalized type
-    /// spelling, so the surface-syntax recommendation ('[str]') is not paired with
+    /// spelling, so the surface-syntax recommendation ('string[]') is not paired with
     /// a mismatched convention.
     /// </summary>
     private void CheckArrayToCollection(
@@ -927,7 +927,7 @@ public sealed class BindValidationPass
         _diagnostics.ReportError(span, DiagnosticCode.BindArrayToConcreteCollection,
             $"{subject} is a concrete collection ('{collectionName}<…>'), but the value is an array. " +
             $"An array is not implicitly convertible to '{collectionName}<…>' in C# (CS0029). Use the " +
-            $"array form '[{elementType}]', or construct a new {collectionName} from the array.");
+            $"array type '{Parsing.AttributeHelper.ToSurfaceSpelling(elementType)}[]', or construct a new {collectionName} from the array.");
     }
 
     /// <summary>

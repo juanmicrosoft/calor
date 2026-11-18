@@ -97,13 +97,14 @@ public class TypeCheckerDefectTests
         var result = Check($"module S S block\n  func Do () → void\n    !\n    let {Native(type)}:x = true\n    return\n");
 
         var error = Assert.Single(result.Diagnostics.Errors);
-        Assert.Contains(type, error.Message);
+        // `type short`, not just `short`, so `ushort` cannot satisfy the `short` case.
+        Assert.Contains($"type {Native(type)}", error.Message);
     }
 
     [Theory]
-    [InlineData("float", "f32")]
-    [InlineData("FLOAT", "f64")]
-    [InlineData("double", "f64")]
+    [InlineData("float", "float")]
+    [InlineData("FLOAT", "double")]
+    [InlineData("double", "double")]
     public void FloatingTypeSpellings_PreserveDiagnosticWidth(string spelling, string surface)
     {
         Assert.Equal(surface, TypeChecking.PrimitiveType.FromName(spelling)!.SurfaceName);
@@ -246,8 +247,8 @@ public class TypeCheckerDefectTests
         var result = Check("module S S block\n  func Do () → int\n    !\n    let long:x = \"a\"\n    return 0\n");
 
         var error = Assert.Single(result.Diagnostics.Errors);
-        Assert.Contains("i64", error.Message);
-        Assert.DoesNotContain("i32", error.Message);
+        Assert.Contains("type long", error.Message);
+        Assert.DoesNotContain("type int", error.Message);
     }
 
     // ---- Operators the checker got wrong ----

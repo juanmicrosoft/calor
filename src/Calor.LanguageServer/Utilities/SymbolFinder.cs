@@ -851,9 +851,12 @@ public static class SymbolFinder
 
     private static bool IsTypeName(string identifier)
     {
-        // Check for built-in types
+        // Check for built-in types: the native C# keywords, plus the retired 0.30 aliases and
+        // internal spellings so hovering one still names the native type to write instead.
         return identifier switch
         {
+            "sbyte" or "byte" or "short" or "ushort" or "int" or "uint" or "long" or "ulong" => true,
+            "float" or "double" or "decimal" or "object" => true,
             "i8" or "i16" or "i32" or "i64" or "INT" => true,
             "u8" or "u16" or "u32" or "u64" => true,
             "f32" or "f64" or "FLOAT" => true,
@@ -867,20 +870,12 @@ public static class SymbolFinder
 
     private static SymbolLookupResult CreateTypeResult(string typeName, int line, string source)
     {
-        var normalizedType = typeName.ToUpperInvariant() switch
-        {
-            "I8" or "I16" or "I32" or "I64" or "INT" => "INT",
-            "U8" or "U16" or "U32" or "U64" => "INT",
-            "F32" or "F64" or "FLOAT" => "FLOAT",
-            "STR" or "STRING" => "STRING",
-            "BOOL" => "BOOL",
-            "VOID" => "VOID",
-            "CHAR" => "CHAR",
-            _ => typeName
-        };
+        // Hover text shows the native 0.30 spelling (`int`, `string`, `double`), never the
+        // internal `INT`/`STRING` key or a retired alias.
+        var nativeType = AttributeHelper.ToSurfaceSpelling(typeName);
 
         return new SymbolLookupResult(
-            typeName, "type", normalizedType,
+            typeName, "type", nativeType,
             CreateSpanAtLine(line, source));
     }
 
