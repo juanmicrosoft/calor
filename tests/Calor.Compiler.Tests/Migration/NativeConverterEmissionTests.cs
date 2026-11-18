@@ -87,13 +87,24 @@ public class NativeConverterEmissionTests
     }
 
     [Fact]
-    public void MemberAccessAfterAnIdentifier_KeepsTheSpacedFormUntilDottedNamesBindAlike()
+    public void MemberAccessAfterAnIdentifier_IsUnspaced()
     {
-        // An unspaced `x.Field` lexes as one dotted name, which the binder does not yet type like
-        // a FieldAccessNode (metadata member typing, static-field selection). Spacing keeps it one.
+        // 0.30: the parser reads `items.Count` on a value as the same FieldAccessNode the
+        // spaced `items . Count` gives, so member access is always written unspaced.
         var span = new TextSpan(0, 0, 1, 1);
         var access = new FieldAccessNode(span, new ReferenceNode(span, "items"), "Count");
-        Assert.Equal("items . Count", access.Accept(new CalorEmitter()));
+        Assert.Equal("items.Count", access.Accept(new CalorEmitter()));
+    }
+
+    [Fact]
+    public void MemberChainOnAnUnrootedReceiver_ParenthesizesTheReceiver()
+    {
+        // `Console.Out.NewLine` would read back as one qualified name; the receiver of a longer
+        // chain whose root is not a value or a source type of the module keeps its own node.
+        var span = new TextSpan(0, 0, 1, 1);
+        var access = new FieldAccessNode(span,
+            new FieldAccessNode(span, new ReferenceNode(span, "Console"), "Out"), "NewLine");
+        Assert.Equal("(Console.Out).NewLine", access.Accept(new CalorEmitter()));
     }
 
     [Fact]

@@ -21,6 +21,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private int _memberBodyDepth;
     private int _inlineObjectInitializers;
     private int _inlineCollections;
+    private IReadOnlySet<ReferenceNode>? _memberAccessRoots;
     private IReadOnlyDictionary<IfStatementNode, ReturnStatementNode> _canonicalLiteralReturns =
         new Dictionary<IfStatementNode, ReturnStatementNode>();
 
@@ -76,6 +77,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _inlineObjectInitializers = 0;
         _inlineCollections = 0;
         _canonicalLiteralReturns = IfStatementNode.GetCanonicalLiteralReturns(module);
+        _memberAccessRoots = Parser.FindMemberAccessRoots(module);
         Visit(module);
         return _builder.ToString();
     }
@@ -2429,16 +2431,41 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0 && !IsElementFieldPath(node.Target))
             target = HoistToTempVar(target);
         var fieldName = EscapeCalorIdentifier(node.FieldName);
-        // 0.30 member access is C# punctuation. After a receiver that ends a token on its own
-        // (`f().X`, `a[0].X`, `this.X`, `"s".Length`) the unspaced `.` reparses as the same
-        // member access. After an identifier it would not: the lexer folds `x.Field` into one
-        // dotted name, which the binder does not yet type like a member read (metadata member
-        // typing, static-field selection, some scopes), so that receiver keeps the spaced form
-        // until dotted names bind identically. A numeric literal receiver is parenthesized so
-        // `1.F` cannot lex as a number.
-        if (node.Target is IntLiteralNode or FloatLiteralNode or DecimalLiteralNode)
+        // 0.30 member access is C# punctuation, written unspaced. After a receiver that ends a
+        // token on its own (`f().X`, `a[0].X`, `this.X`, `"s".Length`) the `.` reparses as the
+        // same member access. After an identifier the lexer folds `x.F` into one dotted name,
+        // which the parser reads as this member access when its root is a value in scope or a
+        // source class of the module with that member (Parser.FindMemberAccessRoots), and as a
+        // qualified name otherwise (`Math.PI`). A longer chain on any other root would read
+        // back as one dotted name (`Console.Out.NewLine` names neither a type nor a value), so
+        // its receiver is parenthesized: `(Console.Out).NewLine`. A numeric literal receiver
+        // is parenthesized so `1.F` cannot lex as a number.
+        if (EndsInIdentifier(target) && IsUnrootedMemberChain(node.Target))
             target = $"({target})";
-        return EndsInIdentifier(target) ? $"{target} . {fieldName}" : $"{target}.{fieldName}";
+        else if (node.Target is IntLiteralNode or FloatLiteralNode or DecimalLiteralNode)
+            target = $"({target})";
+        return $"{target}.{fieldName}";
+    }
+
+    /// <summary>
+    /// True when <paramref name="receiver"/> prints as a dotted identifier path whose root the
+    /// parser does not read as a member-access root (see <see cref="Parser.FindMemberAccessRoots"/>).
+    /// </summary>
+    private bool IsUnrootedMemberChain(ExpressionNode receiver)
+    {
+        switch (receiver)
+        {
+            case ReferenceNode reference:
+                return reference.Name.Contains('.');
+            case FieldAccessNode member:
+                var root = member.Target;
+                while (root is FieldAccessNode inner)
+                    root = inner.Target;
+                return root is ReferenceNode rootReference
+                    && (rootReference.Name.Contains('.') || _memberAccessRoots?.Contains(rootReference) != true);
+            default:
+                return false;
+        }
     }
 
     private static bool EndsInIdentifier(string target)

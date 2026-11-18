@@ -2023,7 +2023,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // A while condition runs on every iteration, so it must not be hoisted ahead of the loop.
-        Assert.Contains("while (items.Where((x) => x . Active)).Any()", result.CalorSource);
+        Assert.Contains("while (items.Where((x) => x.Active)).Any()", result.CalorSource);
         AssertNativeChain(result);
     }
 

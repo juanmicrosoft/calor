@@ -15,9 +15,9 @@ module Fixture overflow unchecked
         return (-1)
       set target new Holder()
       let int?:selected = target?.M(Argument())
-      if (((selected != 7) || (ArgumentCalls != 1)) || (target . Calls != 1))
+      if (((selected != 7) || (ArgumentCalls != 1)) || (target.Calls != 1))
         return (-2)
-      return (((ArgumentCalls * 100) + (target . Calls * 10)) + (selected ?? 0))
+      return (((ArgumentCalls * 100) + (target.Calls * 10)) + (selected ?? 0))
 
     class Holder sealed
       field int:Calls

@@ -687,7 +687,7 @@ public sealed class NativeMetadataClosureTests
                 return @{{alias}}.Length
             """;
         var reemitted = new CalorEmitter().Emit(Parse(source));
-        Assert.Contains("@" + alias + " . Length", reemitted);
+        Assert.Contains("@" + alias + ".Length", reemitted);
         var structural = Assert.IsType<FieldAccessNode>(
             Assert.IsType<ReturnStatementNode>(Assert.Single(Parse(reemitted).Functions).Body[0]).Expression);
         var reference = Assert.IsType<ReferenceNode>(structural.Target);
@@ -2939,7 +2939,11 @@ public sealed class NativeMetadataClosureTests
         var source = $"module Files\n  func Get (string:path) → {output}\n    ! fs:r\n    {body}";
         var result = Compile(source);
         Assert.True(result.HasErrors);
-        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.BindArrayToConcreteCollection);
+        // 0.30: `lines.Count` is the spaced form's member access. With the binding already
+        // invalid its member is not typed, and the type checker rejects the read first.
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.BindArrayToConcreteCollection
+            || body.Contains("lines.Count", StringComparison.Ordinal) && diagnostic.Code == DiagnosticCode.TypeMismatch
+                && diagnostic.Message.Contains("List<string>", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.CodeGenCompilationError);
         var module = Parse(source);
         var diagnostics = new DiagnosticBag();

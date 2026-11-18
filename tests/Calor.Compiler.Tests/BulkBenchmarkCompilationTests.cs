@@ -13,7 +13,6 @@ public class BulkBenchmarkCompilationTests
 {
     private static readonly HashSet<string> KnownGeneratedCSharpFailures =
     [
-        "DesignPatterns/Visitor.calr",
         "DesignPatterns/TemplateMethod.calr",
     ];
 
@@ -43,6 +42,9 @@ public class BulkBenchmarkCompilationTests
         "OOPGenerics/Composition.calr",
         "OOPGenerics/Polymorphism.calr",
         "DataStructures/HashMap.calr",
+        // 0.30 i7: `return expr.Value` (a double field, a float return) is now the typed
+        // member read, so the narrowing is caught here instead of as CS0266 (Calor1002).
+        "DesignPatterns/Visitor.calr",
     ];
 
     /// <summary>

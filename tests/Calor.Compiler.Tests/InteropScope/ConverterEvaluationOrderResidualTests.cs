@@ -252,7 +252,7 @@ public class ConverterEvaluationOrderResidualTests
     public void ExpressionLambda_StaticMemberCompound_KeepsTheOperator()
     {
         var calor = Convert(Rows().Single(r => r.Id == "X-lambda-static-field").Source);
-        Assert.Contains("set Point . Log (Point . Log + \"x\")", calor);
+        Assert.Contains("set Point.Log (Point.Log + \"x\")", calor);
     }
 
     private static string Convert(string source)

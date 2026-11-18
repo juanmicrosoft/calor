@@ -152,10 +152,19 @@ public sealed class CanonicalControlFlowTests
             var module = Parse(candidate);
             var node = Assert.IsType<NewExpressionNode>(
                 Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]).Expression);
-            Assert.IsType<FieldAccessNode>(Assert.Single(node.Arguments));
             var binder = new Calor.Compiler.Binding.Binder(new DiagnosticBag());
             var bound = binder.Bind(module);
             Assert.Empty(binder.BoundSourceStaticFieldReads);
+            // The re-emitted `Missing.Value` names neither a value nor a source type, so it
+            // reads back as a qualified name (0.30), which binds to nothing.
+            if (kind == "unknown-receiver" && candidate != source)
+            {
+                Assert.Equal("Missing.Value", Assert.IsType<ReferenceNode>(Assert.Single(node.Arguments)).Name);
+                Assert.True(Program.Compile(candidate, "static-boundary.calr",
+                    new CompilationOptions { EnableTypeChecking = true, EnforceEffects = true, StatusWriter = TextWriter.Null }).HasErrors);
+                continue;
+            }
+            Assert.IsType<FieldAccessNode>(Assert.Single(node.Arguments));
             var creation = Assert.IsType<BoundNewExpression>(
                 Assert.IsType<BoundReturnStatement>(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body[0]).Expression);
             var member = Assert.IsType<BoundFieldAccessExpression>(Assert.Single(creation.Arguments));

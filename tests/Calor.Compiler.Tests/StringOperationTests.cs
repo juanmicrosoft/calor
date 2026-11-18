@@ -1347,7 +1347,7 @@ public class StringOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
         Assert.Contains("string.Equals", calor);
-        Assert.Contains("StringComparison . OrdinalIgnoreCase", calor);
+        Assert.Contains("StringComparison.OrdinalIgnoreCase", calor);
         Assert.DoesNotContain("(equals", calor);
         var cast = Assert.IsType<TypeOperationNode>(ConvertedReturn(result.Ast!));
         Assert.Equal(TypeOp.Cast, cast.Operation);

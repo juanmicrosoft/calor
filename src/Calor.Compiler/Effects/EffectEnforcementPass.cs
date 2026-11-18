@@ -5141,12 +5141,22 @@ public sealed class EffectEnforcementPass
         private bool TryResolveClass(string typeName, out ClassDefinitionNode cls)
         {
             var shortType = StripGenericArguments(typeName);
-            if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out cls!))
+            // A normalized generic type carries its CLR arity (`Box`1<Int32>`): it names the
+            // source class only when that class has the same number of type parameters.
+            int? arity = null;
+            if (shortType?.IndexOf('`') is > 0 and var tick)
+            {
+                arity = int.TryParse(shortType[(tick + 1)..], out var count) ? count : -1;
+                shortType = shortType[..tick];
+            }
+            if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out cls!)
+                && (arity is null || cls.TypeParameters.Count == arity))
                 return true;
 
             var lastDot = shortType?.LastIndexOf('.') ?? -1;
             if (lastDot >= 0
-                && _context.ClassesByName.TryGetValue(shortType![(lastDot + 1)..], out cls!))
+                && _context.ClassesByName.TryGetValue(shortType![(lastDot + 1)..], out cls!)
+                && (arity is null || cls.TypeParameters.Count == arity))
             {
                 return true;
             }
@@ -5561,6 +5571,9 @@ public sealed class EffectEnforcementPass
                     && lambda.Parameters.FirstOrDefault(parameter => parameter.Name.Equals(name, StringComparison.Ordinal))
                         is { } lambdaParameter)
                     return lambdaParameter.TypeName ?? UnknownLocalTypeSentinel;
+                if (scope is MatchCaseNode matchCase
+                    && FindTypedPatternVariable(matchCase.Pattern, name) is { } patternType)
+                    return patternType;
 
                 var statements = scope switch
                 {
@@ -5576,6 +5589,12 @@ public sealed class EffectEnforcementPass
                     return declaredType;
             }
 
+            // `x is T name` in a condition or contract of an enclosing callable declares name
+            // as a T, when every such test of the name agrees on T.
+            foreach (var scope in scopes)
+                if (scope is FunctionNode or LambdaExpressionNode
+                    && IsPatternVariableType(scope, name) is { } testedType)
+                    return testedType;
 
             // FALLBACK: enclosing-class field type string.
             var field = _context.OwnerClass?.Fields.FirstOrDefault(
@@ -6254,7 +6273,7 @@ public sealed class EffectEnforcementPass
                 FloatLiteralNode => "Double",
                 DecimalLiteralNode => "Decimal",
                 ReferenceNode reference => EffectResolver.NormalizeParameterType(
-                    ResolveLocalValueType(reference.Name) ?? "?"),
+                    ResolveLocalValueType(reference.Name) ?? BoundVariableTypeName(reference) ?? "?"),
                 NewExpressionNode creation => EffectResolver.NormalizeParameterType(
                     GetConstructedTypeName(creation)),
                 ArrayCreationNode array => $"{array.ElementType}[]",
@@ -6287,6 +6306,27 @@ public sealed class EffectEnforcementPass
             };
         }
 
+        /// <summary>
+        /// The declared type of the variable the binder resolved <paramref name="reference"/>
+        /// to (a deconstructed dictionary entry, say), when the AST search has none.
+        /// </summary>
+        private string? BoundVariableTypeName(ReferenceNode reference) =>
+            !reference.Name.Contains('.')
+            && _context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span)
+                is { Id.IsNone: false, TypeName: { Length: > 0 } typeName }
+            && typeName is not ("OBJECT" or "?")
+                ? typeName : null;
+
+        /// <summary>
+        /// A named receiver's declared type as written (<c>Vendor.Widget</c>), for the manifest
+        /// lookup: normalization keeps only the simple name, which a manifest keyed by the full
+        /// name cannot find. The qualified-name path looks types up the same way.
+        /// </summary>
+        private string? DeclaredReceiverType(ExpressionNode target) =>
+            target is ReferenceNode { Name: var name } && !name.Contains('.')
+            && ResolveLocalValueType(name) is { } declared && declared != UnknownLocalTypeSentinel
+                ? declared : null;
+
         private string? InferKnownComputedCallResultType(ExpressionCallNode call)
         {
             var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
@@ -6316,8 +6356,7 @@ public sealed class EffectEnforcementPass
         private string InferMemberType(ExpressionNode target, string memberName)
         {
             var targetType = InferExpressionType(target);
-            var shortType = StripGenericArguments(targetType);
-            if (shortType == null || !_context.ClassesByName.TryGetValue(shortType, out var cls))
+            if (!TryResolveClass(targetType, out var cls))
                 return "?";
 
             var property = FindClassProperty(cls, memberName)?.Property;
@@ -6366,6 +6405,14 @@ public sealed class EffectEnforcementPass
             if (_context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, span)
                 is { SourceStaticFieldOwner: { } owner })
                 return InferStaticFieldInitialization(owner, span);
+            // A source type receiver (`Probe . P`, and `Probe.P` which the parser reads the
+            // same way) names a static member: it is charged exactly as the qualified name is,
+            // the getter and the type's initialization included.
+            if (target is ReferenceNode { IsVerbatim: false } typeReceiver
+                && !typeReceiver.Name.Contains('.')
+                && _context.ClassesByName.ContainsKey(typeReceiver.Name)
+                && ResolveLocalValueType(typeReceiver.Name) is null)
+                return InferFromReference(new ReferenceNode(span, $"{typeReceiver.Name}.{memberName}"));
             var effects = InferFromExpression(target);
             if (_context.CallGraph.SourceFieldAccess(_context.CurrentFunctionId, span)
                 is { ResolvedField: { IsField: true, IsStatic: false } })
@@ -6378,8 +6425,7 @@ public sealed class EffectEnforcementPass
             if (memberName == "Length"
                 && InferBoundArrayLength(target.Span, span) is { } arrayEffects)
                 return effects.Union(arrayEffects);
-            var shortType = StripGenericArguments(targetType);
-            if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out var cls))
+            if (TryResolveClass(targetType, out var cls))
             {
                 var resolved = FindClassProperty(cls, memberName);
                 var getter = resolved?.Property.Getter;
@@ -6394,8 +6440,14 @@ public sealed class EffectEnforcementPass
                 return effects.Union(InferFromInternalFunctions([id]));
             }
 
-            var manifestType = MapShortTypeNameToFullName(targetType);
+            var declaredReceiver = DeclaredReceiverType(target);
             var metadata = _context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, span);
+            // A member of another module's type: the same recorded assumption as its
+            // qualified-name read (`box.count` on a `Holder.Box` parameter).
+            if (metadata is null && selectedGetter is null && declaredReceiver is not null
+                && TryCrossModuleMemberAssumption(declaredReceiver, memberName))
+                return effects;
+            var manifestType = MapShortTypeNameToFullName(declaredReceiver ?? targetType);
             var resolution = _context.Resolver.Resolve(selectedGetter is not null
                 ? EffectResolverKey.FromBoundReceiver(
                     Binding.Metadata.MetadataBinderResult.ToNominalBoundType(selectedGetter.ReceiverType),
@@ -6836,8 +6888,7 @@ public sealed class EffectEnforcementPass
         private EffectSet InferSetterEffects(FieldAccessNode field)
         {
             var targetType = InferExpressionType(field.Target);
-            var shortType = StripGenericArguments(targetType);
-            if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out var cls))
+            if (TryResolveClass(targetType, out var cls))
             {
                 var resolved = FindClassProperty(cls, field.FieldName);
                 if (resolved == null)
@@ -6858,13 +6909,17 @@ public sealed class EffectEnforcementPass
                 return InferFromInternalFunctions([id]);
             }
 
-            var manifestType = MapShortTypeNameToFullName(targetType);
-            var resolution = _context.Resolver.Resolve(ResolverKey(
-                GetReferencePath(field.Target),
-                manifestType,
-                field.FieldName,
-                null,
-                EffectMemberKind.Setter));
+            var manifestType = MapShortTypeNameToFullName(DeclaredReceiverType(field.Target) ?? targetType);
+            // The binder's receiver type names the setter exactly, as for a getter.
+            var metadata = _context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, field.Span);
+            var resolution = _context.Resolver.Resolve(metadata is not null
+                ? EffectResolverKey.FromBoundReceiver(metadata, field.FieldName, null, EffectMemberKind.Setter)
+                : ResolverKey(
+                    GetReferencePath(field.Target),
+                    manifestType,
+                    field.FieldName,
+                    null,
+                    EffectMemberKind.Setter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(
                     $"{manifestType}.set_{field.FieldName}",
@@ -7043,17 +7098,8 @@ public sealed class EffectEnforcementPass
                 return InferFromInternalFunctions([id]);
             }
 
-            var moduleSeparator = receiverType.IndexOf('.');
-            if (moduleSeparator > 0
-                && _context.CrossModuleFunctionNames.Any(name =>
-                    name.StartsWith(
-                        receiverType[..moduleSeparator] + ".",
-                        StringComparison.Ordinal)))
-            {
-                RecordAssumption(
-                    $"reads cross-module member '{receiverType}.{member}', whose field/property accessor effects are not available in this module");
+            if (TryCrossModuleMemberAssumption(receiverType, member))
                 return EffectSet.Empty;
-            }
 
             var manifestType = MapShortTypeNameToFullName(receiverType);
             var resolution = _context.Resolver.Resolve(ResolverKey(
@@ -7061,6 +7107,18 @@ public sealed class EffectEnforcementPass
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation($"{manifestType}.get_{member}", span)
                 : resolution.Effects;
+        }
+
+        private bool TryCrossModuleMemberAssumption(string receiverType, string member)
+        {
+            var moduleSeparator = receiverType.IndexOf('.');
+            if (moduleSeparator <= 0
+                || !_context.CrossModuleFunctionNames.Any(name =>
+                    name.StartsWith(receiverType[..moduleSeparator] + ".", StringComparison.Ordinal)))
+                return false;
+            RecordAssumption(
+                $"reads cross-module member '{receiverType}.{member}', whose field/property accessor effects are not available in this module");
+            return true;
         }
 
         private EffectSet InferSetterEffects(
@@ -7165,7 +7223,7 @@ public sealed class EffectEnforcementPass
             {
                 effects = effects.Union(InferFromPattern(matchCase.Pattern,
                     _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, matchStmt.Target.Span)));
-                effects = effects.Union(InferFromStatements(matchCase.Body));
+                effects = effects.Union(InferFromCaseBody(matchCase));
             }
             return effects;
         }
@@ -7775,6 +7833,54 @@ public sealed class EffectEnforcementPass
             return effects.Union(InferFromCallArguments(call.Target, call.Arguments, call.ArgumentModifiers));
         }
 
+        /// <summary>
+        /// A case body sees the case's typed pattern variables (<c>case Box&lt;int&gt; v → v.Value</c>),
+        /// so a member read on one resolves against its declared type, not as an unknown receiver.
+        /// </summary>
+        private EffectSet InferFromCaseBody(MatchCaseNode matchCase)
+        {
+            _lexicalTypeScopes.Push(matchCase);
+            try
+            {
+                return InferFromStatements(matchCase.Body);
+            }
+            finally
+            {
+                _lexicalTypeScopes.Pop();
+            }
+        }
+
+        private readonly Dictionary<AstNode, Dictionary<string, string?>> _isPatternTypes =
+            new(ReferenceEqualityComparer.Instance);
+
+        private string? IsPatternVariableType(AstNode scope, string name)
+        {
+            if (!_isPatternTypes.TryGetValue(scope, out var types))
+            {
+                // One walk per callable: each tested name with its type, or null when two
+                // tests of the same name disagree.
+                _isPatternTypes[scope] = types = new Dictionary<string, string?>(StringComparer.Ordinal);
+                var pending = new Stack<AstNode>([scope]);
+                while (pending.TryPop(out var node))
+                {
+                    if (node is IsPatternNode { VariableName: { } variable } test)
+                        types[variable] = types.TryGetValue(variable, out var seen) && seen != test.TargetType
+                            ? null : test.TargetType;
+                    foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                        pending.Push(child);
+                }
+            }
+            return types.GetValueOrDefault(name);
+        }
+
+        private static string? FindTypedPatternVariable(AstNode pattern, string name) =>
+            pattern is TypePatternNode { BindingName: { } binding } typed
+                && binding.Equals(name, StringComparison.Ordinal)
+                ? typed.TypeName
+                : RecursiveAstWalker.GetAllChildren(pattern)
+                    .Select(child => FindTypedPatternVariable(child, name))
+                    .FirstOrDefault(type => type != null);
+
         private EffectSet InferFromMatchExpression(MatchExpressionNode match)
         {
             var effects = InferFromExpression(match.Target);
@@ -7782,7 +7888,7 @@ public sealed class EffectEnforcementPass
             {
                 effects = effects.Union(InferFromPattern(matchCase.Pattern,
                     _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, match.Target.Span)));
-                effects = effects.Union(InferFromStatements(matchCase.Body));
+                effects = effects.Union(InferFromCaseBody(matchCase));
             }
             return effects;
         }

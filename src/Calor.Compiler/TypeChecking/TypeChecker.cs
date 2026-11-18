@@ -5320,6 +5320,16 @@ public sealed class TypeChecker
             && (targetType is ArrayType || targetType.Equals(PrimitiveType.String)))
             return PrimitiveType.Int;
 
+        // System.Nullable<T>'s two properties; its other members are unmodeled, as for any
+        // external type, and C# resolves them.
+        if (targetType is NullableValueType nullableValue)
+            return field.FieldName switch
+            {
+                "HasValue" => PrimitiveType.Bool,
+                "Value" => nullableValue.UnderlyingType,
+                _ => ErrorType.Instance
+            };
+
         if (_module != null && Binding.TypeIdentity.TryResolveNativeInstanceMemberType(
             _module, targetType.SurfaceName, field.FieldName, out var nativeMember))
             return ResolveTypeName(nativeMember, field.Span);
