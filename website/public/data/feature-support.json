@@ -9,7 +9,7 @@
     "info": 0
   },
   "data": {
-    "totalFeatures": 183,
+    "totalFeatures": 184,
     "features": {
       "full": [
         {
@@ -512,6 +512,11 @@
           "name": "local-function",
           "description": "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed lambda binding. Direct self-recursion additionally requires a pure body proved over resolved built-in scalar operations; its lambda captures only an initialized internal self binding. Forward/mutual calls, method-group uses, captures, explicit checked/unchecked regions in recursive bodies, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as converter-owned C# interop",
           "workaround": "Use an existing lambda binding with calls after its declaration, or let the converter preserve the original C# member"
+        },
+        {
+          "name": "untyped-block-lambda",
+          "description": "A block-bodied lambda passed as an argument is bound to a temp before the call; when a parameter type cannot be inferred the temp has no C# delegate type, so the containing member is preserved as C# interop",
+          "workaround": "Declare the lambda parameter types, or keep the counted interop"
         },
         {
           "name": "complex-is-pattern",

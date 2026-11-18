@@ -204,8 +204,9 @@ public class CSharpToCalorConversionTests
         Assert.Single(result.Ast.Functions);
 
         var mainFunc = result.Ast.Functions[0];
-        // 3 statements: numbers bind, lambda temp bind, doubled bind
-        Assert.Equal(3, mainFunc.Body.Count);
+        // 2 statements: numbers bind, doubled bind. The expression lambda stays in place as the
+        // call argument (`numbers.Select((int:x) => …)`); an untyped temp would be CS8917 in C#.
+        Assert.Equal(2, mainFunc.Body.Count);
     }
 
     [Fact]
@@ -2130,7 +2131,11 @@ public class CSharpToCalorConversionTests
     [Fact]
     public void Convert_StatementBodyLambda_EmitsLamBlock()
     {
+        // The usings let the semantic model type `x`: a block lambda bound to a temp needs a
+        // natural delegate type, and an untyped `x` would preserve the member instead.
         var csharpSource = """
+            using System;
+            using System.Collections.Generic;
             public class Test
             {
                 public void Run()
@@ -2149,7 +2154,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("(x) =>", result.CalorSource);
+        Assert.Contains("(int:x) =>", result.CalorSource);
         Assert.Contains("let doubled = (x * 2)", result.CalorSource);
         Assert.DoesNotContain("→", result.CalorSource);
     }

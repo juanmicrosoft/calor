@@ -1055,22 +1055,25 @@ public sealed class CSharpToCalorConverter
                         csharpSource,
                         parseOptions,
                         cancellationToken);
+                    context.RecordBranchSelection(csharpSource, stripResult.Source, () =>
+                    {
+                        foreach (var directive in stripResult.RemovedConditionalDirectives)
+                        {
+                            context.RecordLoss(ConversionLossKind.PreprocessorStripped,
+                                "preprocessor-directive",
+                                $"'{directive.Directive}' removed after Roslyn selected the active branch",
+                                directive.Line);
+                        }
+                        foreach (var directive in stripResult.RemovedNonconditionalDirectives)
+                        {
+                            context.RecordLoss(
+                                ConversionLossKind.DirectiveRemoved,
+                                directive.Feature,
+                                $"Inactive directive removed after Roslyn selected the active branch: '{directive.Directive}'",
+                                directive.Line);
+                        }
+                    });
                     csharpSource = stripResult.Source;
-                    foreach (var directive in stripResult.RemovedConditionalDirectives)
-                    {
-                        context.RecordLoss(ConversionLossKind.PreprocessorStripped,
-                            "preprocessor-directive",
-                            $"'{directive.Directive}' removed after Roslyn selected the active branch",
-                            directive.Line);
-                    }
-                    foreach (var directive in stripResult.RemovedNonconditionalDirectives)
-                    {
-                        context.RecordLoss(
-                            ConversionLossKind.DirectiveRemoved,
-                            directive.Feature,
-                            $"Inactive directive removed after Roslyn selected the active branch: '{directive.Directive}'",
-                            directive.Line);
-                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -1988,6 +1991,8 @@ public sealed class CSharpToCalorConverter
                 feature: "namespace-topology",
                 line: 1);
 
+            // R9: preserve the file as written, every #if branch included, not the selected text.
+            csharpSource = context.TakeWholeUnitPreservationSource(csharpSource);
             var module = PreserveCompilationUnit(
                 csharpSource,
                 "namespace-topology",

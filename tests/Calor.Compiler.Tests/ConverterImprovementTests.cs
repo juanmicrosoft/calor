@@ -422,9 +422,9 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = fieldAccess.Accept(emitter);
 
-        // 0.30: a structural member access prints spaced (`a . b`); `a.b` would reparse as
-        // one dotted name rather than a FieldAccessNode.
-        Assert.Equal("this . Name", output);
+        // 0.30: after `this` (which ends its own token) member access prints unspaced, and
+        // `this.Name` still reparses as a FieldAccessNode on `this`.
+        Assert.Equal("this.Name", output);
         Assert.DoesNotContain("§THIS", output);
     }
 
@@ -437,7 +437,7 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = fieldAccess.Accept(emitter);
 
-        Assert.Equal("base . Name", output);
+        Assert.Equal("base.Name", output);
         Assert.DoesNotContain("§BASE", output);
     }
 
