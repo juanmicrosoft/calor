@@ -127,6 +127,12 @@ public sealed class Binder
         _boundSourceStaticFieldReads;
     private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundMetadataConstants =
         new(ReferenceEqualityComparer.Instance);
+    /// <summary>
+    /// Every source field symbol of the module, with whether it is `const` and, when its value
+    /// is the same in every configuration, its initializer (overload resolution reads it).
+    /// </summary>
+    private readonly Dictionary<VariableSymbol, (bool IsConst, ExpressionNode? Initializer)> _sourceFieldConstants =
+        new(ReferenceEqualityComparer.Instance);
     internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundMetadataConstants =>
         _boundMetadataConstants;
     private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundMetadataStaticFieldReads =
@@ -1228,6 +1234,7 @@ public sealed class Binder
         _boundAwaits.Clear();
         _boundSourceEnumConstants.Clear();
         _boundSourceStaticFieldReads.Clear();
+        _sourceFieldConstants.Clear();
         _boundMetadataConstants.Clear();
         _boundMetadataStaticFieldReads.Clear();
         _boundContractExpressions.Clear();
@@ -1606,6 +1613,12 @@ public sealed class Binder
                 // type-parameter list, so no `eff` binders are in scope.
                 functionType: TryBuildFunctionType(
                     field.TypeName, field.Row, binders: null, qualifiedClassName));
+            // 0.30 overloads: a `const` field's value decides C#'s constant conversions
+            // (`byte` accepts a constant int 1). A const declared under a preprocessor branch
+            // may have another value in another configuration, so its value is not known.
+            _sourceFieldConstants[symbol] = field.Modifiers.HasFlag(MethodModifiers.Const)
+                ? (true, conditionalAlternative == null ? field.DefaultValue : null)
+                : (false, null);
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -8727,6 +8740,8 @@ public sealed class Binder
                 candidateOverrides: interfaceCandidates,
                 arguments: arguments,
                 callSpan: span);
+            if (resolution.HasOpaqueOverloads)
+                return resolution;
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
@@ -8932,6 +8947,25 @@ public sealed class Binder
             }
         }
 
+        // 0.30 overloads: C# decides a constant's conversions by its value. When an argument is
+        // (or may be) a constant this binder cannot evaluate, and some candidate could accept it
+        // only through a constant conversion, the applicable set is unknown: stay opaque.
+        if (arguments is not null && accessibleCandidates.Length > 0)
+        {
+            for (var index = 0; index < arguments.Count && index < argumentTypes.Count; index++)
+            {
+                var type = TypeIdentity.Canonicalize(argumentTypes[index]);
+                if (type is "INT" or "LONG"
+                    && ClassifyIntegralConstant(arguments[index], out _) == IntegralConstant.Unknown
+                    && accessibleCandidates.Any(candidate => candidate.Parameters.Any(parameter =>
+                        !string.IsNullOrWhiteSpace(parameter.TypeName)
+                        && IsConstantConversionTarget(type, TypeIdentity.Canonicalize(parameter.TypeName)))))
+                    return OverloadResolutionResult.Opaque();
+            }
+        }
+
+        // An extension call's receiver converts by identity, reference or boxing only.
+        bool IsValueConversionPosition(int index) => !(includesExtensionReceiver && index == 0);
         var resolved = accessibleScope.ResolveOverload(
             lookupName,
             argumentTypes,
@@ -8948,13 +8982,166 @@ public sealed class Binder
                         $"{(payload.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated ? "?" : "")}>" +
                         $"{(generic.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated ? "?" : "")}"
                     : ResolveCallableParameterType(function, type),
-            arguments is null ? null : (index, parameterType, argumentType) =>
-                GetImplicitArgumentConversionCost(parameterType, argumentType, arguments[index]),
+            arguments is null ? null : (index, parameterType, argumentType) => IsValueConversionPosition(index)
+                ? GetImplicitArgumentConversionCost(parameterType, argumentType, arguments[index])
+                : GetImplicitConversionCost(parameterType, argumentType),
             arguments is null ? null : (index, candidateType, otherType) =>
                 IsBetterIntegerLiteralConversionTarget(
-                    arguments[index], argumentTypes[index], candidateType, otherType));
-        return resolved.Function is { } winner && duplicates.TryGetValue(winner, out var ambiguous)
-            ? OverloadResolutionResult.Ambiguous(ambiguous) : resolved;
+                    arguments[index], argumentTypes[index], candidateType, otherType),
+            arguments is null ? null : (index, first, second) =>
+                CompareArgumentConversions(arguments[index], argumentTypes[index], first, second),
+            arguments is null ? null : (index, parameterType) =>
+                RequiresExactBetterness(parameterType, argumentTypes[index]));
+        if (resolved.Function is { } winner && duplicates.TryGetValue(winner, out var ambiguous))
+            return OverloadResolutionResult.Ambiguous(ambiguous);
+
+        // Soundness backstop: the source projection compiles this call with Roslyn. When
+        // Roslyn selected a different source declaration, this binder's choice is wrong (an
+        // unmodeled conversion, a typing difference): leave the call opaque, never charge the
+        // other overload's row.
+        if (resolved.Kind == OverloadResolutionKind.Resolved && resolved.Function is { } chosen
+            && ResolveSourceCallConversions && _asyncTypeModule is not null && callSpan is { } selectedSite
+            && _sourceCallConversions is { } projection
+            && projection.SelectedCalls.TryGetValue(selectedSite, out var roslynSelection)
+            && roslynSelection.IncludesExtensionReceiver == includesExtensionReceiver
+            && roslynSelection.Arguments.Count == argumentTypes.Count
+            && _functionSymbols.TryGetValue(roslynSelection.Declaration, out var roslynFunction)
+            && accessibleCandidates.Contains(roslynFunction)
+            && !ReferenceEquals(roslynFunction, chosen))
+            return OverloadResolutionResult.Opaque();
+        return resolved;
+    }
+
+    /// <summary>
+    /// True when a call that converts this argument to <paramref name="parameterType"/> must be
+    /// resolved by C#'s better-function-member rule: a nullable value parameter the argument
+    /// does not match exactly, or a constant conversion target.
+    /// </summary>
+    private bool RequiresExactBetterness(string parameterType, string argumentType)
+    {
+        var parameter = TypeIdentity.Canonicalize(parameterType);
+        var source = TypeIdentity.Canonicalize(argumentType);
+        return parameter != source
+            && (TryGetValueNullableUnderlying(parameter, out _) || IsConstantConversionTarget(source, parameter));
+    }
+
+    /// <summary>
+    /// C#'s better conversion from expression (§12.6.4.5) for one argument: +1 when converting
+    /// it to <paramref name="first"/> is better than to <paramref name="second"/>, -1 when worse,
+    /// 0 when neither, null when this binder cannot tell (a type outside the built-in value,
+    /// string and object types, or an argument whose C# type it does not know exactly).
+    /// </summary>
+    private int? CompareArgumentConversions(BoundExpression argument, string argumentType, string first, string second)
+    {
+        var target1 = ConversionIdentity(first);
+        var target2 = ConversionIdentity(second);
+        if (target1 == target2)
+            return 0;
+        // The null literal has no type: it exactly matches neither target.
+        var source = argument is BoundNullLiteral ? "NULL" : TryGetCSharpArgumentType(argument, argumentType);
+        if (source is null)
+            return null;
+        source = source == "NULL" ? source : ConversionIdentity(source);
+        // E exactly matches T when E's type is T.
+        var exact1 = source == target1;
+        var exact2 = source == target2;
+        if (exact1 != exact2)
+            return exact1 ? 1 : -1;
+        // Better conversion target: an implicit conversion one way and not the other.
+        var forward = ImplicitTypeConversionExists(target1, target2);
+        var backward = ImplicitTypeConversionExists(target2, target1);
+        if (forward is null || backward is null)
+            return null;
+        if (forward != backward)
+            return forward.Value ? 1 : -1;
+        // A signed integral target (or its nullable) is better than an unsigned one.
+        if (IsSignedBetterTarget(target1, target2))
+            return 1;
+        if (IsSignedBetterTarget(target2, target1))
+            return -1;
+        return 0;
+    }
+
+    /// <summary>
+    /// A type's identity for conversions: a nullable annotation on string or object is not a
+    /// different type (`string?` converts exactly as `string` does).
+    /// </summary>
+    private static string ConversionIdentity(string type)
+    {
+        var canonical = TypeIdentity.Canonicalize(type);
+        return canonical is "STRING?" or "OBJECT?" ? canonical[..^1] : canonical;
+    }
+
+    private static string StripValueNullable(string canonical) =>
+        TryGetValueNullableUnderlying(canonical, out var underlying) ? underlying : canonical;
+
+    private static bool IsSignedBetterTarget(string first, string second) =>
+        (StripValueNullable(first), StripValueNullable(second)) switch
+        {
+            ("INT[bits=8][signed=true]", "INT[bits=8][signed=false]" or "INT[bits=16][signed=false]"
+                or "UINT" or "ULONG") => true,
+            ("INT[bits=16][signed=true]", "INT[bits=16][signed=false]" or "UINT" or "ULONG") => true,
+            ("INT", "UINT" or "ULONG") => true,
+            ("LONG", "ULONG") => true,
+            _ => false
+        };
+
+    /// <summary>
+    /// Whether C# has an implicit conversion between two TYPES (no constant conversions), for
+    /// the built-in value types, their nullables, string and object; null for anything else.
+    /// </summary>
+    private static bool? ImplicitTypeConversionExists(string from, string to)
+    {
+        if (from == to)
+            return true;
+        if (to == "OBJECT")
+            return from != "VOID";
+        if (from == "OBJECT")
+            return false;
+        static bool Known(string type) => type == "STRING" || IsBuiltinValueType(type)
+            || TryGetValueNullableUnderlying(type, out _);
+        if (!Known(from) || !Known(to))
+            return null;
+        if (from == "STRING" || to == "STRING")
+            return false;
+        var toNullable = TryGetValueNullableUnderlying(to, out var toUnderlying);
+        var fromNullable = TryGetValueNullableUnderlying(from, out var fromUnderlying);
+        if (fromNullable && !toNullable)
+            return false;
+        var source = fromNullable ? fromUnderlying : from;
+        var target = toNullable ? toUnderlying : to;
+        return source == target || IsImplicitNumericConversion(source, target);
+    }
+
+    /// <summary>
+    /// The argument's C# type (in the generated C#) when this binder knows it exactly; null
+    /// otherwise (a promoted arithmetic result, a flow-narrowed variable).
+    /// </summary>
+    private static string? TryGetCSharpArgumentType(BoundExpression argument, string argumentType)
+    {
+        var type = TypeIdentity.Canonicalize(argumentType);
+        if (type is "<unresolved>" or "NULL")
+            return null;
+        return argument switch
+        {
+            // The emitter writes a literal with its Calor type's suffix (`3000000000L`, `5U`).
+            BoundIntLiteral => type,
+            BoundFloatLiteral or BoundDecimalLiteral or BoundBoolLiteral or BoundStringLiteral => type,
+            BoundUnaryExpression { Operator: UnaryOperator.Negate, Operand: var operand }
+                when type is "INT" or "LONG" or "FLOAT" or "FLOAT[bits=32]" or "DECIMAL"
+                && TryGetCSharpArgumentType(operand, operand.Type.DisplayString) == type => type,
+            BoundVariableExpression { Variable: { Id.IsNone: false } variable }
+                when TypeIdentity.Canonicalize(variable.TypeName) == type => type,
+            BoundFieldAccessExpression { ResolvedField: { } field }
+                when TypeIdentity.Canonicalize(field.TypeName) == type => type,
+            BoundFieldAccessExpression { ResolvedField: null, ResolvedMetadataMember: not null } => type,
+            BoundTypeOperationExpression { Operation: TypeOp.Cast } => type,
+            BoundNewExpression => type,
+            BoundIncompleteExpression => null,
+            BoundCallExpression { HasUnresolvedArguments: false, HasOpaqueOverloads: false } call
+                when call.ResolvedSymbol is not null || call.ResolvedMetadataMethod is not null => type,
+            _ => null
+        };
     }
 
     private IReadOnlyList<FunctionSymbol>? GetInterfaceCallCandidates(
@@ -9051,20 +9238,178 @@ public sealed class Binder
             && supplied.TypeArguments is [BoundTypes.NominalBoundType sourceElement]
             && targetElement.HasSameUnderlyingReferenceType(sourceElement))
             return 0;
-        if (!TryGetSignedIntegerLiteral(argument, out var value))
-            return null;
 
-        return (TypeIdentity.Canonicalize(argumentType), TypeIdentity.Canonicalize(parameterType)) switch
+        var parameter = TypeIdentity.Canonicalize(parameterType);
+        var source = TypeIdentity.Canonicalize(argumentType);
+        // 0.30 overloads: C#'s implicit nullable conversions. `S` → `T?` when `S` → `T` is an
+        // identity or implicit numeric conversion (or, for a constant, a constant conversion),
+        // and `S?` → `T?` when `S` → `T` is implicit numeric. These are value conversions
+        // (outside GetImplicitConversionCost), so a call that uses one is resolved by C#'s
+        // better-function-member rule (ResolveExactOverload), never by summed cost.
+        if (TryGetValueNullableUnderlying(parameter, out var underlying))
         {
-            ("INT", "INT[bits=8][signed=true]") when value is >= sbyte.MinValue and <= sbyte.MaxValue => 10,
-            ("INT", "INT[bits=8][signed=false]") when value is >= byte.MinValue and <= byte.MaxValue => 10,
-            ("INT", "INT[bits=16][signed=true]") when value is >= short.MinValue and <= short.MaxValue => 10,
-            ("INT", "INT[bits=16][signed=false]") when value is >= ushort.MinValue and <= ushort.MaxValue => 10,
-            ("INT", "UINT") when value is >= uint.MinValue and <= uint.MaxValue => 10,
-            ("INT", "ULONG") when value >= 0 => 10,
-            ("LONG", "ULONG") when value >= 0 => 10,
-            _ => null
+            // The null literal converts to every nullable value type.
+            if (source == "NULL")
+                return 40;
+            if (TryGetValueNullableUnderlying(source, out var sourceUnderlying))
+                return IsImplicitNumericConversion(sourceUnderlying, underlying) ? 11 : null;
+            if (!IsBuiltinValueType(source))
+                return null;
+            if (source == underlying)
+                return 1;
+            return IsImplicitNumericConversion(source, underlying)
+                || IsImplicitConstantConversion(argument, source, underlying) ? 11 : null;
+        }
+
+        return IsImplicitConstantConversion(argument, source, parameter) ? 10 : null;
+    }
+
+    private static readonly HashSet<string> BuiltinNumericTypes = new(StringComparer.Ordinal)
+    {
+        "INT[bits=8][signed=true]", "INT[bits=8][signed=false]",
+        "INT[bits=16][signed=true]", "INT[bits=16][signed=false]",
+        "INT", "UINT", "LONG", "ULONG", "CHAR", "FLOAT[bits=32]", "FLOAT", "DECIMAL"
+    };
+
+    private static bool IsBuiltinValueType(string canonical) =>
+        BuiltinNumericTypes.Contains(canonical) || canonical == "BOOL";
+
+    /// <summary>`T?` for a built-in value type T (not a nullable reference type).</summary>
+    private static bool TryGetValueNullableUnderlying(string canonical, out string underlying)
+    {
+        underlying = canonical.EndsWith('?') ? canonical[..^1] : "";
+        return underlying.Length > 0 && IsBuiltinValueType(underlying);
+    }
+
+    /// <summary>
+    /// C#'s implicit constant expression conversion: a constant of type int converts to
+    /// sbyte, byte, short, ushort, uint or ulong when its value fits; a constant of type long
+    /// converts to ulong when it is not negative.
+    /// </summary>
+    private bool IsImplicitConstantConversion(BoundExpression argument, string source, string target)
+    {
+        if (source is not ("INT" or "LONG")
+            || ClassifyIntegralConstant(argument, out var value) != IntegralConstant.Known)
+            return false;
+        return (source, target) switch
+        {
+            ("INT", "INT[bits=8][signed=true]") => value is >= sbyte.MinValue and <= sbyte.MaxValue,
+            ("INT", "INT[bits=8][signed=false]") => value is >= byte.MinValue and <= byte.MaxValue,
+            ("INT", "INT[bits=16][signed=true]") => value is >= short.MinValue and <= short.MaxValue,
+            ("INT", "INT[bits=16][signed=false]") => value is >= ushort.MinValue and <= ushort.MaxValue,
+            ("INT", "UINT") => value is >= uint.MinValue and <= uint.MaxValue,
+            ("INT" or "LONG", "ULONG") => value >= 0,
+            _ => false
         };
+    }
+
+    /// <summary>The targets a constant of <paramref name="source"/> type may convert to by value.</summary>
+    private static bool IsConstantConversionTarget(string source, string target)
+    {
+        if (TryGetValueNullableUnderlying(target, out var underlying))
+            target = underlying;
+        return source switch
+        {
+            "INT" => target is "INT[bits=8][signed=true]" or "INT[bits=8][signed=false]"
+                or "INT[bits=16][signed=true]" or "INT[bits=16][signed=false]" or "UINT" or "ULONG",
+            "LONG" => target == "ULONG",
+            _ => false
+        };
+    }
+
+    private enum IntegralConstant { NotConstant, Known, Unknown }
+
+    /// <summary>
+    /// Whether C# reads <paramref name="expression"/> as a constant expression, and its value
+    /// when this binder can compute it. <c>Unknown</c> is a constant (or possibly one) whose
+    /// value is not computed here: overload resolution must not guess which constant
+    /// conversions apply to it.
+    /// </summary>
+    private IntegralConstant ClassifyIntegralConstant(BoundExpression expression, out long value)
+    {
+        value = 0;
+        switch (expression)
+        {
+            case BoundIntLiteral { IsUnsigned: false } literal:
+                value = literal.Value;
+                return IntegralConstant.Known;
+            case BoundIntLiteral or BoundFloatLiteral or BoundDecimalLiteral or BoundBoolLiteral
+                or BoundStringLiteral or BoundNullLiteral:
+                return IntegralConstant.Unknown;
+            case BoundUnaryExpression unary:
+            {
+                var operand = ClassifyIntegralConstant(unary.Operand, out var operandValue);
+                if (operand == IntegralConstant.NotConstant)
+                    return IntegralConstant.NotConstant;
+                if (operand == IntegralConstant.Known && unary.Operator == UnaryOperator.Negate
+                    && operandValue != long.MinValue)
+                {
+                    value = -operandValue;
+                    return IntegralConstant.Known;
+                }
+                return IntegralConstant.Unknown;
+            }
+            case BoundBinaryExpression binary:
+                return ClassifyIntegralConstant(binary.Left, out _) == IntegralConstant.NotConstant
+                    || ClassifyIntegralConstant(binary.Right, out _) == IntegralConstant.NotConstant
+                        ? IntegralConstant.NotConstant : IntegralConstant.Unknown;
+            case BoundConditionalExpression conditional:
+                return ClassifyIntegralConstant(conditional.Condition, out _) == IntegralConstant.NotConstant
+                    || ClassifyIntegralConstant(conditional.WhenTrue, out _) == IntegralConstant.NotConstant
+                    || ClassifyIntegralConstant(conditional.WhenFalse, out _) == IntegralConstant.NotConstant
+                        ? IntegralConstant.NotConstant : IntegralConstant.Unknown;
+            case BoundTypeOperationExpression operation:
+                return ClassifyIntegralConstant(operation.Operand, out _) == IntegralConstant.NotConstant
+                    ? IntegralConstant.NotConstant : IntegralConstant.Unknown;
+            case BoundVariableExpression { Variable: var variable }:
+                return ClassifyFieldConstant(variable, out value);
+            case BoundFieldAccessExpression { ResolvedField: { } field }:
+                return ClassifyFieldConstant(field, out value);
+            case BoundFieldAccessExpression { ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol metadataField }:
+                if (!metadataField.IsConst)
+                    return IntegralConstant.NotConstant;
+                if (metadataField.HasConstantValue && metadataField.ConstantValue is
+                    sbyte or byte or short or ushort or int or uint or long)
+                {
+                    value = Convert.ToInt64(metadataField.ConstantValue, System.Globalization.CultureInfo.InvariantCulture);
+                    return IntegralConstant.Known;
+                }
+                return IntegralConstant.Unknown;
+            case BoundFieldAccessExpression { ResolvedMetadataMember: Microsoft.CodeAnalysis.IPropertySymbol }:
+                return IntegralConstant.NotConstant;
+            case BoundFieldAccessExpression or BoundInteropExpression or BoundIncompleteExpression:
+                return IntegralConstant.Unknown;
+            default:
+                return IntegralConstant.NotConstant;
+        }
+    }
+
+    private IntegralConstant ClassifyFieldConstant(VariableSymbol variable, out long value)
+    {
+        value = 0;
+        if (variable.Id.IsNone)
+            return IntegralConstant.Unknown;
+        if (variable.IsParameter || variable.IsProperty || !variable.IsField)
+            return IntegralConstant.NotConstant; // Calor has no constant locals.
+        if (!_sourceFieldConstants.TryGetValue(variable, out var declaration))
+            return variable.IsStatic ? IntegralConstant.Unknown : IntegralConstant.NotConstant;
+        if (!declaration.IsConst)
+            return IntegralConstant.NotConstant;
+        switch (declaration.Initializer)
+        {
+            case IntLiteralNode { IsUnsigned: false } literal:
+                value = literal.Value;
+                return IntegralConstant.Known;
+            case UnaryOperationNode
+            {
+                Operator: UnaryOperator.Negate,
+                Operand: IntLiteralNode { IsUnsigned: false } negated
+            } when negated.Value != long.MinValue:
+                value = -negated.Value;
+                return IntegralConstant.Known;
+            default:
+                return IntegralConstant.Unknown;
+        }
     }
 
     private static bool TryGetSignedIntegerLiteral(BoundExpression expression, out long value)
@@ -9454,6 +9799,16 @@ public sealed class Binder
             ("LONG", "FLOAT[bits=32]" or "FLOAT" or "DECIMAL") => true,
             ("ULONG", "FLOAT[bits=32]" or "FLOAT" or "DECIMAL") => true,
             ("FLOAT[bits=32]", "FLOAT") => true,
+            // 0.30: C#'s char row. Without it a char argument could reach only an `object`
+            // overload while C# picks the `int` one.
+            ("CHAR", "INT[bits=16][signed=false]"
+                or "INT"
+                or "UINT"
+                or "LONG"
+                or "ULONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
             _ => false,
         };
 

@@ -1903,7 +1903,9 @@ public sealed class Scope
         Func<string, string, bool>? isBetterNullConversionTarget = null,
         Func<FunctionSymbol, string, string>? resolveParameterType = null,
         Func<int, string, string, int?>? argumentConversionCost = null,
-        Func<int, string, string, bool>? isBetterArgumentConversionTarget = null)
+        Func<int, string, string, bool>? isBetterArgumentConversionTarget = null,
+        Func<int, string, string, int?>? compareArgumentConversions = null,
+        Func<int, string, bool>? requiresExactBetterness = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(argumentTypes);
@@ -1923,7 +1925,9 @@ public sealed class Scope
                     isBetterNullConversionTarget,
                     resolveParameterType,
                     argumentConversionCost,
-                    isBetterArgumentConversionTarget)
+                    isBetterArgumentConversionTarget,
+                    compareArgumentConversions,
+                    requiresExactBetterness)
                 ?? OverloadResolutionResult.NotFound();
         }
 
@@ -1967,6 +1971,30 @@ public sealed class Scope
                 implicitConversionCost(argument.ParameterType, argumentTypes[argument.ArgumentIndex]) is null
                 && argumentConversionCost(
                     argument.ArgumentIndex, argument.ParameterType, argumentTypes[argument.ArgumentIndex]) is not null));
+        // 0.30: C#'s better-function-member rule (§12.6.4.3) decides when the caller can compare
+        // conversions argument by argument. A call that uses a nullable or constant conversion
+        // must be decided by it: a summed cost would prefer `int?` (identity, lifted) over
+        // `byte` (constant) for the literal 1, where C# picks `byte`. Such a call is resolved
+        // exactly, or reported ambiguous exactly when C# reports it, or left opaque. Any other
+        // call with several candidates is resolved exactly when every comparison is known, and
+        // otherwise falls back to the rules below.
+        if (compareArgumentConversions != null)
+        {
+            var exactRequired = requiresExactBetterness != null && applicable.Any(candidate =>
+                candidate.Arguments.Any(argument =>
+                    requiresExactBetterness(argument.ArgumentIndex, argument.ParameterType)));
+            if (exactRequired || applicable.Count > 1)
+            {
+                var exact = ResolveExactOverload(applicable, argumentTypes.Count, compareArgumentConversions);
+                if (exact.Winner is { } winner)
+                    return OverloadResolutionResult.Resolved(winner.Function, winner.ReturnType, winner.Arguments);
+                if (exact.IsAmbiguous)
+                    return OverloadResolutionResult.Ambiguous(applicable.Select(item => item.Function).ToArray());
+                if (exactRequired)
+                    return OverloadResolutionResult.Opaque();
+            }
+        }
+
         // A new literal conversion can introduce crossed preferences that a summed score hides.
         var best = usesArgumentValueConversion
             ? applicable.ToArray()
@@ -2102,6 +2130,91 @@ public sealed class Scope
             var otherCost = argumentConversionCost?.Invoke(index, otherType, argumentTypes[index]);
             return candidateCost is { } cost && otherCost is { } alternativeCost && cost < alternativeCost;
         }
+    }
+
+    /// <summary>
+    /// C#'s better function member: the winner is better than every other applicable
+    /// candidate, where P is better than Q when no argument converts worse to P than to Q and
+    /// at least one converts better. <paramref name="compare"/> answers +1 (better), -1
+    /// (worse), 0 (neither) or null (unknown) per argument. Candidates with equivalent
+    /// parameter types go through C#'s first tie-breakers. With no winner the call is
+    /// ambiguous only when no candidate's status was left unknown.
+    /// </summary>
+    private static (ApplicableOverload? Winner, bool IsAmbiguous) ResolveExactOverload(
+        IReadOnlyList<ApplicableOverload> applicable, int argumentCount, Func<int, string, string, int?> compare)
+    {
+        bool? Better(ApplicableOverload candidate, ApplicableOverload other)
+        {
+            var anyBetter = false;
+            var anyUnknown = false;
+            var equivalent = true;
+            for (var index = 0; index < argumentCount; index++)
+            {
+                var candidateType = candidate.Arguments[index].ParameterType;
+                var otherType = other.Arguments[index].ParameterType;
+                if (TypeIdentity.Canonicalize(candidateType) == TypeIdentity.Canonicalize(otherType))
+                    continue;
+                equivalent = false;
+                var result = compare(index, candidateType, otherType);
+                if (result is null)
+                    anyUnknown = true;
+                else if (result < 0)
+                    return false;
+                else if (result > 0)
+                    anyBetter = true;
+            }
+            if (!equivalent)
+                return anyUnknown ? null : anyBetter;
+            // Equivalent parameter types: C#'s first tie-breakers. A non-generic member is
+            // better than a generic one, normal form better than expanded `params`, and a call
+            // that supplies every parameter better than one that relies on a default. Later
+            // tie-breakers (more specific types, ref kinds) are not modeled: unknown.
+            if ((candidate.Function.GenericArity == 0) != (other.Function.GenericArity == 0))
+                return candidate.Function.GenericArity == 0;
+            if (candidate.UsesExpandedParams != other.UsesExpandedParams)
+                return !candidate.UsesExpandedParams;
+            if (!candidate.UsesExpandedParams && OmitsDefault(candidate) != OmitsDefault(other))
+                return !OmitsDefault(candidate);
+            return null;
+        }
+
+        static bool OmitsDefault(ApplicableOverload overload) =>
+            overload.Function.Parameters.Count
+                > overload.Arguments.Select(argument => argument.ParameterIndex).Distinct().Count();
+
+        if (applicable.Any(candidate => candidate.Arguments.Count != argumentCount
+                || candidate.Arguments.Select((argument, index) => argument.ArgumentIndex != index).Any(moved => moved)))
+            return (null, false);
+
+        var winners = new List<ApplicableOverload>();
+        var anyUndecided = false;
+        foreach (var candidate in applicable)
+        {
+            var status = (bool?)true;
+            foreach (var other in applicable)
+            {
+                if (ReferenceEquals(candidate, other))
+                    continue;
+                var better = Better(candidate, other);
+                if (better == false)
+                {
+                    status = false;
+                    break;
+                }
+                if (better is null)
+                    status = null;
+            }
+            if (status == true)
+                winners.Add(candidate);
+            else if (status is null)
+                anyUndecided = true;
+        }
+
+        if (winners.Count == 1)
+            return (winners[0], false);
+        // No winner and every comparison known: C# reports the call ambiguous too (a pair whose
+        // comparison is unknown would need to be the winner's, and none could win anyway).
+        return (null, winners.Count == 0 && !anyUndecided);
     }
 
     private sealed record ApplicableOverload(
