@@ -6317,6 +6317,16 @@ public sealed class EffectEnforcementPass
             && typeName is not ("OBJECT" or "?")
                 ? typeName : null;
 
+        /// <summary>
+        /// A named receiver's declared type as written (<c>Vendor.Widget</c>), for the manifest
+        /// lookup: normalization keeps only the simple name, which a manifest keyed by the full
+        /// name cannot find. The qualified-name path looks types up the same way.
+        /// </summary>
+        private string? DeclaredReceiverType(ExpressionNode target) =>
+            target is ReferenceNode { Name: var name } && !name.Contains('.')
+            && ResolveLocalValueType(name) is { } declared && declared != UnknownLocalTypeSentinel
+                ? declared : null;
+
         private string? InferKnownComputedCallResultType(ExpressionCallNode call)
         {
             var bound = _context.CallGraph.ComputedMemberCall(_context.CurrentFunctionId, call.Span);
@@ -6430,8 +6440,14 @@ public sealed class EffectEnforcementPass
                 return effects.Union(InferFromInternalFunctions([id]));
             }
 
-            var manifestType = MapShortTypeNameToFullName(targetType);
+            var declaredReceiver = DeclaredReceiverType(target);
             var metadata = _context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, span);
+            // A member of another module's type: the same recorded assumption as its
+            // qualified-name read (`box.count` on a `Holder.Box` parameter).
+            if (metadata is null && selectedGetter is null && declaredReceiver is not null
+                && TryCrossModuleMemberAssumption(declaredReceiver, memberName))
+                return effects;
+            var manifestType = MapShortTypeNameToFullName(declaredReceiver ?? targetType);
             var resolution = _context.Resolver.Resolve(selectedGetter is not null
                 ? EffectResolverKey.FromBoundReceiver(
                     Binding.Metadata.MetadataBinderResult.ToNominalBoundType(selectedGetter.ReceiverType),
@@ -6893,7 +6909,7 @@ public sealed class EffectEnforcementPass
                 return InferFromInternalFunctions([id]);
             }
 
-            var manifestType = MapShortTypeNameToFullName(targetType);
+            var manifestType = MapShortTypeNameToFullName(DeclaredReceiverType(field.Target) ?? targetType);
             // The binder's receiver type names the setter exactly, as for a getter.
             var metadata = _context.CallGraph.MetadataMemberReceiverType(_context.CurrentFunctionId, field.Span);
             var resolution = _context.Resolver.Resolve(metadata is not null
@@ -7082,17 +7098,8 @@ public sealed class EffectEnforcementPass
                 return InferFromInternalFunctions([id]);
             }
 
-            var moduleSeparator = receiverType.IndexOf('.');
-            if (moduleSeparator > 0
-                && _context.CrossModuleFunctionNames.Any(name =>
-                    name.StartsWith(
-                        receiverType[..moduleSeparator] + ".",
-                        StringComparison.Ordinal)))
-            {
-                RecordAssumption(
-                    $"reads cross-module member '{receiverType}.{member}', whose field/property accessor effects are not available in this module");
+            if (TryCrossModuleMemberAssumption(receiverType, member))
                 return EffectSet.Empty;
-            }
 
             var manifestType = MapShortTypeNameToFullName(receiverType);
             var resolution = _context.Resolver.Resolve(ResolverKey(
@@ -7100,6 +7107,18 @@ public sealed class EffectEnforcementPass
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation($"{manifestType}.get_{member}", span)
                 : resolution.Effects;
+        }
+
+        private bool TryCrossModuleMemberAssumption(string receiverType, string member)
+        {
+            var moduleSeparator = receiverType.IndexOf('.');
+            if (moduleSeparator <= 0
+                || !_context.CrossModuleFunctionNames.Any(name =>
+                    name.StartsWith(receiverType[..moduleSeparator] + ".", StringComparison.Ordinal)))
+                return false;
+            RecordAssumption(
+                $"reads cross-module member '{receiverType}.{member}', whose field/property accessor effects are not available in this module");
+            return true;
         }
 
         private EffectSet InferSetterEffects(

@@ -169,7 +169,7 @@
   },
   "04-03": {
     "CSharpSource": "using System;\n\npublic class Shape\n{\n    public virtual double Area() => 0;\n}\n\npublic class Circle : Shape\n{\n    public double Radius { get; }\n    public Circle(double radius) { Radius = radius; }\n    public override double Area() => Math.PI * Radius * Radius;\n}",
-    "CalorSource": "module Test_04_03 overflow unchecked\n  using System\n\n  class Shape\n    func Area virtual () → double\n      !\n      return 0\n\n\n  class Circle\n    extends Shape\n\n    property double:Radius\n      get public\n\n    ctor (double:radius)\n      set Radius radius\n\n    func Area override () → double\n      !\n      return ((Math . PI * Radius) * Radius)\n\n\n",
+    "CalorSource": "module Test_04_03 overflow unchecked\n  using System\n\n  class Shape\n    func Area virtual () → double\n      !\n      return 0\n\n\n  class Circle\n    extends Shape\n\n    property double:Radius\n      get public\n\n    ctor (double:radius)\n      set Radius radius\n\n    func Area override () → double\n      !\n      return ((Math.PI * Radius) * Radius)\n\n\n",
     "NativeConversionCount": 7,
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,
@@ -445,7 +445,7 @@
   },
   "11-03": {
     "CSharpSource": "public class Container\n{\n    private enum Status\n    {\n        Active,\n        Inactive\n    }\n\n    private class Inner\n    {\n        public int Value { get; set; }\n    }\n\n    public Status GetStatus() => Status.Active;\n}",
-    "CalorSource": "module Test_11_03 overflow unchecked\n  class Container\n    func GetStatus () → Status\n      !\n      return Status . Active\n\n    class Inner private\n      property int:Value\n        get public\n        set public\n\n\n    enum Status private\n      Active\n      Inactive\n\n\n",
+    "CalorSource": "module Test_11_03 overflow unchecked\n  class Container\n    func GetStatus () → Status\n      !\n      return Status.Active\n\n    class Inner private\n      property int:Value\n        get public\n        set public\n\n\n    enum Status private\n      Active\n      Inactive\n\n\n",
     "NativeConversionCount": 3,
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,
@@ -509,7 +509,7 @@
   },
   "12-03": {
     "CSharpSource": "public struct Vector2\n{\n    public float X;\n    public float Y;\n    public Vector2(float x, float y) { X = x; Y = y; }\n    public static Vector2 operator +(Vector2 a, Vector2 b)\n    {\n        return new Vector2(a.X + b.X, a.Y + b.Y);\n    }\n}",
-    "CalorSource": "module Test_12_03 overflow unchecked\n  class Vector2 struct\n    field float:X\n    field float:Y\n\n    ctor (float:x, float:y)\n      set X x\n      set Y y\n\n    op + (Vector2:a, Vector2:b) → Vector2\n      ! alloc, mut\n      return new Vector2((a . X + b . X), (a . Y + b . Y))\n\n\n",
+    "CalorSource": "module Test_12_03 overflow unchecked\n  class Vector2 struct\n    field float:X\n    field float:Y\n\n    ctor (float:x, float:y)\n      set X x\n      set Y y\n\n    op + (Vector2:a, Vector2:b) → Vector2\n      ! alloc, mut\n      return new Vector2((a.X + b.X), (a.Y + b.Y))\n\n\n",
     "NativeConversionCount": 8,
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,
@@ -595,7 +595,7 @@
   },
   "13-04": {
     "CSharpSource": "public abstract class Result<T> { }\npublic class Ok<T> : Result<T>\n{\n    public T Value { get; }\n    public Ok(T value) { Value = value; }\n}\npublic class Error<T> : Result<T>\n{\n    public string Message { get; }\n    public Error(string message) { Message = message; }\n}\n\npublic static class ResultExtensions\n{\n    public static string Describe<T>(Result<T> result)\n    {\n        return result switch\n        {\n            Ok<T> ok => $\"Success: {ok.Value}\",\n            Error<T> err => $\"Error: {err.Message}\",\n            _ => \"Unknown\"\n        };\n    }\n}",
-    "CalorSource": "module Test_13_04 overflow unchecked\n  class Result<T> abstract\n\n  class Ok<T>\n    extends Result<T>\n\n    property T:Value\n      get public\n\n    ctor (T:value)\n      set Value value\n\n\n  class Error<T>\n    extends Result<T>\n\n    property string:Message\n      get public\n\n    ctor (string:message)\n      set Message message\n\n\n  module ResultExtensions\n    func Describe<T> (Result<T>:result) → string\n      ! unknown\n      return match result\n        case Ok<T> ok → \"Success: ${ok . Value}\"\n        case Error<T> err → \"Error: ${err . Message}\"\n        case _ → \"Unknown\"\n\n\n",
+    "CalorSource": "module Test_13_04 overflow unchecked\n  class Result<T> abstract\n\n  class Ok<T>\n    extends Result<T>\n\n    property T:Value\n      get public\n\n    ctor (T:value)\n      set Value value\n\n\n  class Error<T>\n    extends Result<T>\n\n    property string:Message\n      get public\n\n    ctor (string:message)\n      set Message message\n\n\n  module ResultExtensions\n    func Describe<T> (Result<T>:result) → string\n      ! unknown\n      return match result\n        case Ok<T> ok → \"Success: ${ok.Value}\"\n        case Error<T> err → \"Error: ${err.Message}\"\n        case _ → \"Unknown\"\n\n\n",
     "NativeConversionCount": 13,
     "InteropPreservationCount": 0,
     "LossySubstitutionCount": 0,

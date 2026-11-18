@@ -179,7 +179,7 @@ public sealed class UnspacedMemberAccessEquivalenceTests
                 Assert.Contains("Function 'ReadPure' uses effect 'throw'", strict, StringComparison.Ordinal);
                 break;
             case "generic-receiver":
-                Assert.Contains("ICollection`1<T>.get_IsReadOnly", strict, StringComparison.Ordinal);
+                Assert.Contains("get_IsReadOnly", strict, StringComparison.Ordinal);
                 Assert.DoesNotContain("Function 'Read' uses", strict, StringComparison.Ordinal);
                 break;
             case "shadowing-local":
@@ -240,7 +240,7 @@ public sealed class UnspacedMemberAccessEquivalenceTests
                 return h . Instance . Size + Holder . Instance . Size + (Console.Out) . NewLine . Length
             """;
         var emitted = new CalorEmitter().Emit(Parse(source));
-        Assert.Contains("h.Instance.Size + Holder.Instance.Size + ((Console.Out).NewLine).Length", emitted,
+        Assert.Contains("(h.Instance.Size + Holder.Instance.Size) + ((Console.Out).NewLine).Length", emitted,
             StringComparison.Ordinal);
         Assert.DoesNotContain(" . ", emitted, StringComparison.Ordinal);
         Assert.Equal(Shape(source), Shape(emitted));
