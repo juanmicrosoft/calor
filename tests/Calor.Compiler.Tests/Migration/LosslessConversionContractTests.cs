@@ -362,14 +362,15 @@ public sealed class LosslessConversionContractTests
 
     // 0.30: the instance-initializer rows make Run's strict effects Unknown (the selected
     // constructor runs initializers without an effect contract), so the converter declares
-    // ! unknown on Run and they compile honestly instead of failing. The static initializer
-    // rows have no effect-contract surface and still fail closed. An explicit effectful
-    // constructor declares its own row (NamespaceSplitting_EffectfulConstructorDeclaresItsRow…).
+    // ! unknown on Run and they compile honestly instead of failing. Since D1 the static
+    // initializer rows declare `! unknown` as Item's static-initialization row (a header
+    // clause), and `new Item()` charges it to Run; without that row they fail closed. An
+    // explicit effectful constructor declares its own row (NamespaceSplitting_EffectfulConstructorDeclaresItsRow…).
     [Theory]
     [InlineData("int value = System.Math.Abs(-1);", true)]
     [InlineData("int Value { get; } = System.Math.Abs(-1);", true)]
-    [InlineData("static int value = System.Math.Abs(-1);", false)]
-    [InlineData("static int Value { get; } = System.Math.Abs(-1);", false)]
+    [InlineData("static int value = System.Math.Abs(-1);", true)]
+    [InlineData("static int Value { get; } = System.Math.Abs(-1);", true)]
     public void NamespaceSplitting_SelectedConstructorFailsClosedOnRealParsedNativeCalor(string declaration,
         bool declaredUnknown)
     {
@@ -393,6 +394,16 @@ public sealed class LosslessConversionContractTests
                 Assert.Contains("func Run () → Item\n      ! unknown\n",
                     native.CalorSource!.Replace("\r\n", "\n", StringComparison.Ordinal));
                 Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+                if (declaration.StartsWith("static ", StringComparison.Ordinal))
+                {
+                    var normalized = native.CalorSource!.Replace("\r\n", "\n", StringComparison.Ordinal);
+                    Assert.Contains("class Item\n    ! unknown\n", normalized);
+                    var undeclared = Program.Compile(normalized.Replace("class Item\n    ! unknown\n", "class Item\n",
+                        StringComparison.Ordinal), null,
+                        new CompilationOptions { EnableTypeChecking = typed, DeferGeneratedOutputValidation = true });
+                    Assert.Contains(undeclared.Diagnostics.Errors, error =>
+                        error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.ConstructorEffectContractUnavailable);
+                }
                 continue;
             }
             Assert.True(compiled.HasErrors);

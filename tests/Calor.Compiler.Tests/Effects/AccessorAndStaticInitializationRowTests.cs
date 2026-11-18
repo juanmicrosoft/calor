@@ -350,6 +350,29 @@ public class AccessorAndStaticInitializationRowTests
             && error.Message.Contains("'Use'") && error.Message.Contains("'unknown'"));
     }
 
+    [Fact]
+    public void GapB_ABareReadInsideTheClass_IsChargedToo()
+    {
+        const string payload = "public static int X = Start();";
+        var source = $$"""
+            module GapB
+              class Probe
+                ! cw
+                raw member:unsafe:Other:Preserved {{payload.Length}}
+            {{payload}}
+                func Start public static () → int
+                  ! cw
+                  Console.WriteLine("init")
+                  return 1
+
+                func Use public static () → int
+                  !
+                  return X
+            """;
+        Assert.Contains(Errors(source), error => error.Code == DiagnosticCode.ForbiddenEffect
+            && error.Message.Contains("'Use'") && error.Message.Contains("'unknown'"));
+    }
+
     [Theory]
     [InlineData("public int X = 1;", "probe.X")]
     [InlineData("public const int X = 1;", "Probe.X")]

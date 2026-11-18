@@ -6905,6 +6905,10 @@ public sealed class EffectEnforcementPass
                 var bareInitialization = BareStaticFieldInitialization(reference);
                 if (!bareInitialization.IsEmpty)
                     return bareInitialization;
+                // Gap B: an unbound bare name may be a member of a preserved raw C# block.
+                var preserved = BarePreservedMemberAccess(reference);
+                if (!preserved.IsEmpty)
+                    return preserved;
                 if (!chargeMethodGroup
                     || IsLocalFunctionName(reference.Name)
                     || _context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span) is { Id.IsNone: false })
@@ -7196,6 +7200,8 @@ public sealed class EffectEnforcementPass
             }
             if (target is ReferenceNode bare && IsBareMutationTarget(bare, ownedStore))
                 return EffectSet.From("mut").Union(BareStaticFieldInitialization(bare));
+            if (target is ReferenceNode rawBare && BarePreservedMemberAccess(rawBare) is { IsEmpty: false } rawAccess)
+                return EffectSet.From("mut").Union(rawAccess);
 
             var targetEffects = InferFromExpression(target);
             return target is ArrayAccessNode or MultiDimArrayAccessNode
@@ -7225,6 +7231,17 @@ public sealed class EffectEnforcementPass
                 return EffectSet.Empty;
             return InferStaticFieldInitialization(owner, reference.Span);
         }
+
+        /// <summary>
+        /// 0.30 (soundness gap B): a bare name the binder did not resolve, inside a class
+        /// whose preserved raw members declare it (see <see cref="PreservedMemberRead"/>).
+        /// </summary>
+        private EffectSet BarePreservedMemberAccess(ReferenceNode reference) =>
+            reference.Name.Contains('.') || _context.OwnerClass is not { } owner
+            || _context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span) is { Id.IsNone: false }
+            || IsLocalFunctionName(reference.Name)
+                ? EffectSet.Empty
+                : PreservedMemberRead(owner, reference.Name, reference.Span);
 
         private bool IsBareMutationTarget(ReferenceNode reference, bool ownedStore)
         {

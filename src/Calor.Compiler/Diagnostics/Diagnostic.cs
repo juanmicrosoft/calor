@@ -553,8 +553,10 @@ public static class DiagnosticCode
     public const string InterfaceEffectVariance = "Calor0421";
 
     /// <summary>
-    /// Error: a constructor body has effects other than intrinsic initialization
-    /// mutation, but constructor declarations have no §E surface.
+    /// Error: a constructor body, or a type's implicit static initialization, has effects
+    /// beyond intrinsic initialization (mut, alloc) and declares no row for them. Since
+    /// 0.30 a constructor may declare an own row, and a type its static-initialization row
+    /// as a header clause.
     /// </summary>
     public const string ConstructorEffectContractUnavailable = "Calor0422";
 
@@ -589,8 +591,9 @@ public static class DiagnosticCode
     public const string EffectRowUnknown = "Calor0425";
 
     /// <summary>
-    /// Error: a custom property or event accessor body has effects other than
-    /// intrinsic accessor mutation, but the accessor has no §E surface.
+    /// Error: a custom property, indexer or event accessor body has effects beyond
+    /// intrinsic accessor mutation/allocation and declares no row for them. Since 0.30 a
+    /// property or indexer accessor may declare an own row; event accessors still cannot.
     /// </summary>
     public const string AccessorEffectContractUnavailable = "Calor0423";
 
