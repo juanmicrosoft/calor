@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fail-closed controls for registered effect/demand ledger replay."""
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -225,6 +226,71 @@ class RegisteredReplayTests(unittest.TestCase):
                     else:
                         with self.assertRaisesRegex(ValueError, "original 18|frozen bound-type source"):
                             replay.bound_type_inputs(source)
+
+    def test_bound_type_rewritten_subject_requires_exact_registry_entry(self):
+        rewrite = "9" * 40
+        registry_path = replay.BOUND_TYPE_REWRITES
+        for fault in (None, "unlisted", "wrong-sha", "edited-after-rewrite", "stale", "unknown-path",
+                      "parent-not-frozen", "rewrite-is-noop", "duplicate", "short-commit", "extra-field"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "current"
+                source = Path(temporary) / "producer"
+                originals = [f"samples/subject-{i}.calr" for i in range(18)]
+                registry = "tests/TestData/ActiveSyntax/inputs.json"
+                test = "tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeArchitectureTests.cs"
+                for tree in (root, source):
+                    for relative in (*originals, registry, test):
+                        path = tree / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_bytes(b"original")
+                (root / originals[0]).write_bytes(b"public native sample")
+                entry = {
+                    "path": originals[0],
+                    "rewriteCommit": rewrite,
+                    "sha256": hashlib.sha256(b"public native sample").hexdigest(),
+                }
+                entries = [entry]
+                if fault == "unlisted":
+                    (root / originals[1]).write_bytes(b"unregistered edit")
+                elif fault == "wrong-sha":
+                    entry["sha256"] = hashlib.sha256(b"something else").hexdigest()
+                elif fault == "edited-after-rewrite":
+                    (root / originals[0]).write_bytes(b"public native sample, edited again")
+                elif fault == "stale":
+                    entries.append({**entry, "path": originals[1],
+                                    "sha256": hashlib.sha256(b"original").hexdigest()})
+                elif fault == "unknown-path":
+                    entries.append({**entry, "path": "samples/not-a-subject.calr"})
+                elif fault == "duplicate":
+                    entries.append(dict(entry))
+                elif fault == "short-commit":
+                    entry["rewriteCommit"] = rewrite[:9]
+                elif fault == "extra-field":
+                    entry["reason"] = "not part of the schema"
+                (root / registry_path).parent.mkdir(parents=True, exist_ok=True)
+                (root / registry_path).write_text(json.dumps({"rewrites": entries}))
+
+                def git(*arguments):
+                    self.assertEqual("show", arguments[0])
+                    revision, relative = arguments[1].split(":", 1)
+                    self.assertEqual(originals[0], relative)
+                    if revision == f"{rewrite}^":
+                        return b"older native draft" if fault == "parent-not-frozen" else b"original"
+                    self.assertEqual(rewrite, revision)
+                    return b"original" if fault == "rewrite-is-noop" else b"public native sample"
+
+                with patch.object(replay, "ROOT", root), patch.object(replay, "git", side_effect=git), \
+                        patch.object(replay, "require_commit") as require:
+                    if fault is None:
+                        inputs = replay.bound_type_inputs(source)
+                        self.assertEqual(b"original", inputs[originals[0]])
+                        self.assertEqual({originals[0]}, set(replay.bound_type_rewrites()))
+                        require.assert_called_once_with(rewrite)
+                    else:
+                        with self.assertRaises(ValueError) as raised:
+                            replay.bound_type_inputs(source)
+                        if fault == "unlisted":
+                            self.assertIn(f"{originals[1]}: frozen bound-type source changed", str(raised.exception))
 
     def test_signature_registration_pins_original_compiler_landing_and_test(self):
         self.assertEqual((

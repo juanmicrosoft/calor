@@ -349,10 +349,12 @@ def replay(name: str) -> None:
         extract_archive(archive, source)
         if name == "formatter":
             index_original_tree(producer, source)
+        rewritten_subjects: set[str] = set()
         if name != "bound-types":
             archive_submodules(producer, source, scratch)
         else:
             artifacts.update(bound_type_inputs(source))
+            rewritten_subjects = set(bound_type_rewrites())
         for manifest in (
             ".github/z3-binaries-4.15.7.sha256",
             "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
@@ -390,10 +392,55 @@ def replay(name: str) -> None:
         for relative, expected in artifacts.items():
             current_may_differ = name == "bound-types" and (
                 relative.startswith("tests/TestData/ActiveSyntax/")
-                or relative == "tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeArchitectureTests.cs")
+                or relative == "tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeArchitectureTests.cs"
+                or relative in rewritten_subjects)
             if (source / relative).read_bytes() != expected or (
                 not current_may_differ and (ROOT / relative).read_bytes() != expected):
                 raise ValueError(f"{relative}: historical replay changed its immutable input")
+
+
+BOUND_TYPE_REWRITES = "tests/TestData/BoundTypes/frozen-subject-rewrites.json"
+
+
+def bound_type_rewrites() -> dict[str, dict[str, str]]:
+    """The committed registry of frozen bound-type subjects rewritten in place.
+
+    Each entry names the subject path, the commit that rewrote it away from its frozen
+    bytes, and the SHA-256 of its current bytes. The replay itself always runs the
+    producer's frozen bytes; the registry only permits the current public file to differ.
+    """
+    path = ROOT / BOUND_TYPE_REWRITES
+    if not path.exists():
+        return {}
+    document = json.loads(path.read_text(encoding="utf-8"))
+    entries = document.get("rewrites")
+    if not isinstance(entries, list):
+        raise ValueError(f"{BOUND_TYPE_REWRITES}: rewrites must be a list")
+    registry: dict[str, dict[str, str]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != {"path", "rewriteCommit", "sha256"}:
+            raise ValueError(f"{BOUND_TYPE_REWRITES}: each rewrite has exactly path, rewriteCommit and sha256")
+        if not re.fullmatch(r"[0-9a-f]{40}", entry["rewriteCommit"]) \
+                or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]):
+            raise ValueError(f"{BOUND_TYPE_REWRITES}: {entry['path']}: full commit and SHA-256 required")
+        if entry["path"] in registry:
+            raise ValueError(f"{BOUND_TYPE_REWRITES}: duplicate rewrite for {entry['path']}")
+        registry[entry["path"]] = entry
+    return registry
+
+
+def require_registered_rewrite(relative: str, original: bytes, entry: dict[str, str] | None) -> None:
+    if entry is None:
+        raise ValueError(f"{relative}: frozen bound-type source changed")
+    current = (ROOT / relative).read_bytes()
+    if hashlib.sha256(current).hexdigest() != entry["sha256"]:
+        raise ValueError(f"{relative}: frozen bound-type source changed after its registered rewrite")
+    commit = entry["rewriteCommit"]
+    require_commit(commit)
+    if git("show", f"{commit}^:{relative}") != original:
+        raise ValueError(f"{relative}: registered rewrite {commit} does not start from the frozen source")
+    if git("show", f"{commit}:{relative}") == original:
+        raise ValueError(f"{relative}: registered rewrite {commit} does not change the frozen source")
 
 
 def bound_type_inputs(source: Path) -> dict[str, bytes]:
@@ -403,11 +450,17 @@ def bound_type_inputs(source: Path) -> dict[str, bytes]:
                      for path in (ROOT / folder).rglob("*.calr"))
     if len(originals) != 18 or originals != current:
         raise ValueError("bound-type replay requires exactly the original 18 subjects")
+    rewrites = bound_type_rewrites()
+    unknown = sorted(set(rewrites) - set(originals))
+    if unknown:
+        raise ValueError(f"{BOUND_TYPE_REWRITES}: not a frozen bound-type subject: {', '.join(unknown)}")
     inputs = {}
     for relative in originals:
         original = (source / relative).read_bytes()
         if (ROOT / relative).read_bytes() != original:
-            raise ValueError(f"{relative}: frozen bound-type source changed")
+            require_registered_rewrite(relative, original, rewrites.get(relative))
+        elif relative in rewrites:
+            raise ValueError(f"{relative}: registered rewrite but the source still equals its frozen bytes")
         inputs[relative] = original
         mirror = "tests/TestData/ActiveSyntax/" + relative
         if (source / mirror).exists():
