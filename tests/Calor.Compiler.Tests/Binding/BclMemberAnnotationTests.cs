@@ -249,7 +249,13 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         Assert.Null(member.ResolvedMetadataMember);
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
         Assert.Contains(reason, diagnostic.Message);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
+        // A qualified name that resolves to nothing is also an undefined name. `value.X` on a
+        // parameter is the spaced form's member access (0.30): the unresolved read above is
+        // its whole report, exactly as for `value . X`.
+        if (parameters.Length == 0)
+            Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
+        else
+            Assert.IsType<BoundVariableExpression>(member.Target);
     }
 
     [Theory]
@@ -260,9 +266,14 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
     public void UnresolvedReceiver_RetainsExistingResolutionDiagnostic(string expression, string parameters)
     {
         var (module, diagnostics, _) = Bind(Source(expression, parameters, "str", "binding"), FixtureContext.Value);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
         var value = Assert.IsType<BoundBindStatement>(Assert.Single(Assert.Single(module.Functions).Body)).Initializer;
         Assert.Null(Assert.IsType<NominalBoundType>(value!.Type).RoslynSymbol);
+        // A parameter receiver of an unresolved type is the spaced form's member access
+        // (0.30): it stays an unresolved read on that parameter, never a metadata member.
+        if (parameters.Length == 0)
+            Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
+        else
+            Assert.IsType<BoundVariableExpression>(Assert.IsType<BoundFieldAccessExpression>(value).Target);
     }
 
     [Fact]

@@ -967,7 +967,7 @@ public class ConverterImprovementTests
         // iteration (no while-loop lowering is needed to keep that).
         var loop = Assert.IsType<ForStatementNode>(Assert.Single(method.Body));
         Assert.True(loop.ReevaluatesCondition);
-        Assert.Contains("for i = 0; (i < arr . Length); @i = (@i + 1)", result.CalorSource);
+        Assert.Contains("for i = 0; (i < arr.Length); @i = (@i + 1)", result.CalorSource);
         Assert.DoesNotContain(result.Losses, loss =>
             loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
     }
@@ -1670,7 +1670,7 @@ public class ConverterImprovementTests
 
         // Should emit the enum member access as a default value (a structural member access
         // prints spaced in native Calor).
-        Assert.Contains("StringComparison:comparison = StringComparison . Ordinal", output);
+        Assert.Contains("StringComparison:comparison = StringComparison.Ordinal", output);
     }
 
     [Fact]

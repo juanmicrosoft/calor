@@ -76,34 +76,33 @@ public sealed class UnspacedMemberAccessBindingTests
         return string.Join(" ", parts);
     }
 
-    [Fact]
-    public void MissingMemberOnVariable_StillReportsTheUndefinedName()
+    [Theory]
+    [InlineData("Text:t", "t~Nope", "int")]
+    [InlineData("Node:obj", "obj~Nope~Value", "string?")]
+    public void MissingMember_IsReportedExactlyLikeTheSpacedForm(string parameter, string read, string output)
     {
-        var (_, diagnostics) = Bind("""
+        // The unspaced read is the spaced form's member access, so a missing member binds
+        // and fails exactly as there: the generated C# names it (CS1061), or a chain past it
+        // has no known receiver and is charged unknown.
+        string Source(string separator) => $"""
             module M
-              func Read public (Text:t) → int
+              func Read public ({parameter}) → {output}
                 !
-                return t.Nope
-            """ + Types);
+                return {read.Replace("~", separator, StringComparison.Ordinal)}
+            """ + Types;
 
-        var error = Assert.Single(diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.UndefinedReference, error.Code);
-        Assert.Contains("'t.Nope'", error.Message, StringComparison.Ordinal);
-    }
+        var (_, unspacedBinding) = Bind(Source("."));
+        var (_, spacedBinding) = Bind(Source(" . "));
+        Assert.Equal(Messages(spacedBinding), Messages(unspacedBinding));
+        var unspaced = Program.Compile(Source("."));
+        var spaced = Program.Compile(Source(" . "));
+        Assert.True(unspaced.HasErrors);
+        Assert.Equal(Codes(spaced), Codes(unspaced));
+        Assert.Contains(unspaced.Diagnostics.Errors, error => error.Code is DiagnosticCode.CodeGenCompilationError
+            or DiagnosticCode.ForbiddenEffect);
 
-    [Fact]
-    public void MissingPrefixInChain_IsReportedOnce()
-    {
-        var (_, diagnostics) = Bind("""
-            module M
-              func Read public (Node:obj) → string?
-                !
-                return obj.Nope.Value
-            """ + Types);
-
-        var error = Assert.Single(diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.UndefinedReference, error.Code);
-        Assert.Contains("'obj.Nope'", error.Message, StringComparison.Ordinal);
+        static string[] Messages(DiagnosticBag diagnostics) => diagnostics.Select(d => $"{d.Code} {d.Message}").ToArray();
+        static string[] Codes(CompilationResult result) => result.Diagnostics.Select(d => d.Code).ToArray();
     }
 
     [Fact]

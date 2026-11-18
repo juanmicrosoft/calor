@@ -81,6 +81,19 @@ public sealed class Parser
     private readonly Dictionary<ReferenceNode, TextSpan> _groupedReferenceSpans = new();
 
     /// <summary>
+    /// The identifier-token start of every dotted name this parse read as one reference
+    /// (<c>x.Field</c>), so the value-read pass can name the token to split on reparse.
+    /// </summary>
+    private readonly Dictionary<ReferenceNode, int> _dottedReferenceTokenStarts = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// On the lowering reparse only: the token starts of dotted names whose first segment
+    /// names a value in scope. Each becomes the member-access chain the spaced spelling
+    /// <c>x . Field</c> produces (see <see cref="Parse"/>).
+    /// </summary>
+    private readonly IReadOnlySet<int>? _dottedValueReadStarts;
+
+    /// <summary>
     /// Stack of <c>eff</c> binder scopes, innermost last. A scope is pushed when a
     /// declaration form that may bind effect variables (<c>§F</c>, <c>§AF</c>,
     /// <c>§MT</c>, <c>§AMT</c>, and an interface member's <c>§MT</c>) has parsed its
@@ -194,6 +207,13 @@ public sealed class Parser
     {
         _tokens = tokens.ToList();
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    }
+
+    private Parser(List<Token> tokens, DiagnosticBag diagnostics, IReadOnlySet<int> dottedValueReadStarts)
+    {
+        _tokens = tokens;
+        _diagnostics = diagnostics;
+        _dottedValueReadStarts = dottedValueReadStarts;
     }
 
     private Token Current => Peek(0);
@@ -899,6 +919,30 @@ public sealed class Parser
     }
 
     public ModuleNode Parse()
+    {
+        var errorsBefore = _diagnostics.Errors.Count;
+        var module = ParseAndValidateModule();
+        if (_dottedValueReadStarts is not null || _dottedReferenceTokenStarts.Count == 0)
+            return module;
+
+        // The lexer reads `x.Field` as one dotted name, the form that also names namespaces
+        // and types (`System.Math.PI`). As in C# simple-name lookup, a value in scope (a
+        // local, a parameter, or a field, property or event of an enclosing type) wins over
+        // a namespace or type. A dotted name whose first segment is a value is therefore a
+        // member read, and every later pass (binding, typing, effects, nullability,
+        // contracts, codegen, tooling) must see exactly what the spaced `x . Field` gives.
+        // Scope is known only once the module is parsed (members may follow their uses), so
+        // the module is parsed again with those names split into the spaced form's chain.
+        var valueReads = DottedValueReadResolver.Resolve(module, _dottedReferenceTokenStarts);
+        if (valueReads.Count == 0)
+            return module;
+        var reparseDiagnostics = new DiagnosticBag();
+        var lowered = new Parser(_tokens, reparseDiagnostics, valueReads).ParseAndValidateModule();
+        // Same tokens, same errors: anything else would mean the split changed the parse.
+        return reparseDiagnostics.Errors.Count == _diagnostics.Errors.Count - errorsBefore ? lowered : module;
+    }
+
+    private ModuleNode ParseAndValidateModule()
     {
         var module = ParseModule();
         ValidateDefaultConstraintOwners(module);
@@ -6059,6 +6103,13 @@ public sealed class Parser
         }
 
         ExpressionNode expr = new ReferenceNode(token.Span, name, verbatim || token.Value is string);
+        if (name.Contains('.') && !name.Contains('<'))
+        {
+            if (_dottedValueReadStarts is null)
+                _dottedReferenceTokenStarts[(ReferenceNode)expr] = token.Span.Start;
+            else if (_dottedValueReadStarts.Contains(token.Span.Start))
+                expr = SplitNativeMemberReference(expr);
+        }
 
         return ParseTrailingMemberAccess(expr);
     }
@@ -16139,4 +16190,312 @@ public sealed class Parser
     }
 
     #endregion
+
+    /// <summary>
+    /// The simple-name roots of member-access chains (<c>root.Member…</c>) in
+    /// <paramref name="module"/> that the parser reads as member accesses when written
+    /// unspaced: a value in scope, or a source class of the module with that member. The
+    /// Calor emitter prints any other chain's receiver in parentheses, because an unspaced
+    /// <c>Type.Static.Member</c> would read back as one dotted name.
+    /// </summary>
+    internal static IReadOnlySet<ReferenceNode> FindMemberAccessRoots(ModuleNode module)
+        => DottedValueReadResolver.FindRoots(module);
+
+    /// <summary>
+    /// Decides which dotted names (<c>x.Field</c>) are member reads. C# simple-name lookup
+    /// finds a value before any namespace or type, so a first segment that names a value in
+    /// scope makes a member read: a local, loop, catch or pattern variable, a parameter (with
+    /// an accessor's <c>value</c> and a postcondition's <c>result</c>), or a field, property
+    /// or event of an enclosing type, of its other partial parts, or of a base type declared
+    /// in the module. A first segment that names a top-level source class or module of this
+    /// module, followed by one of its fields, properties or events, is a member read on the
+    /// type, exactly as the spaced <c>Type . Member</c>. Any other first segment (a
+    /// namespace, a metadata type, an enum, a function of a module, a nested type, or a
+    /// member this module cannot see) keeps the dotted name's meaning. A nested type of an
+    /// enclosing class shadows an outer value of the same name, as in C#. Scopes follow the source blocks; a pattern variable
+    /// is visible in the rest of the statement list that holds its test.
+    /// </summary>
+    private sealed class DottedValueReadResolver
+    {
+        private readonly IReadOnlyDictionary<ReferenceNode, int>? _candidates;
+        private readonly Dictionary<string, List<ClassDefinitionNode>> _classesByName = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<string>> _typeMembers = new(StringComparer.Ordinal);
+        private readonly List<Dictionary<string, string?>?> _scopes = [];
+        private readonly Stack<int> _containers = new();
+        private readonly HashSet<int> _valueReads = [];
+        private readonly HashSet<ReferenceNode> _roots = new(ReferenceEqualityComparer.Instance);
+
+        private DottedValueReadResolver(ModuleNode module, IReadOnlyDictionary<ReferenceNode, int>? candidates)
+        {
+            _candidates = candidates;
+            foreach (var type in Analysis.CallGraphAnalysis.EnumerateClasses(module))
+            {
+                if (!_classesByName.TryGetValue(type.Name, out var declarations))
+                    _classesByName[type.Name] = declarations = [];
+                declarations.Add(type);
+            }
+            var topLevel = module.Classes.Concat(module.TypePreprocessorBlocks
+                .SelectMany(block => EnumerateBranches(block).SelectMany(branch => branch.Classes)));
+            foreach (var type in topLevel)
+            {
+                if (!_typeMembers.TryGetValue(type.Name, out var members))
+                    _typeMembers[type.Name] = members = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var (name, _) in ValueMembers(type))
+                    members.Add(name);
+            }
+            _scopes.Add(null);
+            _containers.Push(0);
+            Walk(module);
+        }
+
+        public static IReadOnlySet<int> Resolve(ModuleNode module, IReadOnlyDictionary<ReferenceNode, int> candidates)
+            => new DottedValueReadResolver(module, candidates)._valueReads;
+
+        public static IReadOnlySet<ReferenceNode> FindRoots(ModuleNode module)
+            => new DottedValueReadResolver(module, null)._roots;
+
+        private static IEnumerable<TypePreprocessorBlockNode> EnumerateBranches(TypePreprocessorBlockNode block)
+        {
+            for (var branch = block; branch != null; branch = branch.ElseBranch)
+                yield return branch;
+        }
+
+        private void Walk(AstNode node)
+        {
+            if (node is ReferenceNode reference)
+            {
+                if (_candidates is not null && _candidates.TryGetValue(reference, out var start)
+                    && IsMemberRead(reference.Name))
+                    _valueReads.Add(start);
+                return;
+            }
+            // A pattern's dotted names are constants (enum members, static fields); its
+            // variables are declared by the case or test that owns it.
+            if (node is PatternNode)
+                return;
+            if (_candidates is null && node is FieldAccessNode { Target: ReferenceNode root } member
+                && !root.Name.Contains('.') && IsMemberRead($"{root.Name}.{member.FieldName}"))
+                _roots.Add(root);
+
+            var depth = _scopes.Count;
+            var containers = _containers.Count;
+            if (node is StatementNode)
+                _containers.Push(depth - 1);
+            _scopes.Add(null);
+            if (node is FunctionNode or MethodNode or ConstructorNode or OperatorOverloadNode or IndexerNode
+                or PropertyAccessorNode or EventDefinitionNode or LambdaExpressionNode
+                or ClassFieldNode or PropertyNode or EnsuresNode or RequiresNode)
+                _containers.Push(depth);
+            DeclareOwn(node, depth);
+
+            System.Reflection.PropertyInfo? group = null;
+            var groupDepth = -1;
+            foreach (var edge in Analysis.RecursiveAstWalker.GetAllChildEdges(node))
+            {
+                if (!ReferenceEquals(edge.Property, group))
+                {
+                    if (groupDepth >= 0)
+                        _scopes.RemoveRange(groupDepth, _scopes.Count - groupDepth);
+                    group = edge.Property;
+                    // Each statement list (a body, a branch, a case) is its own block.
+                    groupDepth = typeof(AstNode).IsAssignableFrom(group.PropertyType) ? -1 : _scopes.Count;
+                    if (groupDepth >= 0)
+                        _scopes.Add(null);
+                }
+                Walk(edge.Node);
+            }
+
+            switch (node)
+            {
+                case BindStatementNode bind:
+                    Declare(_containers.Peek(), bind.Name, bind.TypeName);
+                    break;
+                case UsingStatementNode { VariableName: { } resource } usingStatement:
+                    Declare(_containers.Peek(), resource, usingStatement.VariableType);
+                    break;
+                case RawCSharpNode raw:
+                    // A preserved C# statement can declare locals the following statements read.
+                    if (SyntaxFactory.ParseStatement("{" + raw.CSharpCode + "\n}") is BlockSyntax block)
+                        foreach (var local in block.Statements.OfType<LocalDeclarationStatementSyntax>())
+                            foreach (var variable in local.Declaration.Variables)
+                                Declare(_containers.Peek(), variable.Identifier.ValueText,
+                                    local.Declaration.Type.IsVar ? null : local.Declaration.Type.ToString());
+                    break;
+            }
+            _scopes.RemoveRange(depth, _scopes.Count - depth);
+            while (_containers.Count > containers)
+                _containers.Pop();
+            // `x is T name` declares name for the rest of the enclosing statement list.
+            if (node is IsPatternNode { VariableName: { } name } test)
+                Declare(_containers.Peek(), name, test.TargetType);
+        }
+
+        private void DeclareOwn(AstNode node, int scope)
+        {
+            switch (node)
+            {
+                case ClassDefinitionNode type:
+                    DeclareMembers(type, scope, new HashSet<ClassDefinitionNode>(ReferenceEqualityComparer.Instance));
+                    break;
+                case InterfaceDefinitionNode contract:
+                    foreach (var property in contract.Properties)
+                        Declare(scope, property.Name, property.TypeName);
+                    break;
+                case FunctionNode function:
+                    DeclareParameters(scope, function.Parameters);
+                    break;
+                case MethodNode method:
+                    DeclareParameters(scope, method.Parameters);
+                    break;
+                case ConstructorNode constructor:
+                    DeclareParameters(scope, constructor.Parameters);
+                    break;
+                case OperatorOverloadNode op:
+                    DeclareParameters(scope, op.Parameters);
+                    break;
+                case IndexerNode indexer:
+                    DeclareParameters(scope, indexer.Parameters);
+                    break;
+                case PropertyAccessorNode { Kind: PropertyAccessorNode.AccessorKind.Set or PropertyAccessorNode.AccessorKind.Init }:
+                case EventDefinitionNode:
+                    Declare(scope, "value", null);
+                    break;
+                case EnsuresNode:
+                    Declare(scope, "result", null);
+                    break;
+                case LambdaExpressionNode lambda:
+                    foreach (var parameter in lambda.Parameters)
+                        Declare(scope, parameter.Name, parameter.TypeName);
+                    break;
+                case ForStatementNode loop:
+                    Declare(scope, loop.VariableName, null);
+                    break;
+                case ForeachStatementNode each:
+                    Declare(scope, each.VariableName, each.VariableType);
+                    if (each.IndexVariableName is { } index)
+                        Declare(scope, index, null);
+                    break;
+                case DictionaryForeachNode pairs:
+                    Declare(scope, pairs.KeyName, null);
+                    Declare(scope, pairs.ValueName, null);
+                    break;
+                case CatchClauseNode { VariableName: { } exception } handler:
+                    Declare(scope, exception, handler.ExceptionType);
+                    break;
+                case UsingStatementNode { VariableName: { } resource } usingStatement:
+                    Declare(scope, resource, usingStatement.VariableType);
+                    break;
+                case FixedStatementNode pinned:
+                    Declare(scope, pinned.PointerName, pinned.PointerType);
+                    break;
+                case ForallExpressionNode forall:
+                    foreach (var variable in forall.BoundVariables)
+                        Declare(scope, variable.Name, variable.TypeName);
+                    break;
+                case ExistsExpressionNode exists:
+                    foreach (var variable in exists.BoundVariables)
+                        Declare(scope, variable.Name, variable.TypeName);
+                    break;
+                case MatchCaseNode matchCase:
+                    DeclarePatternVariables(scope, matchCase.Pattern);
+                    break;
+            }
+        }
+
+        private void DeclareMembers(ClassDefinitionNode type, int scope, HashSet<ClassDefinitionNode> visited)
+        {
+            if (!visited.Add(type))
+                return;
+            foreach (var (name, typeName) in ValueMembers(type))
+                Declare(scope, name, typeName);
+            // A nested type is a member too: it hides an enclosing class's value of that name.
+            foreach (var nested in type.NestedClasses.Select(nested => nested.Name)
+                         .Concat(type.NestedInterfaces.Select(nested => nested.Name))
+                         .Concat(type.NestedEnums.Select(nested => nested.Name))
+                         .Concat(type.NestedDelegates.Select(nested => nested.Name)))
+                (_scopes[scope] ??= new Dictionary<string, string?>(StringComparer.Ordinal)).TryAdd(nested, NestedTypeMarker);
+            if (!_classesByName.TryGetValue(type.Name, out var sameName))
+                sameName = [];
+            // The other parts of a partial class declared in this module.
+            foreach (var part in sameName.Where(part => type.IsPartial && part.IsPartial))
+                DeclareMembers(part, scope, visited);
+            if (type.BaseClass is { } baseName
+                && _classesByName.TryGetValue(SimpleTypeName(baseName), out var bases))
+                foreach (var baseType in bases)
+                    DeclareMembers(baseType, scope, visited);
+        }
+
+        private static IEnumerable<(string Name, string? TypeName)> ValueMembers(ClassDefinitionNode type)
+        {
+            foreach (var field in type.Fields.Concat(type.PreprocessorBlocks.SelectMany(PreprocessorFields)))
+                yield return (field.Name, field.TypeName);
+            foreach (var property in Analysis.CallGraphAnalysis.EnumerateProperties(type).Concat(type.RecordPositionalProperties))
+                yield return (property.Name, property.TypeName);
+            foreach (var evt in Analysis.CallGraphAnalysis.EnumerateEvents(type))
+                yield return (evt.Name, evt.DelegateType);
+        }
+
+        private static IEnumerable<ClassFieldNode> PreprocessorFields(MemberPreprocessorBlockNode block)
+        {
+            for (var branch = block; branch != null; branch = branch.ElseBranch)
+                foreach (var field in branch.Fields)
+                    yield return field;
+        }
+
+        private void DeclareParameters(int scope, IEnumerable<ParameterNode> parameters)
+        {
+            foreach (var parameter in parameters)
+                Declare(scope, parameter.Name, parameter.TypeName);
+        }
+
+        private void DeclarePatternVariables(int scope, AstNode pattern)
+        {
+            switch (pattern)
+            {
+                case VariablePatternNode variable when !variable.Name.Contains('.'):
+                    Declare(scope, variable.Name, null);
+                    break;
+                case VarPatternNode variable when variable.Name != "_":
+                    Declare(scope, variable.Name, null);
+                    break;
+                case TypePatternNode { BindingName: { } binding } typed:
+                    Declare(scope, binding, typed.TypeName);
+                    break;
+            }
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(pattern))
+                DeclarePatternVariables(scope, child);
+        }
+
+        private void Declare(int scope, string name, string? typeName)
+            => (_scopes[scope] ??= new Dictionary<string, string?>(StringComparer.Ordinal))[name] = typeName;
+
+        private const string NestedTypeMarker = "\0type";
+
+        private bool IsMemberRead(string dottedName)
+        {
+            var segments = dottedName.Split('.');
+            var head = segments[0];
+            if (head.Length == 0 || segments.Length < 2 || segments[1].Length == 0)
+                return false;
+            for (var index = _scopes.Count - 1; index >= 0; index--)
+            {
+                if (_scopes[index] is { } scope && scope.TryGetValue(head, out var typeName))
+                    // C#'s "Color Color" rule: when a value's type has the value's own name,
+                    // `Color.Red` may still mean the type's static member. That stays a
+                    // dotted name (today's type-first binding) rather than a member read.
+                    return typeName is null
+                        || !ReferenceEquals(typeName, NestedTypeMarker) && SimpleTypeName(typeName) != head;
+            }
+            return _typeMembers.TryGetValue(head, out var members) && members.Contains(segments[1]);
+        }
+
+        private static string SimpleTypeName(string typeName)
+        {
+            var name = typeName.TrimEnd('?');
+            var generic = name.IndexOf('<');
+            if (generic >= 0)
+                name = name[..generic];
+            return name[(name.LastIndexOf('.') + 1)..];
+        }
+    }
 }
