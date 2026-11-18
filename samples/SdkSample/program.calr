@@ -1,5 +1,5 @@
-module SdkSample SdkSample block
-  func Main () → void
+module SdkSample SdkSample
+  func Main public () → void
     ! cw
     Console.WriteLine("=== Calor SDK Sample ===")
     Console.WriteLine("")
