@@ -2371,6 +2371,46 @@ public class Test
         }
     }
 
+    // A type declared in both arms of `#if`/`#else` has two declarations with one name, so the
+    // effect pass cannot pick one by name. Inside its own members the name means that type: the
+    // record's synthesized constructor stores `this.Value` through its own init accessor (it was
+    // charged `unknown`, Calor0422). Outside both arms the name stays ambiguous and is charged
+    // `unknown`, even though both getters are pure: the control below.
+    [Fact]
+    public void SameNameTypesInIfElseArms_ResolveTheirOwnAccessors_OutsideCallersStayUnknown()
+    {
+        const string arms = """
+            module ConditionalApi
+              pp FEATURE
+                record ConditionalApi (int:Value)
+
+              pp else
+                class ConditionalApi sealed
+                  property int:Value
+                    get public
+
+                  ctor (int:value)
+                    set Value value
+
+            """;
+        var options = new CompilationOptions { StatusWriter = TextWriter.Null, DeferGeneratedOutputValidation = true };
+        var own = Program.Compile(arms, "arms.calr", options);
+        Assert.False(own.HasErrors, string.Join("\n", own.Diagnostics));
+        Assert.DoesNotContain(own.Diagnostics, diagnostic => diagnostic.Code is "Calor0411" or "Calor0422");
+
+        var outside = Program.Compile(arms + """
+              module Use
+                func Touch (ConditionalApi:api) → int
+                  !
+                  return api.Value
+
+            """, "outside.calr", options);
+        Assert.Contains(outside.Diagnostics, diagnostic =>
+            diagnostic.Code == "Calor0411" && diagnostic.Message.Contains("ConditionalApi.get_Value"));
+        Assert.Contains(outside.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == "Calor0410" && diagnostic.Message.Contains("'Touch'"));
+    }
+
     [Fact]
     public void Converter_NestedMalformedInactiveBranch_PreservesOriginalRemainder()
     {
