@@ -305,8 +305,11 @@ public sealed class NativeFieldEffectRowTests
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
     }
 
+    // A row line directly under the class header, before any field, belongs to no field. Before
+    // 0.30 (D1) it was an unowned row; it is now the type's static-initialization row (a header
+    // clause). Either way it must not be read as a separated row of the field below it.
     [Fact]
-    public void UnownedClassRow_DoesNotAcquireAFieldPlacementDiagnostic()
+    public void ClassHeaderRow_IsTheTypeRowAndDoesNotAcquireAFieldPlacementDiagnostic()
     {
         const string source = """
             module Unowned
@@ -314,9 +317,39 @@ public sealed class NativeFieldEffectRowTests
                 ! cw
                 field int:count private
             """;
-        var (_, diagnostics) = Parse(source);
-        Assert.True(diagnostics.HasErrors);
-        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.EffectRowMisplaced);
+        var (module, diagnostics) = Parse(source);
+        Assert.Empty(diagnostics);
+        var counter = Assert.Single(module.Classes);
+        Assert.NotNull(counter.StaticInitializerEffects);
+        Assert.Null(Assert.Single(counter.Fields).Row);
+        var compiled = Program.Compile(source);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Message == MisplacedMessage);
+        Assert.False(compiled.HasErrors, string.Join(Environment.NewLine, compiled.Diagnostics));
+    }
+
+    // A class-level row after a method belongs to neither the method (its row is the first line of
+    // its body) nor a field; it is a misplaced type row and says so, not the field-placement text.
+    [Fact]
+    public void ClassRowAfterAMethod_IsAMisplacedTypeRowNotAFieldPlacementDiagnostic()
+    {
+        const string source = """
+            module Unowned
+              class Counter
+                func Read () → int
+                  !
+                  return 7
+                ! cw
+                field int:count private
+            """;
+        var (module, diagnostics) = Parse(source);
+        var error = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticCode.EffectRowMisplaced, error.Code);
+        Assert.NotEqual(MisplacedMessage, error.Message);
+        Assert.Contains("before the first member", error.Message, StringComparison.Ordinal);
+        var counter = Assert.Single(module.Classes);
+        Assert.Null(counter.StaticInitializerEffects);
+        Assert.Null(Assert.Single(counter.Fields).Row);
+        Assert.Empty(Assert.Single(counter.Methods).Effects!.Effects);
     }
 
     [Theory]
