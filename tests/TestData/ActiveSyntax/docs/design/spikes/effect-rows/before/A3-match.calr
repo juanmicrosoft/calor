@@ -1,6 +1,6 @@
 module MatchAfter MatchAfter block
   module MatchAfterModule partial
-    func MatchOption (bool:hasValue, int:value, Func<int, int>:onSome, Func<int>:onNone) → int
+    func MatchOption (bool:hasValue, int:value, Func<int, int>:onSome ! unknown, Func<int>:onNone ! unknown) → int
       !
       if hasValue
         return onSome(value)
