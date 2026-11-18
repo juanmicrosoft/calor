@@ -210,6 +210,8 @@ public sealed class EffectEnforcementPass
     // Module-shape lookups for delegate detection (D-W2.1), static-receiver
     // call-site charging and declaration-local effect variance (D-W2.2).
     private Dictionary<string, ClassDefinitionNode> _classesByName = new(StringComparer.Ordinal);
+    private Dictionary<ClassDefinitionNode, ClassDefinitionNode> _enclosingClasses = new(ReferenceEqualityComparer.Instance);
+    private List<ClassDefinitionNode> _topLevelClasses = [];
     private Dictionary<string, InterfaceDefinitionNode> _interfacesByName = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EffectsNode?> _declarationOnlyRows = new(StringComparer.Ordinal);
     private HashSet<string> _delegateTypeNames = new(StringComparer.Ordinal);
@@ -326,6 +328,13 @@ public sealed class EffectEnforcementPass
         foreach (var group in CallGraphAnalysis.EnumerateClasses(module).GroupBy(cls => cls.Name, StringComparer.Ordinal))
             if (group.Take(2).ToArray() is [var cls])
                 _classesByName[cls.Name] = cls;
+        _enclosingClasses = new Dictionary<ClassDefinitionNode, ClassDefinitionNode>(ReferenceEqualityComparer.Instance);
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
+            foreach (var nested in cls.NestedClasses.Concat(
+                         CallGraphAnalysis.PreprocessorMembers(cls).OfType<ClassDefinitionNode>()))
+                _enclosingClasses.TryAdd(nested, cls);
+        _topLevelClasses = CallGraphAnalysis.EnumerateClasses(module)
+            .Where(cls => !_enclosingClasses.ContainsKey(cls)).ToList();
         _interfacesByName = new Dictionary<string, InterfaceDefinitionNode>(StringComparer.Ordinal);
         foreach (var group in CallGraphAnalysis.EnumerateInterfaces(module).GroupBy(iface => iface.Name, StringComparer.Ordinal))
             if (group.Take(2).ToArray() is [var iface])
@@ -803,6 +812,8 @@ public sealed class EffectEnforcementPass
                 ? ReturnShape.GetCallableTypeParameters(owner, _module) : [],
             OwnedByRefParameters = ownedByRefParameters,
             ResolveOwnedByRefCall = InferOwnedByRefCall,
+            EnclosingClasses = _enclosingClasses,
+            TopLevelClasses = _topLevelClasses,
         };
 
     private EffectSet InferOwnedByRefCall(string functionId, IReadOnlySet<string> ownedParameters)
@@ -3853,6 +3864,11 @@ public sealed class EffectEnforcementPass
         public IReadOnlyCollection<string> DelegateTypeNames { get; }
         public ClassDefinitionNode? OwnerClass { get; }
         public IReadOnlyList<TypeParameterNode> EnclosingTypeParameters { get; init; } = [];
+        /// <summary>Each nested source class's directly enclosing class.</summary>
+        public IReadOnlyDictionary<ClassDefinitionNode, ClassDefinitionNode> EnclosingClasses { get; init; }
+            = new Dictionary<ClassDefinitionNode, ClassDefinitionNode>();
+        /// <summary>The module's top-level source classes.</summary>
+        public IReadOnlyList<ClassDefinitionNode> TopLevelClasses { get; init; } = [];
         public ConstructorDeclaration? CurrentConstructor { get; }
         public Func<string, EffectSet> ResolveInternalEffects { get; }
         public IReadOnlySet<string>? OwnedByRefParameters { get; init; }
@@ -7049,6 +7065,11 @@ public sealed class EffectEnforcementPass
             var receiverType = receiver is "this" or "self"
                 ? _context.OwnerClass?.Name
                 : receiver.Contains('.') ? null : ResolveLocalValueType(receiver);
+            // C# simple-name lookup (nearest enclosing class first, inherited nested types
+            // included) names the receiver even where simple-name class indexing cannot.
+            if (receiverType == null && receiver is not ("this" or "self")
+                && ResolveDottedReceiver(receiver) is { } lookedUp)
+                return initialization.Union(InferLookedUpMemberRead(lookedUp, member, reference.Span));
             receiverType ??= IsSourceTypePath(receiver) ? receiver : null;
             if (chargeMethodGroup && receiverType != null && TryResolveClass(receiverType, out var cls))
                 return initialization.Union(InferGetterEffects(receiverType, member, reference.Span, receiver))
@@ -7077,7 +7098,8 @@ public sealed class EffectEnforcementPass
             if (separator <= 0 || separator == reference.Name.Length - 1
                 || reference.Name.IndexOf('.') == separator
                 || _context.CallGraph.IsTypeQualifiedMemberRead(_context.CurrentFunctionId, reference.Span)
-                || IsSourceTypePath(reference.Name[..separator]))
+                || IsSourceTypePath(reference.Name[..separator])
+                || ResolveDottedReceiver(reference.Name[..separator]) is { Type: not null })
                 return null;
             return DottedMemberAccess(reference);
         }
@@ -7185,19 +7207,7 @@ public sealed class EffectEnforcementPass
             string? receiverPath = null)
         {
             if (TryResolveClass(receiverType, out var cls))
-            {
-                var resolved = FindClassProperty(cls, member);
-                var getter = resolved?.Property.Getter;
-                if (resolved == null)
-                    return PreservedMemberRead(cls, member, span);
-                if (getter == null)
-                    return EffectSet.Empty;
-                var id = CallGraphAnalysis.GetPropertyAccessorFunctionId(
-                    resolved!.Value.OwnerName,
-                    resolved.Value.Property,
-                    getter);
-                return InferFromInternalFunctions([id]);
-            }
+                return InferClassGetterEffects(cls, member, span);
 
             if (TryCrossModuleMemberAssumption(receiverType, member))
                 return EffectSet.Empty;
@@ -7208,6 +7218,216 @@ public sealed class EffectEnforcementPass
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation($"{manifestType}.get_{member}", span)
                 : resolution.Effects;
+        }
+
+        /// <summary>An instance member read on a source class: a field is pure, a property runs its getter.</summary>
+        private EffectSet InferClassGetterEffects(ClassDefinitionNode cls, string member, TextSpan span)
+        {
+            var resolved = FindClassProperty(cls, member);
+            var getter = resolved?.Property.Getter;
+            if (resolved == null)
+                return PreservedMemberRead(cls, member, span);
+            if (getter == null)
+                return EffectSet.Empty;
+            var id = CallGraphAnalysis.GetPropertyAccessorFunctionId(
+                resolved.Value.OwnerName,
+                resolved.Value.Property,
+                getter);
+            return InferFromInternalFunctions([id]);
+        }
+
+        /// <summary>
+        /// What C# simple-name lookup finds for the receiver of a dotted member read: a source
+        /// type, or a field or property of an enclosing class (a value).
+        /// </summary>
+        private sealed record LookedUpReceiver(
+            ClassDefinitionNode? Type,
+            ClassDefinitionNode? ValueOwner = null,
+            ClassFieldNode? Field = null,
+            PropertyNode? Property = null);
+
+        /// <summary>
+        /// Resolves the receiver of a dotted member read (<c>Limits</c> in <c>Limits.Min</c>,
+        /// <c>Outer.Inner</c> in <c>Outer.Inner.Size</c>) as C# simple-name lookup does: from the
+        /// current class outwards, each class's own and inherited members (fields, properties
+        /// and non-generic nested types; a base's private members are not inherited), the
+        /// nearest match winning, then the module's top-level classes. Later segments name
+        /// nested types. Null when a local or parameter, or anything this lookup does not
+        /// model, could be meant.
+        /// </summary>
+        private LookedUpReceiver? ResolveDottedReceiver(string receiver)
+        {
+            var segments = receiver.Split('.');
+            if (segments.Any(segment => segment.Length == 0 || segment.Contains('<'))
+                || segments[0] is "this" or "self" or "base"
+                || ResolveLocalValueType(segments[0]) is not null)
+                return null;
+            LookedUpReceiver? found = null;
+            for (var scope = _context.OwnerClass; scope != null && found == null;
+                 scope = _context.EnclosingClasses.GetValueOrDefault(scope))
+                found = LookUpMember(scope, segments[0], typesOnly: false, arity: 0, depth: 0, out var stop)
+                    ?? (stop ? new LookedUpReceiver(null) : null);
+            if (found == null && _context.TopLevelClasses.Where(cls =>
+                    cls.Name.Equals(segments[0], StringComparison.Ordinal) && cls.TypeParameters.Count == 0)
+                    .Take(2).ToArray() is [var topLevel])
+                found = new LookedUpReceiver(topLevel);
+            foreach (var segment in segments.Skip(1))
+            {
+                if (found?.Type is not { } current)
+                    return null;
+                found = LookUpMember(current, segment, typesOnly: true, arity: 0, depth: 0, out _);
+            }
+            return found is { Type: null, ValueOwner: null } ? null : found;
+        }
+
+        /// <summary>
+        /// The member named <paramref name="name"/> of <paramref name="type"/> or one of its
+        /// source base classes (a base's private members are not inherited; a generic nested
+        /// type does not match a name without type arguments). <paramref name="stop"/> is set
+        /// when the name is a member this lookup does not model (a method, a nested enum,
+        /// interface or delegate), which hides anything further out.
+        /// </summary>
+        private LookedUpReceiver? LookUpMember(
+            ClassDefinitionNode type, string name, bool typesOnly, int arity, int depth, out bool stop)
+        {
+            stop = false;
+            var visited = new HashSet<ClassDefinitionNode>(ReferenceEqualityComparer.Instance);
+            var inherited = false;
+            for (var current = type; current != null && visited.Add(current) && depth < 16;
+                 current = SourceBaseClass(current, depth + 1), inherited = true)
+            {
+                bool Visible(Visibility visibility) => !inherited || visibility != Visibility.Private;
+                var nested = current.NestedClasses.Concat(
+                        CallGraphAnalysis.PreprocessorMembers(current).OfType<ClassDefinitionNode>())
+                    .Where(candidate => candidate.Name.Equals(name, StringComparison.Ordinal)
+                        && candidate.TypeParameters.Count == arity && Visible(candidate.Visibility))
+                    .Take(2).ToArray();
+                if (nested is [var nestedType])
+                    return new LookedUpReceiver(nestedType);
+                if (nested.Length > 1)
+                {
+                    stop = true;
+                    return null;
+                }
+                if (current.NestedEnums.Any(candidate => candidate.Name.Equals(name, StringComparison.Ordinal))
+                    || current.NestedInterfaces.Any(candidate => candidate.Name.Equals(name, StringComparison.Ordinal))
+                    || current.NestedDelegates.Any(candidate => candidate.Name.Equals(name, StringComparison.Ordinal)))
+                {
+                    stop = true;
+                    return null;
+                }
+                if (typesOnly)
+                    continue;
+                if (current.Fields.FirstOrDefault(field => field.Name.Equals(name, StringComparison.Ordinal)
+                        && Visible(field.Visibility)) is { } valueField)
+                    return new LookedUpReceiver(null, current, Field: valueField);
+                if (CallGraphAnalysis.EnumerateProperties(current).FirstOrDefault(property =>
+                        property.Name.Equals(name, StringComparison.Ordinal) && Visible(property.Visibility))
+                    is { } valueProperty)
+                    return new LookedUpReceiver(null, current, Property: valueProperty);
+                if (CallGraphAnalysis.EnumerateMethods(current).Any(method => method.Name.Equals(name, StringComparison.Ordinal))
+                    || current.Events.Any(evt => evt.Name.Equals(name, StringComparison.Ordinal))
+                    || current.InteropBlocks.Count > 0)
+                {
+                    // A method group or event is not a receiver; a preserved raw member may
+                    // declare the name. Either way this lookup cannot decide.
+                    stop = true;
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>The source class a class extends, resolved from its enclosing class as C# does.</summary>
+        private ClassDefinitionNode? SourceBaseClass(ClassDefinitionNode cls, int depth)
+        {
+            if (cls.BaseClass is not { } baseName || depth >= 16)
+                return null;
+            var open = baseName.IndexOf('<');
+            var arity = 0;
+            if (open >= 0)
+            {
+                var nesting = 0;
+                arity = 1;
+                foreach (var c in baseName[(open + 1)..^1])
+                {
+                    nesting += c switch { '<' or '(' or '[' => 1, '>' or ')' or ']' => -1, _ => 0 };
+                    if (c == ',' && nesting == 0)
+                        arity++;
+                }
+                baseName = baseName[..open];
+            }
+            var segments = baseName.Split('.');
+            ClassDefinitionNode? current = null;
+            for (var scope = _context.EnclosingClasses.GetValueOrDefault(cls); scope != null && current == null;
+                 scope = _context.EnclosingClasses.GetValueOrDefault(scope))
+                current = LookUpMember(scope, segments[0], typesOnly: true,
+                    segments.Length == 1 ? arity : 0, depth, out _)?.Type;
+            if (current == null && _context.TopLevelClasses.Where(candidate =>
+                    candidate.Name.Equals(segments[0], StringComparison.Ordinal)
+                    && candidate.TypeParameters.Count == (segments.Length == 1 ? arity : 0))
+                    .Take(2).ToArray() is [var topLevel])
+                current = topLevel;
+            for (var index = 1; index < segments.Length && current != null; index++)
+                current = LookUpMember(current, segments[index], typesOnly: true,
+                    index == segments.Length - 1 ? arity : 0, depth, out _)?.Type;
+            return current;
+        }
+
+        /// <summary>
+        /// A member read on a receiver C# lookup resolved: on a type, the static member (a static
+        /// field's type initialization, a static property's getter, a constant nothing); on an
+        /// enclosing class's field or property, that value's own read, then the member of its type.
+        /// </summary>
+        private EffectSet InferLookedUpMemberRead(LookedUpReceiver receiver, string member, TextSpan span)
+        {
+            if (receiver.Type is { } type)
+            {
+                if (type.Fields.FirstOrDefault(field => field.Name.Equals(member, StringComparison.Ordinal)) is { } field)
+                    return field.Modifiers.HasFlag(MethodModifiers.Const) ? EffectSet.Empty
+                        : field.IsStatic ? InferStaticFieldInitialization(type, span)
+                        : UnknownResolvedOperation($"{type.Name}.{member}", span);
+                if (CallGraphAnalysis.EnumerateProperties(type).FirstOrDefault(property =>
+                        property.Name.Equals(member, StringComparison.Ordinal)) is { IsStatic: true } property)
+                    return InferStaticFieldInitialization(type, span).Union(property.Getter is { } getter
+                        ? InferFromInternalFunctions([CallGraphAnalysis.GetPropertyAccessorFunctionId(type.Name, property, getter)])
+                        : EffectSet.Empty);
+                if (CallGraphAnalysis.EnumerateMethods(type).Any(method => method.Name.Equals(member, StringComparison.Ordinal)))
+                    return MethodGroupEffects(type, member) ?? EffectSet.Unknown;
+                return type.InteropBlocks.Count > 0
+                    ? PreservedMemberRead(type, member, span)
+                    : UnknownResolvedOperation($"{type.Name}.{member}", span);
+            }
+            var owner = receiver.ValueOwner!;
+            var isStatic = receiver.Field?.IsStatic ?? receiver.Property!.IsStatic;
+            var valueRead = receiver.Field is { } valueField
+                ? valueField.Modifiers.HasFlag(MethodModifiers.Const) ? EffectSet.Empty
+                    : valueField.IsStatic ? InferStaticFieldInitialization(owner, span) : EffectSet.Empty
+                : (isStatic ? InferStaticFieldInitialization(owner, span) : EffectSet.Empty)
+                    .Union(receiver.Property!.Getter is { } valueGetter
+                        ? InferFromInternalFunctions([CallGraphAnalysis.GetPropertyAccessorFunctionId(
+                            owner.Name, receiver.Property, valueGetter)])
+                        : EffectSet.Empty);
+            var valueType = (receiver.Field?.TypeName ?? receiver.Property!.TypeName).TrimEnd('?');
+            var valueClass = valueType.Contains('<') ? null : ResolveTypeFrom(owner, valueType);
+            return valueRead.Union(valueClass is not null
+                ? InferClassGetterEffects(valueClass, member, span)
+                : InferGetterEffects(valueType, member, span));
+        }
+
+        private ClassDefinitionNode? ResolveTypeFrom(ClassDefinitionNode context, string typeName)
+        {
+            var segments = typeName.Split('.');
+            ClassDefinitionNode? current = null;
+            for (var scope = context; scope != null && current == null; scope = _context.EnclosingClasses.GetValueOrDefault(scope))
+                current = LookUpMember(scope, segments[0], typesOnly: true, arity: 0, depth: 0, out _)?.Type;
+            if (current == null && _context.TopLevelClasses.Where(candidate =>
+                    candidate.Name.Equals(segments[0], StringComparison.Ordinal) && candidate.TypeParameters.Count == 0)
+                    .Take(2).ToArray() is [var topLevel])
+                current = topLevel;
+            for (var index = 1; index < segments.Length && current != null; index++)
+                current = LookUpMember(current, segments[index], typesOnly: true, arity: 0, depth: 0, out _)?.Type;
+            return current;
         }
 
         private bool TryCrossModuleMemberAssumption(string receiverType, string member)

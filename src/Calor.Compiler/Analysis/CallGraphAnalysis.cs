@@ -3211,7 +3211,7 @@ public sealed class CallGraphAnalysis
     internal static IEnumerable<IndexerNode> EnumerateIndexers(ClassDefinitionNode cls)
         => cls.Indexers.Concat(PreprocessorMembers(cls).OfType<IndexerNode>());
 
-    private static IEnumerable<AstNode> PreprocessorMembers(ClassDefinitionNode cls)
+    internal static IEnumerable<AstNode> PreprocessorMembers(ClassDefinitionNode cls)
     {
         foreach (var block in cls.PreprocessorBlocks)
             for (var branch = block; branch != null; branch = branch.ElseBranch)
