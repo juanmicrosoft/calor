@@ -563,6 +563,11 @@ public class ArchitectureTests
                     "identifier-bearing node would go unindexed. Rename correctness is " +
                     "established by the apply-recompile-and-run oracle, not by this switch.",
                     "No occurrence for this node kind"),
+            ["Effects/EffectEnforcementPass.cs:InferElementAccessor"] =
+                ("0.30 element-access receiver classifier, not traversal: arrays and string slices are " +
+                    "built in, a selected metadata indexer or a source class's own indexer is charged its " +
+                    "accessor, and every other receiver is explicitly charged unknown.",
+                    "{receiverName}[]"),
             ["Analysis/Dataflow/BoundNodeHelpers.cs:IsLiteralZero"] =
                 ("Literal classifier, not traversal; non-literals explicitly return false.",
                     "_ => false"),
