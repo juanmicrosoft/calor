@@ -1023,6 +1023,46 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void ReferencedAssemblies_ReachTheBinder_AndTheirContractsApply()
+    {
+        // 0.30: the task's references are loaded into the binder's metadata set, so a
+        // call on a referenced type binds to its metadata member and a manifest entry
+        // for that member applies. xunit.assert stands in for a framework package.
+        var src = CreateSourceFile("UsesReference.calr", """
+            module UsesReference UsesReference block
+              using Xunit
+              func Check () → void
+                !
+                Assert.True(true)
+            """);
+        File.WriteAllText(Path.Combine(_projectDir, ".calor-effects.json"), """
+            {
+              "version": "1.0",
+              "mappings": [
+                { "type": "Xunit.Assert", "methods": { "True": [] } }
+              ]
+            }
+            """);
+
+        CompileCalor Task(bool withReference)
+        {
+            var task = CreateTask(src);
+            if (withReference)
+                task.ReferencedAssemblies = [new TaskItem(typeof(Xunit.Assert).Assembly.Location)];
+            return task;
+        }
+
+        var referenced = Task(withReference: true);
+        Assert.True(referenced.Execute(), string.Join("\n", ((TestBuildEngine)referenced.BuildEngine).Errors));
+
+        // Without the reference the call cannot bind, the entry does not apply (D3),
+        // and the unknown call is an undeclared effect.
+        var unreferenced = Task(withReference: false);
+        Assert.False(unreferenced.Execute());
+        Assert.Contains(((TestBuildEngine)unreferenced.BuildEngine).Errors, e => e.Contains("'unknown'"));
+    }
+
+    [Fact]
     public void CanonicalInputs_ReferencedAssemblyContentMutation_InvalidatesWarmCache()
     {
         var src = CreateSourceFile("ReferenceContent.calr", ValidCalorSource);

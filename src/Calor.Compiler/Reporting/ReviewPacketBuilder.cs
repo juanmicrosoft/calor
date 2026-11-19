@@ -96,7 +96,9 @@ public sealed class ReviewPacketBuilder
                     : Effects.UnknownCallPolicy.Strict,
                 ContractMode = options.ContractChecksOff ? ContractMode.Off : ContractMode.Debug,
                 ProjectDirectory = options.ProjectDirectory
-                    ?? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(file.Path))
+                    ?? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(file.Path)),
+                // The same references as `calor -r`: they also feed the binder.
+                ReferencedAssemblyPaths = options.ReferencedAssemblyPaths
             };
             compileOptions.CrossModuleFunctionModules = crossModuleMap;
 

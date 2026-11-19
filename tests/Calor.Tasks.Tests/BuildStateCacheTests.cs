@@ -871,6 +871,27 @@ public class BuildStateCacheTests : IDisposable
     }
 
     [Fact]
+    public void CanonicalInputs_ReferencedAssemblies_FingerprintWithoutILAnalysis()
+    {
+        // 0.30: the binder loads explicit references into its metadata set, so the
+        // reference set changes compiler output even when IL analysis is off. Adding
+        // a reference, or changing its content at the same path, must move the key.
+        var reference = CreateTempFile("refs/Framework.dll", "framework-v1");
+        var none = new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir };
+        var referenced = new Calor.Tasks.CompileCalor
+        {
+            ProjectDirectory = _tempDir,
+            ReferencedAssemblies = [new TaskItem(reference)]
+        };
+
+        var baseline = referenced.ComputeCacheInputs().Serialize();
+        Assert.NotEqual(none.ComputeCacheInputs().Serialize(), baseline);
+
+        File.WriteAllText(reference, "framework-v2");
+        Assert.NotEqual(baseline, referenced.ComputeCacheInputs().Serialize());
+    }
+
+    [Fact]
     public void ManifestHash_IncludesUserLevelManifests_AndDistinguishesScopes()
     {
         var project = Path.Combine(_tempDir, "manifest-project");
