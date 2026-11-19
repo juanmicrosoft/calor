@@ -89,6 +89,19 @@ public class SourceOverloadDifferentialTests
         { "char-ushort-vs-int", ["ushort", "int"], "c", CalorOutcome.Selects },
         { "short-vs-int-exact", ["int", "short"], "s", CalorOutcome.Selects },
         { "uint-vs-long-variable", ["long", "ulong"], "ui", CalorOutcome.Selects },
+        // Conversions this binder does not model: boxing to an interface, a user-defined
+        // conversion, a user enum or struct under `?`. The rules decline; with the projection
+        // the call stands only where Roslyn selected the same declaration.
+        { "interface-boxing", ["System.IComparable", "object"], "i", CalorOutcome.Declines },
+        { "interface-boxing-vs-long", ["System.IComparable", "long"], "i", CalorOutcome.Declines },
+        { "user-defined-implicit", ["Meters", "object"], "i", CalorOutcome.Declines },
+        { "user-defined-implicit-vs-long", ["Meters", "long"], "i", CalorOutcome.Declines },
+        { "enum-nullable-target", ["Color?", "object"], "Color.Red", CalorOutcome.Declines },
+        // Decided without modeling Pt: everything converts to object and object to nothing
+        // else, and an exact match beats any other conversion.
+        { "struct-nullable-target", ["Pt?", "object"], "new Pt()", CalorOutcome.Selects },
+        { "struct-exact-vs-nullable", ["Pt", "Pt?"], "new Pt()", CalorOutcome.Selects },
+        { "struct-nullable-vs-interface", ["Pt?", "System.IComparable"], "new Pt()", CalorOutcome.Declines },
     };
 
     [Theory]
@@ -152,6 +165,18 @@ public class SourceOverloadDifferentialTests
             """));
         return $"""
             module Differential
+              enum Color
+                Red
+                Green
+
+              class Pt struct
+                field int:X
+
+              class Meters
+                op implicit (int:value) → Meters
+                  ! alloc
+                  return new Meters()
+
               module L
                 field int:C const = 1
                 field int:Neg const = -1
@@ -170,6 +195,9 @@ public class SourceOverloadDifferentialTests
         var functions = string.Join("\n", overloads.Select((type, index) =>
             $"    public static int F({type} x) => {index};"));
         return $$"""
+            public enum Color { Red, Green }
+            public struct Pt { public int X; }
+            public class Meters { public static implicit operator Meters(int value) => new Meters(); }
             public static class L
             {
                 public const int C = 1;

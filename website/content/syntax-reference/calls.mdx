@@ -99,12 +99,20 @@ argument cannot cancel a worse conversion for another. For example, `F(1)`
 calls `F(byte)` rather than `F(int?)`, and `F(i)` with an `int` is ambiguous
 between `F(int?)` and `F(long)` (`Calor0207`), as in C#.
 
-The binder never guesses a different overload from C#. If it cannot evaluate a
-constant argument that a constant conversion could affect (for example
-`C + 1`), or it cannot compare two candidates, it leaves the call unresolved.
-The call's effects are then `unknown`. The binder also checks its choice against
-the overload Roslyn selects in the module's C# projection, and leaves the call
-unresolved when the two differ.
+The binder never guesses a different overload from C#. Its own rules cover the
+built-in value types, their nullables, `string`, `object`, arrays against
+those, and exact matches. Other conversions (boxing to an interface, a
+user-defined conversion, a user type under `?`) are outside them. When a choice
+depends on one of those, the binder asks the module's C# projection which
+overload Roslyn selected, and uses that. If the projection has no answer, or the
+binder cannot evaluate a constant argument that a constant conversion could
+affect (for example `C + 1`), it leaves the call unresolved, and the call's
+effects are `unknown`.
+
+An exact match needs no projection: when every argument's type is exactly its
+parameter's type, and the method is not generic, takes only by-value
+parameters, takes no `params` and uses no default, no other overload can beat
+it in C#.
 
 ## Unknown receiver types
 

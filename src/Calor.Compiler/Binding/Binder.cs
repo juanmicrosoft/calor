@@ -8989,27 +8989,161 @@ public sealed class Binder
                 IsBetterIntegerLiteralConversionTarget(
                     arguments[index], argumentTypes[index], candidateType, otherType),
             arguments is null ? null : (index, first, second) =>
-                CompareArgumentConversions(arguments[index], argumentTypes[index], first, second),
+                CompareArgumentConversions(arguments[index], argumentTypes[index], first, second,
+                    InterpolationIsString(accessibleCandidates, index, argumentNames)),
             arguments is null ? null : (index, parameterType) =>
-                RequiresExactBetterness(parameterType, argumentTypes[index]));
+                RequiresExactBetterness(parameterType, argumentTypes[index]),
+            arguments is null ? null : IsConversionModeled);
         if (resolved.Function is { } winner && duplicates.TryGetValue(winner, out var ambiguous))
             return OverloadResolutionResult.Ambiguous(ambiguous);
 
-        // Soundness backstop: the source projection compiles this call with Roslyn. When
-        // Roslyn selected a different source declaration, this binder's choice is wrong (an
-        // unmodeled conversion, a typing difference): leave the call opaque, never charge the
-        // other overload's row.
+        // Roslyn's own selection for this call in the module's C# projection, when it has one.
+        var roslynChoice = callSpan is { } choiceSite ? RoslynSelectedFunction(choiceSite, includesExtensionReceiver,
+            argumentTypes.Count, includeDispatches: true) : null;
+
+        // A choice this binder's rules cannot certify (a comparison or a rejection outside what
+        // they model) stands only when the projection shows Roslyn selected the same
+        // declaration, or when no C# candidate can beat it. Otherwise Roslyn's selection is
+        // used when its argument map is plain, and the call is left opaque when it is not.
+        if (resolved.NeedsConfirmation)
+        {
+            var confirmed = roslynChoice is not null && resolved.Functions is [var only]
+                && ReferenceEquals(only, roslynChoice);
+            var exact = !confirmed && arguments is not null
+                && IsUnbeatableExactMatch(resolved, arguments, argumentTypes, accessibleCandidates, argumentNames);
+            var adopted = confirmed || exact || roslynChoice is null || !accessibleCandidates.Contains(roslynChoice) ? null
+                : TryAdoptRoslynChoice(roslynChoice, argumentTypes, argumentNames, argumentModifiers);
+            if (!confirmed && !exact)
+                return adopted ?? OverloadResolutionResult.Opaque();
+        }
+
+        // Soundness backstop: when Roslyn selected a different source declaration, this
+        // binder's choice is wrong (an unmodeled conversion, a typing difference): leave the
+        // call opaque, never charge the other overload's row.
+        // (Only a recorded argument map: an ordinary dispatch names the least-derived
+        // declaration of a virtual member, which an override this binder chose is not.)
         if (resolved.Kind == OverloadResolutionKind.Resolved && resolved.Function is { } chosen
-            && ResolveSourceCallConversions && _asyncTypeModule is not null && callSpan is { } selectedSite
-            && _sourceCallConversions is { } projection
-            && projection.SelectedCalls.TryGetValue(selectedSite, out var roslynSelection)
-            && roslynSelection.IncludesExtensionReceiver == includesExtensionReceiver
-            && roslynSelection.Arguments.Count == argumentTypes.Count
-            && _functionSymbols.TryGetValue(roslynSelection.Declaration, out var roslynFunction)
-            && accessibleCandidates.Contains(roslynFunction)
-            && !ReferenceEquals(roslynFunction, chosen))
-            return OverloadResolutionResult.Opaque();
+            && callSpan is { } selectedSite
+            && RoslynSelectedFunction(selectedSite, includesExtensionReceiver, argumentTypes.Count,
+                includeDispatches: false) is { } recorded
+            && accessibleCandidates.Contains(recorded) && !ReferenceEquals(recorded, chosen))
+            return TryAdoptRoslynChoice(recorded, argumentTypes, argumentNames, argumentModifiers)
+                ?? OverloadResolutionResult.Opaque();
         return resolved;
+    }
+
+    /// <summary>
+    /// Roslyn's selection as this binder's result, when the call maps argument i to parameter i
+    /// (no names, no defaults, no params, not generic): it is C#'s choice, so it is exact.
+    /// Otherwise null, and the caller leaves the call opaque.
+    /// </summary>
+    private static OverloadResolutionResult? TryAdoptRoslynChoice(FunctionSymbol function,
+        IReadOnlyList<string> argumentTypes, IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers)
+    {
+        if (function.GenericArity != 0 || function.Parameters.Count != argumentTypes.Count
+            || argumentNames?.Any(name => name != null) == true
+            || function.Parameters.Any(parameter => parameter.Modifier.HasFlag(ParameterModifier.Params)))
+            return null;
+        for (var index = 0; index < function.Parameters.Count; index++)
+        {
+            var modifier = function.Parameters[index].Modifier
+                & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In);
+            var supplied = argumentModifiers?.ElementAtOrDefault(index);
+            if (modifier != ParameterModifier.None ? string.IsNullOrEmpty(supplied) : !string.IsNullOrEmpty(supplied))
+                return null;
+        }
+        return OverloadResolutionResult.Resolved(function, function.ReturnType,
+            function.Parameters.Select((parameter, index) =>
+                new ResolvedArgumentMapping(index, index, parameter.TypeName, false)).ToArray());
+    }
+
+    /// <summary>
+    /// The source declaration Roslyn bound this call to in the module's C# projection: a call
+    /// with a recorded argument map (an implicit or extension conversion), or any ordinary
+    /// source invocation's dispatch. Null when the projection has no entry or its
+    /// configurations disagree.
+    /// </summary>
+    private FunctionSymbol? RoslynSelectedFunction(TextSpan site, bool includesExtensionReceiver, int argumentCount,
+        bool includeDispatches)
+    {
+        if (!ResolveSourceCallConversions || _asyncTypeModule is null || _sourceCallConversions is not { } projection)
+            return null;
+        if (projection.SelectedCalls.TryGetValue(site, out var selection)
+            && selection.IncludesExtensionReceiver == includesExtensionReceiver
+            && selection.Arguments.Count == argumentCount
+            && _functionSymbols.TryGetValue(selection.Declaration, out var selected))
+            return selected;
+        if (includeDispatches && !includesExtensionReceiver
+            && projection.SourceDispatches.TryGetValue(site, out var dispatch)
+            && dispatch?.Declaration is { } declaration
+            && dispatch.Method.Parameters.Length >= argumentCount
+            && _functionSymbols.TryGetValue(declaration, out var dispatched))
+            return dispatched;
+        // A constructor call or `base(...)`/`this(...)` initializer (including a record's
+        // synthesized one), as Roslyn bound it in every configuration.
+        if (includeDispatches && !includesExtensionReceiver)
+        {
+            var constructor = projection.SourceConstructors.FirstOrDefault(pair => pair.Key.Span == site).Value
+                ?? projection.ConstructorInitializers.FirstOrDefault(pair => pair.Key.Initializer?.Span == site).Value;
+            if (constructor is not null
+                && projection.SourceDeclarations.TryGetValue(constructor.OriginalDefinition, out var constructorDeclaration)
+                && _functionSymbols.TryGetValue(constructorDeclaration, out var selectedConstructor))
+                return selectedConstructor;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A winner no other candidate can beat in C#: every argument's C# type is exactly its
+    /// parameter type (an exact match is never worse than another conversion, and is better than
+    /// any non-identity one), and it carries every tie-breaker advantage C# gives an
+    /// equivalent candidate (non-generic, normal form, no default supplied, by-value
+    /// parameters). Any C#-applicable competitor, modeled here or not, loses to it.
+    /// </summary>
+    private bool IsUnbeatableExactMatch(
+        OverloadResolutionResult resolved, IReadOnlyList<BoundExpression> arguments, IReadOnlyList<string> argumentTypes,
+        IReadOnlyList<FunctionSymbol> candidates, IReadOnlyList<string?>? argumentNames)
+    {
+        if (resolved.Functions is not [var winner] || resolved.Matches is not [var match]
+            || winner.GenericArity != 0 || winner.Parameters.Count != match.Arguments.Count
+            || winner.Parameters.Any(parameter => (parameter.Modifier & ~ParameterModifier.This) != ParameterModifier.None)
+            || match.Arguments.Count != arguments.Count)
+            return false;
+        return match.Arguments.All(mapping => !mapping.IsExpandedParams
+            && mapping.ArgumentIndex < arguments.Count
+            && TryGetCSharpArgumentType(arguments[mapping.ArgumentIndex], argumentTypes[mapping.ArgumentIndex],
+                InterpolationIsString(candidates, mapping.ArgumentIndex, argumentNames)) is { } type
+            && ConversionIdentity(type) == ConversionIdentity(mapping.ParameterType));
+    }
+
+    /// <summary>
+    /// Whether this binder models every C# conversion between the two types: the built-in value
+    /// types, their nullables, string, object and the null literal, and arrays against those.
+    /// Anything else (a user type, an interface, a type parameter) may convert through boxing, a
+    /// reference or a user-defined conversion this binder does not see.
+    /// </summary>
+    private static bool IsConversionModeled(string parameterType, string argumentType)
+    {
+        static bool Modeled(string type)
+        {
+            var canonical = ConversionIdentity(type.TrimStart('?'));
+            return canonical is "STRING" or "OBJECT" or "NULL" || IsBuiltinValueType(canonical)
+                || TryGetValueNullableUnderlying(canonical, out _);
+        }
+        // An array and a built-in scalar never convert either way except through object:
+        // a user-defined conversion needs a user type on one side.
+        static bool IsArray(string type)
+        {
+            var trimmed = type.Trim().TrimEnd('?');
+            return trimmed.StartsWith('[') || trimmed.EndsWith(']');
+        }
+        if (string.IsNullOrWhiteSpace(parameterType) || string.IsNullOrWhiteSpace(argumentType))
+            return false;
+        if (Modeled(parameterType) && Modeled(argumentType))
+            return true;
+        return IsArray(parameterType) && Modeled(argumentType) && ConversionIdentity(argumentType) is not ("OBJECT" or "NULL")
+            || IsArray(argumentType) && Modeled(parameterType) && ConversionIdentity(parameterType) != "OBJECT";
     }
 
     /// <summary>
@@ -9031,14 +9165,16 @@ public sealed class Binder
     /// 0 when neither, null when this binder cannot tell (a type outside the built-in value,
     /// string and object types, or an argument whose C# type it does not know exactly).
     /// </summary>
-    private int? CompareArgumentConversions(BoundExpression argument, string argumentType, string first, string second)
+    private int? CompareArgumentConversions(BoundExpression argument, string argumentType, string first, string second,
+        bool interpolationIsString = false)
     {
         var target1 = ConversionIdentity(first);
         var target2 = ConversionIdentity(second);
         if (target1 == target2)
             return 0;
         // The null literal has no type: it exactly matches neither target.
-        var source = argument is BoundNullLiteral ? "NULL" : TryGetCSharpArgumentType(argument, argumentType);
+        var source = argument is BoundNullLiteral ? "NULL"
+            : TryGetCSharpArgumentType(argument, argumentType, interpolationIsString);
         if (source is null)
             return null;
         source = source == "NULL" ? source : ConversionIdentity(source);
@@ -9117,7 +9253,8 @@ public sealed class Binder
     /// The argument's C# type (in the generated C#) when this binder knows it exactly; null
     /// otherwise (a promoted arithmetic result, a flow-narrowed variable).
     /// </summary>
-    private static string? TryGetCSharpArgumentType(BoundExpression argument, string argumentType)
+    private string? TryGetCSharpArgumentType(BoundExpression argument, string argumentType,
+        bool interpolationIsString = false)
     {
         var type = TypeIdentity.Canonicalize(argumentType);
         if (type is "<unresolved>" or "NULL")
@@ -9130,10 +9267,15 @@ public sealed class Binder
             BoundUnaryExpression { Operator: UnaryOperator.Negate, Operand: var operand }
                 when type is "INT" or "LONG" or "FLOAT" or "FLOAT[bits=32]" or "DECIMAL"
                 && TryGetCSharpArgumentType(operand, operand.Type.DisplayString) == type => type,
-            BoundVariableExpression { Variable: { Id.IsNone: false } variable }
-                when TypeIdentity.Canonicalize(variable.TypeName) == type => type,
-            BoundFieldAccessExpression { ResolvedField: { } field }
-                when TypeIdentity.Canonicalize(field.TypeName) == type => type,
+            // A storage's bound type is its declared type, resolved (`Color` binds as
+            // `Demo.Storage.Color`). Flow narrowing changes only a reference's nullable state,
+            // which C# overload resolution ignores; a value type narrowed from `T?` to `T` is not
+            // its C# type.
+            BoundVariableExpression { Variable: { Id.IsNone: false } variable } => TrustStorageType(variable, type),
+            BoundFieldAccessExpression { ResolvedField: { } field } => TrustStorageType(field, type),
+            // An interpolated string is a `string` unless a candidate takes an interpolated
+            // string handler there, which C# prefers; the caller decides.
+            BoundInterpolatedStringExpression when interpolationIsString => "STRING",
             BoundFieldAccessExpression { ResolvedField: null, ResolvedMetadataMember: not null } => type,
             BoundTypeOperationExpression { Operation: TypeOp.Cast } => type,
             BoundNewExpression => type,
@@ -9142,6 +9284,47 @@ public sealed class Binder
                 when call.ResolvedSymbol is not null || call.ResolvedMetadataMethod is not null => type,
             _ => null
         };
+    }
+
+    private string? TrustStorageType(VariableSymbol storage, string type)
+    {
+        if (TypeIdentity.Canonicalize(storage.TypeName) == type)
+            return type;
+        if (!_flowNarrowingSources.ContainsKey(storage))
+            return type;
+        return IsBuiltinValueType(type) || TryGetValueNullableUnderlying(type, out _) ? null : type;
+    }
+
+    /// <summary>
+    /// True when no candidate can take an interpolated string handler at argument
+    /// <paramref name="index"/>: every parameter there is string, FormattableString,
+    /// IFormattable or object, so the interpolated string is a plain `string` argument.
+    /// </summary>
+    private static bool InterpolationIsString(IReadOnlyList<FunctionSymbol> candidates, int index,
+        IReadOnlyList<string?>? argumentNames)
+    {
+        if (argumentNames?.Any(name => name != null) == true)
+            return false;
+        foreach (var candidate in candidates)
+        {
+            if (index >= candidate.Parameters.Count)
+            {
+                if (candidate.Parameters.Count > 0
+                    && candidate.Parameters[^1].Modifier.HasFlag(ParameterModifier.Params))
+                    return false;
+                continue;
+            }
+            var parameter = candidate.Parameters[index];
+            if (parameter.Modifier.HasFlag(ParameterModifier.Params) || string.IsNullOrWhiteSpace(parameter.TypeName))
+                return false;
+            var canonical = ConversionIdentity(parameter.TypeName);
+            var simple = canonical.TrimEnd('?');
+            simple = simple.StartsWith("global::", StringComparison.Ordinal) ? simple[8..] : simple;
+            simple = simple.StartsWith("System.", StringComparison.Ordinal) ? simple[7..] : simple;
+            if (canonical is not ("STRING" or "OBJECT") && simple is not ("FormattableString" or "IFormattable"))
+                return false;
+        }
+        return true;
     }
 
     private IReadOnlyList<FunctionSymbol>? GetInterfaceCallCandidates(
