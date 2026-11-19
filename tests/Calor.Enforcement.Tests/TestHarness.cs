@@ -69,9 +69,11 @@ public static class TestHarness
     /// <c>calor -r</c> or the MSBuild task would pass them: the three API
     /// assemblies (logging, configuration, EF Core) and the assemblies their
     /// public signatures name. These are real package assemblies restored for
-    /// this test project; the compiler sees them only through this list.
+    /// this test project (privately: Calor.Compiler.Tests, which references this
+    /// project, does not get them, hence the getter instead of a static field);
+    /// the compiler sees them only through this list.
     /// </summary>
-    public static IReadOnlyList<string> FrameworkReferences { get; } =
+    public static IReadOnlyList<string> FrameworkReferences =>
     [
         typeof(Microsoft.Extensions.Logging.ILogger).Assembly.Location,
         typeof(Microsoft.Extensions.Configuration.IConfiguration).Assembly.Location,

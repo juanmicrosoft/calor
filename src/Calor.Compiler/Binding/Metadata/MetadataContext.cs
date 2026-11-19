@@ -110,7 +110,12 @@ internal sealed class MetadataContext : IDisposable
     /// manifest's <c>System.*</c> set alone.
     /// </summary>
     public static MetadataContext Create()
-        => Create(CurrentReferencePaths);
+    {
+        var manifest = MetadataReferenceManifest.Load();
+        return CreateWithManifest(manifest, AmbientReferences.Value?.Admitted.Value
+            .Select(reference => (MetadataReference)reference.Reference)
+            .ToImmutableArray() ?? ImmutableArray<MetadataReference>.Empty);
+    }
 
     /// <summary>
     /// Entry point with an explicit reference list (CLI <c>-r</c>, the MSBuild
@@ -131,6 +136,16 @@ internal sealed class MetadataContext : IDisposable
     public static MetadataContext CreateWithManifest(
         MetadataReferenceManifest manifest,
         IReadOnlyList<string>? referencePaths = null)
+        => CreateWithManifest(manifest, referencePaths, admitted: null);
+
+    private static MetadataContext CreateWithManifest(
+        MetadataReferenceManifest manifest, ImmutableArray<MetadataReference> admitted)
+        => CreateWithManifest(manifest, null, admitted);
+
+    private static MetadataContext CreateWithManifest(
+        MetadataReferenceManifest manifest,
+        IReadOnlyList<string>? referencePaths,
+        ImmutableArray<MetadataReference>? admitted)
     {
         // Round-2 C1 mitigation: SDK-version-range enforcement. If the running
         // framework is outside the manifest's declared range, hard-fail before
@@ -140,7 +155,7 @@ internal sealed class MetadataContext : IDisposable
         var filtered = FilterAndVerifyReferences(
             GeneratedCSharpCompiler.References,
             manifest);
-        var references = filtered.AddRange(AdmitExplicitReferences(referencePaths, filtered));
+        var references = filtered.AddRange(admitted ?? AdmitExplicitReferences(referencePaths, filtered));
 
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
             .WithNullableContextOptions(NullableContextOptions.Enable);
@@ -161,10 +176,19 @@ internal sealed class MetadataContext : IDisposable
     // verification and cross-module binders) creates its own context; an ambient
     // value gives them all the same reference set without threading it through
     // each construction site. AsyncLocal keeps concurrent compilations apart.
-    private static readonly AsyncLocal<IReadOnlyList<string>?> AmbientReferencePaths = new();
+    // The scope also admits its files once (lazily), so every context and image of
+    // one compilation sees the same assemblies even if a file changes meanwhile.
+    private static readonly AsyncLocal<ReferenceSet?> AmbientReferences = new();
+
+    internal sealed class ReferenceSet(IReadOnlyList<string> paths)
+    {
+        public IReadOnlyList<string> Paths { get; } = paths;
+        public Lazy<ExplicitReference[]> Admitted { get; } = new(() => AdmitExplicit(paths,
+            MetadataReferenceManifest.Load().Assemblies.Select(entry => entry.AssemblyName)).ToArray());
+    }
 
     /// <summary>The explicit references in scope; empty outside a compilation.</summary>
-    internal static IReadOnlyList<string> CurrentReferencePaths => AmbientReferencePaths.Value ?? [];
+    internal static IReadOnlyList<string> CurrentReferencePaths => AmbientReferences.Value?.Paths ?? [];
 
     /// <summary>
     /// Makes <paramref name="referencePaths"/> the explicit references of every
@@ -174,16 +198,17 @@ internal sealed class MetadataContext : IDisposable
     /// </summary>
     internal static ReferenceScope UseReferences(IEnumerable<string>? referencePaths)
     {
-        var previous = AmbientReferencePaths.Value;
-        AmbientReferencePaths.Value = referencePaths?.ToArray() ?? [];
+        var previous = AmbientReferences.Value;
+        var paths = referencePaths?.ToArray() ?? [];
+        AmbientReferences.Value = paths.Length == 0 ? null : new ReferenceSet(paths);
         return new ReferenceScope(previous);
     }
 
     internal readonly struct ReferenceScope : IDisposable
     {
-        private readonly IReadOnlyList<string>? _previous;
-        internal ReferenceScope(IReadOnlyList<string>? previous) => _previous = previous;
-        public void Dispose() => AmbientReferencePaths.Value = _previous;
+        private readonly ReferenceSet? _previous;
+        internal ReferenceScope(ReferenceSet? previous) => _previous = previous;
+        public void Dispose() => AmbientReferences.Value = _previous;
     }
 
     /// <summary>
@@ -253,12 +278,7 @@ internal sealed class MetadataContext : IDisposable
     /// </summary>
     internal static IReadOnlyList<MetadataReference> ProjectionReferences()
     {
-        var paths = CurrentReferencePaths;
-        if (paths.Count == 0)
-            return GeneratedCSharpCompiler.References;
-        var admitted = AdmitExplicit(paths,
-            MetadataReferenceManifest.Load().Assemblies.Select(entry => entry.AssemblyName)).ToArray();
-        if (admitted.Length == 0)
+        if (AmbientReferences.Value?.Admitted.Value is not { Length: > 0 } admitted)
             return GeneratedCSharpCompiler.References;
         lock (ProjectionReferencesLock)
         {
@@ -278,7 +298,7 @@ internal sealed class MetadataContext : IDisposable
         }
     }
 
-    private sealed record ExplicitReference(string AssemblyName, PortableExecutableReference Reference);
+    internal sealed record ExplicitReference(string AssemblyName, PortableExecutableReference Reference);
 
     // One entry per path, replaced when the file's length or write time changes, so a
     // long-lived host (an MSBuild node) holds at most one image per referenced path.

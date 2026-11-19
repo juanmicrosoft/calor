@@ -435,4 +435,122 @@ public class MetadataContextLifecycleTests
         Assert.Equal(before,
             new[] { Lookup("System.Collections.Generic.List`1"), Lookup("System.String") });
     }
+
+    // 0.30 k1: explicit references (CLI -r, the MSBuild task's references,
+    // CompilationOptions.ReferencedAssemblyPaths) are admitted next to the manifest
+    // set. xunit.assert stands in for a framework package: it is in this test host's
+    // TPA but not in the manifest, so it is visible only when listed explicitly.
+    private static readonly string ExplicitAssembly = typeof(Xunit.Assert).Assembly.Location;
+
+    private static string[] ReferencePaths(MetadataContext ctx) =>
+        ctx.HostCompilationForBinder.References
+            .OfType<PortableExecutableReference>()
+            .Select(reference => reference.FilePath ?? "")
+            .ToArray();
+
+    [Fact]
+    public void ExplicitReference_IsVisibleOnlyWhenListed()
+    {
+        using var plain = MetadataContext.Create();
+        Assert.Null(plain.TryResolveType("Xunit.Assert"));
+
+        using var referenced = MetadataContext.Create([ExplicitAssembly]);
+        Assert.NotNull(referenced.TryResolveType("Xunit.Assert"));
+        Assert.Equal(ReferencePaths(plain).Append(ExplicitAssembly), ReferencePaths(referenced));
+    }
+
+    [Fact]
+    public void ExplicitReference_NeverReplacesOrDuplicatesTheManifestSet()
+    {
+        // System.Private.CoreLib is a manifest assembly: listing it (or any System.*
+        // reference assembly a project passes) leaves the reviewed set as it was.
+        using var plain = MetadataContext.Create();
+        using var referenced = MetadataContext.Create([typeof(object).Assembly.Location]);
+        Assert.Equal(ReferencePaths(plain), ReferencePaths(referenced));
+    }
+
+    [Fact]
+    public void ExplicitReferences_OrderAndDuplicatesDoNotMatter()
+    {
+        var other = typeof(Xunit.Sdk.XunitException).Assembly.Location;
+        using var forward = MetadataContext.Create([ExplicitAssembly, other]);
+        using var backward = MetadataContext.Create([other, ExplicitAssembly, ExplicitAssembly]);
+        Assert.Equal(ReferencePaths(forward), ReferencePaths(backward));
+    }
+
+    [Fact]
+    public void ExplicitReferences_MissingOrNotManagedFiles_AreNotAdmitted()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "calor-k1-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var notAssembly = Path.Combine(directory, "NotAnAssembly.dll");
+            File.WriteAllText(notAssembly, "not a PE image");
+            using var plain = MetadataContext.Create();
+            using var referenced = MetadataContext.Create(
+                [notAssembly, Path.Combine(directory, "Missing.dll")]);
+            Assert.Equal(ReferencePaths(plain), ReferencePaths(referenced));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void UseReferences_ScopesTheAmbientSetAndRestoresIt()
+    {
+        string? Lookup()
+        {
+            using var ctx = MetadataContext.Create();
+            return ctx.TryResolveType("Xunit.Assert")?.ToDisplayString();
+        }
+
+        Assert.Null(Lookup());
+        using (MetadataContext.UseReferences([ExplicitAssembly]))
+        {
+            Assert.Equal("Xunit.Assert", Lookup());
+            Assert.Contains(MetadataContext.ProjectionReferences().OfType<PortableExecutableReference>(),
+                reference => reference.FilePath == ExplicitAssembly);
+            // An inner compilation without references does not inherit the outer set.
+            using (MetadataContext.UseReferences(null))
+                Assert.Null(Lookup());
+            Assert.Equal("Xunit.Assert", Lookup());
+        }
+        Assert.Null(Lookup());
+        Assert.Same(Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+            MetadataContext.ProjectionReferences());
+    }
+
+    [Fact]
+    public void Compile_LoadsItsReferencesIntoTheBinder()
+    {
+        // End to end through Program.Compile: the same call binds to metadata only
+        // when the compilation lists the assembly, and stays unknown otherwise.
+        const string source = """
+            module Probe Probe block
+              using Xunit
+              func Check () → void
+                !
+                Assert.True(true)
+            """;
+        CompilationResult Compile(IReadOnlyList<string>? references) =>
+            Program.Compile(source, "probe.calr", new CompilationOptions
+            {
+                UnsafeTranspileOnly = true,
+                ReferencedAssemblyPaths = references
+            });
+
+        var without = Compile(null);
+        Assert.Contains(without.Diagnostics, d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.UnknownExternalCall);
+
+        // Assert.True has no effect contract, so it is still unknown, but now as a
+        // resolved metadata member (Xunit.Assert.True), not as an unresolved name.
+        var with = Compile([ExplicitAssembly]);
+        Assert.Contains(with.Diagnostics, d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.UnknownExternalCall
+            && d.Message.Contains("Xunit.Assert.True"));
+        Assert.Contains(with.Diagnostics.Errors,
+            d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
+    }
 }
