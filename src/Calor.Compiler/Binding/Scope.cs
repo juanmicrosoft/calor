@@ -1621,6 +1621,19 @@ public sealed class OverloadResolutionResult
     public IReadOnlyList<ResolvedOverloadMatch> Matches { get; }
     internal bool ReplacesNativeOverloadError { get; }
     internal bool HasOpaqueOverloads { get; private init; }
+    /// <summary>
+    /// 0.30: the choice rests on a comparison or an applicability check outside what this
+    /// binder models (a user type, an interface, a later C# tie-breaker). The caller keeps it
+    /// only when Roslyn's selection in the module's C# projection confirms it.
+    /// </summary>
+    internal bool NeedsConfirmation { get; private init; }
+
+    internal OverloadResolutionResult RequiringConfirmation() =>
+        new(Kind, Function, ResolvedReturnType, Candidates, Functions, Matches, ReplacesNativeOverloadError)
+        {
+            HasOpaqueOverloads = HasOpaqueOverloads,
+            NeedsConfirmation = true
+        };
 
     private OverloadResolutionResult(
         OverloadResolutionKind kind,
@@ -1905,7 +1918,8 @@ public sealed class Scope
         Func<int, string, string, int?>? argumentConversionCost = null,
         Func<int, string, string, bool>? isBetterArgumentConversionTarget = null,
         Func<int, string, string, int?>? compareArgumentConversions = null,
-        Func<int, string, bool>? requiresExactBetterness = null)
+        Func<int, string, bool>? requiresExactBetterness = null,
+        Func<string, string, bool>? isConversionModeled = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(argumentTypes);
@@ -1927,11 +1941,15 @@ public sealed class Scope
                     argumentConversionCost,
                     isBetterArgumentConversionTarget,
                     compareArgumentConversions,
-                    requiresExactBetterness)
+                    requiresExactBetterness,
+                    isConversionModeled)
                 ?? OverloadResolutionResult.NotFound();
         }
 
         var applicable = new List<ApplicableOverload>();
+        // A candidate rejected at a conversion this binder does not model (boxing to an
+        // interface, a user-defined conversion, a user struct under `?`) may be applicable in C#.
+        var possiblyApplicableElsewhere = false;
         foreach (var function in overloads)
         {
             if (TryMatch(
@@ -1949,7 +1967,9 @@ public sealed class Scope
                     out var usesNullableStringCompatibility,
                     out var mappedArguments,
                     out var substitutedParameterTypes,
-                    out var usesExpandedParams))
+                    out var usesExpandedParams,
+                    isConversionModeled,
+                    out var unmodeledRejection))
             {
                 applicable.Add(new ApplicableOverload(
                     function,
@@ -1959,6 +1979,10 @@ public sealed class Scope
                     mappedArguments,
                     substitutedParameterTypes,
                     usesExpandedParams));
+            }
+            else
+            {
+                possiblyApplicableElsewhere |= unmodeledRejection;
             }
         }
 
@@ -1978,6 +2002,7 @@ public sealed class Scope
         // exactly, or reported ambiguous exactly when C# reports it, or left opaque. Any other
         // call with several candidates is resolved exactly when every comparison is known, and
         // otherwise falls back to the rules below.
+        var exactUndecided = false;
         if (compareArgumentConversions != null)
         {
             var exactRequired = requiresExactBetterness != null && applicable.Any(candidate =>
@@ -1986,135 +2011,163 @@ public sealed class Scope
             if (exactRequired || applicable.Count > 1)
             {
                 var exact = ResolveExactOverload(applicable, argumentTypes.Count, compareArgumentConversions);
-                if (exact.Winner is { } winner)
-                    return OverloadResolutionResult.Resolved(winner.Function, winner.ReturnType, winner.Arguments);
+                if (exact.Winners is [var winner])
+                {
+                    var exactResult = OverloadResolutionResult.Resolved(winner.Function, winner.ReturnType, winner.Arguments);
+                    return possiblyApplicableElsewhere ? exactResult.RequiringConfirmation() : exactResult;
+                }
+                if (exact.Winners.Count > 1)
+                {
+                    // One declaration per configuration: `#if` alternatives with one signature.
+                    var returnTypes = exact.Winners.Select(item => TypeIdentity.Canonicalize(item.ReturnType))
+                        .Distinct(StringComparer.Ordinal).ToArray();
+                    var alternatives = OverloadResolutionResult.ResolvedAlternatives(
+                        exact.Winners.Select(item => item.Function).ToArray(),
+                        returnTypes.Length == 1 ? returnTypes[0] : "OBJECT",
+                        exact.Winners.Select(item => new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                            .ToArray());
+                    return possiblyApplicableElsewhere ? alternatives.RequiringConfirmation() : alternatives;
+                }
                 if (exact.IsAmbiguous)
                     return OverloadResolutionResult.Ambiguous(applicable.Select(item => item.Function).ToArray());
                 if (exactRequired)
                     return OverloadResolutionResult.Opaque();
+                exactUndecided = true;
             }
         }
 
-        // A new literal conversion can introduce crossed preferences that a summed score hides.
-        var best = usesArgumentValueConversion
-            ? applicable.ToArray()
-            : applicable.Where(item => item.Score == bestScore).ToArray();
-        if (best.Length == 1)
-            return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+        // The rules below sum conversion costs, which is not C#'s rule. Their choice among
+        // several candidates whose comparison is unknown, or any choice while a rejected
+        // candidate may apply in C#, stands only when Roslyn confirms it.
+        var legacy = ResolveByCost();
+        return (exactUndecided || possiblyApplicableElsewhere) && isConversionModeled != null
+            && legacy.Kind == OverloadResolutionKind.Resolved
+                ? legacy.RequiringConfirmation()
+                : legacy;
 
-        if (isBetterArgumentConversionTarget != null
-            || isBetterNullConversionTarget != null
-            && argumentTypes.Any(type => string.Equals(
-                TypeIdentity.Canonicalize(type), "NULL", StringComparison.Ordinal)))
+        OverloadResolutionResult ResolveByCost()
         {
-            var undominated = best
-                .Where(candidate => !best.Any(other =>
-                    !ReferenceEquals(candidate.Function, other.Function)
-                    && IsBetterConversionCandidate(
-                        other,
-                        candidate,
-                        argumentTypes.Count,
-                        IsBetterArgumentTarget)))
-                .ToArray();
-            if (undominated.Length != 0 && undominated.Length < best.Length)
-            {
-                best = undominated;
-                if (best.Length == 1)
-                {
-                    return OverloadResolutionResult.Resolved(
-                        best[0].Function,
-                        best[0].ReturnType,
-                        best[0].Arguments);
-                }
-            }
-        }
-
-        if (usesArgumentValueConversion)
-        {
-            best = best.Where(candidate => !best.Any(other => other.Score < candidate.Score
-                && candidate.Arguments.Select(argument => TypeIdentity.Canonicalize(argument.ParameterType))
-                    .SequenceEqual(other.Arguments.Select(argument =>
-                        TypeIdentity.Canonicalize(argument.ParameterType))))).ToArray();
+            // A new literal conversion can introduce crossed preferences that a summed score hides.
+            var best = usesArgumentValueConversion
+                ? applicable.ToArray()
+                : applicable.Where(item => item.Score == bestScore).ToArray();
             if (best.Length == 1)
                 return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
-        }
 
-        best = best.Where(candidate => candidate.Function.GenericArity == 0
-            || !best.Any(other => other.Function.GenericArity == 0
-                && HaveEquivalentParameterShapes(other, candidate))).ToArray();
-        if (best.Length == 1)
-            return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
-
-        var concreteNullableStringGroups = best
-            .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
-            .GroupBy(item => item.Function.SignatureKey, StringComparer.Ordinal)
-            .Where(group =>
+            if (isBetterArgumentConversionTarget != null
+                || isBetterNullConversionTarget != null
+                && argumentTypes.Any(type => string.Equals(
+                    TypeIdentity.Canonicalize(type), "NULL", StringComparison.Ordinal)))
             {
-                var candidates = group.Select(item => item.Function).ToArray();
-                return candidates
-                    .Skip(1)
-                    .All(candidate => candidates
-                        .Where(other => !ReferenceEquals(other, candidate))
-                        .All(other => AreMutuallyExclusiveAlternatives(candidate, other)));
-            })
-            .Select(group => group.ToArray())
-            .ToArray();
-        if (concreteNullableStringGroups.Length == 1)
-        {
-            var selected = concreteNullableStringGroups[0];
-            var selectedFunctions = selected.Select(item => item.Function).ToHashSet();
-            if (best.Where(item => !selectedFunctions.Contains(item.Function))
-                .All(item => item.Function.GenericArity > 0))
-            {
-                if (selected.Length == 1)
+                var undominated = best
+                    .Where(candidate => !best.Any(other =>
+                        !ReferenceEquals(candidate.Function, other.Function)
+                        && IsBetterConversionCandidate(
+                            other,
+                            candidate,
+                            argumentTypes.Count,
+                            IsBetterArgumentTarget)))
+                    .ToArray();
+                if (undominated.Length != 0 && undominated.Length < best.Length)
                 {
-                    return OverloadResolutionResult.Resolved(
-                        selected[0].Function,
-                        selected[0].ReturnType,
-                        selected[0].Arguments);
+                    best = undominated;
+                    if (best.Length == 1)
+                    {
+                        return OverloadResolutionResult.Resolved(
+                            best[0].Function,
+                            best[0].ReturnType,
+                            best[0].Arguments);
+                    }
                 }
+            }
 
-                var alternativeReturnTypes = selected
+            if (usesArgumentValueConversion)
+            {
+                best = best.Where(candidate => !best.Any(other => other.Score < candidate.Score
+                    && candidate.Arguments.Select(argument => TypeIdentity.Canonicalize(argument.ParameterType))
+                        .SequenceEqual(other.Arguments.Select(argument =>
+                            TypeIdentity.Canonicalize(argument.ParameterType))))).ToArray();
+                if (best.Length == 1)
+                    return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+            }
+
+            best = best.Where(candidate => candidate.Function.GenericArity == 0
+                || !best.Any(other => other.Function.GenericArity == 0
+                    && HaveEquivalentParameterShapes(other, candidate))).ToArray();
+            if (best.Length == 1)
+                return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+
+            var concreteNullableStringGroups = best
+                .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
+                .GroupBy(item => item.Function.SignatureKey, StringComparer.Ordinal)
+                .Where(group =>
+                {
+                    var candidates = group.Select(item => item.Function).ToArray();
+                    return candidates
+                        .Skip(1)
+                        .All(candidate => candidates
+                            .Where(other => !ReferenceEquals(other, candidate))
+                            .All(other => AreMutuallyExclusiveAlternatives(candidate, other)));
+                })
+                .Select(group => group.ToArray())
+                .ToArray();
+            if (concreteNullableStringGroups.Length == 1)
+            {
+                var selected = concreteNullableStringGroups[0];
+                var selectedFunctions = selected.Select(item => item.Function).ToHashSet();
+                if (best.Where(item => !selectedFunctions.Contains(item.Function))
+                    .All(item => item.Function.GenericArity > 0))
+                {
+                    if (selected.Length == 1)
+                    {
+                        return OverloadResolutionResult.Resolved(
+                            selected[0].Function,
+                            selected[0].ReturnType,
+                            selected[0].Arguments);
+                    }
+
+                    var alternativeReturnTypes = selected
+                        .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray();
+                    return OverloadResolutionResult.ResolvedAlternatives(
+                        selected.Select(item => item.Function).ToArray(),
+                        alternativeReturnTypes.Length == 1
+                            ? alternativeReturnTypes[0]
+                            : "OBJECT",
+                        selected.Select(item =>
+                                new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                            .ToArray());
+                }
+            }
+
+            var bestFunctions = best.Select(item => item.Function).ToArray();
+            if (bestFunctions
+                .Skip(1)
+                .All(candidate =>
+                    string.Equals(
+                        candidate.SignatureKey,
+                        bestFunctions[0].SignatureKey,
+                        StringComparison.Ordinal)
+                    && bestFunctions
+                        .Where(other => !ReferenceEquals(other, candidate))
+                        .All(other => AreMutuallyExclusiveAlternatives(candidate, other))))
+            {
+                var alternativeReturnTypes = best
                     .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
                     .Distinct(StringComparer.Ordinal)
                     .ToArray();
                 return OverloadResolutionResult.ResolvedAlternatives(
-                    selected.Select(item => item.Function).ToArray(),
+                    bestFunctions,
                     alternativeReturnTypes.Length == 1
                         ? alternativeReturnTypes[0]
                         : "OBJECT",
-                    selected.Select(item =>
-                            new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                    best.Select(item => new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
                         .ToArray());
             }
-        }
 
-        var bestFunctions = best.Select(item => item.Function).ToArray();
-        if (bestFunctions
-            .Skip(1)
-            .All(candidate =>
-                string.Equals(
-                    candidate.SignatureKey,
-                    bestFunctions[0].SignatureKey,
-                    StringComparison.Ordinal)
-                && bestFunctions
-                    .Where(other => !ReferenceEquals(other, candidate))
-                    .All(other => AreMutuallyExclusiveAlternatives(candidate, other))))
-        {
-            var alternativeReturnTypes = best
-                .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-            return OverloadResolutionResult.ResolvedAlternatives(
-                bestFunctions,
-                alternativeReturnTypes.Length == 1
-                    ? alternativeReturnTypes[0]
-                    : "OBJECT",
-                best.Select(item => new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
-                    .ToArray());
+            return OverloadResolutionResult.Ambiguous(bestFunctions);
         }
-
-        return OverloadResolutionResult.Ambiguous(bestFunctions);
 
         bool IsBetterArgumentTarget(int index, string candidateType, string otherType)
         {
@@ -2140,7 +2193,7 @@ public sealed class Scope
     /// parameter types go through C#'s first tie-breakers. With no winner the call is
     /// ambiguous only when no candidate's status was left unknown.
     /// </summary>
-    private static (ApplicableOverload? Winner, bool IsAmbiguous) ResolveExactOverload(
+    private static (IReadOnlyList<ApplicableOverload> Winners, bool IsAmbiguous) ResolveExactOverload(
         IReadOnlyList<ApplicableOverload> applicable, int argumentCount, Func<int, string, string, int?> compare)
     {
         bool? Better(ApplicableOverload candidate, ApplicableOverload other)
@@ -2184,7 +2237,15 @@ public sealed class Scope
 
         if (applicable.Any(candidate => candidate.Arguments.Count != argumentCount
                 || candidate.Arguments.Select((argument, index) => argument.ArgumentIndex != index).Any(moved => moved)))
-            return (null, false);
+            return ([], false);
+
+        // `#if` alternatives with one signature are one candidate: only one exists in any
+        // configuration, so they never compete with each other.
+        bool Alternatives(ApplicableOverload left, ApplicableOverload right) =>
+            AreMutuallyExclusiveAlternatives(left.Function, right.Function)
+            && left.Arguments.Count == right.Arguments.Count
+            && left.Arguments.Zip(right.Arguments).All(pair =>
+                TypeIdentity.Canonicalize(pair.First.ParameterType) == TypeIdentity.Canonicalize(pair.Second.ParameterType));
 
         var winners = new List<ApplicableOverload>();
         var anyUndecided = false;
@@ -2193,7 +2254,7 @@ public sealed class Scope
             var status = (bool?)true;
             foreach (var other in applicable)
             {
-                if (ReferenceEquals(candidate, other))
+                if (ReferenceEquals(candidate, other) || Alternatives(candidate, other))
                     continue;
                 var better = Better(candidate, other);
                 if (better == false)
@@ -2210,11 +2271,14 @@ public sealed class Scope
                 anyUndecided = true;
         }
 
-        if (winners.Count == 1)
-            return (winners[0], false);
+        if (winners.Count == 1 || winners.Count > 1
+            && winners.All(left => winners.All(right => ReferenceEquals(left, right) || Alternatives(left, right))))
+            return (winners, false);
+        if (winners.Count > 1)
+            return ([], false);
         // No winner and every comparison known: C# reports the call ambiguous too (a pair whose
         // comparison is unknown would need to be the winner's, and none could win anyway).
-        return (null, winners.Count == 0 && !anyUndecided);
+        return ([], !anyUndecided);
     }
 
     private sealed record ApplicableOverload(
@@ -2377,8 +2441,11 @@ public sealed class Scope
         out bool usesNullableStringCompatibility,
         out IReadOnlyList<ResolvedArgumentMapping> mappedArguments,
         out IReadOnlyList<string> substitutedParameterTypes,
-        out bool usesExpandedParams)
+        out bool usesExpandedParams,
+        Func<string, string, bool>? isConversionModeled,
+        out bool unmodeledRejection)
     {
+        unmodeledRejection = false;
         resolvedReturnType = function.ReturnType;
         score = int.MaxValue;
         usesNullableStringCompatibility = false;
@@ -2454,6 +2521,9 @@ public sealed class Scope
                         : implicitConversionCost?.Invoke(resolvedParameterType, argumentTypes[argumentIndex]);
                 if (conversionCost == null)
                 {
+                    // Rejected at a conversion this binder may not model: C# might accept it.
+                    unmodeledRejection |= isConversionModeled != null
+                        && !isConversionModeled(resolvedParameterType, argumentTypes[argumentIndex]);
                     matches = false;
                     break;
                 }
@@ -2461,11 +2531,14 @@ public sealed class Scope
                 conversionScore += conversionCost.Value;
             }
 
-            if (!matches
-                || function.TypeParameters.Any(typeParameter => !substitutions.ContainsKey(typeParameter)))
+            if (matches && function.TypeParameters.Any(typeParameter => !substitutions.ContainsKey(typeParameter)))
             {
+                // Type inference this binder did not complete is not a C# rejection.
+                unmodeledRejection |= isConversionModeled != null;
                 continue;
             }
+            if (!matches)
+                continue;
 
             score =
                 (mapping.UsesExpandedParams ? 200 : 0)

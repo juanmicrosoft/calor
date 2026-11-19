@@ -90,6 +90,8 @@ public sealed class CallGraphAnalysis
         internal Dictionary<ExpressionNode, string> ResultTypes { get; } = new(ReferenceEqualityComparer.Instance);
         internal List<string> Failures { get; } = [];
         internal Dictionary<TextSpan, SourceCallSelection> SelectedCalls { get; } = [];
+        /// <summary>The Calor declaration of each source method and constructor symbol, in every configuration's compilation.</summary>
+        internal Dictionary<ISymbol, AstNode> SourceDeclarations { get; } = new(SymbolEqualityComparer.Default);
         internal Dictionary<TextSpan, SourceDispatchSelection?> SourceDispatches { get; } = [];
         internal HashSet<string> FunctionsRequiringDispatchProof { get; } = [];
         internal HashSet<TextSpan> SourceExtensionCalls { get; } = [];
@@ -915,7 +917,25 @@ public sealed class CallGraphAnalysis
             var root = tree.GetRoot();
             var methods = new Dictionary<ISymbol, AstNode>(SymbolEqualityComparer.Default);
             foreach (var (method, origin) in companionMethods)
+            {
                 methods[method] = origin;
+                bindings.SourceDeclarations[method] = origin;
+            }
+            // A record's synthesized base call, recorded like an explicit initializer: a
+            // configuration that selects another constructor makes the selection conflicting.
+            void SetRecordInitializer(ConstructorNode constructor, IMethodSymbol target)
+            {
+                if (conflictingConstructorInitializers.Contains(constructor))
+                    return;
+                if (bindings.ConstructorInitializers.TryGetValue(constructor, out var previous)
+                    && !SameInitializationMethod(previous, target))
+                {
+                    conflictingConstructorInitializers.Add(constructor);
+                    bindings.ConstructorInitializers.Remove(constructor);
+                    return;
+                }
+                bindings.ConstructorInitializers[constructor] = target;
+            }
             var events = new Dictionary<ISymbol, EventDefinitionNode>(SymbolEqualityComparer.Default);
             foreach (var declaration in root.DescendantNodes().OfType<EventFieldDeclarationSyntax>())
             {
@@ -959,7 +979,10 @@ public sealed class CallGraphAnalysis
                     {
                         var origin = emittedCallables[index];
                         if (origin is not DelegateDefinitionNode)
+                        {
                             methods[method] = origin;
+                            bindings.SourceDeclarations[method] = origin;
+                        }
                         if (initializationIds.TryGetValue(origin, out var functionId))
                         {
                             bindings.InitializationFunctions[method.OriginalDefinition] = functionId;
@@ -1508,7 +1531,8 @@ public sealed class CallGraphAnalysis
                     && candidates.Prepend(info.Symbol as IMethodSymbol).Any(method => method is
                         { IsExtensionMethod: true } && method.Locations.Any(location => location.IsInSource)))
                     bindings.SourceExtensionCalls.Add(extensionCall.Span);
-                if (!candidates.Any(candidate => methods.ContainsKey(candidate.OriginalDefinition))
+                // A reduced extension candidate (`color.Take(value)`) is declared as its static form.
+                if (!candidates.Any(candidate => methods.ContainsKey((candidate.ReducedFrom ?? candidate).OriginalDefinition))
                     || !model.GetDiagnostics(syntax.Span).Any(diagnostic => diagnostic.Id == "CS0121"))
                     continue;
                 var arguments = syntax switch
@@ -1837,6 +1861,7 @@ public sealed class CallGraphAnalysis
                         if (part.Origin.RecordPrimaryConstructor is { } primaryOrigin && primary != null)
                         {
                             methods[primary.OriginalDefinition] = primaryOrigin;
+                            bindings.SourceDeclarations[primary.OriginalDefinition] = primaryOrigin;
                             bindings.InitializationFunctions[primary.OriginalDefinition] =
                                 $"{part.Origin.Name}.{primaryOrigin.Id}";
                             if (record.BaseList?.Types.OfType<PrimaryConstructorBaseTypeSyntax>()
@@ -1844,7 +1869,7 @@ public sealed class CallGraphAnalysis
                                     .OfType<IInvocationOperation>().Take(2).ToArray() is [var baseCall]
                                 && !model.GetDiagnostics(baseCall.Syntax.Span).Any(diagnostic =>
                                     diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
-                                bindings.ConstructorInitializers[primaryOrigin] = baseCall.TargetMethod;
+                                SetRecordInitializer(primaryOrigin, baseCall.TargetMethod);
                         }
                         var copies = type.InstanceConstructors.Where(constructor =>
                             constructor.IsImplicitlyDeclared && constructor.Parameters is [var original]
@@ -1853,6 +1878,7 @@ public sealed class CallGraphAnalysis
                         if (part.Origin.RecordCopyConstructor is { } copyOrigin && copy != null)
                         {
                             methods[copy.OriginalDefinition] = copyOrigin;
+                            bindings.SourceDeclarations[copy.OriginalDefinition] = copyOrigin;
                             bindings.InitializationFunctions[copy.OriginalDefinition] =
                                 $"{part.Origin.Name}.{copyOrigin.Id}";
                             bindings.RecordCopyConstructors.Add(copyOrigin);
@@ -1861,7 +1887,7 @@ public sealed class CallGraphAnalysis
                                 && SymbolEqualityComparer.Default.Equals(original.Type, type.BaseType)
                                 && compilation.IsSymbolAccessibleWithin(constructor, type)).Take(2).ToArray();
                             if (baseCopies is [var baseCopy])
-                                bindings.ConstructorInitializers[copyOrigin] = baseCopy;
+                                SetRecordInitializer(copyOrigin, baseCopy);
                         }
                     }
                 foreach (var (type, parts) in declarations)
@@ -1946,7 +1972,7 @@ public sealed class CallGraphAnalysis
                         type.IsValueType, hasImplicitStaticConstructor);
                     if (part.Origin is { BaseClass: not null, RecordPrimaryConstructor: { Initializer: null } primary }
                         && baseConstructor != null)
-                        bindings.ConstructorInitializers[primary] = baseConstructor;
+                        SetRecordInitializer(primary, baseConstructor);
 
                     void AddInitializer(EqualsValueClauseSyntax? initializer, bool isStatic)
                     {
