@@ -2610,6 +2610,8 @@ public sealed class CallGraphAnalysis
     {
         // The bound module the index was read from; null when binding threw.
         internal BoundModule? Module { get; set; }
+        // The binder's source-call bindings for this module, when it computed them.
+        internal OperatorBindings? SourceOperatorBindings { get; set; }
         internal Dictionary<string, FunctionNode> ExternalSourceFunctions { get; } = [];
         internal Dictionary<(string CallerId, int Start, int End), SourceArgumentSelection>
             SourceArguments
@@ -3456,10 +3458,15 @@ public sealed class CallGraphAnalysis
             }
         }
 
-        var operatorBindings = ResolveOperatorCalls(ast, contractMode: projectionContractMode,
-            singleModuleContext: crossModuleFunctions == null,
-            crossModuleTypes: crossModuleTypes, sourcePath: sourcePath,
-            crossModuleFunctions: crossModuleFunctions);
+        // Without cross-module functions this is exactly the binder's own call (same module,
+        // contract mode, cross-module types and source path), so its result is reused rather
+        // than compiling and binding the projection a second time.
+        var operatorBindings = crossModuleFunctions == null && boundValues.SourceOperatorBindings is { } computed
+            ? computed
+            : ResolveOperatorCalls(ast, contractMode: projectionContractMode,
+                singleModuleContext: crossModuleFunctions == null,
+                crossModuleTypes: crossModuleTypes, sourcePath: sourcePath,
+                crossModuleFunctions: crossModuleFunctions);
         foreach (var (site, call) in boundValues.ComputedMemberCalls)
         {
             if (call.SourceStaticMethodOwner is not { } owner)
@@ -3676,6 +3683,7 @@ public sealed class CallGraphAnalysis
             var boundModule = binder.Bind(ast, contractInheritance);
             boundValues.Complete = true;
             boundValues.Module = boundModule;
+            boundValues.SourceOperatorBindings = binder.ComputedSourceCallBindings(ast);
             var incompatibleCallSpans = diagnostics
                 .Where(diagnostic =>
                     diagnostic.Code is Calor.Compiler.Diagnostics.DiagnosticCode.NoMatchingOverload

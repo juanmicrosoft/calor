@@ -7179,6 +7179,13 @@ public sealed class Binder
         return BindFunctionValueCall(call, BindExpression(call.TargetExpression));
     }
 
+    /// <summary>
+    /// The source-call bindings this binder already computed for <paramref name="module"/>, or
+    /// null. The call graph reuses them instead of compiling the same projection again.
+    /// </summary>
+    internal CallGraphAnalysis.OperatorBindings? ComputedSourceCallBindings(ModuleNode module) =>
+        ReferenceEquals(_asyncTypeModule, module) ? _sourceCallConversions : null;
+
     [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(_sourceCallConversions))]
     private CallGraphAnalysis.OperatorBindings SourceCallBindings() =>
         _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(

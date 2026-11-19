@@ -630,9 +630,21 @@ public sealed class CSharpToCalorConverter
     private ConversionResult ConvertWithContext(
         string csharpSource, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
     {
-        var result = ConvertCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
-        result = TryConvertObliviousModule(csharpSource, sourceFile, result,
-            cancellationToken, capturePreservationContext);
+        // An annotation-disabled module certifies only in its oblivious form (see
+        // ObliviousCertificationFirst), so that form is tried first. The annotated
+        // conversion runs only when the oblivious one does not certify, and the
+        // oblivious candidate already evaluated is then reused, not converted again.
+        var obliviousFirst = ObliviousCertificationFirst(
+            csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+        ConversionResult result;
+        if (obliviousFirst?.Verified is { } verified)
+            result = verified;
+        else
+        {
+            result = ConvertCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+            result = TryConvertObliviousModule(csharpSource, sourceFile, result,
+                cancellationToken, capturePreservationContext, evaluated: obliviousFirst);
+        }
         if (_options.Fidelity != ConversionFidelity.Lossless
             || (result.Success && !result.Losses.Any(loss => loss.IsSemanticLoss)))
             return result;
@@ -640,57 +652,164 @@ public sealed class CSharpToCalorConverter
         return PreserveOriginal(csharpSource, sourceFile, result, cancellationToken);
     }
 
-    private ConversionResult TryConvertObliviousModule(
-        string source, string? sourceFile, ConversionResult attempted,
-        CancellationToken cancellationToken, bool capturePreservationContext,
-        bool allowScopedNamespaceImports = false)
+    /// <summary>
+    /// The original compilation an oblivious module is certified against, or null when the
+    /// module needs no oblivious certification (its declarations carry no oblivious metadata,
+    /// or the original does not compile).
+    /// </summary>
+    private sealed record ObliviousOriginal(
+        CSharpParseOptions ParseOptions, SyntaxTree Tree, CompilationUnitSyntax Root,
+        CSharpCompilation Compilation, SemanticModel Model, string[] Before, OutputKind OutputKind)
+    {
+        /// <summary>
+        /// One module policy cannot represent lexical changes of annotation context: a nullable
+        /// directive anywhere, or any annotation-enabled position.
+        /// </summary>
+        internal bool HasLexicalNullableContext =>
+            Root.DescendantTrivia(descendIntoTrivia: true)
+                .Any(trivia => trivia.GetStructure() is NullableDirectiveTriviaSyntax)
+            || Root.DescendantNodes().OfType<TypeSyntax>().Any(type =>
+                Model.GetNullableContext(type.SpanStart).HasFlag(NullableContext.AnnotationsEnabled));
+    }
+
+    /// <summary>The evaluated oblivious candidate and every outcome its certification reports.</summary>
+    private sealed record ObliviousCandidate(
+        OutputKind OutputKind, ConversionResult Conversion, bool Admissible,
+        CompilationResult? Compiled, bool MetadataMatched, Diagnostic[] GeneratedErrors)
+    {
+        internal bool Certified => Admissible && Compiled is { HasErrors: false } && MetadataMatched;
+
+        internal ConversionResult? Verified { get; init; }
+    }
+
+    private ObliviousOriginal? PrepareObliviousOriginal(
+        string source, string? sourceFile, OutputKind outputKind, CancellationToken cancellationToken)
     {
         if (_options.Fidelity != ConversionFidelity.Lossless
             || !_options.ValidateRoundTripCSharp
             || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches
             || _options.References.Any(reference => !File.Exists(reference.Path)))
-            return attempted;
+            return null;
 
         var parseOptions = GetEffectiveParseOptions(sourceFile);
         if (parseOptions.Kind != SourceCodeKind.Regular)
-            return attempted;
+            return null;
         var tree = CSharpSyntaxTree.ParseText(source, parseOptions, sourceFile ?? "",
             cancellationToken: cancellationToken);
         var root = tree.GetCompilationUnitRoot(cancellationToken);
         if (root.ContainsDiagnostics)
-            return attempted;
+            return null;
         var original = CSharpCompilation.Create("ObliviousModuleAnalysis",
             GeneratedCSharpCompiler.AddImplicitUsings(
                 new[] { tree }.Concat(_options.AdditionalSemanticSyntaxTrees
                     .Where(sibling => !IsSameSyntaxTree(sibling, tree))),
                 _options.IncludeImplicitSystemUsing),
             GetSemanticMetadataReferences(),
-            new CSharpCompilationOptions(
-                Enum.TryParse<OutputKind>(attempted.Metadata.OutputKind, out var outputKind)
-                    ? outputKind : _options.OutputKind, allowUnsafe: true)
+            new CSharpCompilationOptions(outputKind, allowUnsafe: true)
                 .WithNullableContextOptions(_options.NullableContextOptions ?? NullableContextOptions.Disable));
         var model = original.GetSemanticModel(tree);
         if (original.GetDiagnostics(cancellationToken).Any(diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error))
-            return attempted;
+            return null;
         var before = DeclaredTypeMetadata(model, root);
         if (!before.Any(record => record.Contains("[None]", StringComparison.Ordinal)))
+            return null;
+        return new(parseOptions, tree, root, original, model, before, outputKind);
+    }
+
+    /// <summary>
+    /// Compiles generated C# inside the original compilation (its references with their aliases,
+    /// and sibling project trees) and compares declared type/nullability metadata.
+    /// </summary>
+    private static bool ObliviousMetadataMatches(
+        ObliviousOriginal original, string generated, out Diagnostic[] errors, CancellationToken cancellationToken)
+    {
+        var generatedTree = CSharpSyntaxTree.ParseText(generated, original.ParseOptions,
+            cancellationToken: cancellationToken);
+        var compilation = original.Compilation.ReplaceSyntaxTree(original.Tree, generatedTree);
+        errors = compilation.GetDiagnostics(cancellationToken)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        return errors.Length == 0
+            && original.Before.SequenceEqual(DeclaredTypeMetadata(compilation.GetSemanticModel(generatedTree),
+                generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal);
+    }
+
+    private ObliviousCandidate EvaluateObliviousCandidate(
+        string source, string? sourceFile, ObliviousOriginal original, CancellationToken cancellationToken,
+        bool capturePreservationContext, bool allowScopedNamespaceImports)
+    {
+        var candidate = ConvertCore(source, sourceFile, cancellationToken, capturePreservationContext,
+            originalSemanticModel: original.Model, allowScopedNamespaceImports: allowScopedNamespaceImports,
+            obliviousModule: true);
+        var entirelyNative = candidate.InteropPreservationCount == 0 && candidate.Losses.Count == 0;
+        var directPreservation = candidate.InteropPreservationCount > 0 && candidate.Losses.Count > 0
+            && candidate.Losses.All(loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Path == ConversionPath.Interop);
+        if (!candidate.Success || !(entirelyNative || directPreservation)
+            || candidate.CalorSource is not { } calorSource)
+            return new(original.OutputKind, candidate, Admissible: false, Compiled: null,
+                MetadataMatched: false, GeneratedErrors: []);
+        // Reparse the actual deliverable and enforce the normal binder/effect
+        // checks. No unchecked output can authorize this recovery: the generated
+        // C# is compiled in the original context by ObliviousMetadataMatches below.
+        var compiled = Program.Compile(calorSource, sourceFile, new CompilationOptions
+        {
+            IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+            ProjectDirectory = _options.ProjectDirectory,
+            DeferGeneratedOutputValidation = true,
+            CancellationToken = cancellationToken
+        });
+        if (compiled.HasErrors)
+            return new(original.OutputKind, candidate, Admissible: true, compiled,
+                MetadataMatched: false, GeneratedErrors: []);
+        var matched = ObliviousMetadataMatches(original, compiled.GeneratedCode, out var generatedErrors,
+            cancellationToken);
+        return new(original.OutputKind, candidate, Admissible: true, compiled, matched, generatedErrors);
+    }
+
+    /// <summary>
+    /// The oblivious certification, tried before the annotated conversion. It applies only to a
+    /// module whose original has oblivious declarations and no lexical nullable context. For such
+    /// a module the annotated conversion cannot certify: its C# is emitted under
+    /// <c>#nullable enable</c> (the module is not marked oblivious and the original carries no
+    /// directive to preserve), and no declaration under an enabled annotation context has the
+    /// oblivious (<c>None</c>) annotation the original's declarations have. So the result is the
+    /// one <see cref="TryConvertObliviousModule"/> would reach after converting twice.
+    /// </summary>
+    private ObliviousCandidate? ObliviousCertificationFirst(
+        string source, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
+    {
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        if (parseOptions.Kind != SourceCodeKind.Regular)
+            return null;
+        // ConvertCore's own rule for a regular file.
+        var outputKind = CSharpSyntaxTree.ParseText(source, parseOptions, cancellationToken: cancellationToken)
+            .GetCompilationUnitRoot(cancellationToken).Members.OfType<GlobalStatementSyntax>().Any()
+            ? OutputKind.ConsoleApplication
+            : _options.OutputKind;
+        if (PrepareObliviousOriginal(source, sourceFile, outputKind, cancellationToken) is not { } original
+            || original.HasLexicalNullableContext)
+            return null;
+        var evaluated = EvaluateObliviousCandidate(source, sourceFile, original, cancellationToken,
+            capturePreservationContext, allowScopedNamespaceImports: false);
+        if (!evaluated.Certified)
+            return evaluated;
+        evaluated.Conversion.Context.RoundTrip = ConversionRoundTrip.Verified;
+        return evaluated with { Verified = evaluated.Conversion };
+    }
+
+    private ConversionResult TryConvertObliviousModule(
+        string source, string? sourceFile, ConversionResult attempted,
+        CancellationToken cancellationToken, bool capturePreservationContext,
+        bool allowScopedNamespaceImports = false, ObliviousCandidate? evaluated = null)
+    {
+        var outputKind = Enum.TryParse<OutputKind>(attempted.Metadata.OutputKind, out var attemptedKind)
+            ? attemptedKind : _options.OutputKind;
+        if (PrepareObliviousOriginal(source, sourceFile, outputKind, cancellationToken) is not { } original)
             return attempted;
 
-        bool MetadataMatches(string generated, out Diagnostic[] errors)
-        {
-            var generatedTree = CSharpSyntaxTree.ParseText(generated, parseOptions,
-                cancellationToken: cancellationToken);
-            var compilation = original.ReplaceSyntaxTree(tree, generatedTree);
-            errors = compilation.GetDiagnostics(cancellationToken)
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-            return errors.Length == 0
-                && before.SequenceEqual(DeclaredTypeMetadata(compilation.GetSemanticModel(generatedTree),
-                    generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal);
-        }
-
         // The certification compiles check the binder and effects here, and check the
-        // generated C# in MetadataMatches, which compiles it inside the original compilation
+        // generated C# in ObliviousMetadataMatches, which compiles it inside the original compilation
         // (its references with their aliases, and sibling project trees). Program.Compile's
         // own standalone C# validation has neither, so a call into a referenced assembly or a
         // sibling type failed it and a faithful native conversion was preserved whole.
@@ -705,7 +824,8 @@ public sealed class CSharpToCalorConverter
                 DeferGeneratedOutputValidation = true,
                 CancellationToken = cancellationToken
             });
-            if (!compiledCurrent.HasErrors && MetadataMatches(compiledCurrent.GeneratedCode, out _))
+            if (!compiledCurrent.HasErrors
+                && ObliviousMetadataMatches(original, compiledCurrent.GeneratedCode, out _, cancellationToken))
                 return attempted;
         }
 
@@ -742,37 +862,23 @@ public sealed class CSharpToCalorConverter
             return result;
         }
 
-        // One module policy cannot represent lexical changes of annotation context.
-        if (root.DescendantTrivia(descendIntoTrivia: true)
-                .Any(trivia => trivia.GetStructure() is NullableDirectiveTriviaSyntax)
-            || root.DescendantNodes().OfType<TypeSyntax>().Any(type =>
-                model.GetNullableContext(type.SpanStart).HasFlag(NullableContext.AnnotationsEnabled)))
+        if (original.HasLexicalNullableContext)
             return PreserveUncertifiedModule(
                 "A single oblivious module context cannot represent the original lexical nullable contexts; "
                 + "the native replacement could not be certified.");
 
-        var candidate = ConvertCore(source, sourceFile, cancellationToken, capturePreservationContext,
-            originalSemanticModel: model, allowScopedNamespaceImports: allowScopedNamespaceImports,
-            obliviousModule: true);
-        var entirelyNative = candidate.InteropPreservationCount == 0 && candidate.Losses.Count == 0;
-        var directPreservation = candidate.InteropPreservationCount > 0 && candidate.Losses.Count > 0
-            && candidate.Losses.All(loss => loss.Kind == ConversionLossKind.InteropPreserved
-                && loss.Path == ConversionPath.Interop);
-        if (!candidate.Success || !(entirelyNative || directPreservation)
-            || candidate.CalorSource is not { } calorSource)
+        // ObliviousCertificationFirst evaluated this candidate against the same original when it
+        // used the same output kind; it is not converted a second time.
+        var candidateResult = evaluated is { } reuse && reuse.OutputKind == outputKind && !allowScopedNamespaceImports
+            ? reuse
+            : EvaluateObliviousCandidate(source, sourceFile, original, cancellationToken,
+                capturePreservationContext, allowScopedNamespaceImports);
+        var candidate = candidateResult.Conversion;
+        if (!candidateResult.Admissible)
             return PreserveUncertifiedModule(
                 "The oblivious module candidate did not produce successful, entirely native Calor "
                 + "or direct, lossless member preservation; the replacement could not be certified.", candidate);
-        // Reparse the actual deliverable and enforce the normal binder/effect
-        // checks. No unchecked output can authorize this recovery: the generated
-        // C# is compiled in the original context by MetadataMatches below.
-        var compiled = Program.Compile(calorSource, sourceFile, new CompilationOptions
-        {
-            IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
-            ProjectDirectory = _options.ProjectDirectory,
-            DeferGeneratedOutputValidation = true,
-            CancellationToken = cancellationToken
-        });
+        var compiled = candidateResult.Compiled!;
         if (compiled.HasErrors)
         {
             foreach (var error in compiled.Diagnostics.Errors)
@@ -781,8 +887,9 @@ public sealed class CSharpToCalorConverter
                     "roundtrip-calor-validation", error.Span.Line, error.Span.Column);
             return PreserveUncertifiedModule(candidate: candidate);
         }
-        if (!MetadataMatches(compiled.GeneratedCode, out var generatedErrors))
+        if (!candidateResult.MetadataMatched)
         {
+            var generatedErrors = candidateResult.GeneratedErrors;
             if (generatedErrors.Length == 0)
                 return PreserveUncertifiedModule(
                     "The native projection changed declared type/nullability metadata; "

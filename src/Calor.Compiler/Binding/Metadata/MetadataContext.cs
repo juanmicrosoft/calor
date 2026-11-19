@@ -111,11 +111,32 @@ internal sealed class MetadataContext : IDisposable
     /// </summary>
     public static MetadataContext Create()
     {
-        var manifest = MetadataReferenceManifest.Load();
-        return CreateWithManifest(manifest, AmbientReferences.Value?.Admitted.Value
-            .Select(reference => (MetadataReference)reference.Reference)
-            .ToImmutableArray() ?? ImmutableArray<MetadataReference>.Empty);
+        // Every binder of a compilation creates a context, several per compilation. The
+        // embedded manifest, its verification against this process's TPA, and the host
+        // compilation over a given reference set are the same each time, so they are built
+        // once per process (per reference scope for explicit references) and shared; only
+        // the wrapper, which a caller may dispose, is new.
+        var (manifest, _, emptyHost) = EmbeddedFramework.Value;
+        var (references, host) = AmbientReferences.Value is { } scope ? scope.Host.Value : emptyHost;
+        return new MetadataContext(host, references, manifest);
     }
+
+    private static readonly Lazy<(MetadataReferenceManifest Manifest, ImmutableArray<MetadataReference> Framework,
+        (ImmutableArray<MetadataReference> References, CSharpCompilation Host) EmptyHost)> EmbeddedFramework = new(() =>
+    {
+        var manifest = MetadataReferenceManifest.Load();
+        VerifyFrameworkVersionInRange(manifest);
+        var framework = FilterAndVerifyReferences(GeneratedCSharpCompiler.References, manifest);
+        return (manifest, framework, (framework, CreateHostCompilation(framework)));
+    });
+
+    private static CSharpCompilation CreateHostCompilation(ImmutableArray<MetadataReference> references)
+        => CSharpCompilation.Create(
+            assemblyName: "CalorMetadataContext",
+            syntaxTrees: null,
+            references: references,
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithNullableContextOptions(NullableContextOptions.Enable));
 
     /// <summary>
     /// Entry point with an explicit reference list (CLI <c>-r</c>, the MSBuild
@@ -156,17 +177,7 @@ internal sealed class MetadataContext : IDisposable
             GeneratedCSharpCompiler.References,
             manifest);
         var references = filtered.AddRange(admitted ?? AdmitExplicitReferences(referencePaths, filtered));
-
-        var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            .WithNullableContextOptions(NullableContextOptions.Enable);
-
-        var compilation = CSharpCompilation.Create(
-            assemblyName: "CalorMetadataContext",
-            syntaxTrees: null,
-            references: references,
-            options: options);
-
-        return new MetadataContext(compilation, references, manifest);
+        return new MetadataContext(CreateHostCompilation(references), references, manifest);
     }
 
     // -------- explicit references --------
@@ -185,6 +196,17 @@ internal sealed class MetadataContext : IDisposable
         public IReadOnlyList<string> Paths { get; } = paths;
         public Lazy<ExplicitReference[]> Admitted { get; } = new(() => AdmitExplicit(paths,
             MetadataReferenceManifest.Load().Assemblies.Select(entry => entry.AssemblyName)).ToArray());
+
+        /// <summary>The verified framework set plus this scope's admitted references, and their host compilation.</summary>
+        internal Lazy<(ImmutableArray<MetadataReference> References, CSharpCompilation Host)> Host
+            => LazyInitializer.EnsureInitialized(ref _host, () => new(() =>
+            {
+                var references = EmbeddedFramework.Value.Framework.AddRange(
+                    Admitted.Value.Select(reference => (MetadataReference)reference.Reference));
+                return (references, CreateHostCompilation(references));
+            }));
+
+        private Lazy<(ImmutableArray<MetadataReference> References, CSharpCompilation Host)>? _host;
     }
 
     /// <summary>The explicit references in scope; empty outside a compilation.</summary>
