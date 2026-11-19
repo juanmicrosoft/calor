@@ -22,13 +22,29 @@
     </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="Xunit.SkippableFact" />
-    <!-- Real framework metadata for the Tier B effect tests: the compilations under
-         test receive these assemblies as explicit references (CLI -r equivalent).
-         PrivateAssets keeps them out of Calor.Compiler.Tests, which references this
-         project. -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!--
+    Real framework metadata for the Tier B effect tests (TestHarness.FrameworkReferences).
+    The compilations under test receive these assemblies only as explicit references,
+    the `calor -r` equivalent. PackageDownload fetches the packages without making them
+    dependencies, so they are not in this test host's trusted platform assemblies (nor in
+    Calor.Compiler.Tests', which references this project); the DLLs are copied to
+    FrameworkReferences/ beside the tests.
+  -->
+  <PropertyGroup>
+    <CalorFrameworkReferenceVersion>10.0.3</CalorFrameworkReferenceVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <CalorFrameworkReference Include="Microsoft.Extensions.Logging.Abstractions" PackageFolder="microsoft.extensions.logging.abstractions" />
+    <CalorFrameworkReference Include="Microsoft.Extensions.Configuration.Abstractions" PackageFolder="microsoft.extensions.configuration.abstractions" />
+    <CalorFrameworkReference Include="Microsoft.Extensions.Primitives" PackageFolder="microsoft.extensions.primitives" />
+    <CalorFrameworkReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" PackageFolder="microsoft.extensions.dependencyinjection.abstractions" />
+    <CalorFrameworkReference Include="Microsoft.EntityFrameworkCore" PackageFolder="microsoft.entityframeworkcore" />
+    <PackageDownload Include="@(CalorFrameworkReference)" Version="[$(CalorFrameworkReferenceVersion)]" />
+    <None Include="@(CalorFrameworkReference->'$(NuGetPackageRoot)%(PackageFolder)/$(CalorFrameworkReferenceVersion)/lib/net10.0/%(Identity).dll')"
+          Link="FrameworkReferences/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
