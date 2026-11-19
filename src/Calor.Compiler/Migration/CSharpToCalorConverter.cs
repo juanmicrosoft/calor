@@ -769,11 +769,11 @@ public sealed class CSharpToCalorConverter
 
     /// <summary>
     /// The oblivious certification, tried before the annotated conversion. It applies only to a
-    /// module whose original has oblivious declarations and no lexical nullable context. For such
-    /// a module the annotated conversion cannot certify: its C# is emitted under
-    /// <c>#nullable enable</c> (the module is not marked oblivious and the original carries no
-    /// directive to preserve), and no declaration under an enabled annotation context has the
-    /// oblivious (<c>None</c>) annotation the original's declarations have. So the result is the
+    /// module whose original has no lexical nullable context and whose declaration metadata
+    /// changes when annotations are enabled. For such a module the annotated conversion cannot
+    /// certify: its C# is emitted under <c>#nullable enable</c> (the module is not marked oblivious
+    /// and the original carries no directive to preserve), so the context-sensitive declarations
+    /// that read <c>None</c> in the original cannot read <c>None</c> in it. So the result is the
     /// one <see cref="TryConvertObliviousModule"/> would reach after converting twice.
     /// </summary>
     private ObliviousCandidate? ObliviousCertificationFirst(
@@ -789,6 +789,13 @@ public sealed class CSharpToCalorConverter
             : _options.OutputKind;
         if (PrepareObliviousOriginal(source, sourceFile, outputKind, cancellationToken) is not { } original
             || original.HasLexicalNullableContext)
+            return null;
+        // Some declarations read the same in both contexts (value types, an implicit object
+        // base). When all of them do, the annotated form can certify and is preferred, as before.
+        var enabled = original.Compilation.WithOptions(
+            original.Compilation.Options.WithNullableContextOptions(NullableContextOptions.Enable));
+        if (original.Before.SequenceEqual(
+                DeclaredTypeMetadata(enabled.GetSemanticModel(original.Tree), original.Root), StringComparer.Ordinal))
             return null;
         var evaluated = EvaluateObliviousCandidate(source, sourceFile, original, cancellationToken,
             capturePreservationContext, allowScopedNamespaceImports: false);
