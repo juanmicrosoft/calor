@@ -7635,6 +7635,10 @@ public sealed class EffectEnforcementPass
                 : targetEffects;
         }
 
+        private static bool IsStringType(Binding.BoundTypes.BoundType type) =>
+            type is Binding.BoundTypes.NominalBoundType { RoslynSymbol.SpecialType: CS.SpecialType.System_String }
+            || type.DisplayString is "STRING" or "string" or "str" or "System.String";
+
         /// <summary>
         /// 0.30: the accessor an element access runs. An array element is built in and
         /// charges nothing beyond its receiver and index. Any other receiver runs an indexer:
@@ -7651,9 +7655,6 @@ public sealed class EffectEnforcementPass
         /// </list>
         /// Before 0.30 no element access charged its indexer at all.
         /// </summary>
-        private static bool IsStringType(Binding.BoundTypes.BoundType type) =>
-            type is Binding.BoundTypes.NominalBoundType { RoslynSymbol.SpecialType: CS.SpecialType.System_String }
-            || type.DisplayString is "STRING" or "string" or "str" or "System.String";
 
         private EffectSet InferElementAccessor(ArrayAccessNode access, bool read, bool write)
         {
