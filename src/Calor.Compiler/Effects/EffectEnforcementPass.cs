@@ -7651,6 +7651,10 @@ public sealed class EffectEnforcementPass
         /// </list>
         /// Before 0.30 no element access charged its indexer at all.
         /// </summary>
+        private static bool IsStringType(Binding.BoundTypes.BoundType type) =>
+            type is Binding.BoundTypes.NominalBoundType { RoslynSymbol.SpecialType: CS.SpecialType.System_String }
+            || type.DisplayString is "STRING" or "string" or "str" or "System.String";
+
         private EffectSet InferElementAccessor(ArrayAccessNode access, bool read, bool write)
         {
             if (!read && !write)
@@ -7660,6 +7664,11 @@ public sealed class EffectEnforcementPass
                 && (Binding.NullabilityChecker.GetMethodInputArrayType(bound.Array) is not null
                     || bound.Array.Type is Binding.BoundTypes.ArrayBoundType
                     || _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, access.Array.Span) is not null))
+                return EffectSet.Empty;
+            // A string's char access, `s[^n]` and `s[a..b]` are built in (the last two
+            // lower to the char indexer and Substring).
+            if (bound is not null && IsStringType(bound.Array.Type)
+                && (bound.ResolvedIndexer is null || bound.Index is Binding.BoundRangeExpression or Binding.BoundIndexFromEnd))
                 return EffectSet.Empty;
 
             if (bound?.ResolvedIndexer is { } indexer)
@@ -7697,8 +7706,15 @@ public sealed class EffectEnforcementPass
                 return effects;
             }
 
-            if (bound?.Array.Type is Binding.BoundTypes.NominalBoundType { Declaration: { } declaration }
-                && _context.ClassesByName.TryGetValue(declaration.Name, out var owner))
+            var ownerName = bound?.Array switch
+            {
+                { Type: Binding.BoundTypes.NominalBoundType { Declaration: { } declaration } } => declaration.Name,
+                // `this` carries the enclosing class's (possibly namespace-qualified) name.
+                Binding.BoundThisExpression { Type: Binding.BoundTypes.NominalBoundType thisType } =>
+                    thisType.DisplayString[(thisType.DisplayString.LastIndexOf('.') + 1)..],
+                _ => null
+            };
+            if (ownerName is not null && _context.ClassesByName.TryGetValue(ownerName, out var owner))
             {
                 var candidates = CallGraphAnalysis.EnumerateIndexers(owner)
                     .Where(candidate => candidate.Parameters.Count == 1).ToArray();

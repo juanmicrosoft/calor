@@ -236,8 +236,14 @@ internal sealed class MetadataBinder
         if (model.GetDiagnostics().Any(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
             return null;
         var access = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().SingleOrDefault();
-        return access is not null && model.GetSymbolInfo(access).Symbol is IPropertySymbol { IsIndexer: true } indexer
-            ? indexer : null;
+        if (access is null)
+            return null;
+        if (model.GetSymbolInfo(access).Symbol is IPropertySymbol { IsIndexer: true } indexer)
+            return indexer;
+        // `list[^1]`: C# runs the receiver's int indexer through the implicit Index support.
+        return model.GetOperation(access) is IImplicitIndexerReferenceOperation
+            { IndexerSymbol: IPropertySymbol { IsIndexer: true } implicitIndexer }
+            ? implicitIndexer : null;
     }
 
     public IPropertySymbol? ResolveIndexer(

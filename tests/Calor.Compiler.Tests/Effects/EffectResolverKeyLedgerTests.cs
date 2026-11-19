@@ -123,6 +123,12 @@ public class EffectResolverKeyLedgerTests
     /// asking the resolver is now an ordinary call that does. Checked exactly on
     /// samples/: the 2cc3cf3e5 compiler on the 5f3bc87bb sources gives 1 bound / 29
     /// string, the current compiler on the native sources 71 / 5.</para>
+    /// <para><b>0.30 k1 refresh: bound 2099 -> 2517, string unchanged at 685.</b> An
+    /// element access on a non-array receiver now charges its indexer, so every
+    /// <c>list[i]</c>, <c>dict[k]</c> or <c>config["k"]</c> asks the resolver for the
+    /// selected accessor with a bound key (bench +409, samples +3, src +3, tests +3).
+    /// Measured with the indexer charge disabled, the counts are exactly the previous
+    /// fixture (2099 / 685), so the manifest review in the same change moved nothing.</para>
     /// </summary>
     [SkippableFact]
     public void CurrentCompiler_KeyOrigins_OverCommittedCalorCorpus_MatchExpectationsExactly()

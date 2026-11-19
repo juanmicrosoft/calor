@@ -117,4 +117,38 @@ public class IndexerEffectTests
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
         Assert.False(result.HasErrors, Describe(result));
     }
+
+    [Fact]
+    public void StringSlicesAndFromEndIndexes_AreBuiltIn()
+    {
+        var result = Compile("""
+            module Test Test block
+              func Read (string:s) → bool
+                !
+                return s[1..3] == "bc" && s[^1] == 'd'
+            """);
+        Assert.False(result.HasErrors, Describe(result));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void SourceIndexerThroughThis_ChargesItsGetterRow()
+    {
+        static string Source(string declared) => $$"""
+            module Test Test block
+              class Journal
+                this[int:i] → int
+                  get
+                    ! cw
+                    Console.WriteLine("read")
+                    return i
+                func First () → int
+                  ! {{declared}}
+                  return this[1]
+            """;
+        var declared = Compile(Source("cw"));
+        Assert.False(declared.HasErrors, Describe(declared));
+        Assert.Contains(Compile(Source("")).Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'cw'"));
+    }
 }
