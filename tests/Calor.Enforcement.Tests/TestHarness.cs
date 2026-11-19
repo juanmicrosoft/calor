@@ -51,16 +51,34 @@ public static class TestHarness
     public static Calor.Compiler.CompilationResult CompileWithEffects(
         string source,
         bool enforceEffects = true,
-        Calor.Compiler.Effects.UnknownCallPolicy policy = Calor.Compiler.Effects.UnknownCallPolicy.Strict)
+        Calor.Compiler.Effects.UnknownCallPolicy policy = Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+        IReadOnlyList<string>? references = null)
     {
         var options = new CompilationOptions
         {
             EnforceEffects = enforceEffects,
             UnsafeTranspileOnly = true,
-            UnknownCallPolicy = policy
+            UnknownCallPolicy = policy,
+            ReferencedAssemblyPaths = references
         };
         return Calor.Compiler.Program.Compile(source, "test.calr", options);
     }
+
+    /// <summary>
+    /// The framework assemblies the Tier B tests reference explicitly, the way
+    /// <c>calor -r</c> or the MSBuild task would pass them: the three API
+    /// assemblies (logging, configuration, EF Core) and the assemblies their
+    /// public signatures name. These are real package assemblies restored for
+    /// this test project; the compiler sees them only through this list.
+    /// </summary>
+    public static IReadOnlyList<string> FrameworkReferences { get; } =
+    [
+        typeof(Microsoft.Extensions.Logging.ILogger).Assembly.Location,
+        typeof(Microsoft.Extensions.Configuration.IConfiguration).Assembly.Location,
+        typeof(Microsoft.Extensions.Primitives.IChangeToken).Assembly.Location,
+        typeof(Microsoft.EntityFrameworkCore.DbContext).Assembly.Location,
+        typeof(Microsoft.Extensions.DependencyInjection.IServiceCollection).Assembly.Location,
+    ];
 
     /// <summary>
     /// Compiles Calor source with specific contract mode.

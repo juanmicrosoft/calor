@@ -738,6 +738,10 @@ public class Program
     /// </summary>
     public static CompilationResult Compile(string source, string? filePath, CompilationOptions options)
     {
+        // Every binder this compilation creates loads the explicit references
+        // into its metadata view, next to the manifest's System.* set.
+        using var metadataReferences = Binding.Metadata.MetadataContext.UseReferences(
+            options.ReferencedAssemblyPaths);
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath(filePath);
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;

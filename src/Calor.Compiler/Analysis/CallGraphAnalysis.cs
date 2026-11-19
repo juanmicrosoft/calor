@@ -526,7 +526,10 @@ public sealed class CallGraphAnalysis
     internal sealed class SharedProjectionImage
     {
         private readonly (string Path, AnnotatedProjection Projection, SourceProjection Plain)[] _entries;
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<CSharpParseOptions,
+        // Keyed by the reference list too: an image is shared across one project pass,
+        // and the list object stands for the explicit reference set in scope.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<
+            (CSharpParseOptions Options, IReadOnlyList<MetadataReference> References),
             Lazy<SharedCompilation?>> _compilations = new();
         private readonly System.Text.RegularExpressions.Regex _annotation;
 
@@ -600,7 +603,8 @@ public sealed class CallGraphAnalysis
             for (var configuration = 0; configuration < configurations.Count; configuration++)
             {
                 var options = configurations[configuration];
-                if (_compilations.GetOrAdd(options, selected => new Lazy<SharedCompilation?>(() => Compile(selected)))
+                if (_compilations.GetOrAdd((options, Binding.Metadata.MetadataContext.ProjectionReferences()),
+                            selected => new Lazy<SharedCompilation?>(() => Compile(selected.Options, selected.References)))
                         .Value is not { } compilation)
                     return null;
                 compilations[configuration] = compilation;
@@ -608,7 +612,7 @@ public sealed class CallGraphAnalysis
             return new(index, compilations);
         }
 
-        private SharedCompilation? Compile(CSharpParseOptions options)
+        private SharedCompilation? Compile(CSharpParseOptions options, IReadOnlyList<MetadataReference> references)
         {
             var trees = new SyntaxTree[_entries.Length];
             for (var index = 0; index < _entries.Length; index++)
@@ -619,7 +623,7 @@ public sealed class CallGraphAnalysis
                     return null;
             }
             var compilation = CSharpCompilation.Create("CalorOperatorBindings", trees,
-                GeneratedCSharpCompiler.References,
+                references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
             return new SharedCompilation(compilation, trees,
                 _entries.Select(entry => (IReadOnlyList<AstNode>)entry.Projection.Callables).ToArray(),
@@ -903,7 +907,7 @@ public sealed class CallGraphAnalysis
                 Tree: ParseCompanion(companion, (CSharpParseOptions)tree.Options))).ToArray();
             var compilation = CSharpCompilation.Create("CalorOperatorBindings",
                 companionTrees.Select(companion => (SyntaxTree)companion.Tree).Prepend(tree),
-                GeneratedCSharpCompiler.References,
+                Binding.Metadata.MetadataContext.ProjectionReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
             BindTree(tree, compilation, companionTrees.SelectMany(companion => DeclaredCompanionMethods(
                 compilation, companion.Tree, companion.Projection.Marker, companion.Projection.Callables)));
