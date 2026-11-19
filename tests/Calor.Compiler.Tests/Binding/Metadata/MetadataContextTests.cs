@@ -526,8 +526,9 @@ public class MetadataContextLifecycleTests
     [Fact]
     public void Compile_LoadsItsReferencesIntoTheBinder()
     {
-        // End to end through Program.Compile: the same call binds to metadata only
-        // when the compilation lists the assembly, and stays unknown otherwise.
+        // End to end through Program.Compile: a project manifest entry for
+        // Xunit.Assert.True applies only when the call binds to that metadata member,
+        // which needs the compilation to list the assembly (decision D3).
         const string source = """
             module Probe Probe block
               using Xunit
@@ -535,22 +536,40 @@ public class MetadataContextLifecycleTests
                 !
                 Assert.True(true)
             """;
-        CompilationResult Compile(IReadOnlyList<string>? references) =>
-            Program.Compile(source, "probe.calr", new CompilationOptions
-            {
-                UnsafeTranspileOnly = true,
-                ReferencedAssemblyPaths = references
-            });
+        var project = Path.Combine(Path.GetTempPath(), "calor-k1-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(project);
+        try
+        {
+            File.WriteAllText(Path.Combine(project, ".calor-effects.json"), """
+                {
+                  "version": "1.0",
+                  "mappings": [
+                    { "type": "Xunit.Assert", "methods": { "True": [] } }
+                  ]
+                }
+                """);
+            CompilationResult Compile(IReadOnlyList<string>? references) =>
+                Program.Compile(source, Path.Combine(project, "probe.calr"), new CompilationOptions
+                {
+                    UnsafeTranspileOnly = true,
+                    ProjectDirectory = project,
+                    ReferencedAssemblyPaths = references
+                });
 
-        var without = Compile(null);
-        Assert.Contains(without.Diagnostics, d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.UnknownExternalCall);
+            var with = Compile([ExplicitAssembly]);
+            Assert.DoesNotContain(with.Diagnostics,
+                d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.UnknownExternalCall);
+            Assert.False(with.HasErrors, string.Join("; ", with.Diagnostics.Select(d => d.Message)));
 
-        // Assert.True has no effect contract, so it is still unknown, but now as a
-        // resolved metadata member (Xunit.Assert.True), not as an unresolved name.
-        var with = Compile([ExplicitAssembly]);
-        Assert.Contains(with.Diagnostics, d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.UnknownExternalCall
-            && d.Message.Contains("Xunit.Assert.True"));
-        Assert.Contains(with.Diagnostics.Errors,
-            d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
+            var without = Compile(null);
+            Assert.Contains(without.Diagnostics,
+                d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.UnknownExternalCall);
+            Assert.Contains(without.Diagnostics.Errors,
+                d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
+        }
+        finally
+        {
+            Directory.Delete(project, recursive: true);
+        }
     }
 }
