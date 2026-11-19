@@ -526,7 +526,10 @@ public sealed class CallGraphAnalysis
     internal sealed class SharedProjectionImage
     {
         private readonly (string Path, AnnotatedProjection Projection, SourceProjection Plain)[] _entries;
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<CSharpParseOptions,
+        // Keyed by the reference list too: an image is shared across one project pass,
+        // and the list object stands for the explicit reference set in scope.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<
+            (CSharpParseOptions Options, IReadOnlyList<MetadataReference> References),
             Lazy<SharedCompilation?>> _compilations = new();
         private readonly System.Text.RegularExpressions.Regex _annotation;
 
@@ -600,7 +603,8 @@ public sealed class CallGraphAnalysis
             for (var configuration = 0; configuration < configurations.Count; configuration++)
             {
                 var options = configurations[configuration];
-                if (_compilations.GetOrAdd(options, selected => new Lazy<SharedCompilation?>(() => Compile(selected)))
+                if (_compilations.GetOrAdd((options, Binding.Metadata.MetadataContext.ProjectionReferences()),
+                            selected => new Lazy<SharedCompilation?>(() => Compile(selected.Options, selected.References)))
                         .Value is not { } compilation)
                     return null;
                 compilations[configuration] = compilation;
@@ -608,7 +612,7 @@ public sealed class CallGraphAnalysis
             return new(index, compilations);
         }
 
-        private SharedCompilation? Compile(CSharpParseOptions options)
+        private SharedCompilation? Compile(CSharpParseOptions options, IReadOnlyList<MetadataReference> references)
         {
             var trees = new SyntaxTree[_entries.Length];
             for (var index = 0; index < _entries.Length; index++)
@@ -619,7 +623,7 @@ public sealed class CallGraphAnalysis
                     return null;
             }
             var compilation = CSharpCompilation.Create("CalorOperatorBindings", trees,
-                GeneratedCSharpCompiler.References,
+                references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
             return new SharedCompilation(compilation, trees,
                 _entries.Select(entry => (IReadOnlyList<AstNode>)entry.Projection.Callables).ToArray(),
@@ -903,7 +907,7 @@ public sealed class CallGraphAnalysis
                 Tree: ParseCompanion(companion, (CSharpParseOptions)tree.Options))).ToArray();
             var compilation = CSharpCompilation.Create("CalorOperatorBindings",
                 companionTrees.Select(companion => (SyntaxTree)companion.Tree).Prepend(tree),
-                GeneratedCSharpCompiler.References,
+                Binding.Metadata.MetadataContext.ProjectionReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
             BindTree(tree, compilation, companionTrees.SelectMany(companion => DeclaredCompanionMethods(
                 compilation, companion.Tree, companion.Projection.Marker, companion.Projection.Callables)));
@@ -2652,6 +2656,9 @@ public sealed class CallGraphAnalysis
         internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.ArrayBoundType>
             ArrayTypes
         { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), BoundArrayAccess>
+            ElementAccesses
+        { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
         /// variable's <c>DeclarationSpan</c>.</summary>
         public Dictionary<(string CallerId, int Start, int End), TextSpan> Declarations { get; } = new();
@@ -2772,6 +2779,10 @@ public sealed class CallGraphAnalysis
 
     public VariableSymbol? BoundVariable(string callerId, TextSpan reference) =>
         _boundValues.Variables.GetValueOrDefault((callerId, reference.Start, reference.End));
+
+    /// <summary>The bound element access at <paramref name="span"/> (<c>a[i]</c>), or null.</summary>
+    internal BoundArrayAccess? BoundElementAccess(string callerId, TextSpan span) =>
+        _boundValues.ElementAccesses.GetValueOrDefault((callerId, span.Start, span.End));
 
     internal Binding.BoundTypes.ArrayBoundType? BoundArrayReceiverType(string callerId, TextSpan expression) =>
         _boundValues.ArrayTypes.GetValueOrDefault((callerId, expression.Start, expression.End));
@@ -3842,6 +3853,8 @@ public sealed class CallGraphAnalysis
                         { Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: { } metadataValueType } })
                         boundValues.MetadataValueTypes.TryAdd(
                             (callerId, node.Span.Start, node.Span.End), metadataValueType);
+                    if (node is BoundArrayAccess elementAccess)
+                        boundValues.ElementAccesses.TryAdd((callerId, node.Span.Start, node.Span.End), elementAccess);
                     if (node is BoundExpression arrayExpression)
                     {
                         var arrayType = arrayExpression.MetadataArrayResultType is { } metadataArray

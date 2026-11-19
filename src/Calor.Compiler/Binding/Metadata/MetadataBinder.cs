@@ -53,7 +53,8 @@ internal sealed class MetadataBinder
 
     internal MetadataBinderResult ResolveExpressionCall(
         ITypeSymbol receiverType, string methodName, IReadOnlyList<MetadataArgument> arguments,
-        IReadOnlyList<ITypeSymbol> typeArguments, bool isStatic, bool preserveArrayAnnotations = false)
+        IReadOnlyList<ITypeSymbol> typeArguments, bool isStatic, bool preserveArrayAnnotations = false,
+        IReadOnlyList<string>? imports = null)
     {
         var receiver = receiverType.ToDisplayString(ReceiverTypeFormat);
         if (!isStatic)
@@ -72,7 +73,7 @@ internal sealed class MetadataBinder
             return MetadataBinderResult.CreateUnresolved("Call contains type parameters from incompatible lexical scopes.");
         var scope = scopes.SingleOrDefault();
         var result = QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations, scope,
-                useArgumentLocals: true),
+                useArgumentLocals: true, imports: imports),
                 out var reason, requireValidSource: true)
             ?? MetadataBinderResult.CreateUnresolved(reason ?? "Expression call resolution failed.");
         return result with { ReceiverType = result.IsResolved ? receiverType : null };
@@ -207,6 +208,44 @@ internal sealed class MetadataBinder
     /// <c>this[]</c>. Return the property symbol so downstream can bind to
     /// the getter/setter as needed.
     /// </summary>
+    /// <summary>
+    /// 0.30: the indexer an element access selects, by Roslyn's own lookup (inherited
+    /// and interface indexers included). Null when the probe does not bind to exactly one
+    /// readable or writable indexer.
+    /// </summary>
+    internal IPropertySymbol? ResolveElementAccess(ITypeSymbol receiverType, ITypeSymbol indexType)
+    {
+        var receiverName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var indexName = indexType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (_elementAccesses.TryGetValue((receiverName, indexName), out var cached))
+            return cached;
+        return _elementAccesses[(receiverName, indexName)] = ProbeElementAccess(receiverName, indexName);
+    }
+
+    private readonly Dictionary<(string Receiver, string Index), IPropertySymbol?> _elementAccesses = new();
+
+    private IPropertySymbol? ProbeElementAccess(string receiverName, string indexName)
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "#nullable enable\nclass __CalorElementAccessProbe { void Probe() {\n" +
+            $"{indexName} __index = default!;\n" +
+            $"_ = (({receiverName})default!)[__index];\n" +
+            "} }");
+        var compilation = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        if (model.GetDiagnostics().Any(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            return null;
+        var access = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().SingleOrDefault();
+        if (access is null)
+            return null;
+        if (model.GetSymbolInfo(access).Symbol is IPropertySymbol { IsIndexer: true } indexer)
+            return indexer;
+        // `list[^1]`: C# runs the receiver's int indexer through the implicit Index support.
+        return model.GetOperation(access) is IImplicitIndexerReferenceOperation
+            { IndexerSymbol: IPropertySymbol { IsIndexer: true } implicitIndexer }
+            ? implicitIndexer : null;
+    }
+
     public IPropertySymbol? ResolveIndexer(
         ITypeSymbol receiverType,
         IReadOnlyList<MetadataArgument> arguments)
@@ -393,13 +432,20 @@ internal sealed class MetadataBinder
     private static string BuildSyntheticSource(
         string receiverExpr, string methodName, IReadOnlyList<MetadataArgument> arguments,
         bool preserveArrayAnnotations, ClassDeclarationSyntax? typeParameterScope = null,
-        bool useArgumentLocals = false)
+        bool useArgumentLocals = false, IReadOnlyList<string>? imports = null)
     {
+        // `imports` are the calling module's using directives visible at the call
+        // (already filtered to namespaces present in this metadata set). The
+        // generated C# carries them too, and they are what bring an extension
+        // method such as LoggerExtensions.LogInformation into scope. Receivers
+        // and arguments are spelled with global:: names, so an import changes
+        // nothing here except which extension methods are candidates.
         return "#nullable enable\n" +
             "using System;\n" +
             "using System.Linq;\n" +
             "using System.Collections.Generic;\n" +
             "using System.Threading.Tasks;\n" +
+            string.Concat((imports ?? []).Select(line => line + "\n")) +
             $"class __CalorS4Synth{typeParameterScope?.TypeParameterList} "
             + $"{string.Join(" ", typeParameterScope?.ConstraintClauses.Select(clause => clause.ToString()) ?? [])}"
             + " { static void __Probe() {\n" +

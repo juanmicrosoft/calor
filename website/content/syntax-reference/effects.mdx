@@ -604,6 +604,14 @@ reads `Balance`. A match case's `when` guard is charged like the case body. A
 dotted name the compiler cannot resolve to a type, member, constant or enum
 member is charged `unknown`, never treated as pure.
 
+Indexing anything but an array runs an indexer, so `items[key]` is charged the
+indexer's getter, and `set items[key] value` its setter plus `mut`. A .NET
+indexer is charged its effect manifest entry (`List<T>`, `Dictionary<K,V>` and
+`string` indexers are pure; `config["key"]` on `IConfiguration` is `env:r`). A
+source class's own indexer is charged its accessor's row. An indexer the
+compiler cannot select, or one with no contract, is `unknown`. An array element
+costs nothing beyond its receiver and index.
+
 ### Asking the index
 
 `calor query effects Name` reports a callable's declared row, inferred body

@@ -60,6 +60,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 |:-------|:------|:---------|:------------|
 | `--input` | `-i` | For compilation | One or more Calor source files; multiple files enable cross-module effect checks |
 | `--output` | `-o` | No | Output path for a single input; otherwise each `.g.cs` is written beside its input |
+| `--reference` | `-r` | No | An assembly the program uses (repeatable). Calls on its types bind to their real metadata, so effect manifest entries for them apply; the generated C# is also validated against it. Without it those calls stay unknown |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable Z3 static contract verification |
 | `--keep-proven-guards` | | No | Keep every runtime guard even after Z3 proves a contract (opts out of the 0.15 default; verification stays diagnostic). Also spelled `--no-elide-proven-guards`. |

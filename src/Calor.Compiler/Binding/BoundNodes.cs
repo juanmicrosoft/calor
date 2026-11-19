@@ -1127,6 +1127,17 @@ public sealed class BoundArrayAccess : BoundExpression
 {
     public BoundExpression Array { get; }
     public BoundExpression Index { get; }
+
+    /// <summary>
+    /// 0.30: the metadata indexer Roslyn selects for this access when the receiver is a
+    /// metadata type other than an array (<c>config["k"]</c> → <c>IConfiguration.this[string]</c>).
+    /// Null for arrays, source types and receivers that do not resolve. The effect pass
+    /// charges the selected accessor's contract, or <c>unknown</c> without one.
+    /// </summary>
+    internal Microsoft.CodeAnalysis.IPropertySymbol? ResolvedIndexer { get; init; }
+
+    /// <summary>The receiver type the indexer was selected on (see <see cref="ResolvedIndexer"/>).</summary>
+    internal Microsoft.CodeAnalysis.ITypeSymbol? ResolvedIndexerReceiver { get; init; }
     public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Array, Index];
 

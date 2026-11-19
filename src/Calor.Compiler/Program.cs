@@ -42,7 +42,7 @@ public class Program
 
         var referenceOption = new Option<FileInfo[]>(
             aliases: ["--reference", "-r"],
-            description: "Assembly reference used to validate generated C# (repeatable)")
+            description: "Assembly reference: calls on its types bind to their metadata, and generated C# is validated against it (repeatable)")
         { Arity = ArgumentArity.ZeroOrMore };
 
         var verboseOption = new Option<bool>(
@@ -738,6 +738,10 @@ public class Program
     /// </summary>
     public static CompilationResult Compile(string source, string? filePath, CompilationOptions options)
     {
+        // Every binder this compilation creates loads the explicit references
+        // into its metadata view, next to the manifest's System.* set.
+        using var metadataReferences = Binding.Metadata.MetadataContext.UseReferences(
+            options.ReferencedAssemblyPaths);
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath(filePath);
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;

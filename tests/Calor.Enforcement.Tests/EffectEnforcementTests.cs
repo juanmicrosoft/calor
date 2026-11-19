@@ -828,139 +828,203 @@ module Test Test block
 
     // ========================================================================
     // E2E: Tier B framework interface effects resolve through enforcement
+    //
+    // Decision D3: a Tier B manifest entry applies only when the binder selected
+    // a real metadata member. These compilations pass the framework assemblies as
+    // explicit references (TestHarness.FrameworkReferences, the `calor -r`
+    // equivalent); the binder loads them next to its System.* set. Receivers are
+    // typed parameters and the namespaces are imported, as in real code. Note that
+    // `logger.LogInformation(...)` selects the extension method
+    // LoggerExtensions.LogInformation, so that is the manifest owner it hits.
     // ========================================================================
+
+    private const string FrameworkImports = """
+        module Test Test block
+          using Microsoft.Extensions.Logging
+          using Microsoft.Extensions.Configuration
+          using Microsoft.EntityFrameworkCore
+
+        """;
+
+    private static CompilationResult CompileFramework(string declaredEffects, string body,
+        bool withReferences = true) =>
+        TestHarness.CompileWithEffects(FrameworkImports + $$"""
+              func HandleRequest (ILogger:logger, IConfiguration:config, DbContext:db) → void
+                ! {{declaredEffects}}
+            {{body}}
+            """, enforceEffects: true, policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+            references: withReferences ? TestHarness.FrameworkReferences : null);
+
+    private static string Describe(CompilationResult result) =>
+        string.Join("; ", result.Diagnostics.Select(d => $"{d.Code}: {d.Message}"));
+
+    private static void AssertResolvedCleanly(CompilationResult result)
+    {
+        // Calor0411 is a warning; checking every severity keeps the assertion honest.
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.False(result.HasErrors, Describe(result));
+    }
 
     [Fact]
     public void TierB_E2E_ILoggerCall_ResolvesToCw_NoUnknownWarning()
     {
-        // A Calor function calls ILogger.LogInformation and declares cw effect.
-        // Should compile without Calor0411 (unknown external call).
-        var source = @"
-module Test Test block
-  func LogSomething () → void
-    ! cw
-    ILogger.LogInformation(""Processing request"")
-";
-        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
-            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
-
-        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
-            $"ILogger.LogInformation should not produce Calor0411. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        AssertResolvedCleanly(CompileFramework("cw", "    logger.LogInformation(\"Processing request\")"));
     }
 
     [Fact]
     public void TierB_E2E_DbContextCall_ResolvesToDbW_NoUnknownWarning()
     {
-        // A Calor function calls DbContext.SaveChanges and declares db:w effect.
-        var source = @"
-module Test Test block
-  func SaveData () → void
-    ! db:w
-    DbContext.SaveChanges()
-";
-        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
-            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
-
-        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
-            $"DbContext.SaveChanges should not produce Calor0411. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        AssertResolvedCleanly(CompileFramework("db:w", "    db.SaveChanges()"));
     }
 
     [Fact]
     public void TierB_E2E_IConfigurationCall_ResolvesToEnvR_NoUnknownWarning()
     {
-        // A Calor function calls IConfiguration.GetSection and declares env:r effect.
-        var source = @"
-module Test Test block
-  func ReadConfig () → void
-    ! env:r
-    IConfiguration.GetSection(""ConnectionStrings"")
-";
-        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
-            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
-
-        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
-            $"IConfiguration.GetSection should not produce Calor0411. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        AssertResolvedCleanly(CompileFramework("env:r", "    config.GetSection(\"ConnectionStrings\")"));
     }
 
     [Fact]
-    public void TierB_E2E_ControllerOk_IsPure_NoUnknownWarning()
+    public void TierB_E2E_ControllerOk_WithoutReference_StaysUnknown()
     {
-        // A Calor function calls ControllerBase.Ok — should be pure.
-        var source = @"
-module Test Test block
-  func GetResult () → void
-    !
-    ControllerBase.Ok()
-";
-        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
-            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+        // ControllerBase lives in the ASP.NET Core shared framework, which this test
+        // project does not reference. Without the reference the call cannot bind, so
+        // the `Microsoft.AspNetCore.Mvc.ControllerBase` entry must not apply (D3):
+        // the call is unknown, never pure.
+        var result = TestHarness.CompileWithEffects("""
+            module Test Test block
+              func GetResult () → void
+                !
+                ControllerBase.Ok()
+            """, enforceEffects: true, policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
 
-        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
-            $"ControllerBase.Ok should not produce Calor0411. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
     }
 
     [Fact]
     public void TierB_E2E_UndeclaredDbEffect_ProducesForbiddenEffect()
     {
         // A Calor function calls DbContext.SaveChanges but does NOT declare db:w.
-        // Should produce Calor0410 (forbidden effect), NOT Calor0411 (unknown).
-        var source = @"
-module Test Test block
-  func SaveData () → void
-    !
-    DbContext.SaveChanges()
-";
-        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
-            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+        // Should produce Calor0410 for db:w (forbidden effect), NOT an unknown call.
+        var result = CompileFramework("", "    db.SaveChanges()");
 
-        // Should have forbidden-effect error (using db:w without declaring it), NOT unknown-call error
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
-        Assert.DoesNotContain(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("DbContext.SaveChanges"));
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'db:w'"));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'unknown'"));
+    }
+
+    [Theory]
+    [InlineData("db:w, env:r", "cw")]
+    [InlineData("cw, env:r", "db:w")]
+    [InlineData("cw, db:w", "env:r")]
+    public void TierB_E2E_EachFrameworkEffectIsCharged(string declared, string missing)
+    {
+        var result = CompileFramework(declared, """
+                logger.LogInformation("Starting request")
+                config.GetSection("AppSettings")
+                db.SaveChanges()
+            """);
+
+        var forbidden = Assert.Single(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.Contains($"'{missing}'", forbidden.Message);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
     }
 
     [Fact]
     public void TierB_E2E_MultipleFrameworkCalls_AllResolve()
     {
-        // A realistic function that calls multiple framework methods in STRICT mode.
-        // This verifies the full pipeline: declared effects match computed effects.
-        //
-        // Native 0.30 shape: typed receivers and namespace imports (the old
-        // `ILogger.LogInformation(...)` spelling called instance members on a type
-        // name and only resolved through the retired short-name manifest fallback,
-        // which decision D3 does not restore).
-        //
-        // KNOWN GAP (left failing on purpose): native member calls are charged only
-        // when the binder selects a metadata method, and the binder's metadata set
-        // is restricted to System.* assemblies (MetadataAllowedNamePrefixes in
-        // Binding/Metadata/MetadataContext.cs). ILogger, IConfiguration and
-        // DbContext are therefore UnresolvedBoundType receivers, the Tier B
-        // entries in bcl-framework-interfaces.calor-effects.json are never
-        // consulted, and every call is Unknown (Calor0411 + Calor0410). `-r`
-        // references feed only the Roslyn validation of the generated C#.
-        var source = @"
-module Test Test block
-  using Microsoft.Extensions.Logging
-  using Microsoft.Extensions.Configuration
-  using Microsoft.EntityFrameworkCore
-  func HandleRequest (ILogger:logger, IConfiguration:config, DbContext:db) → void
-    ! cw, db:w, env:r
-    logger.LogInformation(""Starting request"")
-    config.GetSection(""AppSettings"")
-    db.SaveChanges()
-    logger.LogInformation(""Request complete"")
-";
-        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
-            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+        // A realistic function that calls multiple framework methods in STRICT mode,
+        // compiled with the framework assemblies as explicit references. Every call
+        // binds to a metadata member and takes its Tier B row, so the declared row
+        // covers exactly the computed one.
+        var result = CompileFramework("cw, db:w, env:r", """
+                logger.LogInformation("Starting request")
+                config.GetSection("AppSettings")
+                db.SaveChanges()
+                logger.LogInformation("Request complete")
+            """);
 
-        // No unknown external calls — all framework calls resolve from Tier B manifests
-        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
-            $"All framework calls should resolve. Unknown call errors: {string.Join("; ", result.Diagnostics.Errors.Where(d => d.Code == DiagnosticCode.UnknownExternalCall).Select(e => e.Message))}");
-
-        // No forbidden effect errors — declared effects match computed effects
-        Assert.False(result.HasErrors,
-            $"Should compile with all effects declared. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        AssertResolvedCleanly(result);
     }
+
+    [Fact]
+    public void TierB_E2E_MultipleFrameworkCalls_WithoutReferences_StayUnknown()
+    {
+        // The same program without the references: the binder cannot see the
+        // framework types, so no manifest entry applies (D3) and every call is unknown.
+        var result = CompileFramework("cw, db:w, env:r", """
+                logger.LogInformation("Starting request")
+                config.GetSection("AppSettings")
+                db.SaveChanges()
+            """, withReferences: false);
+
+        var unknown = result.Diagnostics.Where(d => d.Code == DiagnosticCode.UnknownExternalCall)
+            .Select(d => d.Message).ToArray();
+        Assert.Contains(unknown, message => message.Contains("LogInformation"));
+        Assert.Contains(unknown, message => message.Contains("GetSection"));
+        Assert.Contains(unknown, message => message.Contains("SaveChanges"));
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
+    }
+
+    [Fact]
+    public void TierB_E2E_UnlistedFrameworkMember_StaysUnknown()
+    {
+        // With the references, a member the manifest does not list (DbContext's
+        // ChangeTracker getter and ChangeTracker.DetectChanges) still has no effect
+        // contract: binding to real metadata is not an effect grant.
+        var result = CompileFramework("cw, db:w, env:r", "    db.ChangeTracker.DetectChanges()");
+
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall
+            && d.Message.Contains("ChangeTracker.DetectChanges"));
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
+    }
+
+    [Fact]
+    public void TierB_E2E_LoggerExtensionWithoutImport_StaysUnknown()
+    {
+        // LogInformation is an extension method. Without `using Microsoft.Extensions.Logging`
+        // it is not in scope (C# would reject the call too), so nothing binds and the
+        // ILogger receiver's name does not borrow the LoggerExtensions entry.
+        var result = TestHarness.CompileWithEffects("""
+            module Test Test block
+              func LogSomething (Microsoft.Extensions.Logging.ILogger:logger) → void
+                ! cw
+                logger.LogInformation("Processing request")
+            """, enforceEffects: true, policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+            references: TestHarness.FrameworkReferences);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall
+            && d.Message.Contains("LogInformation"));
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
+    }
+
+    [Fact]
+    public void TierB_E2E_FrameworkCallNextToSourceCall_BothResolve()
+    {
+        // The module's C# image is compiled with the same explicit references, so a
+        // framework call does not leave an error in the image that would make the
+        // same file's source calls unproved.
+        var result = TestHarness.CompileWithEffects("""
+            module Test Test block
+              using Microsoft.Extensions.Logging
+              func Helper () → int
+                !
+                return 1
+              func Handle (ILogger:logger) → int
+                ! cw
+                logger.LogInformation("Starting request")
+                return Helper()
+            """, enforceEffects: true, policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+            references: TestHarness.FrameworkReferences);
+
+        AssertResolvedCleanly(result);
+    }
+
     /// <summary>
     /// A directly self-recursive function must not be reported as an unknown call target.
     ///

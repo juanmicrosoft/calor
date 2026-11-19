@@ -410,9 +410,10 @@ public sealed class Binder
                 return null;
             explicitTypes = resolvedTypes.OfType<Microsoft.CodeAnalysis.ITypeSymbol>().ToArray();
         }
+        var imports = computedReceiver is null ? null : MetadataExtensionImports(ctx);
         var result = computedReceiver is null ? binder.ResolveCall(receiverType, methodName, metaArgs)
             : binder.ResolveExpressionCall(receiverType, methodName, metaArgs, explicitTypes,
-                computedReceiver is BoundTypeReferenceExpression);
+                computedReceiver is BoundTypeReferenceExpression, imports: imports);
         if (!result.IsResolved) return ResolveContextualCall();
 
         if (result.Symbol!.IsGenericMethod && metaArgs.Any(argument => argument.Type is Microsoft.CodeAnalysis.IArrayTypeSymbol))
@@ -420,7 +421,8 @@ public sealed class Binder
             var preserved = computedReceiver is null
                 ? binder.ResolveCall(receiverType, methodName, metaArgs, preserveArrayAnnotations: true)
                 : binder.ResolveExpressionCall(receiverType, methodName, metaArgs, explicitTypes,
-                    computedReceiver is BoundTypeReferenceExpression, preserveArrayAnnotations: true);
+                    computedReceiver is BoundTypeReferenceExpression, preserveArrayAnnotations: true,
+                    imports: imports);
             if (!Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(result.Symbol, preserved.Symbol))
                 return null;
             // Accurate method-input facts must not implicitly expand initialization/return policy.
@@ -507,6 +509,52 @@ public sealed class Binder
                 ? type.WithNullableAnnotation(_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
                     ? Microsoft.CodeAnalysis.NullableAnnotation.None : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated)
                 : type;
+    }
+
+    private readonly Dictionary<string, bool> _metadataNamespaces = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The namespace imports a member call's metadata probe carries: the module's
+    /// plain <c>using N</c> directives visible from the current namespace scope,
+    /// limited to namespaces this metadata set actually contains. They put the
+    /// extension methods the generated C# can see (for example
+    /// <c>LoggerExtensions.LogInformation</c> under
+    /// <c>using Microsoft.Extensions.Logging</c>) in scope for the probe. Alias and
+    /// static imports are left out, so an extension they would supply stays
+    /// unresolved. Empty when the scope ancestry is not valid.
+    /// </summary>
+    private IReadOnlyList<string> MetadataExtensionImports(Metadata.MetadataContext context)
+    {
+        var visibleScopes = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = _currentNamespaceScopeId; id is not null;)
+        {
+            if (!visibleScopes.Add(id) || !_metadataNamespaceScopes.TryGetValue(id, out var scope))
+                return [];
+            id = scope.ParentScopeId;
+        }
+        return _metadataUsings
+            .Where(import => (import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId))
+                && import.Alias is null && !import.IsStatic)
+            .Select(import => import.Namespace.StartsWith("global::", StringComparison.Ordinal)
+                ? import.Namespace["global::".Length..]
+                : import.Namespace)
+            .Where(name => name.Length > 0 && MetadataNamespaceExists(context, name))
+            .Distinct(StringComparer.Ordinal)
+            .Select(name => "using " + string.Join(".", name.Split('.').Select(segment => "@" + segment.TrimStart('@'))) + ";")
+            .ToArray();
+    }
+
+    private bool MetadataNamespaceExists(Metadata.MetadataContext context, string name)
+    {
+        if (_metadataNamespaces.TryGetValue(name, out var exists))
+            return exists;
+        Microsoft.CodeAnalysis.INamespaceSymbol? current = context.HostCompilationForBinder.GlobalNamespace;
+        foreach (var segment in name.Split('.'))
+        {
+            var part = segment.TrimStart('@');
+            current = current?.GetNamespaceMembers().FirstOrDefault(member => member.Name == part);
+        }
+        return _metadataNamespaces[name] = current is not null;
     }
 
     private (bool Handled, Microsoft.CodeAnalysis.INamedTypeSymbol? Type) ResolveScopedMetadataType(
@@ -5932,9 +5980,26 @@ public sealed class Binder
             elementType = Metadata.MetadataBinderResult.ToBoundType(property.Type);
             metadataArray = property.Type as Microsoft.CodeAnalysis.IArrayTypeSymbol;
         }
+        // 0.30: the indexer of a non-array metadata receiver, for the effect pass. It does
+        // not change the access's type; only which accessor contract is charged.
+        Microsoft.CodeAnalysis.IPropertySymbol? indexer = null;
+        Microsoft.CodeAnalysis.ITypeSymbol? indexerReceiver = null;
+        if (NullabilityChecker.GetMethodInputArrayType(array) is null
+            && !array.HasUnknownInferredType && !index.HasUnknownInferredType
+            && array.Type is not BoundTypes.NominalBoundType { Declaration: not null }
+            && GetOrCreateMetadataBinder() is { } elementMetadata
+            && ResolveComputedMetadataType(elementMetadata.Context, array.Type.DisplayString)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol { TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error } receiver
+            && ResolveComputedMetadataType(elementMetadata.Context, index.Type.DisplayString) is { } elementIndexType)
+        {
+            indexer = elementMetadata.ResolveElementAccess(receiver, elementIndexType);
+            indexerReceiver = indexer is null ? null : receiver;
+        }
         return new BoundArrayAccess(arrayAccess.Span, array, index, resolvedType: elementType)
         {
-            MetadataArrayResultType = metadataArray
+            MetadataArrayResultType = metadataArray,
+            ResolvedIndexer = indexer,
+            ResolvedIndexerReceiver = indexerReceiver
         };
     }
 
