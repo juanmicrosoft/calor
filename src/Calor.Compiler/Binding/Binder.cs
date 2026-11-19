@@ -5980,9 +5980,26 @@ public sealed class Binder
             elementType = Metadata.MetadataBinderResult.ToBoundType(property.Type);
             metadataArray = property.Type as Microsoft.CodeAnalysis.IArrayTypeSymbol;
         }
+        // 0.30: the indexer of a non-array metadata receiver, for the effect pass. It does
+        // not change the access's type; only which accessor contract is charged.
+        Microsoft.CodeAnalysis.IPropertySymbol? indexer = null;
+        Microsoft.CodeAnalysis.ITypeSymbol? indexerReceiver = null;
+        if (NullabilityChecker.GetMethodInputArrayType(array) is null
+            && !array.HasUnknownInferredType && !index.HasUnknownInferredType
+            && array.Type is not BoundTypes.NominalBoundType { Declaration: not null }
+            && GetOrCreateMetadataBinder() is { } elementMetadata
+            && ResolveComputedMetadataType(elementMetadata.Context, array.Type.DisplayString)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol { TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error } receiver
+            && ResolveComputedMetadataType(elementMetadata.Context, index.Type.DisplayString) is { } elementIndexType)
+        {
+            indexer = elementMetadata.ResolveElementAccess(receiver, elementIndexType);
+            indexerReceiver = indexer is null ? null : receiver;
+        }
         return new BoundArrayAccess(arrayAccess.Span, array, index, resolvedType: elementType)
         {
-            MetadataArrayResultType = metadataArray
+            MetadataArrayResultType = metadataArray,
+            ResolvedIndexer = indexer,
+            ResolvedIndexerReceiver = indexerReceiver
         };
     }
 

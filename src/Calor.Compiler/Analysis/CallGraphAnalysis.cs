@@ -2656,6 +2656,9 @@ public sealed class CallGraphAnalysis
         internal Dictionary<(string CallerId, int Start, int End), Binding.BoundTypes.ArrayBoundType>
             ArrayTypes
         { get; } = new();
+        internal Dictionary<(string CallerId, int Start, int End), BoundArrayAccess>
+            ElementAccesses
+        { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
         /// variable's <c>DeclarationSpan</c>.</summary>
         public Dictionary<(string CallerId, int Start, int End), TextSpan> Declarations { get; } = new();
@@ -2776,6 +2779,10 @@ public sealed class CallGraphAnalysis
 
     public VariableSymbol? BoundVariable(string callerId, TextSpan reference) =>
         _boundValues.Variables.GetValueOrDefault((callerId, reference.Start, reference.End));
+
+    /// <summary>The bound element access at <paramref name="span"/> (<c>a[i]</c>), or null.</summary>
+    internal BoundArrayAccess? BoundElementAccess(string callerId, TextSpan span) =>
+        _boundValues.ElementAccesses.GetValueOrDefault((callerId, span.Start, span.End));
 
     internal Binding.BoundTypes.ArrayBoundType? BoundArrayReceiverType(string callerId, TextSpan expression) =>
         _boundValues.ArrayTypes.GetValueOrDefault((callerId, expression.Start, expression.End));
@@ -3846,6 +3853,8 @@ public sealed class CallGraphAnalysis
                         { Type: Binding.BoundTypes.NominalBoundType { RoslynSymbol: { } metadataValueType } })
                         boundValues.MetadataValueTypes.TryAdd(
                             (callerId, node.Span.Start, node.Span.End), metadataValueType);
+                    if (node is BoundArrayAccess elementAccess)
+                        boundValues.ElementAccesses.TryAdd((callerId, node.Span.Start, node.Span.End), elementAccess);
                     if (node is BoundExpression arrayExpression)
                     {
                         var arrayType = arrayExpression.MetadataArrayResultType is { } metadataArray

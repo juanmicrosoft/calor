@@ -7622,10 +7622,110 @@ public sealed class EffectEnforcementPass
             if (target is ReferenceNode rawBare && BarePreservedMemberAccess(rawBare) is { IsEmpty: false } rawAccess)
                 return EffectSet.From("mut").Union(rawAccess);
 
+            // An element store charges the receiver and index, `mut`, and the selected
+            // indexer's setter; a compound store (`a[i] += x`) also reads through the getter.
+            if (target is ArrayAccessNode element)
+                return InferFromExpression(element.Array).Union(InferFromExpression(element.Index))
+                    .Union(InferOperatorEffects(element))
+                    .Union(EffectSet.From("mut"))
+                    .Union(InferElementAccessor(element, read: readValue, write: true));
             var targetEffects = InferFromExpression(target);
-            return target is ArrayAccessNode or MultiDimArrayAccessNode
+            return target is MultiDimArrayAccessNode
                 ? targetEffects.Union(EffectSet.From("mut"))
                 : targetEffects;
+        }
+
+        /// <summary>
+        /// 0.30: the accessor an element access runs. An array element is built in and
+        /// charges nothing beyond its receiver and index. Any other receiver runs an indexer:
+        /// <list type="bullet">
+        ///   <item><description>A metadata indexer the binder selected is charged its
+        ///   manifest getter or setter (on the receiver type, then on the declaring type), so
+        ///   <c>List&lt;T&gt;</c>, <c>Dictionary</c> and <c>string</c> keep their manifest
+        ///   contracts and <c>IConfiguration</c>'s indexer is <c>env:r</c>.</description></item>
+        ///   <item><description>A source class's own non-virtual indexer is charged its
+        ///   accessor's effects.</description></item>
+        ///   <item><description>Everything else (an unresolved receiver, an inherited,
+        ///   virtual or overloaded source indexer, a metadata indexer without a contract) is
+        ///   <c>unknown</c>.</description></item>
+        /// </list>
+        /// Before 0.30 no element access charged its indexer at all.
+        /// </summary>
+        private EffectSet InferElementAccessor(ArrayAccessNode access, bool read, bool write)
+        {
+            if (!read && !write)
+                return EffectSet.Empty;
+            var bound = _context.CallGraph.BoundElementAccess(_context.CurrentFunctionId, access.Span);
+            if (bound is not null
+                && (Binding.NullabilityChecker.GetMethodInputArrayType(bound.Array) is not null
+                    || bound.Array.Type is Binding.BoundTypes.ArrayBoundType
+                    || _context.CallGraph.BoundArrayReceiverType(_context.CurrentFunctionId, access.Array.Span) is not null))
+                return EffectSet.Empty;
+
+            if (bound?.ResolvedIndexer is { } indexer)
+            {
+                var effects = EffectSet.Empty;
+                foreach (var (accessor, kind) in new[]
+                         {
+                             (read ? indexer.GetMethod : null, EffectMemberKind.Getter),
+                             (write ? indexer.SetMethod : null, EffectMemberKind.Setter)
+                         })
+                {
+                    if ((kind == EffectMemberKind.Getter && !read) || (kind == EffectMemberKind.Setter && !write))
+                        continue;
+                    if (accessor is null)
+                    {
+                        effects = effects.Union(UnknownResolvedOperation(
+                            $"{indexer.ContainingType.ToDisplayString()}.this[]", access.Span));
+                        continue;
+                    }
+                    var resolution = EffectResolution(bound.ResolvedIndexerReceiver ?? indexer.ContainingType);
+                    if (resolution.Status == EffectResolutionStatus.Unknown
+                        && !Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                            bound.ResolvedIndexerReceiver?.OriginalDefinition, indexer.ContainingType.OriginalDefinition))
+                        resolution = EffectResolution(indexer.ContainingType);
+                    effects = effects.Union(resolution.Status == EffectResolutionStatus.Unknown
+                        ? UnknownResolvedOperation(
+                            $"{indexer.ContainingType.ToDisplayString()}.{accessor.Name}", access.Span)
+                        : resolution.Effects);
+
+                    EffectResolution EffectResolution(Microsoft.CodeAnalysis.ITypeSymbol owner) =>
+                        _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                            Binding.Metadata.MetadataBinderResult.ToNominalBoundType(owner),
+                            indexer.MetadataName, null, kind));
+                }
+                return effects;
+            }
+
+            if (bound?.Array.Type is Binding.BoundTypes.NominalBoundType { Declaration: { } declaration }
+                && _context.ClassesByName.TryGetValue(declaration.Name, out var owner))
+            {
+                var candidates = CallGraphAnalysis.EnumerateIndexers(owner)
+                    .Where(candidate => candidate.Parameters.Count == 1).ToArray();
+                if (candidates is [var sourceIndexer]
+                    && !sourceIndexer.IsVirtual && !sourceIndexer.IsAbstract && !sourceIndexer.IsOverride)
+                {
+                    var ids = new List<string>();
+                    var missing = false;
+                    if (read)
+                    {
+                        if (sourceIndexer.Getter is null) missing = true;
+                        else ids.Add($"{owner.Name}.{sourceIndexer.Id}.get");
+                    }
+                    if (write)
+                    {
+                        if (sourceIndexer.Setter is null) missing = true;
+                        else ids.Add($"{owner.Name}.{sourceIndexer.Id}.set");
+                    }
+                    if (!missing)
+                        return InferFromInternalFunctions(ids);
+                }
+            }
+
+            var receiverName = bound?.Array.Type is Binding.BoundTypes.UnresolvedBoundType or null
+                ? Binding.Binder.DottedReferenceName(access.Array) ?? "<expression>"
+                : bound.Array.Type.DisplayString;
+            return UnknownResolvedOperation($"{receiverName}[]", access.Span);
         }
 
         /// <summary>A qualified read of a source constant (<c>Holder.Max</c>) runs no initializer.</summary>
@@ -7739,7 +7839,8 @@ public sealed class EffectEnforcementPass
                     .Union(InferFromExpression(cond.WhenFalse)),
                 NewExpressionNode newExpr => InferFromNewExpression(newExpr),
                 FieldAccessNode field => InferFromFieldAccess(field),
-                ArrayAccessNode array => InferFromExpression(array.Array).Union(InferFromExpression(array.Index)),
+                ArrayAccessNode array => InferFromExpression(array.Array).Union(InferFromExpression(array.Index))
+                    .Union(InferElementAccessor(array, read: true, write: false)),
                 LambdaExpressionNode lambda => InferFromLambda(lambda),
                 AwaitExpressionNode await_ => InferFromExpression(await_.Awaited),
                 ThrowExpressionNode throwExpr => EffectSet.From("throw").Union(InferFromExpression(throwExpr.Exception)),

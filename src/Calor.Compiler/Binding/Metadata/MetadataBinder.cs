@@ -208,6 +208,38 @@ internal sealed class MetadataBinder
     /// <c>this[]</c>. Return the property symbol so downstream can bind to
     /// the getter/setter as needed.
     /// </summary>
+    /// <summary>
+    /// 0.30: the indexer an element access selects, by Roslyn's own lookup (inherited
+    /// and interface indexers included). Null when the probe does not bind to exactly one
+    /// readable or writable indexer.
+    /// </summary>
+    internal IPropertySymbol? ResolveElementAccess(ITypeSymbol receiverType, ITypeSymbol indexType)
+    {
+        var receiverName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var indexName = indexType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (_elementAccesses.TryGetValue((receiverName, indexName), out var cached))
+            return cached;
+        return _elementAccesses[(receiverName, indexName)] = ProbeElementAccess(receiverName, indexName);
+    }
+
+    private readonly Dictionary<(string Receiver, string Index), IPropertySymbol?> _elementAccesses = new();
+
+    private IPropertySymbol? ProbeElementAccess(string receiverName, string indexName)
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "#nullable enable\nclass __CalorElementAccessProbe { void Probe() {\n" +
+            $"{indexName} __index = default!;\n" +
+            $"_ = (({receiverName})default!)[__index];\n" +
+            "} }");
+        var compilation = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        if (model.GetDiagnostics().Any(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            return null;
+        var access = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().SingleOrDefault();
+        return access is not null && model.GetSymbolInfo(access).Symbol is IPropertySymbol { IsIndexer: true } indexer
+            ? indexer : null;
+    }
+
     public IPropertySymbol? ResolveIndexer(
         ITypeSymbol receiverType,
         IReadOnlyList<MetadataArgument> arguments)
