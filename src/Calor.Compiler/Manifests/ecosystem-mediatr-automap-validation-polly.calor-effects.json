@@ -1,83 +1,79 @@
 {
   "version": "1.0",
-  "description": "Effect declarations for MediatR, AutoMapper, FluentValidation, and Polly",
+  "description": "Effect declarations for MediatR, AutoMapper, FluentValidation, and Polly. Members that dispatch to user-supplied handlers, mapping configuration, validation rules or stored policy callbacks are 'unknown'; builder members that only record configuration are 'mut'. No namespace-wide defaults.",
   "confidence": "reviewed",
   "mappings": [
     {
       "type": "MediatR.IMediator",
       "methods": {
-        "Send": [],
-        "Publish": [],
-        "CreateStream": []
+        "Send": ["unknown"],
+        "Publish": ["unknown"],
+        "CreateStream": ["unknown"]
       }
     },
     {
       "type": "MediatR.ISender",
       "methods": {
-        "Send": [],
-        "CreateStream": []
+        "Send": ["unknown"],
+        "CreateStream": ["unknown"]
       }
     },
     {
       "type": "MediatR.IPublisher",
       "methods": {
-        "Publish": []
+        "Publish": ["unknown"]
       }
     },
     {
       "type": "MediatR.Mediator",
       "methods": {
-        "Send": [],
-        "Publish": [],
-        "CreateStream": []
+        "Send": ["unknown"],
+        "Publish": ["unknown"],
+        "CreateStream": ["unknown"]
       }
     },
     {
       "type": "AutoMapper.IMapper",
-      "defaultEffects": [],
       "methods": {
-        "Map": [],
+        "Map": ["unknown"],
         "ProjectTo": []
       }
     },
     {
       "type": "AutoMapper.Mapper",
-      "defaultEffects": [],
       "methods": {
-        "Map": [],
+        "Map": ["unknown"],
         "ProjectTo": []
       }
     },
     {
       "type": "AutoMapper.MapperConfiguration",
-      "defaultEffects": [],
       "methods": {
         "CreateMapper": [],
-        "AssertConfigurationIsValid": []
+        "AssertConfigurationIsValid": ["throw"]
       }
     },
     {
       "type": "FluentValidation.AbstractValidator`1",
-      "defaultEffects": [],
       "methods": {
-        "Validate": [],
-        "ValidateAsync": [],
-        "ValidateAndThrow": ["throw"],
-        "ValidateAndThrowAsync": ["throw"],
+        "Validate": ["unknown"],
+        "ValidateAsync": ["unknown"],
+        "ValidateAndThrow": ["unknown"],
+        "ValidateAndThrowAsync": ["unknown"],
         "RuleFor": ["mut"],
         "RuleForEach": ["mut"],
         "Include": ["mut"],
         "RuleSet": ["mut"],
         "When": ["mut"],
         "Unless": ["mut"],
-        "PreValidate": []
+        "PreValidate": ["unknown"]
       }
     },
     {
       "type": "FluentValidation.DefaultValidatorExtensions",
       "methods": {
-        "ValidateAndThrow": ["throw"],
-        "ValidateAndThrowAsync": ["throw"]
+        "ValidateAndThrow": ["unknown"],
+        "ValidateAndThrowAsync": ["unknown"]
       }
     },
     {
@@ -87,18 +83,16 @@
     },
     {
       "type": "FluentValidation.IValidator",
-      "defaultEffects": [],
       "methods": {
-        "Validate": [],
-        "ValidateAsync": []
+        "Validate": ["unknown"],
+        "ValidateAsync": ["unknown"]
       }
     },
     {
       "type": "FluentValidation.IValidator`1",
-      "defaultEffects": [],
       "methods": {
-        "Validate": [],
-        "ValidateAsync": []
+        "Validate": ["unknown"],
+        "ValidateAsync": ["unknown"]
       }
     },
     {
@@ -112,14 +106,13 @@
     },
     {
       "type": "Polly.Policy",
-      "defaultEffects": [],
       "methods": {
         "Handle": [],
         "HandleResult": [],
-        "Execute": [],
-        "ExecuteAsync": [],
-        "ExecuteAndCapture": [],
-        "ExecuteAndCaptureAsync": [],
+        "Execute": ["unknown"],
+        "ExecuteAsync": ["unknown"],
+        "ExecuteAndCapture": ["unknown"],
+        "ExecuteAndCaptureAsync": ["unknown"],
         "WaitAndRetry": [],
         "WaitAndRetryAsync": [],
         "WaitAndRetryForever": [],
@@ -147,43 +140,36 @@
     {
       "type": "Polly.ISyncPolicy",
       "methods": {
-        "Execute": [],
-        "ExecuteAndCapture": []
+        "Execute": ["unknown"],
+        "ExecuteAndCapture": ["unknown"]
       }
     },
     {
       "type": "Polly.IAsyncPolicy",
       "methods": {
-        "ExecuteAsync": [],
-        "ExecuteAndCaptureAsync": []
+        "ExecuteAsync": ["unknown"],
+        "ExecuteAndCaptureAsync": ["unknown"]
       }
     },
     {
       "type": "Polly.ResiliencePipeline",
       "methods": {
-        "Execute": [],
-        "ExecuteAsync": []
+        "Execute": ["unknown"],
+        "ExecuteAsync": ["unknown"]
       }
     },
     {
       "type": "Polly.ResiliencePipelineBuilder",
-      "defaultEffects": [],
       "methods": {
-        "AddRetry": [],
-        "AddCircuitBreaker": [],
-        "AddTimeout": [],
-        "AddRateLimiter": [],
-        "AddFallback": [],
-        "AddHedging": [],
-        "AddConcurrencyLimiter": [],
+        "AddRetry": ["mut"],
+        "AddCircuitBreaker": ["mut"],
+        "AddTimeout": ["mut"],
+        "AddRateLimiter": ["mut"],
+        "AddFallback": ["mut"],
+        "AddHedging": ["mut"],
+        "AddConcurrencyLimiter": ["mut"],
         "Build": []
       }
     }
-  ],
-  "namespaceDefaults": {
-    "AutoMapper": [],
-    "FluentValidation": [],
-    "FluentValidation.Results": [],
-    "Polly": []
-  }
+  ]
 }

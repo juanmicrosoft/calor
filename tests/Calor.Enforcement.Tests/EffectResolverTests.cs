@@ -1387,41 +1387,94 @@ public class EffectResolverTests
         Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
     }
 
-    [Fact]
-    public void TierB_IServiceProvider_GetService_IsPure()
+    /// <summary>
+    /// 0.30 manifest review: a member whose job is to run user-supplied code is pinned to
+    /// the manifest's "unknown" code (a definitive answer that no wildcard, namespace
+    /// default or IL analysis can weaken), never to an empty row. Service construction,
+    /// hosted services, options configuration callbacks, logger providers and handler
+    /// dispatch all run code the manifest cannot see.
+    /// </summary>
+    [Theory]
+    [InlineData("System.IServiceProvider", "GetService", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions", "GetRequiredService", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions", "CreateScope", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.Hosting.IHost", "RunAsync", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.Hosting.IHost", "StartAsync", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.Hosting.IHostBuilder", "Build", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions", "Run", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.Logging.ILogger", "BeginScope", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.Logging.ILoggerFactory", "CreateLogger", EffectMemberKind.Method)]
+    [InlineData("Microsoft.Extensions.Options.IOptions`1", "Value", EffectMemberKind.Getter)]
+    [InlineData("Microsoft.Extensions.Options.IOptionsMonitor`1", "CurrentValue", EffectMemberKind.Getter)]
+    public void TierB_MembersThatRunUserCode_AreUnknown(string type, string member, EffectMemberKind kind)
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("Microsoft.Extensions.DependencyInjection.IServiceProvider", "GetService"));
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, member, kind: kind));
 
-        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+        Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
+        Assert.True(resolution.Effects.IsUnknown, $"{type}.{member} resolved to {resolution.Effects}");
     }
 
+    /// <summary>
+    /// 0.30 manifest review: no namespace-wide default stands in for an unlisted member of a
+    /// framework or ecosystem library; it stays unknown. (Before, every unlisted type in
+    /// Microsoft.Extensions.Logging was cw and in ...Configuration env:r; DI, Options,
+    /// Serilog, AutoMapper, FluentValidation and Polly members were pure.)
+    /// </summary>
     [Theory]
-    [InlineData("Microsoft.Extensions.Hosting.IHost", "RunAsync", "network_readwrite")]
-    [InlineData("Microsoft.Extensions.Hosting.IHost", "StartAsync", "network_readwrite")]
-    [InlineData("Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions", "Run", "network_readwrite")]
-    public void TierB_Hosting_ResolvesToNetRw(string type, string method, string expectedValue)
+    [InlineData("Microsoft.Extensions.Logging.LoggerMessage", "Define")]
+    [InlineData("Microsoft.Extensions.Configuration.ConfigurationBuilder", "Build")]
+    [InlineData("Microsoft.Extensions.DependencyInjection.ActivatorUtilities", "CreateInstance")]
+    [InlineData("Microsoft.Extensions.Options.OptionsFactory`1", "Create")]
+    [InlineData("Microsoft.Extensions.Caching.Memory.MemoryCache", "Compact")]
+    [InlineData("Serilog.Debugging.SelfLog", "WriteLine")]
+    [InlineData("AutoMapper.Profile", "CreateMap")]
+    [InlineData("FluentValidation.InlineValidator`1", "Add")]
+    [InlineData("Polly.Context", "Add")]
+    [InlineData("Dapper.SqlMapper+Identity", "ForDynamicParameters")]
+    [InlineData("Npgsql.NpgsqlConnection", "Open")]
+    public void Ecosystem_UnlistedMembers_HaveNoNamespaceDefault(string type, string method)
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
 
         var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
 
-        Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
-        Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
+        Assert.Equal(EffectResolutionStatus.Unknown, resolution.Status);
     }
 
     [Fact]
-    public void TierB_IOptions_Value_IsPure()
+    public void TierB_ConfigurationBinder_GetValue_IsEnvRead()
     {
+        // The key used to sit under ConfigurationExtensions, which declares no GetValue.
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("Microsoft.Extensions.Options.IOptions`1", "Value", kind: EffectMemberKind.Getter));
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(
+            "Microsoft.Extensions.Configuration.ConfigurationBinder", "GetValue"));
 
-        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == "environment_read");
+        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(EffectResolverKey.FromStrings(
+            "Microsoft.Extensions.Configuration.ConfigurationExtensions", "GetValue")).Status);
+    }
+
+    [Theory]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "Add")]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "AddAsync")]
+    [InlineData("Microsoft.EntityFrameworkCore.DbSet`1", "Attach")]
+    public void TierB_EfCoreTrackingWithValueGeneration_IsMutAndDbReadWrite(string type, string method)
+    {
+        // Starting to track an entity runs its key's value generator, which for HiLo
+        // sequences reads and advances a database sequence.
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
+
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == "heap_write");
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == "database_readwrite");
     }
 
     [Theory]
@@ -1682,31 +1735,37 @@ public class EffectResolverTests
     // Ecosystem manifest tests: MediatR, AutoMapper, FluentValidation, Polly
     // ========================================================================
 
+    /// <summary>
+    /// 0.30 manifest review: dispatching to handlers, running mapping configuration,
+    /// evaluating validation rules and executing a policy (with its stored onRetry/fallback
+    /// callbacks) all run user code, so they are unknown, not pure.
+    /// </summary>
     [Theory]
     [InlineData("MediatR.IMediator", "Send")]
     [InlineData("MediatR.IMediator", "Publish")]
     [InlineData("AutoMapper.IMapper", "Map")]
-    [InlineData("AutoMapper.IMapper", "ProjectTo")]
     [InlineData("FluentValidation.IValidator", "Validate")]
     [InlineData("FluentValidation.IValidator", "ValidateAsync")]
+    [InlineData("FluentValidation.AbstractValidator`1", "ValidateAndThrow")]
     [InlineData("Polly.Policy", "Execute")]
     [InlineData("Polly.Policy", "ExecuteAsync")]
-    public void Ecosystem_MediatR_AutoMapper_FluentValidation_Polly_ArePure(string type, string method)
+    public void Ecosystem_MediatR_AutoMapper_FluentValidation_Polly_DispatchToUserCode_AreUnknown(string type, string method)
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
         var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
-        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.True(result.Effects.IsUnknown, $"{type}.{method} resolved to {result.Effects}");
     }
 
     [Fact]
-    public void Ecosystem_FluentValidation_ValidateAndThrow_HasThrowEffect()
+    public void Ecosystem_AutoMapper_ProjectTo_StaysPure()
     {
+        // ProjectTo only builds an expression tree from the configuration; nothing user-defined runs.
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(EffectResolverKey.FromStrings("FluentValidation.AbstractValidator`1", "ValidateAndThrow"));
-        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
-        Assert.Contains(result.Effects.Effects, e => e.Value == "intentional");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("AutoMapper.IMapper", "ProjectTo"));
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
     [Theory]

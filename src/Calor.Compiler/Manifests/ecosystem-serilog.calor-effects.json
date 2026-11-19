@@ -40,7 +40,6 @@
     },
     {
       "type": "Serilog.LoggerConfiguration",
-      "defaultEffects": [],
       "methods": {
         "MinimumLevel": [],
         "WriteTo": [],
@@ -49,7 +48,7 @@
         "Destructure": [],
         "ReadFrom": [],
         "AuditTo": [],
-        "CreateLogger": []
+        "CreateLogger": ["unknown"]
       }
     },
     {
@@ -63,7 +62,7 @@
         "Fatal": ["cw"],
         "Write": ["cw"],
         "ForContext": [],
-        "Dispose": []
+        "Dispose": ["cw"]
       }
     },
     {
@@ -77,27 +76,19 @@
     },
     {
       "type": "Serilog.Configuration.LoggerSinkConfiguration",
-      "defaultEffects": [],
-      "methods": { "*": [] }
+      "methods": { "*": ["mut"] }
     },
     {
       "type": "Serilog.Configuration.LoggerMinimumLevelConfiguration",
-      "defaultEffects": [],
-      "methods": { "*": [] }
+      "methods": { "*": ["mut"] }
     },
     {
       "type": "Serilog.Configuration.LoggerEnrichmentConfiguration",
-      "defaultEffects": [],
-      "methods": { "*": [] }
+      "methods": { "*": ["mut"] }
     },
     {
       "type": "Serilog.Configuration.LoggerAuditSinkConfiguration",
-      "defaultEffects": [],
-      "methods": { "*": [] }
+      "methods": { "*": ["mut"] }
     }
-  ],
-  "namespaceDefaults": {
-    "Serilog": ["cw"],
-    "Serilog.Events": []
-  }
+  ]
 }

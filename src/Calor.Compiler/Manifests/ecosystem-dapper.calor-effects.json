@@ -58,8 +58,5 @@
       "defaultEffects": [],
       "methods": { "*": [] }
     }
-  ],
-  "namespaceDefaults": {
-    "Dapper": ["db:rw"]
-  }
+  ]
 }
