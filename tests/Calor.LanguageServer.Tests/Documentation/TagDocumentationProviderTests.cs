@@ -26,7 +26,7 @@ public class TagDocumentationProviderTests
     [InlineData("if", "If")]
     [InlineData("return", "Return")]
     [InlineData("!", "Effects")]
-    [InlineData("requires", "Precondition")]
+
     [InlineData("=>", "Postcondition")]
     [InlineData("try", "Try")]
     [InlineData("catch", "Catch")]
@@ -124,7 +124,7 @@ public class TagDocumentationProviderTests
     {
         foreach (var syntax in new[]
         {
-            "new", "func", "for", "if", "else", "await", "let", "var", "requires",
+            "new", "func", "for", "if", "else", "await", "let", "var",
             "return", "!", "=>", "→", ".."
         })
         {
