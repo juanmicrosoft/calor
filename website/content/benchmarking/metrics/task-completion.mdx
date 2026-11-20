@@ -171,11 +171,12 @@ public static class Functions
 }
 ```
 
-For `(6, 2)` both return `3`. With runtime checks enabled, Calor's zero-divisor
-contract throws `ContractViolationException`; the C# guard throws
-`ArgumentException`. With Calor checks off, division by zero reaches the ordinary
-`DivideByZeroException`. These are explicit boundary observations, not a model
-task-completion score or a claim of exception equivalence.
+For `(6, 2)` both return `3`. For `(6, 0)`, Calor's zero-divisor precondition
+throws `ArgumentOutOfRangeException`; the C# guard throws `ArgumentException`.
+The Calor precondition is a parameter refinement, so it is also checked with
+`--contract-mode off`, and the division never runs. These are explicit boundary
+observations, not a model task-completion score or a claim of exception
+equivalence.
 
 ---
 

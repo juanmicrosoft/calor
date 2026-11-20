@@ -182,8 +182,9 @@ public static int FindMax(int[] arr)
 
 For non-null, non-empty arrays, both examples compute the same maximum, including
 single-element and all-negative inputs. The examples reject an empty array rather
-than return zero: with runtime contracts enabled, Calor raises
-`ContractViolationException`; C# raises `ArgumentException`.
+than return zero: Calor raises `ArgumentOutOfRangeException` from its
+`#.Length > 0` precondition in every contract mode, including
+`--contract-mode off`; C# raises `ArgumentException`.
 
 The original Calor precondition is deliberately unchanged. It accesses
 `arr.Length` without first checking for null, whereas the C# example explicitly

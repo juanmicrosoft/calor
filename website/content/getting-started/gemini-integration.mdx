@@ -99,8 +99,9 @@ module GeminiDivision
 ```
 
 `Divide(9, 2)` returns `4`, and `Divide(9, -2)` returns `-4`. Integer division
-truncates toward zero. With runtime contracts enabled, `Divide(9, 0)` fails its
-precondition; with contracts off, it throws `DivideByZeroException` instead.
+truncates toward zero. `Divide(9, 0)` fails its precondition and throws
+`ArgumentOutOfRangeException`. It does so with `--contract-mode off` too, so
+the division by zero never runs.
 `Divide(int.MinValue, -1)` still throws `OverflowException` in both modes.
 The nonzero-divisor contract does not exclude that overflow case.
 

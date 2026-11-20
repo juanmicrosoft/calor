@@ -47,8 +47,8 @@ module ServerContracts
 ```
 
 `Main()` returns `10`. The short-circuiting null check precedes the length
-read. With runtime contracts enabled, invalid ports, null or empty hostnames,
-and nonpositive connection limits fail at entry.
+read. Invalid ports, null or empty hostnames, and nonpositive connection limits
+fail at entry. They fail in every contract mode, including `--contract-mode off`.
 
 This is a contract example, not a server implementation or an exact conversion
 of the C# function. Its ordinary parameter types remain `int` and `string`.
@@ -62,12 +62,13 @@ rules.
 
 ### What Happens in the Emitted C#
 
-With runtime contract checks enabled, a failed parameter refinement throws
-`ArgumentOutOfRangeException` naming the parameter. It does not reproduce the
-original C# example's other `ArgumentException` subclasses or messages.
+A failed parameter refinement throws `ArgumentOutOfRangeException`. Its
+`ParamName` is the parameter, and its message is
+`Violation of inline refinement for parameter '<name>'`. It does not reproduce
+the original C# example's other `ArgumentException` subclasses or messages.
 
-Turning runtime contracts off removes these checks. It does not make invalid
-inputs valid. A refinement is rechecked when the body assigns that parameter,
+`--contract-mode off` does not remove these checks. It removes only
+postcondition (`=>`) and invariant checks. A refinement is rechecked when the body assigns that parameter,
 but it does not constrain assignments to ordinary local variables.
 
 ## Part 2 — Financial Calculations with Input and Output Contracts
@@ -89,8 +90,9 @@ module BankingContracts
     return Transfer(100, 30)
 ```
 
-`Main()` returns `70`. With runtime contracts enabled, `Transfer(3, 5)` fails
-the sufficient-funds precondition before subtraction.
+`Main()` returns `70`. `Transfer(3, 5)` fails the sufficient-funds
+precondition before subtraction. It throws `ArgumentOutOfRangeException` naming
+`amount`, in every contract mode.
 
 ### Requesting Verification
 
@@ -152,10 +154,11 @@ module DivisionContracts
     return Divide(-7, 3)
 ```
 
-`Main()` returns `-2`, truncating toward zero. With runtime contracts enabled,
-`Divide(1, 0)` and `Divide(-2147483648, -1)` fail their entry requirements.
-With checks off, the body throws `DivideByZeroException` and
-`OverflowException`, respectively.
+`Main()` returns `-2`, truncating toward zero. `Divide(1, 0)` and
+`Divide(-2147483648, -1)` fail the entry requirement on `b` and throw
+`ArgumentOutOfRangeException`. With `--contract-mode off` they throw the same
+exception, because preconditions are parameter refinements. The body never
+reaches `DivideByZeroException` or `OverflowException`.
 
 ### Step 1: Inspect the Exact Program
 

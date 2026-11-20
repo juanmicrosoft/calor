@@ -183,10 +183,10 @@ public class DocDriftCheckerTests
             "global::Math.MathModule.Factorial(5)" })]
     [InlineData("benchmarking/metrics/error-detection.mdx", 5, 0,
         new[] { "DivisionSignals", "NullSignals", "BoundsSignals", "BuggyCaller", "NullableSignals" },
-        new[] { "4", "3", "42", "Requires", "3" },
+        new[] { "4", "3", "42", "Refinement:b", "3" },
         new[] { "GlobalModule.Divide(9, 2)", "GlobalModule.Length(\"abc\")",
             "GlobalModule.At(new int[] { 42 }, 0)",
-            "((System.Func<string>)(() => { try { GlobalModule.Trigger(9, 5); return \"not rejected\"; } catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); } }))()",
+            "((System.Func<string>)(() => { try { GlobalModule.Trigger(9, 5); return \"not rejected\"; } catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); } catch (System.ArgumentOutOfRangeException failure) { return \"Refinement:\" + failure.ParamName; } }))()",
             "GlobalModule.SafeDivide(6, 2)" })]
     [InlineData("benchmarking/metrics/task-completion.mdx", 2, 0,
         new[] { "TaskSafeDivide", "TaskNormalizeScore" }, new[] { "3", "75" },
@@ -436,11 +436,11 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("ContractDivide", "GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]
-    [InlineData("ContractDivide", "GlobalModule.Divide(-1, 1)", "!ContractViolationException", "-1")]
-    [InlineData("ContractClamp", "GlobalModule.Clamp(4, 10, 0)", "!ContractViolationException", "10")]
+    [InlineData("ContractDivide", "GlobalModule.Divide(9, 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("ContractDivide", "GlobalModule.Divide(-1, 1)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("ContractClamp", "GlobalModule.Clamp(4, 10, 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("NonEmptyCollection", "GlobalModule.First(System.Array.Empty<int>())",
-        "!ContractViolationException", "!IndexOutOfRangeException")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("AbsoluteValue", "GlobalModule.Abs(int.MinValue)", "!OverflowException", "!OverflowException")]
     public void PublicContracts_SeparateEnabledGuardsFromBodyBehavior(
         string module, string expression, string enabled, string disabled)
@@ -489,11 +489,11 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("PortConstraint", "GlobalModule.SelectPort(0)", "!ContractViolationException", "0")]
-    [InlineData("PortConstraint", "GlobalModule.SelectPort(65536)", "!ContractViolationException", "65536")]
-    [InlineData("TextConstraint", "GlobalModule.Length(\"\")", "!ContractViolationException", "0")]
-    [InlineData("TextConstraint", "GlobalModule.Length(null!)", "!ContractViolationException", "!NullReferenceException")]
-    [InlineData("TransferConstraint", "GlobalModule.Transfer(3, 5)", "!ContractViolationException", "-2")]
+    [InlineData("PortConstraint", "GlobalModule.SelectPort(0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("PortConstraint", "GlobalModule.SelectPort(65536)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("TextConstraint", "GlobalModule.Length(\"\")", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("TextConstraint", "GlobalModule.Length(null!)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("TransferConstraint", "GlobalModule.Transfer(3, 5)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("ConstraintBoundary", "GlobalModule.Reset(5)", "-1", "-1")]
     public void PublicValueConstraints_SeparateEntryGuardsFromNominalAndAssignmentInvariants(
         string module, string expression, string enabled, string disabled)
@@ -518,10 +518,10 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData(-1, "!ContractViolationException")]
+    [InlineData(-1, "!ArgumentOutOfRangeException")]
     [InlineData(0, "1")]
     [InlineData(12, "479001600")]
-    [InlineData(13, "!ContractViolationException")]
+    [InlineData(13, "!ArgumentOutOfRangeException")]
     public void PublicClaudeGuide_FactorialUsesActualCheckedIntegerBounds(int value, string expected)
     {
         var path = "website/content/getting-started/claude-integration.mdx";
@@ -541,15 +541,15 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(0, \"localhost\", 10)", "!ContractViolationException", "10")]
-    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(65536, \"localhost\", 10)", "!ContractViolationException", "10")]
-    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, \"\", 10)", "!ContractViolationException", "10")]
-    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, null!, 10)", "!ContractViolationException", "10")]
-    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, \"localhost\", 0)", "!ContractViolationException", "0")]
-    [InlineData("BankingContracts", "GlobalModule.Transfer(3, 5)", "!ContractViolationException", "-2")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(0, \"localhost\", 10)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(65536, \"localhost\", 10)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, \"\", 10)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, null!, 10)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("ServerContracts", "GlobalModule.ConfigureServer(443, \"localhost\", 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("BankingContracts", "GlobalModule.Transfer(3, 5)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("MissingFundsContract", "GlobalModule.Transfer(3, 5)", "!ContractViolationException", "-2")]
-    [InlineData("DivisionContracts", "GlobalModule.Divide(1, 0)", "!ContractViolationException", "!DivideByZeroException")]
-    [InlineData("DivisionContracts", "GlobalModule.Divide(int.MinValue, -1)", "!ContractViolationException", "!OverflowException")]
+    [InlineData("DivisionContracts", "GlobalModule.Divide(1, 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("DivisionContracts", "GlobalModule.Divide(int.MinValue, -1)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     public void PublicInputContractsTutorial_ObservesOriginalBoundaryCallsWithChecksEnabledAndOff(
         string module, string expression, string enabled, string disabled)
     {
@@ -573,7 +573,7 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("BankingContracts", "Requires")]
+    [InlineData("BankingContracts", "Refinement:amount")]
     [InlineData("MissingFundsContract", "Ensures")]
     public void PublicInputContractsTutorial_IdentifiesActualFailedContractKind(string module, string expectedKind)
     {
@@ -591,6 +591,7 @@ public class DocDriftCheckerTests
                 {
                     try { return GlobalModule.Transfer(3, 5); }
                     catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); }
+                    catch (System.ArgumentOutOfRangeException failure) { return "Refinement:" + failure.ParamName; }
                 }
             }
             """);
@@ -673,7 +674,7 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("GlobalModule.Divide(9, 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("GlobalModule.Divide(int.MinValue, -1)", "!OverflowException", "!OverflowException")]
     public void PublicEnforcementOpportunity_SeparatesContractGuardsFromArithmetic(
         string expression, string enabled, string disabled)
@@ -698,10 +699,11 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData(2, "4")]
-    [InlineData(0, "!ContractViolationException")]
-    [InlineData(int.MaxValue, "!OverflowException")]
-    public void PublicBackendReference_CompilesAndExecutesBothPublishedCSharpContractApis(int input, string expected)
+    [InlineData(2, "4", "4")]
+    [InlineData(0, "!ArgumentOutOfRangeException", "!ContractViolationException")]
+    [InlineData(int.MaxValue, "!OverflowException", "!OverflowException")]
+    public void PublicBackendReference_CompilesAndExecutesBothPublishedCSharpContractApis(
+        int input, string preconditionExpected, string postconditionExpected)
     {
         const string path = "website/content/semantics/dotnet-backend.mdx";
         var content = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), path));
@@ -709,28 +711,31 @@ public class DocDriftCheckerTests
                 @"```csharp\r?\n(?<body>.*?)\r?\n```",
                 System.Text.RegularExpressions.RegexOptions.Singleline)
             .Select(match => match.Groups["body"].Value)
-            .Where(body => body.Contains("public int MyFunction(int x)", StringComparison.Ordinal)).ToArray();
+            .Where(body => body.Contains("public static int MyFunction(int x)", StringComparison.Ordinal)).ToArray();
+        // The first sample is the precondition (parameter refinement) lowering; the second is the postcondition.
         Assert.Equal(2, implementations.Length);
-        foreach (var implementation in implementations)
+        var expectations = new[] { preconditionExpected, postconditionExpected };
+        for (var index = 0; index < implementations.Length; index++)
         {
             var observed = InteropScope.RefOutImplementationTests.Run($$"""
-                public class BackendContractExample
+                using System;
+                public static class BackendContractExample
                 {
-                    {{implementation}}
+                    {{implementations[index]}}
                 }
                 public static class Probe
                 {
-                    public static object? Run() => new BackendContractExample().MyFunction({{input}});
+                    public static object? Run() => BackendContractExample.MyFunction({{input}});
                 }
                 """);
-            Assert.Equal(expected, observed);
+            Assert.Equal(expectations[index], observed);
         }
     }
 
     [Theory]
     [InlineData("CoreOverflow", "GlobalModule.Increment(int.MaxValue)", "!OverflowException", "!OverflowException")]
-    [InlineData("CoreRequires", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
-    [InlineData("CoreRequires", "GlobalModule.Positive(-1)", "!ContractViolationException", "-1")]
+    [InlineData("CoreRequires", "GlobalModule.Positive(0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("CoreRequires", "GlobalModule.Positive(-1)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("CoreEnsures", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
     [InlineData("CoreNullableValues", "GlobalModule.Fallback(null)", "none", "none")]
     [InlineData("CoreNullableValues", "GlobalModule.Fallback(\"abc\")", "abc", "abc")]
@@ -763,7 +768,7 @@ public class DocDriftCheckerTests
     [InlineData(9, 5, "5")]
     [InlineData(-2, 5, "-2")]
     [InlineData(0, 0, "0")]
-    [InlineData(9, -1, "!ContractViolationException")]
+    [InlineData(9, -1, "!ArgumentOutOfRangeException")]
     public void PublicAdoptionPilot_RetainsExactClampAndContractBehavior(int amount, int cap, string expected)
     {
         const string path = "website/content/guides/adoption-playbook.mdx";
@@ -878,7 +883,7 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("CoreOverflow", "GlobalModule.Increment(int.MaxValue)", "!OverflowException", "!OverflowException")]
-    [InlineData("CoreRequires", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    [InlineData("CoreRequires", "GlobalModule.Positive(0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("CoreEnsures", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
     public void MarkdownCoreSemantics_RetainsArithmeticAndContractModeBoundaries(
         string module, string expression, string enabled, string disabled)
@@ -948,7 +953,7 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("BackendOverflow", "GlobalModule.Increment(int.MaxValue)", "!OverflowException", "!OverflowException")]
-    [InlineData("BackendContracts", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    [InlineData("BackendContracts", "GlobalModule.Positive(0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     public void MarkdownBackend_PreservesArithmeticAndContractModeBoundaries(
         string module, string expression, string enabled, string disabled)
     {
@@ -1013,9 +1018,9 @@ public class DocDriftCheckerTests
     }
 
     [Theory]
-    [InlineData("NormalRequires", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
+    [InlineData("NormalRequires", "GlobalModule.Positive(0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("NormalEnsures", "GlobalModule.Positive(0)", "!ContractViolationException", "0")]
-    [InlineData("NormalSum", "GlobalModule.SumIfPositive(0, 3)", "!ContractViolationException", "3")]
+    [InlineData("NormalSum", "GlobalModule.SumIfPositive(0, 3)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("NormalSum", "GlobalModule.SumIfPositive(int.MaxValue, 1)", "!OverflowException", "!OverflowException")]
     public void MarkdownNormalForm_RetainsProductionGuardsAndCheckedArithmetic(
         string module, string expression, string enabled, string disabled)
@@ -1078,7 +1083,7 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("WeakerPreconditions", "new Derived().Process(0)", "0", "0")]
-    [InlineData("WeakerPreconditions", "new Derived().Process(-1)", "!ContractViolationException", "-2")]
+    [InlineData("WeakerPreconditions", "new Derived().Process(-1)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("StrongerPostconditions", "new Derived().GetValue()", "42", "42")]
     public void MarkdownInheritance_PreservesRuntimeContractModeBehavior(
         string module, string expression, string enabled, string disabled)
@@ -1156,8 +1161,8 @@ public class DocDriftCheckerTests
     [Theory]
     [InlineData("SquareBoundaries", "46340", "2147395600", "2147395600")]
     [InlineData("SquareBoundaries", "46341", "!OverflowException", "!OverflowException")]
-    [InlineData("SquareBoundaries", "-1", "!ContractViolationException", "1")]
-    [InlineData("FloatingProofBoundary", "double.NaN", "!ContractViolationException", "NaN")]
+    [InlineData("SquareBoundaries", "-1", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("FloatingProofBoundary", "double.NaN", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     public void PublicStaticVerification_SeparatesEnabledContractsFromActualArithmetic(
         string module, string argument, string enabled, string disabled)
     {
@@ -1356,13 +1361,13 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("comprehension", "GlobalModule.Divide(9, 2)", "4", "4")]
-    [InlineData("comprehension", "GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("comprehension", "GlobalModule.Divide(9, 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("comprehension", "GlobalModule.Divide(-9, 2)", "!ContractViolationException", "-4")]
     [InlineData("comprehension", "GlobalModule.Divide(9, -2)", "!ContractViolationException", "-4")]
     [InlineData("comprehension", "GlobalModule.Divide(int.MinValue, -1)", "!OverflowException", "!OverflowException")]
     [InlineData("safety", "GlobalModule.SafeDivide(10, 2)", "5", "5")]
     [InlineData("safety", "GlobalModule.SafeDivide(0, 5)", "0", "0")]
-    [InlineData("safety", "GlobalModule.SafeDivide(10, 0)", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("safety", "GlobalModule.SafeDivide(10, 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("safety", "GlobalModule.SafeDivide(int.MinValue, -1)", "!OverflowException", "!OverflowException")]
     public void PublicBenchmarkContracts_DistinguishGuardsFromArithmeticAndWaivers(
         string page, string expression, string enabled, string disabled)
@@ -1407,16 +1412,16 @@ public class DocDriftCheckerTests
             """);
 
     [Theory]
-    [InlineData("DivisionSignals", "GlobalModule.Divide(9, 0)", "!ContractViolationException", "!DivideByZeroException")]
-    [InlineData("DivisionSignals", "GlobalModule.Divide(-1, 2)", "!ContractViolationException", "0")]
+    [InlineData("DivisionSignals", "GlobalModule.Divide(9, 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("DivisionSignals", "GlobalModule.Divide(-1, 2)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("DivisionSignals", "GlobalModule.Divide(9, -2)", "!ContractViolationException", "-4")]
     [InlineData("DivisionSignals", "GlobalModule.Divide(0, -1)", "0", "0")]
-    [InlineData("NullSignals", "GlobalModule.Length(null!)", "!ContractViolationException", "!NullReferenceException")]
-    [InlineData("BoundsSignals", "GlobalModule.At(new int[] { 42 }, -1)", "!ContractViolationException", "!IndexOutOfRangeException")]
-    [InlineData("BoundsSignals", "GlobalModule.At(new int[] { 42 }, 1)", "!ContractViolationException", "!IndexOutOfRangeException")]
+    [InlineData("NullSignals", "GlobalModule.Length(null!)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("BoundsSignals", "GlobalModule.At(new int[] { 42 }, -1)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("BoundsSignals", "GlobalModule.At(new int[] { 42 }, 1)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("BoundsSignals", "GlobalModule.At(null!, 0)", "!NullReferenceException", "!NullReferenceException")]
-    [InlineData("BuggyCaller", "GlobalModule.Trigger(9, 5)", "!ContractViolationException", "!DivideByZeroException")]
-    [InlineData("NullableSignals", "GlobalModule.SafeDivide(6, 0)", "!ContractViolationException", "<null>")]
+    [InlineData("BuggyCaller", "GlobalModule.Trigger(9, 5)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("NullableSignals", "GlobalModule.SafeDivide(6, 0)", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("NullableSignals", "GlobalModule.SafeDivide(-7, 3)", "-2", "-2")]
     [InlineData("NullableSignals", "GlobalModule.SafeDivide(int.MinValue, -1)", "!OverflowException", "!OverflowException")]
     public void PublicErrorDetection_ObservesExactContractAndUncheckedBoundaries(
@@ -1443,8 +1448,8 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("DivisionSignals", "GlobalModule.Divide(9, -2)", "Ensures")]
-    [InlineData("BuggyCaller", "GlobalModule.Trigger(9, 5)", "Requires")]
-    [InlineData("NullableSignals", "GlobalModule.SafeDivide(6, 0)", "Requires")]
+    [InlineData("BuggyCaller", "GlobalModule.Trigger(9, 5)", "Refinement:b")]
+    [InlineData("NullableSignals", "GlobalModule.SafeDivide(6, 0)", "Refinement:b")]
     public void PublicErrorDetection_IdentifiesTheActualFailedContract(
         string module, string expression, string expectedKind)
     {
@@ -1462,6 +1467,7 @@ public class DocDriftCheckerTests
                 {
                     try { return {{expression}}; }
                     catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); }
+                    catch (System.ArgumentOutOfRangeException failure) { return "Refinement:" + failure.ParamName; }
                 }
             }
             """));
@@ -1704,9 +1710,9 @@ public class DocDriftCheckerTests
 
     [Theory]
     [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, 2", "4", "4")]
-    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "-9, 2", "Requires", "-4")]
-    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, -2", "Requires", "-4")]
-    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, 0", "Requires", "!DivideByZeroException")]
+    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "-9, 2", "Refinement:a", "Refinement:a")]
+    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, -2", "Refinement:b", "Refinement:b")]
+    [InlineData("philosophy/design-principles.mdx", "DesignContracts", "9, 0", "Refinement:b", "Refinement:b")]
     public void PublicPhilosophy_ObservesActualPreconditionPostconditionAndArithmeticBoundaries(
         string page, string module, string arguments, string enabled, string disabled)
     {
@@ -1726,6 +1732,7 @@ public class DocDriftCheckerTests
                     {
                         try { return GlobalModule.Divide({{arguments}}); }
                         catch (Calor.Runtime.ContractViolationException failure) { return failure.Kind.ToString(); }
+                        catch (System.ArgumentOutOfRangeException failure) { return "Refinement:" + failure.ParamName; }
                     }
                 }
                 """);
@@ -1737,7 +1744,7 @@ public class DocDriftCheckerTests
     [InlineData("9, 2", "4", "4")]
     [InlineData("9, -2", "-4", "-4")]
     [InlineData("-9, 2", "-4", "-4")]
-    [InlineData("9, 0", "!ContractViolationException", "!DivideByZeroException")]
+    [InlineData("9, 0", "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("int.MinValue, -1", "!OverflowException", "!OverflowException")]
     public void PublicGeminiGuide_PreservesDivisionContractAndCheckedOverflow(
         string arguments, string enabled, string disabled)
@@ -1828,18 +1835,18 @@ public class DocDriftCheckerTests
     [Theory]
     [InlineData(0, "GlobalModule.SafeDivide(6, 2)", "Functions.SafeDivide(6, 2)", "3", "3", "3")]
     [InlineData(0, "GlobalModule.SafeDivide(6, 0)", "Functions.SafeDivide(6, 0)",
-        "!ContractViolationException", "!DivideByZeroException", "!ArgumentException")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException", "!ArgumentException")]
     [InlineData(0, "GlobalModule.SafeDivide(int.MinValue, -1)", "Functions.SafeDivide(int.MinValue, -1)",
         "!OverflowException", "!OverflowException", "!OverflowException")]
     [InlineData(1, "GlobalModule.NormalizeScore(0, 100)", "Original.NormalizeScore(0, 100)", "0", "0", "0")]
     [InlineData(1, "GlobalModule.NormalizeScore(100, 100)", "Original.NormalizeScore(100, 100)", "100", "100", "100")]
     [InlineData(1, "GlobalModule.NormalizeScore(75, 100)", "Original.NormalizeScore(75, 100)", "75", "75", "75")]
     [InlineData(1, "GlobalModule.NormalizeScore(-1, 100)", "Original.NormalizeScore(-1, 100)",
-        "!ContractViolationException", "-1", "!ArgumentException")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException", "!ArgumentException")]
     [InlineData(1, "GlobalModule.NormalizeScore(1, 0)", "Original.NormalizeScore(1, 0)",
-        "!ContractViolationException", "!DivideByZeroException", "!ArgumentException")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException", "!ArgumentException")]
     [InlineData(1, "GlobalModule.NormalizeScore(101, 100)", "Original.NormalizeScore(101, 100)",
-        "!ContractViolationException", "101", "!ArgumentException")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException", "!ArgumentException")]
     [InlineData(1, "GlobalModule.NormalizeScore(30000000, 30000000)", "Original.NormalizeScore(30000000, 30000000)",
         "!OverflowException", "!OverflowException", "-43")]
     [InlineData(1, "GlobalModule.NormalizeScore(int.MaxValue, int.MaxValue)", "Original.NormalizeScore(int.MaxValue, int.MaxValue)",

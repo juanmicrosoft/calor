@@ -44,7 +44,7 @@ Calor defines its semantics **independently of any backend**. The C# emitter mus
 | **Integer Overflow** | TRAP by default | Safety-first; silent bugs are unacceptable |
 | **Type Conversions** | Explicit for narrowing | Prevents accidental data loss |
 | **Nullability** | .NET nullable types and `null` | Models absence; supported receiving boundaries are checked, not whole-program null safety |
-| **Exceptions** | Typed, with semantic meaning | `ContractViolationException` carries context |
+| **Exceptions** | Typed, with semantic meaning | A failed precondition (parameter refinement) throws `ArgumentOutOfRangeException` naming the parameter; a failed postcondition or invariant throws `ContractViolationException` with context |
 
 ### Why This Matters for Agents
 

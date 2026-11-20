@@ -29,8 +29,9 @@ module PortConstraint
     return SelectPort(443)
 ```
 
-`Main()` returns `443`. With runtime contracts enabled, `SelectPort(0)` and
-`SelectPort(65536)` throw `ArgumentOutOfRangeException` for `port`.
+`Main()` returns `443`. `SelectPort(0)` and `SelectPort(65536)` throw
+`ArgumentOutOfRangeException` for `port`. This happens in every contract mode,
+including `--contract-mode off`.
 
 The parameter's type is still `int`. Repeating this precondition in another
 function does not create two distinct port types, nor does it implicitly
@@ -53,8 +54,8 @@ module TextConstraint
     return Length("calor")
 ```
 
-`Main()` returns `5`. With runtime contracts enabled, null or empty text fails
-the precondition. A .NET caller can still supply null at runtime despite the
+`Main()` returns `5`. Null or empty text fails the precondition in every
+contract mode. A .NET caller can still supply null at runtime despite the
 non-nullable parameter annotation; the runtime guard is a separate check.
 
 ## Relating several parameters
@@ -75,7 +76,7 @@ module TransferConstraint
 ```
 
 `Main()` returns `7`. `Transfer(3, 5)` fails its sufficient-funds precondition
-when runtime contracts are enabled. The preconditions together also bound the
+in every contract mode. The preconditions together also bound the
 successful subtraction; a successful example execution alone is not a verifier
 proof of that property.
 
@@ -124,7 +125,8 @@ statement emits a runtime check: `Transfer(3, 5)` throws
 refinement, which throws `ArgumentOutOfRangeException`.
 
 The proof-statement check remains even with `--contract-mode off`; that switch
-disables precondition and postcondition guards, not this explicit statement.
+disables postcondition and invariant guards, not this explicit statement or
+parameter refinements.
 A successful execution is not a static proof. Optional obligation verification
 and its actual status must be inspected separately before claiming discharge
 or guard removal.
@@ -141,20 +143,20 @@ module TransferProof
     return balance - amount
 ```
 
-`Transfer(10, 3)` returns `7`. With contracts enabled, `Transfer(3, 5)` fails
-the refinement on `amount` with `ArgumentOutOfRangeException`, before reaching the proof.
-With contracts off, the proof still throws `InvalidOperationException`.
+`Transfer(10, 3)` returns `7`. `Transfer(3, 5)` fails the refinement on
+`amount` with `ArgumentOutOfRangeException`, before reaching the proof. This
+happens in every contract mode, including `--contract-mode off`.
 Moving an obligation between an entry contract and a body statement changes
 failure behavior; the two examples are not equivalent.
 
 ## Runtime checks and verification
 
 The [contracts reference](/docs/syntax-reference/contracts/) explains enabled and
-off runtime contract modes. Disabling checks does not make invalid calls safe:
-`SelectPort(0)` then returns `0`, and `Transfer(3, 5)` in the
-`TransferConstraint` example returns `-2`. The separate `TransferProofAtPoint`
-example still throws at its explicit proof statement. Empty text has length
-`0`; null text reaches a body `NullReferenceException`.
+off runtime contract modes. `--contract-mode off` removes postcondition and
+invariant checks only. Parameter refinements stay: `SelectPort(0)` and
+`Transfer(3, 5)` in the `TransferConstraint` example still throw
+`ArgumentOutOfRangeException`, and so do null and empty text. The separate
+`TransferProofAtPoint` example still throws at its explicit proof statement.
 
 Effect enforcement remains independent of runtime contract mode. A pure row
 does not prove a precondition or prevent ordinary body exceptions.
@@ -184,8 +186,9 @@ module ArrayIndexConstraint
     return items[index]
 ```
 
-`At(new int[] { 4, 9 }, 1)` returns `9`. With checks enabled, index `2`
-fails the precondition; with guards off, the array access itself throws.
+`At(new int[] { 4, 9 }, 1)` returns `9`. Index `2` fails the precondition and
+throws `ArgumentOutOfRangeException` in every contract mode, so the array
+access does not run.
 This is not a replacement guarantee of automatically discharged index-bounds
 obligations on every array operation.
 

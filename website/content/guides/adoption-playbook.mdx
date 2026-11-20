@@ -83,8 +83,9 @@ module Pricing
 
 - Parameter refinements and `=>` postconditions receive one of the documented
   proof statuses where verification is requested. Only a clean, non-vacuous,
-  assumption-free `proven` result can authorize guard removal; runtime checks
-  also depend on contract mode and supported lowering.
+  assumption-free `proven` result can authorize guard removal. Parameter
+  refinements are checked in every contract mode; postcondition checks also
+  depend on contract mode and supported lowering.
 - `! cw` declares console-write effects; a standalone `!` is explicitly pure.
 - A missing declared effect is an error with its call chain.
 

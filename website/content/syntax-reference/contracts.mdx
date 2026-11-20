@@ -29,9 +29,9 @@ names the earlier ones: `int:lo, int:hi | (# > lo)`. Two conditions on one
 parameter are joined with `&&`. There is no separate precondition clause; the
 `requires` keyword from earlier versions is an error.
 
-With runtime checks enabled, a failed refinement throws
-`ArgumentOutOfRangeException` naming the parameter before the body runs, and the
-check runs again whenever the body assigns the parameter. For example,
+In every contract mode, including `--contract-mode off`, a failed refinement
+throws `ArgumentOutOfRangeException` naming the parameter before the body runs.
+The check runs again whenever the body assigns the parameter. For example,
 `Divide(9, 0)` fails the refinement on `divisor` rather than reaching integer
 division.
 
@@ -95,8 +95,8 @@ module NonEmptyCollection
     return items[0]
 ```
 
-`First(new int[] { 42 })` returns `42`. With checks enabled, an empty array
-fails the precondition before indexing. The declared input is non-null; a
+`First(new int[] { 42 })` returns `42`. An empty array fails the precondition
+before indexing, in every contract mode. The declared input is non-null; a
 nullable input would need its own null guard before reading `Length`.
 
 <a id="runtime-contract-enforcement"></a>
@@ -140,9 +140,10 @@ module FunctionCallBoundary
     return x
 ```
 
-`Identity(1)` returns `1`. With checks enabled, `Identity(0)` fails its
-precondition. Predicate receiver and argument expressions run once, in source
-order. Turning contracts off removes their runtime evaluation, not the body.
+`Identity(1)` returns `1`. `Identity(0)` fails its precondition in every
+contract mode. Predicate receiver and argument expressions run once, in source
+order. Turning contracts off removes the postcondition's runtime evaluation, not
+the refinement's or the body's.
 Their effects must still fit the enclosing function even when runtime guards
 are off; an effectful predicate cannot hide behind an omitted guard.
 Inherited contracts contribute the calls that will actually execute.
@@ -215,7 +216,7 @@ module NonNegativeArray
 ```
 
 `ProcessArray(new int[] { 0, 3 }, 2)` returns `true`. A negative element
-fails the second precondition with checks enabled, before the body runs.
+fails the second precondition before the body runs, in every contract mode.
 
 ### Search precondition
 
@@ -232,9 +233,9 @@ module ArraySearch
 ```
 
 `Find(new int[] { 4, 9 }, 9)` returns `1`. This is a linear search, not a
-claim that an unsorted input supports binary search. With checks enabled,
-an absent target fails the precondition; with guards off, the body returns
-`-1`.
+claim that an unsorted input supports binary search. An absent target fails
+the precondition and throws `ArgumentOutOfRangeException`, also with
+`--contract-mode off`, so the body's `return -1` is not reached for it.
 
 ### Runtime and static limits
 

@@ -279,28 +279,27 @@ int i = checked((int)f);  // Explicit cast required
 
 ### 5.1 Preconditions
 
-**Schematic C# implementation** (the emitter supplies actual IDs and spans):
-```csharp
-public int MyFunction(int x)
-{
-    // REQUIRES: x > 0
-    if (!(x > 0))
-    {
-        throw new Calor.Runtime.ContractViolationException(
-            "Precondition failed", "f001", Calor.Runtime.ContractKind.Requires,
-            startOffset: 0, length: 0, condition: "x > 0");
-    }
+A precondition is an inline refinement on the parameter it constrains, as in
+`func MyFunction (int:x | (# > 0)) → int`. The emitter lowers it to an entry
+guard that throws `System.ArgumentOutOfRangeException`. The exception's
+`ParamName` is the parameter name. The guard is emitted in every contract mode,
+including `off`.
 
-    // Body
+**C# implementation** (actual emitter output for that signature; the
+`#line` directives are omitted):
+```csharp
+public static int MyFunction(int x)
+{
+    if (!(x > 0)) throw new ArgumentOutOfRangeException(nameof(x), "Violation of inline refinement for parameter 'x'");
     return checked(x * 2);
 }
 ```
 
 ### 5.2 Postconditions
 
-**C# Implementation:**
+**Schematic C# implementation** (the ID and spans are placeholders):
 ```csharp
-public int MyFunction(int x)
+public static int MyFunction(int x)
 {
     // Body
     var __result = checked(x * 2);
@@ -321,9 +320,9 @@ public int MyFunction(int x)
 
 | Mode | Behavior |
 |------|----------|
-| `debug` | Detailed supported precondition and postcondition checks |
-| `release` | The same supported checks, with leaner exceptions |
-| `off` | No precondition or postcondition guards |
+| `debug` | Precondition (parameter refinement) guards; postcondition and invariant checks with detailed `ContractViolationException` messages |
+| `release` | The same guards and checks; postcondition and invariant failures throw leaner `ContractViolationException`s |
+| `off` | Precondition (parameter refinement) guards only; no postcondition or invariant checks |
 
 This is a compiler option, not a C# `DEBUG` conditional. Optional verification
 can remove only eligible clean proven postcondition guards;
@@ -339,8 +338,10 @@ module BackendContracts
     return value
 ```
 
-`Positive(1)` returns `1`. `Positive(0)` throws `ContractViolationException`
-with enabled contracts and returns `0` with contract mode off.
+`Positive(1)` returns `1`. `Positive(0)` throws `ArgumentOutOfRangeException`
+(with `ParamName` `value`) in every contract mode, including `off`, because the
+precondition is a parameter refinement. Only the `=> result > 0` postcondition
+check is removed in `off` mode.
 
 ---
 

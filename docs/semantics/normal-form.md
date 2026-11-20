@@ -533,10 +533,15 @@ module NormalRequires
     t_pre = x > 0
     branch t_pre -> precond_ok, precond_fail
 precond_fail:
-    throw ContractViolationException("f1", "x must be positive", "x > 0")
+    throw ArgumentOutOfRangeException("x", "Violation of inline refinement for parameter 'x'")
 precond_ok:
     [body lowered]
 ```
+
+A precondition is an inline parameter refinement. The production compiler
+emits this guard in every contract mode, including `off`, and a failure throws
+`System.ArgumentOutOfRangeException` with `ParamName` set to the parameter, not
+`ContractViolationException`. The shape above mirrors that behavior.
 
 ### 4.2 Postconditions
 
@@ -697,7 +702,7 @@ and_then:
 and_end:
     branch t_pre_result -> precond_ok, precond_fail
 precond_fail:
-    throw ContractViolationException("f1", null, "(a > 0) && (b > 0)")
+    throw ArgumentOutOfRangeException("b", "Violation of inline refinement for parameter 'b'")
 precond_ok:
     // Body: return a + b
     t3 = CnfBinaryOp(Add, a, b, INT)
