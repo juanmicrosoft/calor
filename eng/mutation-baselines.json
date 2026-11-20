@@ -42,8 +42,8 @@
       "id": "native-parser-conditional-arms",
       "component": "parsing",
       "file": "src/Calor.Compiler/Parsing/Parser.cs",
-      "before": "return new ConditionalExpressionNode(span, args[0], args[1], args[2]);",
-      "after": "return new ConditionalExpressionNode(span, args[0], args[2], args[1]);",
+      "before": "expr, whenTrue, whenFalse);",
+      "after": "expr, whenFalse, whenTrue);",
       "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "filter": "FullyQualifiedName~NativeCodeGenerationMutationTests.Conditional_ExecutesOnlySelectedArm"
     },

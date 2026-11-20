@@ -24,9 +24,11 @@
 # runs beside the parts on cores the serial suite leaves idle; the step waits for it and fails
 # when it fails. Its TRX is checked like every other part.
 #
-# 0.30 (#1730): the four parts run in two pairs (compiler-shard-filter.sh --pairs). In each pair
-# the first part's host runs in the background and the second in the foreground; the step waits
-# for the first and fails when it failed. Every part keeps its own fresh host and its own TRX.
+# 0.30 (#1730): the four parts run at the same time, each in its own fresh host with its own log
+# and TRX (each host runs its tests serially, so the 4-vCPU runner has a core per part). The step
+# waits for every part, prints each log, then fails if any part failed. Two pairs run back to back
+# used 40.3 min on a slow runner (run 44793777859), past the job limit; four at once bound the
+# step by the slowest part instead of two parts in sequence.
 set -euo pipefail
 # usage: bash scripts/run-shard-tests.sh <matrix name> <test project>
 test "$#" -eq 2
@@ -52,33 +54,39 @@ if [ "$name" = "compiler" ]; then
     --results-directory artifacts/test \
     --verbosity normal > replay-output.log 2>&1 &
   replay_pid=$!
-  for pair in $(bash scripts/compiler-shard-filter.sh --pairs); do
-    paired_part="${pair%,*}"
-    paired_filter="$(bash scripts/compiler-shard-filter.sh --part "$paired_part")"
-    dotnet test "$project" -c Release --no-build --no-restore \
-      --filter "$paired_filter" \
-      --logger "trx;LogFileName=$name-$paired_part.trx" \
-      --results-directory artifacts/test \
-      --verbosity normal > "part-$paired_part.log" 2>&1 &
-    paired_pid=$!
-    part="${pair#*,}"
+  # Parts 1-3 in the background; the last (largest) part in the foreground, then wait for the rest.
+  part_pids=()
+  for part in $(bash scripts/compiler-shard-filter.sh --parts | head -n 3); do
     filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
     dotnet test "$project" -c Release --no-build --no-restore \
       --filter "$filter" \
       --logger "trx;LogFileName=$name-$part.trx" \
       --results-directory artifacts/test \
-      --verbosity normal 2>&1 | tee -a test-output.log
-    paired_status=0
-    wait "$paired_pid" || paired_status=$?
-    echo "--- compiler part $paired_part (exit $paired_status) ---"
-    tee -a test-output.log < "part-$paired_part.log"
-    test "$paired_status" = 0
+      --verbosity normal > "part-$part.log" 2>&1 &
+    part_pids+=("$part:$!")
+  done
+  part="$(bash scripts/compiler-shard-filter.sh --parts | tail -n 1)"
+  filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
+  dotnet test "$project" -c Release --no-build --no-restore \
+    --filter "$filter" \
+    --logger "trx;LogFileName=$name-$part.trx" \
+    --results-directory artifacts/test \
+    --verbosity normal 2>&1 | tee -a test-output.log
+  parts_failed=0
+  for entry in "${part_pids[@]}"; do
+    part="${entry%%:*}"
+    part_status=0
+    wait "${entry#*:}" || part_status=$?
+    echo "--- compiler part $part (exit $part_status) ---"
+    tee -a test-output.log < "part-$part.log"
+    [ "$part_status" = 0 ] || parts_failed=1
   done
   replay_status=0
   wait "$replay_pid" || replay_status=$?
   echo "--- historical replay host (exit $replay_status) ---"
   tee -a test-output.log < replay-output.log
   test "$replay_status" = 0
+  test "$parts_failed" = 0
 else
   dotnet test "$project" -c Release \
     --logger "trx;LogFileName=$name.trx" \
