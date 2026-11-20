@@ -2414,9 +2414,78 @@ public sealed class CSharpToCalorConverter
         OutputKind outputKind,
         CancellationToken cancellationToken)
     {
+        var compile = CompileRoundTrip(
+            calorSource, context, parseOptions, outputKind,
+            Enum.TryParse<NullableContextOptions>(context.Metadata.NullableContextOptions, out var nullableContext)
+                ? nullableContext
+                : NullableContextOptions.Disable,
+            cancellationToken);
+        return compile is { CompileCrash: null, Compiled.HasErrors: false, ValidationCrash: null, Validation: { } validation }
+            && validation.SyntaxErrors.Count == 0
+            && validation.CompilationErrors.Count == 0;
+    }
+
+    /// <summary>
+    /// Everything a round-trip compile reads. Two compiles with equal keys produce the same
+    /// result: <see cref="global::Calor.Compiler.Program.Compile(string, string?, CompilationOptions)"/>
+    /// and <see cref="GeneratedCSharpCompiler.Validate(IEnumerable{GeneratedCSharpSource}, GeneratedCSharpCompilationContext)"/>
+    /// receive nothing else. References are compared by path and aliases, in order.
+    /// </summary>
+    internal readonly record struct RoundTripCompileKey(
+        string CalorSource,
+        string? SourceFile,
+        CSharpParseOptions ParseOptions,
+        OutputKind OutputKind,
+        NullableContextOptions NullableContextOptions,
+        bool IncludeImplicitSystemUsing,
+        string References);
+
+    /// <summary>
+    /// One round-trip compile: the Calor compile (effects off, unknown calls permitted, as the
+    /// round trip has always run it) and, when that has no errors, the standalone compile of the
+    /// generated C#. A crash in either step is kept as the exception, for the caller to report.
+    /// </summary>
+    internal sealed record RoundTripCompile(
+        RoundTripCompileKey Key,
+        CompilationResult? Compiled,
+        Exception? CompileCrash,
+        GeneratedCSharpValidation? Validation,
+        Exception? ValidationCrash);
+
+    /// <summary>
+    /// The round-trip compile behind both <see cref="RoundTripCompiles"/> (the #717 rewrap gate)
+    /// and <see cref="RunRoundTripCheck"/> (the lossless check). A conversion asked both about the
+    /// same Calor under the same options, compiling it and its generated C# twice; the result is
+    /// now kept on the context and reused only when every input in <see cref="RoundTripCompileKey"/>
+    /// is equal. Cancellation is never cached.
+    /// </summary>
+    private static RoundTripCompile CompileRoundTrip(
+        string calorSource,
+        ConversionContext context,
+        CSharpParseOptions parseOptions,
+        OutputKind outputKind,
+        NullableContextOptions nullableContextOptions,
+        CancellationToken cancellationToken)
+    {
+        var references = context.Metadata.References
+            .Select(reference => new GeneratedCSharpReference(reference.Path, reference.Aliases))
+            .ToArray();
+        var key = new RoundTripCompileKey(
+            calorSource,
+            context.SourceFile,
+            parseOptions,
+            outputKind,
+            nullableContextOptions,
+            context.Metadata.IncludeImplicitSystemUsing,
+            string.Join("\n", references.Select(reference =>
+                reference.Path + "\t" + string.Join("\t", reference.Aliases))));
+        if (context.LastRoundTripCompile is { } previous && previous.Key == key)
+            return previous;
+
+        CompilationResult compiled;
         try
         {
-            var compileResult = global::Calor.Compiler.Program.Compile(
+            compiled = global::Calor.Compiler.Program.Compile(
                 calorSource,
                 context.SourceFile ?? "converted-output.calr",
                 new CompilationOptions
@@ -2426,12 +2495,25 @@ public sealed class CSharpToCalorConverter
                     DeferGeneratedOutputValidation = true,
                     CancellationToken = cancellationToken
                 });
-            if (compileResult.HasErrors)
-                return false;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return context.LastRoundTripCompile = new(key, null, ex, null, null);
+        }
 
+        if (compiled.HasErrors)
+            return context.LastRoundTripCompile = new(key, compiled, null, null, null);
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             var validation = GeneratedCSharpCompiler.Validate(
                 [new GeneratedCSharpSource(
-                    compileResult.GeneratedCode,
+                    compiled.GeneratedCode,
                     context.SourceFile ?? "converted-output.g.cs")],
                 new GeneratedCSharpCompilationContext
                 {
@@ -2441,26 +2523,19 @@ public sealed class CSharpToCalorConverter
                     SourceCodeKind = parseOptions.Kind,
                     Features = parseOptions.Features,
                     PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
-                    References = context.Metadata.References.Select(
-                        reference => new GeneratedCSharpReference(
-                            reference.Path,
-                            reference.Aliases)),
+                    References = references,
                     OutputKind = outputKind,
-                    NullableContextOptions = Enum.TryParse<NullableContextOptions>(
-                        context.Metadata.NullableContextOptions,
-                        out var nullableContext)
-                        ? nullableContext
-                        : NullableContextOptions.Disable
+                    NullableContextOptions = nullableContextOptions
                 });
-            return validation.SyntaxErrors.Count == 0 && validation.CompilationErrors.Count == 0;
+            return context.LastRoundTripCompile = new(key, compiled, null, validation, null);
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            return context.LastRoundTripCompile = new(key, compiled, null, null, ex);
         }
     }
 
@@ -2757,25 +2832,9 @@ public sealed class CSharpToCalorConverter
         CancellationToken cancellationToken,
         Action<string, string, int?, int?> fail)
     {
-        CompilationResult compileResult;
-        try
-        {
-            compileResult = global::Calor.Compiler.Program.Compile(
-                calorSource,
-                context.SourceFile ?? "converted-output.calr",
-                new CompilationOptions
-                {
-                    EnforceEffects = false,
-                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
-                    DeferGeneratedOutputValidation = true,
-                    CancellationToken = cancellationToken
-                });
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        var compile = CompileRoundTrip(
+            calorSource, context, parseOptions, outputKind, nullableContextOptions, cancellationToken);
+        if (compile.CompileCrash is { } ex)
         {
             fail(
                 $"Generated Calor validation crashed: {ex.GetType().Name}: {ex.Message}",
@@ -2783,6 +2842,7 @@ public sealed class CSharpToCalorConverter
             return;
         }
 
+        var compileResult = compile.Compiled!;
         foreach (var diagnostic in compileResult.Diagnostics.Errors)
         {
             fail(
@@ -2797,47 +2857,23 @@ public sealed class CSharpToCalorConverter
             return;
         }
 
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var validation = GeneratedCSharpCompiler.Validate(
-                [new GeneratedCSharpSource(
-                    compileResult.GeneratedCode,
-                    context.SourceFile ?? "converted-output.g.cs")],
-                new GeneratedCSharpCompilationContext
-                {
-                    IncludeImplicitSystemUsing = context.Metadata.IncludeImplicitSystemUsing,
-                    LanguageVersion = parseOptions.LanguageVersion,
-                    DocumentationMode = parseOptions.DocumentationMode,
-                    SourceCodeKind = parseOptions.Kind,
-                    Features = parseOptions.Features,
-                    PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
-                    References = context.Metadata.References.Select(
-                        reference => new GeneratedCSharpReference(
-                            reference.Path,
-                            reference.Aliases)),
-                    OutputKind = outputKind,
-                    NullableContextOptions = nullableContextOptions
-                });
-            foreach (var diagnostic in validation.SyntaxErrors.Concat(validation.CompilationErrors))
-            {
-                var span = diagnostic.Location.GetLineSpan().StartLinePosition;
-                fail(
-                    $"Round-tripped C# failed compilation ({diagnostic.Id}): {diagnostic.GetMessage()}",
-                    "roundtrip-csharp-validation",
-                    span.Line + 1,
-                    span.Character + 1);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        if (compile.ValidationCrash is { } crash)
         {
             fail(
-                $"Round-tripped C# validation crashed: {ex.GetType().Name}: {ex.Message}",
+                $"Round-tripped C# validation crashed: {crash.GetType().Name}: {crash.Message}",
                 "roundtrip-csharp-validation", null, null);
+            return;
+        }
+
+        var validation = compile.Validation!;
+        foreach (var diagnostic in validation.SyntaxErrors.Concat(validation.CompilationErrors))
+        {
+            var span = diagnostic.Location.GetLineSpan().StartLinePosition;
+            fail(
+                $"Round-tripped C# failed compilation ({diagnostic.Id}): {diagnostic.GetMessage()}",
+                "roundtrip-csharp-validation",
+                span.Line + 1,
+                span.Character + 1);
         }
     }
 

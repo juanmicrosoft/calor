@@ -608,6 +608,13 @@ public sealed class ConversionContext
     public string RoundTrip { get; set; } = ConversionRoundTrip.NotRun;
 
     /// <summary>
+    /// The most recent round-trip compile of this conversion's Calor. The #717 rewrap gate and
+    /// the lossless round-trip check compile the same source under the same options; the second
+    /// reuses this result when every input in its key is equal. Converter-internal.
+    /// </summary>
+    internal CSharpToCalorConverter.RoundTripCompile? LastRoundTripCompile { get; set; }
+
+    /// <summary>
     /// Whether unsupported constructs should be preserved as C# passthrough blocks.
     /// True when Mode is Interop or PassthroughOnError is enabled.
     /// </summary>

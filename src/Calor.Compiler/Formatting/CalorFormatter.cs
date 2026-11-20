@@ -124,7 +124,11 @@ public sealed class CalorFormatter
             DeferGeneratedOutputValidation = true
         };
         var originalCompilation = Program.Compile(original, filePath, structuralOptions);
-        var formattedCompilation = Program.Compile(formatted, filePath, structuralOptions);
+        // Program.Compile is deterministic in its inputs, so text the formatter left unchanged
+        // (an already-canonical file) has the same compilation; it is not compiled twice.
+        var formattedCompilation = string.Equals(original, formatted, StringComparison.Ordinal)
+            ? originalCompilation
+            : Program.Compile(formatted, filePath, structuralOptions);
         if (originalCompilation.HasErrors != formattedCompilation.HasErrors)
         {
             return SourceValidationResult.Failed(
