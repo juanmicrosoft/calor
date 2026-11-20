@@ -22,6 +22,8 @@ primitive literals. Safe repair checks the declared return type, leaves comments
 and nonliteral branches alone, and retains blank lines to preserve later source
 mappings. Whitespace edits are applied before an overlapping structural patch.
 Both steps recompile and must retain identical generated C#.
+`Calor1306` (an `if` chain that `match` states more briefly) has no patch,
+because the match lowers to a C# `switch`; rewrite it by hand.
 
 ```bash
 calor fix --apply

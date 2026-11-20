@@ -176,6 +176,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1303` | Lint: input file is not a `.calr` file |
 | `Calor1304` | Lint: unexpected error while processing a file |
 | `Calor1305` | Lint: a two-branch literal return can use a conditional expression. Both branches must return matching primitive literal types. The safe patch preserves the condition and literal source text; commented or multiline choices are left unchanged |
+| `Calor1306` | Lint: an `if`/`else if` chain compares one parameter or local with `==` against 3 or more distinct constants of its integer, char, string or enum type; use `match`. Report-only: no patch, because a statement match lowers to a C# `switch` and a loop `break` would bind to it |
 | `Calor1310` | Compile: `--input` file not found |
 | `Calor1311` | Compile: invalid argument combination (e.g. `--output` with multiple inputs) |
 | `Calor1312` | Compile: unhandled internal error |

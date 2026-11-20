@@ -176,7 +176,7 @@ Complete example: [objects](#example-complete_objects).
 
 ## for loop
 
-One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.
+One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other. Count with from/to when the bound cannot change in the body; use while otherwise. while also leaves its counter in scope after the loop.
 
 Syntax: `for i from start to end step stepValue; for i = start; condition; i = next`
 
@@ -385,7 +385,7 @@ Complete example: [Effects](#example-primer_effects).
 
 ## precondition
 
-Constrains a parameter at the call: an inline refinement after the parameter, with # standing for its value, checked on entry and on every reassignment. A condition on several parameters refines the last one and names the earlier ones (int:lo, int:hi | (# > lo)). There is no separate precondition clause. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.
+Constrains a parameter at the call: an inline refinement after the parameter, with # standing for its value, checked on entry and on every reassignment. A condition on several parameters refines the last one and names the earlier ones (int:lo, int:hi | (# > lo)). There is no separate precondition clause. Use a refinement, not an if-throw guard. A failed refinement throws ArgumentOutOfRangeException with a generated message, so keep a guard only when callers need another exception type or a custom message.
 
 Syntax: `type:name | (condition on #)`
 
@@ -506,7 +506,7 @@ Complete example: [Person](#example-task_33).
 
 ## switch expression
 
-Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.
+Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression. Branching on one value against 3 or more constants uses match; otherwise use if. Calor1306 reports such if chains without a patch: a statement match lowers to a C# switch.
 
 Syntax: `match expression with indented case pattern → result arms`
 
@@ -577,7 +577,7 @@ Complete example: [Container](#example-task_29).
 
 ## LINQ query
 
-LINQ calls use ordinary postfix syntax, but syntax and metadata resolution do not prove their effects. Enumerable.Where and Enumerable.ToArray currently remain unknown under strict checking, even with a pure typed predicate and fully qualified IEnumerable<T> result. The complete example instead traverses the input once into a private buffer, then copies the matched prefix into an exact-sized result. It preserves encounter order and duplicates without rereading caller-owned entries; it is not LINQ support or deferred enumeration. Its alloc and mut row covers constructing and filling both arrays. Do not relax effect policy or use casts to hide the LINQ boundary.
+LINQ calls use ordinary postfix syntax, but syntax and metadata resolution do not prove their effects. Enumerable.Where and Enumerable.ToArray currently remain unknown under strict checking, even with a pure typed predicate and fully qualified IEnumerable<T> result. The complete example instead traverses the input once into a private buffer, then copies the matched prefix into an exact-sized result. It preserves encounter order and duplicates without rereading caller-owned entries; it is not LINQ support or deferred enumeration. Its alloc and mut row covers constructing and filling both arrays. Do not relax effect policy or use casts to hide the LINQ boundary. Default to a loop for transformations and queries: it measured fewer tokens. It is not identical: the loop runs eagerly, not deferred, its row is alloc,mut where LINQ's is alloc, and a null source throws a different exception type.
 
 Syntax: `System.Linq.Enumerable.Where(collection, predicate)`
 
