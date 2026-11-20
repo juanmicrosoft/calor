@@ -283,7 +283,9 @@ public class SignatureHelpHandlerTests
         var func = SymbolFinder.FindFunction(ast, "Divide");
 
         Assert.NotNull(func);
-        Assert.NotEmpty(func.Preconditions);
+        // #1618: the precondition is the refinement on b
+        Assert.NotEmpty(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(
+            func.Parameters, func.Preconditions));
     }
 
     [Fact]

@@ -490,12 +490,13 @@ public class BoundTypeArchitectureTests
 
     private static void AssertContractMessageTransition(ModuleNode module)
     {
+        // #1618: the precondition (and its retired custom message) is now the refinement on b.
         var divide = Assert.Single(module.Functions, function => function.Name == "Divide");
-        var precondition = Assert.Single(divide.Preconditions);
-        Assert.Null(precondition.Message);
-        var condition = Assert.IsType<BinaryOperationNode>(precondition.Condition);
+        Assert.Empty(divide.Preconditions);
+        var refinement = Assert.Single(divide.Parameters, parameter => parameter.Name == "b").InlineRefinement!;
+        var condition = Assert.IsType<BinaryOperationNode>(refinement.Predicate);
         Assert.Equal(BinaryOperator.NotEqual, condition.Operator);
-        Assert.Equal("b", Assert.IsType<ReferenceNode>(condition.Left).Name);
+        Assert.IsType<SelfRefNode>(condition.Left);
         Assert.Equal(0, Assert.IsType<IntLiteralNode>(condition.Right).Value);
 
         const string original = """
@@ -517,14 +518,12 @@ public class BoundTypeArchitectureTests
         Assert.Equal(5, current.Invoke(null, [10, 2]));
         var oldFailure = Assert.IsType<Calor.Runtime.ContractViolationException>(
             Assert.Throws<TargetInvocationException>(() => historical.Invoke(null, [10, 0])).InnerException);
-        var newFailure = Assert.IsType<Calor.Runtime.ContractViolationException>(
+        var newFailure = Assert.IsType<ArgumentOutOfRangeException>(
             Assert.Throws<TargetInvocationException>(() => current.Invoke(null, [10, 0])).InnerException);
         Assert.Equal("message= divisor must not be zero \"\"", oldFailure.Message);
-        Assert.Equal("Precondition failed: b != 0", newFailure.Message);
         Assert.Equal(Calor.Runtime.ContractKind.Requires, oldFailure.Kind);
-        Assert.Equal(oldFailure.Kind, newFailure.Kind);
         Assert.Equal("b != 0", oldFailure.Condition);
-        Assert.Equal(oldFailure.Condition, newFailure.Condition);
+        Assert.Equal("b", newFailure.ParamName);
     }
 
     private static void AssertCheckedBoundary(string source, ModuleNode module)

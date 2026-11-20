@@ -125,33 +125,35 @@ public class MarkdownReferenceTests
         "!ContractViolationException", "10")]
     [InlineData("contracts", "NonEmptyCollection", "GlobalModule.First(System.Array.Empty<int>())",
         "!ContractViolationException", "!IndexOutOfRangeException")]
+    // #1618: every violation below is a parameter refinement, whose entry check throws
+    // ArgumentOutOfRangeException in every contract mode, Off included.
     [InlineData("contracts", "AbsoluteValue", "GlobalModule.Abs(int.MinValue)",
         "!OverflowException", "!OverflowException")]
     [InlineData("contracts", "FunctionCallBoundary", "GlobalModule.Identity(0)",
-        "!ContractViolationException", "0")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("contracts", "NonNegativeArray", "GlobalModule.ProcessArray(new int[] { 0, -1 }, 2)",
-        "!ContractViolationException", "True")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("contracts", "NonNegativeArray", "GlobalModule.ProcessArray(System.Array.Empty<int>(), 0)",
         "True", "True")]
     [InlineData("contracts", "ArraySearch", "GlobalModule.Find(new int[] { 4, 9 }, 3)",
-        "!ContractViolationException", "-1")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("contracts", "ArraySearch", "GlobalModule.Find(System.Array.Empty<int>(), 3)",
-        "!ContractViolationException", "-1")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("refinement-types", "PortConstraint", "GlobalModule.SelectPort(0)",
-        "!ContractViolationException", "0")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("refinement-types", "PortConstraint", "GlobalModule.SelectPort(65536)",
-        "!ContractViolationException", "65536")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("refinement-types", "TextConstraint", "GlobalModule.Length(\"\")",
-        "!ContractViolationException", "0")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("refinement-types", "TextConstraint", "GlobalModule.Length(null!)",
-        "!ContractViolationException", "!NullReferenceException")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("refinement-types", "TransferConstraint", "GlobalModule.Transfer(3, 5)",
-        "!ContractViolationException", "-2")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("refinement-types", "ConstraintBoundary", "GlobalModule.Reset(5)", "-1", "-1")]
     [InlineData("refinement-types", "TransferProof", "GlobalModule.Transfer(3, 5)",
-        "!ContractViolationException", "!InvalidOperationException")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("refinement-types", "ArrayIndexConstraint", "GlobalModule.At(new int[] { 4, 9 }, 2)",
-        "!ContractViolationException", "!IndexOutOfRangeException")]
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     public void Contracts_DistinguishEnabledGuardsFromBodyBehavior(
         string page, string module, string expression, string enabled, string disabled)
     {

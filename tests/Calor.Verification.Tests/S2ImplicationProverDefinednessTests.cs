@@ -91,7 +91,9 @@ public sealed class S2ImplicationProverDefinednessTests
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(NativeSource(source), diagnostics).TokenizeAllForParser();
         var module = new Parser(tokens, diagnostics).Parse();
-        var pres = Assert.Single(module.Functions).Preconditions;
+        var parsed = Assert.Single(module.Functions);
+        // #1618: the preconditions are the refinements on s and x
+        var pres = Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(parsed.Parameters, parsed.Preconditions);
         using var ctx = Z3ContextFactory.Create();
         using var prover = new Z3ImplicationProver(ctx);
         var result = prover.ProveImplication(
@@ -118,7 +120,8 @@ public sealed class S2ImplicationProverDefinednessTests
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(NativeSource(source), diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        var pre = Assert.Single(Assert.Single(module.Functions).Preconditions);
+        var parsed = Assert.Single(module.Functions);
+        var pre = Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(parsed.Parameters, parsed.Preconditions));
         using var ctx = Z3ContextFactory.Create();
         using var prover = new Z3ImplicationProver(ctx);
         var result = prover.ProveImplication(
