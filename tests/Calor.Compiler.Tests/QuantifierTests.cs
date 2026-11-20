@@ -799,14 +799,14 @@ module Test Test block
         var module1 = Parse(source, out var diag1);
         Assert.False(diag1.HasErrors, string.Join("\n", diag1.Select(d => d.Message)));
 
-        // Get the precondition expression and emit it as Calor syntax
-        var forall = (ForallExpressionNode)Pre(module1.Functions[0])[0].Condition;
+        // Get the refinement predicate (#1618: the precondition) and emit it as Calor syntax
+        var forall = (ForallExpressionNode)module1.Functions[0].Parameters[0].InlineRefinement!.Predicate;
         var emitter = new CalorEmitter();
         var emittedContract = forall.Accept(emitter);
 
         // Verify the emitted string contains expected elements
         Assert.Contains("forall", emittedContract);
-        Assert.Contains("in 0..n", emittedContract);
+        Assert.Contains("in 0..#", emittedContract);
         Assert.Contains("int:i", emittedContract);
     }
 

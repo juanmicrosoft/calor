@@ -167,7 +167,9 @@ public sealed class UnspacedMemberAccessEquivalenceTests
         {
             case "nullable-receiver":
                 Assert.Contains("Calor0922", verified, StringComparison.Ordinal);
-                Assert.Contains("Precondition failed: t.Size > 0", verified, StringComparison.Ordinal);
+                // #1618: the refinement on t is emitted as an entry check on the lowered member read.
+                Assert.Contains("if (!(t.Size > 0)) throw new ArgumentOutOfRangeException(nameof(t)", verified,
+                    StringComparison.Ordinal);
                 break;
             case "static-constructor":
                 // Reading the static field may run the static constructor.

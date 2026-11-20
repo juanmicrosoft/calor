@@ -116,7 +116,8 @@ module Test
         Assert.Single(iface.Methods);
 
         var method = iface.Methods[0];
-        Assert.Single(method.Preconditions);
+        // #1618: the precondition is the refinement on input
+        Assert.Single(ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions));
         Assert.Empty(method.Postconditions);
         Assert.True(method.HasContracts);
     }
@@ -158,7 +159,7 @@ module Test
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var method = module.Interfaces[0].Methods[0];
-        Assert.Equal(2, method.Preconditions.Count);
+        Assert.Equal(2, ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions).Count);
         Assert.Single(method.Postconditions);
     }
 
@@ -1249,7 +1250,8 @@ module Test
         var inherited = Assert.Single(result.InheritedContracts).Value;
         var conjunction = Assert.IsType<BinaryOperationNode>(
             Assert.Single(inherited.Preconditions).Condition);
-        var typeCheck = Assert.IsType<IsPatternNode>(conjunction.Right);
+        // #1618: one refinement per parameter; the conjunction order follows the parameters.
+        var typeCheck = Assert.Single(new[] { conjunction.Left, conjunction.Right }.OfType<IsPatternNode>());
         Assert.Equal("U", typeCheck.TargetType);
     }
 

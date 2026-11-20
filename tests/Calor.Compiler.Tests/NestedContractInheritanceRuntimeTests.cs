@@ -428,7 +428,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                 """;
             if (path != "base")
             {
-                declarations += "\n" + """
+                declarations += "\n" + $$"""
                     interface IValue<T>
                       func Check (T:x{{refinement}}) → T
                         !

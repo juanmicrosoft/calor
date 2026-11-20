@@ -93,8 +93,7 @@ public sealed class NativeEffectSuggestionTests
         var unit = new string(' ', indentation);
         var owner = nested ? unit + "class Box\n" : "";
         var indent = nested ? unit + unit : unit;
-        var source = $"module Native\n{owner}{indent}func Echo public (int:value) → int\n"
-            + $"{indent}{unit}requires value >= 0\n"
+        var source = $"module Native\n{owner}{indent}func Echo public (int:value | (# >= 0)) → int\n"
             + $"{indent}{unit}System.Console.Write(value)\n"
             + $"{indent}{unit}return value\n";
         // 0.30: a public method with no row is a missing boundary row (Calor0124),

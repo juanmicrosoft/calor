@@ -698,7 +698,7 @@ public class StructAndOperatorTests
 
         // Should emit the precondition contract check
         Assert.Contains("(a >= 0)", code);
-        Assert.Contains("ContractViolationException", code);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(a)", code);
     }
 
     [Fact]

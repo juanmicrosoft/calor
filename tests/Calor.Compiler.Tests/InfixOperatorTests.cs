@@ -424,7 +424,7 @@ public class InfixOperatorTests
         var module = Parse(source);
         Assert.Equal(2, module.Functions.Count);
         var function = module.Functions[0];
-        Assert.Single(function.Preconditions);
+        Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions));
         Assert.Single(function.Postconditions);
         Assert.Equal(3, function.Body.Count);
         var call = Assert.IsType<CallExpressionNode>(

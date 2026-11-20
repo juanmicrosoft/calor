@@ -372,11 +372,14 @@ public class RefOutImplementationTests
             VerifyContracts = true, VerifyRefinements = true, ContractMode = ContractMode.Debug,
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
         };
+        // #1618: the fact comes from a guard, not a refinement on x: a refined variable may
+        // not be passed by reference at all (Calor1104), which would hide the stale-fact case.
         var errors = Errors($$"""
-              func Run public (int:x | (# > 0)) → int
+              func Run public (int:x) → int
                 ! mut
-                {{call}}
-                proof x > 0
+                if x > 0
+                  {{call.Replace("\n", "\n  ", StringComparison.Ordinal)}}
+                  proof x > 0
                 return x
             """, options: options);
         Assert.Empty(errors);
@@ -433,11 +436,12 @@ public class RefOutImplementationTests
         };
         var result = Program.Compile($$"""
             module P
-              func Run public (int:x | (# > 0)) → int
+              func Run public (int:x) → int
                 {{effects}}
                 let int[]:arr = new int[] {1}
-                {{call}}
-                proof x > 0
+                if x > 0
+                  {{call}}
+                  proof x > 0
                 return x
               func Inc private (ref int:v) → void
                 set v v + 1

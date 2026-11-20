@@ -1,4 +1,5 @@
 module Test Test block
-  func RequirePositive (int:n | (# > 0)) → int
+  func RequirePositive (int:n) → int
     !
+    => (result > 0)
     return n

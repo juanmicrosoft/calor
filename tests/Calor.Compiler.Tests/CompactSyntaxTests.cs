@@ -729,7 +729,7 @@ public class CompactSyntaxTests
         var func = Assert.Single(module.Functions);
         Assert.Equal(2, func.Parameters.Count);
         Assert.NotNull(func.Output);
-        Assert.Single(func.Preconditions);
+        Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions));
         Assert.Single(func.Postconditions);
     }
 

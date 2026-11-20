@@ -185,11 +185,13 @@ public sealed class NativeSourceContractCallTests
         {
             Console.SetOut(output);
             Assert.Equal(1, method.Invoke(null, [1]));
-            Assert.Equal(mode == ContractMode.Off ? ["body"]
+            // #1618: the entry predicate is the refinement on x, checked in every contract mode;
+            // Off strips only the postcondition.
+            Assert.Equal(mode == ContractMode.Off ? ["receiver", "entry", "predicate", "body"]
                 : new[] { "receiver", "entry", "predicate", "body", "receiver", "exit", "predicate" },
                 output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
-            if (mode == ContractMode.Off)
-                Assert.Equal(-1, method.Invoke(null, [-1]));
+            Assert.IsType<ArgumentOutOfRangeException>(
+                Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [-1])).InnerException);
         }
         finally
         {
@@ -535,7 +537,8 @@ public sealed class NativeSourceContractCallTests
             if (mode == ContractMode.Off)
                 Assert.Equal(-1, method.Invoke(instance, [-1]));
             else
-                Assert.Equal(PreconditionFailure(!postcondition),
+                // Impl inherits the declared refinement as a runtime contract guard.
+                Assert.Equal("ContractViolationException",
                     Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [-1])).InnerException!.GetType().Name);
         }
         finally
@@ -557,7 +560,8 @@ public sealed class NativeSourceContractCallTests
         Assert.False(result.HasErrors, Errors(result));
         var method = Load(result.GeneratedCode).GetType("GlobalModule")!.GetMethod("Read")!.MakeGenericMethod(typeof(string));
         Assert.Equal(("value", 1), method.Invoke(null, [("value", 1)]));
-        Assert.Equal("ContractViolationException",
+        // #1618: the precondition is the refinement on x, an entry check
+        Assert.Equal("ArgumentOutOfRangeException",
             Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [((string?)null, 1)])).InnerException!.GetType().Name);
     }
 

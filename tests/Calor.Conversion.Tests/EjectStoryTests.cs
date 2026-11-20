@@ -16,7 +16,9 @@ namespace Calor.Conversion.Tests;
 /// Slice-3 <see cref="GeneratedCSharpCompiler"/>, (b) preserves behavior at
 /// runtime, and (c) degrades contracts to the documented runtime checks
 /// (retained <c>ContractViolationException</c> guards in debug/release mode;
-/// stripped entirely under the contract-mode-off waiver). The degradation
+/// stripped under the contract-mode-off waiver). #1618: a precondition is a
+/// parameter refinement whose <c>ArgumentOutOfRangeException</c> entry check is
+/// emitted in every contract mode, including off. The degradation
 /// semantics are documented in website/content/guides/adoption-playbook.mdx — this suite
 /// is what makes that documentation a tested claim instead of a promise.
 /// </summary>
@@ -235,10 +237,10 @@ public class EjectStoryTests
     {
         var csharp = Emit(ContractsCurrentNativeModule, EmitContractMode.Debug);
 
-        // Both §Q and §S survive as runtime guards — `calor convert` runs no
-        // verification, so nothing is elided on the eject path.
+        // The refinement and the postcondition both survive as runtime guards — `calor
+        // convert` runs no verification, so nothing is elided on the eject path.
         Assert.Contains("ContractViolationException", csharp);
-        Assert.Contains("ContractKind.Requires", csharp);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(cap)", csharp);
         Assert.Contains("ContractKind.Ensures", csharp);
     }
 
@@ -246,7 +248,7 @@ public class EjectStoryTests
     public void Contracts_EarlyReturnBody_RetainsPostcondition()
     {
         var csharp = Emit(EarlyReturnContractsCurrentNativeModule, EmitContractMode.Debug);
-        Assert.Contains("ContractKind.Requires", csharp);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(cap)", csharp);
         Assert.Contains("ContractKind.Ensures", csharp);
         Assert.Contains("goto __calorPostconditionExit", csharp);
     }
@@ -256,12 +258,12 @@ public class EjectStoryTests
     {
         var assembly = CompileToAssembly(Emit(ContractsCurrentNativeModule, EmitContractMode.Debug));
 
-        // cap < 0 violates §Q (>= cap 0) — the retained guard must throw.
+        // cap < 0 violates the refinement on cap — the retained entry check must throw.
         var ex = Assert.Throws<TargetInvocationException>(
             () => Invoke(assembly, "Pricing", "ClampToCap", 5, -1));
         Assert.NotNull(ex.InnerException);
-        Assert.Equal("ContractViolationException", ex.InnerException!.GetType().Name);
-        Assert.Contains("cap", ex.InnerException.Message);
+        var violation = Assert.IsType<ArgumentOutOfRangeException>(ex.InnerException);
+        Assert.Equal("cap", violation.ParamName);
     }
 
     [Fact]
@@ -273,18 +275,21 @@ public class EjectStoryTests
         var assembly = CompileToAssembly(csharp);
         var ex = Assert.Throws<TargetInvocationException>(
             () => Invoke(assembly, "Pricing", "ClampToCap", 5, -1));
-        Assert.Equal("ContractViolationException", ex.InnerException!.GetType().Name);
+        Assert.IsType<ArgumentOutOfRangeException>(ex.InnerException);
     }
 
     [Fact]
-    public void Contracts_OffMode_StripsAllChecks_TheDocumentedWaiver()
+    public void Contracts_OffMode_StripsContractGuards_KeepsRefinementEntryChecks()
     {
         var csharp = Emit(ContractsCurrentNativeModule, EmitContractMode.Off);
+        // The waiver strips the postcondition guard...
         Assert.DoesNotContain("ContractViolationException", csharp);
 
-        // The waiver strips guards; behavior otherwise unchanged — the same
-        // violating call now runs through and returns the (nonsensical) cap.
+        // ...but #1618: the precondition is the refinement on cap, and its entry check is
+        // emitted in every contract mode, so the violating call still fails at entry.
         var assembly = CompileToAssembly(csharp);
-        Assert.Equal(-1, Invoke(assembly, "Pricing", "ClampToCap", 5, -1));
+        var ex = Assert.Throws<TargetInvocationException>(
+            () => Invoke(assembly, "Pricing", "ClampToCap", 5, -1));
+        Assert.Equal("cap", Assert.IsType<ArgumentOutOfRangeException>(ex.InnerException).ParamName);
     }
 }
