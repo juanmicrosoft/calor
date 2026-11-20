@@ -17,6 +17,12 @@
 # and no single host accumulates the whole suite. This CAPS THE SYMPTOM; it does not fix the leak
 # (see docs/plans/2026-09-03-issue-1150-kill-rate-measurement.md). The parts come from
 # scripts/compiler-shard-filter.sh, whose final part complements the other three.
+#
+# 0.30 (#1730): the historical replays (Category=HistoricalReplay) are a fifth part. Each
+# rebuilds an archived compiler and reruns one test with it, about 2-4 minutes, and they cost
+# the serial parts about half an hour. Their host starts in the background after the build and
+# runs beside the parts on cores the serial suite leaves idle; the step waits for it and fails
+# when it fails. Its TRX is checked like every other part.
 set -euo pipefail
 # usage: bash scripts/run-shard-tests.sh <matrix name> <test project>
 test "$#" -eq 2
@@ -35,6 +41,13 @@ if [ "$name" = "compiler" ]; then
   bash scripts/compiler-shard-filter.sh --self-test
   # The invocations pass --no-build, so build once up front.
   dotnet build "$project" -c Release
+  replay_filter="$(bash scripts/compiler-shard-filter.sh --replay)"
+  dotnet test "$project" -c Release --no-build --no-restore \
+    --filter "$replay_filter" \
+    --logger "trx;LogFileName=$name-replay.trx" \
+    --results-directory artifacts/test \
+    --verbosity normal > replay-output.log 2>&1 &
+  replay_pid=$!
   for part in $(bash scripts/compiler-shard-filter.sh --parts); do
     filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
     dotnet test "$project" -c Release --no-build --no-restore \
@@ -43,6 +56,11 @@ if [ "$name" = "compiler" ]; then
       --results-directory artifacts/test \
       --verbosity normal 2>&1 | tee -a test-output.log
   done
+  replay_status=0
+  wait "$replay_pid" || replay_status=$?
+  echo "--- historical replay host (exit $replay_status) ---"
+  tee -a test-output.log < replay-output.log
+  test "$replay_status" = 0
 else
   dotnet test "$project" -c Release \
     --logger "trx;LogFileName=$name.trx" \

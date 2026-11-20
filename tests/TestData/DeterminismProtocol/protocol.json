@@ -649,9 +649,10 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "1846487e4cdedfa830dfee96bcc7ee894576bc54d4be1de5ded2e5718bbd99fe",
-        "repinnedFrom": "c10de3ffc7840da703bf783d0f74139383d19e3af3bea1a4df7e511f2c49f30a",
+        "scriptSha256": "1d20e02e2234ad9bb75d83cef246df73cccf87d1c80d8333e5d554b557c3632d",
+        "repinnedFrom": "1846487e4cdedfa830dfee96bcc7ee894576bc54d4be1de5ded2e5718bbd99fe",
         "testCommands": [
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
           "dotnet test \"$project\" -c Release  --logger \"trx;LogFileName=$name.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log"
         ],
@@ -668,9 +669,10 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "1846487e4cdedfa830dfee96bcc7ee894576bc54d4be1de5ded2e5718bbd99fe",
-        "repinnedFrom": "c10de3ffc7840da703bf783d0f74139383d19e3af3bea1a4df7e511f2c49f30a",
+        "scriptSha256": "1d20e02e2234ad9bb75d83cef246df73cccf87d1c80d8333e5d554b557c3632d",
+        "repinnedFrom": "1846487e4cdedfa830dfee96bcc7ee894576bc54d4be1de5ded2e5718bbd99fe",
         "testCommands": [
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
           "dotnet test \"$project\" -c Release  --logger \"trx;LogFileName=$name.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log"
         ],

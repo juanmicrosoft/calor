@@ -29,16 +29,28 @@
 # this shard's measured duration. The old two-host split dates from 7,978 cases;
 # each of its halves had grown to roughly a whole old suite before these repairs.
 #
+# HISTORICAL REPLAYS (0.30, #1730) are the fifth, separate part. Each test in
+# Category=HistoricalReplay rebuilds an archived compiler at its registered producer
+# commit and reruns one test with it (scripts/registered_ledger_historical_replay.py),
+# about 2-4 minutes on a hosted runner. Nine of them in the serial parts cost the
+# shard about half an hour, so the four parts exclude them and run-shard-tests.sh runs
+# them in their own test host beside the parts, on cores the serial suite leaves idle.
+# Coverage loops use --parts only: a replay measures an archived tree, not this one.
+#
 # Usage:
 #   bash scripts/compiler-shard-filter.sh --parts    # prints all part numbers
 # or:
 #   filter="$(bash scripts/compiler-shard-filter.sh --part 1)"  # raw filter, no eval
+# or:
+#   filter="$(bash scripts/compiler-shard-filter.sh --replay)"  # the historical replays
 # or:
 #   bash scripts/compiler-shard-filter.sh --self-test
 
 set -euo pipefail
 
 SHARD_LETTERS=("C D J U" "B F I Y" "A E S T V")
+REPLAY_FILTER="Category=HistoricalReplay"
+NOT_REPLAY="Category!=HistoricalReplay"
 FILTERS=()
 
 build_filters() {
@@ -49,14 +61,14 @@ build_filters() {
             include="${include:+$include|}FullyQualifiedName~Calor.Compiler.Tests.$letter"
             exclude="${exclude:+$exclude&}FullyQualifiedName!~Calor.Compiler.Tests.$letter"
         done
-        FILTERS+=("$include")
+        FILTERS+=("($include)&$NOT_REPLAY")
     done
     # Include future class initials and shared tests in the final complement.
-    FILTERS+=("$exclude")
+    FILTERS+=("$exclude&$NOT_REPLAY")
 }
 
 usage() {
-    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4]" >&2
+    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4 | --replay]" >&2
     exit 2
 }
 
@@ -77,6 +89,11 @@ if [ "$#" -gt 0 ]; then
             esac
             exit 0
             ;;
+        --replay)
+            [ "$#" -eq 1 ] || usage
+            printf '%s\n' "$REPLAY_FILTER"
+            exit 0
+            ;;
         *) usage ;;
     esac
 fi
@@ -95,10 +112,21 @@ if [ "${1:-}" = "--self-test" ]; then
             seen="$seen $letter"
         done
     done
-    selected="$(printf '%s|' "${FILTERS[@]:0:3}")"
-    expected_negation="$(printf '%s' "${selected%|}" | sed 's/|/\&/g; s/FullyQualifiedName~/FullyQualifiedName!~/g')"
+    # Every part excludes the replays, which form the separate fifth part.
+    selected=""
+    for filter in "${FILTERS[@]:0:3}"; do
+        case "$filter" in
+            "("*")&$NOT_REPLAY") ;;
+            *) echo "FAIL: a letter part does not exclude the historical replays: $filter"; fail=1 ;;
+        esac
+        filter="${filter#(}"
+        selected="$selected${filter%)&$NOT_REPLAY}|"
+    done
+    expected_negation="$(printf '%s' "${selected%|}" | sed 's/|/\&/g; s/FullyQualifiedName~/FullyQualifiedName!~/g')&$NOT_REPLAY"
     [ "${FILTERS[3]}" = "$expected_negation" ] \
         || { echo "FAIL: shard 4 is not the complement of shards 1-3"; fail=1; }
+    [ "$(bash "$0" --replay)" = "$REPLAY_FILTER" ] && [ "$NOT_REPLAY" = "${REPLAY_FILTER/=/!=}" ] \
+        || { echo "FAIL: the replay part is not the exact complement of the replay exclusion"; fail=1; }
 
     # Word splitting must actually happen. The interactive shell used to develop this
     # is zsh, which does NOT split an unquoted variable, and the first version of this
@@ -132,12 +160,13 @@ if [ "${1:-}" = "--self-test" ]; then
         || bash "$0" --part 1 extra >/dev/null 2>&1 \
         || bash "$0" --self-test extra >/dev/null 2>&1 \
         || bash "$0" --parts extra >/dev/null 2>&1 \
+        || bash "$0" --replay extra >/dev/null 2>&1 \
         || bash "$0" --unknown >/dev/null 2>&1; then
         echo "FAIL: accepted invalid arguments"
         fail=1
     fi
 
-    [ "$fail" = "0" ] && echo "compiler-shard-filter self-test passed (four disjoint parts, complement exact)."
+    [ "$fail" = "0" ] && echo "compiler-shard-filter self-test passed (four disjoint parts and the replay part, complements exact)."
     exit "$fail"
 fi
 
