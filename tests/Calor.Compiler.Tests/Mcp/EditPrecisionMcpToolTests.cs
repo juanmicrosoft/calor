@@ -263,8 +263,8 @@ module IoModule IoModule block
     public async Task EditPreview_ContractChange_Detected()
     {
         var tool = new EditPreviewTool();
-        // Remove a contract line
-        var modified = SampleSource.Replace("    requires (x >= 0)\n", "");
+        // Remove a contract: the refinement on add's x (#1618: preconditions are refinements)
+        var modified = SampleSource.Replace("(int:x | (# >= 0), int:y)", "(int:x, int:y)");
 
         var args = CreateEditPreviewArgs(SampleSource, modified);
         var result = await tool.ExecuteAsync(args);

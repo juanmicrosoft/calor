@@ -103,9 +103,9 @@ public sealed class S2NestedQuantifierTests : IDisposable
 
         List<(string Name, string TypeName)> parameters = [("n", "i8")];
         using var cache = new VerificationCache(new VerificationCacheOptions { Enabled = true, CacheDirectory = _cacheDir });
-        cache.CachePostconditionResult(parameters, "i32", function.Preconditions, post, function.Body,
+        cache.CachePostconditionResult(parameters, "i32", Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions), post, function.Body,
             new Calor.Compiler.Verification.Z3.ContractVerificationResult(ContractVerificationStatus.Proven));
-        Assert.False(cache.TryGetPostconditionResult(parameters, "i32", function.Preconditions, post, function.Body, out _));
+        Assert.False(cache.TryGetPostconditionResult(parameters, "i32", Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions), post, function.Body, out _));
         Assert.Empty(Directory.Exists(_cacheDir)
             ? Directory.GetFiles(_cacheDir, "*.json", SearchOption.AllDirectories)
             : []);
@@ -113,14 +113,14 @@ public sealed class S2NestedQuantifierTests : IDisposable
         // Review round 3: an older compiler could have stored Proven under this very key (the
         // hasher still computes one). Seed such an entry, show it is readable by key, and
         // show the lookup still refuses to serve it.
-        var key = hasher.HashPostcondition(parameters, "i32", function.Preconditions, post, function.Body);
+        var key = hasher.HashPostcondition(parameters, "i32", Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions), post, function.Body);
         var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
         var scoped = (string)typeof(VerificationCache).GetMethod("ApplyKeyScope", flags)!.Invoke(cache, [key])!;
         typeof(VerificationCache).GetMethod("CacheResult", flags)!.Invoke(cache,
             [scoped, new Calor.Compiler.Verification.Z3.ContractVerificationResult(ContractVerificationStatus.Proven)]);
         object?[] lookup = [scoped, null];
         Assert.True((bool)typeof(VerificationCache).GetMethod("TryGetCachedResult", flags)!.Invoke(cache, lookup)!);
-        Assert.False(cache.TryGetPostconditionResult(parameters, "i32", function.Preconditions, post, function.Body, out _));
+        Assert.False(cache.TryGetPostconditionResult(parameters, "i32", Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions), post, function.Body, out _));
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public sealed class S2NestedQuantifierTests : IDisposable
         using var ctx = Z3ContextFactory.Create();
         using var prover = new Z3ImplicationProver(ctx);
         var result = prover.ProveImplication(
-            [("n", "i8")], function.Preconditions[0].Condition, function.Postconditions[0].Condition);
+            [("n", "i8")], Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions)[0].Condition, function.Postconditions[0].Condition);
         Assert.Equal(ImplicationStatus.Unsupported, result.Status);
     }
 }

@@ -59,8 +59,8 @@ public class CompileToolTests
     // v0.15 (PR #1088): the MCP compile tool inherits default-on elision and must
     // expose the same opt-out the CLI has (`keepProvenGuards` ⇔ --keep-proven-guards).
     private const string ProvenSquareSource =
-        "module Test Test\n  class Calc public\n    func Square public (int:x) → int\n      !\n" +
-        "      requires x >= 0\n      requires x <= 46340\n      => result >= 0\n      return x * x\n";
+        "module Test Test\n  class Calc public\n    func Square public (int:x | ((# >= 0) && (# <= 46340))) → int\n      !\n" +
+        "      => result >= 0\n      return x * x\n";
 
     private async Task<string> CompileProvenSquare(string options)
     {
@@ -199,7 +199,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "module Test Test\n  module TestModule public\n    func Div public (int:a, int:b) → int\n      !\n      requires b != 0\n      return a / b\n",
+                "source": "module Test Test\n  module TestModule public\n    func Div public (int:a, int:b | (# != 0)) → int\n      !\n      return a / b\n",
                 "options": {
                     "contractMode": "off"
                 }
@@ -218,7 +218,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "module Test Test\n  module TestModule public\n    func Div public (int:a, int:b) → int\n      !\n      requires b != 0\n      return a / b\n",
+                "source": "module Test Test\n  module TestModule public\n    func Div public (int:a, int:b | (# != 0)) → int\n      !\n      return a / b\n",
                 "options": {
                     "contractMode": "release"
                 }

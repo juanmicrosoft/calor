@@ -1,7 +1,6 @@
 module OutcomeUnsupportedBody OutcomeUnsupportedBody block
-  func SumTo (int:n) → int
+  func SumTo (int:n | (# > 0)) → int
     !
-    requires (n > 0)
     => (result >= 0)
     var int:total = 0
     for i from 1 to n step 1

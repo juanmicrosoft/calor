@@ -525,7 +525,7 @@ public class LintRegressionTests
         }
         else if (file.Contains("contracts"))
         {
-            Assert.Contains("requires", formatted); // Precondition
+            Assert.Contains(" | (# ", formatted); // Precondition (#1618: a parameter refinement)
             Assert.Contains("=>", formatted); // Postcondition
         }
     }

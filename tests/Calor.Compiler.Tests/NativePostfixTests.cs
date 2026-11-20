@@ -265,7 +265,7 @@ public sealed class NativePostfixTests
               interface IReader
                 func Read () → int
                   !
-                  requires 2 > 1
+                  => 2 > 1
             """;
         var ast = Parse(source);
         var signature = Assert.Single(Assert.Single(ast.Interfaces).Methods);

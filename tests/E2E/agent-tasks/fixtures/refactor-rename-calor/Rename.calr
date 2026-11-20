@@ -4,10 +4,8 @@ module RenameExamples RenameExamples block
     => (result == (val * 2))
     return (val * 2)
 
-  func ValidatedOp (int:num, int:max) → int
+  func ValidatedOp (int:num | (# >= 0), int:max | (num <= #)) → int
     !
-    requires (num >= 0)
-    requires (num <= max)
     => (result <= max)
     return num
 

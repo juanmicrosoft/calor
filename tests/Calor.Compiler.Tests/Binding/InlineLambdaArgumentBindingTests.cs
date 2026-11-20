@@ -594,12 +594,14 @@ public sealed class InlineLambdaArgumentBindingTests
         string callbackType, bool contract, bool unrelatedLambda)
     {
         const string predicate = "forall int:i in 0..n, int:j in 0..n : matrix[i,j] == matrix[j,i]";
+        // #1618: the contract is a postcondition so that --contract-mode off can disable it;
+        // a parameter refinement (the only precondition form) is checked in every mode.
         var source = $$"""
             module QuantifiedCallbacks
               using Callback = System.Action
               func Check<T> ({{callbackType}}:callback !, T[,]:matrix, int:n) → bool
                 !
-                {{(contract ? "requires " + predicate : "")}}
+                {{(contract ? "=> " + predicate : "")}}
                 callback()
                 return {{(contract ? "true" : predicate)}}
               {{UnrelatedLambda(unrelatedLambda)}}

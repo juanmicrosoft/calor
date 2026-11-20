@@ -35,15 +35,22 @@ public sealed class NativeSelfTestScenarioTests
         }
     }
 
+    // #1618: custom precondition messages are gone; Divide's precondition is the refinement on b,
+    // so the contracts scenario now round-trips through the native emitter like the others.
     [Fact]
-    public void CustomMessage_RemainsAParsedContractWithAnExplicitEmitterGap()
+    public void ContractsScenario_RefinementRoundTripsThroughNativeEmitter()
     {
         var scenario = Scenario("03_contracts");
         var ast = CalorSourceHelper.Parse(scenario.Input).Ast!;
         var divide = Assert.Single(Assert.Single(ast.Classes).Methods, method => method.Name == "Divide");
-        Assert.Equal("divisor must not be zero", Assert.Single(divide.Preconditions).Message);
-        var failure = Assert.Throws<InvalidOperationException>(() => new CalorEmitter().Emit(ast));
-        Assert.Equal("Canonical precondition message syntax has not been selected.", failure.Message);
+        Assert.Empty(divide.Preconditions);
+        Assert.NotNull(divide.Parameters[1].InlineRefinement);
+        var emitted = new CalorEmitter().Emit(ast);
+        Assert.Contains("int:b | (# != 0)", emitted);
+        var reparsed = CalorSourceHelper.Parse(emitted);
+        Assert.True(reparsed.IsSuccess, string.Join("\n", reparsed.Errors));
+        Assert.NotNull(Assert.Single(Assert.Single(reparsed.Ast!.Classes).Methods, method => method.Name == "Divide")
+            .Parameters[1].InlineRefinement);
         Assert.DoesNotContain("raw ", scenario.Input);
         Assert.DoesNotContain("throw ", scenario.Input);
     }
@@ -224,7 +231,7 @@ public sealed class NativeSelfTestScenarioTests
     [InlineData(ContractMode.Debug)]
     [InlineData(ContractMode.Release)]
     [InlineData(ContractMode.Off)]
-    public void ContractModes_PreserveCustomMessageAndDisabledGuardSemantics(ContractMode mode)
+    public void ContractModes_KeepRefinementChecksAndOffStripsContractGuards(ContractMode mode)
     {
         var scenario = Scenario("03_contracts");
         var result = Program.Compile(scenario.Input, "03_contracts.calr", new CompilationOptions
@@ -235,25 +242,17 @@ public sealed class NativeSelfTestScenarioTests
         var assembly = Load(result.GeneratedCode);
         Assert.Equal(9, Invoke(assembly, "Contracts.ContractsModule", "Square", [3]));
         Assert.Equal(2, Invoke(assembly, "Contracts.ContractsModule", "Divide", [4, 2]));
+        // #1618: the preconditions are refinements (x >= 0 on Square, b != 0 on Divide). Their
+        // entry checks throw ArgumentOutOfRangeException naming the parameter in every contract
+        // mode, Off included; Off strips only the ContractViolationException guards.
         var error = ObserveException(assembly, "Contracts.ContractsModule", "Divide", [4, 0]);
+        Assert.Equal("b", Assert.IsType<ArgumentOutOfRangeException>(error).ParamName);
+        Assert.Equal("x", Assert.IsType<ArgumentOutOfRangeException>(
+            ObserveException(assembly, "Contracts.ContractsModule", "Square", [-1])).ParamName);
         if (mode == ContractMode.Off)
-        {
-            Assert.IsType<DivideByZeroException>(error);
-            Assert.Equal(1, Invoke(assembly, "Contracts.ContractsModule", "Square", [-1]));
             Assert.DoesNotContain("ContractViolationException", result.GeneratedCode);
-        }
         else
-        {
-            var contract = Assert.IsType<ContractViolationException>(error);
-            Assert.Equal(ContractKind.Requires, contract.Kind);
-            if (mode == ContractMode.Debug)
-                Assert.Equal("divisor must not be zero", contract.Message);
-            else
-            {
-                Assert.Equal(0, contract.Length);
-                Assert.Null(contract.Condition);
-            }
-        }
+            Assert.Contains("ContractViolationException", result.GeneratedCode);
     }
 
     [Fact]
@@ -269,12 +268,14 @@ public sealed class NativeSelfTestScenarioTests
         Assert.DoesNotContain("Results:", failure.StdOut);
     }
 
+    // #1618: a refinement entry check carries the parameter, not an owner id or location, so
+    // those rows assert the parameter; the owner/location row is a postcondition violation.
     [Theory]
-    [InlineData("03_contracts", "Contracts.ContractsModule", "Divide", 4, 0)]
-    [InlineData("07_quantifiers", "QuantifierDemo.QuantifierDemoModule", "ExistsTarget", -1, null)]
-    [InlineData("08_contract_inheritance_z3", "ContractZ3Test.ValidService", "Process", -11, null)]
+    [InlineData("03_contracts", "Contracts.ContractsModule", "Divide", 4, 0, "b")]
+    [InlineData("07_quantifiers", "QuantifierDemo.QuantifierDemoModule", "ExistsTarget", -1, null, "target")]
+    [InlineData("08_contract_inheritance_z3", "ContractZ3Test.ValidService", "Process", -10, null, null)]
     public void PhysicalCli_ExceptionsRetainCommittedSidecarOwnersAndCurrentLocations(
-        string name, string type, string method, int first, int? second)
+        string name, string type, string method, int first, int? second, string? refinedParameter)
     {
         var root = CliTestHarness.FindRepoRoot();
         var canonical = Path.Combine(root, "tests/E2E/scenarios", name);
@@ -292,14 +293,21 @@ public sealed class NativeSelfTestScenarioTests
                 declaration => declaration.GetProperty("Name").GetString() == method
                     && declaration.GetProperty("Container").GetString()!.Contains(type, StringComparison.Ordinal));
             object?[] arguments = second.HasValue ? [first, second.Value] : [first];
-            var exception = Assert.IsType<ContractViolationException>(ObserveException(
-                Load(File.ReadAllText(Path.Combine(temporary, "actual.g.cs"))), type, method, arguments));
+            var observed = ObserveException(
+                Load(File.ReadAllText(Path.Combine(temporary, "actual.g.cs"))), type, method, arguments);
+            if (refinedParameter != null)
+            {
+                Assert.Equal(refinedParameter, Assert.IsType<ArgumentOutOfRangeException>(observed).ParamName);
+                return;
+            }
+            var exception = Assert.IsType<ContractViolationException>(observed);
+            Assert.Equal(ContractKind.Ensures, exception.Kind);
             Assert.Equal(owner.GetProperty("Id").GetString(), exception.FunctionId);
             var source = File.ReadAllText(Path.Combine(temporary, "input.calr"));
             var parsedType = Assert.Single(CalorSourceHelper.Parse(source).Ast!.Classes,
                 item => type.EndsWith("." + item.Name, StringComparison.Ordinal));
             var parsedOwner = Assert.Single(parsedType.Methods, item => item.Name == method);
-            var span = Assert.Single(parsedOwner.Preconditions).Span;
+            var span = Assert.Single(parsedOwner.Postconditions).Span;
             Assert.Equal((span.Start, span.Length, span.Line, span.Column),
                 (exception.StartOffset, exception.Length, exception.Line, exception.Column));
         }

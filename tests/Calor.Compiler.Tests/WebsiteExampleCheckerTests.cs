@@ -518,7 +518,7 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Theory]
-    [InlineData("contracts", "x >= 0", "missing >= 0")]
+    [InlineData("contracts", "result >= 0", "missing >= 0")]
     [InlineData("effects", "! db:rw,net:rw", "! db:rw,net:rw\nMissingType.Save()")]
     [InlineData("stableId", "func Process () → void", "func Process (MissingType:x) → void")]
     public void Landing_MutatedDisplayedCodeFails(string id, string original, string replacement)
@@ -641,7 +641,7 @@ public sealed class WebsiteExampleCheckerTests
     {
         var (source, components) = LandingInputs();
         var broken = MutateLanding(source, json =>
-            json["contracts"]!["code"] = json["contracts"]!["code"]!.GetValue<string>().Replace("x >= 0", "missing >= 0"));
+            json["contracts"]!["code"] = json["contracts"]!["code"]!.GetValue<string>().Replace("result >= 0", "missing >= 0"));
         var inputs = new DocDriftInputs
         {
             Version = "0.0.0",
@@ -750,7 +750,7 @@ public sealed class WebsiteExampleCheckerTests
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]
     [InlineData("guides/cross-module-effect-propagation.mdx", "```calor group=orders expect=Calor0410\n", "```calor group=orders\n")]
-    [InlineData("guides/dependent-types-tutorial.mdx", "(int:balance, int:amount) → int\n    !\n    requires balance >= 0\n    requires amount > 0\n    requires balance >= amount", "(int:balance, int:amount) → string\n    !\n    requires balance >= 0\n    requires amount > 0\n    requires balance >= amount")]
+    [InlineData("guides/dependent-types-tutorial.mdx", "(int:balance | (# >= 0), int:amount | ((# > 0) && (balance >= #))) → int", "(int:balance | (# >= 0), int:amount | ((# > 0) && (balance >= #))) → string")]
     [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\nmodule TokenHello\n",
         "```calor\nmodule TokenHello\nnamespace Name\n")]
     [InlineData("syntax-reference/structure-tags.mdx", "      if i > 1\n", "      if missing > 1\n")]

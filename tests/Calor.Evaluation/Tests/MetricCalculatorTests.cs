@@ -252,7 +252,7 @@ namespace Calculator
         // Arrange
         var calculator = new InformationDensityCalculator();
         var context = CreateContext(
-            calor: "module m m block\n  func f (int:x) → int\n    !\n    requires x > 0\n    return x\n",
+            calor: "module m m block\n  func f (int:x | (# > 0)) → int\n    !\n    return x\n",
             csharp: "class C { int F(int x) { return x; } }");
 
         // Act

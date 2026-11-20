@@ -33,7 +33,8 @@ module Test Test
     }
 
     /// <summary>
-    /// S10: REQUIRES that fails throws ContractViolationException with FunctionId.
+    /// S10: a failing precondition throws at entry. #1618: the precondition is a parameter
+    /// refinement, whose entry check throws ArgumentOutOfRangeException naming the parameter.
     /// </summary>
     [Fact]
     public void S10_RequiresFails_ThrowsContractViolation()
@@ -51,17 +52,8 @@ module Test Test
         Assert.False(result.Succeeded, "Contract violation should throw");
         Assert.NotNull(result.Exception);
 
-        // Should be ContractViolationException
-        Assert.True(
-            result.Exception is ContractViolationException,
-            $"Expected ContractViolationException but got: {result.Exception.GetType().Name}");
-
-        var cve = (ContractViolationException)result.Exception;
-
-        var compilation = Program.Compile(source, "test.calr",
-            new CompilationOptions { EnforceEffects = false });
-        Assert.False(compilation.HasErrors);
-        Assert.Equal(Assert.Single(compilation.Ast!.Functions).Id, cve.FunctionId);
+        var violation = Assert.IsType<ArgumentOutOfRangeException>(result.Exception);
+        Assert.Equal("x", violation.ParamName);
     }
 
     /// <summary>
@@ -85,32 +77,33 @@ module Test Test
     }
 
     /// <summary>
-    /// Multiple REQUIRES are evaluated in order.
+    /// Multiple preconditions are evaluated in order. #1618: one refinement per parameter,
+    /// checked in parameter order.
     /// </summary>
     [Fact]
     public void MultipleRequires_EvaluatedInOrder()
     {
         var source = @"
 module Test Test
-  func bounded (int:x | ((# > 0) && (# < 100))) → int
+  func bounded (int:x | (# > 0), int:y | (# < 100)) → int
     !
     return x
 ";
 
-        // x = 50 should pass both
-        var result1 = SemanticsTestHarness.Execute(source, "bounded", new object[] { 50 });
+        // x = 50, y = 50 should pass both
+        var result1 = SemanticsTestHarness.Execute(source, "bounded", new object[] { 50, 50 });
         Assert.True(result1.Succeeded);
         Assert.Equal(50, result1.ReturnValue);
 
-        // x = -1 should fail first requires
-        var result2 = SemanticsTestHarness.Execute(source, "bounded", new object[] { -1 });
+        // Both violated: the first parameter's check fails first
+        var result2 = SemanticsTestHarness.Execute(source, "bounded", new object[] { -1, 150 });
         Assert.False(result2.Succeeded);
-        Assert.IsType<ContractViolationException>(result2.Exception);
+        Assert.Equal("x", Assert.IsType<ArgumentOutOfRangeException>(result2.Exception).ParamName);
 
-        // x = 150 should fail second requires (first passes)
-        var result3 = SemanticsTestHarness.Execute(source, "bounded", new object[] { 150 });
+        // y = 150 should fail the second check (first passes)
+        var result3 = SemanticsTestHarness.Execute(source, "bounded", new object[] { 50, 150 });
         Assert.False(result3.Succeeded);
-        Assert.IsType<ContractViolationException>(result3.Exception);
+        Assert.Equal("y", Assert.IsType<ArgumentOutOfRangeException>(result3.Exception).ParamName);
     }
 
     /// <summary>
@@ -133,7 +126,8 @@ module Test Test
         Assert.False(result.Succeeded);
         Assert.NotNull(result.Exception);
 
-        // Exception should be a ContractViolationException
-        Assert.IsType<ContractViolationException>(result.Exception);
+        // #1618: the refinement entry check names the violated parameter in its message
+        var violation = Assert.IsType<ArgumentOutOfRangeException>(result.Exception);
+        Assert.Contains("parameter 'x'", violation.Message);
     }
 }

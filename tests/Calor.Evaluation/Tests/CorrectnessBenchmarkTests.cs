@@ -522,7 +522,7 @@ public class Test
         // Context with validation patterns (null checks, bounds checks)
         // The estimator looks for patterns like `requires`, "null", ">=", "<"
         var withValidation = CreateTestContext(
-            calorSource: "module Test Test block\n  func test (int:x) → int\n    !\n    requires (x >= 0)\n    return x\n",
+            calorSource: "module Test Test block\n  func test (int:x | (# >= 0)) → int\n    !\n    return x\n",
             csharpSource: "public class T { public int test(int x) { if (x == null) throw new ArgumentNullException(); if (x < 0) throw new ArgumentException(); return x; } }"
         );
         var withValidationResult = await calculator.CalculateAsync(withValidation);

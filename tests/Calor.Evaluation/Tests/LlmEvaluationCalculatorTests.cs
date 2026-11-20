@@ -346,7 +346,7 @@ public class LlmEvaluationCalculatorTests
         // Source with contracts
         var context = new EvaluationContext
         {
-            CalorSource = "module T T block\n  func F (int:x) → int\n    !\n    requires (x > 0)\n    => (result >= 0)\n    return x",
+            CalorSource = "module T T block\n  func F (int:x | (# > 0)) → int\n    !\n    => (result >= 0)\n    return x",
             CSharpSource = "class T { int F(int x) { return x; } }",
             FileName = "unmatched_name", // Won't find in question bank
             Level = 1,

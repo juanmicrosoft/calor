@@ -167,8 +167,8 @@ public class RunTestCommandTests : IDisposable
         Assert.NotEmpty(generated);
         Assert.Contains("// PROVEN: Postcondition", generated);
         Assert.DoesNotContain("ContractKind.Ensures", generated);
-        // Preconditions never elide.
-        Assert.Contains("ContractKind.Requires", generated);
+        // Preconditions never elide (#1618: the refinement's entry check on x).
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(x)", generated);
     }
 
     [SkippableFact]

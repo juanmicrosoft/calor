@@ -1,13 +1,10 @@
 module OutcomeRefutedOverflow OutcomeRefutedOverflow block
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     => (result >= 0)
     return (x * x)
 
-  func AddPositive (int:a, int:b) → int
+  func AddPositive (int:a | (# > 0), int:b | (# > 0)) → int
     !
-    requires (a > 0)
-    requires (b > 0)
     => (result > a)
     return (a + b)

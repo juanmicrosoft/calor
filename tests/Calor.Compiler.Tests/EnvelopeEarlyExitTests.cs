@@ -224,7 +224,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         // Z3 finds a counterexample (e.g. x = 1 → result = 0).
         var file = Path.Combine(_tempDir, "refutable.calr");
         File.WriteAllText(file,
-            "module Demo Demo block\n  func Dec (int:x) → int\n    !\n    requires (x > 0)\n    => (result > 10)\n    return (x - 1)\n");
+            "module Demo Demo block\n  func Dec (int:x | (# > 0)) → int\n    !\n    => (result > 10)\n    return (x - 1)\n");
         return file;
     }
 
@@ -233,7 +233,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         // §S (>= x 1) follows directly from §Q (> x 0) for §R x.
         var file = Path.Combine(_tempDir, "provable.calr");
         File.WriteAllText(file,
-            "module Demo Demo block\n  func Ok (int:x) → int\n    !\n    requires (x > 0)\n    => (x >= 1)\n    return x\n");
+            "module Demo Demo block\n  func Ok (int:x | (# > 0)) → int\n    !\n    => (x >= 1)\n    return x\n");
         return file;
     }
 

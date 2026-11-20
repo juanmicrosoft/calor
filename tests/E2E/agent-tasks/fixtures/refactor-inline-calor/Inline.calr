@@ -9,9 +9,8 @@ module InlineExamples InlineExamples block
     var _hoist001 = Double(b)
     return (_hoist000 + _hoist001)
 
-  func Clamp (int:value, int:min, int:max) → int
+  func Clamp (int:value, int:min, int:max | (min <= #)) → int
     !
-    requires (min <= max)
     => (result >= min)
     => (result <= max)
     return ((value < min) ? min : ((value > max) ? max : value))

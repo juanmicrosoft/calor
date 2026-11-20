@@ -2966,8 +2966,9 @@ public sealed class NativeMetadataClosureTests
                 return c - '0'
             """;
         var module = Parse(authored);
-        var predicate = Assert.Single(Assert.Single(module.Functions).Preconditions).Condition.Accept(new CalorEmitter());
-        foreach (var source in new[] { authored, authored.Replace("char.IsDigit(c)", predicate, StringComparison.Ordinal) })
+        // #1618: the precondition is the refinement on c; round-trip its emitted predicate.
+        var predicate = Assert.Single(module.Functions).Parameters[0].InlineRefinement!.Predicate.Accept(new CalorEmitter());
+        foreach (var source in new[] { authored, authored.Replace("(char.IsDigit(#))", predicate, StringComparison.Ordinal) })
         {
             var result = Compile(source);
             Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));

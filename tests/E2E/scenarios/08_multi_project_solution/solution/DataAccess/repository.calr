@@ -1,8 +1,7 @@
 module Repository Repository block
   module RepositoryModule
-    func GetById (int:id) → int
+    func GetById (int:id | (# > 0)) → int
       !
-      requires id > 0
       => result >= 0
       return id * 10
 

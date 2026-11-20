@@ -108,7 +108,7 @@ public sealed class AgentGuidanceTests
         var guards = discovery.DiscoverGuards(tracker);
 
         Assert.True(guards.Count >= 2);
-        Assert.Contains(guards, g => g.InsertionKind == "precondition");
+        Assert.Contains(guards, g => g.InsertionKind == "refinement");
         Assert.Contains(guards, g => g.InsertionKind == "if_guard");
         Assert.Contains(guards, g => g.Confidence == "high");
     }
@@ -137,7 +137,9 @@ public sealed class AgentGuidanceTests
         var guards = discovery.DiscoverGuards(tracker);
 
         Assert.NotEmpty(guards);
-        Assert.Contains(guards, g => g.CalorExpression.StartsWith("requires ", StringComparison.Ordinal));
+        // #1618: the entry-condition guard is a refinement for the last parameter it mentions.
+        Assert.Contains(guards, g => g.InsertionKind == "refinement"
+            && g.CalorExpression.StartsWith("| (", StringComparison.Ordinal));
         Assert.DoesNotContain(guards, g => g.CalorExpression.Contains('§'));
     }
 
@@ -408,8 +410,8 @@ public sealed class AgentGuidanceTests
 
         Assert.NotEmpty(guards);
         // The precondition guard should contain the formatted condition with >= and <=
-        var precondGuard = guards.First(g => g.InsertionKind == "precondition");
-        Assert.Equal("requires (x >= 0) && (x <= 100)", precondGuard.CalorExpression);
+        var precondGuard = guards.First(g => g.InsertionKind == "refinement");
+        Assert.Equal("x | ((# >= 0) && (# <= 100))", precondGuard.CalorExpression);
         var ifGuard = guards.First(g => g.InsertionKind == "if_guard");
         Assert.StartsWith("if !((x >= 0) && (x <= 100))\n  throw new InvalidOperationException(", ifGuard.CalorExpression);
     }
@@ -436,10 +438,13 @@ public sealed class AgentGuidanceTests
         var discovery = new GuardDiscovery();
         var guards = discovery.DiscoverGuards(tracker);
 
-        // # should be replaced with the parameter name 'age'
-        var precondGuard = guards.First(g => g.InsertionKind == "precondition");
-        Assert.Contains("age", precondGuard.CalorExpression);
-        Assert.DoesNotContain("#", precondGuard.CalorExpression);
+        // #1618: the refinement guard names the parameter 'age' and keeps # inside the predicate
+        var precondGuard = guards.First(g => g.InsertionKind == "refinement");
+        Assert.Equal("age | (# >= 0)", precondGuard.CalorExpression);
+        // The if-guard is a statement in the body, so # is replaced with the parameter name there
+        var ifGuard = guards.First(g => g.InsertionKind == "if_guard");
+        Assert.Contains("age", ifGuard.CalorExpression);
+        Assert.DoesNotContain("#", ifGuard.CalorExpression);
     }
 
     // ───── GuardDiscovery: Z3 Validation ─────
@@ -474,8 +479,8 @@ public sealed class AgentGuidanceTests
             .ToList();
         discovery.ValidateWithZ3(guards, tracker.Obligations, parameters);
 
-        // Precondition guards should be validated (assuming the condition discharges it)
-        var precondGuard = guards.First(g => g.InsertionKind == "precondition");
+        // Refinement guards should be validated (assuming the condition discharges it)
+        var precondGuard = guards.First(g => g.InsertionKind == "refinement");
         Assert.True(precondGuard.Validated);
 
         // if_guard guards should have null (not applicable for Z3 validation)

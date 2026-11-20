@@ -107,12 +107,12 @@ public class ComprehensionProportionalTests
 
         // Pre-only
         var preOnlyContext = CreateContext(
-            calor: "module T T block\n  func F (int:x) → int\n    !\n    requires (x > 0)\n    return x",
+            calor: "module T T block\n  func F (int:x | (# > 0)) → int\n    !\n    return x",
             csharp: "class T { int F(int x) { return x; } }");
 
         // Pre + Post (contract completeness bonus)
         var bothContext = CreateContext(
-            calor: "module T T block\n  func F (int:x) → int\n    !\n    requires (x > 0)\n    => (result >= 0)\n    return x",
+            calor: "module T T block\n  func F (int:x | (# > 0)) → int\n    !\n    => (result >= 0)\n    return x",
             csharp: "class T { int F(int x) { return x; } }");
 
         var preOnly = await calculator.CalculateAsync(preOnlyContext);

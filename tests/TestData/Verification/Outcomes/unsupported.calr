@@ -1,6 +1,5 @@
 module OutcomeUnsupported OutcomeUnsupported block
-  func Half (double:x) → double
+  func Half (double:x | (# > 0.0)) → double
     !
-    requires (x > 0.0)
     => (result > 0.0)
     return x

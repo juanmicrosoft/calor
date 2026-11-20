@@ -400,13 +400,13 @@ public class BclContractTests
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer($$"""
             module DirectNativeBcl
-              func Probe (string:s, int:x) → int
+              func Probe (string:s, int:x | ({{predicate}})) → int
                 !
-                requires {{predicate}}
                 return 0
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
-        return Assert.Single(Assert.Single(module.Functions).Preconditions).Condition;
+        // #1618: the predicate names both parameters directly, so it is the refinement as written.
+        return Assert.Single(module.Functions).Parameters[1].InlineRefinement!.Predicate;
     }
 
     [SkippableTheory]

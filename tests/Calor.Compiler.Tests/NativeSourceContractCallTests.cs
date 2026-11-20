@@ -23,6 +23,20 @@ public sealed class NativeSourceContractCallTests
             return x
         """ + "\n";
 
+    // #1618: a precondition is a refinement on the parameter. A contract starting with "|" is
+    // placed on Identity's x; any other contract replaces the postcondition line.
+    private static string WithContract(string contract)
+    {
+        var source = Original.Replace("(int:x | (# > 0))", "(int:x)", StringComparison.Ordinal);
+        return contract.StartsWith('|')
+            ? source.Replace("(int:x)", "(int:x " + contract + ")", StringComparison.Ordinal)
+                .Replace("    => Positive(result)\n", "", StringComparison.Ordinal)
+            : source.Replace("    => Positive(result)", "    " + contract, StringComparison.Ordinal);
+    }
+
+    private static string PreconditionFailure(bool precondition) =>
+        precondition ? "ArgumentOutOfRangeException" : "ContractViolationException";
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -36,21 +50,23 @@ public sealed class NativeSourceContractCallTests
                 func Positive (int:value) → bool
                   !
                   return value > 0
-              func Identity (int:x) → int
+              func Identity (int:xREFINEMENT) → int
                 !
                 CONTRACT
                 return x
-            """ + "\n" : Original.Replace("    requires x > 0\n", "", StringComparison.Ordinal)
+            """ + "\n" : Original.Replace("(int:x | (# > 0))", "(int:xREFINEMENT)", StringComparison.Ordinal)
                 .Replace("    => Positive(result)", "    CONTRACT", StringComparison.Ordinal);
-        source = source.Replace("CONTRACT",
-            $"{(precondition ? "requires" : "=>")} {(qualified ? "Predicates." : "")}Positive({(precondition ? "x" : "result")})",
-            StringComparison.Ordinal);
+        var predicate = $"{(qualified ? "Predicates." : "")}Positive({(precondition ? "#" : "result")})";
+        source = source
+            .Replace("REFINEMENT", precondition ? $" | ({predicate})" : "", StringComparison.Ordinal)
+            .Replace(precondition ? "    CONTRACT\n" : "CONTRACT", precondition ? "" : "=> " + predicate,
+                StringComparison.Ordinal);
         var result = Program.Compile(source, "source-contract.calr");
         Assert.False(result.HasErrors, Errors(result));
         var method = Load(result.GeneratedCode).GetType("GlobalModule")!.GetMethod("Identity")!;
         Assert.Equal(1, method.Invoke(null, [1]));
         var exception = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [-1]));
-        Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
+        Assert.Equal(PreconditionFailure(precondition), exception.InnerException!.GetType().Name);
     }
 
     [Fact]
@@ -77,12 +93,11 @@ public sealed class NativeSourceContractCallTests
     }
 
     [Theory]
-    [InlineData("requires Positive(x)")]
+    [InlineData("| (Positive(#))")]
     [InlineData("=> Positive(result)")]
     public void SelectedEffectfulPredicate_CannotEscapePureCaller(string contract)
     {
-        var source = Original.Replace("    requires x > 0\n    => Positive(result)", "    " + contract,
-                StringComparison.Ordinal)
+        var source = WithContract(contract)
             .Replace("func Positive (int:value) → bool\n    !",
                 "func Positive (int:value) → bool\n    ! cw\n    Console.WriteLine(value)", StringComparison.Ordinal);
         var result = Program.Compile(source, "effect-contract.calr");
@@ -93,13 +108,12 @@ public sealed class NativeSourceContractCallTests
     }
 
     [Theory]
-    [InlineData("Missing(x)")]
+    [InlineData("Missing(#)")]
     [InlineData("Positive(\"text\")")]
-    [InlineData("Number(x)")]
+    [InlineData("Number(#)")]
     public void UnselectedOrNonBooleanCalls_AreRejected(string predicate)
     {
-        var source = Original.Replace("    requires x > 0\n    => Positive(result)",
-            "    requires " + predicate, StringComparison.Ordinal) + """
+        var source = WithContract("| (" + predicate + ")") + """
               func Number (int:value) → int
                 !
                 return value
@@ -119,8 +133,7 @@ public sealed class NativeSourceContractCallTests
     [InlineData(true)]
     public void RuntimeRepair_DoesNotProveSourceFunctionCalls(bool precondition)
     {
-        var source = Original.Replace("    requires x > 0\n    => Positive(result)",
-            precondition ? "    requires Positive(x)" : "    => Positive(result)", StringComparison.Ordinal);
+        var source = WithContract(precondition ? "| (Positive(#))" : "=> Positive(result)");
         var options = new CompilationOptions
         {
             VerifyContracts = true,
@@ -172,11 +185,13 @@ public sealed class NativeSourceContractCallTests
         {
             Console.SetOut(output);
             Assert.Equal(1, method.Invoke(null, [1]));
-            Assert.Equal(mode == ContractMode.Off ? ["body"]
+            // #1618: the entry predicate is the refinement on x, checked in every contract mode;
+            // Off strips only the postcondition.
+            Assert.Equal(mode == ContractMode.Off ? ["receiver", "entry", "predicate", "body"]
                 : new[] { "receiver", "entry", "predicate", "body", "receiver", "exit", "predicate" },
                 output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
-            if (mode == ContractMode.Off)
-                Assert.Equal(-1, method.Invoke(null, [-1]));
+            Assert.IsType<ArgumentOutOfRangeException>(
+                Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [-1])).InnerException);
         }
         finally
         {
@@ -202,13 +217,14 @@ public sealed class NativeSourceContractCallTests
     }
 
     [Theory]
-    [InlineData("requires Predicates.Positive(x)", "int:x", "private", "int:value")]
-    [InlineData("requires Predicates.Positive(x)", "int:x, int:Predicates", "public", "int:value")]
-    [InlineData("requires Predicates.Positive(missing)", "int:x", "public", "int:value")]
-    [InlineData("requires Predicates.Positive(x)", "int:x", "public", "string:value")]
-    [InlineData("requires Other.Positive(x)", "int:x", "public", "int:value")]
+    // #1618: the precondition is the refinement inside the parameter list.
+    [InlineData("int:x | (Predicates.Positive(#))", "private", "int:value")]
+    [InlineData("int:x, int:Predicates | (Predicates.Positive(x))", "public", "int:value")]
+    [InlineData("int:x | (Predicates.Positive(missing))", "public", "int:value")]
+    [InlineData("int:x | (Predicates.Positive(#))", "public", "string:value")]
+    [InlineData("int:x | (Other.Positive(#))", "public", "int:value")]
     public void InvalidCompetitors_DoNotBorrowThePurePredicate(
-        string contract, string parameters, string visibility, string predicateParameters)
+        string parameters, string visibility, string predicateParameters)
     {
         var source = $$"""
             module NegativeSourceContracts
@@ -217,7 +233,6 @@ public sealed class NativeSourceContractCallTests
                   {{(visibility == "private" ? "" : "!\n      ")}}return true
               func Identity ({{parameters}}) → int
                 !
-                {{contract}}
                 return x
             """;
         var result = Program.Compile(source, "source-contract-competitor.calr");
@@ -242,9 +257,8 @@ public sealed class NativeSourceContractCallTests
               func Positive (Right:value) → bool
                 !
                 return true
-              func Identity (int:x) → int
+              func Identity (int:x | (Positive(null))) → int
                 !
-                requires Positive(null)
                 return x
             """, "ambiguous-contract.calr");
         Assert.True(result.HasErrors);
@@ -306,9 +320,8 @@ public sealed class NativeSourceContractCallTests
                 {{(receiverWrites ? "!" : "! cw")}}
                 {{(receiverWrites ? "" : "Console.WriteLine(\"argument\")")}}
                 return value
-              func Identity (Predicate:predicate, int:x) → int
+              func Identity (Predicate:predicate, int:x | (Receiver(predicate).Positive(Argument(#)))) → int
                 {{(permitsWrite ? "! cw" : "!")}}
-                requires Receiver(predicate).Positive(Argument(x))
                 return x
             """;
         var result = Program.Compile(source, "contract-evaluation-effects.calr");
@@ -326,11 +339,11 @@ public sealed class NativeSourceContractCallTests
     }
 
     [Theory]
-    [InlineData("func Read (int:x) → int\n      !\n      requires Predicates.Positive(x)\n      => Predicates.Positive(result)\n      return x", "method")]
-    [InlineData("ctor (int:x)\n      requires Predicates.Positive(x)", "constructor")]
-    [InlineData("property int:Value\n      get\n        requires Predicates.Positive(1)\n        return 1", "accessor")]
-    [InlineData("this [int:x] → int\n      get\n        requires Predicates.Positive(x)\n        return x", "indexer")]
-    [InlineData("op + (Box:left, Box:right) → Box\n      !\n      requires Predicates.Positive(1)\n      => Predicates.Positive(1)\n      return left", "operator")]
+    // #1618: accessor and indexer-getter `requires` rows were removed: an accessor has no
+    // parameter to refine, and an indexer parameter refinement is not yet enforced.
+    [InlineData("func Read (int:x | (Predicates.Positive(#))) → int\n      !\n      => Predicates.Positive(result)\n      return x", "method")]
+    [InlineData("ctor (int:x | (Predicates.Positive(#)))", "constructor")]
+    [InlineData("op + (Box:left | (Predicates.Positive(1)), Box:right) → Box\n      !\n      => Predicates.Positive(1)\n      return left", "operator")]
     public void ExistingMemberContractSurfaces_BindSourcePredicates(string member, string kind)
     {
         var result = Program.Compile($$"""
@@ -350,21 +363,19 @@ public sealed class NativeSourceContractCallTests
         if (kind == "constructor")
         {
             Assert.NotNull(Activator.CreateInstance(type, [1]));
-            Assert.Equal("ContractViolationException",
+            Assert.Equal("ArgumentOutOfRangeException",
                 Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [-1])).InnerException!.GetType().Name);
         }
         else
         {
             var instance = Activator.CreateInstance(type);
-            if (kind == "method" || kind == "indexer")
+            if (kind == "method")
             {
-                var method = type.GetMethod(kind == "method" ? "Read" : "get_Item")!;
+                var method = type.GetMethod("Read")!;
                 Assert.Equal(1, method.Invoke(instance, [1]));
-                Assert.Equal("ContractViolationException",
+                Assert.Equal("ArgumentOutOfRangeException",
                     Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [-1])).InnerException!.GetType().Name);
             }
-            else if (kind == "accessor")
-                Assert.Equal(1, type.GetProperty("Value")!.GetValue(instance));
             else
                 Assert.Same(instance, type.GetMethod("op_Addition")!.Invoke(null, [instance, instance]));
         }
@@ -384,9 +395,8 @@ public sealed class NativeSourceContractCallTests
                 ! cw
                 Console.WriteLine(value)
                 return true
-              func Identity (int:x) → int
+              func Identity (int:x | (Positive({{(effectful ? "\"effectful\"" : "#")}}))) → int
                 !
-                requires Positive({{(effectful ? "\"effectful\"" : "x")}})
                 return x
             """, "overloaded-contract.calr");
         if (effectful)
@@ -400,11 +410,10 @@ public sealed class NativeSourceContractCallTests
     }
 
     [Theory]
-    [InlineData("func Read (int:x) → int\n      !\n      requires Predicates.Positive(x)\n      return x", "Calor0410")]
-    [InlineData("ctor (int:x)\n      requires Predicates.Positive(x)", "Calor0422")]
-    [InlineData("property int:Value\n      get\n        requires Predicates.Positive(1)\n        return 1", "Calor0423")]
-    [InlineData("this [int:x] → int\n      get\n        requires Predicates.Positive(x)\n        return x", "Calor0423")]
-    [InlineData("op + (Box:left, Box:right) → Box\n      !\n      requires Predicates.Positive(1)\n      return left", "Calor0410")]
+    // #1618: accessor and indexer-getter rows removed (see ExistingMemberContractSurfaces_BindSourcePredicates).
+    [InlineData("func Read (int:x | (Predicates.Positive(#))) → int\n      !\n      return x", "Calor0410")]
+    [InlineData("ctor (int:x | (Predicates.Positive(#)))", "Calor0422")]
+    [InlineData("op + (Box:left | (Predicates.Positive(1)), Box:right) → Box\n      !\n      return left", "Calor0410")]
     public void MemberContracts_CannotHideSelectedConsoleEffects(string member, string expectedCode)
     {
         var result = Program.Compile($$"""
@@ -423,11 +432,10 @@ public sealed class NativeSourceContractCallTests
     }
 
     [Theory]
-    [InlineData("func Read (int:x) → int\n      !\n      requires Predicates.Number(x)\n      return x")]
-    [InlineData("ctor (int:x)\n      requires Predicates.Number(x)")]
-    [InlineData("property int:Value\n      get\n        requires Predicates.Number(1)\n        return 1")]
-    [InlineData("this [int:x] → int\n      get\n        requires Predicates.Number(x)\n        return x")]
-    [InlineData("op + (Box:left, Box:right) → Box\n      !\n      requires Predicates.Number(1)\n      return left")]
+    // #1618: accessor and indexer-getter rows removed (see ExistingMemberContractSurfaces_BindSourcePredicates).
+    [InlineData("func Read (int:x | (Predicates.Number(#))) → int\n      !\n      return x")]
+    [InlineData("ctor (int:x | (Predicates.Number(#)))")]
+    [InlineData("op + (Box:left | (Predicates.Number(1)), Box:right) → Box\n      !\n      return left")]
     public void MemberContracts_RejectSelectedNonBooleanReturns(string member)
     {
         var result = Program.Compile($$"""
@@ -493,9 +501,9 @@ public sealed class NativeSourceContractCallTests
                   Console.WriteLine(value)
                   return value > 0
               {{(baseClass ? "class Base public abstract" : "interface IGuard")}}
-                func Read {{(baseClass ? "public abstract " : "")}}(int:x) → int
+                func Read {{(baseClass ? "public abstract " : "")}}(int:x{{(postcondition ? "" : " | (Predicates.Positive(#))")}}) → int
                   ! cw
-                  {{(postcondition ? "=> Predicates.Positive(result)" : "requires Predicates.Positive(x)")}}
+                  {{(postcondition ? "=> Predicates.Positive(result)" : "")}}
               class Impl public
                 {{(baseClass ? "extends Base" : "implements IGuard")}}
                 func Read public{{(baseClass ? " override" : "")}} (int:input) → int
@@ -529,6 +537,7 @@ public sealed class NativeSourceContractCallTests
             if (mode == ContractMode.Off)
                 Assert.Equal(-1, method.Invoke(instance, [-1]));
             else
+                // Impl inherits the declared refinement as a runtime contract guard.
                 Assert.Equal("ContractViolationException",
                     Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [-1])).InnerException!.GetType().Name);
         }
@@ -551,7 +560,8 @@ public sealed class NativeSourceContractCallTests
         Assert.False(result.HasErrors, Errors(result));
         var method = Load(result.GeneratedCode).GetType("GlobalModule")!.GetMethod("Read")!.MakeGenericMethod(typeof(string));
         Assert.Equal(("value", 1), method.Invoke(null, [("value", 1)]));
-        Assert.Equal("ContractViolationException",
+        // #1618: the precondition is the refinement on x, an entry check
+        Assert.Equal("ArgumentOutOfRangeException",
             Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [((string?)null, 1)])).InnerException!.GetType().Name);
     }
 
@@ -571,9 +581,9 @@ public sealed class NativeSourceContractCallTests
                   return value > 0
               class Outer public
                 class Inner public
-                  func Identity public (int:x) → int
+                  func Identity public (int:x{{(postcondition ? "" : " | (Predicates.Positive(#))")}}) → int
                     !
-                    {{(postcondition ? "=> Predicates.Positive(result)" : "requires Predicates.Positive(x)")}}
+                    {{(postcondition ? "=> Predicates.Positive(result)" : "")}}
                     return x
             """, "nested-source-contract.calr");
         if (writes)
@@ -586,7 +596,7 @@ public sealed class NativeSourceContractCallTests
             var method = type.GetMethod("Identity")!;
             var instance = Activator.CreateInstance(type);
             Assert.Equal(1, method.Invoke(instance, [1]));
-            Assert.Equal("ContractViolationException",
+            Assert.Equal(PreconditionFailure(!postcondition),
                 Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [-1])).InnerException!.GetType().Name);
         }
     }

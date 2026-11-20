@@ -41,7 +41,8 @@ public sealed class BenchmarkWebsiteExamplesTests
             Assert.Equal(expected, csharp.Invoke(null, [a, b]));
         }
 
-        Assert.IsType<ContractViolationException>(
+        // #1618: b != 0 is the refinement on b; result >= 0 stays a postcondition.
+        Assert.IsType<ArgumentOutOfRangeException>(
             Assert.Throws<TargetInvocationException>(() => calor.Invoke(null, [1, 0])).InnerException);
         Assert.IsType<ArgumentException>(
             Assert.Throws<TargetInvocationException>(() => csharp.Invoke(null, [1, 0])).InnerException);
@@ -67,7 +68,8 @@ public sealed class BenchmarkWebsiteExamplesTests
             Assert.Equal(unchanged, values);
         }
 
-        Assert.IsType<ContractViolationException>(
+        // #1618: the non-empty requirement is the refinement on arr.
+        Assert.IsType<ArgumentOutOfRangeException>(
             Assert.Throws<TargetInvocationException>(() => calor.Invoke(null, [Array.Empty<int>()])).InnerException);
         Assert.IsType<ArgumentException>(
             Assert.Throws<TargetInvocationException>(() => csharp.Invoke(null, [Array.Empty<int>()])).InnerException);

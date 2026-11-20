@@ -1,8 +1,7 @@
 module Contracted Contracted block
   assume{env} "the clock is monotonic"
-  func Bounded (int:n) → int
+  func Bounded (int:n | (# >= 0)) → int
     !
-    requires n >= 0
     => result >= 1
     assume{perf} "callers pass small values"
     return n + 1

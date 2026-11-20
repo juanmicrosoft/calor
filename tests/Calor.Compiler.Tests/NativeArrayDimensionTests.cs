@@ -81,7 +81,8 @@ public sealed class NativeArrayDimensionTests
                 "GlobalModule.CheckSymmetric(new int[3, 2], 2)",
                 "GlobalModule.CheckSymmetric(new int[0, 0], -1)"
             })
-                Assert.Equal("!ContractViolationException", Run(generated, expression));
+                // #1618: the dimension and symmetry preconditions are the refinement on n
+                Assert.Equal("!ArgumentOutOfRangeException", Run(generated, expression));
         }
         finally
         {
@@ -99,9 +100,11 @@ public sealed class NativeArrayDimensionTests
         Assert.All(compiled.Diagnostics, diagnostic => Assert.Equal(DiagnosticCode.QuantifierNestedComplexity, diagnostic.Code));
         Assert.Equal("True", Run(compiled.GeneratedCode,
             "GlobalModule.CheckSymmetric(new int[,] { { 1, 2 }, { 2, 3 } }, 2)"));
-        Assert.Equal(mode == ContractMode.Off ? "True" : "!ContractViolationException",
+        // #1618: the preconditions are the refinement on n, whose entry check is emitted in every
+        // contract mode, Off included.
+        Assert.Equal("!ArgumentOutOfRangeException",
             Run(compiled.GeneratedCode, "GlobalModule.CheckSymmetric(new int[,] { { 1, 2 }, { 3, 4 } }, 2)"));
-        Assert.Equal(mode == ContractMode.Off ? "True" : "!ContractViolationException",
+        Assert.Equal("!ArgumentOutOfRangeException",
             Run(compiled.GeneratedCode, "GlobalModule.CheckSymmetric(new int[2, 3], 2)"));
     }
 

@@ -117,7 +117,7 @@ module Test Test
       => result >= 1
       return x + 1
   class Second public
-    ctor (int:size | (# > 0";))
+    ctor (int:size | (# > 0))";
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions());
 
@@ -125,7 +125,9 @@ module Test Test
         var constructor = Assert.Single(result.Ast!.Classes.Single(c => c.Name == "Second").Constructors);
         var foreignMethod = Assert.Single(result.Ast.Classes.Single(c => c.Name == "First").Methods);
         Assert.NotEqual(foreignMethod.Id, constructor.Id);
-        Assert.Contains($"\"{constructor.Id}\", Calor.Runtime.ContractKind", result.GeneratedCode);
+        // #1618: the constructor's precondition is the refinement on size; its entry check names
+        // the parameter and carries no owner id, so it cannot borrow First.Inc's id either.
+        Assert.Contains("if (!(size > 0)) throw new ArgumentOutOfRangeException(nameof(size)", result.GeneratedCode);
         Assert.DoesNotContain($"size > 0\", \"{foreignMethod.Id}\"", result.GeneratedCode);
     }
 
@@ -215,7 +217,7 @@ module Test Test
         // Only the postcondition guard (ContractKind.Ensures) goes; the two §Q
         // precondition guards stay by design, so the exception type is still present.
         Assert.DoesNotContain("ContractKind.Ensures", result.GeneratedCode);
-        Assert.Contains("ContractKind.Requires", result.GeneratedCode);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(x)", result.GeneratedCode);
         // The verdict must actually be Proven — otherwise this test passes vacuously
         // for a source whose verification degraded to Assumed/Timeout. The message must
         // also say the check was ELIDED, matching the emitted code.

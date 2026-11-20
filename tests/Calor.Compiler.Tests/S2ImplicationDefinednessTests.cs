@@ -26,9 +26,8 @@ public sealed class S2ImplicationDefinednessTests
           class Impl
             implements IProbe
 
-            func Run (int:x, string:s) → int
+            func Run (int:x, string:s | IMPLPRE) → int
               !
-              requires IMPLPRE
               return 0
         """;
 
@@ -158,16 +157,14 @@ public sealed class S2ImplicationDefinednessTests
     private const string IntegerTemplate = """
         module M M block
           interface IProbe
-            func Run (int:x, int:y) → int
+            func Run (int:x, int:y | IFACEPRE) → int
               !
-              requires IFACEPRE
 
           class Impl
             implements IProbe
 
-            func Run (int:x, int:y) → int
+            func Run (int:x, int:y | IMPLPRE) → int
               !
-              requires IMPLPRE
               return 0
         """;
 
@@ -389,17 +386,15 @@ public sealed class S2ImplicationDefinednessTests
         var source = $$"""
             module M M block
               interface IProbe
-                func Run (int:x) → int
+                func Run (int:x | {{pre}}) → int
                   !
-                  requires {{pre}}
                   => {{post}}
 
               class Impl
                 implements IProbe
 
-                func Run (int:x) → int
+                func Run (int:x | {{pre}}) → int
                   !
-                  requires {{pre}}
                   => {{post}}
                   return 0
             """;

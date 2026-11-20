@@ -61,9 +61,10 @@ public class CliElisionDefaultTests : IDisposable
 
         Assert.Equal(0, exit);
         Assert.Contains("// PROVEN: Postcondition", generated);
-        // Only the postcondition guard (ContractKind.Ensures) goes; §Q guards stay by design.
+        // Only the postcondition guard (ContractKind.Ensures) goes; the precondition (#1618: the
+        // refinement on x, an ArgumentOutOfRangeException entry check) stays by design.
         Assert.DoesNotContain("ContractKind.Ensures", generated);
-        Assert.Contains("ContractKind.Requires", generated);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(x)", generated);
         // No flag was written, so no "has no effect" warning may fire either.
         Assert.DoesNotContain("has no effect without --verify", stdErr);
     }

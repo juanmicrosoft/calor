@@ -109,13 +109,17 @@ public class OperatorOverloadTests
         Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(ParseAndEmit(conversion.CalorSource!)));
     }
 
+    // #1618: a precondition is a parameter refinement; this is the list the verifier sees.
+    private static IReadOnlyList<RequiresNode> Pre(OperatorOverloadNode op)
+        => Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(op.Parameters, op.Preconditions);
+
     #region Parsing Tests
 
     [Theory]
     [InlineData(3, 4, "7", false)]
     [InlineData(3, 4, "7", true)]
-    [InlineData(-1, 4, "Requires", false)]
-    [InlineData(-1, 4, "Requires", true)]
+    [InlineData(-1, 4, "ArgumentOutOfRange:left", false)]
+    [InlineData(-1, 4, "ArgumentOutOfRange:left", true)]
     [InlineData(1, -2, "Ensures", false)]
     [InlineData(1, -2, "Ensures", true)]
     public void CanonicalOperatorContracts_ExecuteOnTheClr(int left, int right, string expected, bool roundtrip)
@@ -140,6 +144,7 @@ public class OperatorOverloadTests
                 {
                     try { return (new Number { Value = {{left}} } + ({{right}})).ToString(); }
                     catch (Calor.Runtime.ContractViolationException error) { return error.Kind.ToString(); }
+                    catch (System.ArgumentOutOfRangeException error) { return "ArgumentOutOfRange:" + error.ParamName; }
                 }
             }
             """;
@@ -271,7 +276,7 @@ module Test
         var cls = Assert.Single(module.Classes);
         var op = Assert.Single(cls.OperatorOverloads);
 
-        Assert.Single(op.Preconditions);
+        Assert.Single(Pre(op));
         Assert.Single(op.Postconditions);
     }
 
@@ -506,8 +511,8 @@ module Test
         var result = ParseAndEmit(source);
 
         Assert.Contains("operator +(int left, int right)", result);
-        // Precondition should be emitted as a contract violation check
-        Assert.Contains("ContractViolationException", result);
+        // #1618: the precondition is a refinement, emitted as a parameter entry check
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(left)", result);
     }
 
     [Fact]
@@ -906,7 +911,7 @@ module Test
         // Parse original
         var module1 = ParseModule(source);
         var op1 = Assert.Single(Assert.Single(module1.Classes).OperatorOverloads);
-        Assert.Single(op1.Preconditions);
+        Assert.Single(Pre(op1));
         Assert.Single(op1.Postconditions);
 
         // Emit back to Calor
@@ -914,14 +919,14 @@ module Test
         var emitted = emitter.Emit(module1);
 
         // Verify contracts present in emitted output
-        Assert.Contains("requires (left >= 0)", emitted);
+        Assert.Contains("int:left | (# >= 0)", emitted);
         Assert.Contains("=> (result >= 0)", emitted);
 
         // Reparse emitted output
         var module2 = ParseModule(emitted);
         var op2 = Assert.Single(Assert.Single(module2.Classes).OperatorOverloads);
 
-        Assert.Single(op2.Preconditions);
+        Assert.Single(Pre(op2));
         Assert.Single(op2.Postconditions);
     }
 
@@ -967,8 +972,7 @@ module Test
         var formatter = new Calor.Compiler.Formatting.CalorFormatter();
         var formatted = formatter.Format(module);
 
-        Assert.Contains("op + (int:left, int:right) → int", formatted);
-        Assert.Contains("requires (left >= 0)", formatted);
+        Assert.Contains("op + (int:left | (# >= 0), int:right) → int", formatted);
         Assert.Contains("=> (result >= 0)", formatted);
         Assert.DoesNotContain('§', formatted);
     }
@@ -996,7 +1000,7 @@ module Test
         Assert.Equal("+", op2.OperatorToken);
         Assert.Equal(OperatorOverloadKind.Add, op2.Kind);
         Assert.Equal(2, op2.Parameters.Count);
-        Assert.Single(op2.Preconditions);
+        Assert.Single(Pre(op2));
         Assert.Single(op2.Postconditions);
     }
 

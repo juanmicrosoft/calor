@@ -773,7 +773,7 @@ public class AsyncAwaitTests
         Assert.Empty(diagnostics.Errors);
         var func = Assert.Single(ast.Functions);
         Assert.True(func.IsAsync);
-        Assert.Single(func.Preconditions);
+        Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions));
     }
 
     [Fact]
@@ -842,7 +842,7 @@ public class AsyncAwaitTests
         var classNode = Assert.Single(ast.Classes);
         var method = Assert.Single(classNode.Methods);
         Assert.True(method.IsAsync);
-        Assert.Single(method.Preconditions);
+        Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions));
     }
 
     #endregion

@@ -96,7 +96,7 @@ public class HoverHandlerTests
     [InlineData("var int:value = 1", "var")]
     [InlineData("for i from 0 to 2 step 1", "for")]
     [InlineData("each item in items", "each")]
-    [InlineData("requires value > 0", "requires")]
+
     [InlineData("=> result > 0", "=>")]
     [InlineData("! cw", "!")]
     [InlineData("func Add () → int", "→")]
@@ -590,11 +590,14 @@ public class HoverHandlerTests
     }
 
     [Fact]
-    public async Task Handle_TagHover_Q_ReturnsDocumentationAsync()
+    public async Task Handle_TagHover_RetiredRequires_HasNoPreconditionDocumentationAsync()
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
+        // #1618: `requires` is retired (a parse error); a precondition is a parameter refinement,
+        // so the keyword has no hover documentation of its own.
         var source = "requires x > 0";
+        Assert.Null(TagDocumentationProvider.ExtractTagAtPosition(source, 1));
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -606,9 +609,7 @@ public class HoverHandlerTests
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
-        Assert.NotNull(result);
-        var content = result.Contents.MarkupContent?.Value ?? "";
-        Assert.Contains("Precondition", content);
+        Assert.DoesNotContain("Precondition", result?.Contents.MarkupContent?.Value ?? "");
     }
 
     [Fact]

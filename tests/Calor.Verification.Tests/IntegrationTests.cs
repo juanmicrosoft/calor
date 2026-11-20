@@ -144,7 +144,7 @@ module Test Test block
         // check, so the emitted-overload assertion is what pins that the fix is precise: a blanket
         // refusal of these three operations would fail here.
         var ordinal = Program.Compile(
-            source.Replace(@"""))", @""", StringComparison.Ordinal))"), "test.calr", NoCache());
+            source.Replace(@"StartsWith(""‍abc""))", @"StartsWith(""‍abc"", StringComparison.Ordinal))"), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
         Assert.Contains("StringComparison.Ordinal", ordinal.GeneratedCode);
@@ -235,7 +235,8 @@ module Test
         var result = Program.Compile(source, "test.calr", options);
 
         Assert.False(result.HasErrors);
-        Assert.Contains("ContractKind.Requires", result.GeneratedCode);
+        // #1618: the precondition is the refinement on x, emitted as an entry check
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(x)", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Precondition", result.GeneratedCode);
     }
 

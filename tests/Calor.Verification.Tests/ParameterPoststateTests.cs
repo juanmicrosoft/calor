@@ -32,7 +32,8 @@ public class ParameterPoststateTests
             if (verify)
                 Assert.Contains(result.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
             var exception = Assert.Throws<TargetInvocationException>(() => Invoke(result));
-            Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
+            // #1618: x is refined, so the write that breaks x >= 0 fails its refinement check.
+            Assert.Equal("ArgumentOutOfRangeException", exception.InnerException!.GetType().Name);
         }
     }
 
@@ -67,7 +68,8 @@ public class ParameterPoststateTests
             var edited = Compile(Source(isVoid, "set x -1"), true, directory);
             Assert.Contains(edited.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
             var exception = Assert.Throws<TargetInvocationException>(() => Invoke(edited));
-            Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
+            // #1618: x is refined, so the write that breaks x >= 0 fails its refinement check.
+            Assert.Equal("ArgumentOutOfRangeException", exception.InnerException!.GetType().Name);
         }
         finally
         {

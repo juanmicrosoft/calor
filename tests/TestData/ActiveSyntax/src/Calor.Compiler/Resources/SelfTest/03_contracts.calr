@@ -11,7 +11,6 @@ module Contracts Contracts block
 
     // Residual compatibility carrier: no canonical custom-message spelling
     // is selected, and CalorEmitter cannot round-trip this contract yet.
-    func Divide (int:a, int:b) → int
+    func Divide (int:a, int:b | (# != 0)) → int
       !
-      requires{"divisor must not be zero"} b != 0
       return a / b
