@@ -1031,7 +1031,8 @@ public sealed class NavigateTool : McpToolBase
         var asyncPrefix = func.IsAsync ? "async " : "";
 
         var contracts = new List<ContractInfo>();
-        foreach (var pre in func.Preconditions)
+        // #1618: parameter refinements are the preconditions.
+        foreach (var pre in RefinementPreconditions.Effective(func.Parameters, func.Preconditions))
             contracts.Add(new ContractInfo { Type = "requires", Expression = FormatExpression(pre.Condition) });
         foreach (var post in func.Postconditions)
             contracts.Add(new ContractInfo { Type = "ensures", Expression = FormatExpression(post.Condition) });
@@ -1066,7 +1067,7 @@ public sealed class NavigateTool : McpToolBase
         if (method.IsAsync) modifiers.Add("async");
 
         var contracts = new List<ContractInfo>();
-        foreach (var pre in method.Preconditions)
+        foreach (var pre in RefinementPreconditions.Effective(method.Parameters, method.Preconditions))
             contracts.Add(new ContractInfo { Type = "requires", Expression = FormatExpression(pre.Condition) });
         foreach (var post in method.Postconditions)
             contracts.Add(new ContractInfo { Type = "ensures", Expression = FormatExpression(post.Condition) });
@@ -1213,7 +1214,9 @@ public sealed class NavigateTool : McpToolBase
 
             if (includeContracts)
             {
-                foreach (var pre in enclosingFunction.Preconditions)
+                // #1618: parameter refinements are the preconditions.
+                foreach (var pre in RefinementPreconditions.Effective(
+                             enclosingFunction.Parameters, enclosingFunction.Preconditions))
                     activeContracts.Add($"requires: {pre.Message ?? pre.Condition.ToString()}");
                 foreach (var post in enclosingFunction.Postconditions)
                     activeContracts.Add($"ensures: {post.Message ?? post.Condition.ToString()}");

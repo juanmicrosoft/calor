@@ -236,35 +236,28 @@ public sealed class EditPreviewTool : McpToolBase
     }
 
     private static int CountContracts(ModuleNode ast)
-    {
-        var count = 0;
-        foreach (var func in ast.Functions)
-        {
-            count += func.Preconditions.Count + func.Postconditions.Count;
-        }
-        foreach (var cls in ast.Classes)
-        {
-            foreach (var method in cls.Methods)
-            {
-                count += method.Preconditions.Count + method.Postconditions.Count;
-            }
-        }
-        return count;
-    }
+        => GetFunctionContracts(ast).Values.Sum();
+
+    // #1618: a parameter refinement is a precondition, so dropping one loses a contract.
+    private static int ContractCount(
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions)
+        => RefinementPreconditions.Effective(parameters, preconditions).Count + postconditions.Count;
 
     private static Dictionary<string, int> GetFunctionContracts(ModuleNode ast)
     {
         var result = new Dictionary<string, int>();
         foreach (var func in ast.Functions)
         {
-            var count = func.Preconditions.Count + func.Postconditions.Count;
+            var count = ContractCount(func.Parameters, func.Preconditions, func.Postconditions);
             if (count > 0) result[func.Id] = count;
         }
         foreach (var cls in ast.Classes)
         {
             foreach (var method in cls.Methods)
             {
-                var count = method.Preconditions.Count + method.Postconditions.Count;
+                var count = ContractCount(method.Parameters, method.Preconditions, method.Postconditions);
                 if (count > 0) result[$"{cls.Name}.{method.Id}"] = count;
             }
         }

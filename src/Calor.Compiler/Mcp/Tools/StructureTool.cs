@@ -233,8 +233,9 @@ public sealed class StructureTool : McpToolBase
             });
         }
 
-        // Add contracts as children for visibility
-        foreach (var pre in func.Preconditions)
+        // Add contracts as children for visibility. #1618: parameter refinements are the
+        // preconditions.
+        foreach (var pre in RefinementPreconditions.Effective(func.Parameters, func.Preconditions))
         {
             children.Add(new OutlineSymbol
             {
@@ -732,7 +733,9 @@ public sealed class StructureTool : McpToolBase
                 // Check if target has contracts
                 if (targetFunc.HasContracts)
                 {
-                    contractImpacts.Add($"Function '{targetFunc.Name}' has {targetFunc.Preconditions.Count} precondition(s) and {targetFunc.Postconditions.Count} postcondition(s) that may need updating");
+                    var preconditionCount = RefinementPreconditions.Effective(
+                        targetFunc.Parameters, targetFunc.Preconditions).Count;
+                    contractImpacts.Add($"Function '{targetFunc.Name}' has {preconditionCount} precondition(s) and {targetFunc.Postconditions.Count} postcondition(s) that may need updating");
                 }
 
                 // Check callers with contracts

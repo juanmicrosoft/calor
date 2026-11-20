@@ -222,6 +222,30 @@ public sealed class AgentGuidanceTests
     }
 
     [Fact]
+    public void TypeSuggester_ParameterReadByAnotherRefinement_CountsAsGuarded()
+    {
+        // #1618: a refinement on x that reads y is a precondition on y, as a `requires`
+        // clause reading y was; y is treated as already guarded, for functions and methods.
+        var source = """
+            module Test Test block
+              func Divide (int:y, int:x | (# > y)) → int
+                !
+                return (x / y)
+              class Calc
+                func Divide (int:y, int:x | (# > y)) → int
+                  !
+                  return (x / y)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+
+        var suggestions = new TypeSuggester().Suggest(module);
+
+        Assert.DoesNotContain(suggestions, s => s.ParameterName == "y");
+    }
+
+    [Fact]
     public void TypeSuggester_NoPatterns_NoSuggestions()
     {
         var source = """

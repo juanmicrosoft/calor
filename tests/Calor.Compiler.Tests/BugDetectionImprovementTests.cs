@@ -969,6 +969,32 @@ module PrimeCheck PrimeCheck block
     #region EdgeCaseCoverageAnalyzer
 
     [Fact]
+    public void EdgeCaseCoverage_ParameterRefinement_CountsAsContract()
+    {
+        // #1618: a parameter refinement is the precondition, for functions and methods alike.
+        var source = @"
+module Test Test block
+  func Divide (int:a, int:b | (# != 0)) → int
+    !
+    return a / b
+  func Plain (int:a) → int
+    !
+    return a
+  class Calc
+    func Half (int:n | (# >= 0)) → int
+      !
+      return n / 2
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.Equal(3, result.TotalFunctions);
+        Assert.Equal(2, result.FunctionsWithContracts);
+    }
+
+    [Fact]
     public void EdgeCaseCoverage_ProgramWithEarlyReturnGuards_DetectsGuards()
     {
         var source = @"

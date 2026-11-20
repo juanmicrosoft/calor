@@ -137,8 +137,10 @@ public sealed class HoverHandler : HoverHandlerBase
                     AppendDeclarationHeader(sb, func, snapshot);
                     if (func.Effects != null)
                         sb.AppendLine($"**Effects:** `! {string.Join(",", func.Effects.Effects.Values)}`");
-                    if (func.Preconditions.Count > 0)
-                        sb.AppendLine($"**Preconditions:** {func.Preconditions.Count}");
+                    // #1618: parameter refinements are the preconditions.
+                    var preconditionCount = RefinementPreconditions.Effective(func.Parameters, func.Preconditions).Count;
+                    if (preconditionCount > 0)
+                        sb.AppendLine($"**Preconditions:** {preconditionCount}");
                     if (func.Postconditions.Count > 0)
                         sb.AppendLine($"**Postconditions:** {func.Postconditions.Count}");
 

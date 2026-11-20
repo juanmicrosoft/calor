@@ -273,6 +273,69 @@ module IoModule IoModule block
         var output = ParseOutput(result);
         var contracts = output.GetProperty("contractVerification");
         Assert.True(contracts.GetProperty("checked").GetBoolean());
+        // add had one refinement precondition and one postcondition; the edit drops the refinement.
+        Assert.Equal(2, contracts.GetProperty("originalContractCount").GetInt32());
+        Assert.Equal(1, contracts.GetProperty("modifiedContractCount").GetInt32());
+        Assert.Contains(contracts.GetProperty("issues").EnumerateArray(),
+            issue => issue.GetString()!.Contains("lost contracts: 2 → 1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SymbolInfo_ParameterRefinement_ListedAsPrecondition()
+    {
+        // #1618: the refinement on add's x is its precondition.
+        var result = await new NavigateTool().ExecuteAsync(CreateArgs(SampleSource, 3, 8, "info"));
+
+        Assert.False(result.IsError, GetErrorText(result));
+        var output = ParseOutput(result);
+        Assert.Equal("add", output.GetProperty("name").GetString());
+        var kinds = output.GetProperty("contracts").EnumerateArray()
+            .Select(contract => contract.GetProperty("type").GetString()).ToArray();
+        Assert.Equal(new[] { "requires", "ensures" }, kinds);
+    }
+
+    [Fact]
+    public async Task ScopeInfo_ActiveContracts_IncludeParameterRefinement()
+    {
+        // Inside add's body (line 6): the refinement on x is an active precondition.
+        var result = await new NavigateTool().ExecuteAsync(CreateArgs(SampleSource, 6, 7, "scope"));
+
+        Assert.False(result.IsError, GetErrorText(result));
+        var contracts = ParseOutput(result).GetProperty("activeContracts").EnumerateArray()
+            .Select(contract => contract.GetString()!).ToArray();
+        Assert.Single(contracts, contract => contract.StartsWith("requires:", StringComparison.Ordinal));
+        Assert.Single(contracts, contract => contract.StartsWith("ensures:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Outline_ParameterRefinement_ListedAsRequiresContract()
+    {
+        var json = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["action"] = "outline",
+            ["source"] = SampleSource
+        });
+        var result = await new StructureTool().ExecuteAsync(JsonDocument.Parse(json).RootElement);
+
+        Assert.False(result.IsError, GetErrorText(result));
+        var add = ParseOutput(result).GetProperty("symbols").EnumerateArray()
+            .Single(symbol => symbol.GetProperty("name").GetString() == "add");
+        var contracts = add.GetProperty("children").EnumerateArray()
+            .Where(child => child.GetProperty("kind").GetString() == "contract")
+            .Select(child => child.GetProperty("name").GetString()).ToArray();
+        Assert.Equal(new[] { "requires", "ensures" }, contracts);
+    }
+
+    [Fact]
+    public async Task ImpactAnalysis_ContractImpacts_CountParameterRefinement()
+    {
+        var result = await new StructureTool().ExecuteAsync(
+            CreateImpactArgs(SampleSource, FunctionId(SampleSource, "add")));
+
+        Assert.False(result.IsError, GetErrorText(result));
+        Assert.Contains(ParseOutput(result).GetProperty("contractImpacts").EnumerateArray(),
+            impact => impact.GetString()!.Contains(
+                "has 1 precondition(s) and 1 postcondition(s)", StringComparison.Ordinal));
     }
 
     [Fact]

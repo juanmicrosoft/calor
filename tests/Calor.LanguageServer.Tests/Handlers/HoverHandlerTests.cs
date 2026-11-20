@@ -177,6 +177,30 @@ public class HoverHandlerTests
     }
 
     [Fact]
+    public void BuildHover_Function_CountsParameterRefinementsAsPreconditions()
+    {
+        // #1618: a parameter refinement is the precondition; the hover counts it.
+        const string source = """
+            module TestModule
+              func Divide (int:a, int:b | (# != 0), int:c | (# > 0)) → int
+                => (result >= 0)
+                return a / b
+            """;
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(
+            "file:///refined-hover.calr");
+        var state = _workspace.GetOrCreate(uri, source, version: 1);
+        var (line, column) = LspTestHarness.GetLineColumn(
+            source, source.IndexOf("Divide", StringComparison.Ordinal));
+
+        var hover = HoverHandler.BuildHover(state.Snapshot, new Position(line - 1, column - 1));
+
+        Assert.NotNull(hover);
+        var markup = Assert.IsType<MarkupContent>(hover.Contents.MarkupContent);
+        Assert.Contains("**Preconditions:** 2", markup.Value, StringComparison.Ordinal);
+        Assert.Contains("**Postconditions:** 1", markup.Value, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildHover_UsesOneCapturedAnalysisSnapshot()
     {
         const string original = """

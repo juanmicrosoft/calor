@@ -304,10 +304,13 @@ public sealed class BreakingChangeDetector
             changes.Add("Visibility changed from public to non-public");
         }
 
-        // Check precondition changes (added preconditions are breaking)
-        if (newFunc.Preconditions.Count > oldFunc.Preconditions.Count)
+        // Check precondition changes (added preconditions are breaking). #1618: a parameter
+        // refinement is a precondition, so refining a parameter adds one.
+        var oldPreconditions = RefinementPreconditions.Effective(oldFunc.Parameters, oldFunc.Preconditions).Count;
+        var newPreconditions = RefinementPreconditions.Effective(newFunc.Parameters, newFunc.Preconditions).Count;
+        if (newPreconditions > oldPreconditions)
         {
-            changes.Add($"New preconditions added ({newFunc.Preconditions.Count - oldFunc.Preconditions.Count} new)");
+            changes.Add($"New preconditions added ({newPreconditions - oldPreconditions} new)");
         }
 
         return changes;
