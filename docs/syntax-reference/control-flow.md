@@ -172,6 +172,14 @@ keeps later source-line mappings, and does not introduce a wider conditional
 type into a narrow return. The converter emits the same bounded canonical form.
 This rule does not rewrite calls, assignments, lambdas, or mixed-type branches.
 
+Branch on one value against three or more constants with `match`; use `if`
+otherwise. `calor lint` reports `Calor1306` for an `if`/`else if` chain whose
+every condition compares the same parameter or local with `==` against a
+distinct integer, char, string or enum constant. It offers no patch: a statement
+match lowers to a C# `switch`, so generated C# changes, and a `break` inside a
+case exits the switch rather than the loop. Chains containing a loop `break` are
+not reported.
+
 ```calor
 if x > 0
   Console.WriteLine("positive")

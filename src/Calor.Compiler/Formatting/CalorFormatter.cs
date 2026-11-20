@@ -480,6 +480,15 @@ internal sealed class LosslessSourceDocument
                         last.Span.Line, last.Span.End - lastLine.Start + 1, replacement),
                     isSafeToApply: true));
         }
+        foreach (var (chain, name) in IfStatementNode.GetMatchCandidateChains(ast).OrderBy(found => found.Chain.Span.Start))
+        {
+            // No patch: the match lowers to a C# switch, so the rewrite cannot keep
+            // generated C# identical, which safe repair requires.
+            diagnostics.ReportWarning(
+                new TextSpan(chain.Span.Start, 2, chain.Span.Line, chain.Span.Column),
+                DiagnosticCode.LintPreferMatch,
+                $"Use match {name} for an if chain comparing {name} with 3 or more constants");
+        }
         return diagnostics;
     }
 
