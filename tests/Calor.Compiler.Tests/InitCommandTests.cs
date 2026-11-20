@@ -323,8 +323,8 @@ Run `dotnet build` to compile.
         // Verify Calor-first rules are in the generated file
         Assert.Contains("Calor-First Project", content);
         Assert.Contains("Rules for AI Agents", content);
-        Assert.Contains("must be `.calr` files", content);
-        Assert.Contains("Convert before modifying", content);
+        Assert.Contains("Write new code in Calor (`.calr`)", content);
+        Assert.Contains("Convert C# to Calor before modifying", content);
         Assert.Contains("calor_convert", content);
     }
 
@@ -364,10 +364,10 @@ Run `dotnet build` to compile.
         Assert.Contains("Calor-First Project", template);
         Assert.Contains("MANDATORY Rules for AI Agents", template);
         Assert.Contains("Rule 1: Never create new `.cs` files", template);
-        Assert.Contains("All new code MUST be written in Calor", template);
+        Assert.Contains("Write new code in Calor (`.calr`)", template);
         Assert.Contains("Rule 2: Convert C# to Calor before modifying", template);
         Assert.Contains("Rule 3: Never edit generated files", template);
-        Assert.Contains("calor analyze", template);
+        Assert.Contains("Rule 4: Compile with `calor_compile`", template);
     }
 
     [Fact]
@@ -385,6 +385,6 @@ Run `dotnet build` to compile.
         Assert.Contains("MANDATORY Rules for AI Agents", content);
         Assert.Contains("Rule 1: Never create new `.cs` files", content);
         Assert.Contains("Rule 2: Convert C# to Calor before modifying", content);
-        Assert.Contains("calor analyze", content);
+        Assert.Contains("Rule 4: Compile with `calor_compile`", content);
     }
 }
