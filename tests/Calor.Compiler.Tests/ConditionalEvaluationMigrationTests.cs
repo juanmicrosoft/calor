@@ -1216,7 +1216,7 @@ public class ConditionalEvaluationMigrationTests
             Calor.Compiler.Ast.UnaryOperatorExtensions.FromString(operation)!.Value,
             new Calor.Compiler.Ast.ReferenceNode(default, "i"));
         var error = Assert.Throws<InvalidOperationException>(() => new CalorEmitter().Visit(node));
-        Assert.Contains("§ASSIGN", error.Message);
+        Assert.Contains("set statements", error.Message);
     }
 
     [Theory]

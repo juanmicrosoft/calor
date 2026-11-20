@@ -2313,7 +2313,7 @@ public sealed class CSharpToCalorConverter
         {
             var (path, enabledBy) = RescueProvenance(triggers[i], context);
             context.RecordLoss(ConversionLossKind.InteropPreserved, "post-validation-fallback",
-                interops[i].Reason ?? "Member re-preserved as raw C# after emitted Calor failed to parse (#717)",
+                interops[i].Reason ?? "Member re-preserved as §CSHARP after emitted Calor failed to parse (#717)",
                 line: null, path, triggers[i], enabledBy);
         }
         var items = module.Items

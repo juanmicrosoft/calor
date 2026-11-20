@@ -176,13 +176,13 @@ public class ParserTests
 
     [Theory]
     [InlineData("STATIC", "static")]
-    [InlineData("STAT", "stat")]
+    [InlineData("STAT", "static")]
     [InlineData("VIRTUAL", "virtual")]
-    [InlineData("OV", "ov")]
+    [InlineData("OV", "override")]
     [InlineData("Readonly", "readonly")]
     [InlineData("Required", "required")]
     [InlineData("Unsafe", "unsafe")]
-    [InlineData("VOL", "vol")]
+    [InlineData("VOL", "volatile")]
     public void MemberModifierCaseVariants_ReportCanonicalSpelling(string modifier, string canonical)
     {
         var source = $$"""
@@ -199,24 +199,22 @@ public class ParserTests
         {
             "readonly" => "field int:Value readonly = 1",
             "required" => "property string:Value required\n      get\n      set",
-            "vol" => "field int:Value volatile",
-            "stat" => "func Run static () → void\n      !",
-            "ov" => "func Run override () → void\n      !",
+            "volatile" => "field int:Value volatile",
             _ => $"func Run {canonical} () → void\n      !"
         };
         var type = Assert.Single(ParseNative($"module Modifiers\n  class Widget\n    {nativeMember}").Classes);
         var expected = canonical switch
         {
-            "static" or "stat" => MethodModifiers.Static,
+            "static" => MethodModifiers.Static,
             "virtual" => MethodModifiers.Virtual,
-            "ov" => MethodModifiers.Override,
+            "override" => MethodModifiers.Override,
             "readonly" => MethodModifiers.Readonly,
             "required" => MethodModifiers.Required,
             "unsafe" => MethodModifiers.Unsafe,
-            "vol" => MethodModifiers.Volatile,
+            "volatile" => MethodModifiers.Volatile,
             _ => throw new ArgumentOutOfRangeException(nameof(canonical))
         };
-        var actual = canonical is "readonly" or "vol" ? Assert.Single(type.Fields).Modifiers
+        var actual = canonical is "readonly" or "volatile" ? Assert.Single(type.Fields).Modifiers
             : canonical == "required" ? Assert.Single(type.Properties).Modifiers
             : Assert.Single(type.Methods).Modifiers;
         Assert.Equal(expected, actual);
@@ -224,7 +222,7 @@ public class ParserTests
 
     [Theory]
     [InlineData("STATIC", "static")]
-    [InlineData("ABS", "abs")]
+    [InlineData("ABS", "abstract")]
     [InlineData("Struct", "struct")]
     [InlineData("Readonly", "readonly")]
     public void ClassModifierCaseVariants_ReportCanonicalSpelling(string modifier, string canonical)
@@ -238,7 +236,7 @@ public class ParserTests
         var header = canonical switch
         {
             "static" => "module Widget",
-            "abs" => "class Widget abstract",
+            "abstract" => "class Widget abstract",
             "struct" => "class Widget struct",
             "readonly" => "class Widget struct readonly",
             _ => throw new ArgumentOutOfRangeException(nameof(canonical))
@@ -246,7 +244,7 @@ public class ParserTests
         var type = Assert.Single(ParseNative($"module Modifiers\n  {header}").Classes);
         Assert.Equal(canonical == "static", type.IsModule);
         Assert.Equal(canonical == "static", type.IsStatic);
-        Assert.Equal(canonical == "abs", type.IsAbstract);
+        Assert.Equal(canonical == "abstract", type.IsAbstract);
         Assert.Equal(canonical is "struct" or "readonly", type.IsStruct);
         Assert.Equal(canonical == "readonly", type.IsReadOnly);
     }

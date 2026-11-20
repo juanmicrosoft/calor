@@ -370,7 +370,7 @@ public class ContractSimplificationRuntimeTests
     {
         foreach (var fallback in new[] { false, true })
         {
-            var assembly = Compile(Function("bool?", $"(! (! (?? x {fallback.ToString().ToLowerInvariant()})))"), verify);
+            var assembly = Compile(Function("bool?", $"(! (! (x ?? {fallback.ToString().ToLowerInvariant()})))"), verify);
             Assert.Equal(7, Invoke(assembly, true));
             AssertContractViolation(() => Invoke(assembly, false));
             if (fallback)

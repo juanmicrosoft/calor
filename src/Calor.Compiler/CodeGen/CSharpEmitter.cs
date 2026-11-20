@@ -6521,7 +6521,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         if (HasQuantifierBindingName(predicate, sanitizedValueName))
             return "false";
 
-        var condition = predicate.Accept(this);
+        // #1618: substitute # on the AST so the checked value has its declared type while the
+        // predicate is emitted as a contract expression; quantifier bounds and bodies are
+        // certified against those types. Any # the substitution does not model stays a
+        // placeholder and is replaced textually below, as before.
+        var substituted = Calor.Compiler.Verification.Obligations.FactCollector.SubstituteSelf(
+            predicate, new ReferenceNode(predicate.Span, valueName));
+        var condition = EmitContractExpression(substituted);
         if (condition.Contains("STATIC ONLY:", StringComparison.Ordinal))
             return "false";
 

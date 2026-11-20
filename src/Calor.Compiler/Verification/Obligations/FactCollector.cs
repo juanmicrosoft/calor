@@ -893,6 +893,13 @@ public sealed class FactCollector
         // manufacture an unsatisfiable precondition set (a vacuous proof).
         => SubstituteSelfRef(expression, new ReferenceNode(expression.Span, name, isVerbatim: true));
 
+    /// <summary>
+    /// Replaces every # with <paramref name="replacement"/> where the substitution is
+    /// modeled, leaving any unmodeled # in place (the caller decides what that means).
+    /// </summary>
+    internal static ExpressionNode SubstituteSelf(ExpressionNode expression, ExpressionNode replacement)
+        => SubstituteSelfRef(expression, replacement);
+
     internal static bool IsPlainCallArgument(ExpressionNode argument)
         => DescendantsAndSelf(argument).All(IsPlainDefinitionNode);
 

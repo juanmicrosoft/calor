@@ -122,7 +122,7 @@ public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper outpu
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
         Assert.Equal("conditional-expression-hoisting", loss.Feature);
         Assert.Equal(3, loss.Line);
-        Assert.Equal("Method preserved as raw C#: public static int Run()\n"
+        Assert.Equal("Method preserved as §CSHARP interop: public static int Run()\n"
             + "    {\n        int i = 0;\n        bool gate = false;\n ...", loss.Description);
         Assert.Equal(4, converted.NativeConversionCount);
         Assert.Empty(converted.Ast!.Functions);

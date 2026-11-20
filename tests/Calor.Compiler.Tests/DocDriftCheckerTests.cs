@@ -2796,8 +2796,8 @@ public class DocDriftCheckerTests
 
         Assert.Contains("mut", EffectCodes.DocumentedCompactCodes);
         Assert.Contains("mut:col", EffectCodes.DocumentedCompactCodes);
-        Assert.DoesNotContain("fw", EffectCodes.DocumentedCompactCodes);
-        Assert.Contains("fw", EffectCodes.KnownCompactCodes);
+        // 0.30 (#1596): the legacy fw/fr/fd codes are gone, not merely undocumented.
+        Assert.DoesNotContain("fw", EffectCodes.KnownCompactCodes);
     }
 
     [Fact]

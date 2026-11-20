@@ -6058,7 +6058,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 "Disabled preprocessor member text preserved verbatim",
                 InteropMemberKind.Other);
             _context.RecordLoss(ConversionLossKind.InteropPreserved, "preprocessor-disabled",
-                $"Disabled #if branch text preserved as raw C#: {TruncateForMessage(disabledText.Trim())}");
+                $"Disabled #if branch text preserved as §CSHARP interop: {TruncateForMessage(disabledText.Trim())}");
             interopBlocks.Add(interop);
             items.Add(interop);
         }
@@ -17319,7 +17319,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.Stats.InteropBlocksEmitted++;
         _context.AddInfo($"C# interop block preserved for [{featureName}]", feature: featureName, line: line);
         _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName,
-            $"{kind} preserved as raw C#: {TruncateForMessage(node.ToString())}", line);
+            $"{kind} preserved as §CSHARP interop: {TruncateForMessage(node.ToString())}", line);
 
         var block = new CSharpInteropBlockNode(
             GetTextSpan(node),

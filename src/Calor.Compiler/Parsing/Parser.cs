@@ -6472,7 +6472,7 @@ public sealed class Parser
             if (!ClassModifierKeywords.Contains(token))
             {
                 var lower = token.ToLowerInvariant();
-                var hint = RetiredModifierReplacement(token) is { } replacement
+                var hint = (RetiredModifierReplacement(token) ?? RetiredModifierReplacement(lower)) is { } replacement
                     ? $"Use '{replacement}' instead."
                     : RemovedVisibilityReplacement(token) is { } visibilityWord
                     ? $"Use '{visibilityWord}' instead."
@@ -7081,7 +7081,7 @@ public sealed class Parser
             else if (span is { } location)
             {
                 var lower = token.ToLowerInvariant();
-                var hint = RetiredModifierReplacement(token) is { } replacement
+                var hint = (RetiredModifierReplacement(token) ?? RetiredModifierReplacement(lower)) is { } replacement
                     ? $"Use '{replacement}' instead."
                     : token != lower && ParseMethodModifiers(lower) != MethodModifiers.None
                     ? $"Use '{lower}' instead."

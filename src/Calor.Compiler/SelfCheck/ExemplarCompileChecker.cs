@@ -386,7 +386,9 @@ public static class ExemplarCompileChecker
     public static readonly string AgentTaskReferencePath =
         TeachingReferencePath;
 
-    private static readonly Regex ModuleStart = new(@"^module(?:\s|$)");
+    // A retired `§M` header also starts a program, so a stale module example in the docs is
+    // compiled and rejected; other retired fragments (`§MT`, `§FOREACH`) are skipped as before.
+    private static readonly Regex ModuleStart = new(@"^(?:module(?:\s|$)|§M(?:\s|\{|$))");
     private static readonly Regex ReferenceDeclaration = new(
         @"^(?:module|func|class|record|interface|delegate)\s");
 

@@ -386,7 +386,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var source = $$"""
             module ArrayElements nullable oblivious
               func Probe public () → void
-                ! alloc, fw
+                ! alloc, fs:w
                 let {{elementType}}[]:values = new {{elementType}}[1]
                 System.IO.File.WriteAllLines("unused", values)
             """;

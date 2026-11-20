@@ -362,7 +362,7 @@ public sealed class SafeConsumptionRuntimeTests
     [InlineData("argument")]
     public void LiteralNullWithNonNullFallback_HasTheFallbackType(string consumer)
     {
-        var source = Source(consumer, "(?? null \"fallback\")");
+        var source = Source(consumer, "(null ?? \"fallback\")");
         var (_, diagnostics) = Bind(source);
         Assert.DoesNotContain(diagnostics, IsNullableDiagnostic);
         var result = Program.Compile(source, "literal-null.calr");

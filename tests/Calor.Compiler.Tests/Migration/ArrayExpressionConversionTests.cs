@@ -538,9 +538,9 @@ public class ArrayExpressionConversionTests
     }
 
     [Theory]
-    [InlineData("static")]
-    [InlineData("public stat")]
-    [InlineData("stat private")]
+    [InlineData("stat")]
+    [InlineData("public static")]
+    [InlineData("static private")]
     public void StaticConstructorHeaders_RejectNoncanonicalOrVisibilityModifiers(string modifiers)
     {
         var source = $$"""

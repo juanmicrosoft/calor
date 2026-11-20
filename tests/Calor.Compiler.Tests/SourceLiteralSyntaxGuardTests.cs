@@ -8,7 +8,8 @@ namespace Calor.Compiler.Tests;
 /// #1603 / #1613: compiler and tool messages, hints, examples and fix patches must teach
 /// the 0.30 native syntax. A string literal anywhere under <c>src/</c> that contains a
 /// retired <c>§</c> marker fails here unless its file is listed below with the reason.
-/// <c>§</c> followed by a digit is a document section reference ("§4.5"), not syntax.
+/// A marker is <c>§</c> followed by a letter or <c>/</c>; a bare <c>§</c> (detection code) or
+/// <c>§</c> followed by a digit (a document section reference, "§4.5") is not syntax.
 /// Comments are not scanned.
 /// </summary>
 public sealed class SourceLiteralSyntaxGuardTests
@@ -23,6 +24,17 @@ public sealed class SourceLiteralSyntaxGuardTests
         // strings and assumption-set hashes key on them.
         ["src/Calor.Compiler/Verification/Z3/Z3Verifier.cs"] = "content-stable assumption identifiers",
     };
+
+    // Individual literals that must keep their text, as (file, literal substring, reason).
+    private static readonly (string File, string Text, string Reason)[] AllowedLiterals =
+    [
+        // Conversion-loss descriptions: the immutable binder conversion baselines
+        // (BinderIncompleteRatchetTests) hash these exact descriptions.
+        ("src/Calor.Compiler/Migration/RoslynSyntaxVisitor.cs", "preserved as §CSHARP interop: ", "pinned loss identity"),
+        ("src/Calor.Compiler/Migration/CSharpToCalorConverter.cs", "re-preserved as §CSHARP after emitted Calor failed to parse", "pinned loss identity"),
+        // Detection: a retired `§M` header in a docs example is still compiled (and rejected).
+        ("src/Calor.Compiler/SelfCheck/ExemplarCompileChecker.cs", "|§M(?:", "retired-module detection"),
+    ];
 
     [Fact]
     public void SourceStringLiteralsUseNativeSyntax()
@@ -41,8 +53,9 @@ public sealed class SourceLiteralSyntaxGuardTests
             var tree = CSharpSyntaxTree.ParseText(text);
             foreach (var token in tree.GetRoot().DescendantTokens())
             {
-                // A bare "§" or "§/" is detection code (checking for a retired marker), not teaching.
-                if (!IsStringToken(token) || token.ValueText is "§" or "§/" || !ContainsRetiredMarker(token.ValueText))
+                if (!IsStringToken(token) || !ContainsRetiredMarker(token.ValueText)
+                    || AllowedLiterals.Any(allowed => allowed.File == relative
+                        && token.ValueText.Contains(allowed.Text, StringComparison.Ordinal)))
                     continue;
                 var line = token.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
                 findings.Add($"{relative}:{line}: {Shorten(token.Text)}");
@@ -58,6 +71,8 @@ public sealed class SourceLiteralSyntaxGuardTests
     {
         var root = CliTestHarness.FindRepoRoot();
         Assert.All(Allowed.Keys, relative => Assert.True(File.Exists(Path.Combine(root, relative)), relative));
+        Assert.All(AllowedLiterals, allowed => Assert.Contains(allowed.Text,
+            File.ReadAllText(Path.Combine(root, allowed.File)), StringComparison.Ordinal));
     }
 
     private static bool IsStringToken(SyntaxToken token) => token.Kind() is
@@ -69,7 +84,7 @@ public sealed class SourceLiteralSyntaxGuardTests
     {
         for (var i = text.IndexOf('§'); i >= 0; i = text.IndexOf('§', i + 1))
         {
-            if (i + 1 >= text.Length || !char.IsDigit(text[i + 1]))
+            if (i + 1 < text.Length && (char.IsLetter(text[i + 1]) || text[i + 1] == '/'))
                 return true;
         }
         return false;
