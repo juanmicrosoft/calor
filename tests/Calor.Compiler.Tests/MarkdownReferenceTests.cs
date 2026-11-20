@@ -117,16 +117,16 @@ public class MarkdownReferenceTests
     }
 
     [Theory]
-    [InlineData("contracts", "ContractDivide", "GlobalModule.Divide(9, 0)",
-        "!ContractViolationException", "!DivideByZeroException")]
-    [InlineData("contracts", "ContractDivide", "GlobalModule.Divide(-1, 1)",
-        "!ContractViolationException", "-1")]
-    [InlineData("contracts", "ContractClamp", "GlobalModule.Clamp(4, 10, 0)",
-        "!ContractViolationException", "10")]
-    [InlineData("contracts", "NonEmptyCollection", "GlobalModule.First(System.Array.Empty<int>())",
-        "!ContractViolationException", "!IndexOutOfRangeException")]
     // #1618: every violation below is a parameter refinement, whose entry check throws
     // ArgumentOutOfRangeException in every contract mode, Off included.
+    [InlineData("contracts", "ContractDivide", "GlobalModule.Divide(9, 0)",
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("contracts", "ContractDivide", "GlobalModule.Divide(-1, 1)",
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("contracts", "ContractClamp", "GlobalModule.Clamp(4, 10, 0)",
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
+    [InlineData("contracts", "NonEmptyCollection", "GlobalModule.First(System.Array.Empty<int>())",
+        "!ArgumentOutOfRangeException", "!ArgumentOutOfRangeException")]
     [InlineData("contracts", "AbsoluteValue", "GlobalModule.Abs(int.MinValue)",
         "!OverflowException", "!OverflowException")]
     [InlineData("contracts", "FunctionCallBoundary", "GlobalModule.Identity(0)",
