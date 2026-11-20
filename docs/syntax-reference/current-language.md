@@ -31,7 +31,7 @@ Functions use func, type:name parameters and → returnType; public visibility i
 Types and members include class, record, interface, property and this[...] indexer declarations.
 Use let for immutable bindings, var for mutable bindings and set for updates.
 Control flow includes if/else if/else, while, each collection iteration and two distinct for modes.
-Contracts and authoritative effects describe obligations and side effects with requires, => and !.
+Contracts and authoritative effects describe obligations and side effects with parameter refinements (| (# > 0)), => and !.
 Async functions distinguish their body result from the callable Task or ValueTask carrier.
 Expressions use C# precedence, postfix calls and indexing. Collections use ordinary .NET types.
 Types use C# names, T[] arrays and T? nullability. Literals include 42, true, "hello" and 18.00m.
@@ -385,9 +385,9 @@ Complete example: [Effects](#example-primer_effects).
 
 ## precondition
 
-Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.
+Constrains a parameter at the call: an inline refinement after the parameter, with # standing for its value, checked on entry and on every reassignment. A condition on several parameters refines the last one and names the earlier ones (int:lo, int:hi | (# > lo)). There is no separate precondition clause. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.
 
-Syntax: `requires condition`
+Syntax: `type:name | (condition on #)`
 
 C# equivalents (fragments):
 
@@ -1445,9 +1445,8 @@ SquareRoot
 
 ```calor
 module AgentReference3
-  func SquareRoot (int:x) → int
+  func SquareRoot (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     return x
 ```
 
@@ -1619,9 +1618,8 @@ GetListLength
 
 ```calor
 module AgentReference15
-  func GetListLength (int:n) → int
+  func GetListLength (int:n | (# >= 0)) → int
     ! alloc,mut
-    requires n >= 0
     let List<int>:nums = new List<int>()
     for i from 1 to n step 1
       nums.Add(i)
@@ -1916,9 +1914,8 @@ GetFirstChar
 
 ```calor
 module AgentReference36
-  func GetFirstChar (string:s) → char
+  func GetFirstChar (string:s | (#.Length > 0)) → char
     !
-    requires s.Length > 0
     return s[0]
 ```
 
@@ -1964,9 +1961,8 @@ AllPositive
 
 ```calor
 module AgentReference39
-  func AllPositive (int[]:arr, int:n) → bool
+  func AllPositive (int[]:arr, int:n | (# == arr.Length)) → bool
     !
-    requires n == arr.Length
     => !result || !(exists int:i in 0..n : arr[i] <= 0)
     var bool:allPos = true
     for i from 0 to arr.Length - 1 step 1
@@ -1981,9 +1977,8 @@ HasNegative
 
 ```calor
 module AgentReference40
-  func HasNegative (int[]:arr, int:n) → bool
+  func HasNegative (int[]:arr, int:n | (# == arr.Length)) → bool
     !
-    requires n == arr.Length
     => result == (exists int:i in 0..n : arr[i] < 0)
     for i from 0 to arr.Length - 1 step 1
       if arr[i] < 0
@@ -1997,9 +1992,8 @@ DigitValue
 
 ```calor
 module AgentReference41
-  func DigitValue (char:c) → int
+  func DigitValue (char:c | (char.IsDigit(#))) → int
     !
-    requires char.IsDigit(c)
     return c - '0'
 ```
 
@@ -2020,15 +2014,13 @@ Contracts
 
 ```calor
 module Contracts
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x
 
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 

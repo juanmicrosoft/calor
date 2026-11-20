@@ -292,9 +292,8 @@ Contracts are semantic constructs that specify behavioral requirements.
 
 ```calor
 module CoreRequires
-  func Positive (int:x) → int
+  func Positive (int:x | (# > 0)) → int
     !
-    requires x > 0
     return x
 ```
 

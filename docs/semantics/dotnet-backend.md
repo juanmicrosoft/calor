@@ -333,9 +333,8 @@ their own guards and remain active with contract mode off.
 
 ```calor
 module BackendContracts
-  func Positive (int:value) → int
+  func Positive (int:value | (# > 0)) → int
     !
-    requires value > 0
     => result > 0
     return value
 ```

@@ -181,10 +181,8 @@ Do not confuse those tags with measured outcomes or complexity denominators.
 
 ```calor
 module FactorialBenchmark Math
-  func Factorial (int:n) → int
+  func Factorial (int:n | ((# >= 0) && (# <= 12))) → int
     !
-    requires n >= 0
-    requires n <= 12
     => result >= 1
     if n <= 1
       return 1
@@ -262,7 +260,7 @@ Both implementations must be semantically equivalent:
 - Same edge case handling
 
 ### Same Contracts
-- Match `requires` entry checks and `=>` postconditions under the actual modes
+- Match parameter-refinement entry checks and `=>` postconditions under the actual modes
 - Compare exception types and timing, not just condition text
 - Do not substitute assertions that disappear in the measured build
 

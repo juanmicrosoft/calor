@@ -202,14 +202,13 @@ See [verification modes and limits](/docs/guides/verification-guarantees/).
 
 ```calor
 module EnforcedDivide
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 
 `Divide(9, 2)` returns `4`. With checks enabled, `Divide(9, 0)` fails the
-precondition before division. Native `requires` has no custom-message clause.
+precondition before division. A parameter refinement has no custom-message clause.
 The condition does not prevent every arithmetic exception:
 `Divide(int.MinValue, -1)` still overflows.
 

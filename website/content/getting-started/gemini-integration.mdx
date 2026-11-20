@@ -93,9 +93,8 @@ You: Does this function have any contract violations?
 
 ```calor
 module GeminiDivision
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 

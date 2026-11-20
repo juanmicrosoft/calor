@@ -37,9 +37,9 @@ estimation mode because no LLM provider is configured; that separate result is
 
 | Scenario | Calor Approach | C# Approach |
 |:---------|:---------------|:------------|
-| Null input | Precondition `requires x != null` | Guard clause `x ?? throw` |
-| Division by zero | Precondition `requires b != 0` | Guard clause `if (b == 0)` |
-| Empty array | Precondition `requires arr.Length > 0` | `if (arr.Length == 0)` |
+| Null input | Precondition `string?:x \| (# != null)` | Guard clause `x ?? throw` |
+| Division by zero | Precondition `int:b \| (# != 0)` | Guard clause `if (b == 0)` |
+| Empty array | Precondition `int[]:arr \| (#.Length > 0)` | `if (arr.Length == 0)` |
 | Integer overflow | Checked arithmetic; contracts constrain inputs and results | `checked { }` block |
 
 **Both approaches are valid.** The benchmark measures outcomes, not mechanisms.
@@ -149,9 +149,8 @@ Tests general boundary handling:
 **Calor Implementation:**
 ```calor
 module Math
-  func FindMax (int[]:arr) → int
+  func FindMax (int[]:arr | (#.Length > 0)) → int
     !
-    requires arr.Length > 0
     var int:max = arr[0]
     var int:i = 1
     while i < arr.Length
@@ -282,7 +281,7 @@ It is retained from the task-runner description, not newly measured by this page
 In this executable task-runner example, both languages achieve equal
 correctness:
 
-- **Calor:** Preconditions and postconditions provide contract-based protection; current compatibility syntax uses `requires` and `=>`
+- **Calor:** Preconditions and postconditions provide contract-based protection; native syntax uses parameter refinements and `=>`
 - **C#:** Guard clauses (`ArgumentException`, `ArgumentNullException`) provide equivalent protection
 
 The benchmark accepts **both mechanisms** as valid contract enforcement. This ensures a fair comparison of actual code quality rather than language-specific features.

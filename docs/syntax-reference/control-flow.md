@@ -222,16 +222,14 @@ counts the same values; `CountEvens(6)` returns `3`.
 
 ```calor
 module Example
-  func PrintEvens (int:n) → void
+  func PrintEvens (int:n | (# > 0)) → void
     ! cw
-    requires n > 0
     for i from 1 to n step 1
       if i % 2 == 0
         Console.WriteLine(i)
 
-  func CountEvens (int:n) → int
+  func CountEvens (int:n | (# > 0)) → int
     !
-    requires n > 0
     var int:count = 0
     for i from 1 to n step 1
       if i % 2 == 0
@@ -246,9 +244,8 @@ factorial example returns immediately for zero or one; `Main` returns `120`.
 
 ```calor
 module EarlyReturn
-  func Factorial (int:n) → int
+  func Factorial (int:n | (# >= 0)) → int
     !
-    requires n >= 0
     if n <= 1
       return 1
     return n * Factorial(n - 1)

@@ -55,7 +55,7 @@ The same prompt goes to both Calor and C#. The LLM must apply its knowledge of e
 
 | Approach | Problem |
 |:---------|:--------|
-| Calor-biased prompts | "Add a Calor `requires` precondition..." supplies syntax instead of testing its selection |
+| Calor-biased prompts | "Add a Calor refinement precondition..." supplies syntax instead of testing its selection |
 | C#-biased prompts | Unfair to Calor, doesn't reflect real usage |
 | **Neutral prompts** | Tests whether LLM can translate requirements to idiomatic code |
 
@@ -153,9 +153,8 @@ These are different questions that require different benchmarks.
 **Current native illustration, not an archived model response:**
 ```calor
 module TaskSafeDivide
-  func SafeDivide public (int:a, int:b) → int
+  func SafeDivide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 
@@ -186,11 +185,8 @@ task-completion score or a claim of exception equivalence.
 **Current native illustration, retaining the original formula:**
 ```calor
 module TaskNormalizeScore
-  func NormalizeScore public (int:score, int:maxScore) → int
+  func NormalizeScore public (int:score | (# >= 0), int:maxScore | ((# > 0) && (score <= #))) → int
     !
-    requires score >= 0
-    requires maxScore > 0
-    requires score <= maxScore
     => result >= 0
     => result <= 100
     return score * 100 / maxScore
@@ -234,11 +230,11 @@ They are not observed extraction rates from the failed published run.
 
 | Requirement Language | Generated Contract |
 |:---------------------|:-------------------|
-| "must only accept non-negative" | `requires n >= 0` |
-| "must not be zero" | `requires n != 0` |
+| "must only accept non-negative" | `int:n \| (# >= 0)` |
+| "must not be zero" | `int:n \| (# != 0)` |
 | "result is never negative" | `=> result >= 0` |
 | "result is always at least 1" | `=> result >= 1` |
-| "must be between X and Y" | `requires n >= X` and `requires n <= Y` |
+| "must be between X and Y" | `int:n \| (# >= X && # <= Y)` |
 
 Whether a model chooses complete, correct contracts must be measured from its
 actual responses and tested obligations, including invalid-input cases.

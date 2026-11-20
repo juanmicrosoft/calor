@@ -42,9 +42,8 @@ on the same row, as in `! !cw` or `! alloc, !e`, reports `Calor0403`
 This is a template, not a complete function:
 
 ```calor
-func Name (Type:parameter) → ReturnType
+func Name (Type:parameter | (condition on #)) → ReturnType
   ! effects               // Here
-  requires condition
   => condition
   // body
 ```

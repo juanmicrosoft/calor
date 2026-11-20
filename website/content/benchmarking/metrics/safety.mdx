@@ -220,9 +220,8 @@ centralize them, subject to contract mode and supported lowering:
 **Calor:**
 ```calor
 module Math
-  func SafeDivide public (int:a, int:b) → int
+  func SafeDivide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 

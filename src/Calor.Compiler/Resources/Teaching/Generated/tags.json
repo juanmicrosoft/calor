@@ -1,10 +1,10 @@
 {
   "tags": [
     {
-      "open": "requires condition",
+      "open": "type:name | (condition on #)",
       "close": "(none)",
       "tag": "requires",
-      "description": "Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.",
+      "description": "Constrains a parameter at the call: an inline refinement after the parameter, with # standing for its value, checked on entry and on every reassignment. A condition on several parameters refines the last one and names the earlier ones (int:lo, int:hi | (# > lo)). There is no separate precondition clause. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.",
       "csharpEquivalent": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)"
     },
     {

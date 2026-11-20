@@ -523,9 +523,8 @@ match_end:
 **Source:**
 ```calor
 module NormalRequires
-  func Positive (int:x) → int
+  func Positive (int:x | (# > 0)) → int
     !
-    requires x > 0
     return x
 ```
 
@@ -673,9 +672,8 @@ public interface ICnfVisitor<T>
 
 ```calor
 module NormalSum
-  func SumIfPositive (int:a, int:b) → int
+  func SumIfPositive (int:a, int:b | (a > 0 && # > 0)) → int
     !
-    requires a > 0 && b > 0
     return a + b
 ```
 

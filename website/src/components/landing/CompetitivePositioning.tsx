@@ -5,7 +5,7 @@ const comparisons = [
     rows: [
       {
         feature: 'Contracts',
-        calor: 'First-class requires and => contracts',
+        calor: 'First-class parameter refinements and => contracts',
         others: 'Deprecated / Comments / None',
       },
       {
@@ -134,7 +134,7 @@ const comparisons = [
       },
       {
         feature: 'Division by Zero',
-        calor: 'Expressed with requires; checked or verified',
+        calor: 'Expressed as parameter refinements; checked or verified',
         others: 'Runtime crash',
       },
       {

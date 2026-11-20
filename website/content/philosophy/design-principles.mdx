@@ -32,7 +32,7 @@ Unresolved calls, interop, and waivers limit enforcement. Use the canonical
 
 ## Contracts state checkable obligations
 
-`requires` states a precondition; `=>` states a postcondition on normal returns.
+A parameter refinement (`| (# > 0)`) states a precondition; `=>` states a postcondition on normal returns.
 Runtime checking and optional static proof are separate operations with
 documented limits.
 
@@ -40,10 +40,8 @@ Complete program; `Divide(9, 2)` returns `4`:
 
 ```calor
 module DesignContracts
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a | (# >= 0), int:b | (# > 0)) → int
     !
-    requires a >= 0
-    requires b > 0
     => result >= 0
     return a / b
 ```

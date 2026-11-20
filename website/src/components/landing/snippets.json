@@ -1,10 +1,10 @@
 {
   "contracts": {
     "component": "FeatureGrid",
-    "code": "requires x >= 0\n=> result >= 0",
-    "before": "module ContractContext\n  func Identity (int:x) → int\n    !\n",
+    "code": "func Identity (int:x | (# >= 0)) → int\n  !\n  => result >= 0",
+    "before": "module ContractContext\n",
     "after": "    return x\n",
-    "indent": 4,
+    "indent": 2,
     "inputs": [],
     "expectedDiagnostics": []
   },

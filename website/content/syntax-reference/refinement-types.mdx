@@ -4,14 +4,14 @@ section: "syntax-reference"
 order: 6
 ---
 
-Use ordinary .NET types and `requires` clauses to constrain function inputs.
-Use `=>` postconditions to describe the result. Retired named refinements,
-inline refinement predicates and self-reference syntax are not current source
-forms.
+Constrain a function input with an inline refinement on the parameter:
+`int:port | (# >= 1 && # <= 65535)`, where `#` is the parameter's value. It is
+the one precondition form. Use `=>` postconditions to describe the result.
+Named refinement types and indexed type aliases are retired.
 
-A precondition does **not** create a new nominal type, attach an invariant to
-every local assignment or establish that a verifier proved every caller safe.
-Those are different guarantees.
+A refinement does **not** create a new nominal type or establish that a verifier
+proved every caller safe. It is checked when the function is entered and again
+whenever the body assigns the parameter.
 
 ## Constraining a parameter
 
@@ -19,9 +19,8 @@ This function accepts an `int` port in the inclusive range 1 through 65535.
 
 ```calor
 module PortConstraint
-  func SelectPort (int:port) → int
+  func SelectPort (int:port | (# >= 1 && # <= 65535)) → int
     !
-    requires port >= 1 && port <= 65535
     => result == port
     return port
 
@@ -31,7 +30,7 @@ module PortConstraint
 ```
 
 `Main()` returns `443`. With runtime contracts enabled, `SelectPort(0)` and
-`SelectPort(65536)` throw `ContractViolationException`.
+`SelectPort(65536)` throw `ArgumentOutOfRangeException` for `port`.
 
 The parameter's type is still `int`. Repeating this precondition in another
 function does not create two distinct port types, nor does it implicitly
@@ -44,9 +43,8 @@ length read does not run when the value is null.
 
 ```calor
 module TextConstraint
-  func Length (string:text) → int
+  func Length (string:text | (# != null && #.Length > 0)) → int
     !
-    requires text != null && text.Length > 0
     => result > 0
     return text.Length
 
@@ -66,11 +64,8 @@ is needed.
 
 ```calor
 module TransferConstraint
-  func Transfer (int:balance, int:amount) → int
+  func Transfer (int:balance | (# >= 0), int:amount | ((# > 0) && (balance >= #))) → int
     !
-    requires balance >= 0
-    requires amount > 0
-    requires balance >= amount
     => result >= 0
     return balance - amount
 
@@ -91,9 +86,8 @@ local into a permanently constrained value.
 
 ```calor
 module ConstraintBoundary
-  func Reset (int:count) → int
+  func Reset (int:count | (# >= 0)) → int
     !
-    requires count >= 0
     var int:remaining = count
     set remaining -1
     return remaining
@@ -118,18 +112,16 @@ mutable local.
 
 ```calor
 module TransferProofAtPoint
-  func Transfer (int:balance, int:amount) → int
+  func Transfer (int:balance | (# >= 0), int:amount | (# > 0)) → int
     !
-    requires balance >= 0
-    requires amount > 0
     proof balance >= amount
     return balance - amount
 ```
 
 `Transfer(10, 3)` returns `7`. Without a discharged verifier obligation, the
 statement emits a runtime check: `Transfer(3, 5)` throws
-`InvalidOperationException`. This is distinct from a failed `requires` guard,
-which throws `ContractViolationException`.
+`InvalidOperationException`. This is distinct from a failed parameter
+refinement, which throws `ArgumentOutOfRangeException`.
 
 The proof-statement check remains even with `--contract-mode off`; that switch
 disables precondition and postcondition guards, not this explicit statement.
@@ -143,16 +135,14 @@ This version makes `balance >= amount` an entry precondition:
 
 ```calor
 module TransferProof
-  func Transfer (int:balance, int:amount) → int
+  func Transfer (int:balance | (# >= 0), int:amount | (# > 0 && balance >= #)) → int
     !
-    requires balance >= 0
-    requires amount > 0 && balance >= amount
     proof balance - amount >= 0
     return balance - amount
 ```
 
 `Transfer(10, 3)` returns `7`. With contracts enabled, `Transfer(3, 5)` fails
-the precondition with `ContractViolationException`, before reaching the proof.
+the refinement on `amount` with `ArgumentOutOfRangeException`, before reaching the proof.
 With contracts off, the proof still throws `InvalidOperationException`.
 Moving an obligation between an entry contract and a body statement changes
 failure behavior; the two examples are not equivalent.
@@ -178,9 +168,8 @@ a successful C# build does not do so.
 ## Named and indexed types
 
 This page replaces the retired refinement authoring guide. It does not promise
-the old named-type distinction or per-assignment refinement guards.
-Named refinement definitions, inline self-reference predicates and indexed
-type aliases are not native authoring forms. The old erased aliases did not
+the old named-type distinction. Named refinement definitions and indexed type
+aliases are not native authoring forms; inline parameter refinements are. The old erased aliases did not
 become ordinary distinct CLR domain types.
 
 Use the real collection type and explicitly relate its length to an index.
@@ -189,9 +178,8 @@ check by itself:
 
 ```calor
 module ArrayIndexConstraint
-  func At (int[]:items, int:index) → int
+  func At (int[]:items, int:index | (# >= 0 && # < items.Length)) → int
     !
-    requires index >= 0 && index < items.Length
     => result == items[index]
     return items[index]
 ```

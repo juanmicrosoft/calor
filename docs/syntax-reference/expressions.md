@@ -204,7 +204,7 @@ contracts and loop bounds.
 | Return | `return (x - 1) * 2` |
 | Call argument | `Console.WriteLine(x * x)` |
 | Condition | `if value > 0` |
-| Precondition | `requires divisor != 0` |
+| Precondition | `int:divisor \| (# != 0)` |
 | Postcondition | `=> result >= 0` |
 | Range bound | `for i from 0 to count - 1 step 1` |
 
@@ -253,9 +253,8 @@ A duplicate key throws before later entries run.
 
 ```calor
 module CollectionExpressions
-  func NonEmptyCount (List<int>:items) → int
+  func NonEmptyCount (List<int>:items | (#.Count > 0)) → int
     !
-    requires items.Count > 0
     => result > 0
     // Get count
     return items.Count

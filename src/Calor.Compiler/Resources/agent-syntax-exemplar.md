@@ -19,7 +19,8 @@ func Name (string:x) → string        Public by default; private is explicit
 let string:name = expression         Immutable (type optional)
 var int:name = 0                     Mutable (type optional)
 set name expression                 Updates, including increments expressed as addition
-requires condition / => condition   Precondition / postcondition (result = body return value)
+int:x | (# > 0)                      Precondition: refine the parameter (# is its value)
+=> condition                         Postcondition (result = body return value)
 return expression                   Return (bare return for void)
 Console.WriteLine(expression)        Print line [needs cw]
 if condition / else if condition / else
@@ -91,15 +92,13 @@ an effect charge. Arrays and lists differ: File.ReadAllLines returns string[], n
 
 ```calor
 module Contracts
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x
 
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 

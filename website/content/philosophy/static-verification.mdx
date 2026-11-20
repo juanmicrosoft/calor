@@ -22,9 +22,8 @@ When you write contracts in Calor:
 
 ```calor
 module SquareBoundaries
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x
 ```
@@ -146,9 +145,8 @@ module FunctionCallBoundary
   func Positive (int:value) → bool
     !
     return value > 0
-  func Identity (int:x) → int
+  func Identity (int:x | (# > 0)) → int
     !
-    requires x > 0
     => Positive(result)
     return x
 ```
@@ -198,7 +196,7 @@ there is no silent static-only fallback. See the
 Simple arithmetic and comparison contracts verify quickly:
 
 ```calor-fragment
-requires x >= 0
+int:x | (# >= 0)
 => result >= 0
 ```
 
@@ -244,7 +242,7 @@ Calor is **not** a proof assistant like LEAN, Isabelle, or Rocq. The distinction
 
 | Aspect | Proof Assistants | Calor |
 |:-------|:-----------------|:------|
-| You write | Proofs (tactics, lemmas) | Contracts (`requires`, `=>`) |
+| You write | Proofs (tactics, lemmas) | Contracts (refinements, `=>`) |
 | Verification | Must complete to compile | Optional; reports seven verdicts and removes only eligible clean proven guards |
 | Scope | Arbitrary mathematical properties | Practical software contracts |
 | Expertise | Type theory, proof tactics | Software engineering |
@@ -264,9 +262,8 @@ This example squares its input; it does not calculate a square root.
 
 ```calor
 module FloatingProofBoundary
-  func Square (double:x) → double
+  func Square (double:x | (# >= 0.0)) → double
     !
-    requires x >= 0.0
     => result >= 0.0
     return x * x
 ```
@@ -328,7 +325,7 @@ instead attach a predicate to a type. Retired named refinements, inline
 refinement predicates, and proof-statement tags are not current native source
 forms; do not copy them from historical examples.
 
-Use ordinary .NET types and native `requires` clauses for current input
+Use ordinary .NET types and parameter refinements for current input
 constraints. This does not create a new nominal type, validate every assignment,
 or prove every caller safe. The retained internal refinement obligation engine
 is compile-time analysis, not a native runtime-guard guarantee.

@@ -411,15 +411,13 @@ strengthen, their inherited preconditions:
 ```calor
 module WeakerPreconditions
   class Base
-    func Process virtual (int:value) → int
+    func Process virtual (int:value | (# > 0)) → int
       !
-      requires value > 0
       return value * 2
   class Derived
     extends Base
-    func Process override (int:value) → int
+    func Process override (int:value | (# >= 0)) → int
       !
-      requires value >= 0
       return value * 2
   func Main () → int
     ! alloc

@@ -10,15 +10,14 @@ nav_order: 5
 <!-- Generated from website/content/syntax-reference/contracts.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Contracts state what a function requires from its caller and what it guarantees
-on a normal return. Write preconditions with `requires` and postconditions with
-`=>`, before the first body statement.
+on a normal return. A precondition is a refinement on the parameter it
+constrains, written `| (condition)` after the parameter with `#` standing for its
+value. Postconditions use `=>` lines before the first body statement.
 
 ```calor
 module ContractDivide
-  func Divide (int:dividend, int:divisor) → int
+  func Divide (int:dividend | (# >= 0), int:divisor | (# > 0)) → int
     !
-    requires divisor > 0
-    requires dividend >= 0
     => result >= 0
     => result <= dividend
     return dividend / divisor
@@ -29,11 +28,17 @@ divisor would contradict the promised non-negative result.
 
 ## Preconditions
 
-Each `requires` line is an ordinary Boolean expression over the function's
-inputs. Multiple lines must all hold. With runtime checks enabled, a failed
-precondition throws `Calor.Runtime.ContractViolationException` before the body
-runs. For example, `Divide(9, 0)` fails its precondition rather than reaching
-integer division.
+A refinement is an ordinary Boolean expression in which `#` is the parameter's
+value. A condition on several parameters goes on the last one it mentions and
+names the earlier ones: `int:lo, int:hi | (# > lo)`. Two conditions on one
+parameter are joined with `&&`. There is no separate precondition clause; the
+`requires` keyword from earlier versions is an error.
+
+With runtime checks enabled, a failed refinement throws
+`ArgumentOutOfRangeException` naming the parameter before the body runs, and the
+check runs again whenever the body assigns the parameter. For example,
+`Divide(9, 0)` fails the refinement on `divisor` rather than reaching integer
+division.
 
 Contracts do not replace the implementation or automatically prove every call
 safe. A runtime test that exercises a guard is not a verifier proof.
@@ -65,9 +70,8 @@ Separate a valid input range from the promised result range.
 
 ```calor
 module ContractClamp
-  func Clamp (int:value, int:min, int:max) → int
+  func Clamp (int:value, int:min, int:max | (min <= #)) → int
     !
-    requires min <= max
     => result >= min
     => result <= max
     if value < min
@@ -90,9 +94,8 @@ Use the actual collection type and its members in the contract.
 
 ```calor
 module NonEmptyCollection
-  func First (int[]:items) → int
+  func First (int[]:items | (#.Length > 0)) → int
     !
-    requires items.Length > 0
     => result == items[0]
     return items[0]
 ```
@@ -134,9 +137,8 @@ module FunctionCallBoundary
     !
     return value > 0
 
-  func Identity (int:x) → int
+  func Identity (int:x | (Positive(#))) → int
     !
-    requires Positive(x)
     => Positive(result)
     return x
 ```
@@ -194,11 +196,8 @@ effect contract.
 
 ```calor
 module MatrixSymmetry
-  func CheckSymmetric (int[,]:matrix, int:n) → bool
+  func CheckSymmetric (int[,]:matrix, int:n | (((# >= 0) && (matrix.GetLength(0) == # && matrix.GetLength(1) == #)) && (forall int:i in 0..#, int:j in 0..# : matrix[i,j] == matrix[j,i]))) → bool
     !
-    requires n >= 0
-    requires matrix.GetLength(0) == n && matrix.GetLength(1) == n
-    requires forall int:i in 0..n, int:j in 0..n : matrix[i,j] == matrix[j,i]
     return true
 ```
 
@@ -213,10 +212,8 @@ quantifier's quadratic runtime cost.
 
 ```calor
 module NonNegativeArray
-  func ProcessArray (int[]:arr, int:n) → bool
+  func ProcessArray (int[]:arr, int:n | ((# >= 0 && # == arr.Length) && (forall int:i in 0..# : arr[i] >= 0))) → bool
     !
-    requires n >= 0 && n == arr.Length
-    requires forall int:i in 0..n : arr[i] >= 0
     return true
 ```
 
@@ -227,9 +224,8 @@ fails the second precondition with checks enabled, before the body runs.
 
 ```calor
 module ArraySearch
-  func Find (int[]:arr, int:target) → int
+  func Find (int[]:arr, int:target | (exists int:i in 0..arr.Length : arr[i] == #)) → int
     !
-    requires exists int:i in 0..arr.Length : arr[i] == target
     => result >= 0 && result < arr.Length
     => arr[result] == target
     for i from 0 to arr.Length - 1 step 1
@@ -297,9 +293,9 @@ Put the signature first, followed by effect and contract lines, then the body.
 Keep contracts above the first statement; they are declaration clauses, not
 statements to execute in the middle of a function.
 
-The native `requires` form does not have a custom-message clause. When an API
-needs a particular exception type and message, use an explicit condition and
-exception in the body rather than inventing a contract attribute.
+A refinement has no custom-message clause. When an API needs a particular
+exception type and message, use an explicit condition and exception in the body
+rather than inventing a contract attribute.
 
 ## Related references
 

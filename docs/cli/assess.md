@@ -53,7 +53,7 @@ Each file is scored across eight dimensions that correspond to Calor language fe
 
 | Dimension | Weight | What It Detects | Calor Feature |
 |:----------|:------:|:----------------|:-------------|
-| **ContractPotential** | 18% | Argument validation, `ArgumentException` throws, range checks | `requires`/`=>` contracts |
+| **ContractPotential** | 18% | Argument validation, `ArgumentException` throws, range checks | refinement and `=>` contracts |
 | **NullSafetyPotential** | 18% | Nullable types, `?.`, `??`, null checks | Nullable-boundary checks |
 | **ErrorHandlingPotential** | 18% | Try/catch blocks, throw statements | Native exceptions with declared effects |
 | **EffectPotential** | 13% | File I/O, network calls, database access, console | `!` effect rows |
@@ -305,5 +305,5 @@ Skipped files are reported in the summary but don't affect scoring.
 
 - [Getting Started](/calor/getting-started/) - Install Calor and write your first program
 - [Syntax Reference](/calor/syntax-reference/) - Complete language reference
-- [Contracts](/calor/syntax-reference/contracts/) - Learn about `requires`/`=>` contracts
+- [Contracts](/calor/syntax-reference/contracts/) - Learn about refinement and `=>` contracts
 - [Effects](/calor/syntax-reference/effects/) - Learn about `!` effect rows

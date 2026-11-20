@@ -21,7 +21,7 @@ repository benchmarks as an adoption result.
 - **The project has one maintainer.** The mitigation is a tested eject path:
   generated C# is yours and can be built without continuing to author Calor.
 - **Refinement types are not runtime-enforced.** Their obligations are
-  compile-time analysis. Contracts (`requires` and `=>`) are the constructs that can
+  compile-time analysis. Contracts (parameter refinements and `=>`) are the constructs that can
   emit runtime checks.
 - **Waivers void guarantees.** `--permissive-effects` assumes unknown calls are
   pure. `--contract-mode off` removes contract checks. A review packet produced
@@ -72,16 +72,15 @@ The [full list of build settings](/docs/cli/init/#build-settings) is on the
 
 ```calor
 module Pricing
-  func ClampToCap public (int:amount, int:cap) → int
+  func ClampToCap public (int:amount, int:cap | (# >= 0)) → int
     !
-    requires cap >= 0
     => result <= cap
     if amount > cap
       return cap
     return amount
 ```
 
-- `requires` preconditions and `=>` postconditions receive one of the documented
+- Parameter refinements and `=>` postconditions receive one of the documented
   proof statuses where verification is requested. Only a clean, non-vacuous,
   assumption-free `proven` result can authorize guard removal; runtime checks
   also depend on contract mode and supported lowering.
@@ -157,7 +156,7 @@ compiles and executes the result to pin these degradation rules:
 
 | Calor construct | After eject |
 |:----------------|:------------|
-| `requires` | Runtime `ContractViolationException` guard |
+| Parameter refinement (`\| (# > 0)`) | Runtime `ArgumentOutOfRangeException` guard on entry and reassignment |
 | `=>` | Runtime guard on return; conversion itself does not perform proof-based elision |
 | `=>` on a structured early/nested-return body | Shared postcondition exit when runtime checks are enabled |
 | `=>` on an opaque raw-C# body | Rejected with `Calor1001` |
