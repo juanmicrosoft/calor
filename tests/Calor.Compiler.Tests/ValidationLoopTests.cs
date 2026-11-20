@@ -536,8 +536,11 @@ public sealed class ValidationLoopTests : IDisposable
     [InlineData(true)]
     public async Task HangingTest_ReturnsTimeoutWithoutClaimingTestSuccess(bool mcp)
     {
-        WriteFixture(testBody: "System.Threading.Thread.Sleep(30000);");
-        var result = await RunAsync(mcp, timeout: 5);
+        // The timeout is per child process (build, then test). 5 s let the fixture BUILD time
+        // out on a loaded CI runner (stage "skipped", 2026-11-20), so the build gets 45 s and
+        // the test sleeps far longer than that: the test stage is still what times out.
+        WriteFixture(testBody: "System.Threading.Thread.Sleep(600000);");
+        var result = await RunAsync(mcp, timeout: 45);
         Assert.False(result.GetProperty("success").GetBoolean());
         Assert.Equal("timeout", Stage(result, "test").GetProperty("status").GetString());
         Assert.Contains("timed out", result.ToString());
