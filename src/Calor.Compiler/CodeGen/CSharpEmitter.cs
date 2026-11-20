@@ -6481,9 +6481,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
                     out var constraint))
                 continue;
 
+            // #1618: the parameter's own inline refinement is emitted from its projected
+            // precondition node (RefinementPreconditions.For), the node the binder binds and the
+            // effect checker walks, so operator and call bindings recovered from this C# land on
+            // the nodes those passes look up.
+            var projected = parameter.InlineRefinement is { } inline
+                && ReferenceEquals(constraint.Predicate, inline.Predicate)
+                    ? RefinementPreconditions.For(parameter).Condition
+                    : null;
             var condition = EmitRefinementCondition(
                 constraint.Predicate,
-                parameter.Name);
+                parameter.Name,
+                projected);
             AppendLine($"if (!({condition})) throw new ArgumentOutOfRangeException(" +
                 $"nameof({SanitizeIdentifier(parameter.Name)}), \"Violation of {constraint.Description}\");");
         }
@@ -6515,7 +6524,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
             $"nameof({valueName}), \"Value violates {constraint.Description}\");");
     }
 
-    private string EmitRefinementCondition(ExpressionNode predicate, string valueName)
+    private string EmitRefinementCondition(
+        ExpressionNode predicate, string valueName, ExpressionNode? projected = null)
     {
         var sanitizedValueName = SanitizeIdentifier(valueName);
         if (HasQuantifierBindingName(predicate, sanitizedValueName))
@@ -6525,7 +6535,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
         // predicate is emitted as a contract expression; quantifier bounds and bodies are
         // certified against those types. Any # the substitution does not model stays a
         // placeholder and is replaced textually below, as before.
-        var substituted = Calor.Compiler.Verification.Obligations.FactCollector.SubstituteSelf(
+        var substituted = projected ?? Calor.Compiler.Verification.Obligations.FactCollector.SubstituteSelf(
             predicate, new ReferenceNode(predicate.Span, valueName));
         var condition = EmitContractExpression(substituted);
         if (condition.Contains("STATIC ONLY:", StringComparison.Ordinal))
