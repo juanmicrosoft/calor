@@ -53,8 +53,8 @@ Contracts use the schema 2.0 seven-status vocabulary:
 
 The metric tracks the distribution across these categories. Runtime checks
 separately require supported lowering and an enabled contract mode.
-`--contract-mode off` emits no contract guards; it does not disable checked
-arithmetic. See
+`--contract-mode off` removes postcondition and invariant guards; it keeps
+parameter-refinement guards and does not disable checked arithmetic. See
 [verification modes and limits](/docs/guides/verification-guarantees/).
 
 This page describes current semantics, not a new measurement of historical

@@ -23,7 +23,7 @@ public class ErrorDetectionCalculator : IMetricCalculator
         {
             ["calorContracts"] = CountCalorContracts(context.CalorSource),
             ["csharpGuards"] = CountCSharpGuards(context.CSharpSource),
-            ["calorPreconditions"] = NativeCalorSyntax.Requires.Matches(context.CalorSource).Count,
+            ["calorPreconditions"] = NativeCalorSyntax.Precondition.Matches(context.CalorSource).Count,
             ["calorPostconditions"] = NativeCalorSyntax.Ensures.Matches(context.CalorSource).Count,
             ["calorInvariants"] = NativeCalorSyntax.Invariant.Matches(context.CalorSource).Count,
             ["csharpExceptions"] = CountOccurrences(context.CSharpSource, "throw ")
@@ -43,7 +43,7 @@ public class ErrorDetectionCalculator : IMetricCalculator
         var score = 0.0;
 
         // Preconditions (`requires expr`)
-        var reqCount = NativeCalorSyntax.Requires.Matches(source).Count;
+        var reqCount = NativeCalorSyntax.Precondition.Matches(source).Count;
         score += Math.Min(0.3, reqCount * 0.1);
 
         // Postconditions (line-head `=> expr`)
@@ -124,7 +124,7 @@ public class ErrorDetectionCalculator : IMetricCalculator
     {
         return new Dictionary<string, int>
         {
-            ["requires"] = NativeCalorSyntax.Requires.Matches(source).Count,
+            ["requires"] = NativeCalorSyntax.Precondition.Matches(source).Count,
             ["ensures"] = NativeCalorSyntax.Ensures.Matches(source).Count,
             ["invariants"] = NativeCalorSyntax.Invariant.Matches(source).Count,
             ["effects"] = NativeCalorSyntax.EffectRow.Matches(source).Count

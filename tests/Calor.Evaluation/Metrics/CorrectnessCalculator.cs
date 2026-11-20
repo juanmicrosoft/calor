@@ -117,7 +117,7 @@ public class CorrectnessCalculator : IMetricCalculator
             ["calorFactors"] = new Dictionary<string, object>
             {
                 ["compiles"] = context.CalorCompilation.Success,
-                ["hasPreconditions"] = CalorSyntax.Requires.IsMatch(source),
+                ["hasPreconditions"] = CalorSyntax.Precondition.IsMatch(source),
                 ["hasPostconditions"] = CalorSyntax.Ensures.IsMatch(source),
                 ["hasOptionHandling"] = HasOptionHandling(source),
                 ["hasBoundsChecks"] = HasCalorBoundsChecks(source),
@@ -155,7 +155,7 @@ public class CorrectnessCalculator : IMetricCalculator
         var source = context.CalorSource;
 
         // Preconditions indicate input validation
-        if (CalorSyntax.Requires.IsMatch(source))
+        if (CalorSyntax.Precondition.IsMatch(source))
             score += 0.15;
 
         // Postconditions indicate output validation

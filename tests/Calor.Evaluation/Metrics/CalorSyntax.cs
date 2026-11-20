@@ -5,7 +5,7 @@ namespace Calor.Evaluation.Metrics;
 /// <summary>
 /// Source patterns for native (0.30) Calor constructs, shared by the metric calculators.
 /// Each pattern is the native spelling of the construct the calculators used to find by its
-/// retired section marker (<c>requires</c> for a precondition, a line-head <c>=&gt;</c> for a
+/// retired section marker (a parameter refinement for a precondition, a line-head <c>=&gt;</c> for a
 /// postcondition, a line-head <c>!</c> for an effect row, and so on). The metrics, weights and
 /// scoring are unchanged; only the spelling they look for is.
 /// </summary>
@@ -18,7 +18,14 @@ public static class CalorSyntax
     /// <summary>A function header that declares a return type (<c>→ T</c>).</summary>
     public static readonly Regex TypedOutput = new(@"^[ \t]*func[ \t][^\n]*→", Line);
     public static readonly Regex Return = new(@"^[ \t]*return\b", Line);
-    public static readonly Regex Requires = new(@"^[ \t]*requires\b", Line);
+    /// <summary>
+    /// A precondition: one parameter refinement (<c>int:x | (# &gt;= 0)</c>) on a
+    /// <c>func</c>, <c>ctor</c>, <c>op</c> or <c>delegate</c> declaration line. Since #1618 a
+    /// refinement is the only precondition form; one refined parameter counts once.
+    /// </summary>
+    public static readonly Regex Precondition = new(
+        @"(?<=^[ \t]*(?:\[@[^\]\n]*\][ \t]*)*(?:func|ctor|op|delegate)\b[^\n]*):@?[A-Za-z_]\w*[ \t]*\|(?!\|)[ \t]*\(",
+        Line);
     public static readonly Regex Ensures = new(@"^[ \t]*=>[ \t]", Line);
     public static readonly Regex Invariant = new(@"^[ \t]*invariant\b", Line);
     /// <summary>An effect row; a bare <c>!</c> is the pure row.</summary>

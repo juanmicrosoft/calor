@@ -92,9 +92,11 @@ module DivisionSignals
     return a / b
 ```
 
-With runtime contract checks enabled, `Divide(9, 2)` returns `4`, while a zero
-divisor or negative `a` fails a precondition. This is not a guarantee of
-compile-time diagnosis at every call.
+`Divide(9, 2)` returns `4`. A zero divisor or a negative `a` fails a
+precondition and throws `ArgumentOutOfRangeException`. Preconditions are
+parameter refinements, so this check runs in every contract mode, including
+`--contract-mode off`. This is not a guarantee of compile-time diagnosis at
+every call.
 
 The postcondition is **incorrect for the declared input domain**:
 `Divide(9, -2)` satisfies both preconditions but produces `-4`, failing the
@@ -123,9 +125,11 @@ public static int Divide(int a, int b)
 - Less structured, more inference required
 
 This C# fragment has the same negative-divisor mistake. It is not
-exception-equivalent: its guards throw `ArgumentException`, while enabled Calor
-contracts throw `ContractViolationException`. `Debug.Assert` also depends on the
-C# build configuration and is not Calor's runtime postcondition mechanism.
+exception-equivalent: its guards throw `ArgumentException`. A failed Calor
+precondition throws `ArgumentOutOfRangeException`, and a failed Calor
+postcondition throws `ContractViolationException` when contract checks are
+enabled. `Debug.Assert` also depends on the C# build configuration and is not
+Calor's runtime postcondition mechanism.
 
 ---
 
@@ -142,8 +146,8 @@ module NullSignals
 ```
 
 `Length("abc")` returns `3`. Passing null through the CLR boundary fails the
-precondition when checks are enabled; disabling checks exposes the ordinary
-null dereference instead.
+precondition and throws `ArgumentOutOfRangeException` in every contract mode,
+so the body never dereferences null.
 
 **C# detection:**
 ```csharp
@@ -162,9 +166,10 @@ module BoundsSignals
     return array[index]
 ```
 
-`At([42], 0)` returns `42`. Index `-1` or `1` fails a precondition with checks
-enabled and throws `IndexOutOfRangeException` with checks off. These contracts
-do not guard a null array: evaluating `array.Length` can itself throw.
+`At([42], 0)` returns `42`. Index `-1` or `1` fails the precondition and
+throws `ArgumentOutOfRangeException` in every contract mode, including
+`--contract-mode off`. The body's array access never runs. These contracts do
+not guard a null array: evaluating `array.Length` can itself throw.
 
 **C# detection:**
 ```csharp
@@ -206,9 +211,10 @@ module BuggyCaller
 3. Evaluate `y - y` as zero.
 4. Report that this call violates the precondition.
 
-`Trigger(9, 5)` actually fails a runtime precondition with checks enabled.
-With checks off, it reaches integer division by zero. Compilation of the example
-does not by itself establish an interprocedural static diagnosis.
+`Trigger(9, 5)` fails the runtime precondition on `b` and throws
+`ArgumentOutOfRangeException`. The check also runs with `--contract-mode off`,
+so the division by zero is never reached. Compilation of the example does not
+by itself establish an interprocedural static diagnosis.
 
 **C# agent detection:**
 1. See `Divide(x, y - y)`
@@ -223,7 +229,7 @@ does not by itself establish an interprocedural static diagnosis.
 ## Scoring Example
 
 This is an explanatory example, not a measured corpus input. Its nullable return
-type does not make the enabled precondition optional.
+type does not make the precondition optional.
 
 ### Calor Code
 
@@ -273,9 +279,10 @@ An earlier version of this page showed an illustrative 0.85 / 0.45 = 1.89x that
 the calculator never produced.
 
 For valid input `(6, 2)`, both implementations return `3`. For `(6, 0)`, the
-C# version returns null, but the Calor version fails `int:b | (# != 0)` when
-checks are enabled; only checks-off execution takes its null branch. The two
-versions do not have the same API behavior.
+C# version returns null, but the Calor version fails `int:b | (# != 0)` and
+throws `ArgumentOutOfRangeException`. This happens in every contract mode, so
+the Calor null branch is unreachable. The two versions do not have the same API
+behavior.
 
 ---
 

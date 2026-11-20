@@ -64,7 +64,7 @@ public class ComprehensionCalculator : IMetricCalculator
         ("variable", s => NativeCalorSyntax.Binding.Matches(s).Count, 0.5),       // let/var binding
         ("input", NativeCalorSyntax.CountTypedParameters, 0.5),                   // Typed parameter (T:x)
         ("output", s => NativeCalorSyntax.TypedOutput.Matches(s).Count, 0.5),     // Return type (→ T)
-        ("requires", s => NativeCalorSyntax.Requires.Matches(s).Count, 1.0),      // Precondition
+        ("requires", s => NativeCalorSyntax.Precondition.Matches(s).Count, 1.0),      // Precondition
         ("ensures", s => NativeCalorSyntax.Ensures.Matches(s).Count, 1.0),        // Postcondition (=> expr)
         ("invariant", s => NativeCalorSyntax.Invariant.Matches(s).Count, 1.0),    // Invariant
         ("effects", s => NativeCalorSyntax.EffectRow.Matches(s).Count, 0.8),      // Effect row (! ...)
@@ -156,7 +156,7 @@ public class ComprehensionCalculator : IMetricCalculator
 /// <summary>
 /// Source patterns for native (0.30) Calor constructs, shared by the metric calculators in this
 /// folder. Each pattern is the native spelling of a construct the calculators used to find by its
-/// retired section marker: <c>module</c>, <c>func</c>, <c>requires</c> for a precondition, a
+/// retired section marker: <c>module</c>, <c>func</c>, a parameter refinement for a precondition, a
 /// line-head <c>=&gt;</c> for a postcondition, a line-head <c>!</c> for an effect row, and so on.
 /// Mirrors <c>tests/Calor.Evaluation/Metrics/CalorSyntax.cs</c>, so both copies of the metrics
 /// count the same things.
@@ -170,7 +170,14 @@ internal static class NativeCalorSyntax
     /// <summary>A function header that declares a return type (<c>→ T</c>).</summary>
     public static readonly Regex TypedOutput = new(@"^[ \t]*func[ \t][^\n]*→", Line);
     public static readonly Regex Return = new(@"^[ \t]*return\b", Line);
-    public static readonly Regex Requires = new(@"^[ \t]*requires\b", Line);
+    /// <summary>
+    /// A precondition: one parameter refinement (<c>int:x | (# &gt;= 0)</c>) on a
+    /// <c>func</c>, <c>ctor</c>, <c>op</c> or <c>delegate</c> declaration line. Since #1618 a
+    /// refinement is the only precondition form; one refined parameter counts once.
+    /// </summary>
+    public static readonly Regex Precondition = new(
+        @"(?<=^[ \t]*(?:\[@[^\]\n]*\][ \t]*)*(?:func|ctor|op|delegate)\b[^\n]*):@?[A-Za-z_]\w*[ \t]*\|(?!\|)[ \t]*\(",
+        Line);
     public static readonly Regex Ensures = new(@"^[ \t]*=>[ \t]", Line);
     public static readonly Regex Invariant = new(@"^[ \t]*invariant\b", Line);
     /// <summary>An effect row; a bare <c>!</c> is the pure row.</summary>

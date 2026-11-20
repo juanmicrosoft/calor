@@ -24,7 +24,8 @@ subcommand.
 > `--keep-proven-guards` to retain otherwise-emitted guards and treat verdicts as
 > diagnostic only (the 0.13/0.14 behavior). `--elide-proven-guards` is still
 > accepted and now simply restates the default. Checks still require an enabled
-> contract mode and supported runtime lowering; `--contract-mode off` emits none.
+> contract mode and supported runtime lowering; `--contract-mode off` removes
+> postcondition and invariant checks (parameter refinements are always checked).
 
 ---
 
@@ -208,7 +209,8 @@ The compiler uses Z3 to attempt proving contracts at compile time and reports
 one of seven verdicts. Since 0.15, a clean `proven` postcondition drops its
 runtime guard by default; other verdicts never authorize proof-based removal.
 Pass `--keep-proven-guards` to retain otherwise-emitted guards and use verification
-as a diagnostic only. `--contract-mode off` emits no checks, and enabled checks
+as a diagnostic only. `--contract-mode off` removes postcondition and invariant
+checks but keeps parameter-refinement guards, and enabled checks
 still require supported runtime lowering.
 
 Example output:
