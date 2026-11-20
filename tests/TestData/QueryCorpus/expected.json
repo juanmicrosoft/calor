@@ -122,13 +122,13 @@
       "partial": true
     },
     {
-      "why": "Contracts declared on a function, in source order and kind. The index records what is DECLARED — a proof status would have to come from the verifier, and a stale 'Proven' is worse than none.",
+      "why": "Contracts declared on a function, in source order and kind. The index records what is DECLARED — a proof status would have to come from the verifier, and a stale 'Proven' is worse than none. #1618: the precondition is the refinement on n in the signature (line 3); the postcondition moved up a line when the requires clause left the body.",
       "facet": "contracts",
       "name": "Bounded",
       "inFile": "contracts.calr",
       "expect": [
-        "contracts.calr:5:precondition",
-        "contracts.calr:6:postcondition"
+        "contracts.calr:3:precondition",
+        "contracts.calr:5:postcondition"
       ],
       "partial": false
     },
@@ -147,7 +147,7 @@
       "inFile": "contracts.calr",
       "expect": [
         "contracts.calr:2:module",
-        "contracts.calr:7:declaration"
+        "contracts.calr:6:declaration"
       ],
       "partial": false
     },
