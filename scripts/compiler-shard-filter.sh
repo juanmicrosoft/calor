@@ -28,6 +28,10 @@
 # run once in Tasks.Tests instead (#1590); the class-level CLI loops dominated
 # this shard's measured duration. The old two-host split dates from 7,978 cases;
 # each of its halves had grown to roughly a whole old suite before these repairs.
+# 0.30 (#1730): P moved from the complement to part 1, which balances the paired run
+# by measured time (local, paired: parts 239 / 295 / 279 / 507 s became about 337 /
+# 295 / 279 / 409 s). Cases at the 22,562 inventory: 6,305 / 4,941 / 5,802 / 5,502,
+# and 8 historical replays.
 #
 # HISTORICAL REPLAYS (0.30, #1730) are the fifth, separate part. Each test in
 # Category=HistoricalReplay rebuilds an archived compiler at its registered producer
@@ -44,12 +48,19 @@
 # or:
 #   filter="$(bash scripts/compiler-shard-filter.sh --replay)"  # the historical replays
 # or:
+#   bash scripts/compiler-shard-filter.sh --pairs    # "1,4" and "2,3": parts the shard runs together
+#
+# PAIRS (0.30, #1730): the four parts run two at a time, each in its own test host (separate
+# environment, console and CALOR_HOME). Paired by measured duration so the pairs finish close
+# together: parts 1 and 4, then 2 and 3. Coverage loops still run --parts one at a time.
+# or:
 #   bash scripts/compiler-shard-filter.sh --self-test
 
 set -euo pipefail
 
-SHARD_LETTERS=("C D J U" "B F I Y" "A E S T V")
+SHARD_LETTERS=("C D J U P" "B F I Y" "A E S T V")
 REPLAY_FILTER="Category=HistoricalReplay"
+PAIRS=("1,4" "2,3")
 NOT_REPLAY="Category!=HistoricalReplay"
 FILTERS=()
 
@@ -68,7 +79,7 @@ build_filters() {
 }
 
 usage() {
-    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4 | --replay]" >&2
+    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4 | --replay | --pairs]" >&2
     exit 2
 }
 
@@ -92,6 +103,11 @@ if [ "$#" -gt 0 ]; then
         --replay)
             [ "$#" -eq 1 ] || usage
             printf '%s\n' "$REPLAY_FILTER"
+            exit 0
+            ;;
+        --pairs)
+            [ "$#" -eq 1 ] || usage
+            printf '%s\n' "${PAIRS[@]}"
             exit 0
             ;;
         *) usage ;;
@@ -139,6 +155,10 @@ if [ "${1:-}" = "--self-test" ]; then
 
     [ "$(bash "$0" --parts)" = "$(printf '%s\n' 1 2 3 4)" ] \
         || { echo "FAIL: part inventory differs from the shared partition"; fail=1; }
+    # The pairs name every part exactly once, two per pair.
+    [ "$(bash "$0" --pairs | tr ',' '\n' | sort)" = "$(bash "$0" --parts)" ] \
+        && [ "$(bash "$0" --pairs | grep -cx '[1-4],[1-4]')" = 2 ] \
+        || { echo "FAIL: the pairs do not name each part exactly once"; fail=1; }
     for part in 1 2 3 4; do
         [ "$(bash "$0" --part "$part")" = "${FILTERS[$((part - 1))]}" ] \
             || { echo "FAIL: raw filter interface differs for part $part"; fail=1; }
@@ -161,6 +181,7 @@ if [ "${1:-}" = "--self-test" ]; then
         || bash "$0" --self-test extra >/dev/null 2>&1 \
         || bash "$0" --parts extra >/dev/null 2>&1 \
         || bash "$0" --replay extra >/dev/null 2>&1 \
+        || bash "$0" --pairs extra >/dev/null 2>&1 \
         || bash "$0" --unknown >/dev/null 2>&1; then
         echo "FAIL: accepted invalid arguments"
         fail=1

@@ -23,6 +23,10 @@
 # the serial parts about half an hour. Their host starts in the background after the build and
 # runs beside the parts on cores the serial suite leaves idle; the step waits for it and fails
 # when it fails. Its TRX is checked like every other part.
+#
+# 0.30 (#1730): the four parts run in two pairs (compiler-shard-filter.sh --pairs). In each pair
+# the first part's host runs in the background and the second in the foreground; the step waits
+# for the first and fails when it failed. Every part keeps its own fresh host and its own TRX.
 set -euo pipefail
 # usage: bash scripts/run-shard-tests.sh <matrix name> <test project>
 test "$#" -eq 2
@@ -48,13 +52,27 @@ if [ "$name" = "compiler" ]; then
     --results-directory artifacts/test \
     --verbosity normal > replay-output.log 2>&1 &
   replay_pid=$!
-  for part in $(bash scripts/compiler-shard-filter.sh --parts); do
+  for pair in $(bash scripts/compiler-shard-filter.sh --pairs); do
+    paired_part="${pair%,*}"
+    paired_filter="$(bash scripts/compiler-shard-filter.sh --part "$paired_part")"
+    dotnet test "$project" -c Release --no-build --no-restore \
+      --filter "$paired_filter" \
+      --logger "trx;LogFileName=$name-$paired_part.trx" \
+      --results-directory artifacts/test \
+      --verbosity normal > "part-$paired_part.log" 2>&1 &
+    paired_pid=$!
+    part="${pair#*,}"
     filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
     dotnet test "$project" -c Release --no-build --no-restore \
       --filter "$filter" \
       --logger "trx;LogFileName=$name-$part.trx" \
       --results-directory artifacts/test \
       --verbosity normal 2>&1 | tee -a test-output.log
+    paired_status=0
+    wait "$paired_pid" || paired_status=$?
+    echo "--- compiler part $paired_part (exit $paired_status) ---"
+    tee -a test-output.log < "part-$paired_part.log"
+    test "$paired_status" = 0
   done
   replay_status=0
   wait "$replay_pid" || replay_status=$?
