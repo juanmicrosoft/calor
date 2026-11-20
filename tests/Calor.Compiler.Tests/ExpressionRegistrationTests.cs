@@ -52,14 +52,9 @@ public class ExpressionRegistrationTests
             [TokenKind.RangeOp] = ("§RANGE 1 2", nameof(RangeExpressionNode)),
             [TokenKind.IndexEnd] = ("§^ 1", nameof(IndexFromEndNode)),
             [TokenKind.With] = ("§WITH value §SET{Name} \"Ada\" §/WITH", nameof(WithExpressionNode)),
-            [TokenKind.StackAlloc] = ("§SALLOC{i32:4}", nameof(StackAllocNode)),
-            [TokenKind.AddressOf] = ("§ADDR value", nameof(AddressOfNode)),
-            [TokenKind.Deref] = ("§DEREF pointer", nameof(PointerDereferenceNode)),
-            [TokenKind.SizeOf] = ("§SIZEOF{i32}", nameof(SizeOfNode)),
             [TokenKind.Array2D] = ("§ARR2D{i32:2:2}", nameof(MultiDimArrayCreationNode)),
             [TokenKind.Index2D] = ("§IDX2D grid 0 1", nameof(MultiDimArrayAccessNode)),
             [TokenKind.Throw] = ("§TH §NEW{Exception} §/NEW", nameof(ThrowExpressionNode)),
-            [TokenKind.RawCSharpExpression] = ("§CS{DateTime.Now}", nameof(RawCSharpExpressionNode)),
             [TokenKind.Hash] = ("#", nameof(SelfRefNode)),
             [TokenKind.At] = ("@value", nameof(ReferenceNode)),
             [TokenKind.Minus] = ("-value", nameof(UnaryOperationNode)),
@@ -116,32 +111,14 @@ public class ExpressionRegistrationTests
 
     // Explicit token/API fixtures for prefix dispatch that the native equivalents do not
     // exercise. These are NOT source translations or evidence of native acceptance.
+    // Kinds the lexer can no longer produce (§ markers) left this table with the parser
+    // branches that dispatched them; a retired case with no native form left Cases too.
     private static readonly IReadOnlyDictionary<TokenKind, (string Tail, TokenKind? End, object? Value)> InternalCases =
         new Dictionary<TokenKind, (string, TokenKind?, object?)>
         {
-            [TokenKind.Array] = ("{i32}", TokenKind.EndArray, null),
-            [TokenKind.Index] = ("values 0", null, null),
-            [TokenKind.Length] = ("values", null, null),
-            [TokenKind.List] = ("{i32}", TokenKind.EndList, null),
-            [TokenKind.Dict] = ("{str:i32}", TokenKind.EndDict, null),
-            [TokenKind.HashSet] = ("{i32}", TokenKind.EndHashSet, null),
-            [TokenKind.Has] = ("{values} 1", null, null),
-            [TokenKind.Count] = ("{values}", null, null),
-            [TokenKind.AnonymousObject] = ("Name = \"Ada\"", TokenKind.EndAnonymousObject, null),
-            [TokenKind.Call] = ("{GetValue}", TokenKind.EndCall, null),
-            [TokenKind.Lambda] = ("{x:i32} x", TokenKind.EndLambda, null),
-            [TokenKind.Interpolate] = ("\"x\"", TokenKind.EndInterpolate, null),
             [TokenKind.NullCoalesce] = ("value 0", null, null),
             [TokenKind.NullConditional] = ("value Length", null, null),
             [TokenKind.RangeOp] = ("2", null, null),
-            [TokenKind.IndexEnd] = ("1", null, null),
-            [TokenKind.StackAlloc] = ("{i32:4}", null, null),
-            [TokenKind.AddressOf] = ("value", null, null),
-            [TokenKind.Deref] = ("pointer", null, null),
-            [TokenKind.SizeOf] = ("{i32}", null, null),
-            [TokenKind.Array2D] = ("{i32:2:2}", null, null),
-            [TokenKind.Index2D] = ("grid 0 1", null, null),
-            [TokenKind.RawCSharpExpression] = ("", null, "DateTime.Now"),
             [TokenKind.At] = ("value", null, null),
         };
 

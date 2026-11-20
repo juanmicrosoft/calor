@@ -157,14 +157,7 @@ public class StringOperationTests
             tokens[index] = new Token(TokenKind.Identifier, recipe.Keyword, marker.Span);
         }
 
-        // This private prefix entry is intentionally NOT native source admission.
-        var parser = new Parser(tokens, diagnostics);
-        var entry = typeof(Parser).GetMethod("ParseLispExpression", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(entry);
-        var expression = Assert.IsAssignableFrom<ExpressionNode>(entry.Invoke(parser, null));
-        var position = Assert.IsType<int>(typeof(Parser)
-            .GetField("_position", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(parser));
-        Assert.All(tokens.Skip(position), token => Assert.True(token.Kind is TokenKind.Dedent or TokenKind.Eof));
+        var expression = BuildInternalOperation(tokens);
 
         ExpressionNode Inner(string innerLabel)
         {
@@ -184,6 +177,54 @@ public class StringOperationTests
                 Inner("§R (len s)"), new IntLiteralNode(TextSpan.Empty, 10)),
             _ => expression,
         };
+    }
+
+    // 0.30 retired the Lisp prefix parser that used to build these fixtures. The converter
+    // and the verifier still create StringOperationNode, so the IR the emitter receives is
+    // assembled here the way that parser assembled it: `(op arg... [:mode])`, with a
+    // two-argument substr meaning SubstringFrom.
+    private static ExpressionNode BuildInternalOperation(IReadOnlyList<Token> tokens)
+    {
+        var position = 0;
+        var open = tokens[position++];
+        Assert.Equal(TokenKind.OpenParen, open.Kind);
+        var op = tokens[position++].Text;
+        var arguments = new List<ExpressionNode>();
+        StringComparisonMode? mode = null;
+        while (tokens[position].Kind != TokenKind.CloseParen)
+        {
+            var token = tokens[position++];
+            switch (token.Kind)
+            {
+                case TokenKind.Colon:
+                    mode = StringComparisonModeExtensions.FromKeyword(tokens[position++].Text);
+                    break;
+                case TokenKind.StrLiteral:
+                    arguments.Add(new StringLiteralNode(token.Span, Assert.IsType<string>(token.Value)));
+                    break;
+                case TokenKind.IntLiteral:
+                    // Same node ParseIntLiteral builds from the lexer's literal info.
+                    var info = Assert.IsType<IntLiteralInfo>(token.Value);
+                    arguments.Add(new IntLiteralNode(token.Span, info.Magnitude, info.Sign, info.Base, info.Width, info.Signedness)
+                    {
+                        WidthInferred = info.WidthInferred,
+                    });
+                    break;
+                case TokenKind.Identifier:
+                    arguments.Add(new ReferenceNode(token.Span, token.Text));
+                    break;
+                default:
+                    throw new ArgumentException($"Unexpected {token.Kind} in fixture.");
+            }
+        }
+        var span = open.Span.Union(tokens[position++].Span);
+        Assert.All(tokens.Skip(position), token => Assert.True(token.Kind is TokenKind.Dedent or TokenKind.Eof));
+        // Composite labels (`(> inner 10)`) are rebuilt from their inner operations by the caller.
+        if (StringOpExtensions.FromString(op) is not { } operation)
+            return new ReferenceNode(span, op);
+        if (operation == StringOp.Substring && arguments.Count == 2)
+            operation = StringOp.SubstringFrom;
+        return new StringOperationNode(span, operation, arguments, mode);
     }
 
     private static ExpressionNode Returned(ModuleNode module) =>
@@ -286,21 +327,6 @@ public class StringOperationTests
                 error.Code == DiagnosticCode.UnknownSectionMarker && error.Span.Equals(isolated.Span));
         }
         Assert.DoesNotContain(tokens, token => token.Kind is TokenKind.RawCSharpExpression or TokenKind.CSharpInterop);
-    }
-
-    private static void AssertOwnedInternalError(ControlSource control, ModuleNode module, DiagnosticBag diagnostics, string code)
-    {
-        var error = Assert.Single(diagnostics.Errors);
-        Assert.Equal(code, error.Code);
-        var operation = GetReturnExpression(module);
-        if (code == DiagnosticCode.OperatorArgumentCount)
-            Assert.Equal(operation.Span, error.Span);
-        else
-        {
-            var start = Operations[control.Label].Fixture.IndexOf(":mode", StringComparison.Ordinal);
-            Assert.True(start >= 0);
-            Assert.Equal(new TextSpan(start, ":mode".Length, 1, start + 1), error.Span);
-        }
     }
 
     private static void AssertRuntime(string source, string method, object expected, params object?[] arguments)
@@ -709,38 +735,8 @@ public class StringOperationTests
         Assert.Equal("upper", Assert.IsType<ReferenceNode>(statement.Expression).Name);
     }
 
-    [Fact]
-    public void Parse_Upper_TooManyArgs_ReportsError()
-    {
-        var source = WrapInFunction("§R (upper s \"extra\")");
-        var module = ParseInternalControl(source, out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("accepts at most 1 argument"));
-        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.OperatorArgumentCount);
-    }
 
-    [Fact]
-    public void Parse_Contains_OneArg_ReportsError()
-    {
-        var source = WrapInFunction("§R (contains s)");
-        var module = ParseInternalControl(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
-        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.OperatorArgumentCount);
-    }
-
-    [Fact]
-    public void Parse_Substr_OneArg_ReportsError()
-    {
-        var source = WrapInFunction("§R (substr s)");
-        var module = ParseInternalControl(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
-        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.OperatorArgumentCount);
-    }
 
     #endregion
 
@@ -1686,27 +1682,7 @@ public class StringOperationTests
         AssertCSharpEquivalent(new CSharpEmitter().Emit(module), new CSharpEmitter().Emit(reparsed));
     }
 
-    [Fact]
-    public void Parse_Upper_WithComparisonMode_ReportsError()
-    {
-        var source = WrapInFunction("§R (upper s :ignore-case)");
-        var module = ParseInternalControl(source, out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("does not support comparison modes"));
-        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.InvalidComparisonMode);
-    }
-
-    [Fact]
-    public void Parse_InvalidKeyword_ReportsError()
-    {
-        var source = WrapInFunction("§R (contains s \"x\" :invalid-mode)");
-        var module = ParseInternalControl(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("Unknown comparison mode"));
-        AssertOwnedInternalError(source, module, diagnostics, DiagnosticCode.InvalidComparisonMode);
-    }
 
     [Theory]
     [InlineData("ordinal", StringComparisonMode.Ordinal)]

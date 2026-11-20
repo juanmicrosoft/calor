@@ -467,19 +467,6 @@ public class EmptyClauseBodyTests
                 §B{a:Action} §LAM{}
                 §R 7
             """);
-        var source = """
-            module T
-              func A public () → int
-                !
-                let Action:a = __lambda__{}
-                return 7
-            """;
-        var body = Assert.Single(ParseInternal(source, ("__lambda__", TokenKind.Lambda)).Functions).Body;
-
-        Assert.Equal(2, body.Count);
-        Assert.IsType<BindStatementNode>(body[0]);
-        Assert.IsType<ReturnStatementNode>(body[1]);
-
         var native = ParseSingleFunctionBody("""
             module T
               func A public () → int
@@ -517,7 +504,6 @@ public class EmptyClauseBodyTests
     [Fact]
     public void MultilineHeader_BodyOnHeaderLastLine_StaysInBody()
     {
-        // PrintStatementNode's prefix dispatch is internal; native calls are expression statements.
         AssertRetiredSourceRejected("""
             §M{T}
               §F{A:pub} (bool:b) -> void
@@ -527,20 +513,6 @@ public class EmptyClauseBodyTests
                 ) §P "then"
                 §P "after"
             """);
-        var body = Assert.Single(ParseInternal("""
-            module T
-              func A public (bool:b) → void
-                ! cw
-                if (
-                  1 == 2
-                ) __print__ "then"
-                __print__ "after"
-            """, ("__print__", TokenKind.Print)).Functions).Body;
-
-        Assert.Equal(2, body.Count);
-        Assert.IsType<PrintStatementNode>(Assert.Single(Assert.IsType<IfStatementNode>(body[0]).ThenBody));
-        Assert.IsType<PrintStatementNode>(body[1]);
-
         var native = ParseSingleFunctionBody("""
             module T
               func A public (bool:b) → void
@@ -586,25 +558,6 @@ public class EmptyClauseBodyTests
                 §C{a.Invoke}
                 §R n
             """);
-        // Parentheses suppress lexer dedents just as the retired braces did. Only
-        // synthetic Lambda/EndLambda tokens admit the internal statement-lambda body.
-        var internalModule = ParseInternal("""
-            module EmptyClause T
-              module TModule public
-                func A public () → int
-                  !
-                  var int:n = 0
-                  let Action:a = (__lambda__{}
-                    if false
-                      if true
-                    else
-                      set n 1
-                  __end__)
-                  a.Invoke()
-                  return n
-            """, ("__lambda__", TokenKind.Lambda), ("__end__", TokenKind.EndLambda));
-        var internalType = EmitAndLoad(new CSharpEmitter().Emit(internalModule), "T.TModule");
-        Assert.Equal(1, Invoke(internalType, "A"));
         var type = Compile("""
             module EmptyClause T
               module TModule public
@@ -642,26 +595,6 @@ public class EmptyClauseBodyTests
                 §C{a.Invoke}
                 §R n
             """);
-        var internalModule = ParseInternal("""
-            module EmptyClause T
-              module TModule public
-                func A public (int:x) → int
-                  !
-                  var int:n = 0
-                  let Action:a = (__lambda__{}
-                    match x
-                      case 1
-                        match x
-                          case 2
-                      case _
-                        set n 7
-                  __end__)
-                  a.Invoke()
-                  return n
-            """, ("__lambda__", TokenKind.Lambda), ("__end__", TokenKind.EndLambda));
-        var internalType = EmitAndLoad(new CSharpEmitter().Emit(internalModule), "T.TModule");
-        Assert.Equal(7, Invoke(internalType, "A", 3));
-        Assert.Equal(0, Invoke(internalType, "A", 1));
         var type = Compile("""
             module EmptyClause T
               module TModule public
@@ -688,16 +621,6 @@ public class EmptyClauseBodyTests
     {
         AssertRetiredSourceRejected("§M{T}\n  §F{A:pub} () -> void\n    §E{cw}\n"
             + "    §UNSAFE\n    §P \"first\"\n    §B{x:i32} (+\n1 2\n    )\n    §/UNSAFE\n    §P \"after\"\n");
-        // Synthetic closers exercise the retired scan's internal production,
-        // not native source admission. The low-column continuation must not end the scan.
-        var body = Assert.Single(ParseInternal(
-            "module T\n  func A public () → void\n    ! cw\n"
-            + "    unsafe\n    __print__ \"first\"\n    let int:x = (\n1 + 2\n    )\n"
-            + "    __end__\n    __print__ \"after\"\n",
-            ("__print__", TokenKind.Print), ("__end__", TokenKind.EndUnsafe)).Functions).Body;
-
-        Assert.Equal(2, body.Count);
-        Assert.Equal(2, Assert.IsType<UnsafeBlockNode>(body[0]).Body.Count);
         var native = ParseSingleFunctionBody("""
             module T
               func A public () → void
@@ -725,33 +648,6 @@ public class EmptyClauseBodyTests
                 (+ n 1)
                 §R n
             """);
-        var source = """
-            module T
-              func A public () → int
-                !
-                var int:n = 0
-                let Func<int>:a = __lambda__{}
-                (n + 1)
-                return n
-            """;
-        // Bare arithmetic statements are no longer admitted. Preserve the exact recovered
-        // structural oracle, with the error owned by that expression rather than the lambda.
-        var tokens = InternalTokens(source, [("__lambda__", TokenKind.Lambda)]);
-        var diagnostics = new DiagnosticBag();
-        var module = new Parser(tokens, diagnostics).Parse();
-        var error = Assert.Single(diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
-        Assert.Equal("(n + 1)", source.Substring(error.Span.Start, error.Span.Length));
-        Assert.Equal("A native expression statement must be an invocation or object creation.", error.Message);
-        var body = Assert.Single(module.Functions).Body;
-
-        Assert.Equal(4, body.Count);
-        var binding = Assert.IsType<BindStatementNode>(body[1]);
-        var lambda = Assert.IsType<LambdaExpressionNode>(binding.Initializer);
-        Assert.Null(lambda.ExpressionBody);
-        Assert.Null(lambda.StatementBody);
-        Assert.IsType<ExpressionStatementNode>(body[2]);
-        Assert.IsType<ReturnStatementNode>(body[3]);
         const string nativeSource = """
             module T
               func A public () → int
@@ -768,7 +664,7 @@ public class EmptyClauseBodyTests
         var nativeError = Assert.Single(nativeDiagnostics.Errors);
         Assert.Equal(DiagnosticCode.UnexpectedToken, nativeError.Code);
         Assert.Equal("(n + 1)", nativeSource.Substring(nativeError.Span.Start, nativeError.Span.Length));
-        Assert.Equal(error.Message, nativeError.Message);
+        Assert.Equal("A native expression statement must be an invocation or object creation.", nativeError.Message);
     }
 
     [Fact]
@@ -782,19 +678,6 @@ public class EmptyClauseBodyTests
                 §/SYNC
                 §P "after"
             """);
-        var body = Assert.Single(ParseInternal("""
-            module T
-              func A public (object:a, object:b) → void
-                ! cw
-                lock (a) lock (b) __print__ "inside"
-                __end__
-                __print__ "after"
-            """, ("__print__", TokenKind.Print), ("__end__", TokenKind.EndSyncBlock)).Functions).Body;
-
-        Assert.Equal(2, body.Count);
-        var outer = Assert.IsType<SyncBlockNode>(body[0]);
-        Assert.IsType<SyncBlockNode>(Assert.Single(outer.Body));
-        Assert.IsType<PrintStatementNode>(body[1]);
         var native = ParseSingleFunctionBody("""
             module T
               func A public (object:a, object:b) → void
@@ -919,20 +802,7 @@ public class EmptyClauseBodyTests
                 §E{}
                 §R 1
             """);
-        // There is no native enum-extension declaration; retain this internal production's
-        // ownership oracle without counting it as a native enum-extension acceptance case.
-        var module = ParseInternal("""
-            module T
-              enum Color
-                Red
-              __extension__{Color}
-              func A public (Color:self) → int
-                !
-                return 1
-            """, ("__extension__", TokenKind.EnumExtension));
-
-        Assert.Empty(Assert.Single(module.EnumExtensions).Methods);
-        Assert.Equal("A", Assert.Single(module.Functions).Name);
+        // The internal enum-extension production went with the § syntax (0.30); no native form exists.
     }
 
     [Fact]
@@ -1007,22 +877,6 @@ public class EmptyClauseBodyTests
                 §/TR
                 §R 5
             """);
-        var body = Assert.Single(ParseInternal("""
-            module Test
-              func SafeDivide public (int:a, int:b) → int
-                !
-                try
-                return a / b
-                catch DivideByZeroException:ex
-                return 0
-                __end__
-                return 5
-            """, ("__end__", TokenKind.EndTry)).Functions).Body;
-
-        Assert.Equal(2, body.Count);
-        var tryStmt = Assert.IsType<TryStatementNode>(body[0]);
-        Assert.Single(tryStmt.TryBody);
-        Assert.Single(Assert.Single(tryStmt.CatchClauses).Body);
         var native = ParseSingleFunctionBody("""
             module Test
               func SafeDivide public (int:a, int:b) → int
@@ -1077,18 +931,6 @@ public class EmptyClauseBodyTests
                 §/SYNC
                 §P "after"
             """);
-        var body = Assert.Single(ParseInternal("""
-            module T
-              func A public () → void
-                ! cw
-                lock (this) __print__ "first"
-                __print__ "second"
-                __end__
-                __print__ "after"
-            """, ("__print__", TokenKind.Print), ("__end__", TokenKind.EndSyncBlock)).Functions).Body;
-
-        Assert.Equal(2, body.Count);
-        Assert.Equal(2, Assert.IsType<SyncBlockNode>(body[0]).Body.Count);
         var native = ParseSingleFunctionBody("""
             module T
               func A public () → void
@@ -1115,21 +957,6 @@ public class EmptyClauseBodyTests
                 §/UNSAFE
                 §P "after"
             """);
-        var body = Assert.Single(ParseInternal("""
-            module T
-              func A public () → void
-                ! cw
-                unsafe
-                unsafe
-                  __print__ "inner"
-                __end__
-                __print__ "after"
-            """, ("__print__", TokenKind.Print), ("__end__", TokenKind.EndUnsafe)).Functions).Body;
-
-        Assert.Equal(3, body.Count);
-        Assert.Empty(Assert.IsType<UnsafeBlockNode>(body[0]).Body);
-        Assert.Single(Assert.IsType<UnsafeBlockNode>(body[1]).Body);
-        Assert.IsType<PrintStatementNode>(body[2]);
         var native = ParseSingleFunctionBody("""
             module T
               func A public () → void
@@ -1160,22 +987,6 @@ public class EmptyClauseBodyTests
                 §/TR
                 §R n
             """);
-        var body = Assert.Single(ParseInternal("""
-            module T
-              func A public (int:x) → int
-                ! throw
-                var int:n = 0
-                try
-                  set n 10 / x
-                catch DivideByZeroException
-                set n -1
-                __end__
-                return n
-            """, ("__end__", TokenKind.EndTry)).Functions).Body;
-
-        Assert.Equal(3, body.Count);
-        var tryStmt = Assert.IsType<TryStatementNode>(body[1]);
-        Assert.Single(Assert.Single(tryStmt.CatchClauses).Body);
         var native = ParseSingleFunctionBody("""
             module T
               func A public (int:x) → int

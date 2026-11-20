@@ -30,8 +30,8 @@
 # each of its halves had grown to roughly a whole old suite before these repairs.
 # 0.30 (#1730): P moved from the complement to part 1, which balances the paired run
 # by measured time (local, paired: parts 239 / 295 / 279 / 507 s became about 337 /
-# 295 / 279 / 409 s). Cases at the 22,562 inventory: 6,305 / 4,941 / 5,802 / 5,502,
-# and 8 historical replays.
+# 295 / 279 / 409 s). Cases at the 22,554 inventory: 6,305 / 4,941 / 5,777 / 5,523,
+# and 8 historical replays (CI coverage run 44743090058 counted 5,506 in part 4 at 22,562).
 #
 # HISTORICAL REPLAYS (0.30, #1730) are the fifth, separate part. Each test in
 # Category=HistoricalReplay rebuilds an archived compiler at its registered producer
