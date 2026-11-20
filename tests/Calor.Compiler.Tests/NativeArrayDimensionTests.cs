@@ -16,11 +16,8 @@ public sealed class NativeArrayDimensionTests
 {
     private const string MatrixSource = """
         module MatrixSymmetry
-          func CheckSymmetric (int[,]:matrix, int:n) → bool
+          func CheckSymmetric (int[,]:matrix, int:n | (((# >= 0) && (matrix.GetLength(0) == # && matrix.GetLength(1) == #)) && (forall int:i in 0..#, int:j in 0..# : matrix[i,j] == matrix[j,i]))) → bool
             !
-            requires n >= 0
-            requires matrix.GetLength(0) == n && matrix.GetLength(1) == n
-            requires forall int:i in 0..n, int:j in 0..n : matrix[i,j] == matrix[j,i]
             return true
         """;
 
@@ -311,9 +308,8 @@ public sealed class NativeArrayDimensionTests
     {
         var result = Program.Compile("""
             module GenericMatrixPredicate
-              func Check<T> (T[,]:matrix, int:n) → bool
+              func Check<T> (T[,]:matrix, int:n | (forall int:i in 0..#, int:j in 0..# : matrix[i,j] == matrix[j,i])) → bool
                 !
-                requires forall int:i in 0..n, int:j in 0..n : matrix[i,j] == matrix[j,i]
                 return true
             """);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);

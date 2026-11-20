@@ -1,13 +1,11 @@
 module TruncateString TruncateString
   module TruncateStringModule
-    func NeedsTruncation public (int:strLen, int:maxLen) → bool
+    func NeedsTruncation public (int:strLen, int:maxLen | (# > 0)) → bool
       !
-      requires maxLen > 0
       return strLen > maxLen
 
-    func TruncatedLength public (int:strLen, int:maxLen) → int
+    func TruncatedLength public (int:strLen, int:maxLen | (# > 0)) → int
       !
-      requires maxLen > 0
       if strLen > maxLen
         return maxLen
       else

@@ -13,7 +13,6 @@ module ScoreBoard ScoreBoard
       => result >= 1
       return winsAbove + 1
 
-    func AverageScore public (int:totalScore, int:games) → float
+    func AverageScore public (int:totalScore, int:games | (# > 0)) → float
       !
-      requires games > 0
       return (double)totalScore / (double)games

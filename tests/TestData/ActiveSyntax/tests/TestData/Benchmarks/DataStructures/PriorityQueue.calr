@@ -4,17 +4,14 @@ module PriorityQueue PriorityQueue
       !
       return a < b
 
-    func ParentIndex public (int:index) → int
+    func ParentIndex public (int:index | (# > 0)) → int
       !
-      requires index > 0
       return (index - 1) / 2
 
-    func LeftChild public (int:index) → int
+    func LeftChild public (int:index | (# >= 0)) → int
       !
-      requires index >= 0
       return (2 * index) + 1
 
-    func RightChild public (int:index) → int
+    func RightChild public (int:index | (# >= 0)) → int
       !
-      requires index >= 0
       return (2 * index) + 2

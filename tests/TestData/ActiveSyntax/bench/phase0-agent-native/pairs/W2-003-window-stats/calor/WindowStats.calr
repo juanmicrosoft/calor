@@ -1,10 +1,7 @@
 module WindowStats WindowStats block
   module WindowStatsModule partial
-    func WindowSum (int[]:values, int:start, int:count) → int
+    func WindowSum (int[]:values, int:start | (# >= 0), int:count | ((# > 0) && ((start + #) <= values.Length))) → int
       !
-      requires (start >= 0)
-      requires (count > 0)
-      requires ((start + count) <= values.Length)
       var int:total = 0
       var int:i = start
       while (i < (start + count))

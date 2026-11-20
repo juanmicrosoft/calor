@@ -40,9 +40,8 @@ module Test Test
     {
         var source = @"
 module Test Test
-  func positiveOnly (int:x) → int
+  func positiveOnly (int:x | (# > 0)) → int
     !
-    requires x > 0
     return x
 ";
 
@@ -73,9 +72,8 @@ module Test Test
     {
         var source = @"
 module Test Test
-  func positiveOnly (int:x) → int
+  func positiveOnly (int:x | (# > 0)) → int
     !
-    requires x > 0
     return x * 2
 ";
 
@@ -94,10 +92,8 @@ module Test Test
     {
         var source = @"
 module Test Test
-  func bounded (int:x) → int
+  func bounded (int:x | ((# > 0) && (# < 100))) → int
     !
-    requires x > 0
-    requires x < 100
     return x
 ";
 
@@ -127,9 +123,8 @@ module Test Test
         // since message syntax may not be supported
         var source = @"
 module Test Test
-  func withMessage (int:x) → int
+  func withMessage (int:x | (# > 0)) → int
     !
-    requires x > 0
     return x
 ";
 

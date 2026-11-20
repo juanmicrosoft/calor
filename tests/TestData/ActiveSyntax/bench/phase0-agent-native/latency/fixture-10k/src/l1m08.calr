@@ -1,9 +1,8 @@
 module L1M08 L1M08 block
   module L1M08Module public
 
-    func l1m08_fn01 public (int:x, int:y) → int
+    func l1m08_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20371)
       if (x >= 20371)
@@ -11,9 +10,8 @@ module L1M08 L1M08 block
       else
         return 20371
 
-    func l1m08_fn02 public (int:x, int:y) → int
+    func l1m08_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20378)
       if (x >= 20378)
@@ -21,18 +19,16 @@ module L1M08 L1M08 block
       else
         return 20378
 
-    func l1m08_fn03 public (int:x, int:y) → int
+    func l1m08_fn03 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20385)
       let int:total = ((x * 2) + y)
       if (total > 20385)
         return 20385
       return total
 
-    func l1m08_fn04 public (int:x, int:y) → int
+    func l1m08_fn04 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20392)
       if (x >= 20392)
@@ -45,9 +41,8 @@ module L1M08 L1M08 block
       let int:v1 = L2M08.L2M08Module.l2m08_fn13(x, 2)
       return (v1 + y)
 
-    func l1m08_fn06 public (int:x, int:y) → int
+    func l1m08_fn06 public (int:x | (# > 6), int:y) → int
       !
-      requires (x > 6)
       => (x >= 7)
       let int:acc = ((x * 3) + y)
       if (acc > 20399)
@@ -60,19 +55,16 @@ module L1M08 L1M08 block
       let int:v1 = L2M12.L2M12Module.l2m12_fn02(x, 26)
       return (v1 + y)
 
-    func l1m08_fn08 public (int:x, int:y) → int
+    func l1m08_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20406)
       let int:total = ((x * 2) + y)
       if (total > 20406)
         return 20406
       return total
 
-    func l1m08_fn09 public (int:x, int:y) → int
+    func l1m08_fn09 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 20413)
       let int:total = ((x * 3) + y)
       if (total < 20413)
@@ -80,18 +72,16 @@ module L1M08 L1M08 block
       else
         return total
 
-    func l1m08_fn10 public (int:x, int:y) → int
+    func l1m08_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20420)
       let int:total = ((x * 5) + y)
       if (total > 20420)
         return 20420
       return total
 
-    func l1m08_fn11 public (int:x, int:y) → int
+    func l1m08_fn11 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 3) + y)
       if (acc > 20427)

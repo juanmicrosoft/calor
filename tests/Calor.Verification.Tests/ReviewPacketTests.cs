@@ -25,11 +25,9 @@ public class ReviewPacketTests : IDisposable
 
     private const string MixedModule = @"
 module Pricing
-  func Square public (int:x) → int
+  func Square public (int:x | ((# >= 0) && (# <= 46340))) → int
 
     !
-    requires x >= 0
-    requires x <= 46340
     => result >= 0
     return x * x
 
@@ -239,10 +237,8 @@ module App
         // let summary.proven read clean — proven counts non-vacuous only.
         const string vacuous = @"
 module Vac
-  func Weird public (int:x) → int
+  func Weird public (int:x | ((# >= 1) && (# <= 0))) → int
     !
-    requires x >= 1
-    requires x <= 0
     => result == 5
     return 7
 ";

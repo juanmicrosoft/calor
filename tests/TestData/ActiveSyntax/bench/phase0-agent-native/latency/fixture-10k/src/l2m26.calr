@@ -1,10 +1,8 @@
 module L2M26 L2M26 block
   module L2M26Module public
 
-    func l2m26_fn01 public (int:x, int:y) → int
+    func l2m26_fn01 public (int:x | (# >= 7), int:y | (# >= 0)) → int
       !
-      requires (x >= 7)
-      requires (y >= 0)
       => (result >= 23031)
       let int:total = ((x * 2) + y)
       if (total < 23031)
@@ -12,10 +10,8 @@ module L2M26 L2M26 block
       else
         return total
 
-    func l2m26_fn02 public (int:x, int:y) → int
+    func l2m26_fn02 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 23038)
       let int:total = ((x * 3) + y)
       if (total < 23038)
@@ -23,9 +19,8 @@ module L2M26 L2M26 block
       else
         return total
 
-    func l2m26_fn03 public (int:x, int:y) → int
+    func l2m26_fn03 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23045)
       let int:total = ((x * 3) + y)
       if (total > 23045)
@@ -43,9 +38,8 @@ module L2M26 L2M26 block
       let int:v1 = L3M05.L3M05Module.l3m05_fn01(x, 66)
       return (v1 + y)
 
-    func l2m26_fn06 public (int:x, int:y) → int
+    func l2m26_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23052)
       if (x >= 23052)
@@ -53,9 +47,8 @@ module L2M26 L2M26 block
       else
         return 23052
 
-    func l2m26_fn07 public (int:x, int:y) → int
+    func l2m26_fn07 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23059)
       if (x >= 23059)
@@ -63,9 +56,8 @@ module L2M26 L2M26 block
       else
         return 23059
 
-    func l2m26_fn08 public (int:x, int:y) → int
+    func l2m26_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23066)
       let int:total = ((x * 5) + y)
       if (total > 23066)
@@ -83,9 +75,8 @@ module L2M26 L2M26 block
       let int:v2 = L3M06.L3M06Module.l3m06_fn10(x, 81)
       return ((v1 + v2) + y)
 
-    func l2m26_fn11 public (int:x, int:y) → int
+    func l2m26_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23073)
       if (x >= 23073)
@@ -93,9 +84,8 @@ module L2M26 L2M26 block
       else
         return 23073
 
-    func l2m26_fn12 public (int:x, int:y) → int
+    func l2m26_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23080)
       if (x >= 23080)

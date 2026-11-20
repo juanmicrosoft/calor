@@ -7,18 +7,16 @@ module L2M22 L2M22 block
       let int:v2 = L3M25.L3M25Module.l3m25_fn01(x, 35)
       return ((v1 + v2) + y)
 
-    func l2m22_fn02 public (int:x, int:y) → int
+    func l2m22_fn02 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22849)
       let int:total = ((x * 5) + y)
       if (total > 22849)
         return 22849
       return total
 
-    func l2m22_fn03 public (int:x, int:y) → int
+    func l2m22_fn03 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22856)
       let int:total = ((x * 2) + y)
       if (total > 22856)
@@ -30,9 +28,8 @@ module L2M22 L2M22 block
       let int:v1 = L3M10.L3M10Module.l3m10_fn07(x, 57)
       return (v1 + y)
 
-    func l2m22_fn05 public (int:x, int:y) → int
+    func l2m22_fn05 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 2) + y)
       if (acc > 22863)
@@ -51,9 +48,8 @@ module L2M22 L2M22 block
       let int:v1 = L3M02.L3M02Module.l3m02_fn13(x, 15)
       return (v1 + y)
 
-    func l2m22_fn08 public (int:x, int:y) → int
+    func l2m22_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22870)
       let int:total = ((x * 5) + y)
       if (total > 22870)
@@ -66,9 +62,8 @@ module L2M22 L2M22 block
       let int:v2 = L3M32.L3M32Module.l3m32_fn05(x, 81)
       return ((v1 + v2) + y)
 
-    func l2m22_fn10 public (int:x, int:y) → int
+    func l2m22_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22877)
       let int:total = ((x * 3) + y)
       if (total > 22877)
@@ -80,9 +75,8 @@ module L2M22 L2M22 block
       let int:v1 = L3M04.L3M04Module.l3m04_fn02(x, 37)
       return (v1 + y)
 
-    func l2m22_fn12 public (int:x, int:y) → int
+    func l2m22_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22884)
       if (x >= 22884)

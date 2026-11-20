@@ -9,12 +9,10 @@ module DateDiff DateDiff
       else
         return diff
 
-    func WeeksBetween public (int:days) → int
+    func WeeksBetween public (int:days | (# >= 0)) → int
       !
-      requires days >= 0
       return days / 7
 
-    func RemainingDays public (int:days) → int
+    func RemainingDays public (int:days | (# >= 0)) → int
       !
-      requires days >= 0
       return days % 7

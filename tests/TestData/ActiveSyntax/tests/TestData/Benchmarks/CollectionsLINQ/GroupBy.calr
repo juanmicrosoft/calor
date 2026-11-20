@@ -1,11 +1,9 @@
 module GroupBy GroupBy
   module GroupByModule
-    func GroupKey public (int:value, int:divisor) → int
+    func GroupKey public (int:value, int:divisor | (# != 0)) → int
       !
-      requires divisor != 0
       return value / divisor
 
-    func BucketIndex public (int:value, int:bucketSize) → int
+    func BucketIndex public (int:value, int:bucketSize | (# > 0)) → int
       !
-      requires bucketSize > 0
       return value / bucketSize

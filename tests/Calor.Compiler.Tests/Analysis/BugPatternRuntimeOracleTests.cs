@@ -31,9 +31,8 @@ public class BugPatternRuntimeOracleTests
             "NonNegativePreconditionAllowsZero",
             """
             module NonNegativePreconditionAllowsZero NonNegativePreconditionAllowsZero block
-              func Run (int:divisor) → int
+              func Run (int:divisor | (# >= 0)) → int
                 !
-                requires (divisor >= 0)
                 return (10 / divisor)
             """,
             DiagnosticCode.DivisionByZero,

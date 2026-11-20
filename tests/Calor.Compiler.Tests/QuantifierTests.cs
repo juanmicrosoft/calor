@@ -76,9 +76,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func TestFunc (int:x) → bool
+  func TestFunc (int:x | (exists int:i where true : (i == #))) → bool
     !
-    requires (exists int:i where true : (i == x))
     return true
 ";
 
@@ -125,9 +124,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func ArrayAllNonNeg (int:n) → bool
+  func ArrayAllNonNeg (int:n | (forall int:i in 0..# : (i >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (i >= 0))
     return true
 ";
 
@@ -609,9 +607,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func CheckAllPositive (int:n) → bool
+  func CheckAllPositive (int:n | (forall int:i in 0..# : (i >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (i >= 0))
     return true
 ";
 
@@ -636,9 +633,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func CheckImplication (int:x) → bool
+  func CheckImplication (int:x | (!(# > 0) || (# >= 0))) → bool
     !
-    requires (!(x > 0) || (x >= 0))
     return true
 ";
 
@@ -662,9 +658,8 @@ module Test Test block
         // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
 module Test Test block
-  func AllNonNegative (int[]:arr, int:n) → bool
+  func AllNonNegative (int[]:arr, int:n | (forall int:i in 0..# : (arr[i] >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (arr[i] >= 0))
     return true
 ";
 
@@ -690,9 +685,8 @@ module Test Test block
         // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
 module Test Test block
-  func ContainsTarget (int[]:arr, int:n, int:target) → bool
+  func ContainsTarget (int[]:arr, int:n, int:target | (exists int:i in 0..n : (arr[i] == #))) → bool
     !
-    requires (exists int:i in 0..n : (arr[i] == target))
     return true
 ";
 
@@ -794,9 +788,8 @@ module Test Test block
         // Parse source with quantifiers
         var source = @"
 module Test Test block
-  func TestFunc (int:n) → bool
+  func TestFunc (int:n | (forall int:i in 0..# : (i >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (i >= 0))
     return true
 ";
 
@@ -824,9 +817,8 @@ module Test Test block
         // Test that integer types are accepted without warnings
         var source = @"
 module Test Test block
-  func TestFunc (int:n) → bool
+  func TestFunc (int:n | (forall int:i in 0..# : (i >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (i >= 0))
     return true
 ";
 
@@ -999,9 +991,8 @@ module Test Test block
     {
         var source = @"
 module Sorting Sorting block
-  func IsSorted (int:arr, int:n) → bool
+  func IsSorted (int:arr, int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     => (forall int:i where ((i >= 0) && (i < (n - 1))) : (arr[i] <= arr[(i + 1)]))
     return true
 ";
@@ -1026,10 +1017,8 @@ module Sorting Sorting block
     {
         var source = @"
 module Search Search block
-  func BinarySearch (int:arr, int:n, int:target) → int
+  func BinarySearch (int:arr, int:n | ((# > 0) && (forall int:i where ((i >= 0) && (i < (# - 1))) : (arr[i] <= arr[(i + 1)]))), int:target) → int
     !
-    requires (n > 0)
-    requires (forall int:i where ((i >= 0) && (i < (n - 1))) : (arr[i] <= arr[(i + 1)]))
     => (!(result >= 0) || (arr[result] == target))
     return 0
 ";
@@ -1053,9 +1042,8 @@ module Search Search block
     {
         var source = @"
 module QuickSort QuickSort block
-  func Partition (int:arr, int:low, int:high, int:pivot) → int
+  func Partition (int:arr, int:low, int:high | (low <= #), int:pivot) → int
     !
-    requires (low <= high)
     => (forall int:i where ((i >= low) && (i < result)) : (arr[i] <= pivot))
     => (forall int:j where ((j > result) && (j <= high)) : (arr[j] > pivot))
     return low
@@ -1084,10 +1072,8 @@ module QuickSort QuickSort block
     {
         var source = @"
 module Validation Validation block
-  func ValidateGrades (int:grades, int:n) → bool
+  func ValidateGrades (int:grades, int:n | ((# > 0) && (forall int:i where ((i >= 0) && (i < #)) : ((grades[i] >= 0) && (grades[i] <= 100))))) → bool
     !
-    requires (n > 0)
-    requires (forall int:i where ((i >= 0) && (i < n)) : ((grades[i] >= 0) && (grades[i] <= 100)))
     return true
 ";
 
@@ -1112,13 +1098,8 @@ module Validation Validation block
     {
         var source = @"
 module Matrix Matrix block
-  func MultiplyDimCheck (int:rowsA, int:colsA, int:rowsB, int:colsB) → bool
+  func MultiplyDimCheck (int:rowsA | (# > 0), int:colsA | (# > 0), int:rowsB | ((# > 0) && (colsA == #)), int:colsB | (# > 0)) → bool
     !
-    requires (rowsA > 0)
-    requires (colsA > 0)
-    requires (rowsB > 0)
-    requires (colsB > 0)
-    requires (colsA == rowsB)
     return true
 ";
 
@@ -1139,9 +1120,8 @@ module Matrix Matrix block
     {
         var source = @"
 module Heap Heap block
-  func IsMaxHeap (int:heap, int:n) → bool
+  func IsMaxHeap (int:heap, int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     => (!(result == true) || (forall int:i where ((i >= 0) && ((2 * (i + 1)) < n)) : (heap[i] >= heap[(2 * (i + 1))])))
     return false
 ";
@@ -1162,9 +1142,8 @@ module Heap Heap block
     {
         var source = @"
 module Sorting Sorting block
-  func Sort (int[]:arr, int:n) → bool
+  func Sort (int[]:arr, int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     => (forall int:i in 0..(n - 1) : (arr[i] <= arr[(i + 1)]))
     return true
 ";

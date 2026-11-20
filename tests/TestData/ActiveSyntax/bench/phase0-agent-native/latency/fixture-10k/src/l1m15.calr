@@ -1,10 +1,8 @@
 module L1M15 L1M15 block
   module L1M15Module public
 
-    func l1m15_fn01 public (int:x, int:y) → int
+    func l1m15_fn01 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 20756)
       let int:total = ((x * 2) + y)
       if (total < 20756)
@@ -12,9 +10,8 @@ module L1M15 L1M15 block
       else
         return total
 
-    func l1m15_fn02 public (int:x, int:y) → int
+    func l1m15_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20763)
       if (x >= 20763)
@@ -22,9 +19,8 @@ module L1M15 L1M15 block
       else
         return 20763
 
-    func l1m15_fn03 public (int:x, int:y) → int
+    func l1m15_fn03 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 2) + y)
       if (acc > 20770)
@@ -32,9 +28,8 @@ module L1M15 L1M15 block
       else
         return ((acc * 2) + 20770)
 
-    func l1m15_fn04 public (int:x, int:y) → int
+    func l1m15_fn04 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20777)
       if (x >= 20777)
@@ -48,9 +43,8 @@ module L1M15 L1M15 block
       let int:v2 = L2M31.L2M31Module.l2m31_fn06(x, 69)
       return ((v1 + v2) + y)
 
-    func l1m15_fn06 public (int:x, int:y) → int
+    func l1m15_fn06 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 20784)
@@ -58,10 +52,8 @@ module L1M15 L1M15 block
       else
         return ((acc * 2) + 20784)
 
-    func l1m15_fn07 public (int:x, int:y) → int
+    func l1m15_fn07 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 20791)
       let int:total = ((x * 2) + y)
       if (total < 20791)
@@ -69,10 +61,8 @@ module L1M15 L1M15 block
       else
         return total
 
-    func l1m15_fn08 public (int:x, int:y) → int
+    func l1m15_fn08 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 20798)
       let int:total = ((x * 2) + y)
       if (total < 20798)
@@ -80,18 +70,16 @@ module L1M15 L1M15 block
       else
         return total
 
-    func l1m15_fn09 public (int:x, int:y) → int
+    func l1m15_fn09 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20805)
       let int:total = ((x * 3) + y)
       if (total > 20805)
         return 20805
       return total
 
-    func l1m15_fn10 public (int:x, int:y) → int
+    func l1m15_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20812)
       if (x >= 20812)
@@ -105,9 +93,8 @@ module L1M15 L1M15 block
       let int:v2 = L2M06.L2M06Module.l2m06_fn03(x, 1)
       return ((v1 + v2) + y)
 
-    func l1m15_fn12 public (int:x, int:y) → int
+    func l1m15_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20819)
       if (x >= 20819)
@@ -115,9 +102,8 @@ module L1M15 L1M15 block
       else
         return 20819
 
-    func l1m15_fn13 public (int:x, int:y) → int
+    func l1m15_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20826)
       if (x >= 20826)

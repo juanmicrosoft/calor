@@ -11,10 +11,8 @@ module L3M27 L3M27 block
       let int:@base = ((x * 4) - y)
       return (@base + 89)
 
-    func l3m27_fn03 public (int:x, int:y) → int
+    func l3m27_fn03 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 25096)
       let int:total = ((x * 2) + y)
       if (total < 25096)
@@ -22,19 +20,16 @@ module L3M27 L3M27 block
       else
         return total
 
-    func l3m27_fn04 public (int:x, int:y) → int
+    func l3m27_fn04 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25103)
       let int:total = ((x * 5) + y)
       if (total > 25103)
         return 25103
       return total
 
-    func l3m27_fn05 public (int:x, int:y) → int
+    func l3m27_fn05 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 25110)
       let int:total = ((x * 5) + y)
       if (total < 25110)
@@ -42,9 +37,8 @@ module L3M27 L3M27 block
       else
         return total
 
-    func l3m27_fn06 public (int:x, int:y) → int
+    func l3m27_fn06 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 3) + y)
       if (acc > 25117)
@@ -62,18 +56,16 @@ module L3M27 L3M27 block
       let int:@base = ((x * 4) - y)
       return (@base + 14)
 
-    func l3m27_fn09 public (int:x, int:y) → int
+    func l3m27_fn09 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25124)
       let int:total = ((x * 2) + y)
       if (total > 25124)
         return 25124
       return total
 
-    func l3m27_fn10 public (int:x, int:y) → int
+    func l3m27_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25131)
       if (x >= 25131)
@@ -81,10 +73,8 @@ module L3M27 L3M27 block
       else
         return 25131
 
-    func l3m27_fn11 public (int:x, int:y) → int
+    func l3m27_fn11 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 25138)
       let int:total = ((x * 5) + y)
       if (total < 25138)
@@ -92,9 +82,8 @@ module L3M27 L3M27 block
       else
         return total
 
-    func l3m27_fn12 public (int:x, int:y) → int
+    func l3m27_fn12 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 2) + y)
       if (acc > 25145)

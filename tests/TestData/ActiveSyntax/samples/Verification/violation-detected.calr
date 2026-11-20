@@ -9,8 +9,7 @@ module ViolationDetected ViolationDetected
     => x + 1 > x + 2
     return x + 1
 
-  func DivisionBug public (int:a, int:b) → int
+  func DivisionBug public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     => a / b > a
     return a / b

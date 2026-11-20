@@ -1,9 +1,8 @@
 module L2M11 L2M11 block
   module L2M11Module public
 
-    func l2m11_fn01 public (int:x, int:y) → int
+    func l2m11_fn01 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 2) + y)
       if (acc > 22324)
@@ -11,10 +10,8 @@ module L2M11 L2M11 block
       else
         return ((acc * 2) + 22324)
 
-    func l2m11_fn02 public (int:x, int:y) → int
+    func l2m11_fn02 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 22331)
       let int:total = ((x * 2) + y)
       if (total < 22331)
@@ -22,9 +19,8 @@ module L2M11 L2M11 block
       else
         return total
 
-    func l2m11_fn03 public (int:x, int:y) → int
+    func l2m11_fn03 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22338)
       if (x >= 22338)
@@ -38,10 +34,8 @@ module L2M11 L2M11 block
       let int:v2 = L3M28.L3M28Module.l3m28_fn12(x, 83)
       return ((v1 + v2) + y)
 
-    func l2m11_fn05 public (int:x, int:y) → int
+    func l2m11_fn05 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 22345)
       let int:total = ((x * 5) + y)
       if (total < 22345)
@@ -54,10 +48,8 @@ module L2M11 L2M11 block
       let int:v1 = L3M06.L3M06Module.l3m06_fn03(x, 56)
       return (v1 + y)
 
-    func l2m11_fn07 public (int:x, int:y) → int
+    func l2m11_fn07 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 22352)
       let int:total = ((x * 5) + y)
       if (total < 22352)
@@ -71,10 +63,8 @@ module L2M11 L2M11 block
       let int:v2 = L3M13.L3M13Module.l3m13_fn12(x, 33)
       return ((v1 + v2) + y)
 
-    func l2m11_fn09 public (int:x, int:y) → int
+    func l2m11_fn09 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 22359)
       let int:total = ((x * 2) + y)
       if (total < 22359)
@@ -82,19 +72,16 @@ module L2M11 L2M11 block
       else
         return total
 
-    func l2m11_fn10 public (int:x, int:y) → int
+    func l2m11_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22366)
       let int:total = ((x * 2) + y)
       if (total > 22366)
         return 22366
       return total
 
-    func l2m11_fn11 public (int:x, int:y) → int
+    func l2m11_fn11 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 22373)
       let int:total = ((x * 2) + y)
       if (total < 22373)

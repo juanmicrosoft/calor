@@ -17,9 +17,8 @@ public sealed class NativeSourceContractCallTests
           func Positive (int:value) → bool
             !
             return value > 0
-          func Identity (int:x) → int
+          func Identity (int:x | (# > 0)) → int
             !
-            requires x > 0
             => Positive(result)
             return x
         """ + "\n";
@@ -159,9 +158,8 @@ public sealed class NativeSourceContractCallTests
                 ! cw
                 Console.WriteLine(label)
                 return value
-              func Identity (int:x) → int
+              func Identity (int:x | (Receiver().Positive(Argument("entry", #)))) → int
                 ! cw,alloc
-                requires Receiver().Positive(Argument("entry", x))
                 => Receiver().Positive(Argument("exit", result))
                 Console.WriteLine("body")
                 return x
@@ -266,9 +264,8 @@ public sealed class NativeSourceContractCallTests
                 func Positive<T> (T:value) → bool
                   !
                   return true
-              func Identity (object[]:values) → int
+              func Identity (object[]:values | (Predicates.Positive(#))) → int
                 !
-                requires Predicates.Positive(values)
                 return 1
             """;
         var result = Program.Compile(source, "opaque-contract.calr");
@@ -459,9 +456,8 @@ public sealed class NativeSourceContractCallTests
                   {{(writes ? "Console.WriteLine(value)" : "")}}
                   return value > 0
               interface IGuard
-                func Read (int:x) → int
+                func Read (int:x | (Predicates.Positive(#))) → int
                   !
-                  requires Predicates.Positive(x)
             """, "interface-source-contract.calr");
         if (writes)
             Assert.Contains(result.Diagnostics.Errors, error => error.Code == DiagnosticCode.ForbiddenEffect
@@ -547,10 +543,9 @@ public sealed class NativeSourceContractCallTests
     {
         var result = Program.Compile("""
             module TupleContract
-              func Read<T> ((T,int):x) → (T,int)
+              func Read<T> ((T,int):x | (#.Item1 != null)) → (T,int)
                 where T : class
                 !
-                requires x.Item1 != null
                 return x
             """, "tuple-contract.calr");
         Assert.False(result.HasErrors, Errors(result));

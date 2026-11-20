@@ -2961,9 +2961,8 @@ public sealed class NativeMetadataClosureTests
     {
         const string authored = """
             module AgentReference41
-              func DigitValue (char:c) → int
+              func DigitValue (char:c | (char.IsDigit(#))) → int
                 !
-                requires char.IsDigit(c)
                 return c - '0'
             """;
         var module = Parse(authored);

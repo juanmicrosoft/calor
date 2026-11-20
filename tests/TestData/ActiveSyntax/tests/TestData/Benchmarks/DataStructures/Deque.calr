@@ -9,9 +9,8 @@ module Deque Deque
       => result > size
       return size + 1
 
-    func NewSizeAfterRemove public (int:size) → int
+    func NewSizeAfterRemove public (int:size | (# > 0)) → int
       !
-      requires size > 0
       => result < size
       return size - 1
 

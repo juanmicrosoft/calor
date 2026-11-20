@@ -33,10 +33,8 @@ public class CliElisionDefaultTests : IDisposable
         File.WriteAllText(path, """
             module Test Test block
               class Calc
-                func Square (int:x) → int
+                func Square (int:x | ((# >= 0) && (# <= 46340))) → int
                   !
-                  requires (x >= 0)
-                  requires (x <= 46340)
                   => (result >= 0)
                   return (x * x)
             """);

@@ -676,9 +676,8 @@ public class SimplificationTests
     {
         var source = @"
 module Test Test block
-  func TestFunc (int:x) → bool
+  func TestFunc (int:x | (true && (# >= 0))) → bool
     !
-    requires (true && (x >= 0))
     return true
 ";
 
@@ -703,9 +702,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func TestFunc (int:x) → bool
+  func TestFunc (int:x | (!(# >= 0) || (# >= 0))) → bool
     !
-    requires (!(x >= 0) || (x >= 0))
     return true
 ";
 
@@ -726,9 +724,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func TestFunc (int:x) → bool
+  func TestFunc (int:x | (# >= 0)) → bool
     !
-    requires (x >= 0)
     return true
 ";
 

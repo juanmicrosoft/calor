@@ -194,8 +194,7 @@ public sealed class ObligationTests
 
         var source = """
             module Test Test block
-              func Add private (int:x) → void
-                requires (x >= 0)
+              func Add private (int:x | (# >= 0)) → void
                 proof{"non-neg"} (x >= 0)
             """;
 
@@ -311,8 +310,7 @@ public sealed class ObligationTests
         // The # in (>= # INT:0) should resolve to 'age' via PushSelfVariable.
         var source = """
             module Test Test block
-              func Validate private (int:age | (# >= 0)) → void
-                requires (age >= 0)
+              func Validate private (int:age | ((# >= 0) && (# >= 0))) → void
                 return
             """;
 

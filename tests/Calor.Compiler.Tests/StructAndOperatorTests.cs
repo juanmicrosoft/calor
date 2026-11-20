@@ -677,9 +677,8 @@ public class StructAndOperatorTests
               class Vector struct
                 field double:X public
                 field double:Y public
-                op + (int:a, int:b) → int
+                op + (int:a | (# >= 0), int:b) → int
                   ! unknown
-                  requires a >= 0
                   return a + b
             """;
 

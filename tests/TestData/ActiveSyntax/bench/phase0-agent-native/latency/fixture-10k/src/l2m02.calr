@@ -1,10 +1,8 @@
 module L2M02 L2M02 block
   module L2M02Module public
 
-    func l2m02_fn01 public (int:x, int:y) → int
+    func l2m02_fn01 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 21918)
       let int:total = ((x * 2) + y)
       if (total < 21918)
@@ -18,18 +16,16 @@ module L2M02 L2M02 block
       let int:v2 = L3M07.L3M07Module.l3m07_fn07(x, 59)
       return ((v1 + v2) + y)
 
-    func l2m02_fn03 public (int:x, int:y) → int
+    func l2m02_fn03 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21925)
       let int:total = ((x * 3) + y)
       if (total > 21925)
         return 21925
       return total
 
-    func l2m02_fn04 public (int:x, int:y) → int
+    func l2m02_fn04 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 5) + y)
       if (acc > 21932)
@@ -37,9 +33,8 @@ module L2M02 L2M02 block
       else
         return ((acc * 2) + 21932)
 
-    func l2m02_fn05 public (int:x, int:y) → int
+    func l2m02_fn05 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 5) + y)
       if (acc > 21939)
@@ -47,9 +42,8 @@ module L2M02 L2M02 block
       else
         return ((acc * 2) + 21939)
 
-    func l2m02_fn06 public (int:x, int:y) → int
+    func l2m02_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21946)
       if (x >= 21946)
@@ -57,9 +51,8 @@ module L2M02 L2M02 block
       else
         return 21946
 
-    func l2m02_fn07 public (int:x, int:y) → int
+    func l2m02_fn07 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21953)
       let int:total = ((x * 2) + y)
       if (total > 21953)
@@ -71,9 +64,8 @@ module L2M02 L2M02 block
       let int:v1 = L3M16.L3M16Module.l3m16_fn06(x, 9)
       return (v1 + y)
 
-    func l2m02_fn09 public (int:x, int:y) → int
+    func l2m02_fn09 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21960)
       let int:total = ((x * 5) + y)
       if (total > 21960)
@@ -97,10 +89,8 @@ module L2M02 L2M02 block
       let int:v2 = L3M21.L3M21Module.l3m21_fn08(x, 75)
       return ((v1 + v2) + y)
 
-    func l2m02_fn13 public (int:x, int:y) → int
+    func l2m02_fn13 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 21967)
       let int:total = ((x * 5) + y)
       if (total < 21967)

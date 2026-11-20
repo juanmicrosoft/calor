@@ -34,9 +34,8 @@ public class EjectStoryTests
 ";
 
     private const string EarlyReturnContractsModule = @"module Pricing Pricing block
-  func ClampToCap (int:amount, int:cap) → int
+  func ClampToCap (int:amount, int:cap | (# >= 0)) → int
     !
-    requires (cap >= 0)
     => (result <= cap)
     if (amount > cap)
       return cap
@@ -63,18 +62,16 @@ public class EjectStoryTests
     // Explicit namespaces retain the original namespace-qualified CLR owners.
     private const string ContractsCurrentNativeModule = """
         module Pricing Pricing
-          func ClampToCap public (int:amount, int:cap) → int
+          func ClampToCap public (int:amount, int:cap | (# >= 0)) → int
             !
-            requires cap >= 0
             => result <= cap
             return Math.Min(amount, cap)
         """;
 
     private const string EarlyReturnContractsCurrentNativeModule = """
         module Pricing Pricing
-          func ClampToCap public (int:amount, int:cap) → int
+          func ClampToCap public (int:amount, int:cap | (# >= 0)) → int
             !
-            requires cap >= 0
             => result <= cap
             if amount > cap
               return cap

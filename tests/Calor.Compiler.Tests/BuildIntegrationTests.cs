@@ -106,9 +106,8 @@ module Math Math block
         // Arrange
         var source = @"
 module Safe Safe block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
 

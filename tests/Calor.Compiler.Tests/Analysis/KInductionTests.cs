@@ -571,9 +571,8 @@ module Test Test block
 
         var source = @"
 module Test Test block
-  func Sum (int:n) → int
+  func Sum (int:n | (# >= 0)) → int
     !
-    requires (n >= 0)
     let int:sum = 0
     for i from 0 to 10 step 1
       Console.WriteLine(i)

@@ -34,10 +34,8 @@ module L2M15 L2M15 block
       let int:v1 = L3M34.L3M34Module.l3m34_fn07(x, 18)
       return (v1 + y)
 
-    func l2m15_fn07 public (int:x, int:y) → int
+    func l2m15_fn07 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 22513)
       let int:total = ((x * 2) + y)
       if (total < 22513)
@@ -45,27 +43,24 @@ module L2M15 L2M15 block
       else
         return total
 
-    func l2m15_fn08 public (int:x, int:y) → int
+    func l2m15_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22520)
       let int:total = ((x * 5) + y)
       if (total > 22520)
         return 22520
       return total
 
-    func l2m15_fn09 public (int:x, int:y) → int
+    func l2m15_fn09 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22527)
       let int:total = ((x * 5) + y)
       if (total > 22527)
         return 22527
       return total
 
-    func l2m15_fn10 public (int:x, int:y) → int
+    func l2m15_fn10 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 2) + y)
       if (acc > 22534)

@@ -13,9 +13,8 @@ public class CalorIdentitiesTests
 {
     private const string Source = """
         module Shop Shop block
-          func Total public (int:price, int:count) → int
+          func Total public (int:price, int:count | (# >= 0)) → int
             !
-            requires count >= 0
             return price * count
           func Twice public (int:x) → int
             !

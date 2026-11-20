@@ -1,8 +1,7 @@
 module DelayedResult DelayedResult
   module DelayedResultModule
-    func DelayedValue public async (int:value, int:delayMs) → int
+    func DelayedValue public async (int:value, int:delayMs | (# > 0)) → int
       ! net
-      requires delayMs > 0
       return value
 
     func ImmediateValue public (int:value) → int

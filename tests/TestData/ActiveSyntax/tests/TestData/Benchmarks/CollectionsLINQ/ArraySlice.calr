@@ -1,9 +1,7 @@
 module ArraySlice ArraySlice
   module ArraySliceModule
-    func SliceLength public (int:start, int:end) → int
+    func SliceLength public (int:start | (# >= 0), int:end | (# > start)) → int
       !
-      requires start >= 0
-      requires end > start
       => result > 0
       return end - start
 

@@ -1,9 +1,7 @@
 module SwitchExpression SwitchExpression
   module SwitchExpressionModule
-    func Season public (int:month) → int
+    func Season public (int:month | ((# >= 1) && (# <= 12))) → int
       !
-      requires month >= 1
-      requires month <= 12
       if month == 12
         return 0
       else if month <= 2

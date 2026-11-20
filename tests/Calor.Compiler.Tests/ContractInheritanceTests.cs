@@ -103,9 +103,8 @@ public class ContractInheritanceTests
         var source = @"
 module Test
   interface IValidator
-    func Validate (string:input) → bool
+    func Validate (string:input | (# != null)) → bool
       !
-      requires input != null
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -149,10 +148,8 @@ module Test
         var source = @"
 module Test
   interface ICalculator
-    func Divide (int:a, int:b) → int
+    func Divide (int:a | (# > 0), int:b | (# != 0)) → int
       !
-      requires a > 0
-      requires b != 0
       => result >= 0
 ";
 
@@ -175,9 +172,8 @@ module Test
         var source = @"
 module Test
   interface IRepository
-    func GetById (int:id) → string
+    func GetById (int:id | (# > 0)) → string
       !
-      requires id > 0
       => result != null
   class SqlRepository public
     implements IRepository
@@ -210,14 +206,12 @@ module Test
         var source = @"
 module Test
   interface IRepository
-    func GetById (int:id) → string
+    func GetById (int:id | (# > 0)) → string
       !
-      requires id > 0
   class SqlRepository public
     implements IRepository
-    func GetById public (int:id) → string
+    func GetById public (int:id | (# > 0)) → string
       !
-      requires id > 0
       return ""found""
 ";
 
@@ -239,14 +233,12 @@ module Test
         var source = @"
 module Test
   interface IRepository
-    func GetById (int:id) → string
+    func GetById (int:id | (# > 0)) → string
       !
-      requires id > 0
   class SqlRepository public
     implements IRepository
-    func GetById public (int:id) → string
+    func GetById public (int:id | (# >= 0)) → string
       !
-      requires id >= 0
       return ""found""
 ";
 
@@ -268,14 +260,12 @@ module Test
         var source = @"
 module Test
   interface IRepository
-    func GetById (int:id) → string
+    func GetById (int:id | (# >= 0)) → string
       !
-      requires id >= 0
   class SqlRepository public
     implements IRepository
-    func GetById public (int:id) → string
+    func GetById public (int:id | (# > 0)) → string
       !
-      requires id > 0
       return ""found""
 ";
 
@@ -358,9 +348,8 @@ module Test
         var source = @"
 module Test
   interface IRepository
-    func GetById (int:id) → string
+    func GetById (int:id | (# > 0)) → string
       !
-      requires id > 0
   class SqlRepository public
     implements IRepository
     func GetById public (int:id) → string
@@ -423,9 +412,8 @@ module Test
         var source = @"
 module Test
   interface IRepository
-    func GetById (int:id) → string
+    func GetById (int:id | (# > 0)) → string
       !
-      requires id > 0
       => result != null
 ";
 
@@ -446,14 +434,12 @@ module Test
         var source = @"
 module Test
   interface IRepository
-    func GetById (int:id) → string
+    func GetById (int:id | (# > 0)) → string
       !
-      requires id > 0
   class SqlRepository public
     implements IRepository
-    func GetById public (int:id) → string
+    func GetById public (int:id | (# > 0)) → string
       !
-      requires id > 0
       return ""found""
 ";
 
@@ -487,9 +473,8 @@ module Test
       !
       => result != null
   interface IWriter
-    func Write (string:data) → void
+    func Write (string:data | (# != null)) → void
       !
-      requires data != null
   class FileHandler public
     implements IReader
     implements IWriter
@@ -548,9 +533,8 @@ module Test
         var source = @"
 module Test
   interface IRepository
-    func GetById (int:id) → string
+    func GetById (int:id | (# > 0)) → string
       !
-      requires id > 0
   class SqlRepository public
     implements IRepository
     func GetById public (int:id) → string
@@ -587,15 +571,12 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Process (int:x) → int
+    func Process (int:x | (# >= 0)) → int
       !
-      requires x >= 0
   class Service public
     implements IService
-    func Process public (int:x) → int
+    func Process public (int:x | ((# >= -10) && (# < 1000))) → int
       !
-      requires x >= -10
-      requires x < 1000
       return x
 ";
 
@@ -668,15 +649,12 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Process (int:x) → int
+    func Process (int:x | (# >= 0)) → int
       !
-      requires x >= 0
   class Service public
     implements IService
-    func Process public (int:x) → int
+    func Process public (int:x | ((# >= 10) && (# < 1000))) → int
       !
-      requires x >= 10
-      requires x < 1000
       return x
 ";
 
@@ -743,14 +721,12 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Process (int:id) → int
+    func Process (int:id | (# >= 1)) → int
       !
-      requires id >= 1
   class ValidService public
     implements IService
-    func Process public (int:id) → int
+    func Process public (int:id | (# >= 0)) → int
       !
-      requires id >= 0
       return id
 ";
 
@@ -777,14 +753,12 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Process (int:id) → int
+    func Process (int:id | (# >= 0)) → int
       !
-      requires id >= 0
   class InvalidService public
     implements IService
-    func Process public (int:id) → int
+    func Process public (int:id | (# >= 10)) → int
       !
-      requires id >= 10
       return id
 ";
 
@@ -810,14 +784,12 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Process (int:x) → int
+    func Process (int:x | (# > 0)) → int
       !
-      requires x > 0
   class InvalidService public
     implements IService
-    func Process public (int:x) → int
+    func Process public (int:x | (# > 0 && # < 100)) → int
       !
-      requires x > 0 && x < 100
       return x
 ";
 
@@ -910,14 +882,12 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Process (int:x) → int
+    func Process (int:x | (# > 0)) → int
       !
-      requires x > 0
   class ValidService public
     implements IService
-    func Process public (int:x) → int
+    func Process public (int:x | (# >= 1)) → int
       !
-      requires x >= 1
       return x
 ";
 
@@ -940,14 +910,12 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Process (int:id) → int
+    func Process (int:id | (# > 0)) → int
       !
-      requires id > 0
   class Service public
     implements IService
-    func Process public (int:id) → int
+    func Process public (int:id | (# > 0)) → int
       !
-      requires id > 0
       return id
 ";
 
@@ -977,9 +945,8 @@ module Test
       !
   class Service public
     implements IService
-    func Process public (int:x) → int
+    func Process public (int:x | (# > 0)) → int
       !
-      requires x > 0
       return x
 ";
 
@@ -1002,12 +969,10 @@ module Test
         var source = @"
 module Test
   interface IParser
-    func Parse (int:value) → int
+    func Parse (int:value | (# > 0)) → int
       !
-      requires value > 0
-    func Parse (string:value) → string
+    func Parse (string:value | (# != null)) → string
       !
-      requires value != null
   class Parser public
     implements IParser
     func Parse public (int:value) → int
@@ -1041,13 +1006,11 @@ module Test
         var source = @"
 module Test
   interface IPositive
-    func Use (int:value) → int
+    func Use (int:value | (# > 0)) → int
       !
-      requires value > 0
   interface INegative
-    func Use (int:value) → int
+    func Use (int:value | (# < 0)) → int
       !
-      requires value < 0
   class Service public
     implements IPositive
     implements INegative
@@ -1083,9 +1046,8 @@ module Test
         var source = @"
 module Test
   class Base public
-    func Use public virtual (int:value) → int
+    func Use public virtual (int:value | (# > 0)) → int
       !
-      requires value > 0
       return value
   class Derived public
     extends Base
@@ -1115,9 +1077,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (int:x) → int
+    func Use (int:x | (# > 0)) → int
       !
-      requires x > 0
   class Service public
     implements IService
     func Use public (int:value) → int
@@ -1146,9 +1107,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (int:value) → int
+    func Use (int:value | (# > 0)) → int
       !
-      requires value > 0
   class Base public
     implements IService
     func Use public virtual (int:value) → int
@@ -1182,9 +1142,8 @@ module Test
         var source = @"
 module Test
   interface IRepository<T>
-    func Save (T:value) → T
+    func Save (T:value | (# != null)) → T
       !
-      requires value != null
   class IntRepository public
     implements IRepository<int>
     func Save public (int:value) → int
@@ -1215,9 +1174,8 @@ module Test
         var source = @"
 module Test
   class Base<T> public
-    func Save public virtual (T:value) → T
+    func Save public virtual (T:value | (# != null)) → T
       !
-      requires value != null
       return value
   class IntRepository public
     extends Base<int>
@@ -1242,12 +1200,10 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Touch (int:value) → int
+    func Touch (int:value | (# > 0)) → int
       !
-      requires value > 0
-    func Touch (ref int:value) → int
+    func Touch (ref int:value | (# >= 0)) → int
       !
-      requires value >= 0
   class Service public
     implements IService
     func Touch public (int:value) → int
@@ -1274,10 +1230,8 @@ module Test
         var source = @"
 module Test
   interface ITransformer
-    func Map<T> (T:item, int:limit) → T
+    func Map<T> (T:item | (# is T), int:limit | (# > 0)) → T
       !
-      requires limit > 0
-      requires item is T
   class Transformer public
     implements ITransformer
     func Map<U> public (U:item, int:limit) → U
@@ -1305,9 +1259,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (int:x) → int
+    func Use (int:x | (IsValid(#))) → int
       !
-      requires IsValid(x)
   class Service public
     implements IService
     func Use public (int:value) → int
@@ -1333,9 +1286,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (string:x) → string
+    func Use (string:x | ((# ?? ""fallback"") != ""invalid"")) → string
       !
-      requires (x ?? ""fallback"") != ""invalid""
   class Service public
     implements IService
     func Use public (string:value) → string
@@ -1362,9 +1314,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (string:x) → string
+    func Use (string:x | (""id:${#}"" != """")) → string
       !
-      requires ""id:${x}"" != """"
   class Service public
     implements IService
     func Use public (string:value) → string
@@ -1394,9 +1345,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (object:x) → bool
+    func Use (object:x | (# is int value && value > 0)) → bool
       !
-      requires x is int value && value > 0
   class Service public
     implements IService
     func Use public (object:value) → bool
@@ -1427,9 +1377,8 @@ module Test
         var source = @"
 module Test
   interface IFoo<T>
-    func Use (T:x) → T
+    func Use (T:x | (# is T)) → T
       !
-      requires x is T
   class Base<U> public
     implements IFoo<U>
     func Use public virtual (U:x) → U
@@ -1463,9 +1412,8 @@ module Test
         var source = @"
 module Test
   interface IService<T>
-    func Use (T:x) → T
+    func Use (T:x | (Check<T>(#))) → T
       !
-      requires Check<T>(x)
   class IntService public
     implements IService<int>
     func Use public (int:value) → int
@@ -1524,9 +1472,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (int:value) → int
+    func Use (int:value | (# > 0)) → int
       !
-      requires value > 0
   class Service public
     implements IService
     func Use private (int:value) → int
@@ -1565,9 +1512,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (int:limit) → int
+    func Use (int:limit | (exists int:i where i >= 0 : i < #)) → int
       !
-      requires exists int:i where i >= 0 : i < limit
   class Service public
     implements IService
     func Use public (int:i) → int
@@ -1599,9 +1545,8 @@ module Test
         var source = @"
 module Test
   interface IService
-    func Use (int:value) → int
+    func Use (int:value | (# > 0)) → int
       !
-      requires value > 0
   class Base public
     func Use public virtual (int:value) → int
       !
@@ -1630,14 +1575,12 @@ module Test
         var source = @"
 module Test
   interface IPositive
-    func Use (int:value) → int
+    func Use (int:value | (# > 0)) → int
       !
-      requires value > 0
       => result > 0
   interface INegative
-    func Use (int:value) → int
+    func Use (int:value | (# < 0)) → int
       !
-      requires value < 0
       => result < 0
   class Service public
     implements IPositive
@@ -1712,9 +1655,8 @@ module Test
         const string source = """
             module Inheritance
               interface IService
-                func Use (int:x) → int
+                func Use (int:x | (# > 0)) → int
                   !
-                  requires x > 0
                   => result > 0
               class Service public
                 implements IService

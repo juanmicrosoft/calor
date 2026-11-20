@@ -88,10 +88,8 @@ public class IntegrationTests
         // and lives in the outcome corpus as refuted-overflow.calr.)
         var source = @"
 module Test
-  func Square public (int:x) → int
+  func Square public (int:x | ((# >= 0) && (# <= 46340))) → int
     !
-    requires x >= 0
-    requires x <= 46340
     => result >= 0
     return x * x";
 
@@ -129,9 +127,8 @@ module Test
 
         const string source = @"
 module Test Test block
-  func Chk (string:s) → string
+  func Chk (string:s | (# == ""abc"")) → string
     !
-    requires (s == ""abc"")
     => (!(result).StartsWith(""‍abc""))
     return s";
 
@@ -225,9 +222,8 @@ module Test
         // can still violate it, so the emitted C# must always carry the guard.
         var source = @"
 module Test
-  func Half public (int:x) → int
+  func Half public (int:x | (# > 0)) → int
     !
-    requires x > 0
     return x / 2";
 
         var options = new CompilationOptions
@@ -252,10 +248,8 @@ module Test
         // must not elide the postcondition check and must warn loudly.
         var source = @"
 module Test
-  func Impossible public (int:x) → int
+  func Impossible public (int:x | ((# > 10) && (# < 5))) → int
     !
-    requires x > 10
-    requires x < 5
     => result == x
     return x";
 
@@ -306,9 +300,8 @@ module Test
     {
         var source = @"
 module Test
-  func Square public (int:x) → int
+  func Square public (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x";
 
@@ -332,9 +325,8 @@ module Test
 
         var source = @"
 module Test
-  func Square public (int:x) → int
+  func Square public (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x";
 
@@ -378,9 +370,8 @@ module Test
     {
         var source = @"
 module Test
-  func Square public (int:x) → int
+  func Square public (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x";
 
@@ -411,10 +402,8 @@ module Test
         // LONG:/UINT: literals appear in the pre/postconditions and the body.
         var source = @"
 module Test
-  func Clamp public (long:x) → long
+  func Clamp public (long:x | ((# >= 0L) && (# <= 1000000000000L))) → long
     !
-    requires x >= 0L
-    requires x <= 1000000000000L
     => result >= 0L
     return x";
 

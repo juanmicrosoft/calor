@@ -11,19 +11,12 @@ module RangeContracts RangeContracts
       else
         return value
 
-    func Percentage public (int:part, int:whole) → int
+    func Percentage public (int:part | (# >= 0), int:whole | ((# > 0) && (part <= #))) → int
       !
-      requires whole > 0
-      requires part >= 0
-      requires part <= whole
       => result >= 0
       => result <= 100
       return (part * 100) / whole
 
-    func MapRange public (int:value, int:inMin, int:inMax, int:outMin, int:outMax) → int
+    func MapRange public (int:value, int:inMin | (value >= #), int:inMax | ((inMin < #) && (value <= #)), int:outMin, int:outMax | (outMin < #)) → int
       !
-      requires inMin < inMax
-      requires outMin < outMax
-      requires value >= inMin
-      requires value <= inMax
       return outMin + (((value - inMin) * (outMax - outMin)) / (inMax - inMin))

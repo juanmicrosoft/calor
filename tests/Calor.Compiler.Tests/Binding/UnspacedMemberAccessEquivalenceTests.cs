@@ -40,9 +40,8 @@ public sealed class UnspacedMemberAccessEquivalenceTests
                 !
                 return t~Next~Size
 
-              func Contracted public (Text:t) → int
+              func Contracted public (Text:t | (#~Size > 0)) → int
                 !
-                requires t~Size > 0
                 => result == t~Size
                 return t~Size
             """ },

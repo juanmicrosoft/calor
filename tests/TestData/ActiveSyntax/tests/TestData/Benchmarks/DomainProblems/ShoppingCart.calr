@@ -1,24 +1,17 @@
 module ShoppingCart ShoppingCart
   module ShoppingCartModule
-    func ItemTotal public (float:price, int:quantity) → float
+    func ItemTotal public (float:price | (# > 0), int:quantity | (# > 0)) → float
       !
-      requires price > 0
-      requires quantity > 0
       => result >= 0
       return price * quantity
 
-    func CartSubtotal public (float:itemTotal1, float:itemTotal2) → float
+    func CartSubtotal public (float:itemTotal1 | (# >= 0), float:itemTotal2 | (# >= 0)) → float
       !
-      requires itemTotal1 >= 0
-      requires itemTotal2 >= 0
       => result >= 0
       return itemTotal1 + itemTotal2
 
-    func TotalWithTax public (float:subtotal, float:taxRate) → float
+    func TotalWithTax public (float:subtotal | (# >= 0), float:taxRate | ((# >= 0) && (# <= 1))) → float
       !
-      requires subtotal >= 0
-      requires taxRate >= 0
-      requires taxRate <= 1
       => result >= subtotal
       return subtotal + (subtotal * taxRate)
 

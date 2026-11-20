@@ -148,9 +148,8 @@ module Test Test block
 
         var source = @"
 module Test Test block
-  func SafeDivide (int:x, int:y) → int
+  func SafeDivide (int:x, int:y | (# != 0)) → int
     !
-    requires (y != 0)
     return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);
@@ -322,10 +321,8 @@ module Test Test block
 
         var source = @"
 module Test Test block
-  func SafeAdd (int:x, int:y) → int
+  func SafeAdd (int:x | ((# >= 0) && (# <= 100)), int:y | ((# >= 0) && (# <= 100))) → int
     !
-    requires ((x >= 0) && (x <= 100))
-    requires ((y >= 0) && (y <= 100))
     return (x + y)";
 
         var func = GetFunction(source, out var parseDiag);

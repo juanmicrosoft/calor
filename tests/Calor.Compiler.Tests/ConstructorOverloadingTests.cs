@@ -196,8 +196,7 @@ public class ConstructorOverloadingTests
               class PositiveValue public
                 field int:value private
 
-                ctor (int:value)
-                  requires value > 0
+                ctor (int:value | (# > 0))
                   set this.value value
 
                 ctor ()

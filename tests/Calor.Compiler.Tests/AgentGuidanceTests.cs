@@ -204,9 +204,8 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             module Test Test block
-              func Divide (int:x, int:y) → int
+              func Divide (int:x, int:y | (# != 0)) → int
                 !
-                requires (y != 0)
                 return (x / y)
             """;
 

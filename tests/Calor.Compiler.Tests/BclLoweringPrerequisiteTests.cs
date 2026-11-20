@@ -428,9 +428,8 @@ public class BclLoweringPrerequisiteTests
     {
         var source = """
             module BclContracts BclContracts block
-              func Run (string:s) → bool
+              func Run (string:s | (#.Contains("b"))) → bool
                 !
-                requires s.Contains("b")
                 => (result == s.StartsWith("a", System.StringComparison.Ordinal))
                 return s.StartsWith("a", System.StringComparison.Ordinal)
             """;

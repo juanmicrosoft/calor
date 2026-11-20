@@ -1,9 +1,8 @@
 module L2M19 L2M19 block
   module L2M19Module public
 
-    func l2m19_fn01 public (int:x, int:y) → int
+    func l2m19_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22681)
       if (x >= 22681)
@@ -11,9 +10,8 @@ module L2M19 L2M19 block
       else
         return 22681
 
-    func l2m19_fn02 public (int:x, int:y) → int
+    func l2m19_fn02 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 3) + y)
       if (acc > 22688)
@@ -21,10 +19,8 @@ module L2M19 L2M19 block
       else
         return ((acc * 2) + 22688)
 
-    func l2m19_fn03 public (int:x, int:y) → int
+    func l2m19_fn03 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 22695)
       let int:total = ((x * 5) + y)
       if (total < 22695)
@@ -32,9 +28,8 @@ module L2M19 L2M19 block
       else
         return total
 
-    func l2m19_fn04 public (int:x, int:y) → int
+    func l2m19_fn04 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22702)
       if (x >= 22702)
@@ -42,10 +37,8 @@ module L2M19 L2M19 block
       else
         return 22702
 
-    func l2m19_fn05 public (int:x, int:y) → int
+    func l2m19_fn05 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 22709)
       let int:total = ((x * 5) + y)
       if (total < 22709)
@@ -53,9 +46,8 @@ module L2M19 L2M19 block
       else
         return total
 
-    func l2m19_fn06 public (int:x, int:y) → int
+    func l2m19_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22716)
       let int:total = ((x * 2) + y)
       if (total > 22716)
@@ -72,9 +64,8 @@ module L2M19 L2M19 block
       let int:v1 = L3M32.L3M32Module.l3m32_fn05(x, 82)
       return (v1 + y)
 
-    func l2m19_fn09 public (int:x, int:y) → int
+    func l2m19_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22723)
       if (x >= 22723)
@@ -82,9 +73,8 @@ module L2M19 L2M19 block
       else
         return 22723
 
-    func l2m19_fn10 public (int:x, int:y) → int
+    func l2m19_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22730)
       if (x >= 22730)

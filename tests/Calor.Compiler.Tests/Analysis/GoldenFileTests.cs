@@ -771,9 +771,8 @@ module Test Test block
 
         var source = @"
 module Test Test block
-  func PrecondDiv (int:x, int:y) → int
+  func PrecondDiv (int:x, int:y | (# != 0)) → int
     !
-    requires (y != 0)
     return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);

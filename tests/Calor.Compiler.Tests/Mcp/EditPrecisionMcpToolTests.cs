@@ -14,9 +14,8 @@ public class EditPrecisionMcpToolTests
 {
     private static readonly string SampleSource = @"
 module MathModule MathModule block
-  func add (int:x, int:y) → int
+  func add (int:x | (# >= 0), int:y) → int
     !
-    requires (x >= 0)
     => (result >= 0)
     return (x + y)
   func multiply (int:a, int:b) → int

@@ -5,9 +5,8 @@ module Flyweight Flyweight
       => result >= 0
       return uniqueCount
 
-    func MemorySaved public (int:totalObjects, int:uniqueObjects, int:objectSize) → int
+    func MemorySaved public (int:totalObjects, int:uniqueObjects | (totalObjects >= #), int:objectSize) → int
       !
-      requires totalObjects >= uniqueObjects
       => result >= 0
       return (totalObjects - uniqueObjects) * objectSize
 

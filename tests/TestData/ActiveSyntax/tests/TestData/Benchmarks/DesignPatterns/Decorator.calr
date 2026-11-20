@@ -1,20 +1,14 @@
 module Decorator Decorator
   module DecoratorModule
-    func BasePrice public (float:price) → float
+    func BasePrice public (float:price | (# > 0)) → float
       !
-      requires price > 0
       return price
 
-    func WithTax public (float:price, float:taxRate) → float
+    func WithTax public (float:price | (# > 0), float:taxRate | (# >= 0)) → float
       !
-      requires price > 0
-      requires taxRate >= 0
       => result >= price
       return price * (1 + taxRate)
 
-    func WithDiscount public (float:price, float:discount) → float
+    func WithDiscount public (float:price | (# > 0), float:discount | ((# >= 0) && (# <= 1))) → float
       !
-      requires price > 0
-      requires discount >= 0
-      requires discount <= 1
       return price * (1 - discount)

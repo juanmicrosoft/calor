@@ -60,9 +60,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var ctx = new EvaluationContext
@@ -137,9 +136,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     => result == a / b
     return a / b
 ";
@@ -163,9 +161,8 @@ module Test Test block
         // Source with a native precondition
         var source = @"
 module Test Test block
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ";
         var ctx = new EvaluationContext
@@ -200,9 +197,8 @@ module Test Test block
 ";
         var fixedSource = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var calc = new ErrorDetectionCalculator();
@@ -262,9 +258,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
@@ -501,9 +496,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
@@ -697,9 +691,8 @@ module UnsafeDivide UnsafeDivide block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
@@ -896,9 +889,8 @@ namespace MathOps {
         // It should succeed after the fix.
         var source = @"
 module PrimeCheck PrimeCheck block
-  func IsPrime (int:n) → bool
+  func IsPrime (int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     if (n <= 1)
       return false
     if (n <= 3)
@@ -1047,9 +1039,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     => (result >= 0)
     return (a / b)
 
@@ -1138,9 +1129,8 @@ module Test Test block
         // A Calor program with → §R conditional returns should score higher than base
         var source = @"
 module Test Test block
-  func Factorial (int:n) → int
+  func Factorial (int:n | (# >= 0)) → int
     !
-    requires (n >= 0)
     if (n <= 1)
       return 1
     return (n * Factorial((n - 1)))
@@ -1167,9 +1157,8 @@ module Test Test block
         // but a minimal program without them should not
         var defensiveSource = @"
 module Test Test block
-  func SafeDiv (int:a, int:b) → int
+  func SafeDiv (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     if (b <= 1)
       return 0
     return (a / b)
@@ -1221,9 +1210,8 @@ class C {
         // Calor with all patterns
         var calorSource = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     => (result >= 0)
     if (b <= 1)
       return 0

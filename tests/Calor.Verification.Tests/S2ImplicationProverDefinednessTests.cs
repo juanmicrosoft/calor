@@ -184,10 +184,8 @@ public sealed class S2ImplicationProverDefinednessTests
             §R INT:1
         """ => """
         module M
-          func P public (string:s, int:x) → int
+          func P public (string:s | (string.IsNullOrEmpty(#) && # != ""), int:x | (# > 0)) → int
             !
-            requires string.IsNullOrEmpty(s) && s != ""
-            requires x > 0
             return 1
         """,
         """
@@ -198,9 +196,8 @@ public sealed class S2ImplicationProverDefinednessTests
             §R INT:1
         """ => """
         module M
-          func P public (int[]:arr, string:s) → int
+          func P public (int[]:arr | (#[-1] == 0), string:s) → int
             !
-            requires arr[-1] == 0
             return 1
         """,
         // A translation refusal alone does not establish that the substring definedness query ran.
@@ -212,9 +209,8 @@ public sealed class S2ImplicationProverDefinednessTests
             §R INT:1
         """ => """
         module M
-          func P public (int[]:arr, string:s) → int
+          func P public (int[]:arr, string:s | (#.Substring(-1, 1) == "")) → int
             !
-            requires s.Substring(-1, 1) == ""
             return 1
         """,
         _ => throw new ArgumentException("Unregistered definedness fixture.", nameof(source))

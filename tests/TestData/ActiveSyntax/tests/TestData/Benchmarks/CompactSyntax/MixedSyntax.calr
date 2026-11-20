@@ -4,13 +4,11 @@ module MixedSyntax MixedSyntax
       !
       return x * 2
 
-    func Verbose public (int:x) → int
+    func Verbose public (int:x | (# > 0)) → int
       !
-      requires x > 0
       => result > x
       return x * 3
 
-    func CompactWithContract public (int:a, int:b) → int
+    func CompactWithContract public (int:a, int:b | (# != 0)) → int
       !
-      requires b != 0
       return a / b

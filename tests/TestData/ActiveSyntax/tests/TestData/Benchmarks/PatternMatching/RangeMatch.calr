@@ -1,8 +1,7 @@
 module RangeMatch RangeMatch
   module RangeMatchModule
-    func AgeGroup public (int:age) → int
+    func AgeGroup public (int:age | (# >= 0)) → int
       !
-      requires age >= 0
       if age < 13
         return 0
       else if age < 20

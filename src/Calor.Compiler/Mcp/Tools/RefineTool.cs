@@ -542,11 +542,11 @@ public sealed class RefineTool : McpToolBase
                 {
                     ObligationId = obligation.Id,
                     Strategy = "add_precondition",
-                    Description = $"Add a requires precondition so callers satisfy the constraint",
+                    Description = "Refine the parameter so callers must satisfy the constraint",
                     Confidence = "high",
                     Template = paramName != null
-                        ? $"requires {paramName} >= 0"
-                        : "requires condition"
+                        ? $"{paramName} | (# >= 0)"
+                        : "parameter | (condition on #)"
                 });
                 fixes.Add(new FixSuggestion
                 {
@@ -565,9 +565,9 @@ public sealed class RefineTool : McpToolBase
                 {
                     ObligationId = obligation.Id,
                     Strategy = "strengthen_precondition",
-                    Description = "Add or strengthen preconditions so the proof obligation can be discharged",
+                    Description = "Add or strengthen a parameter refinement so the proof obligation can be discharged",
                     Confidence = "high",
-                    Template = "requires condition-that-implies-proof"
+                    Template = "parameter | (condition-that-implies-proof, with the parameter as #)"
                 });
                 fixes.Add(new FixSuggestion
                 {

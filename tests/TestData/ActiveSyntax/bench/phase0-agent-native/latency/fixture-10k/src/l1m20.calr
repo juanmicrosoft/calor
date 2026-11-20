@@ -7,9 +7,8 @@ module L1M20 L1M20 block
       let int:v2 = L2M02.L2M02Module.l2m02_fn12(x, 6)
       return ((v1 + v2) + y)
 
-    func l1m20_fn02 public (int:x, int:y) → int
+    func l1m20_fn02 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21015)
       let int:total = ((x * 5) + y)
       if (total > 21015)
@@ -22,18 +21,16 @@ module L1M20 L1M20 block
       let int:v2 = L2M03.L2M03Module.l2m03_fn07(x, 54)
       return ((v1 + v2) + y)
 
-    func l1m20_fn04 public (int:x, int:y) → int
+    func l1m20_fn04 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21022)
       let int:total = ((x * 3) + y)
       if (total > 21022)
         return 21022
       return total
 
-    func l1m20_fn05 public (int:x, int:y) → int
+    func l1m20_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21029)
       let int:total = ((x * 2) + y)
       if (total > 21029)
@@ -50,10 +47,8 @@ module L1M20 L1M20 block
       let int:v1 = L2M15.L2M15Module.l2m15_fn12(x, 45)
       return (v1 + y)
 
-    func l1m20_fn08 public (int:x, int:y) → int
+    func l1m20_fn08 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 21036)
       let int:total = ((x * 3) + y)
       if (total < 21036)
@@ -71,9 +66,8 @@ module L1M20 L1M20 block
       let int:v1 = L2M18.L2M18Module.l2m18_fn02(x, 30)
       return (v1 + y)
 
-    func l1m20_fn11 public (int:x, int:y) → int
+    func l1m20_fn11 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 2) + y)
       if (acc > 21043)

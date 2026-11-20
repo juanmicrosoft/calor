@@ -273,8 +273,7 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             module TestModule TestModule block
-              func Divide private (int:a, int:b) → int
-                requires (b != 0)
+              func Divide private (int:a, int:b | (# != 0)) → int
                 return (a / b)
             """;
 

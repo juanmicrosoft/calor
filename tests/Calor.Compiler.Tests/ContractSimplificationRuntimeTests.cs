@@ -58,9 +58,8 @@ public class ContractSimplificationRuntimeTests
         var nullableArray = Compile("""
             module TypedContracts TypedContracts block
               class NullableDomain
-                func Check (int[]?:x) → int
+                func Check (int[]?:x | (forall int:i where ((# != null) && ((i >= 0) && (i < #.Length))) : true)) → int
                   !
-                  requires (forall int:i where ((x != null) && ((i >= 0) && (i < x.Length))) : true)
                   return 7
             """, verify, rejectNullableWarnings: true);
         var domainType = nullableArray.GetType("TypedContracts.NullableDomain")!;
@@ -176,9 +175,8 @@ public class ContractSimplificationRuntimeTests
                 op ! (Probe:a) → bool
                   !
                   return false
-              func Check (Probe:x) → int
+              func Check (Probe:x | ((# == ((# is Probe candidate) ? # : #)) == true)) → int
                 !
-                requires ((x == ((x is Probe candidate) ? x : x)) == true)
                 return 7
             """, verify);
         var probe = Activator.CreateInstance(Assert.Single(overloaded.GetTypes(), type => type.Name == "Probe"));

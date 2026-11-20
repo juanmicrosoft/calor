@@ -882,10 +882,8 @@ public class CompileCalorIntegrationTests : IDisposable
         var src = CreateSourceFile("ElideOptOut.calr", """
             module ElideOptOut ElideOptOut block
               class Calc
-                func Square (int:x) → int
+                func Square (int:x | ((# >= 0) && (# <= 46340))) → int
                   !
-                  requires (x >= 0)
-                  requires (x <= 46340)
                   => (result >= 0)
                   return (x * x)
             """);

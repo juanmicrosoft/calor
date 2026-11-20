@@ -1,9 +1,7 @@
 module Ledger Ledger block
   module LedgerModule partial
-    func EntryFee (int:amount) → int
+    func EntryFee (int:amount | ((# > 0) && (# < 1000000))) → int
       !
-      requires (amount > 0)
-      requires (amount < 1000000)
       => (result >= 0)
       return (amount / 100)
 
@@ -15,24 +13,16 @@ module Ledger Ledger block
       !
       return ((amount > 0) && (amount < 1000000))
 
-    func PostEntry (int[]:debits, int[]:credits, int[]:amounts, int:count, int:debitAcct, int:creditAcct, int:amount) → int
+    func PostEntry (int[]:debits, int[]:credits, int[]:amounts, int:count | ((((# >= 0) && (# < debits.Length)) && (# < credits.Length)) && (# < amounts.Length)), int:debitAcct, int:creditAcct, int:amount) → int
       ! mut
-      requires (count >= 0)
-      requires (count < debits.Length)
-      requires (count < credits.Length)
-      requires (count < amounts.Length)
       => (result == (count + 1))
       set debits[count] debitAcct
       set credits[count] creditAcct
       set amounts[count] amount
       return (count + 1)
 
-    func AccountBalance (int[]:debits, int[]:credits, int[]:amounts, int:count, int:account) → int
+    func AccountBalance (int[]:debits, int[]:credits, int[]:amounts, int:count | ((((# >= 0) && (# <= debits.Length)) && (# <= credits.Length)) && (# <= amounts.Length)), int:account) → int
       !
-      requires (count >= 0)
-      requires (count <= debits.Length)
-      requires (count <= credits.Length)
-      requires (count <= amounts.Length)
       var int:total = 0
       var int:i = 0
       while (i < count)
@@ -44,11 +34,8 @@ module Ledger Ledger block
         set i (i + 1)
       return total
 
-    func TotalDebited (int[]:debits, int[]:amounts, int:count, int:account) → int
+    func TotalDebited (int[]:debits, int[]:amounts, int:count | (((# >= 0) && (# <= debits.Length)) && (# <= amounts.Length)), int:account) → int
       !
-      requires (count >= 0)
-      requires (count <= debits.Length)
-      requires (count <= amounts.Length)
       var int:total = 0
       var int:i = 0
       while (i < count)
@@ -58,11 +45,8 @@ module Ledger Ledger block
         set i (i + 1)
       return total
 
-    func TotalCredited (int[]:credits, int[]:amounts, int:count, int:account) → int
+    func TotalCredited (int[]:credits, int[]:amounts, int:count | (((# >= 0) && (# <= credits.Length)) && (# <= amounts.Length)), int:account) → int
       !
-      requires (count >= 0)
-      requires (count <= credits.Length)
-      requires (count <= amounts.Length)
       var int:total = 0
       var int:i = 0
       while (i < count)
@@ -72,10 +56,8 @@ module Ledger Ledger block
         set i (i + 1)
       return total
 
-    func TotalVolume (int[]:amounts, int:count) → int
+    func TotalVolume (int[]:amounts, int:count | ((# >= 0) && (# <= amounts.Length))) → int
       !
-      requires (count >= 0)
-      requires (count <= amounts.Length)
       var int:total = 0
       var int:i = 0
       while (i < count)
@@ -83,34 +65,23 @@ module Ledger Ledger block
         set i (i + 1)
       return total
 
-    func FeesCollected (int[]:credits, int[]:amounts, int:count) → int
+    func FeesCollected (int[]:credits, int[]:amounts, int:count | (((# >= 0) && (# <= credits.Length)) && (# <= amounts.Length))) → int
       !
-      requires (count >= 0)
-      requires (count <= credits.Length)
-      requires (count <= amounts.Length)
       let int:fees = TotalCredited(credits, amounts, count, 0)
       return fees
 
-    func TransferCost (int:amount) → int
+    func TransferCost (int:amount | ((# > 0) && (# < 1000000))) → int
       !
-      requires (amount > 0)
-      requires (amount < 1000000)
       => (result >= amount)
       return (amount + (amount / 100))
 
-    func CanAfford (int:balance, int:amount) → bool
+    func CanAfford (int:balance, int:amount | ((# > 0) && (# < 1000000))) → bool
       !
-      requires (amount > 0)
-      requires (amount < 1000000)
       let int:cost = TransferCost(amount)
       return (balance >= cost)
 
-    func Transfer (int[]:debits, int[]:credits, int[]:amounts, int:count, int:fromAcct, int:toAcct, int:amount) → int
+    func Transfer (int[]:debits, int[]:credits, int[]:amounts, int:count | ((((# >= 0) && ((# + 2) <= debits.Length)) && ((# + 2) <= credits.Length)) && ((# + 2) <= amounts.Length)), int:fromAcct, int:toAcct, int:amount) → int
       ! mut
-      requires (count >= 0)
-      requires ((count + 2) <= debits.Length)
-      requires ((count + 2) <= credits.Length)
-      requires ((count + 2) <= amounts.Length)
       => (result >= (count + 1))
       let int:next = PostEntry(debits, credits, amounts, count, fromAcct, toAcct, amount)
       let int:fee = EntryFee(amount)
@@ -119,16 +90,8 @@ module Ledger Ledger block
         return next2
       return next
 
-    func BatchPost (int[]:debits, int[]:credits, int[]:amounts, int:count, int[]:fromAccts, int[]:toAccts, int[]:batchAmounts, int:n) → int
+    func BatchPost (int[]:debits, int[]:credits, int[]:amounts, int:count | (# >= 0), int[]:fromAccts, int[]:toAccts, int[]:batchAmounts, int:n | (((((((# >= 0) && (# <= fromAccts.Length)) && (# <= toAccts.Length)) && (# <= batchAmounts.Length)) && ((count + #) <= debits.Length)) && ((count + #) <= credits.Length)) && ((count + #) <= amounts.Length))) → int
       ! mut
-      requires (count >= 0)
-      requires (n >= 0)
-      requires (n <= fromAccts.Length)
-      requires (n <= toAccts.Length)
-      requires (n <= batchAmounts.Length)
-      requires ((count + n) <= debits.Length)
-      requires ((count + n) <= credits.Length)
-      requires ((count + n) <= amounts.Length)
       var int:cur = count
       var int:i = 0
       while (i < n)
@@ -139,16 +102,8 @@ module Ledger Ledger block
         set i (i + 1)
       return cur
 
-    func BatchTransfer (int[]:debits, int[]:credits, int[]:amounts, int:count, int[]:fromAccts, int[]:toAccts, int[]:batchAmounts, int:n) → int
+    func BatchTransfer (int[]:debits, int[]:credits, int[]:amounts, int:count | (# >= 0), int[]:fromAccts, int[]:toAccts, int[]:batchAmounts, int:n | (((((((# >= 0) && (# <= fromAccts.Length)) && (# <= toAccts.Length)) && (# <= batchAmounts.Length)) && ((count + (2 * #)) <= debits.Length)) && ((count + (2 * #)) <= credits.Length)) && ((count + (2 * #)) <= amounts.Length))) → int
       ! mut
-      requires (count >= 0)
-      requires (n >= 0)
-      requires (n <= fromAccts.Length)
-      requires (n <= toAccts.Length)
-      requires (n <= batchAmounts.Length)
-      requires ((count + (2 * n)) <= debits.Length)
-      requires ((count + (2 * n)) <= credits.Length)
-      requires ((count + (2 * n)) <= amounts.Length)
       var int:cur = count
       var int:i = 0
       while (i < n)

@@ -13,9 +13,8 @@ public class BenchmarkMetricsNativeSyntaxTests
 {
     private const string NativeSource = """
         module Spans Spans
-          func TotalCovered public (int[]:starts, int[]:ends) → int
+          func TotalCovered public (int[]:starts, int[]:ends | (starts.Length == #.Length)) → int
             !
-            requires (starts.Length == ends.Length)
             => (result >= 0)
             var int:total = 0
             var int:i = 0

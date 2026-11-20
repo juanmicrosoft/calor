@@ -1,8 +1,7 @@
 module Composite Composite
   module CompositeModule
-    func FileSize public (int:size) → int
+    func FileSize public (int:size | (# >= 0)) → int
       !
-      requires size >= 0
       return size
 
     func TotalSize public (int:ownSize, int:childrenSize) → int

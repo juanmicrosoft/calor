@@ -10,27 +10,22 @@ module OverflowUnsafe OverflowUnsafe
       => result < x
       return x - 1
 
-    func DoubleUnsafe public (int:x) → int
+    func DoubleUnsafe public (int:x | (# > 0)) → int
       !
-      requires x > 0
       => result > x
       return x * 2
 
-    func SquareUnsafe public (int:x) → int
+    func SquareUnsafe public (int:x | (# >= 0)) → int
       !
-      requires x >= 0
       => result >= 0
       return x * x
 
-    func NegateUnsafe public (int:x) → int
+    func NegateUnsafe public (int:x | (# < 0)) → int
       !
-      requires x < 0
       => result > 0
       return 0 - x
 
-    func AddPositivesUnsafe public (int:x, int:y) → int
+    func AddPositivesUnsafe public (int:x | (# > 0), int:y | (# > 0)) → int
       !
-      requires x > 0
-      requires y > 0
       => result > 0
       return x + y

@@ -1313,14 +1313,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ParameterNode node)
         => throw new InvalidOperationException("ParameterNode has no 0.30 source form.");
 
+    // #1618: preconditions are parameter refinements; a parsed `requires` is already an error,
+    // so no module that reaches the emitter carries one.
     public string Visit(RequiresNode node)
-    {
-        var condition = node.Condition.Accept(this);
-        if (node.Message != null)
-            throw new InvalidOperationException("Canonical precondition message syntax has not been selected.");
-        AppendLine($"requires {condition}");
-        return "";
-    }
+        => throw new InvalidOperationException("RequiresNode has no 0.30 source form; preconditions are parameter refinements.");
 
     public string Visit(EnsuresNode node)
     {

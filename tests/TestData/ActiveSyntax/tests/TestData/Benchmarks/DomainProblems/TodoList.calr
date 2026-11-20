@@ -8,9 +8,8 @@ module TodoList TodoList
       !
       return completedCount + 1
 
-    func PendingCount public (int:total, int:completed) → int
+    func PendingCount public (int:total, int:completed | (total >= #)) → int
       !
-      requires total >= completed
       => result >= 0
       return total - completed
 

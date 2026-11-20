@@ -1,8 +1,7 @@
 module StringContracts StringContracts
   module StringContractsModule
-    func NonEmptyLength public (string:s) → int
+    func NonEmptyLength public (string:s | (!string.IsNullOrEmpty(#))) → int
       !
-      requires !string.IsNullOrEmpty(s)
       => result > 0
       return s.Length
 
@@ -11,15 +10,13 @@ module StringContracts StringContracts
       => result == (s.Length == 0)
       return string.IsNullOrEmpty(s)
 
-    func ConcatLonger public (string:a, string:b) → string
+    func ConcatLonger public (string:a | (!string.IsNullOrEmpty(#)), string:b) → string
       !
-      requires !string.IsNullOrEmpty(a)
       => result.Length > b.Length
       return string.Concat(a, b)
 
-    func ContainsImpliesLength public (string:haystack, string:needle) → bool
+    func ContainsImpliesLength public (string:haystack, string:needle | (!string.IsNullOrEmpty(#))) → bool
       !
-      requires !string.IsNullOrEmpty(needle)
       => !result || haystack.Length >= needle.Length
       return haystack.Contains(needle)
 

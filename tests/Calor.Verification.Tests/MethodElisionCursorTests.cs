@@ -26,10 +26,8 @@ public class MethodElisionCursorTests
         const string source = @"
 module Test Test
   class Calc public
-    func Square public (int:x) → int
+    func Square public (int:x | ((# >= 0) && (# <= 46340))) → int
       !
-      requires x >= 0
-      requires x <= 46340
       => result >= 0
       return x * x";
 
@@ -76,9 +74,8 @@ module Test Test
         const string source = @"
 module Test Test
   class Calc public
-    func Pick public (int:x) → int
+    func Pick public (int:x | (# >= 0)) → int
       !
-      requires x >= 0
       => result >= 0
       if x >= 5
         return x
@@ -115,14 +112,12 @@ module Test Test
         const string source = @"
 module Test Test
   class First public
-    func Inc public (int:x) → int
+    func Inc public (int:x | (# >= 0)) → int
       !
-      requires x >= 0
       => result >= 1
       return x + 1
   class Second public
-    ctor (int:size)
-      requires size > 0";
+    ctor (int:size | (# > 0";))
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions());
 
@@ -174,9 +169,8 @@ module Test Test
         const string source = @"
 module Test Test
   class Fmt public
-    func Chk public (string:s) → string
+    func Chk public (string:s | (# == ""abc"")) → string
       !
-      requires s == ""abc""
       => !result.StartsWith(""zzz"", System.StringComparison.Ordinal)
       return s";
 
@@ -194,10 +188,8 @@ module Test Test
     private const string ProvenSquareSource = @"
 module Test Test
   class Calc public
-    func Square public (int:x) → int
+    func Square public (int:x | ((# >= 0) && (# <= 46340))) → int
       !
-      requires x >= 0
-      requires x <= 46340
       => result >= 0
       return x * x";
 

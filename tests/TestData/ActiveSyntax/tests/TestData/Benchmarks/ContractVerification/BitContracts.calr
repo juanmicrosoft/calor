@@ -1,16 +1,13 @@
 module BitContracts BitContracts
   module BitContractsModule
-    func PowerOfTwo public (int:n) → bool
+    func PowerOfTwo public (int:n | (# > 0)) → bool
       !
-      requires n > 0
       return (n & (n - 1)) == 0
 
-    func IsAligned public (int:value, int:alignment) → bool
+    func IsAligned public (int:value, int:alignment | (# > 0)) → bool
       !
-      requires alignment > 0
       return value % alignment == 0
 
-    func ClearLowest public (int:n) → int
+    func ClearLowest public (int:n | (# > 0)) → int
       !
-      requires n > 0
       return n & (n - 1)

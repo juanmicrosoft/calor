@@ -1,16 +1,13 @@
 module ReverseArray ReverseArray
   module ReverseArrayModule
-    func SwapIndex public (int:length, int:i) → int
+    func SwapIndex public (int:length, int:i | ((# >= 0) && (# < length))) → int
       !
-      requires i >= 0
-      requires i < length
       return (length - 1) - i
 
     func ShouldSwap public (int:left, int:right) → bool
       !
       return left < right
 
-    func MidPoint public (int:length) → int
+    func MidPoint public (int:length | (# > 0)) → int
       !
-      requires length > 0
       return length / 2

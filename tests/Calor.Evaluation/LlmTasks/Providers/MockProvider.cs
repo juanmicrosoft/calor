@@ -220,9 +220,8 @@ public sealed class MockProvider : ILlmProvider
         // IsPrime
         WithImplementation("prime",
             @"module Math Math block
-  func IsPrime (int:n) → bool
+  func IsPrime (int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     if (n <= 1)
       return false
     if (n <= 3)
@@ -312,9 +311,8 @@ public sealed class MockProvider : ILlmProvider
         // SafeDivide
         WithImplementation("safedivide",
             @"module Math Math block
-  func SafeDivide (int:a, int:b) → int
+  func SafeDivide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)",
             @"public static class Math
 {
@@ -328,9 +326,8 @@ public sealed class MockProvider : ILlmProvider
         // Clamp
         WithImplementation("clamp",
             @"module Math Math block
-  func Clamp (int:value, int:min, int:max) → int
+  func Clamp (int:value, int:min, int:max | (min <= #)) → int
     !
-    requires (min <= max)
     => (result >= min)
     => (result <= max)
     if (value < min)
@@ -403,9 +400,8 @@ public sealed class MockProvider : ILlmProvider
         // Power - lookup table for common powers
         WithImplementation("power",
             @"module Math Math block
-  func Power (int:baseVal, int:exp) → int
+  func Power (int:baseVal, int:exp | (# >= 0)) → int
     !
-    requires (exp >= 0)
     if (exp == 0)
       return 1
     else if (exp == 1)
@@ -539,9 +535,8 @@ public sealed class MockProvider : ILlmProvider
         // SafeModulo
         WithImplementation("safemodulo",
             @"module Math Math block
-  func SafeModulo (int:a, int:b) → int
+  func SafeModulo (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a % b)",
             @"public static class Math
 {
@@ -555,10 +550,8 @@ public sealed class MockProvider : ILlmProvider
         // Percentage
         WithImplementation("percentage",
             @"module Math Math block
-  func Percentage (int:value, int:percent) → int
+  func Percentage (int:value, int:percent | ((# >= 0) && (# <= 100))) → int
     !
-    requires (percent >= 0)
-    requires (percent <= 100)
     return ((value * percent) / 100)",
             @"public static class Math
 {
@@ -571,9 +564,8 @@ public sealed class MockProvider : ILlmProvider
         // ValidIndex
         WithImplementation("validindex",
             @"module Math Math block
-  func ValidIndex (int:index, int:size) → bool
+  func ValidIndex (int:index, int:size | (# > 0)) → bool
     !
-    requires (size > 0)
     return ((index >= 0) && (index < size))",
             @"public static class Math
 {
@@ -586,9 +578,8 @@ public sealed class MockProvider : ILlmProvider
         // InRange
         WithImplementation("inrange",
             @"module Math Math block
-  func InRange (int:value, int:min, int:max) → bool
+  func InRange (int:value, int:min, int:max | (min <= #)) → bool
     !
-    requires (min <= max)
     return ((value >= min) && (value <= max))",
             @"public static class Math
 {
@@ -619,9 +610,8 @@ public sealed class MockProvider : ILlmProvider
         // HalfEven
         WithImplementation("halfeven",
             @"module Math Math block
-  func HalfEven (int:n) → int
+  func HalfEven (int:n | ((# % 2) == 0)) → int
     !
-    requires ((n % 2) == 0)
     return (n / 2)",
             @"public static class Math
 {
@@ -635,11 +625,8 @@ public sealed class MockProvider : ILlmProvider
         // NormalizeScore
         WithImplementation("normalizescore",
             @"module Math Math block
-  func NormalizeScore (int:score, int:maxScore) → int
+  func NormalizeScore (int:score | (# >= 0), int:maxScore | ((# > 0) && (score <= #))) → int
     !
-    requires (maxScore > 0)
-    requires (score >= 0)
-    requires (score <= maxScore)
     return ((score * 100) / maxScore)",
             @"public static class Math
 {
@@ -652,9 +639,8 @@ public sealed class MockProvider : ILlmProvider
         // SafeDecrement
         WithImplementation("safedecrement",
             @"module Math Math block
-  func SafeDecrement (int:n) → int
+  func SafeDecrement (int:n | (# > 0)) → int
     !
-    requires (n > 0)
     => (result >= 0)
     return (n - 1)",
             @"public static class Math
@@ -894,9 +880,8 @@ public sealed class MockProvider : ILlmProvider
         // IsMultipleOf
         WithImplementation("ismultipleof",
             @"module Math Math block
-  func IsMultipleOf (int:a, int:b) → bool
+  func IsMultipleOf (int:a, int:b | (# != 0)) → bool
     !
-    requires (b != 0)
     return ((a % b) == 0)",
             @"public static class Math
 {

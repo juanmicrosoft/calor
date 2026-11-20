@@ -43,9 +43,8 @@ public sealed class S2NestedQuantifierTests : IDisposable
 
     private static string Nested(string comparison) => $$"""
         module R1Case
-          func Probe public (sbyte:n) → int
+          func Probe public (sbyte:n | (# > 0 && # < 12)) → int
             !
-            requires n > 0 && n < 12
             => forall int:i in 0..n : (forall int:j in 0..n : {{NativeComparisonInput(comparison)}})
             return 0
         """;
@@ -80,9 +79,8 @@ public sealed class S2NestedQuantifierTests : IDisposable
     {
         const string source = """
             module M
-              func Probe public (sbyte:n) → int
+              func Probe public (sbyte:n | (# > 0 && # < 12)) → int
                 !
-                requires n > 0 && n < 12
                 => forall int:i in 0..n : i < 29
                 return 0
             """;

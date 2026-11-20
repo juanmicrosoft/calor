@@ -1,15 +1,11 @@
 module Dijkstra Dijkstra
   module DijkstraModule
-    func Relax public (int:currentDist, int:edgeWeight, int:neighborDist) → bool
+    func Relax public (int:currentDist | (# >= 0), int:edgeWeight | (# > 0), int:neighborDist) → bool
       !
-      requires currentDist >= 0
-      requires edgeWeight > 0
       return (currentDist + edgeWeight) < neighborDist
 
-    func NewDist public (int:currentDist, int:edgeWeight) → int
+    func NewDist public (int:currentDist | (# >= 0), int:edgeWeight | (# > 0)) → int
       !
-      requires currentDist >= 0
-      requires edgeWeight > 0
       => result > currentDist
       return currentDist + edgeWeight
 

@@ -1,9 +1,8 @@
 module L3M13 L3M13 block
   module L3M13Module public
 
-    func l3m13_fn01 public (int:x, int:y) → int
+    func l3m13_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24298)
       if (x >= 24298)
@@ -16,19 +15,16 @@ module L3M13 L3M13 block
       let int:@base = ((x * 4) - y)
       return (@base + 10)
 
-    func l3m13_fn03 public (int:x, int:y) → int
+    func l3m13_fn03 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 24305)
       let int:total = ((x * 5) + y)
       if (total > 24305)
         return 24305
       return total
 
-    func l3m13_fn04 public (int:x, int:y) → int
+    func l3m13_fn04 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 24312)
       let int:total = ((x * 5) + y)
       if (total < 24312)
@@ -41,9 +37,8 @@ module L3M13 L3M13 block
       let int:@base = ((x * 4) - y)
       return (@base + 72)
 
-    func l3m13_fn06 public (int:x, int:y) → int
+    func l3m13_fn06 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 24319)
@@ -56,9 +51,8 @@ module L3M13 L3M13 block
       let int:@base = ((x * 4) - y)
       return (@base + 45)
 
-    func l3m13_fn08 public (int:x, int:y) → int
+    func l3m13_fn08 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24326)
       if (x >= 24326)
@@ -86,9 +80,8 @@ module L3M13 L3M13 block
       let int:@base = ((x * 4) - y)
       return (@base + 15)
 
-    func l3m13_fn13 public (int:x, int:y) → int
+    func l3m13_fn13 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 2) + y)
       if (acc > 24333)

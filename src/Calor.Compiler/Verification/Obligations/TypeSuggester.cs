@@ -225,7 +225,7 @@ public sealed class TypeSuggester
                 SuggestedPredicate = $"{paramName} != 0",
                 Reason = $"'{paramName}' is used as a divisor without a non-zero constraint",
                 Confidence = "high",
-                CalorSyntax = $"requires {paramName} != 0"
+                CalorSyntax = $"{typeName}:{paramName} | (# != 0)"
             });
         }
 
@@ -239,7 +239,7 @@ public sealed class TypeSuggester
                 SuggestedPredicate = $"{paramName} >= 0",
                 Reason = $"'{paramName}' is used as an array index without a non-negative constraint",
                 Confidence = "high",
-                CalorSyntax = $"requires {paramName} >= 0"
+                CalorSyntax = $"{typeName}:{paramName} | (# >= 0)"
             });
         }
 
@@ -253,7 +253,7 @@ public sealed class TypeSuggester
                 SuggestedPredicate = $"{paramName} >= 0",
                 Reason = $"'{paramName}' is compared with >= 0, suggesting a non-negative constraint",
                 Confidence = "medium",
-                CalorSyntax = $"requires {paramName} >= 0"
+                CalorSyntax = $"{typeName}:{paramName} | (# >= 0)"
             });
         }
 
@@ -267,7 +267,7 @@ public sealed class TypeSuggester
                 SuggestedPredicate = $"{paramName} > 0",
                 Reason = $"'{paramName}' is compared with > 0, suggesting a positive constraint",
                 Confidence = "medium",
-                CalorSyntax = $"requires {paramName} > 0"
+                CalorSyntax = $"{typeName}:{paramName} | (# > 0)"
             });
         }
 

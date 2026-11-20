@@ -1,8 +1,7 @@
 module CircularBuffer CircularBuffer
   module CircularBufferModule
-    func NextIndex public (int:current, int:capacity) → int
+    func NextIndex public (int:current, int:capacity | (# > 0)) → int
       !
-      requires capacity > 0
       => result >= 0
       => result < capacity
       return (current + 1) % capacity
@@ -15,7 +14,6 @@ module CircularBuffer CircularBuffer
       !
       return count == 0
 
-    func WriteIndex public (int:head, int:count, int:capacity) → int
+    func WriteIndex public (int:head, int:count, int:capacity | (# > 0)) → int
       !
-      requires capacity > 0
       return (head + count) % capacity

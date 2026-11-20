@@ -1,10 +1,8 @@
 module L1M30 L1M30 block
   module L1M30Module public
 
-    func l1m30_fn01 public (int:x, int:y) → int
+    func l1m30_fn01 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 21561)
       let int:total = ((x * 3) + y)
       if (total < 21561)
@@ -17,9 +15,8 @@ module L1M30 L1M30 block
       let int:v1 = L2M10.L2M10Module.l2m10_fn02(x, 4)
       return (v1 + y)
 
-    func l1m30_fn03 public (int:x, int:y) → int
+    func l1m30_fn03 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 21568)
@@ -38,9 +35,8 @@ module L1M30 L1M30 block
       let int:v1 = L2M08.L2M08Module.l2m08_fn07(x, 34)
       return (v1 + y)
 
-    func l1m30_fn06 public (int:x, int:y) → int
+    func l1m30_fn06 public (int:x | (# > 6), int:y) → int
       !
-      requires (x > 6)
       => (x >= 7)
       let int:acc = ((x * 5) + y)
       if (acc > 21575)
@@ -48,9 +44,8 @@ module L1M30 L1M30 block
       else
         return ((acc * 2) + 21575)
 
-    func l1m30_fn07 public (int:x, int:y) → int
+    func l1m30_fn07 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 2) + y)
       if (acc > 21582)
@@ -63,9 +58,8 @@ module L1M30 L1M30 block
       let int:v1 = L2M05.L2M05Module.l2m05_fn09(x, 70)
       return (v1 + y)
 
-    func l1m30_fn09 public (int:x, int:y) → int
+    func l1m30_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21589)
       if (x >= 21589)
@@ -73,9 +67,8 @@ module L1M30 L1M30 block
       else
         return 21589
 
-    func l1m30_fn10 public (int:x, int:y) → int
+    func l1m30_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21596)
       let int:total = ((x * 3) + y)
       if (total > 21596)
@@ -88,9 +81,8 @@ module L1M30 L1M30 block
       let int:v2 = L2M07.L2M07Module.l2m07_fn12(x, 10)
       return ((v1 + v2) + y)
 
-    func l1m30_fn12 public (int:x, int:y) → int
+    func l1m30_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21603)
       if (x >= 21603)
@@ -98,9 +90,8 @@ module L1M30 L1M30 block
       else
         return 21603
 
-    func l1m30_fn13 public (int:x, int:y) → int
+    func l1m30_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21610)
       if (x >= 21610)

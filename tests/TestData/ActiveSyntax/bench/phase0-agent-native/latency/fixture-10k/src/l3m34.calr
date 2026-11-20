@@ -1,10 +1,8 @@
 module L3M34 L3M34 block
   module L3M34Module public
 
-    func l3m34_fn01 public (int:x, int:y) → int
+    func l3m34_fn01 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 25460)
       let int:total = ((x * 2) + y)
       if (total < 25460)
@@ -12,10 +10,8 @@ module L3M34 L3M34 block
       else
         return total
 
-    func l3m34_fn02 public (int:x, int:y) → int
+    func l3m34_fn02 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 25467)
       let int:total = ((x * 5) + y)
       if (total < 25467)
@@ -28,27 +24,24 @@ module L3M34 L3M34 block
       let int:@base = ((x * 4) - y)
       return (@base + 45)
 
-    func l3m34_fn04 public (int:x, int:y) → int
+    func l3m34_fn04 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25474)
       let int:total = ((x * 3) + y)
       if (total > 25474)
         return 25474
       return total
 
-    func l3m34_fn05 public (int:x, int:y) → int
+    func l3m34_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25481)
       let int:total = ((x * 2) + y)
       if (total > 25481)
         return 25481
       return total
 
-    func l3m34_fn06 public (int:x, int:y) → int
+    func l3m34_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25488)
       let int:total = ((x * 5) + y)
       if (total > 25488)
@@ -60,9 +53,8 @@ module L3M34 L3M34 block
       let int:@base = ((x * 4) - y)
       return (@base + 47)
 
-    func l3m34_fn08 public (int:x, int:y) → int
+    func l3m34_fn08 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 25495)
@@ -70,9 +62,8 @@ module L3M34 L3M34 block
       else
         return ((acc * 2) + 25495)
 
-    func l3m34_fn09 public (int:x, int:y) → int
+    func l3m34_fn09 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 25502)
@@ -80,9 +71,8 @@ module L3M34 L3M34 block
       else
         return ((acc * 2) + 25502)
 
-    func l3m34_fn10 public (int:x, int:y) → int
+    func l3m34_fn10 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 3) + y)
       if (acc > 25509)

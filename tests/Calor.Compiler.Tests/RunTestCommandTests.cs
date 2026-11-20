@@ -121,10 +121,8 @@ public class RunTestCommandTests : IDisposable
         var file = Path.Combine(_tempDir, "square.calr");
         File.WriteAllText(file, """
             module SquareApp SquareApp block
-              func Square (int:x) → int
+              func Square (int:x | ((# >= 0) && (# <= 46340))) → int
                 !
-                requires (x >= 0)
-                requires (x <= 46340)
                 => (result >= 0)
                 return (x * x)
 

@@ -24,12 +24,10 @@ module OverflowBenchmark OverflowBenchmark
     // EXPECTED: Calor0923 Integer Overflow
     return x * y
 
-  func SafeSmallValues public (int:x) → int
+  func SafeSmallValues public (int:x | ((# < 1000) && (# > 0))) → int
     !
     // SAFE: Values known to be small
     // EXPECTED: No warnings
-    requires x < 1000
-    requires x > 0
     return x * 100
 
   func VulnerableLeftShift public (int:x, int:n) → int
@@ -38,12 +36,10 @@ module OverflowBenchmark OverflowBenchmark
     // EXPECTED: Calor0923 Integer Overflow
     return x << n
 
-  func SafeBoundedShift public (int:x) → int
+  func SafeBoundedShift public (int:x | ((# >= -536870912) && (# <= 536870911))) → int
     !
     // SAFE: Both the operand and shift amount are bounded
     // EXPECTED: No warnings
-    requires x >= -536870912
-    requires x <= 536870911
     return x << 2
 
   func VulnerableAccumulator public (int:n) → int

@@ -12,10 +12,8 @@ module L1M13 L1M13 block
       let int:v1 = L2M04.L2M04Module.l2m04_fn04(x, 61)
       return (v1 + y)
 
-    func l1m13_fn03 public (int:x, int:y) → int
+    func l1m13_fn03 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 20672)
       let int:total = ((x * 5) + y)
       if (total < 20672)
@@ -23,9 +21,8 @@ module L1M13 L1M13 block
       else
         return total
 
-    func l1m13_fn04 public (int:x, int:y) → int
+    func l1m13_fn04 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20679)
       if (x >= 20679)
@@ -33,10 +30,8 @@ module L1M13 L1M13 block
       else
         return 20679
 
-    func l1m13_fn05 public (int:x, int:y) → int
+    func l1m13_fn05 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 20686)
       let int:total = ((x * 5) + y)
       if (total < 20686)
@@ -49,18 +44,16 @@ module L1M13 L1M13 block
       let int:v1 = L2M02.L2M02Module.l2m02_fn10(x, 56)
       return (v1 + y)
 
-    func l1m13_fn07 public (int:x, int:y) → int
+    func l1m13_fn07 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20693)
       let int:total = ((x * 2) + y)
       if (total > 20693)
         return 20693
       return total
 
-    func l1m13_fn08 public (int:x, int:y) → int
+    func l1m13_fn08 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 2) + y)
       if (acc > 20700)
@@ -68,18 +61,16 @@ module L1M13 L1M13 block
       else
         return ((acc * 2) + 20700)
 
-    func l1m13_fn09 public (int:x, int:y) → int
+    func l1m13_fn09 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20707)
       let int:total = ((x * 5) + y)
       if (total > 20707)
         return 20707
       return total
 
-    func l1m13_fn10 public (int:x, int:y) → int
+    func l1m13_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20714)
       if (x >= 20714)
@@ -93,9 +84,8 @@ module L1M13 L1M13 block
       let int:v2 = L2M06.L2M06Module.l2m06_fn02(x, 38)
       return ((v1 + v2) + y)
 
-    func l1m13_fn12 public (int:x, int:y) → int
+    func l1m13_fn12 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 3) + y)
       if (acc > 20721)
@@ -103,9 +93,8 @@ module L1M13 L1M13 block
       else
         return ((acc * 2) + 20721)
 
-    func l1m13_fn13 public (int:x, int:y) → int
+    func l1m13_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20728)
       if (x >= 20728)

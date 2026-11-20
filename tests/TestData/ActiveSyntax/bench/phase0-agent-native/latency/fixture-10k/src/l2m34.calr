@@ -1,9 +1,8 @@
 module L2M34 L2M34 block
   module L2M34Module public
 
-    func l2m34_fn01 public (int:x, int:y) → int
+    func l2m34_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23514)
       if (x >= 23514)
@@ -16,9 +15,8 @@ module L2M34 L2M34 block
       let int:v1 = L3M28.L3M28Module.l3m28_fn02(x, 88)
       return (v1 + y)
 
-    func l2m34_fn03 public (int:x, int:y) → int
+    func l2m34_fn03 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 3) + y)
       if (acc > 23521)
@@ -26,10 +24,8 @@ module L2M34 L2M34 block
       else
         return ((acc * 2) + 23521)
 
-    func l2m34_fn04 public (int:x, int:y) → int
+    func l2m34_fn04 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 23528)
       let int:total = ((x * 2) + y)
       if (total < 23528)
@@ -43,18 +39,16 @@ module L2M34 L2M34 block
       let int:v2 = L3M12.L3M12Module.l3m12_fn06(x, 37)
       return ((v1 + v2) + y)
 
-    func l2m34_fn06 public (int:x, int:y) → int
+    func l2m34_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23535)
       let int:total = ((x * 2) + y)
       if (total > 23535)
         return 23535
       return total
 
-    func l2m34_fn07 public (int:x, int:y) → int
+    func l2m34_fn07 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23542)
       if (x >= 23542)
@@ -62,9 +56,8 @@ module L2M34 L2M34 block
       else
         return 23542
 
-    func l2m34_fn08 public (int:x, int:y) → int
+    func l2m34_fn08 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 2) + y)
       if (acc > 23549)
@@ -72,9 +65,8 @@ module L2M34 L2M34 block
       else
         return ((acc * 2) + 23549)
 
-    func l2m34_fn09 public (int:x, int:y) → int
+    func l2m34_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23556)
       if (x >= 23556)
@@ -92,9 +84,8 @@ module L2M34 L2M34 block
       let int:v1 = L3M11.L3M11Module.l3m11_fn08(x, 64)
       return (v1 + y)
 
-    func l2m34_fn12 public (int:x, int:y) → int
+    func l2m34_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23563)
       if (x >= 23563)
@@ -102,9 +93,8 @@ module L2M34 L2M34 block
       else
         return 23563
 
-    func l2m34_fn13 public (int:x, int:y) → int
+    func l2m34_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23570)
       if (x >= 23570)

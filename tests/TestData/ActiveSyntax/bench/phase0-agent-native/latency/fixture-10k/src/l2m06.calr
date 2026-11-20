@@ -18,10 +18,8 @@ module L2M06 L2M06 block
       let int:v2 = L3M12.L3M12Module.l3m12_fn02(x, 49)
       return ((v1 + v2) + y)
 
-    func l2m06_fn04 public (int:x, int:y) → int
+    func l2m06_fn04 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 22121)
       let int:total = ((x * 3) + y)
       if (total < 22121)
@@ -29,9 +27,8 @@ module L2M06 L2M06 block
       else
         return total
 
-    func l2m06_fn05 public (int:x, int:y) → int
+    func l2m06_fn05 public (int:x | (# > 2), int:y) → int
       !
-      requires (x > 2)
       => (x >= 3)
       let int:acc = ((x * 5) + y)
       if (acc > 22128)
@@ -44,9 +41,8 @@ module L2M06 L2M06 block
       let int:v1 = L3M32.L3M32Module.l3m32_fn08(x, 24)
       return (v1 + y)
 
-    func l2m06_fn07 public (int:x, int:y) → int
+    func l2m06_fn07 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22135)
       if (x >= 22135)
@@ -54,10 +50,8 @@ module L2M06 L2M06 block
       else
         return 22135
 
-    func l2m06_fn08 public (int:x, int:y) → int
+    func l2m06_fn08 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 22142)
       let int:total = ((x * 5) + y)
       if (total < 22142)
@@ -70,10 +64,8 @@ module L2M06 L2M06 block
       let int:v1 = L3M30.L3M30Module.l3m30_fn06(x, 68)
       return (v1 + y)
 
-    func l2m06_fn10 public (int:x, int:y) → int
+    func l2m06_fn10 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 22149)
       let int:total = ((x * 2) + y)
       if (total < 22149)
@@ -81,9 +73,8 @@ module L2M06 L2M06 block
       else
         return total
 
-    func l2m06_fn11 public (int:x, int:y) → int
+    func l2m06_fn11 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22156)
       let int:total = ((x * 5) + y)
       if (total > 22156)

@@ -1,9 +1,7 @@
 module ModuloContracts ModuloContracts
   module ModuloContractsModule
-    func ModBounded public (int:a, int:b) → int
+    func ModBounded public (int:a | (# >= 0), int:b | (# > 0)) → int
       !
-      requires b > 0
-      requires a >= 0
       => result >= 0
       => result < b
       return a % b
@@ -18,10 +16,8 @@ module ModuloContracts ModuloContracts
       else
         return r
 
-    func WrapAround public (int:index, int:size) → int
+    func WrapAround public (int:index | (# >= 0), int:size | (# > 0)) → int
       !
-      requires size > 0
-      requires index >= 0
       => result >= 0
       => result < size
       return index % size

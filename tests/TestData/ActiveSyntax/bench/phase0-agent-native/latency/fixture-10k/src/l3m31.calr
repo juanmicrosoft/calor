@@ -1,9 +1,8 @@
 module L3M31 L3M31 block
   module L3M31Module public
 
-    func l3m31_fn01 public (int:x, int:y) → int
+    func l3m31_fn01 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 5) + y)
       if (acc > 25292)
@@ -11,9 +10,8 @@ module L3M31 L3M31 block
       else
         return ((acc * 2) + 25292)
 
-    func l3m31_fn02 public (int:x, int:y) → int
+    func l3m31_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25299)
       if (x >= 25299)
@@ -21,10 +19,8 @@ module L3M31 L3M31 block
       else
         return 25299
 
-    func l3m31_fn03 public (int:x, int:y) → int
+    func l3m31_fn03 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 25306)
       let int:total = ((x * 3) + y)
       if (total < 25306)
@@ -42,18 +38,16 @@ module L3M31 L3M31 block
       let int:@base = ((x * 4) - y)
       return (@base + 56)
 
-    func l3m31_fn06 public (int:x, int:y) → int
+    func l3m31_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25313)
       let int:total = ((x * 5) + y)
       if (total > 25313)
         return 25313
       return total
 
-    func l3m31_fn07 public (int:x, int:y) → int
+    func l3m31_fn07 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25320)
       if (x >= 25320)
@@ -61,28 +55,24 @@ module L3M31 L3M31 block
       else
         return 25320
 
-    func l3m31_fn08 public (int:x, int:y) → int
+    func l3m31_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25327)
       let int:total = ((x * 2) + y)
       if (total > 25327)
         return 25327
       return total
 
-    func l3m31_fn09 public (int:x, int:y) → int
+    func l3m31_fn09 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25334)
       let int:total = ((x * 5) + y)
       if (total > 25334)
         return 25334
       return total
 
-    func l3m31_fn10 public (int:x, int:y) → int
+    func l3m31_fn10 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 25341)
       let int:total = ((x * 5) + y)
       if (total < 25341)
@@ -90,10 +80,8 @@ module L3M31 L3M31 block
       else
         return total
 
-    func l3m31_fn11 public (int:x, int:y) → int
+    func l3m31_fn11 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 25348)
       let int:total = ((x * 3) + y)
       if (total < 25348)
@@ -106,9 +94,8 @@ module L3M31 L3M31 block
       let int:@base = ((x * 4) - y)
       return (@base + 77)
 
-    func l3m31_fn13 public (int:x, int:y) → int
+    func l3m31_fn13 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 2) + y)
       if (acc > 25355)

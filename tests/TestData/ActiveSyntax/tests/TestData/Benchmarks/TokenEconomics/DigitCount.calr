@@ -12,9 +12,8 @@ module DigitCount DigitCount
       else
         return n
 
-    func DigitCountPositive public (int:n) → int
+    func DigitCountPositive public (int:n | (# >= 0)) → int
       !
-      requires n >= 0
       => result > 0
       if n < 10
         return 1

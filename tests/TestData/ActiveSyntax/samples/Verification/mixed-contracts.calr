@@ -1,13 +1,11 @@
 module MixedContracts MixedContracts
-  func SafeDivide public (int:a, int:b) → int
+  func SafeDivide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     => b != 0
     return a / b
 
-  func SumArray public (int:n) → int
+  func SumArray public (int:n | (# >= 0)) → int
     !
-    requires n >= 0
     return 0
 
   func Increment public (int:x) → int

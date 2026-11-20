@@ -1,9 +1,8 @@
 module L1M32 L1M32 block
   module L1M32Module public
 
-    func l1m32_fn01 public (int:x, int:y) → int
+    func l1m32_fn01 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21666)
       let int:total = ((x * 5) + y)
       if (total > 21666)
@@ -20,10 +19,8 @@ module L1M32 L1M32 block
       let int:v1 = L2M33.L2M33Module.l2m33_fn08(x, 72)
       return (v1 + y)
 
-    func l1m32_fn04 public (int:x, int:y) → int
+    func l1m32_fn04 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 21673)
       let int:total = ((x * 3) + y)
       if (total < 21673)
@@ -36,9 +33,8 @@ module L1M32 L1M32 block
       let int:v1 = L2M15.L2M15Module.l2m15_fn11(x, 65)
       return (v1 + y)
 
-    func l1m32_fn06 public (int:x, int:y) → int
+    func l1m32_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21680)
       if (x >= 21680)
@@ -52,9 +48,8 @@ module L1M32 L1M32 block
       let int:v2 = L2M10.L2M10Module.l2m10_fn02(x, 31)
       return ((v1 + v2) + y)
 
-    func l1m32_fn08 public (int:x, int:y) → int
+    func l1m32_fn08 public (int:x | (# > 6), int:y) → int
       !
-      requires (x > 6)
       => (x >= 7)
       let int:acc = ((x * 5) + y)
       if (acc > 21687)
@@ -62,9 +57,8 @@ module L1M32 L1M32 block
       else
         return ((acc * 2) + 21687)
 
-    func l1m32_fn09 public (int:x, int:y) → int
+    func l1m32_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21694)
       if (x >= 21694)
@@ -72,9 +66,8 @@ module L1M32 L1M32 block
       else
         return 21694
 
-    func l1m32_fn10 public (int:x, int:y) → int
+    func l1m32_fn10 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 2) + y)
       if (acc > 21701)
@@ -82,9 +75,8 @@ module L1M32 L1M32 block
       else
         return ((acc * 2) + 21701)
 
-    func l1m32_fn11 public (int:x, int:y) → int
+    func l1m32_fn11 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21708)
       let int:total = ((x * 5) + y)
       if (total > 21708)
@@ -97,9 +89,8 @@ module L1M32 L1M32 block
       let int:v2 = L2M10.L2M10Module.l2m10_fn02(x, 38)
       return ((v1 + v2) + y)
 
-    func l1m32_fn13 public (int:x, int:y) → int
+    func l1m32_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21715)
       if (x >= 21715)

@@ -86,9 +86,8 @@ public class ParameterPoststateTests
                   get
                     set Value -1
                     return Value
-                func Change (ref int:x) → int
+                func Change (ref int:x | (# >= 0)) → int
                   !
-                  requires (x >= 0)
                   => (x >= 0)
                   let int:ignored = Mutate
                   return x
@@ -123,9 +122,8 @@ public class ParameterPoststateTests
     private static string Source(bool isVoid, string mutation) => $$"""
         module ParameterPoststate
           module ParameterPoststateModule
-            func Change public (int:x) → {{(isVoid ? "void" : "int")}}
+            func Change public (int:x | (# >= 0)) → {{(isVoid ? "void" : "int")}}
               !
-              requires x >= 0
               => x >= 0
               {{mutation.Replace("\n", "\n  ")}}
               return{{(isVoid ? "" : " x")}}

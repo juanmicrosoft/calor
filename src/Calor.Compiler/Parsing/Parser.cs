@@ -1795,6 +1795,11 @@ public sealed class Parser
     private RequiresNode ParseRequires()
     {
         var startToken = Expect(TokenKind.Requires);
+        // #1618: one precondition form. The clause is still parsed for recovery.
+        _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+            "'requires' is removed. State a precondition as a refinement on the parameter it "
+            + "constrains, for example 'int:divisor | (# != 0)'; for a condition on several "
+            + "parameters, refine the last one and name the earlier ones, e.g. 'int:hi | (# > lo)'.");
         var attrs = ParseAttributes();
         // v2 syntax: message is first positional §Q{"message"} (condition)
         var message = attrs["_pos0"];

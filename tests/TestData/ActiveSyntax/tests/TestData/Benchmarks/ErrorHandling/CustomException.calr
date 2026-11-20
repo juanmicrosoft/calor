@@ -4,8 +4,6 @@ module CustomException CustomException
       !
       return value >= min && value <= max
 
-    func ThrowIfInvalid public (int:value, int:min, int:max) → int
+    func ThrowIfInvalid public (int:value, int:min | (value >= #), int:max | (value <= #)) → int
       !
-      requires value >= min
-      requires value <= max
       return value

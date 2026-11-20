@@ -12,9 +12,8 @@ module L1M06 L1M06 block
       let int:v1 = L2M07.L2M07Module.l2m07_fn05(x, 41)
       return (v1 + y)
 
-    func l1m06_fn03 public (int:x, int:y) → int
+    func l1m06_fn03 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 20259)
@@ -22,9 +21,8 @@ module L1M06 L1M06 block
       else
         return ((acc * 2) + 20259)
 
-    func l1m06_fn04 public (int:x, int:y) → int
+    func l1m06_fn04 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20266)
       if (x >= 20266)
@@ -38,9 +36,8 @@ module L1M06 L1M06 block
       let int:v2 = L2M27.L2M27Module.l2m27_fn03(x, 31)
       return ((v1 + v2) + y)
 
-    func l1m06_fn06 public (int:x, int:y) → int
+    func l1m06_fn06 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 3) + y)
       if (acc > 20273)
@@ -48,9 +45,8 @@ module L1M06 L1M06 block
       else
         return ((acc * 2) + 20273)
 
-    func l1m06_fn07 public (int:x, int:y) → int
+    func l1m06_fn07 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 3) + y)
       if (acc > 20280)
@@ -68,9 +64,8 @@ module L1M06 L1M06 block
       let int:v1 = L2M12.L2M12Module.l2m12_fn13(x, 59)
       return (v1 + y)
 
-    func l1m06_fn10 public (int:x, int:y) → int
+    func l1m06_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20287)
       if (x >= 20287)
@@ -78,9 +73,8 @@ module L1M06 L1M06 block
       else
         return 20287
 
-    func l1m06_fn11 public (int:x, int:y) → int
+    func l1m06_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20294)
       if (x >= 20294)
@@ -88,9 +82,8 @@ module L1M06 L1M06 block
       else
         return 20294
 
-    func l1m06_fn12 public (int:x, int:y) → int
+    func l1m06_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20301)
       if (x >= 20301)

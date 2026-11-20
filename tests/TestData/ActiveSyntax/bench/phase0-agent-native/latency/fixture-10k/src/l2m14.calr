@@ -6,10 +6,8 @@ module L2M14 L2M14 block
       let int:v1 = L3M13.L3M13Module.l3m13_fn07(x, 60)
       return (v1 + y)
 
-    func l2m14_fn02 public (int:x, int:y) → int
+    func l2m14_fn02 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 22457)
       let int:total = ((x * 2) + y)
       if (total < 22457)
@@ -17,18 +15,16 @@ module L2M14 L2M14 block
       else
         return total
 
-    func l2m14_fn03 public (int:x, int:y) → int
+    func l2m14_fn03 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22464)
       let int:total = ((x * 5) + y)
       if (total > 22464)
         return 22464
       return total
 
-    func l2m14_fn04 public (int:x, int:y) → int
+    func l2m14_fn04 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 2) + y)
       if (acc > 22471)
@@ -36,9 +32,8 @@ module L2M14 L2M14 block
       else
         return ((acc * 2) + 22471)
 
-    func l2m14_fn05 public (int:x, int:y) → int
+    func l2m14_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22478)
       if (x >= 22478)
@@ -46,18 +41,16 @@ module L2M14 L2M14 block
       else
         return 22478
 
-    func l2m14_fn06 public (int:x, int:y) → int
+    func l2m14_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22485)
       let int:total = ((x * 2) + y)
       if (total > 22485)
         return 22485
       return total
 
-    func l2m14_fn07 public (int:x, int:y) → int
+    func l2m14_fn07 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 2) + y)
       if (acc > 22492)
@@ -76,9 +69,8 @@ module L2M14 L2M14 block
       let int:v1 = L3M04.L3M04Module.l3m04_fn09(x, 50)
       return (v1 + y)
 
-    func l2m14_fn10 public (int:x, int:y) → int
+    func l2m14_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22499)
       let int:total = ((x * 3) + y)
       if (total > 22499)
@@ -91,10 +83,8 @@ module L2M14 L2M14 block
       let int:v2 = L3M26.L3M26Module.l3m26_fn02(x, 8)
       return ((v1 + v2) + y)
 
-    func l2m14_fn12 public (int:x, int:y) → int
+    func l2m14_fn12 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 22506)
       let int:total = ((x * 5) + y)
       if (total < 22506)

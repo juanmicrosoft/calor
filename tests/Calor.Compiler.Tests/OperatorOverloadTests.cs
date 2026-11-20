@@ -124,9 +124,8 @@ public class OperatorOverloadTests
             module Operators
               class Number struct
                 field int:Value public
-                op + (Number:left, int:right) → int
+                op + (Number:left | (#.Value >= 0), int:right) → int
                   !
-                  requires left.Value >= 0
                   => result >= 0
                   return left.Value + right
             """;
@@ -262,9 +261,8 @@ module Test
         var source = @"
 module Test
   class MyType
-    op + (MyType:left, MyType:right) → MyType
+    op + (MyType:left | (# >= 0), MyType:right) → MyType
       !
-      requires left >= 0
       => result >= 0
       return left
 ";
@@ -500,9 +498,8 @@ module Test
         var source = @"
 module Test
   class MyType
-    op + (int:left, int:right) → int
+    op + (int:left | (# >= 0), int:right) → int
       !
-      requires left >= 0
       return left + right
 ";
 
@@ -900,9 +897,8 @@ module Test
         var source = @"
 module Test
   class MyType
-    op + (int:left, int:right) → int
+    op + (int:left | (# >= 0), int:right) → int
       !
-      requires left >= 0
       => result >= 0
       return left + right
 ";
@@ -961,9 +957,8 @@ module Test
         var source = @"
 module Test
   class MyType
-    op + (int:left, int:right) → int
+    op + (int:left | (# >= 0), int:right) → int
       !
-      requires left >= 0
       => result >= 0
       return left + right
 ";
@@ -984,9 +979,8 @@ module Test
         var source = @"
 module Test
   class MyType
-    op + (int:left, int:right) → int
+    op + (int:left | (# >= 0), int:right) → int
       !
-      requires left >= 0
       => result >= 0
       return left + right
 ";

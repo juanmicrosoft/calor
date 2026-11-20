@@ -101,9 +101,8 @@ public sealed class S2ObligationStateTests
         module M M block
           class Box
             field int:Value
-            func Probe (ref int:x) → int
+            func Probe (ref int:x | (# > 0)) → int
               ! mut
-              requires (x > 0)
               set this.Value -5
               proof{"claim"} (x > 0)
               return x
@@ -138,9 +137,8 @@ public sealed class S2ObligationStateTests
         // precondition) make the claim hold; a model y = z = 0 is unreachable.
         const string source = """
             module M M block
-              func Probe (int:x | ((# > 0) && (y > 0)), int:y, int:z) → void
+              func Probe (int:x | ((# > 0) && (y > 0)), int:y, int:z | (y == #)) → void
                 !
-                requires (y == z)
                 set x 1
                 proof{"claim"} (z > 0)
             """;
@@ -161,9 +159,8 @@ public sealed class S2ObligationStateTests
                   get
                     set this.Value -5
                     return 0
-                func Probe (ref int:x) → int
+                func Probe (ref int:x | (# > 0)) → int
                   ! mut
-                  requires (x > 0)
                   let int:sink = this.Trigger
                   proof{"claim"} (x > 0)
                   return x
@@ -185,9 +182,8 @@ public sealed class S2ObligationStateTests
                   get
                     set this.Value -5
                     return 0
-                func Probe (ref int:x) → int
+                func Probe (ref int:x | (# > 0)) → int
                   ! mut
-                  requires (x > 0)
                   proof{"trigger"} (this.Trigger == 0)
                   proof{"claim"} (x > 0)
                   return x

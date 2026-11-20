@@ -15,9 +15,8 @@ public class SafetyBenchmarkTests
 {
     private const string SafeDivideCalor = @"
 module Test Test block
-  func SafeDivide (int:a, int:b) → int
+  func SafeDivide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
 

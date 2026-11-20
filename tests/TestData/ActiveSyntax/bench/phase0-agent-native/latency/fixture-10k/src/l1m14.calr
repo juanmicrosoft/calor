@@ -1,10 +1,8 @@
 module L1M14 L1M14 block
   module L1M14Module public
 
-    func l1m14_fn01 public (int:x, int:y) → int
+    func l1m14_fn01 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 20735)
       let int:total = ((x * 5) + y)
       if (total < 20735)
@@ -29,9 +27,8 @@ module L1M14 L1M14 block
       let int:v1 = L2M20.L2M20Module.l2m20_fn06(x, 77)
       return (v1 + y)
 
-    func l1m14_fn05 public (int:x, int:y) → int
+    func l1m14_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20742)
       let int:total = ((x * 5) + y)
       if (total > 20742)
@@ -54,9 +51,8 @@ module L1M14 L1M14 block
       let int:v2 = L2M15.L2M15Module.l2m15_fn12(x, 10)
       return ((v1 + v2) + y)
 
-    func l1m14_fn09 public (int:x, int:y) → int
+    func l1m14_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20749)
       if (x >= 20749)

@@ -27,9 +27,8 @@ module L1M17 L1M17 block
       let int:v1 = L2M09.L2M09Module.l2m09_fn03(x, 17)
       return (v1 + y)
 
-    func l1m17_fn06 public (int:x, int:y) → int
+    func l1m17_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20889)
       if (x >= 20889)
@@ -42,10 +41,8 @@ module L1M17 L1M17 block
       let int:v1 = L2M07.L2M07Module.l2m07_fn07(x, 50)
       return (v1 + y)
 
-    func l1m17_fn08 public (int:x, int:y) → int
+    func l1m17_fn08 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 20896)
       let int:total = ((x * 3) + y)
       if (total < 20896)
@@ -59,9 +56,8 @@ module L1M17 L1M17 block
       let int:v2 = L2M24.L2M24Module.l2m24_fn03(x, 2)
       return ((v1 + v2) + y)
 
-    func l1m17_fn10 public (int:x, int:y) → int
+    func l1m17_fn10 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 5) + y)
       if (acc > 20903)
@@ -74,9 +70,8 @@ module L1M17 L1M17 block
       let int:v1 = L2M33.L2M33Module.l2m33_fn06(x, 56)
       return (v1 + y)
 
-    func l1m17_fn12 public (int:x, int:y) → int
+    func l1m17_fn12 public (int:x | (# > 2), int:y) → int
       !
-      requires (x > 2)
       => (x >= 3)
       let int:acc = ((x * 3) + y)
       if (acc > 20910)

@@ -1,9 +1,8 @@
 module L2M31 L2M31 block
   module L2M31Module public
 
-    func l2m31_fn01 public (int:x, int:y) → int
+    func l2m31_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23360)
       if (x >= 23360)
@@ -11,9 +10,8 @@ module L2M31 L2M31 block
       else
         return 23360
 
-    func l2m31_fn02 public (int:x, int:y) → int
+    func l2m31_fn02 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23367)
       let int:total = ((x * 5) + y)
       if (total > 23367)
@@ -31,9 +29,8 @@ module L2M31 L2M31 block
       let int:v2 = L3M24.L3M24Module.l3m24_fn05(x, 38)
       return ((v1 + v2) + y)
 
-    func l2m31_fn05 public (int:x, int:y) → int
+    func l2m31_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23374)
       if (x >= 23374)
@@ -51,9 +48,8 @@ module L2M31 L2M31 block
       let int:v1 = L3M10.L3M10Module.l3m10_fn08(x, 89)
       return (v1 + y)
 
-    func l2m31_fn08 public (int:x, int:y) → int
+    func l2m31_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23381)
       let int:total = ((x * 2) + y)
       if (total > 23381)
@@ -71,9 +67,8 @@ module L2M31 L2M31 block
       let int:v2 = L3M11.L3M11Module.l3m11_fn12(x, 75)
       return ((v1 + v2) + y)
 
-    func l2m31_fn11 public (int:x, int:y) → int
+    func l2m31_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23388)
       if (x >= 23388)

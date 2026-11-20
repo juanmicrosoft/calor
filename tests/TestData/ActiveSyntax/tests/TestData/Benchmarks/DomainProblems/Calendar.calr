@@ -1,8 +1,7 @@
 module Calendar Calendar
   module CalendarModule
-    func IsLeapYear public (int:year) → bool
+    func IsLeapYear public (int:year | (# > 0)) → bool
       !
-      requires year > 0
       if year % 400 == 0
         return true
       else if year % 4 == 0 && year % 100 != 0
@@ -10,10 +9,8 @@ module Calendar Calendar
       else
         return false
 
-    func DaysInMonth public (int:month, bool:isLeap) → int
+    func DaysInMonth public (int:month | ((# >= 1) && (# <= 12)), bool:isLeap) → int
       !
-      requires month >= 1
-      requires month <= 12
       => result > 0
       if month == 2
         if isLeap

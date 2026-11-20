@@ -204,9 +204,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var module = Parse(source, out var parseDiagnostics);

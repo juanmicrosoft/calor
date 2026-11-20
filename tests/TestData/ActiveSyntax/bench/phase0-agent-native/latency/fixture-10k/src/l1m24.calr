@@ -19,10 +19,8 @@ module L1M24 L1M24 block
       let int:v2 = L2M19.L2M19Module.l2m19_fn11(x, 15)
       return ((v1 + v2) + y)
 
-    func l1m24_fn04 public (int:x, int:y) → int
+    func l1m24_fn04 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 21232)
       let int:total = ((x * 2) + y)
       if (total < 21232)
@@ -36,9 +34,8 @@ module L1M24 L1M24 block
       let int:v2 = L2M29.L2M29Module.l2m29_fn01(x, 53)
       return ((v1 + v2) + y)
 
-    func l1m24_fn06 public (int:x, int:y) → int
+    func l1m24_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21239)
       if (x >= 21239)
@@ -46,18 +43,16 @@ module L1M24 L1M24 block
       else
         return 21239
 
-    func l1m24_fn07 public (int:x, int:y) → int
+    func l1m24_fn07 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21246)
       let int:total = ((x * 3) + y)
       if (total > 21246)
         return 21246
       return total
 
-    func l1m24_fn08 public (int:x, int:y) → int
+    func l1m24_fn08 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 3) + y)
       if (acc > 21253)
@@ -71,9 +66,8 @@ module L1M24 L1M24 block
       let int:v2 = L2M09.L2M09Module.l2m09_fn03(x, 64)
       return ((v1 + v2) + y)
 
-    func l1m24_fn10 public (int:x, int:y) → int
+    func l1m24_fn10 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 3) + y)
       if (acc > 21260)
@@ -81,9 +75,8 @@ module L1M24 L1M24 block
       else
         return ((acc * 2) + 21260)
 
-    func l1m24_fn11 public (int:x, int:y) → int
+    func l1m24_fn11 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 3) + y)
       if (acc > 21267)
@@ -91,9 +84,8 @@ module L1M24 L1M24 block
       else
         return ((acc * 2) + 21267)
 
-    func l1m24_fn12 public (int:x, int:y) → int
+    func l1m24_fn12 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 5) + y)
       if (acc > 21274)

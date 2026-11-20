@@ -1,10 +1,8 @@
 module L1M10 L1M10 block
   module L1M10Module public
 
-    func l1m10_fn01 public (int:x, int:y) → int
+    func l1m10_fn01 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 20504)
       let int:total = ((x * 2) + y)
       if (total < 20504)
@@ -23,9 +21,8 @@ module L1M10 L1M10 block
       let int:v1 = L2M01.L2M01Module.l2m01_fn12(x, 60)
       return (v1 + y)
 
-    func l1m10_fn04 public (int:x, int:y) → int
+    func l1m10_fn04 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 2) + y)
       if (acc > 20511)
@@ -33,18 +30,16 @@ module L1M10 L1M10 block
       else
         return ((acc * 2) + 20511)
 
-    func l1m10_fn05 public (int:x, int:y) → int
+    func l1m10_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20518)
       let int:total = ((x * 2) + y)
       if (total > 20518)
         return 20518
       return total
 
-    func l1m10_fn06 public (int:x, int:y) → int
+    func l1m10_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20525)
       if (x >= 20525)
@@ -57,18 +52,16 @@ module L1M10 L1M10 block
       let int:v1 = L2M29.L2M29Module.l2m29_fn01(x, 13)
       return (v1 + y)
 
-    func l1m10_fn08 public (int:x, int:y) → int
+    func l1m10_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20532)
       let int:total = ((x * 3) + y)
       if (total > 20532)
         return 20532
       return total
 
-    func l1m10_fn09 public (int:x, int:y) → int
+    func l1m10_fn09 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 20539)

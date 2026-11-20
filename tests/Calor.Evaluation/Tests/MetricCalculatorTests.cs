@@ -128,9 +128,8 @@ namespace Calculator
         var calculator = new ComprehensionCalculator();
         var context = CreateContext(
             calor: @"module Math Math block
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# > 0)) → int
     !
-    requires b > 0
     => result == a / b
     return a / b",
             csharp: @"namespace Math { public class MathOps { public int Divide(int a, int b) { return a / b; } } }");
@@ -207,9 +206,8 @@ namespace Calculator
         var calculator = new ErrorDetectionCalculator();
         var context = CreateContext(
             calor: @"module Safe Safe block
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b",
             csharp: @"public class Safe { public int Divide(int a, int b) { return a / b; } }");
 
@@ -233,9 +231,8 @@ namespace Calculator
         var calculator = new InformationDensityCalculator();
         var context = CreateContext(
             calor: @"module Dense Dense block
-  func Process public (int:x) → int
+  func Process public (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x",
             csharp: @"namespace Dense { public class DenseModule { public int Process(int x) { return x * x; } } }");

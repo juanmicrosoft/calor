@@ -1,10 +1,8 @@
 module L2M24 L2M24 block
   module L2M24Module public
 
-    func l2m24_fn01 public (int:x, int:y) → int
+    func l2m24_fn01 public (int:x | (# >= 7), int:y | (# >= 0)) → int
       !
-      requires (x >= 7)
-      requires (y >= 0)
       => (result >= 22947)
       let int:total = ((x * 2) + y)
       if (total < 22947)
@@ -12,9 +10,8 @@ module L2M24 L2M24 block
       else
         return total
 
-    func l2m24_fn02 public (int:x, int:y) → int
+    func l2m24_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22954)
       if (x >= 22954)
@@ -39,9 +36,8 @@ module L2M24 L2M24 block
       let int:v2 = L3M18.L3M18Module.l3m18_fn12(x, 61)
       return ((v1 + v2) + y)
 
-    func l2m24_fn06 public (int:x, int:y) → int
+    func l2m24_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22961)
       let int:total = ((x * 3) + y)
       if (total > 22961)
@@ -54,10 +50,8 @@ module L2M24 L2M24 block
       let int:v2 = L3M11.L3M11Module.l3m11_fn05(x, 69)
       return ((v1 + v2) + y)
 
-    func l2m24_fn08 public (int:x, int:y) → int
+    func l2m24_fn08 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 22968)
       let int:total = ((x * 2) + y)
       if (total < 22968)
@@ -70,10 +64,8 @@ module L2M24 L2M24 block
       let int:v1 = L3M21.L3M21Module.l3m21_fn08(x, 73)
       return (v1 + y)
 
-    func l2m24_fn10 public (int:x, int:y) → int
+    func l2m24_fn10 public (int:x | (# >= 7), int:y | (# >= 0)) → int
       !
-      requires (x >= 7)
-      requires (y >= 0)
       => (result >= 22975)
       let int:total = ((x * 2) + y)
       if (total < 22975)
@@ -86,9 +78,8 @@ module L2M24 L2M24 block
       let int:v1 = L3M01.L3M01Module.l3m01_fn06(x, 46)
       return (v1 + y)
 
-    func l2m24_fn12 public (int:x, int:y) → int
+    func l2m24_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22982)
       if (x >= 22982)

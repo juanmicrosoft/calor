@@ -172,9 +172,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     => (result >= 0)
     return (a / b)
 ";
@@ -378,9 +377,8 @@ module MathLib MathLib block
     {
         var source = @"
 module ComplexTest ComplexTest block
-  func Process (int:input) → int
+  func Process (int:input | (# > 0)) → int
     ! cw
-    requires (input > 0)
     => (result >= 0)
     if (input > 10)
       Console.WriteLine(""big"")

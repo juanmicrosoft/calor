@@ -47,11 +47,10 @@ module BoundsViolationBenchmark BoundsViolationBenchmark
     let int:index = startIndex - offset
     return items[index]
 
-  func SafeClampedIndex public (int:index, int[]:items) → int
+  func SafeClampedIndex public (int:index, int[]:items | (#.Length > 0)) → int
     !
     // SAFE: Index clamped to valid range
     // EXPECTED: No warnings
-    requires items.Length > 0
     let int:len = items.Length
     let int:minIdx = System.Math.Max(index, 0)
     let int:safeIdx = System.Math.Min(minIdx, len - 1)
@@ -69,10 +68,8 @@ module BoundsViolationBenchmark BoundsViolationBenchmark
       set sum sum + val
     return sum
 
-  func SafeWithPrecondition public (int:index, int[]:items) → int
+  func SafeWithPrecondition public (int:index | (# >= 0), int[]:items | (index < #.Length)) → int
     !
     // SAFE: Precondition guarantees valid index
     // EXPECTED: No warnings
-    requires index >= 0
-    requires index < items.Length
     return items[index]

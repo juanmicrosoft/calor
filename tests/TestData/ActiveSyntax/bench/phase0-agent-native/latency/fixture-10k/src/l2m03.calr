@@ -1,10 +1,8 @@
 module L2M03 L2M03 block
   module L2M03Module public
 
-    func l2m03_fn01 public (int:x, int:y) → int
+    func l2m03_fn01 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 21974)
       let int:total = ((x * 5) + y)
       if (total < 21974)
@@ -23,10 +21,8 @@ module L2M03 L2M03 block
       let int:v1 = L3M17.L3M17Module.l3m17_fn05(x, 55)
       return (v1 + y)
 
-    func l2m03_fn04 public (int:x, int:y) → int
+    func l2m03_fn04 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 21981)
       let int:total = ((x * 2) + y)
       if (total < 21981)
@@ -34,9 +30,8 @@ module L2M03 L2M03 block
       else
         return total
 
-    func l2m03_fn05 public (int:x, int:y) → int
+    func l2m03_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21988)
       let int:total = ((x * 3) + y)
       if (total > 21988)
@@ -66,9 +61,8 @@ module L2M03 L2M03 block
       let int:v1 = L3M30.L3M30Module.l3m30_fn07(x, 39)
       return (v1 + y)
 
-    func l2m03_fn10 public (int:x, int:y) → int
+    func l2m03_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21995)
       if (x >= 21995)
@@ -76,9 +70,8 @@ module L2M03 L2M03 block
       else
         return 21995
 
-    func l2m03_fn11 public (int:x, int:y) → int
+    func l2m03_fn11 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 2) + y)
       if (acc > 22002)
@@ -86,10 +79,8 @@ module L2M03 L2M03 block
       else
         return ((acc * 2) + 22002)
 
-    func l2m03_fn12 public (int:x, int:y) → int
+    func l2m03_fn12 public (int:x | (# >= 7), int:y | (# >= 0)) → int
       !
-      requires (x >= 7)
-      requires (y >= 0)
       => (result >= 22009)
       let int:total = ((x * 3) + y)
       if (total < 22009)
@@ -97,9 +88,8 @@ module L2M03 L2M03 block
       else
         return total
 
-    func l2m03_fn13 public (int:x, int:y) → int
+    func l2m03_fn13 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 22016)

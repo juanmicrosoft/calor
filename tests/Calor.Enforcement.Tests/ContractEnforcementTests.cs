@@ -14,9 +14,8 @@ public class ContractEnforcementTests
     // declarations, checked arithmetic, and Test.TestModule CLR owner.
     private const string RequiresCurrentNativeProgram = """
         module Test Test
-          func Divide public (int:a, int:b) → int
+          func Divide public (int:a, int:b | (# != 0)) → int
             !
-            requires b != 0
             return a / b
         """;
 
@@ -30,9 +29,8 @@ public class ContractEnforcementTests
 
     private const string ModeOffCurrentNativeProgram = """
         module Test Test
-          func Divide public (int:a, int:b) → int
+          func Divide public (int:a, int:b | (# != 0)) → int
             !
-            requires b != 0
             return a / b
         """;
 
@@ -48,17 +46,15 @@ public class ContractEnforcementTests
 
     private const string FunctionIdCurrentNativeProgram = """
         module Test Test
-          func RequirePositive public (int:n) → int
+          func RequirePositive public (int:n | (# > 0)) → int
             !
-            requires n > 0
             return n
         """;
 
     private const string NoEffectsCurrentNativeProgram = """
         module Test Test
-          func SafeAdd public (int:a, int:b) → int
+          func SafeAdd public (int:a | (# >= 0), int:b) → int
             !
-            requires a >= 0
             => result >= a
             return a + b
         """;
@@ -236,9 +232,8 @@ public class ContractEnforcementTests
         // B1 scenario: Function with contracts but no effects is valid
         var source = @"
 module Test Test block
-  func SafeAdd (int:a, int:b) → int
+  func SafeAdd (int:a | (# >= 0), int:b) → int
     !
-    requires (a >= 0)
     => (result >= a)
     return (a + b)
 ";

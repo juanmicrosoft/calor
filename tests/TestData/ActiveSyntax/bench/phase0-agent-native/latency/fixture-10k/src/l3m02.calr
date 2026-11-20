@@ -1,9 +1,8 @@
 module L3M02 L3M02 block
   module L3M02Module public
 
-    func l3m02_fn01 public (int:x, int:y) → int
+    func l3m02_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23682)
       if (x >= 23682)
@@ -11,9 +10,8 @@ module L3M02 L3M02 block
       else
         return 23682
 
-    func l3m02_fn02 public (int:x, int:y) → int
+    func l3m02_fn02 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 2) + y)
       if (acc > 23689)
@@ -21,9 +19,8 @@ module L3M02 L3M02 block
       else
         return ((acc * 2) + 23689)
 
-    func l3m02_fn03 public (int:x, int:y) → int
+    func l3m02_fn03 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23696)
       if (x >= 23696)
@@ -36,10 +33,8 @@ module L3M02 L3M02 block
       let int:@base = ((x * 4) - y)
       return (@base + 15)
 
-    func l3m02_fn05 public (int:x, int:y) → int
+    func l3m02_fn05 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 23703)
       let int:total = ((x * 2) + y)
       if (total < 23703)
@@ -47,9 +42,8 @@ module L3M02 L3M02 block
       else
         return total
 
-    func l3m02_fn06 public (int:x, int:y) → int
+    func l3m02_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23710)
       if (x >= 23710)
@@ -57,10 +51,8 @@ module L3M02 L3M02 block
       else
         return 23710
 
-    func l3m02_fn07 public (int:x, int:y) → int
+    func l3m02_fn07 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 23717)
       let int:total = ((x * 3) + y)
       if (total < 23717)
@@ -73,9 +65,8 @@ module L3M02 L3M02 block
       let int:@base = ((x * 4) - y)
       return (@base + 84)
 
-    func l3m02_fn09 public (int:x, int:y) → int
+    func l3m02_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23724)
       if (x >= 23724)
@@ -83,9 +74,8 @@ module L3M02 L3M02 block
       else
         return 23724
 
-    func l3m02_fn10 public (int:x, int:y) → int
+    func l3m02_fn10 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 23731)
@@ -93,9 +83,8 @@ module L3M02 L3M02 block
       else
         return ((acc * 2) + 23731)
 
-    func l3m02_fn11 public (int:x, int:y) → int
+    func l3m02_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23738)
       if (x >= 23738)

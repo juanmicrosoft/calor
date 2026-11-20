@@ -1,8 +1,7 @@
 module Spans Spans block
   module SpansModule partial
-    func TotalCovered (int[]:starts, int[]:ends) → int
+    func TotalCovered (int[]:starts, int[]:ends | (starts.Length == #.Length)) → int
       !
-      requires (starts.Length == ends.Length)
       => (result >= 0)
       var int:total = 0
       var int:i = 0
@@ -11,9 +10,8 @@ module Spans Spans block
         set i (i + 1)
       return total
 
-    func ContainsPoint (int[]:starts, int[]:ends, int:x) → bool
+    func ContainsPoint (int[]:starts, int[]:ends | (starts.Length == #.Length), int:x) → bool
       !
-      requires (starts.Length == ends.Length)
       var int:i = 0
       while (i < starts.Length)
         if ((x >= starts[i]) && (x < ends[i]))
@@ -21,10 +19,8 @@ module Spans Spans block
         set i (i + 1)
       return false
 
-    func ClipCovered (int[]:starts, int[]:ends, int:lo, int:hi) → int
+    func ClipCovered (int[]:starts, int[]:ends | (starts.Length == #.Length), int:lo, int:hi | (lo <= #)) → int
       !
-      requires (starts.Length == ends.Length)
-      requires (lo <= hi)
       => (result >= 0)
       var int:total = 0
       var int:i = 0
@@ -40,9 +36,8 @@ module Spans Spans block
         set i (i + 1)
       return total
 
-    func GapCount (int[]:starts, int[]:ends) → int
+    func GapCount (int[]:starts, int[]:ends | (starts.Length == #.Length)) → int
       !
-      requires (starts.Length == ends.Length)
       => (result >= 0)
       var int:n = 0
       var int:i = 1

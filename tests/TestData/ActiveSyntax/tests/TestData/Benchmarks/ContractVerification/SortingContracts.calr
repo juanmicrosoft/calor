@@ -8,9 +8,7 @@ module SortingContracts SortingContracts
       !
       return left <= pivot && right >= pivot
 
-    func MergePreserves public (int:lenA, int:lenB) → int
+    func MergePreserves public (int:lenA | (# >= 0), int:lenB | (# >= 0)) → int
       !
-      requires lenA >= 0
-      requires lenB >= 0
       => result == lenA + lenB
       return lenA + lenB

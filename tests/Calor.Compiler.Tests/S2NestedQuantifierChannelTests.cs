@@ -23,8 +23,7 @@ public sealed class S2NestedQuantifierChannelTests
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         const string source = """
             module M
-              func Probe private (int:n) → int
-                requires forall int:i in 0..1 : (forall int:j in 0..1 : n > 0)
+              func Probe private (int:n | (forall int:i in 0..1 : (forall int:j in 0..1 : # > 0))) → int
                 proof{"claim"} n > 0
                 return n
             """;
@@ -97,9 +96,8 @@ public sealed class S2NestedQuantifierChannelTests
         using var status = new StringWriter();
         var source = $$"""
             module NativeRefusal
-              func Probe public (sbyte:n) → int
+              func Probe public (sbyte:n | (# > 0 && # < 12)) → int
                 !
-                requires n > 0 && n < 12
                 {{(proofObligation ? "proof{\"claim\"}" : "=>")}} forall int:i in 0..n : (forall int:j in 0..n : i - j < 29)
                 return 0
             """;
@@ -172,9 +170,8 @@ public sealed class S2NestedQuantifierChannelTests
     {
         const string source = """
             module NativeRefusal
-              func Probe public (sbyte:n) → int
+              func Probe public (sbyte:n | (# > 0 && # < 12)) → int
                 !
-                requires n > 0 && n < 12
                 => forall int:i in 0..n : (forall int:j in 0..n : i - j < 29)
                 return 0
             """;
@@ -195,9 +192,8 @@ public sealed class S2NestedQuantifierChannelTests
     {
         const string source = """
             module NativeRefusal
-              func Probe public (sbyte:n) → int
+              func Probe public (sbyte:n | (# > 0 && # < 12)) → int
                 !
-                requires n > 0 && n < 12
                 => forall int:i in 0..n : (forall int:j in 0..n : i - j < 29)
                 return 0
             """;
@@ -236,9 +232,8 @@ public sealed class S2NestedQuantifierChannelTests
     {
         const string source = """
             module InvalidNative
-              func Probe public (sbyte:n) → int
+              func Probe public (sbyte:n | (# > 0 && # < 12)) → int
                 !
-                requires n > 0 && n < 12
                 => forall int:i in 0..n : (forall int:j in 0..n : i - j < 29)
                 return missing
             """;

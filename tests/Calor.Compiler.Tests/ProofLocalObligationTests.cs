@@ -65,9 +65,8 @@ public sealed class ProofLocalObligationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
             module Banking Banking block
-              func Transfer (int:balance, int:amount | (# > 0)) → int
+              func Transfer (int:balance, int:amount | ((# > 0) && (balance >= #))) → int
                 !
-                requires (balance >= amount)
                 let int:newBalance = (balance - amount)
                 proof{"non-negative"} (newBalance >= 0)
                 return newBalance

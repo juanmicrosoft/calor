@@ -47,9 +47,8 @@ public sealed class NestedContractInheritanceRuntimeTests
             module NestedContracts NestedContracts block
               class Outer public
                 interface IPositive
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
                     => result > 0
                 interface IChild
                   extends IPositive
@@ -76,9 +75,8 @@ public sealed class NestedContractInheritanceRuntimeTests
         var positive = """
             class Positive public
               interface IValue
-                func Get (int:x) → int
+                func Get (int:x | (# > 0)) → int
                   !
-                  requires x > 0
                   => result > 0
               class Inner public
                 implements IValue
@@ -122,16 +120,14 @@ public sealed class NestedContractInheritanceRuntimeTests
         const string source = """
             module NestedContracts NestedContracts block
               interface IValue
-                func Get (int:x) → int
+                func Get (int:x | (# > 0)) → int
                   !
-                  requires x > 0
               class Outer public
                 class Inner public
                   implements IValue
                   interface IValue
-                    func Get (int:x) → int
+                    func Get (int:x | (# < 0)) → int
                       !
-                      requires x < 0
                   func Get public (int:value) → int
                     !
                     return value
@@ -151,9 +147,8 @@ public sealed class NestedContractInheritanceRuntimeTests
             module NestedContracts NestedContracts block
               class Base public
                 interface IPositive
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
                     => result > 0
               class Outer public
                 extends Base
@@ -178,14 +173,12 @@ public sealed class NestedContractInheritanceRuntimeTests
             module NestedContracts NestedContracts block
               class Outer<T> public
                 interface IPositive
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
                     => result > 0
                 interface IValue
-                  func Check (object:x) → object
+                  func Check (object:x | (# is T)) → object
                     !
-                    requires x is T
                     => result is T
               class Inner public
                 implements Outer<int>.IPositive
@@ -216,9 +209,8 @@ public sealed class NestedContractInheritanceRuntimeTests
         const string positive = """
             class Outer public
               interface IValue
-                func Get (int:x) → int
+                func Get (int:x | (# > 0)) → int
                   !
-                  requires x > 0
                   => result > 0
               class Inner public
                 implements IValue
@@ -473,9 +465,8 @@ public sealed class NestedContractInheritanceRuntimeTests
         const string source = """
             module NestedContracts NestedContracts block
               interface IValue<U>
-                func Check<T> (U:x) → U
+                func Check<T> (U:x | (# != null)) → U
                   !
-                  requires x != null
                   => result != null
               class Impl<T> public
                 implements IValue<T>
@@ -575,9 +566,8 @@ public sealed class NestedContractInheritanceRuntimeTests
                 module NestedContracts {{(moduleName == "_global" ? "" : moduleName + " block")}}
                   class Outer public
                     interface IValue
-                      func Check (object:x) → object
+                      func Check (object:x | (# != null)) → object
                         !
-                        requires x != null
                         => result != null
                     class Impl public
                       implements {{(global ? "global::" : "")}}{{namespacePrefix}}Outer.IValue
@@ -593,16 +583,14 @@ public sealed class NestedContractInheritanceRuntimeTests
             module Scope Scope block
               class Outer public
                 interface IValue
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
               class Container public
                 class Scope public
                   class Outer public
                     interface IValue
-                      func Get (int:x) → int
+                      func Get (int:x | (# < 0)) → int
                         !
-                        requires x < 0
                 class Relative public
                   implements Scope.Outer.IValue
                   func Get public (int:x) → int
@@ -691,9 +679,8 @@ public sealed class NestedContractInheritanceRuntimeTests
                     class Limits public
                       field int:Min public static = -10
                     interface IValue
-                      func Check (Payload:Limits) → int
+                      func Check (Payload:Limits | (#.Min > 0)) → int
                         !
-                        requires Limits.Min > 0
                   class Payload public
                     field int:Min public = 0
                   class Impl public
@@ -942,9 +929,8 @@ public sealed class NestedContractInheritanceRuntimeTests
             module Wrapper{{(ns.Length == 0 ? "" : " " + ns + " block")}}
               class Outer public
                 interface IValue
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
                     => result > 0
                 class Impl public
                   implements global::{{prefix}}Outer.IValue
@@ -1011,9 +997,8 @@ public sealed class NestedContractInheritanceRuntimeTests
 
     private const string NativePositiveInterface = """
         interface IPositive
-          func Get (int:x) → int
+          func Get (int:x | (# > 0)) → int
             !
-            requires x > 0
             => result > 0
         """;
 }

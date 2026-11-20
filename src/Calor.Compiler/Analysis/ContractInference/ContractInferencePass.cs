@@ -59,17 +59,18 @@ public sealed class ContractInferencePass
 
         // Infer non-zero preconditions for divisors
         var divisorParams = FindDivisorParameters(function);
-        foreach (var paramName in divisorParams)
+        foreach (var parameter in divisorParams)
         {
-            var contractText = $"requires {paramName} != 0";
+            // #1618: a parameter precondition is an inline refinement on that parameter.
+            var contractText = $"{parameter.Name} | (# != 0)";
             var fix = new SuggestedFix(
-                $"Add inferred precondition: {contractText}",
-                ContractFixEdit.Insert(function, contractText));
+                $"Add inferred refinement: {contractText}",
+                ContractFixEdit.Refine(parameter, "# != 0"));
 
             _diagnostics.ReportWithFix(
                 function.Span,
                 DiagnosticCode.InferredContract,
-                $"Inferred precondition: {contractText} (parameter used as divisor)",
+                $"Inferred refinement: {contractText} (parameter used as divisor)",
                 fix,
                 DiagnosticSeverity.Info);
 
@@ -151,12 +152,12 @@ public sealed class ContractInferencePass
     /// <summary>
     /// Finds parameter names used as divisors in the function body.
     /// </summary>
-    private static HashSet<string> FindDivisorParameters(BoundFunction function)
+    private static List<VariableSymbol> FindDivisorParameters(BoundFunction function)
     {
         var parameterIds = function.Symbol.Parameters
             .Select(parameter => parameter.Id)
             .ToHashSet();
-        var divisorParams = new HashSet<string>();
+        var divisorParams = new List<VariableSymbol>();
 
         foreach (var division in BoundNodeHelpers.DescendantsAndSelf(function)
                      .OfType<BoundBinaryExpression>()
@@ -167,7 +168,8 @@ public sealed class ContractInferencePass
             if (divisor is BoundVariableExpression variable
                 && parameterIds.Contains(variable.Variable.Id))
             {
-                divisorParams.Add(variable.Variable.Name);
+                if (!divisorParams.Any(existing => existing.Id == variable.Variable.Id))
+                    divisorParams.Add(variable.Variable);
             }
         }
 
@@ -194,5 +196,15 @@ internal static class ContractFixEdit
             ? (first.Span.Line, first.Span.Column - 1)
             : (function.Span.Line + 1, function.Span.Column - 1 + 2);
         return TextEdit.Insert("", line, 1, new string(' ', Math.Max(indent, 0)) + clause + "\n");
+    }
+
+    /// <summary>
+    /// #1618: refines a parameter in place, `int:x` → `int:x | (predicate)`, where the
+    /// predicate names the parameter as #. The edit goes right after the parameter's name.
+    /// </summary>
+    public static TextEdit Refine(VariableSymbol parameter, string predicate)
+    {
+        var name = parameter.IdentifierSpan;
+        return TextEdit.Insert("", name.Line, name.Column + name.Length, $" | ({predicate})");
     }
 }

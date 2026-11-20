@@ -4,9 +4,8 @@ module Contracts Contracts block
       ! cw
       Console.WriteLine("Testing contracts...")
 
-    func Square (int:x) → int
+    func Square (int:x | (# >= 0)) → int
       !
-      requires x >= 0
       => result >= 0
       return x * x
 

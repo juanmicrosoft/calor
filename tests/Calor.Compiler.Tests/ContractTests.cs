@@ -35,9 +35,8 @@ public class ContractTests
     {
         var source = @"
 module Test Test block
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     return (x * x)
 ";
 
@@ -83,10 +82,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a | (# >= 0), int:b | (# != 0)) → int
     !
-    requires (b != 0)
-    requires (a >= 0)
     => (result >= 0)
     return (a / b)
 ";
@@ -170,9 +167,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     return (x * x)
 ";
 
@@ -218,9 +214,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     return (x * x)
 ";
 

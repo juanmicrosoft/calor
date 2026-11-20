@@ -373,9 +373,8 @@ public class RefOutImplementationTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
         };
         var errors = Errors($$"""
-              func Run public (int:x) → int
+              func Run public (int:x | (# > 0)) → int
                 ! mut
-                requires x > 0
                 {{call}}
                 proof x > 0
                 return x

@@ -19,9 +19,8 @@ module L1M19 L1M19 block
       let int:v2 = L2M33.L2M33Module.l2m33_fn12(x, 1)
       return ((v1 + v2) + y)
 
-    func l1m19_fn04 public (int:x, int:y) → int
+    func l1m19_fn04 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20973)
       if (x >= 20973)
@@ -29,18 +28,16 @@ module L1M19 L1M19 block
       else
         return 20973
 
-    func l1m19_fn05 public (int:x, int:y) → int
+    func l1m19_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20980)
       let int:total = ((x * 2) + y)
       if (total > 20980)
         return 20980
       return total
 
-    func l1m19_fn06 public (int:x, int:y) → int
+    func l1m19_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20987)
       let int:total = ((x * 5) + y)
       if (total > 20987)
@@ -52,9 +49,8 @@ module L1M19 L1M19 block
       let int:v1 = L2M09.L2M09Module.l2m09_fn10(x, 76)
       return (v1 + y)
 
-    func l1m19_fn08 public (int:x, int:y) → int
+    func l1m19_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20994)
       let int:total = ((x * 5) + y)
       if (total > 20994)
@@ -71,9 +67,8 @@ module L1M19 L1M19 block
       let int:v1 = L2M30.L2M30Module.l2m30_fn02(x, 6)
       return (v1 + y)
 
-    func l1m19_fn11 public (int:x, int:y) → int
+    func l1m19_fn11 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21001)
       let int:total = ((x * 5) + y)
       if (total > 21001)
@@ -86,9 +81,8 @@ module L1M19 L1M19 block
       let int:v2 = L2M06.L2M06Module.l2m06_fn02(x, 42)
       return ((v1 + v2) + y)
 
-    func l1m19_fn13 public (int:x, int:y) → int
+    func l1m19_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21008)
       if (x >= 21008)

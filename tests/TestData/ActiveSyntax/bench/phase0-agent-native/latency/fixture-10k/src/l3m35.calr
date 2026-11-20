@@ -1,9 +1,8 @@
 module L3M35 L3M35 block
   module L3M35Module public
 
-    func l3m35_fn01 public (int:x, int:y) → int
+    func l3m35_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25516)
       if (x >= 25516)
@@ -11,9 +10,8 @@ module L3M35 L3M35 block
       else
         return 25516
 
-    func l3m35_fn02 public (int:x, int:y) → int
+    func l3m35_fn02 public (int:x | (# > 2), int:y) → int
       !
-      requires (x > 2)
       => (x >= 3)
       let int:acc = ((x * 2) + y)
       if (acc > 25523)
@@ -31,9 +29,8 @@ module L3M35 L3M35 block
       let int:@base = ((x * 4) - y)
       return (@base + 77)
 
-    func l3m35_fn05 public (int:x, int:y) → int
+    func l3m35_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25530)
       if (x >= 25530)
@@ -41,9 +38,8 @@ module L3M35 L3M35 block
       else
         return 25530
 
-    func l3m35_fn06 public (int:x, int:y) → int
+    func l3m35_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25537)
       let int:total = ((x * 2) + y)
       if (total > 25537)
@@ -55,10 +51,8 @@ module L3M35 L3M35 block
       let int:@base = ((x * 4) - y)
       return (@base + 60)
 
-    func l3m35_fn08 public (int:x, int:y) → int
+    func l3m35_fn08 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 25544)
       let int:total = ((x * 5) + y)
       if (total < 25544)
@@ -66,9 +60,8 @@ module L3M35 L3M35 block
       else
         return total
 
-    func l3m35_fn09 public (int:x, int:y) → int
+    func l3m35_fn09 public (int:x | (# > 2), int:y) → int
       !
-      requires (x > 2)
       => (x >= 3)
       let int:acc = ((x * 2) + y)
       if (acc > 25551)
@@ -76,9 +69,8 @@ module L3M35 L3M35 block
       else
         return ((acc * 2) + 25551)
 
-    func l3m35_fn10 public (int:x, int:y) → int
+    func l3m35_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25558)
       if (x >= 25558)
@@ -86,9 +78,8 @@ module L3M35 L3M35 block
       else
         return 25558
 
-    func l3m35_fn11 public (int:x, int:y) → int
+    func l3m35_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25565)
       if (x >= 25565)
@@ -96,9 +87,8 @@ module L3M35 L3M35 block
       else
         return 25565
 
-    func l3m35_fn12 public (int:x, int:y) → int
+    func l3m35_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25572)
       if (x >= 25572)
@@ -106,9 +96,8 @@ module L3M35 L3M35 block
       else
         return 25572
 
-    func l3m35_fn13 public (int:x, int:y) → int
+    func l3m35_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25579)
       if (x >= 25579)

@@ -423,9 +423,8 @@ public class BclContractTests
         {
             var source = $$"""
                 module NativeBclProof
-                  func Probe public (string:s) → {{output}}
+                  func Probe public (string:s | (# == "{{input}}")) → {{output}}
                     ! alloc
-                    requires s == "{{input}}"
                     => result {{(refute ? "!=" : "==")}} {{expected}}
                     return {{expression}}
                 """;
@@ -479,9 +478,8 @@ public class BclContractTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = $$"""
             module NativeBclProof
-              func Probe public (string:s) → string
+              func Probe public (string:s | (# == "abc")) → string
                 ! alloc
-                requires s == "abc"
                 => result == {{expected}}
                 {{binding}}
                 return {{expression}}
@@ -502,9 +500,8 @@ public class BclContractTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var (compiled, verification) = CompileNative("""
             module NativeBclProof
-              func Probe public (string:s, int[]:items) → string
+              func Probe public (string:s | (# == "abc"), int[]:items) → string
                 ! alloc
-                requires s == "abc"
                 => string.Concat(s, "d") == result && items.Length == items.Length
                 return string.Concat(s, "d")
             """);
@@ -529,9 +526,8 @@ public class BclContractTests
                 func IsNullOrEmpty public (string:s) → bool
                   !
                   return false
-              func Probe public (Widget:{{name}}, string:s) → bool
+              func Probe public (Widget:{{name}}, string:s | (# == "")) → bool
                 !
-                requires s == ""
                 => result == false
                 return {{name}}.IsNullOrEmpty(s)
             """);
@@ -609,9 +605,8 @@ public class BclContractTests
                 func IsNullOrEmpty public static (string:s) → bool
                   !
                   return false
-              func Probe public (string:s) → bool
+              func Probe public (string:s | (# == "")) → bool
                 !
-                requires s == ""
                 => result == false
                 return {{name}}.IsNullOrEmpty(s)
             """;
@@ -637,9 +632,8 @@ public class BclContractTests
               func Echo (string:s) → string
                 !
                 return s
-              func Probe public (string:s) → bool
+              func Probe public (string:s | (# == "abc")) → bool
                 ! alloc
-                requires s == "abc"
                 => result == result
                 return {{expression}}
             """;
