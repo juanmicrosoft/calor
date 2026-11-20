@@ -5,6 +5,7 @@ using Microsoft.Build.Utilities;
 
 namespace Calor.Tasks.Tests;
 
+[Xunit.Collection(ProcessStateCollection.Name)]
 public class BuildStateCacheTests : IDisposable
 {
     private readonly string _tempDir;

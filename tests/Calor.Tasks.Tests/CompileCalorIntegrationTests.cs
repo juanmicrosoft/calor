@@ -35,6 +35,7 @@ internal sealed class TestBuildEngine : IBuildEngine
     public void LogWarningEvent(BuildWarningEventArgs e) => Warnings.Add(e.Message ?? "");
 }
 
+[Xunit.Collection(ProcessStateCollection.Name)]
 public class CompileCalorIntegrationTests : IDisposable
 {
     [Theory]

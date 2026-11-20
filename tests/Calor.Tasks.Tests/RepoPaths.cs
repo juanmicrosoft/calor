@@ -28,3 +28,16 @@ internal static class RepoPaths
             "repository root (src/Calor.Sdk/Sdk/Sdk.targets) not found above " + AppContext.BaseDirectory);
     }
 }
+
+/// <summary>
+/// Test classes that touch process-wide or repository state join this collection. xUnit runs
+/// it alone, after every parallel class: <see cref="BuildStateCacheTests"/> sets
+/// <c>CALOR_NO_TYPE_CHECK</c>, and the MSBuild classes build temporary projects that reference
+/// this repository's Calor.Runtime and Calor.Sdk, whose bin and obj directories two concurrent
+/// builds would both write.
+/// </summary>
+[Xunit.CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class ProcessStateCollection
+{
+    public const string Name = "Process and repository state";
+}

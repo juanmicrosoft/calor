@@ -29,6 +29,7 @@ namespace Calor.Tasks.Tests;
 /// <c>Calor0421</c> (an override or interface implementation that BROADENS the effects
 /// it inherited; narrowing is legal).</para>
 /// </summary>
+[Xunit.Collection(ProcessStateCollection.Name)]
 public sealed class PermissiveEffectsTests : IDisposable
 {
     private readonly string _tempDir;

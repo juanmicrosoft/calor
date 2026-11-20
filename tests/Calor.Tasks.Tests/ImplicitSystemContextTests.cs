@@ -8,6 +8,7 @@ using Xunit.Abstractions;
 
 namespace Calor.Tasks.Tests;
 
+[Xunit.Collection(ProcessStateCollection.Name)]
 public sealed class ImplicitSystemContextTests(ITestOutputHelper output) : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"calor-system-sdk-{Guid.NewGuid():N}");

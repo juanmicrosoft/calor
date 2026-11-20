@@ -2,6 +2,7 @@ using Xunit;
 
 namespace Calor.Tasks.Tests;
 
+[Xunit.Collection(ProcessStateCollection.Name)]
 public sealed class EffectDefaultEquivalenceTests
 {
     [Fact]

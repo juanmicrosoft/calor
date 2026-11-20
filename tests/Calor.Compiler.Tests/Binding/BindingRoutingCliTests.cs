@@ -50,7 +50,7 @@ public class BindingRoutingCliTests : IDisposable
             NativeReceivingSource(targetType, targetType, boundary));
         // Each mode is two independent CLI processes with their own directory and an explicit
         // child environment (nothing process-wide), so the 33 modes run in parallel. Calor.Tasks.Tests
-        // links this file and disables xUnit parallelism, so this is where the wall time is won.
+        // links this file; this case loop is most of that project's wall time.
         Parallel.ForEach(Enumerable.Range(0, 33), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, mode =>
         {
             var modeDirectory = Path.Combine(_directory, "mode-" + mode);
