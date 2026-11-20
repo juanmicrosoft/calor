@@ -5917,7 +5917,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
             AppendLine($"/// Interface method with contracts.");
             AppendLine("/// </summary>");
 
-            foreach (var requires in node.Preconditions)
+            foreach (var requires in Verification.ContractVerifier.EffectivePreconditions(node.Parameters, node.Preconditions))
             {
                 var condition = requires.Condition.Accept(this);
                 AppendLine($"/// <remarks>Requires: {condition}</remarks>");

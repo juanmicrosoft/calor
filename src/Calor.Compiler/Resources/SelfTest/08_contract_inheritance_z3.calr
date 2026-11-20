@@ -1,23 +1,20 @@
 module ContractZ3Test ContractZ3Test block
   interface IService
-    func Process (int:value) → int
+    func Process (int:value | (# >= 0)) → int
       !
-      requires value >= 0
 
   class ValidService
     implements IService
 
-    func Process (int:value) → int
+    func Process (int:value | (# >= -10)) → int
       !
-      requires value >= -10
       => result >= 1
       return value + 1
 
   class AnotherValidService
     implements IService
 
-    func Process (int:value) → int
+    func Process (int:value | (# >= 0)) → int
       !
-      requires value >= 0
       => result >= 10
       return value + 10

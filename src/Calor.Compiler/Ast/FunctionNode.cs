@@ -293,7 +293,8 @@ public sealed class FunctionNode : AstNode
     /// <summary>
     /// Returns true if this function has any contracts (preconditions or postconditions).
     /// </summary>
-    public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
+    public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0
+        || Parameters.Any(parameter => parameter.InlineRefinement != null);
 
     /// <summary>
     /// Returns true if this function is generic (has type parameters).
