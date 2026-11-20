@@ -1,11 +1,13 @@
 using Calor.Compiler.Evaluation.Core;
+using Calor.Compiler.Ids;
 
 namespace Calor.Compiler.Evaluation.Metrics;
 
 /// <summary>
 /// Category 4: Edit Precision Calculator
 /// Measures the ability to make targeted edits via unique IDs.
-/// Calor's §F[id:name] enables precise edits without context ambiguity.
+/// Calor gives every declaration a stable ID (kept in the <c>.calor/ids.json</c> sidecar in native
+/// source), which enables precise edits without context ambiguity.
 /// </summary>
 public class EditPrecisionCalculator : IMetricCalculator
 {
@@ -37,32 +39,24 @@ public class EditPrecisionCalculator : IMetricCalculator
 
     private static double CalculateCalorEditPrecision(EvaluationContext context)
     {
-        var source = context.CalorSource;
+        var declarations = ReadDeclarations(context.CalorSource);
         var score = 0.0;
 
-        // Count explicit IDs that enable precise targeting
-        var idCount = CountUniqueIds(source);
+        // Count explicit IDs that enable precise targeting. Native source carries no inline IDs;
+        // every declaration (module, type, callable, member) gets one from the identity store.
+        var idCount = declarations.Count;
         score += Math.Min(1.0, idCount * 0.15);
 
-        // Function markers with IDs
-        var functionIds = CountOccurrences(source, "§F[id:");
+        // Functions with IDs
+        var functionIds = declarations.Count(d => IsCallable(d.Kind));
         score += Math.Min(0.3, functionIds * 0.1);
 
-        // Variable markers
-        var varMarkers = CountOccurrences(source, "§V[");
-        score += Math.Min(0.2, varMarkers * 0.05);
+        // Modules with IDs
+        var moduleIds = declarations.Count(d => d.Kind == IdKind.Module);
+        score += Math.Min(0.2, moduleIds * 0.1);
 
-        // Module markers
-        var moduleMarkers = CountOccurrences(source, "§M[");
-        score += Math.Min(0.2, moduleMarkers * 0.1);
-
-        // Return markers (enable precise return targeting)
-        var returnMarkers = CountOccurrences(source, "§RET");
-        score += Math.Min(0.1, returnMarkers * 0.05);
-
-        // Call markers (enable precise call site targeting)
-        var callMarkers = CountOccurrences(source, "§C[");
-        score += Math.Min(0.2, callMarkers * 0.05);
+        // Local bindings, returns and call sites have no IDs in native Calor, so the legacy
+        // variable, return and call marker terms earn nothing (as in Calor.Evaluation's copy).
 
         return Math.Min(1.0, score);
     }
@@ -107,32 +101,29 @@ public class EditPrecisionCalculator : IMetricCalculator
         return Math.Max(0, Math.Min(1.0, score));
     }
 
-    private static int CountUniqueIds(string source)
-    {
-        var count = 0;
-        var index = 0;
-        var pattern = "id:";
+    private static int CountUniqueIds(string source) => ReadDeclarations(source).Count;
 
-        while ((index = source.IndexOf(pattern, index, StringComparison.Ordinal)) != -1)
+    private static int CountAddressableElements(string source) =>
+        ReadDeclarations(source).Count(d => d.Kind == IdKind.Module || IsCallable(d.Kind));
+
+    private static bool IsCallable(IdKind kind) =>
+        kind is IdKind.Function or IdKind.Method or IdKind.Constructor or IdKind.OperatorOverload;
+
+    /// <summary>
+    /// The declarations the identity store gives IDs to (what <c>calor ids sync</c> would record
+    /// for this source). Source that does not parse and bind has none, as the store cannot
+    /// assign IDs to it.
+    /// </summary>
+    private static IReadOnlyList<DeclarationIdentity> ReadDeclarations(string source)
+    {
+        try
         {
-            count++;
-            index += pattern.Length;
+            return DeclarationIdentityStore.Describe("input.calr", source);
         }
-
-        return count;
-    }
-
-    private static int CountAddressableElements(string source)
-    {
-        var count = 0;
-
-        // Count all major addressable markers
-        count += CountOccurrences(source, "§M[");
-        count += CountOccurrences(source, "§F[");
-        count += CountOccurrences(source, "§V[");
-        count += CountOccurrences(source, "§C[");
-
-        return count;
+        catch (DeclarationIdentityParseException)
+        {
+            return [];
+        }
     }
 
     private static int CountNamedElements(string source)

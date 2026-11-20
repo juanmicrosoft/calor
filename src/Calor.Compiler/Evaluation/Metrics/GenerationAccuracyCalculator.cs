@@ -60,15 +60,15 @@ public class GenerationAccuracyCalculator : IMetricCalculator
         var score = 0.0;
         var checks = 0;
 
-        // Check for proper module structure
-        if (source.Contains("§M["))
+        // Check for proper module structure (`module Name`)
+        if (NativeCalorSyntax.Module.IsMatch(source))
         {
             score += 1.0;
             checks++;
         }
 
-        // Check for function definitions
-        if (source.Contains("§F["))
+        // Check for function definitions (`func Name`)
+        if (NativeCalorSyntax.Function.IsMatch(source))
         {
             score += 1.0;
             checks++;
@@ -83,8 +83,8 @@ public class GenerationAccuracyCalculator : IMetricCalculator
             checks++;
         }
 
-        // Check for proper parameter definitions
-        if (source.Contains("§I[") || source.Contains("§O["))
+        // Check for proper parameter definitions: typed parameters (`T:x`) or a return type (`→ T`)
+        if (NativeCalorSyntax.HasTypedParameters(source) || NativeCalorSyntax.TypedOutput.IsMatch(source))
         {
             score += 1.0;
             checks++;
