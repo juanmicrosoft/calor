@@ -279,7 +279,7 @@ else if condition                     Else-if (at parent column)
 else                                  Else (at parent column)
 object.Method(argument)               Method call
 ! cw                                  Declaration effect row (standalone ! = pure)
-requires expression                   Precondition
+(int:x | (# >= 0))                    Precondition: parameter refinement (# is the value)
 => expression                         Postcondition
 invariant expression                  Invariant
 ```

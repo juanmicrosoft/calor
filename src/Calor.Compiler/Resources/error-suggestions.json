@@ -7,10 +7,10 @@
       "title": "Null-Check Ordering (CRITICAL)",
       "matchPatterns": ["NullReferenceException", "null reference", ".Length"],
       "matchCodes": ["Calor0922", "Calor0921"],
-      "description": "Checking array/string length without null check first causes NullReferenceException instead of ContractViolationException.",
-      "wrongExample": "requires arr.Length > 0        // Crashes if arr is null!",
-      "correctExample": "requires arr != null       // First: reject null\nrequires arr.Length > 0    // Then: check length",
-      "explanation": "Contracts are evaluated in order. Reading arr.Length when arr is null throws instead of reporting the intended contract violation. Guard reference types with x != null before accessing their properties."
+      "description": "Checking array/string length without null check first causes NullReferenceException instead of the precondition's ArgumentOutOfRangeException.",
+      "wrongExample": "func First (int[]?:arr | (#.Length > 0)) → int    // Crashes if arr is null!",
+      "correctExample": "func First (int[]?:arr | (# != null && #.Length > 0)) → int    // Reject null first, then check length",
+      "explanation": "A refinement is evaluated left to right with short-circuit &&. Reading arr.Length when arr is null throws instead of reporting the intended contract violation. Guard reference types with x != null before accessing their properties."
     },
     {
       "id": "string-operations",
