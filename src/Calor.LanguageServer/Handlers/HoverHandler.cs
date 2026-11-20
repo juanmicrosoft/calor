@@ -63,7 +63,8 @@ public sealed class HoverHandler : HoverHandlerBase
         if (snapshot.GetTokenAtOffset(offset) is not { } syntaxToken || syntaxToken.Kind == TokenKind.Error)
             return null;
 
-        var tagHover = TryGetTagHover(snapshot.Source, syntaxToken);
+        var tagHover = TryGetTagHover(snapshot.Source, syntaxToken,
+            syntaxToken.Span.Start > 0 ? snapshot.GetTokenAtOffset(syntaxToken.Span.Start - 1) : null);
         if (tagHover != null)
         {
             return tagHover;
@@ -104,9 +105,9 @@ public sealed class HoverHandler : HoverHandlerBase
     /// <summary>
     /// Attempts to provide hover documentation for a Calor syntax tag.
     /// </summary>
-    private static Hover? TryGetTagHover(string source, Token token)
+    private static Hover? TryGetTagHover(string source, Token token, Token? previous)
     {
-        var tag = TagDocumentationProvider.GetSyntaxTag(token, source);
+        var tag = TagDocumentationProvider.GetSyntaxTag(token, previous);
         if (tag == null)
             return null;
         var doc = TagDocumentationProvider.Instance.GetTagDocumentation(tag);

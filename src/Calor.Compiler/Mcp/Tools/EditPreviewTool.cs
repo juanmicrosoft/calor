@@ -291,7 +291,7 @@ public sealed class EditPreviewTool : McpToolBase
     internal static void CheckReferences(ParseResult originalParse, ParseResult modifiedParse, ReferenceCheckResult result)
     {
         // Functions are checked against actual call targets in the modified
-        // AST — declarations are referenced by NAME at call sites (§C{add}),
+        // AST — declarations are referenced by NAME at call sites (add(1, 2)),
         // not by declaration id (f001), so an id-substring scan would both
         // miss real dangling calls and flag ids that only appear in strings.
         var removedFunctions = CollectFunctionNames(originalParse.Ast!)

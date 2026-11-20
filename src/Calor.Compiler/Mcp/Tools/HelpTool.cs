@@ -225,8 +225,6 @@ public sealed class HelpTool : McpToolBase
         var keywords = construct.Keywords.Select(NormalizeQuery).Distinct(StringComparer.Ordinal).ToList();
         if (name == queryLower) return 10_000;
         if (keywords.Contains(queryLower)) return 9_000 + (ContainsTerm(name, queryLower) ? 100 : 0);
-        if (queryLower.StartsWith('§') && construct.CalorSyntax.Contains(queryLower, StringComparison.OrdinalIgnoreCase))
-            return 8_000;
 
         var score = keywords.Where(k => ContainsTerm(queryLower, k) && QueryTerms(k).Any(queryTerms.Contains))
             .Sum(k => 100 + k.Length);
@@ -268,42 +266,42 @@ public sealed class HelpTool : McpToolBase
 
     #region SyntaxHelp (explicit overview and reference)
 
-    // Query terms that select a topic. Native keywords come first; the retired `§` markers stay
-    // as recognized synonyms so a query in the old spelling still finds the native topic.
+    // Query terms that select a topic, in the native 0.30 spelling. The first entry is the
+    // topic's primary search term; reference.json is the source of the syntax each one names.
     private static readonly Dictionary<string, string[]> FeatureAliases = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["async"] = ["async", "await", "§AF", "§AMT", "§AWAIT", "§ASYNC"],
-        ["contracts"] = ["contract", "invariant", "proof", "§Q", "§S", "precondition", "postcondition", "requires", "ensures"],
-        ["effects"] = ["effect", "effect row", "§E", "side effect", "cw", "cr", "fs:"],
-        ["loops"] = ["loop", "for", "for loop", "foreach", "each", "while", "break", "continue", "§L{", "§WH{", "§DO{", "§BK", "§CN"],
-        ["conditionals"] = ["if", "if statement", "if-else", "else", "conditional", "§IF{", "§EI", "§EL", "ternary"],
-        ["functions"] = ["function", "func", "§F{", "§I{", "§O{", "§R", "return", "parameter", "extension method", "params", "default parameter", "ref", "out", "in"],
-        ["classes"] = ["class", "§CL{", "§EXT{", "§IMPL{", "inheritance", "interface", "static class"],
-        ["generics"] = ["generic", "<T>", "§WHERE", "type parameter", "constraint"],
-        ["collections"] = ["list", "dict", "array", "§LIST{", "§DICT{", "§ARR", "§IDX"],
-        ["patterns"] = ["pattern", "match", "switch", "§W{", "§K", "is pattern", "combinator", "relational pattern", "positional", "property pattern"],
-        ["exceptions"] = ["try", "catch", "throw", "exception", "§TR{", "§CA", "§TH"],
-        ["lambdas"] = ["lambda", "delegate", "§LAM{", "§DEL{", "nested delegate"],
+        ["async"] = ["async", "await"],
+        ["contracts"] = ["contract", "invariant", "proof", "precondition", "postcondition", "requires", "ensures", "assume"],
+        ["effects"] = ["effect", "effect row", "side effect", "cw", "cr", "fs:", "!"],
+        ["loops"] = ["loop", "for", "for loop", "foreach", "each", "while", "break", "continue", "do"],
+        ["conditionals"] = ["if", "if statement", "if-else", "else", "conditional", "ternary"],
+        ["functions"] = ["function", "func", "return", "parameter", "extension method", "params", "default parameter", "ref", "out", "in"],
+        ["classes"] = ["class", "inheritance", "interface", "static class", "extends", "implements"],
+        ["generics"] = ["generic", "<T>", "type parameter", "constraint"],
+        ["collections"] = ["list", "dict", "array"],
+        ["patterns"] = ["pattern", "match", "switch", "is pattern", "combinator", "relational pattern", "positional", "property pattern", "case", "when"],
+        ["exceptions"] = ["try", "catch", "throw", "exception", "finally"],
+        ["lambdas"] = ["lambda", "delegate", "nested delegate"],
         ["strings"] = ["string", "str", "concat", "substr", "interpolation"],
         ["types"] = ["type", "i32", "i64", "f32", "f64", "bool", "void"],
-        ["records"] = ["record", "§D{", "union", "§T{", "§V{"],
-        ["enums"] = ["enum", "§EN{"],
-        ["constructors"] = ["constructor", "ctor", "§CTOR{", "§BASE", "§THIS"],
-        ["properties"] = ["property", "§PROP{", "§GET", "§SET", "field", "§FLD{"],
-        ["structs"] = ["struct", "§ST{", "value type"],
-        ["operators"] = ["operator", "§OP{", "overload", "arithmetic"],
-        ["nullable"] = ["nullable", "null", "§?", "§??", "§?.", "null check", "null coalescing", "null conditional", "null-conditional", "null-coalescing", "coalesce"],
+        ["records"] = ["record", "union"],
+        ["enums"] = ["enum"],
+        ["constructors"] = ["constructor", "ctor", "base", "this"],
+        ["properties"] = ["property", "field", "get", "set", "init"],
+        ["structs"] = ["struct", "value type"],
+        ["operators"] = ["operator", "overload", "arithmetic", "op"],
+        ["nullable"] = ["nullable", "null", "null check", "null coalescing", "null conditional", "null-conditional", "null-coalescing", "coalesce", "??", "?."],
         ["linq"] = ["linq", "query", "select", "where", "orderby"],
-        ["events"] = ["event", "§EV{", "§EVT{", "§EADD", "§EREM", "add accessor", "remove accessor", "event handler"],
-        ["using"] = ["using", "§USE{", "dispose", "IDisposable"],
+        ["events"] = ["event", "add accessor", "remove accessor", "event handler", "add", "remove"],
+        ["using"] = ["using", "dispose", "IDisposable"],
         ["modifiers"] = ["static", "abstract", "sealed", "virtual", "override", "readonly", "partial", "volatile"],
-        ["indexers"] = ["indexer", "§IXER{", "this[]", "this[int", "this[string"],
+        ["indexers"] = ["indexer", "this[]", "this[int", "this[string"],
         ["yield"] = ["yield", "iterator", "IEnumerable"],
         ["tuples"] = ["tuple", "value tuple", "(,)", "pair", "triple", "deconstruct", "tuple literal", "tuple type"],
-        ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
-        ["synchronization"] = ["lock", "sync", "§SYNC", "monitor", "thread safety"],
-        ["ranges"] = ["range", "slice", "..", "§RANGE", "§^", "index from end", "span", "array slice"],
-        ["goto"] = ["goto", "goto case", "goto default", "§GOTO", "jump", "label", "fallthrough"],
+        ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "conditional compilation", "pp"],
+        ["synchronization"] = ["lock", "sync", "monitor", "thread safety"],
+        ["ranges"] = ["range", "slice", "..", "index from end", "span", "array slice", "^"],
+        ["goto"] = ["goto", "goto case", "goto default", "jump", "label", "fallthrough"],
         ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues", "pragma", "#pragma"],
         ["overview"] = ["overview", "all", "summary", "syntax", "reference", "cheatsheet", "cheat sheet"],
     };
