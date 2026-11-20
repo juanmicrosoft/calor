@@ -64,45 +64,36 @@ public class EditPrecisionCalculator : IMetricCalculator
         @"^[ \t]+\S",
         System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.Multiline);
 
+    /// <summary>
+    /// Calculates C#'s edit precision from its structural patterns. Same rule as
+    /// Calor.Evaluation's copy of this metric: a 0.5 base, plus presence bonuses for a namespace,
+    /// a class and method declarations, less 0.05 for heavy brace nesting, clamped to 0.3-0.85.
+    /// </summary>
     private static double CalculateCSharpEditPrecision(EvaluationContext context)
     {
+        var score = 0.5; // Base score
+
         var source = context.CSharpSource;
-        var score = 0.0;
 
-        // Named elements in C# require context to target
-        var namedElements = CountNamedElements(source);
+        // C# relies on names and line numbers for targeting
+        var hasNamespace = source.Contains("namespace");
+        var hasClass = source.Contains("class");
+        var hasMethods = MethodDeclaration.Matches(source).Count;
 
-        // Base score from having named elements
-        score += Math.Min(0.3, namedElements * 0.02);
+        if (hasNamespace) score += 0.10;
+        if (hasClass) score += 0.10;
+        if (hasMethods > 0) score += 0.15;
 
-        // Attributes can help with targeting
-        var attributeCount = CountOccurrences(source, "[");
-        score += Math.Min(0.1, attributeCount * 0.02);
+        // Braces can cause edit ambiguity
+        var braceCount = source.Count(c => c == '{');
+        if (braceCount > 5) score -= 0.05; // Nested braces reduce precision
 
-        // XML comments with references can help
-        var xmlRefs = CountOccurrences(source, "<see cref=");
-        score += Math.Min(0.1, xmlRefs * 0.05);
-
-        // Regions help organize for targeting
-        var regions = CountOccurrences(source, "#region");
-        score += Math.Min(0.1, regions * 0.05);
-
-        // Partial classes enable splitting
-        if (source.Contains("partial class") || source.Contains("partial struct"))
-        {
-            score += 0.1;
-        }
-
-        // Method overloads require more context to target correctly (penalty)
-        var methodMatches = CountMethodDeclarations(source);
-        var duplicateNames = FindDuplicateMethodNames(source);
-        if (duplicateNames > 0)
-        {
-            score -= duplicateNames * 0.05;
-        }
-
-        return Math.Max(0, Math.Min(1.0, score));
+        return Math.Max(0.3, Math.Min(score, 0.85)); // Cap at 0.85 for C#
     }
+
+    private static readonly System.Text.RegularExpressions.Regex MethodDeclaration = new(
+        @"\b(public|private|protected|internal)\s+(static\s+)?\w+\s+\w+\s*\(",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private static int CountUniqueIds(string source) => ReadDeclarations(source).Count;
 
@@ -168,36 +159,6 @@ public class EditPrecisionCalculator : IMetricCalculator
         }
 
         return count;
-    }
-
-    private static int FindDuplicateMethodNames(string source)
-    {
-        var methodNames = new List<string>();
-        var lines = source.Split('\n');
-
-        foreach (var line in lines)
-        {
-            var trimmed = line.Trim();
-            if ((trimmed.Contains("public ") || trimmed.Contains("private ") ||
-                 trimmed.Contains("protected ") || trimmed.Contains("internal ")) &&
-                trimmed.Contains("("))
-            {
-                // Extract method name (simplified)
-                var parenIndex = trimmed.IndexOf('(');
-                if (parenIndex > 0)
-                {
-                    var beforeParen = trimmed.Substring(0, parenIndex);
-                    var parts = beforeParen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 0)
-                    {
-                        var methodName = parts[^1];
-                        methodNames.Add(methodName);
-                    }
-                }
-            }
-        }
-
-        return methodNames.Count - methodNames.Distinct().Count();
     }
 
     private static int CountOccurrences(string source, string pattern)

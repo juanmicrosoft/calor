@@ -119,8 +119,9 @@ public class BenchmarkMetricsNativeSyntaxTests
         // 0.5 base + 0.15 (module ID) + 0.20 (callable ID) + 0.10 (indented body lines),
         // the same rule as Calor.Evaluation's copy of this metric.
         Assert.Equal(0.95, result.CalorScore, 6);
-        // The C# arm is unchanged by the port: 2 named elements (0.04) + 4 brackets (0.08).
-        Assert.Equal(0.12, result.CSharpScore, 6);
+        // C# uses the tests copy's rule too: 0.5 base + 0.10 (namespace) + 0.10 (class)
+        // + 0.15 (method declaration), capped at 0.85.
+        Assert.Equal(0.85, result.CSharpScore, 6);
     }
 
     [Fact]
@@ -129,7 +130,8 @@ public class BenchmarkMetricsNativeSyntaxTests
         var result = await new EditPrecisionCalculator().CalculateAsync(Context("module (((("));
 
         Assert.Equal(0, (int)result.Details["calorUniqueIds"]);
-        // Only the base remains: no IDs and no indented body lines.
+        // Only the base remains: no IDs and no indented body lines. The tests copy of this
+        // metric gives unparsable input the same 0.5 base.
         Assert.Equal(0.5, result.CalorScore, 6);
     }
 
