@@ -597,9 +597,8 @@ public sealed class InlineLambdaArgumentBindingTests
         var source = $$"""
             module QuantifiedCallbacks
               using Callback = System.Action
-              func Check<T> ({{callbackType}}:callback !, T[,]:matrix, int:n) → bool
+              func Check<T> ({{callbackType}}:callback !, T[,]:matrix, int:n{{(contract ? " | (" + predicate + ")" : "")}}) → bool
                 !
-                {{(contract ? "requires " + predicate : "")}}
                 callback()
                 return {{(contract ? "true" : predicate)}}
               {{UnrelatedLambda(unrelatedLambda)}}

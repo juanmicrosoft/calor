@@ -36,10 +36,9 @@ public sealed class NativeEffectSuggestionTests
     public async Task KnownEffects_OfferApplicableNativeEditsWithoutAutomaticPolicyChanges(
         bool existingRow, bool crlf)
     {
-        var source = "module Native\n  func Echo (int:value) → int\n    !\n"
+        var source = "module Native\n  func Echo (int:value | (# >= 0)) → int\n    !\n"
             + (existingRow ? "    ! alloc // keep this row comment\n" : "")
             + "    // keep the contract comment\n"
-            + "    requires value >= 0\n"
             + "    => result == value\n"
             + "    System.Console.Write(\"effect\")\n"
             + "    return value";

@@ -1,7 +1,6 @@
 module Scoring Scoring block
-  func ClampScore (int:score, int:max) → int
+  func ClampScore (int:score, int:max | (# >= 0)) → int
     !
-    requires (max >= 0)
     => (result <= max)
     if (score > max)
       return max

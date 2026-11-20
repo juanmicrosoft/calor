@@ -746,7 +746,7 @@ module Test Test block
 module Test Test block
   func TestFunc (int:n) → bool
     !
-    requires (forall int:i where true : true)
+    => (forall int:i where true : true)
     return true
 ";
 
@@ -757,10 +757,10 @@ module Test Test block
         var simplified = simplificationPass.Simplify(module);
 
         var func = simplified.Functions[0];
-        Assert.Single(func.Preconditions);
+        Assert.Single(func.Postconditions);
 
         // (forall (...) true) should simplify to true
-        var condition = func.Preconditions[0].Condition;
+        var condition = func.Postconditions[0].Condition;
         var lit = Assert.IsType<BoolLiteralNode>(condition);
         Assert.True(lit.Value);
     }

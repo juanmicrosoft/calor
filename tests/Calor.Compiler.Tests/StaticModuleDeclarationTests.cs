@@ -588,7 +588,7 @@ public class StaticModuleDeclarationTests
               module Helpers partial
                 func First (int:value) → int
                   !
-                  requires (2 > 1)
+                  => (2 > 1)
                   return value
             """);
         var second = Parse("""

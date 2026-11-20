@@ -824,7 +824,8 @@ public sealed class FinalExpressionGrammarTests
     [InlineData("forall int:i in 0..n,")]
     public void QuantifierRecovery_DoesNotConsumeTheFollowingReturn(string expression)
     {
-        var source = $"module Q\n  func Run (int:n) → bool\n    !\n    requires {expression}\n    return true";
+        // #1618: the line-level contract clause is now the postcondition.
+        var source = $"module Q\n  func Run (int:n) → bool\n    !\n    => {expression}\n    return true";
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.True(diagnostics.HasErrors);

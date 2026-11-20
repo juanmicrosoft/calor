@@ -20,22 +20,21 @@ namespace Contracts
 
         public static int Square(int x)
         {
-            if (!(x >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: x >= 0", "mt_auto5", Calor.Runtime.ContractKind.Requires, startOffset: 186, length: 15, sourceFile: null, line: 9, column: 7, condition: "x >= 0");
+            if (!(x >= 0)) throw new ArgumentOutOfRangeException(nameof(x), "Violation of inline refinement for parameter 'x'");
             int __calorPostconditionResult0;
             __calorPostconditionResult0 = checked(x * x);
             goto __calorPostconditionExit0;
             __calorPostconditionExit0:
-            if (!(__calorPostconditionResult0 >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 >= 0", "mt_auto5", Calor.Runtime.ContractKind.Ensures, startOffset: 208, length: 14, sourceFile: null, line: 10, column: 7, condition: "__calorPostconditionResult0 >= 0");
+            if (!(__calorPostconditionResult0 >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 >= 0", "mt_auto5", Calor.Runtime.ContractKind.Ensures, startOffset: 197, length: 14, sourceFile: null, line: 9, column: 7, condition: "__calorPostconditionResult0 >= 0");
             return __calorPostconditionResult0;
         }
 
         public static int Divide(int a, int b)
         {
-            if (!(b != 0)) throw new Calor.Runtime.ContractViolationException("divisor must not be zero", "mt_auto6", Calor.Runtime.ContractKind.Requires, startOffset: 444, length: 43, sourceFile: null, line: 17, column: 7, condition: "b != 0");
+            if (!(b != 0)) throw new ArgumentOutOfRangeException(nameof(b), "Violation of inline refinement for parameter 'b'");
             return a / b;
         }
 
     }
 
 }
-

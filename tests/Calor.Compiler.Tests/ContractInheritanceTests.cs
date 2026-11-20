@@ -1439,9 +1439,8 @@ module Test
         var source = @"
 module Test
   interface IService<T>
-    func Use (T:x) → T
+    func Use (T:x | (new Box<T>() != null)) → T
       !
-      requires new Box<T>() != null
   class IntService public
     implements IService<int>
     func Use public (int:value) → int

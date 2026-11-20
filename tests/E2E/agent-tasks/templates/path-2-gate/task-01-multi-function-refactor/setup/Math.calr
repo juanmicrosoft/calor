@@ -1,7 +1,6 @@
 module MathOps MathOps block
-  func Calculate (int:val, int:prior) → int
+  func Calculate (int:val | (# >= 0), int:prior) → int
     !
-    requires (val >= 0)
     => (result >= prior)
     let validated = val
     let scaled = (validated * 2)

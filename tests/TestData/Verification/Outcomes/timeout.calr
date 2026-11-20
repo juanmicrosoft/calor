@@ -1,9 +1,5 @@
 module OutcomeTimeout OutcomeTimeout block
-  func Hard (int:a, int:b, int:c, int:d) → int
+  func Hard (int:a | (# > 1), int:b | (# > 1), int:c | (# > 1), int:d | (# > 1)) → int
     !
-    requires (a > 1)
-    requires (b > 1)
-    requires (c > 1)
-    requires (d > 1)
     => ((((result * result) * result) * result) != ((((a * a) * b) * c) + (((b * b) * c) * d)))
     return (a + b)

@@ -4,9 +4,8 @@ module MathModule MathModule block
     => (result >= 0)
     return ((x < 0) ? (0 - x) : x)
 
-  func SafeDivide (int:a, int:b) → int
+  func SafeDivide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     => (result == (a / b))
     return (a / b)
 

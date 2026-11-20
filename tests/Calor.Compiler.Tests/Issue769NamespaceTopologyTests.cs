@@ -551,17 +551,17 @@ public class Issue769NamespaceTopologyTests
             module Test Alpha block
               func Compute () → int
                 !
-                requires 2 > 1
+                => 2 > 1
                 return 42
               class Worker
                 func Run () → int
                   !
-                  requires 2 > 1
+                  => 2 > 1
                   return 42
               interface IWorker
                 func Run () → int
                   !
-                  requires 2 > 1
+                  => 2 > 1
             """);
         module.NamespaceIdentity = "module-metadata";
         module.NamespaceScopeId = "module-scope";

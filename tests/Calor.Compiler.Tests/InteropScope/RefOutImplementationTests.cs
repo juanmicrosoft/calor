@@ -433,9 +433,8 @@ public class RefOutImplementationTests
         };
         var result = Program.Compile($$"""
             module P
-              func Run public (int:x) → int
+              func Run public (int:x | (# > 0)) → int
                 {{effects}}
-                requires x > 0
                 let int[]:arr = new int[] {1}
                 {{call}}
                 proof x > 0

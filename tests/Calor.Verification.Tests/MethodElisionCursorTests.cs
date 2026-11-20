@@ -117,7 +117,7 @@ module Test Test
       => result >= 1
       return x + 1
   class Second public
-    ctor (int:size | (# > 0";))
+    ctor (int:size | (# > 0))";
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions());
 

@@ -352,7 +352,7 @@ module Test Test block
         // Check that we have a fix with native contract text, placed so the result parses
         Assert.True(diagnostics.DiagnosticsWithFixes.Count > 0);
         var fix = diagnostics.DiagnosticsWithFixes[0].Fix;
-        Assert.Contains("requires b != 0", fix.Description);
+        Assert.Contains("b | (# != 0)", fix.Description);
         AssertFixAddsContract(source, fix, preconditions: 1, postconditions: 0);
     }
 
@@ -531,7 +531,7 @@ module Test Test block
 
         Assert.True(diagnostics.DiagnosticsWithFixes.Count > 0);
         var fix = diagnostics.DiagnosticsWithFixes[0].Fix;
-        Assert.Contains("requires b != 0", fix.Description);
+        Assert.Contains("b | (# != 0)", fix.Description);
         AssertFixAddsContract(source, fix, preconditions: 1, postconditions: 0);
     }
 
@@ -573,7 +573,9 @@ module Test Test block
         var module = Parse(patched, out var parseDiag);
         Assert.False(parseDiag.HasErrors, patched + "\n" + string.Join("\n", parseDiag.Select(d => d.Message)));
         var function = Assert.Single(module.Functions);
-        Assert.Equal(preconditions, function.Preconditions.Count);
+        // #1618: a precondition is a parameter refinement; count what the verifier sees.
+        Assert.Equal(preconditions, Calor.Compiler.Verification.ContractVerifier
+            .EffectivePreconditions(function.Parameters, function.Preconditions).Count);
         Assert.Equal(postconditions, function.Postconditions.Count);
     }
 

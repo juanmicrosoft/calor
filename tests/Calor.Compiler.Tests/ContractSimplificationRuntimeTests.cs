@@ -19,9 +19,8 @@ public class ContractSimplificationRuntimeTests
     {
         string Guarded(string predicate) => $$"""
             module TypedContracts TypedContracts block
-              func Check (bool:guard, int:x) → int
+              func Check (bool:guard, int:x | {{predicate}}) → int
                 !
-                requires {{predicate}}
                 return 7
             """;
         var all = Compile(Guarded(
@@ -29,7 +28,7 @@ public class ContractSimplificationRuntimeTests
         var any = Compile(Guarded(
             "(exists int:i where guard : ((i >= (1 / x)) && (i < 2)))"), verify);
         Assert.Equal(7, InvokeArguments(all, false, 0));
-        AssertContractViolation(() => InvokeArguments(any, false, 0));
+        AssertPreconditionViolation(() => InvokeArguments(any, false, 0));
         Assert.Equal(7, InvokeArguments(all, true, 1));
         Assert.Equal(7, InvokeArguments(any, true, 1));
         foreach (var assembly in new[] { all, any })
@@ -75,7 +74,7 @@ public class ContractSimplificationRuntimeTests
     {
         var falseExists = Compile(Function("int",
             "(exists int:i where (i >= 0) : ((i < 1) && ((i == i) && false)))"), verify);
-        AssertContractViolation(() => Invoke(falseExists, 0));
+        AssertPreconditionViolation(() => Invoke(falseExists, 0));
 
         var throwingExists = Compile(Function("int",
             "(exists int:i where (i >= 0) : ((i < 1) && ((i == i) && ((1 / x) > 0))))"), verify);
@@ -90,7 +89,7 @@ public class ContractSimplificationRuntimeTests
             "(exists int:i, int:j where (i >= (x - x)) : ((i < 2) && ((j >= (x - x)) && ((j < 2) && ((i == j) && (j == 1))))))"), verify);
         foreach (var value in new[] { -2, 0, 1, 2 })
         {
-            AssertContractViolation(() => Invoke(forall, value));
+            AssertPreconditionViolation(() => Invoke(forall, value));
             Assert.Equal(7, Invoke(exists, value));
             Assert.Equal(7, Invoke(multi, value));
         }
@@ -100,14 +99,14 @@ public class ContractSimplificationRuntimeTests
         var emptyAny = Compile(Function("int",
             "(exists int:i where (i >= 1) : ((i < 0) && true))"), verify);
         Assert.Equal(7, Invoke(emptyAll, 0));
-        AssertContractViolation(() => Invoke(emptyAny, 0));
+        AssertPreconditionViolation(() => Invoke(emptyAny, 0));
 
         var shortAll = Compile(Function("int",
             "(forall int:i where (false && ((i >= (1 / x)) && (i < 2))) : true)"), verify);
         var shortAny = Compile(Function("int",
             "(exists int:i where false : ((i >= (1 / x)) && (i < 2)))"), verify);
         Assert.Equal(7, Invoke(shortAll, 0));
-        AssertContractViolation(() => Invoke(shortAny, 0));
+        AssertPreconditionViolation(() => Invoke(shortAny, 0));
         Assert.Equal(new[] { int.MinValue, int.MinValue + 1, int.MinValue + 2 },
             Calor.Runtime.ContractQuantifier.Range(int.MinValue, int.MaxValue).Take(3));
         Assert.Equal(new[] { int.MaxValue - 1 },
@@ -118,16 +117,16 @@ public class ContractSimplificationRuntimeTests
 
         var inclusive = Compile(Function("int",
             "(forall int:i where ((i >= x) && (i <= x)) : (i < 0))"), verify);
-        AssertContractViolation(() => Invoke(inclusive, int.MaxValue));
-        AssertContractViolation(() => Invoke(inclusive, int.MaxValue - 1));
+        AssertPreconditionViolation(() => Invoke(inclusive, int.MaxValue));
+        AssertPreconditionViolation(() => Invoke(inclusive, int.MaxValue - 1));
         Assert.Equal(7, Invoke(inclusive, int.MinValue));
         var strict = Compile(Function("int",
             "(exists int:i where (i > x) : (i <= 2147483647))"), verify);
-        AssertContractViolation(() => Invoke(strict, int.MaxValue));
+        AssertPreconditionViolation(() => Invoke(strict, int.MaxValue));
         Assert.Equal(7, Invoke(strict, int.MaxValue - 1));
         var wideEndpoint = Compile(Function("long",
             "(forall int:i where ((i >= 0) && (i <= x)) : (i < 0))"), verify);
-        AssertContractViolation(() => Invoke(wideEndpoint, long.MaxValue));
+        AssertPreconditionViolation(() => Invoke(wideEndpoint, long.MaxValue));
         Assert.Equal(7, Invoke(wideEndpoint, long.MinValue));
         (string Type, object Min, object Max)[] domains =
         [
@@ -140,8 +139,8 @@ public class ContractSimplificationRuntimeTests
         {
             var singleton = Compile(Function(type,
                 $"(forall {type}:i where ((i >= x) && (i <= x)) : false)"), verify);
-            AssertContractViolation(() => Invoke(singleton, min));
-            AssertContractViolation(() => Invoke(singleton, max));
+            AssertPreconditionViolation(() => Invoke(singleton, min));
+            AssertPreconditionViolation(() => Invoke(singleton, max));
         }
     }
 
@@ -151,11 +150,11 @@ public class ContractSimplificationRuntimeTests
     public void PatternOperand_ContainsCompleteEquality(bool verify)
     {
         var assembly = Compile(Function("bool", "(((x == x) is bool) == false)"), verify);
-        AssertContractViolation(() => Invoke(assembly, false));
-        AssertContractViolation(() => Invoke(assembly, true));
+        AssertPreconditionViolation(() => Invoke(assembly, false));
+        AssertPreconditionViolation(() => Invoke(assembly, true));
         var compound = Compile(Function("object", "((((x is int) || false) == true) && false)"), verify);
-        AssertContractViolation(() => Invoke(compound, 5));
-        AssertContractViolation(() => Invoke(compound, "text"));
+        AssertPreconditionViolation(() => Invoke(compound, 5));
+        AssertPreconditionViolation(() => Invoke(compound, "text"));
 
         var overloaded = Compile("""
             module TypedContracts TypedContracts block
@@ -180,7 +179,7 @@ public class ContractSimplificationRuntimeTests
                 return 7
             """, verify);
         var probe = Activator.CreateInstance(Assert.Single(overloaded.GetTypes(), type => type.Name == "Probe"));
-        AssertContractViolation(() => Invoke(overloaded, probe));
+        AssertPreconditionViolation(() => Invoke(overloaded, probe));
     }
 
     [Theory]
@@ -274,16 +273,16 @@ public class ContractSimplificationRuntimeTests
     {
         var receiver = Compile(Function("int?", "((x + 0) . Value == 3)"), verify);
         Assert.Equal(7, Invoke(receiver, 3));
-        AssertContractViolation(() => Invoke(receiver, 2));
+        AssertPreconditionViolation(() => Invoke(receiver, 2));
         var exception = Assert.Throws<TargetInvocationException>(() => Invoke(receiver, null));
         Assert.IsType<InvalidOperationException>(exception.InnerException);
 
         var index = Compile(Function("int", "((\"abcd\")[(^(x + 0))] == ((char)98))"), verify);
         Assert.Equal(7, Invoke(index, 3));
-        AssertContractViolation(() => Invoke(index, 2));
+        AssertPreconditionViolation(() => Invoke(index, 2));
         var range = Compile(Function("int", "((\"abcd\")[((x + 0)..4)] == \"d\")"), verify);
         Assert.Equal(7, Invoke(range, 3));
-        AssertContractViolation(() => Invoke(range, 2));
+        AssertPreconditionViolation(() => Invoke(range, 2));
     }
 
     [Theory]
@@ -338,7 +337,7 @@ public class ContractSimplificationRuntimeTests
         foreach (var value in new[] { 1.5, -1.5, 0.0, 10.0 })
         {
             Assert.Equal(7, Invoke(equal, value));
-            AssertContractViolation(() => Invoke(unequal, value));
+            AssertPreconditionViolation(() => Invoke(unequal, value));
         }
     }
 
@@ -349,16 +348,16 @@ public class ContractSimplificationRuntimeTests
     {
         var right = Compile(Function("bool?", "(true && (x ?? false))"), verify);
         Assert.Equal(7, Invoke(right, true));
-        AssertContractViolation(() => Invoke(right, false));
-        AssertContractViolation(() => Invoke(right, null));
+        AssertPreconditionViolation(() => Invoke(right, false));
+        AssertPreconditionViolation(() => Invoke(right, null));
 
         var left = Compile(Function("bool?", "((x ?? false) && false)"), verify);
         foreach (object? value in new object?[] { true, false, null })
-            AssertContractViolation(() => Invoke(left, value));
+            AssertPreconditionViolation(() => Invoke(left, value));
 
         var arithmetic = Compile(Function("int?", "(((x ?? 1) + 2) == 7)"), verify);
         Assert.Equal(7, Invoke(arithmetic, 5));
-        AssertContractViolation(() => Invoke(arithmetic, null));
+        AssertPreconditionViolation(() => Invoke(arithmetic, null));
     }
 
     [Theory]
@@ -370,11 +369,11 @@ public class ContractSimplificationRuntimeTests
         {
             var assembly = Compile(Function("bool?", $"(! (! (x ?? {fallback.ToString().ToLowerInvariant()})))"), verify);
             Assert.Equal(7, Invoke(assembly, true));
-            AssertContractViolation(() => Invoke(assembly, false));
+            AssertPreconditionViolation(() => Invoke(assembly, false));
             if (fallback)
                 Assert.Equal(7, Invoke(assembly, null));
             else
-                AssertContractViolation(() => Invoke(assembly, null));
+                AssertPreconditionViolation(() => Invoke(assembly, null));
         }
     }
 
@@ -385,7 +384,7 @@ public class ContractSimplificationRuntimeTests
     {
         var assembly = Compile(Function("int", "((-(-x)) == 5)"), verify);
         Assert.Equal(7, Invoke(assembly, 5));
-        AssertContractViolation(() => Invoke(assembly, 6));
+        AssertPreconditionViolation(() => Invoke(assembly, 6));
 
         var longLiteral = Compile(Function("int", "((-(-2147483649)) == 2147483649)"), verify);
         Assert.Equal(7, Invoke(longLiteral, 0));
@@ -414,7 +413,7 @@ public class ContractSimplificationRuntimeTests
                 if (expected(value))
                     Assert.Equal(7, Invoke(assembly, value));
                 else
-                    AssertContractViolation(() => Invoke(assembly, value));
+                    AssertPreconditionViolation(() => Invoke(assembly, value));
             }
         }
     }
@@ -456,7 +455,7 @@ public class ContractSimplificationRuntimeTests
                     return Value
                 func Check () → int
                   !
-                  requires (Tick == Tick)
+                  => (Tick == Tick)
                   return 7
             """;
         const string harness = """
@@ -474,12 +473,14 @@ public class ContractSimplificationRuntimeTests
             """;
         var assembly = Compile(source, verify, harness);
         Assert.Equal(2, assembly.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
-        var quantified = Compile(source.Replace("requires (Tick == Tick)",
-            "requires (forall int:i in 0..3 : (Tick > 0))"),
+        // #1618: a refinement can name only parameters, so the repeated getter is read by a
+        // postcondition; it runs after the body, with the same counts.
+        var quantified = Compile(source.Replace("=> (Tick == Tick)",
+            "=> (forall int:i in 0..3 : (Tick > 0))"),
             verify, harness.Replace("return -1;", "return counter.Value + 100;"));
         Assert.Equal(103, quantified.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
-        var quantifiedFailure = Compile(source.Replace("requires (Tick == Tick)",
-            "requires (forall int:i in 0..3 : (Tick < 2))"),
+        var quantifiedFailure = Compile(source.Replace("=> (Tick == Tick)",
+            "=> (forall int:i in 0..3 : (Tick < 2))"),
             verify, harness.Replace("return -1;", "return counter.Value + 100;"));
         Assert.Equal(2, quantifiedFailure.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
     }
@@ -524,9 +525,8 @@ public class ContractSimplificationRuntimeTests
 
     private static string Function(string type, string predicate) => $$"""
         module TypedContracts TypedContracts block
-          func Check ({{type}}:x) → int
+          func Check ({{type}}:x | {{predicate}}) → int
             !
-            requires {{predicate}}
             return 7
         """;
 
@@ -569,5 +569,13 @@ public class ContractSimplificationRuntimeTests
     {
         var exception = Assert.Throws<TargetInvocationException>(action);
         Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
+    }
+
+    // #1618: a precondition is a parameter refinement; its entry check throws
+    // ArgumentOutOfRangeException rather than ContractViolationException.
+    private static void AssertPreconditionViolation(Action action)
+    {
+        var exception = Assert.Throws<TargetInvocationException>(action);
+        Assert.IsType<ArgumentOutOfRangeException>(exception.InnerException);
     }
 }

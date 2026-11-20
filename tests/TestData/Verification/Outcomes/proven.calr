@@ -1,6 +1,5 @@
 module OutcomeProven OutcomeProven block
-  func AtLeastOne (int:x) → int
+  func AtLeastOne (int:x | (# > 0)) → int
     !
-    requires (x > 0)
     => (x >= 1)
     return x

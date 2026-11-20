@@ -12,10 +12,10 @@ grep -q "namespace Contracts" "$OUTPUT_FILE" || { echo "Missing namespace"; exit
 grep -q "Square" "$OUTPUT_FILE" || { echo "Missing Square function"; exit 1; }
 grep -q "Divide" "$OUTPUT_FILE" || { echo "Missing Divide function"; exit 1; }
 
-# Check for precondition enforcement (ContractViolationException)
-grep -q "ContractViolationException" "$OUTPUT_FILE" || { echo "Missing precondition check"; exit 1; }
+# Check for precondition enforcement: a parameter refinement's entry check (#1618)
+grep -q "ArgumentOutOfRangeException(nameof(b)" "$OUTPUT_FILE" || { echo "Missing precondition check"; exit 1; }
 
-# Check for custom error message
-grep -q "divisor must not be zero" "$OUTPUT_FILE" || { echo "Missing custom error message"; exit 1; }
+# Check for postcondition enforcement (ContractViolationException)
+grep -q "ContractViolationException" "$OUTPUT_FILE" || { echo "Missing postcondition check"; exit 1; }
 
 exit 0

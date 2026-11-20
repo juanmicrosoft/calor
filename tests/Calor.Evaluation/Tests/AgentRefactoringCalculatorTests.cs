@@ -220,8 +220,8 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "func Test (int:x) → int\n  !\n  requires x >= 0\n  => result >= 0\n  return x\n";
-        var after = before + "func Helper (int:y) → int\n  !\n  requires y >= 0\n  return y\n";
+        var before = "func Test (int:x | (# >= 0)) → int\n  !\n  => result >= 0\n  return x\n";
+        var after = before + "func Helper (int:y | (# >= 0)) → int\n  !\n  return y\n";
 
         // Act
         var result = calculator.EvaluateRefactoring("test-scenario", before, after, "", "");
@@ -235,7 +235,7 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "func Test (int:x) → int\n  !\n  requires x >= 0\n  => result >= 0\n  return x\n";
+        var before = "func Test (int:x | (# >= 0)) → int\n  !\n  => result >= 0\n  return x\n";
         var after = "func Test (int:x) → int\n  !\n  return x\n"; // Contracts removed
 
         // Act
@@ -295,7 +295,7 @@ public class AgentRefactoringCalculatorTests
     {
         // Arrange
         var calculator = new AgentRefactoringCalculator(quickMode: true);
-        var before = "func Test (int:x) → int\n  ! cw\n  requires x >= 0\n  return x\n";
+        var before = "func Test (int:x | (# >= 0)) → int\n  ! cw\n  return x\n";
         var after = before;
 
         // Act

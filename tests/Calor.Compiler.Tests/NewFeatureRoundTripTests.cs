@@ -178,7 +178,7 @@ module Test Test block
     return (a / b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("requires ", formatted);
+        Assert.Contains(" | (# ", formatted);
         Assert.Contains("=> ", formatted);
         Assert.Single(reparsed.Functions);
     }
@@ -388,7 +388,7 @@ module ComplexTest ComplexTest block
       return input
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("requires ", formatted);
+        Assert.Contains(" | (# ", formatted);
         Assert.Contains("=> ", formatted);
         Assert.Contains("if ", formatted);
         Assert.Single(reparsed.Functions);

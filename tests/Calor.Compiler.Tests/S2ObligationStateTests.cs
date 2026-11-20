@@ -54,8 +54,7 @@ public sealed class S2ObligationStateTests
     // The opaque writes are converter-owned raw frames (a raw payload's line starts at
     // column 0, so those cases are concatenated rather than raw string literals).
     [InlineData("module M M block\n"
-        + "  func Probe private (int:x) \u2192 int\n"
-        + "    requires (x > 0)\n"
+        + "  func Probe private (int:x | (# > 0)) \u2192 int\n"
         + "    raw member:checked-block:Other:checked%20overflow%20block%20preserved%20verbatim 19\n"
         + "checked { x = -5; }\n"
         + "    proof{\"claim\"} (x > 0)\n"
@@ -71,8 +70,7 @@ public sealed class S2ObligationStateTests
             return x
         """)]
     [InlineData("module M M block\n"
-        + "  func Probe private (int:x) \u2192 int\n"
-        + "    requires (x > 0)\n"
+        + "  func Probe private (int:x | (# > 0)) \u2192 int\n"
         + "    unsafe\n"
         + "      raw member:pointer:Other:Statement%20preserved%20as%20raw%20C%23%3A%20int%2A%20ptr%20%3D%20%26x%3B 15\n"
         + "int* ptr = &x; \n"

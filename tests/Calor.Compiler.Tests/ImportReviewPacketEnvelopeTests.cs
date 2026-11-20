@@ -129,9 +129,8 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
         var path = Path.Combine(_tempDir, "pricing.calr");
         File.WriteAllText(path,
             "module Pricing Pricing block\n"
-            + "  func ClampToCap (int:amount, int:cap) → int\n"
+            + "  func ClampToCap (int:amount, int:cap | (# >= 0)) → int\n"
             + "    !\n"
-            + "    requires (cap >= 0)\n"
             + "    if (amount > cap)\n"
             + "      return cap\n"
             + "    return amount\n");
@@ -215,9 +214,8 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
         var outputPath = Path.Combine(_tempDir, "eject.out.cs");
         File.WriteAllText(path,
             "module Pricing Pricing block\n"
-            + "  func ClampToCap (int:amount, int:cap) → int\n"
+            + "  func ClampToCap (int:amount, int:cap | (# >= 0)) → int\n"
             + "    !\n"
-            + "    requires (cap >= 0)\n"
             + "    => (result <= cap)\n"
             + "    if (amount > cap)\n"
             + "      return cap\n"
