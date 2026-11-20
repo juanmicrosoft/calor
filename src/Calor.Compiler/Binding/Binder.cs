@@ -1404,7 +1404,8 @@ public sealed class Binder
             return new BoundFunction(method.Span, symbol, [], functionScope,
                 ExtractMethodEffects(method.Effects), BoundMemberKind.Method, owner.QualifiedName)
             {
-                ContractConditions = BindContracts(method.Preconditions, method.Postconditions, symbol.BodyReturnType)
+                ContractConditions = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions),
+                    method.Postconditions, symbol.BodyReturnType)
             };
         }
         finally
@@ -2612,7 +2613,8 @@ public sealed class Binder
                 using var _identity = PushDeclarationContext(symbol.Id);
                 using var _returnCtx = PushReturnTypeContext(symbol.BodyReturnType);
                 DeclareParameters(symbol.Parameters, function.Parameters);
-                var contracts = BindContracts(function.Preconditions, function.Postconditions, symbol.BodyReturnType);
+                var contracts = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions),
+                    function.Postconditions, symbol.BodyReturnType);
                 var body = BindStatements(function.Body);
                 _boundLocalFunctions.Add(new BoundFunction(function.Span, symbol, body, bodyScope,
                     Array.Empty<string>(), BoundMemberKind.LocalFunction, containingTypeName: null)
@@ -2668,7 +2670,8 @@ public sealed class Binder
         try
         {
             DeclareParameters(functionSymbol.Parameters, func.Parameters);
-            var contracts = BindContracts(func.Preconditions, func.Postconditions, functionSymbol.BodyReturnType);
+            var contracts = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions),
+                func.Postconditions, functionSymbol.BodyReturnType);
 
             // Bind body
             var boundBody = BindStatements(func.Body);
@@ -11980,7 +11983,8 @@ public sealed class Binder
         DeclareParameters(functionSymbol.Parameters, method.Parameters);
         var inherited = !method.HasContracts
             ? _contractInheritance?.RuntimeContracts.GetValueOrDefault(method) : null;
-        var contracts = BindContracts(inherited?.Preconditions ?? method.Preconditions,
+        // Inherited runtime contracts already include refinement preconditions.
+        var contracts = BindContracts(inherited?.Preconditions ?? Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions),
             inherited?.Postconditions ?? method.Postconditions, functionSymbol.BodyReturnType);
         var boundBody = BindStatements(method.Body);
         BindLocalFunctions(localFunctions, localFunctionScope, functionSymbol.Id);
@@ -12002,7 +12006,7 @@ public sealed class Binder
         using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
 
         DeclareParameters(functionSymbol.Parameters, ctor.Parameters);
-        var contracts = BindContracts(ctor.Preconditions, [], "VOID");
+        var contracts = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(ctor.Parameters, ctor.Preconditions), [], "VOID");
 
         // Bind constructor initializer (: base(...) / : this(...)) as a call prepended to body.
         // This makes initializer arguments visible to bug pattern checkers (e.g., div-by-zero in base(x / y)).
@@ -12129,7 +12133,7 @@ public sealed class Binder
         TrackSymbol(functionSymbol);
         // v0.14 §S4 — operator overloads with a declared return type.
         using var _returnCtx = PushReturnTypeContext(returnType);
-        var contracts = BindContracts(op.Preconditions, op.Postconditions, returnType);
+        var contracts = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(op.Parameters, op.Preconditions), op.Postconditions, returnType);
         var boundBody = BindStatements(op.Body);
         var declaredEffects = op.Effects is null
             ? new[] { "*:*" }

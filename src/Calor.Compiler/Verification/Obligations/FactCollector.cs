@@ -1040,6 +1040,20 @@ public sealed class FactCollector
                 call.ReceiverSpan);
         }
 
+        // #1618: native member calls (`string.IsNullOrEmpty(#)`, `#.Contains(x)`) are
+        // expression-valued calls; substitute in the target and every argument.
+        if (expr is ExpressionCallNode expressionCall)
+        {
+            var target = SubstituteSelfRef(expressionCall.TargetExpression, replacement);
+            var arguments = expressionCall.Arguments
+                .Select(argument => SubstituteSelfRef(argument, replacement)).ToArray();
+            return ReferenceEquals(target, expressionCall.TargetExpression)
+                    && arguments.Zip(expressionCall.Arguments, ReferenceEquals).All(unchanged => unchanged)
+                ? expressionCall
+                : new ExpressionCallNode(expressionCall.Span, target, arguments,
+                    expressionCall.ArgumentNames, expressionCall.ArgumentModifiers, expressionCall.TypeArguments);
+        }
+
         if (expr is ImplicationExpressionNode implication)
         {
             var antecedent = SubstituteSelfRef(

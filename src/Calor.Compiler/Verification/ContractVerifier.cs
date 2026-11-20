@@ -26,13 +26,22 @@ public sealed class ContractVerifier
         => parameters
             .Where(parameter => !parameter.Modifier.HasFlag(ParameterModifier.Out)
                 && parameter.InlineRefinement != null)
-            .Select(parameter => new RequiresNode(
-                parameter.InlineRefinement!.Predicate.Span,
-                FactCollector.SubstituteContractSelf(parameter.InlineRefinement.Predicate, parameter.Name),
-                null,
-                new AttributeCollection()))
+            .Select(RefinementPrecondition)
             .Concat(preconditions)
             .ToArray();
+
+    // #1618: one node per refined parameter. The binder binds these nodes and the verifier
+    // and translator look the bound calls up by node identity, so every pass must see the
+    // same instance rather than a fresh substitution.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ParameterNode, RequiresNode>
+        RefinementPreconditions = new();
+
+    private static RequiresNode RefinementPrecondition(ParameterNode parameter)
+        => RefinementPreconditions.GetValue(parameter, refined => new RequiresNode(
+            refined.InlineRefinement!.Predicate.Span,
+            FactCollector.SubstituteContractSelf(refined.InlineRefinement.Predicate, refined.Name),
+            null,
+            new AttributeCollection()));
 
     private readonly DiagnosticBag _diagnostics;
     private readonly Binder _contractBinder;
