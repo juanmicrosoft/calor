@@ -111,7 +111,9 @@ nullable input would need its own null guard before reading `Length`.
 ## Runtime modes and verification
 
 `--contract-mode debug` emits detailed runtime checks. `--contract-mode release`
-emits leaner checks; `--contract-mode off` emits none.
+emits leaner checks; `--contract-mode off` removes postcondition and invariant
+checks. Parameter refinements, the precondition form, are always checked: their
+`ArgumentOutOfRangeException` guard is emitted in every mode.
 Turning checks off does not make invalid inputs valid,
 prove a contract or prevent exceptions from the body.
 

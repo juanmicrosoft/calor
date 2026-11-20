@@ -193,8 +193,8 @@ public static int Divide(int a, int b)
 // In production: DivideByZeroException with no context
 ```
 
-Calor preconditions are emitted as runtime checks unless contract checks are
-explicitly disabled with `--contract-mode off`. For supported body shapes,
+Calor preconditions (parameter refinements) are always emitted as runtime
+checks, in every contract mode. For supported body shapes,
 postconditions are emitted unless optional `--verify` produces an eligible,
 clean, non-vacuous `proven` result. Inconclusive results do not authorize
 proof-based removal; they do not guarantee that runtime lowering is supported.

@@ -24,7 +24,8 @@ repository benchmarks as an adoption result.
   compile-time analysis. Contracts (parameter refinements and `=>`) are the constructs that can
   emit runtime checks.
 - **Waivers void guarantees.** `--permissive-effects` assumes unknown calls are
-  pure. `--contract-mode off` removes contract checks. A review packet produced
+  pure. `--contract-mode off` removes postcondition and invariant checks;
+  parameter refinements stay checked. A review packet produced
   with either option says so on its first line.
 - **Workflow savings are unmeasured.** The project has not established that
   Calor reduces total review/repair cost versus ordinary or strongly protected
@@ -161,7 +162,7 @@ compiles and executes the result to pin these degradation rules:
 | `=>` on a structured early/nested-return body | Shared postcondition exit when runtime checks are enabled |
 | `=>` on an opaque raw-C# body | Rejected with `Calor1001` |
 | `=>` on an iterator | Rejected with `Calor1004`; iterator postconditions have no defined semantics |
-| `--contract-mode off` | Checks are stripped because the waiver requested it |
+| `--contract-mode off` | Postcondition and invariant checks are stripped because the waiver requested it; parameter-refinement guards remain |
 | Effect row (`!`) | No runtime footprint; the compile-time discipline disappears |
 | Refinement obligation | Still analysis-only; no runtime guard is invented |
 | Nullable values and exceptions | Native .NET types and exception handling |

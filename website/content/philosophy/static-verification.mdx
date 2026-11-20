@@ -10,8 +10,8 @@ result is one of seven statuses. With optional `--verify`, the compiler
 removes an eligible runtime guard only for a clean, non-vacuous,
 assumption-free `proven` result. Other results never authorize proof-based
 removal. Runtime checks depend separately on contract mode and supported lowering;
-`--contract-mode off` emits no contract guards; it does not disable checked
-arithmetic. See
+`--contract-mode off` removes postcondition and invariant guards; it keeps
+parameter-refinement guards and does not disable checked arithmetic. See
 [verification modes and limits](/docs/guides/verification-guarantees/).
 
 ---
