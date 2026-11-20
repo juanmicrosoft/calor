@@ -29,6 +29,9 @@
     <PackageReference Include="FsCheck.Xunit" />
     <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <!-- Offline o200k proxy tokenizer for the agent-surface token budgets (TokenBudgetTests; #1603/#1613/#1614). -->
+    <PackageReference Include="Microsoft.ML.Tokenizers" />
+    <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase" />
   </ItemGroup>
 
   <!-- Reference the same Z3 assembly as Calor.Compiler (#1413: internal Z3 seams in tests) -->
