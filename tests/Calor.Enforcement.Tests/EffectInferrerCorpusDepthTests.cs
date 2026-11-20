@@ -37,7 +37,7 @@ public class EffectInferrerCorpusDepthTests
 {
     /// <summary>
     /// Measured over all 364 corpus modules at the pinned submodule SHAs:
-    /// deepest is 13 frames (since 0.30 the sweep enforces the 204 that convert;
+    /// deepest is 13 frames (since 0.30 the sweep enforces the 206 that convert;
     /// see <see cref="RegisteredRefusals"/>). No single module owns that number — several reach
     /// it, and <c>deepestFile</c> below names whichever RAISED the maximum
     /// first in the Ordinal file order, so the name is a debugging aid and not
@@ -55,10 +55,15 @@ public class EffectInferrerCorpusDepthTests
     /// <summary>
     /// Corpus files the converter refuses under the sweep's one-file
     /// Lossy/SelectActiveBranchLossy options (2026-11-17, 0.30): 141 fail the
-    /// original-source validation of the lossy scoped-import path, 6 are not fully
-    /// native, 13 have an inexpressible namespace topology. 204 modules are enforced.
+    /// original-source validation of the lossy scoped-import path, 4 are not fully
+    /// native, 13 have an inexpressible namespace topology. 206 modules are enforced.
+    /// 2026-11-20: 160 -> 158, the two FluentValidation files that
+    /// <c>Calor0270CorpusVolumeTests</c> attributes in its after-i8 refresh, both formerly
+    /// not fully native: TestMessages.Designer.cs (accessors may declare a row, h1
+    /// 06f6f63fc) and CultureScope.cs (constructor-initializer arguments stay inline, i5
+    /// 5427061f0). This pin was not moved with that ledger refresh.
     /// </summary>
-    private const int RegisteredRefusals = 160;
+    private const int RegisteredRefusals = 158;
 
     [SkippableFact]
     public void CorpusEnforcedWithoutBinding_StaysAnOrderOfMagnitudeBelowTheCap()
