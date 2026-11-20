@@ -679,6 +679,8 @@ public class ConvertFormatEnvelopeTests : IDisposable
     [InlineData(true)]
     public async Task Convert_Receipt_MandatoryValidationPrecedesBothWrites(bool existing)
     {
+        // #1609: the injected error rejects every output, so whole-file preservation (the
+        // last rung) fails the check too. Only then is the conversion refused.
         var input = WriteFile("Validation.cs", "public record struct R(int X);");
         var output = Path.ChangeExtension(input, ".calr");
         if (existing) Assert.Equal(0, RunCli("convert", input).ExitCode);
@@ -699,6 +701,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.True(data.GetProperty("lossCount").GetInt32() > 0);
         Assert.Contains(root.GetProperty("diagnostics").EnumerateArray(),
             diagnostic => diagnostic.GetProperty("code").GetString() == DiagnosticCode.ConvertValidationError);
+        Assert.Contains("Whole-file preservation also failed validation", run.StdErr);
         Assert.Contains("Destination was not modified.", run.StdErr);
         Assert.Equal(before, ArtifactBytes(output));
         Assert.Equal(beforeReceipt, ArtifactBytes(output + ".conversion.json"));
@@ -713,13 +716,13 @@ public class ConvertFormatEnvelopeTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Convert_Receipt_CancellationAfterConversionWritesNeitherArtifact(bool existing)
+    public async Task Convert_Receipt_TimeoutAfterConversionPreservesTheWholeFile(bool existing)
     {
+        // #1609: this test used to pin "a timeout writes neither artifact". A timeout now
+        // discards the native result and writes exact whole-file preservation instead.
         var input = WriteFile("Cancellation.cs", "public record struct R(int X);");
         var output = Path.ChangeExtension(input, ".calr");
         if (existing) Assert.Equal(0, RunCli("convert", input).ExitCode);
-        var before = ArtifactBytes(output);
-        var beforeReceipt = ArtifactBytes(output + ".conversion.json");
         var conversions = 0;
         var run = await InvokeReceiptCommandAsync([input, "--format", "json", "--timeout", "30"],
             completed: (_, timeout) =>
@@ -729,14 +732,34 @@ public class ConvertFormatEnvelopeTests : IDisposable
                 timeout.Cancel();
             });
         Assert.Equal(1, conversions);
-        Assert.Equal(1, run.ExitCode);
+        Assert.True(run.ExitCode is 0 or 2, run.StdErr);
         var data = ParseAndValidate(run.StdOut, "convert").GetProperty("data");
-        Assert.False(data.GetProperty("success").GetBoolean());
-        Assert.Equal("refused", data.GetProperty("conversionPaths").GetProperty("outcome").GetString());
-        Assert.True(data.GetProperty("lossCount").GetInt32() > 0);
-        Assert.Contains("Destination was not modified.", run.StdErr);
-        Assert.Equal(before, ArtifactBytes(output));
-        Assert.Equal(beforeReceipt, ArtifactBytes(output + ".conversion.json"));
+        var paths = data.GetProperty("conversionPaths");
+        Assert.NotEqual("refused", paths.GetProperty("outcome").GetString());
+        Assert.Equal(1, paths.GetProperty("triggers").GetProperty("timeout").GetInt32());
+        Assert.Contains("did not finish within 30s", run.StdErr);
+        Assert.Equal(File.ReadAllText(output),
+            ConversionReceipt.Deserialize(File.ReadAllText(output + ".conversion.json")).GeneratedCalor);
+    }
+
+    [Fact]
+    public async Task Convert_Receipt_FailedOutputCheckFallsBackToWholeFilePreservation()
+    {
+        // #1609: generated Calor that fails the mandatory check drops to the last rung.
+        var input = WriteFile("Fallback.cs", "public record struct R(int X);");
+        var output = Path.ChangeExtension(input, ".calr");
+        var run = await InvokeReceiptCommandAsync([input, "--format", "json"],
+            additionalValidation: source => source.Contains("whole-file-preservation", StringComparison.Ordinal)
+                ? null
+                : new Diagnostic(DiagnosticCode.ExpectedExpression,
+                    "injected rejection of native output", new TextSpan(0, 0, 1, 1), DiagnosticSeverity.Error));
+        Assert.True(run.ExitCode is 0 or 2, run.StdErr);
+        var data = ParseAndValidate(run.StdOut, "convert").GetProperty("data");
+        Assert.Equal(0, data.GetProperty("validationErrorCount").GetInt32());
+        Assert.NotEqual("refused", data.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+        var written = File.ReadAllText(output);
+        Assert.Contains("whole-file-preservation", written);
+        Assert.Equal(written, ConversionReceipt.Deserialize(File.ReadAllText(output + ".conversion.json")).GeneratedCalor);
     }
 
     [Theory]

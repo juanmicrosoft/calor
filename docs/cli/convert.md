@@ -567,7 +567,7 @@ Review the warnings and manually adjust as needed.
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Conversion completed; read `conversionPaths.outcome` to distinguish native from preserved output |
-| `1` | Invalid or missing input, timeout, filesystem failure, or any refused conversion (`outcome: "refused"`; nothing written) |
+| `1` | Input that does not parse (`outcome: "refused"`; nothing written), a missing input or `--reference`, a destination-safety refusal, a filesystem failure, or a whole-file preservation that cannot reproduce the original (a converter bug). Since 0.30 (#1609) a timeout, a conversion crash or a failed output check falls back to exact whole-file preservation and writes the file. |
 | `2` | Exact original C# was preserved and written, but standalone compilation failed (`outcome: "unverified"`). Validate with the original project context. |
 
 ---

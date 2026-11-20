@@ -812,23 +812,23 @@ public static class FeatureSupport
         {
             Name = "namespace",
             Support = SupportLevel.Partial,
-            Description = "Single namespace scopes convert natively; lossless conversion preserves multiple, nested, or mixed global/namespace topologies as whole-file C# interop",
-            Workaround = "Explicitly choose lossy mode to convert namespace topology, or retain the converter's lossless whole-file interop boundary"
+            Description = "One namespace scope with no using directives of its own converts natively. Other namespace layouts are recorded as namespace-topology and are usually preserved as whole-file C# interop",
+            Workaround = "No action needed: calor convert and calor migrate still write the file, with the original C# preserved exactly inside the .calr output"
         },
 
         ["namespace-single-scope"] = new FeatureInfo
         {
             Name = "namespace-single-scope",
             Support = SupportLevel.Full,
-            Description = "One block-scoped or file-scoped namespace converts natively with qualified identities and namespace-local usings"
+            Description = "One block-scoped or file-scoped namespace with no using directives of its own converts natively with qualified identities. A namespace with its own using directives is recorded as namespace-topology"
         },
 
         ["namespace-topology"] = new FeatureInfo
         {
             Name = "namespace-topology",
             Support = SupportLevel.Partial,
-            Description = "Multiple, nested, or mixed global/namespace scopes convert natively only in explicit lossy mode; default lossless mode uses whole-file interop",
-            Workaround = "Review the recorded namespace-topology interop loss or explicitly choose lossy namespace-topology conversion"
+            Description = "Several or nested namespaces, types both inside and outside a namespace, or a namespace with its own using directives. For one namespace with its own using directives the converter tries a native projection of those imports and keeps it only when the generated C# compiles and declares the same types; otherwise, and for every other layout, the whole file is preserved as C# (whole-file interop)",
+            Workaround = "No action needed: the file is still written, and the recorded namespace-topology loss shows which files kept their original C#"
         },
 
         // #777 (WS-W4 D4): local functions are never hoisted to module level — the

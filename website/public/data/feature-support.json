@@ -266,7 +266,7 @@
         },
         {
           "name": "namespace-single-scope",
-          "description": "One block-scoped or file-scoped namespace converts natively with qualified identities and namespace-local usings"
+          "description": "One block-scoped or file-scoped namespace with no using directives of its own converts natively with qualified identities. A namespace with its own using directives is recorded as namespace-topology"
         },
         {
           "name": "utf8-string-literal",
@@ -500,13 +500,13 @@
         },
         {
           "name": "namespace",
-          "description": "Single namespace scopes convert natively; lossless conversion preserves multiple, nested, or mixed global/namespace topologies as whole-file C# interop",
-          "workaround": "Explicitly choose lossy mode to convert namespace topology, or retain the converter\u0027s lossless whole-file interop boundary"
+          "description": "One namespace scope with no using directives of its own converts natively. Other namespace layouts are recorded as namespace-topology and are usually preserved as whole-file C# interop",
+          "workaround": "No action needed: calor convert and calor migrate still write the file, with the original C# preserved exactly inside the .calr output"
         },
         {
           "name": "namespace-topology",
-          "description": "Multiple, nested, or mixed global/namespace scopes convert natively only in explicit lossy mode; default lossless mode uses whole-file interop",
-          "workaround": "Review the recorded namespace-topology interop loss or explicitly choose lossy namespace-topology conversion"
+          "description": "Several or nested namespaces, types both inside and outside a namespace, or a namespace with its own using directives. For one namespace with its own using directives the converter tries a native projection of those imports and keeps it only when the generated C# compiles and declares the same types; otherwise, and for every other layout, the whole file is preserved as C# (whole-file interop)",
+          "workaround": "No action needed: the file is still written, and the recorded namespace-topology loss shows which files kept their original C#"
         },
         {
           "name": "local-function",

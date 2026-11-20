@@ -85,6 +85,25 @@ All notable changes to this project will be documented in this file.
   preserved raw C# (charged `unknown` when its initializer cannot be analyzed).
   Programs that left these effects out now fail with `Calor0410`.
 
+- **`calor migrate` and `calor convert` write every C# file that parses (#1609).**
+  This reverses the all-or-nothing contract of #770 and #932, where one failing
+  file or a failed project build left every file unwritten. A file that fails
+  native conversion, crashes the converter, fails an output check, or runs past
+  the time limit now drops to exact whole-file preservation (the original C#
+  kept byte for byte), and the report records why. C# that parses but does not
+  compile is written and marked `unverified`. The project build is a check, not
+  a gate, and a write error affects only its own file. Only six cases leave a
+  file unwritten: input that does not parse, a destination safety check (for
+  example an output you edited), a disk write error, a whole-file preservation
+  that cannot reproduce the original (a converter bug), a compile item outside
+  the project folder (such as a NuGet `contentFiles` item, now skipped instead
+  of written into the package cache), and `--dry-run` or Ctrl+C. `convert
+  --timeout` now writes the preserved file instead of exiting `1`. Known gap: in
+  a project with `<Nullable>enable</Nullable>` and `TreatWarningsAsErrors`, a
+  whole-file preserved original that uses `?` reports CS8669, because the build
+  treats `*.g.cs` files as generated code. Those files are written and marked
+  `unverified`.
+
 ### Added
 
 - **Constructors can declare an effect row.** A constructor body may always

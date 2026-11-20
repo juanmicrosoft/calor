@@ -367,7 +367,10 @@ public static class ConvertCommand
         // Review C1(b)/N2: the CLI discards the output entirely when conversion
         // fails, so preserving one unusable member as §CSHARP beats writing
         // nothing. Library callers keep the native tree (option defaults false).
-        RescueUnusableMembers = true
+        RescueUnusableMembers = true,
+        // #1609: every input that parses is written. An original that does not
+        // compile is preserved exactly, reported, and exits 2 (unverified).
+        PreserveDespiteOriginalErrors = !(lossy || selectActivePreprocessorBranchLossy)
     };
 
     private static Microsoft.CodeAnalysis.CSharp.CSharpParseOptions
@@ -474,15 +477,26 @@ public static class ConvertCommand
         // JSON document. Text mode keeps them on stdout.
         conversionOptions.StatusWriter = envelope != null ? Console.Error : null;
         ConversionOptionsObserver.Value?.Invoke(conversionOptions);
+        // A --reference that does not exist is a command-line error, like a missing input.
+        foreach (var reference in conversionOptions.References.Where(reference => !File.Exists(reference.Path)))
+        {
+            envelope?.AddCommandError($"Reference not found: {reference.Path}", inputPath);
+            Console.Error.WriteLine($"Error: Reference not found: {reference.Path}");
+            return (1, null);
+        }
+
         var converter = new CSharpToCalorConverter(conversionOptions);
 
+        using var generation = converter.CreateGeneration(inputPath, outputPath);
+        // Destination-safety checks and the writer lock come first and are not timed:
+        // --timeout bounds the native conversion attempt only (#1609).
+        await generation.PrepareAsync();
         using var timeoutCts = timeoutSeconds > 0
             ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds))
             : null;
         var cancellationToken = timeoutCts?.Token ?? CancellationToken.None;
-        using var generation = converter.CreateGeneration(inputPath, outputPath);
 
-        ConversionResult result;
+        ConversionResult? converted = null;
         if (timeoutCts != null)
         {
             try
@@ -490,22 +504,65 @@ public static class ConvertCommand
                 // Run on a thread pool thread so the cancellation token can
                 // interrupt even CPU-bound conversion hangs (e.g. infinite loops
                 // in preprocessor region extraction).
-                result = await Task.Run(
+                converted = await Task.Run(
                     () => generation.ConvertAsync(cancellationToken),
                     cancellationToken);
             }
             catch (OperationCanceledException)
             {
-                envelope?.AddCommandError($"Conversion timed out after {timeoutSeconds}s", inputPath);
-                Console.Error.WriteLine($"Error: Conversion timed out after {timeoutSeconds}s");
-                return (1, null);
+                converted = null;
             }
         }
         else
         {
-            result = await generation.ConvertAsync(cancellationToken);
+            converted = await generation.ConvertAsync(cancellationToken);
         }
-        ConversionCompletedObserver.Value?.Invoke(result, timeoutCts);
+        if (converted != null)
+            ConversionCompletedObserver.Value?.Invoke(converted, timeoutCts);
+
+        ConversionResult result;
+        if (converted == null || timeoutCts?.IsCancellationRequested == true)
+        {
+            // #1609: a timeout is not a refusal. Whole-file preservation needs no
+            // conversion, so the original C# is written unchanged inside Calor.
+            Console.Error.WriteLine(
+                $"Native conversion did not finish within {timeoutSeconds}s; preserving the original C# whole.");
+            result = await generation.PreserveWithoutConversionAsync(CancellationToken.None,
+                [new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Warning,
+                    Feature = "conversion-timeout",
+                    Message = $"Native conversion did not finish within {timeoutSeconds}s; "
+                        + "the original C# is preserved whole."
+                }], ConversionTrigger.Timeout);
+        }
+        else
+        {
+            result = converted;
+        }
+
+        // Validation is mandatory in every mode. The converter additionally compiles
+        // round-tripped C# in lossless mode; --validate remains accepted for compatibility.
+        // #1609: output that fails it drops to whole-file preservation instead of being refused.
+        var validationErrors = result.Success && result.CalorSource != null
+            ? ValidateOutput(result.CalorSource)
+            : new List<Diagnostic>();
+        if (validationErrors.Count > 0
+            && result.Losses.All(loss => loss.Feature != "whole-file-preservation"))
+        {
+            var failures = validationErrors.Select(error => new ConversionIssue
+            {
+                Severity = ConversionIssueSeverity.Error,
+                Feature = "generated-calor-validation",
+                Message = $"Generated output failed validation: {error.Message}",
+                Line = error.Span.Line,
+                Column = error.Span.Column
+            }).ToList();
+            result = generation.PreserveOriginal(CancellationToken.None, failures);
+            validationErrors = result.Success && result.CalorSource != null
+                ? ValidateOutput(result.CalorSource)
+                : new List<Diagnostic>();
+        }
 
         if (envelope != null)
         {
@@ -552,22 +609,17 @@ public static class ConvertCommand
                     Console.Error.WriteLine($"  ⚠ {warning.Message}");
                 }
             }
-            // #1144: name the path taken (refused) and the defaults that applied.
+            // #1144: name the path taken (refused). #1609: only two causes are left.
             envelope?.SetConversionSummary(result);
-            Console.Error.WriteLine(
-                $"  Conversion refused; no output written (automatic rescue: {(result.Context.RescueUnusableMembers ? "on" : "off")}, " +
-                $"--passthrough: {(result.Context.PassthroughOnError ? "on" : "off")}).");
+            Console.Error.WriteLine(InputHasSyntaxErrors(inputPath, conversionOptions)
+                ? "  Conversion refused; no output written: the input C# does not parse, so it cannot be preserved."
+                : "  Conversion refused; no output written: whole-file preservation could not reproduce the original C# exactly. "
+                  + "This is a converter bug; please report it.");
             return (1, result);
         }
 
-        // Validation is mandatory in every mode. The converter additionally compiles
-        // round-tripped C# in lossless mode; --validate remains accepted for compatibility.
-        List<Diagnostic> validationErrors = new();
         if (result.CalorSource != null)
         {
-            validationErrors = ValidateCalorSource(result.CalorSource);
-            if (AdditionalValidationError.Value?.Invoke(result.CalorSource) is { } additionalError)
-                validationErrors.Add(additionalError);
             if (envelope != null)
             {
                 envelope.Data.Validated = true;
@@ -594,30 +646,20 @@ public static class ConvertCommand
                 Console.Error.WriteLine($"  {err}");
             if (validationErrors.Count > 5)
                 Console.Error.WriteLine($"  ... and {validationErrors.Count - 5} more");
+            // #1609: this is the last rung. Even whole-file preservation failed the check.
+            Console.Error.WriteLine("Whole-file preservation also failed validation. This is a converter bug; please report it.");
             Console.Error.WriteLine("Destination was not modified.");
             return (1, result);
         }
 
         // #1144: record losses before writing, so a write failure still reports them.
+        // #1609: the write is not bound by --timeout; it bounds the conversion attempt only.
         envelope?.SetConversionSummary(result);
-        try
+        await generation.WriteAsync(result, CancellationToken.None, outputWritten: () =>
         {
-            await generation.WriteAsync(result, cancellationToken, outputWritten: () =>
-            {
-                if (envelope != null)
-                    envelope.OutputWritten = true;
-            });
-        }
-        catch (OperationCanceledException)
-        {
-            envelope?.AddCommandError($"Conversion timed out after {timeoutSeconds}s", inputPath);
-            envelope?.Data.Success = false;
-            envelope?.SetConversionSummary(result);
-            envelope?.MarkRefused();
-            Console.Error.WriteLine($"Error: Conversion timed out after {timeoutSeconds}s");
-            Console.Error.WriteLine("Destination was not modified.");
-            return (1, result);
-        }
+            if (envelope != null)
+                envelope.OutputWritten = true;
+        });
 
         // #770: structured loss accounting. The unconditional "✓ Conversion
         // successful" line was a false-success vector — it is now printed ONLY
@@ -798,6 +840,31 @@ public static class ConvertCommand
     /// <summary>
     /// Validates Calor source by lexing and parsing it. Returns a list of error diagnostics.
     /// </summary>
+    /// <summary>The mandatory output check, plus the test hook's injected error.</summary>
+    private static List<Diagnostic> ValidateOutput(string calorSource)
+    {
+        var errors = ValidateCalorSource(calorSource);
+        if (AdditionalValidationError.Value?.Invoke(calorSource) is { } additionalError)
+            errors.Add(additionalError);
+        return errors;
+    }
+
+    /// <summary>#1609: whether a refusal is the allowed one (the input does not parse).</summary>
+    private static bool InputHasSyntaxErrors(string inputPath, ConversionOptions options)
+    {
+        try
+        {
+            var source = File.ReadAllText(inputPath);
+            return Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source, options.ParseOptions)
+                .GetDiagnostics()
+                .Any(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
     internal static List<Diagnostic> ValidateCalorSource(string calorSource)
     {
         var diagBag = new DiagnosticBag();

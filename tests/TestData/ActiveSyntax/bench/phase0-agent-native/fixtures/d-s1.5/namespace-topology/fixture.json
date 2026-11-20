@@ -12,7 +12,7 @@
     "reason": "Explicit lossless project conversion emits two native namespace files. It retains both original CLR owners without granting single-result native conversion.",
     "fullyNative": true,
     "nativeConversionCount": 3,
-    "requiredIssueMessage": "Feature 'namespace-topology' is partially supported. Review the recorded namespace-topology interop loss or explicitly choose lossy namespace-topology conversion",
+    "requiredIssueMessage": "Feature 'namespace-topology' is partially supported. No action needed: the file is still written, and the recorded namespace-topology loss shows which files kept their original C#",
     "outputs": [
       {
         "fileName": "namespace-topology.namespace1.calr",
