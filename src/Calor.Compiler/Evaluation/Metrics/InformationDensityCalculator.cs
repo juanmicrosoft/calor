@@ -82,7 +82,7 @@ public class InformationDensityCalculator : IMetricCalculator
                              NativeCalorSyntax.TypedOutput.Matches(source).Count,
 
             // Contract elements (high semantic value - weight 2x)
-            ["requires"] = NativeCalorSyntax.Requires.Matches(source).Count * 2,
+            ["requires"] = NativeCalorSyntax.Precondition.Matches(source).Count * 2,
             ["ensures"] = NativeCalorSyntax.Ensures.Matches(source).Count * 2,
             ["invariants"] = NativeCalorSyntax.Invariant.Matches(source).Count * 2,
 

@@ -21,7 +21,7 @@ public class ComprehensionCalculator : IMetricCalculator
     private static readonly Regex RxOutputOpen = CalorSyntax.TypedOutput;
     private static readonly Regex RxReturn = CalorSyntax.Return;
     private static readonly Regex RxEffectOpen = CalorSyntax.EffectRow;
-    private static readonly Regex RxRequires = CalorSyntax.Requires;
+    private static readonly Regex RxRequires = CalorSyntax.Precondition;
     private static readonly Regex RxEnsures = CalorSyntax.Ensures;
     // Block boundaries are signalled by indentation alone; any line that begins
     // with whitespace (a structural body line) is the "completed block" signal.

@@ -285,7 +285,7 @@ public class TestDataAdapter
         if (CalorSyntax.Binding.IsMatch(content)) features.Add("variable");
         if (CalorSyntax.HasTypedParameters(content)) features.Add("parameters");
         if (CalorSyntax.TypedOutput.IsMatch(content)) features.Add("return_type");
-        if (CalorSyntax.Requires.IsMatch(content)) features.Add("requires");
+        if (CalorSyntax.Precondition.IsMatch(content)) features.Add("requires");
         if (CalorSyntax.Ensures.IsMatch(content)) features.Add("ensures");
         if (CalorSyntax.Invariant.IsMatch(content)) features.Add("invariant");
         if (CalorSyntax.EffectRow.IsMatch(content)) features.Add("effects");

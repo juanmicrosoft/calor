@@ -289,8 +289,8 @@ public partial class AgentRefactoringCalculator : IMetricCalculator
 
     private static bool AreContractsPreserved(string before, string after)
     {
-        var beforeCount = CalorSyntax.Requires.Matches(before).Count + CalorSyntax.Ensures.Matches(before).Count;
-        var afterCount = CalorSyntax.Requires.Matches(after).Count + CalorSyntax.Ensures.Matches(after).Count;
+        var beforeCount = CalorSyntax.Precondition.Matches(before).Count + CalorSyntax.Ensures.Matches(before).Count;
+        var afterCount = CalorSyntax.Precondition.Matches(after).Count + CalorSyntax.Ensures.Matches(after).Count;
         return afterCount >= beforeCount;
     }
 
