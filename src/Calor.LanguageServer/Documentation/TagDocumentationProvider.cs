@@ -50,19 +50,25 @@ public sealed class TagDocumentationProvider
         if (string.IsNullOrEmpty(text) || offset < 0 || offset >= text.Length)
             return null;
 
+        Token? previous = null;
         foreach (var token in new Lexer(text, new DiagnosticBag()).Tokenize())
         {
             if (token.Span.Contains(offset))
-                return GetSyntaxTag(token, text);
+                return GetSyntaxTag(token, previous);
             if (token.Span.Start > offset)
                 return null;
+            previous = token;
         }
         return null;
     }
 
-    internal static string? GetSyntaxTag(Token token, string source)
-        => !(token.Span.Start > 0 && source[token.Span.Start - 1] == '§')
-            && !(token.Span.Start > 1 && source.AsSpan(token.Span.Start - 2, 2).SequenceEqual("§/"))
+    /// <summary>
+    /// Returns the documented native keyword or operator <paramref name="token"/> spells, or null.
+    /// A token glued to a lexer error (for example the rest of a retired pre-0.30 marker, which the
+    /// lexer reports as an error token) is not native syntax and gets no documentation.
+    /// </summary>
+    internal static string? GetSyntaxTag(Token token, Token? previous)
+        => !(previous is { Kind: TokenKind.Error } error && error.Span.End == token.Span.Start)
             && (token.IsKeyword || token.Kind is TokenKind.Arrow or TokenKind.FatArrow
                 or TokenKind.Exclamation or TokenKind.RangeOp)
             && Instance._tagDocs.ContainsKey(token.Text)
