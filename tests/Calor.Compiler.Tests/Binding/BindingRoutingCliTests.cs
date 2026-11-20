@@ -4,6 +4,9 @@ using Xunit;
 
 namespace Calor.Compiler.Tests;
 
+// RunCliInProcess replaces process-wide state (console streams, current directory,
+// CALOR_NO_TYPE_CHECK), so this class runs alone with the other process-state classes.
+[Collection(Calor.Tasks.Tests.ProcessStateCollection.Name)]
 public class BindingRoutingCliTests : IDisposable
 {
     private const string Duplicate = """
@@ -36,9 +39,53 @@ public class BindingRoutingCliTests : IDisposable
             yield return [expression, mode];
     }
 
+    private const int StageBModeCount = 33;
+
     [Theory]
     [MemberData(nameof(BindingReceivingCases.StageB), MemberType = typeof(BindingReceivingCases))]
     public void StageB_CliMatchesApiAndSuppressesOutputAcrossOptOuts(
+        string sourceType, string targetType, Binding.BindingReceivingShape shape,
+        Binding.BindingReceivingBoundary boundary)
+    {
+        var (source, safeSource, api) = StageBInputs(sourceType, targetType, shape, boundary);
+        // Every mode runs the CLI's own entry point in this process. As child processes the
+        // 12 cases x 33 modes x 2 runs were 792 starts, about 430 s of the tasks job on CI and
+        // almost all of it start-up and JIT. StageB_FreshProcessesMatchInProcessRuns checks
+        // that a fresh process and the in-process runner agree.
+        for (var mode = 0; mode < StageBModeCount; mode++)
+            RunStageBMode(CliTestHarness.RunCliInProcess, ModeDirectory(mode), mode, source, safeSource, api);
+    }
+
+    /// <summary>
+    /// The fresh-process leg of StageB: what only a new process shows (clean static state, a
+    /// real exit code and stream flush, the start-up warm-up). For one case, each opt-out on
+    /// its own, none, all of them, and the environment opt-out run as child processes and in
+    /// this process, and must agree exactly: exit code, standard output, and the written file.
+    /// </summary>
+    [Fact]
+    public void StageB_FreshProcessesMatchInProcessRuns()
+    {
+        var (sourceType, targetType, shape, boundary) = BindingReceivingCases.StageB()
+            .Select(row => ((string)row[0], (string)row[1],
+                (Binding.BindingReceivingShape)row[2], (Binding.BindingReceivingBoundary)row[3]))
+            .First();
+        var (source, safeSource, api) = StageBInputs(sourceType, targetType, shape, boundary);
+        foreach (var mode in new[] { 0, 1, 2, 4, 8, 16, 31, 32 })
+        {
+            var fresh = RunStageBMode(CliTestHarness.RunCli, ModeDirectory(mode), mode, source, safeSource, api);
+            var inProcess = RunStageBMode(CliTestHarness.RunCliInProcess, ModeDirectory(mode), mode, source, safeSource, api);
+            Assert.Equal(fresh.SafeExitCode, inProcess.SafeExitCode);
+            Assert.Equal(fresh.SafeStdOut, inProcess.SafeStdOut);
+            Assert.Equal(fresh.SafeOutput, inProcess.SafeOutput);
+            Assert.Equal(fresh.RejectedExitCode, inProcess.RejectedExitCode);
+            Assert.Equal(fresh.RejectedStdOut, inProcess.RejectedStdOut);
+        }
+    }
+
+    private sealed record StageBRun(
+        int SafeExitCode, string SafeStdOut, string SafeOutput, int RejectedExitCode, string RejectedStdOut);
+
+    private (string Source, string SafeSource, Diagnostic Api) StageBInputs(
         string sourceType, string targetType, Binding.BindingReceivingShape shape,
         Binding.BindingReceivingBoundary boundary)
     {
@@ -48,46 +95,61 @@ public class BindingRoutingCliTests : IDisposable
         Assert.Equal(shape, api.BindingContext?.Shape);
         var safeSource = NativeCounterpart(BindingReceivingCases.Source(targetType, targetType, boundary),
             NativeReceivingSource(targetType, targetType, boundary));
-        // Each mode is two independent CLI processes with their own directory and an explicit
-        // child environment (nothing process-wide), so the 33 modes run in parallel. Calor.Tasks.Tests
-        // links this file; this case loop is most of that project's wall time.
-        Parallel.ForEach(Enumerable.Range(0, 33), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, mode =>
+        return (source, safeSource, api);
+    }
+
+    private string ModeDirectory(int mode)
+    {
+        var directory = Path.Combine(_directory, "mode-" + mode);
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    /// <summary>
+    /// One StageB mode: bits 0-4 add <c>--verify</c>, <c>--no-type-check</c>,
+    /// <c>--transpile-only</c>, <c>--permissive-effects</c> and <c>--enforce-effects false</c>;
+    /// mode 32 sets <c>CALOR_NO_TYPE_CHECK=1</c> instead. The safe source must compile and write
+    /// its output; the receiving error must exit 1, write nothing, and report the API's
+    /// diagnostic at the API's location.
+    /// </summary>
+    private static StageBRun RunStageBMode(
+        Func<string, IReadOnlyDictionary<string, string>?, string[], (int ExitCode, string StdOut, string StdErr)> run,
+        string modeDirectory, int mode, string source, string safeSource, Diagnostic api)
+    {
+        var file = Path.Combine(modeDirectory, "stage-b.calr");
+        var output = Path.Combine(modeDirectory, "stage-b.cs");
+        var arguments = new List<string>
         {
-            var modeDirectory = Path.Combine(_directory, "mode-" + mode);
-            Directory.CreateDirectory(modeDirectory);
-            var file = Path.Combine(modeDirectory, "stage-b.calr");
-            var output = Path.Combine(modeDirectory, "stage-b.cs");
-            var arguments = new List<string>
-            {
-                "-i", file, "-o", output, "--format", "json", "--no-cache", "--no-telemetry"
-            };
-            if ((mode & 1) != 0) arguments.Add("--verify");
-            if ((mode & 2) != 0) arguments.Add("--no-type-check");
-            if ((mode & 4) != 0) arguments.Add("--transpile-only");
-            if ((mode & 8) != 0) arguments.Add("--permissive-effects");
-            if ((mode & 16) != 0) arguments.AddRange(["--enforce-effects", "false"]);
-            var environment = new Dictionary<string, string>
-            {
-                ["CALOR_NO_TYPE_CHECK"] = mode == 32 ? "1" : "0"
-            };
-            File.WriteAllText(file, safeSource);
-            var safe = CliTestHarness.RunCli(modeDirectory, environment, arguments.ToArray());
-            Assert.Equal(0, safe.ExitCode);
-            Assert.True(File.Exists(output));
-            File.Delete(output);
-            File.WriteAllText(file, source);
-            var rejected = CliTestHarness.RunCli(modeDirectory, environment, arguments.ToArray());
-            Assert.Equal(1, rejected.ExitCode);
-            Assert.False(File.Exists(output));
-            using var json = JsonDocument.Parse(rejected.StdOut);
-            var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray(),
-                d => d.GetProperty("code").GetString() == api.Code);
-            Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
-            var location = diagnostic.GetProperty("location");
-            Assert.Equal(api.Span.Line, location.GetProperty("line").GetInt32());
-            Assert.Equal(api.Span.Column, location.GetProperty("column").GetInt32());
-            Assert.Equal(api.Span.Length, location.GetProperty("length").GetInt32());
-        });
+            "-i", file, "-o", output, "--format", "json", "--no-cache", "--no-telemetry"
+        };
+        if ((mode & 1) != 0) arguments.Add("--verify");
+        if ((mode & 2) != 0) arguments.Add("--no-type-check");
+        if ((mode & 4) != 0) arguments.Add("--transpile-only");
+        if ((mode & 8) != 0) arguments.Add("--permissive-effects");
+        if ((mode & 16) != 0) arguments.AddRange(["--enforce-effects", "false"]);
+        var environment = new Dictionary<string, string>
+        {
+            ["CALOR_NO_TYPE_CHECK"] = mode == 32 ? "1" : "0"
+        };
+        File.WriteAllText(file, safeSource);
+        var safe = run(modeDirectory, environment, arguments.ToArray());
+        Assert.Equal(0, safe.ExitCode);
+        Assert.True(File.Exists(output));
+        var safeOutput = File.ReadAllText(output);
+        File.Delete(output);
+        File.WriteAllText(file, source);
+        var rejected = run(modeDirectory, environment, arguments.ToArray());
+        Assert.Equal(1, rejected.ExitCode);
+        Assert.False(File.Exists(output));
+        using var json = JsonDocument.Parse(rejected.StdOut);
+        var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray(),
+            d => d.GetProperty("code").GetString() == api.Code);
+        Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
+        var location = diagnostic.GetProperty("location");
+        Assert.Equal(api.Span.Line, location.GetProperty("line").GetInt32());
+        Assert.Equal(api.Span.Column, location.GetProperty("column").GetInt32());
+        Assert.Equal(api.Span.Length, location.GetProperty("length").GetInt32());
+        return new StageBRun(safe.ExitCode, safe.StdOut, safeOutput, rejected.ExitCode, rejected.StdOut);
     }
 
     [Theory]

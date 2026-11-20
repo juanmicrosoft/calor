@@ -212,6 +212,57 @@ internal static class CliTestHarness
         string workingDirectory, IReadOnlyDictionary<string, string>? environment, params string[] args)
         => RunCliWithCompiler(FindCalorDll(), workingDirectory, environment, args);
 
+    private static readonly object InProcessGate = new();
+
+    /// <summary>
+    /// Runs the CLI's own entry point, <see cref="Program.Main"/>, inside this test process with
+    /// the arguments <see cref="RunCli(string, IReadOnlyDictionary{string, string}?, string[])"/>
+    /// would pass a child (<c>--no-telemetry</c> first), and returns its exit code and what it
+    /// wrote to standard output and standard error. A child process pays about 0.65 CPU-seconds
+    /// of start-up and JIT before it compiles anything; a large matrix of CLI cases runs here
+    /// instead, and a few fresh processes check that both runners agree.
+    /// <para>For the duration of the call it replaces process-wide state: <c>Console.Out</c>,
+    /// <c>Console.Error</c>, the current directory and the given environment variables, and it
+    /// restores all of them afterwards. Calls are serialized, and a caller must belong to a test
+    /// collection that does not run in parallel with others, since another test could observe
+    /// the replaced state. What a fresh process alone shows (clean static state, a real process
+    /// exit and stream flush, the start-up warm-up) still needs <see cref="RunCli(string, IReadOnlyDictionary{string, string}?, string[])"/>.</para>
+    /// </summary>
+    internal static (int ExitCode, string StdOut, string StdErr) RunCliInProcess(
+        string workingDirectory, IReadOnlyDictionary<string, string>? environment, params string[] args)
+    {
+        lock (InProcessGate)
+        {
+            var variables = environment ?? new Dictionary<string, string>();
+            var saved = variables.Keys.ToDictionary(key => key, Environment.GetEnvironmentVariable);
+            var savedOut = Console.Out;
+            var savedError = Console.Error;
+            var savedDirectory = Directory.GetCurrentDirectory();
+            using var stdOut = new StringWriter();
+            using var stdErr = new StringWriter();
+            try
+            {
+                foreach (var (key, value) in variables)
+                    Environment.SetEnvironmentVariable(key, value);
+                Directory.SetCurrentDirectory(workingDirectory);
+                Console.SetOut(stdOut);
+                Console.SetError(stdErr);
+                var exitCode = Program.Main(["--no-telemetry", .. args]).GetAwaiter().GetResult();
+                Console.Out.Flush();
+                Console.Error.Flush();
+                return (exitCode, stdOut.ToString(), stdErr.ToString());
+            }
+            finally
+            {
+                Console.SetOut(savedOut);
+                Console.SetError(savedError);
+                Directory.SetCurrentDirectory(savedDirectory);
+                foreach (var (key, value) in saved)
+                    Environment.SetEnvironmentVariable(key, value);
+            }
+        }
+    }
+
     internal static (int ExitCode, string StdOut, string StdErr) RunCliWithCompiler(
         string compilerPath,
         string workingDirectory,
