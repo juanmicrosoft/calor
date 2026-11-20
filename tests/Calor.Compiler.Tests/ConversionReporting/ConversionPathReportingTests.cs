@@ -448,7 +448,8 @@ public class ConversionPathReportingTests : IDisposable
         var (exit, stdout, stderr) = Cli("public class Broken { public int M( { }", "--format", "json");
 
         Assert.Equal(1, exit);
-        Assert.Contains("Conversion refused; no output written (automatic rescue: on, --passthrough: off)", stderr);
+        // #1609: the refusal now names its only allowed cause, input that does not parse.
+        Assert.Contains("Conversion refused; no output written: the input C# does not parse", stderr);
         Assert.Equal("refused", Data(stdout).GetProperty("conversionPaths").GetProperty("outcome").GetString());
     }
 

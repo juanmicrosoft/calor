@@ -1219,6 +1219,9 @@ public static class ConversionTrigger
 
     /// <summary>The visitor met a construct it cannot convert.</summary>
     public const string UnsupportedConstruct = "unsupported-construct";
+
+    /// <summary>#1609: native conversion ran past its time limit, so the original was preserved whole.</summary>
+    public const string Timeout = "timeout";
 }
 
 /// <summary>#1144: the option or default that made a rescue or passthrough reachable.</summary>

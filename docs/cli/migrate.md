@@ -71,6 +71,60 @@ Loose directories can lack references: exact preserved sources are still written
 with failed compilation reported as `unverified`, not a passed build.
 Writing, native fraction, project compilation, and test execution are distinct results.
 
+### What migrate always writes (0.30, #1609)
+
+Default `calor migrate` (C# to Calor) writes a `.calr` file for every discovered
+input that parses. This reverses the all-or-nothing contract of #770/#932, under
+which one failing file, or a failed project build, left every file unwritten.
+
+Each file tries these rungs in order: native Calor, member-level C# preservation,
+type-level C# preservation, and whole-file preservation (the original C# kept
+byte-for-byte inside the `.calr`). A unit drops one rung when its conversion fails
+or crashes, when the generated Calor or C# fails a check, or when native conversion
+runs past the per-file time limit (60 seconds; whole-file preservation does no
+conversion work, so it needs no limit). The loss ledger records the reason: loss
+`whole-file-preservation` with trigger `round-trip-failure`, `parse-failure`,
+`unsupported-construct` or `timeout`, plus issues such as `conversion-timeout` or
+`conversion-internal-error`.
+
+- **Input that parses but does not compile** is preserved exactly and reported
+  with `original-csharp-validation` warnings and an unverified round trip.
+- **Project validation is a check, not a gate.** All generated C# is compiled
+  together with the project's references and options. Native files with errors
+  drop to whole-file preservation and the check runs again. Errors that remain
+  even when every file is its exact original are not blamed on native output:
+  every file is written, and each lists the errors located in it. If the project
+  cannot be evaluated at all, every file is written and reported unverified.
+- **Write failures are isolated.** A file whose destination check or write fails is
+  reported alone; the other files are still written.
+
+A file is left unwritten only in these cases:
+
+| Case | Reported as |
+|:-----|:------------|
+| The input does not parse (Roslyn syntax errors, including an active `#error`) | `Failed`; nothing faithful can be preserved |
+| A destination-safety check: an existing output without its receipt, an edited output, an output from another source, a receipt without its output, an artifact that would overwrite an input, or an output-path collision | `Failed`; the message names the file and says what to delete or where to convert instead |
+| An I/O error writing that file | `Failed` (`migration-write-failure`) |
+| Whole-file preservation cannot reproduce the original exactly | `Failed`; a converter bug, please report it |
+| A compile item outside the project directory (a NuGet `contentFiles` item, a linked file) | `Skipped`; nothing is written outside the project |
+| `--dry-run`, or cancellation (Ctrl+C) | nothing is written |
+
+Not migration inputs, and left as C#: files matching `*.g.cs`, `*.Designer.cs`,
+`GlobalUsings.cs` or `AssemblyInfo.cs`, and files under `bin`, `obj`, `.git`,
+`.vs` or `node_modules`. Files larger than 1 MB are migrated; only the advisory
+feature analysis skips them.
+
+Out of scope for this contract: opt-in `--split-namespaces` keeps its
+all-or-nothing batch (below), and `--direction calor-to-cs` does not write Calor
+that fails to compile.
+
+Known limitation: the build compiles generated C# from files named `*.g.cs`, which
+Roslyn treats as generated code with nullable annotations disabled. A whole-file
+preserved original that uses `?` annotations therefore reports CS8669 in a project
+with `<Nullable>enable</Nullable>`; with `TreatWarningsAsErrors` the project does
+not build. Migration writes these files and reports them unverified, naming each
+error's file and line.
+
 ### Opt-in native namespace splitting
 
 `calor migrate ./src --split-namespaces` can split a C# file containing distinct
@@ -288,8 +342,7 @@ envelopes, logs, and a combined JSON/Markdown summary:
 This report complements the existing project-context round-trip harness; it
 does not replace or relax its build, test, native-conversion or coverage gates.
 The source-directory measurement does not establish that a migration builds.
-Until the preservation fallback ladder is implemented, a failed file can still
-block other converted files from being written.
+Since 0.30 one failed file no longer blocks the others from being written.
 
 ### Markdown Report
 

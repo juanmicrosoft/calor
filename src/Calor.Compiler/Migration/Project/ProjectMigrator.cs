@@ -539,6 +539,36 @@ public sealed class ProjectMigrator
             }
         }
         catch (OperationCanceledException)
+            when (!cancellationToken.IsCancellationRequested && CanPreserveWhole(direction, entry))
+        {
+            // #1609: a timeout is not a refusal. The original C# is preserved whole,
+            // which needs no conversion; the per-file limit bounds the native attempt only.
+            return await PreserveWholeAfterFailureAsync(entry, dryRun, startTime, generations, validationGate,
+                new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Warning,
+                    Feature = "conversion-timeout",
+                    Message = $"Native conversion did not finish within {_options.PerFileTimeoutSeconds}s; "
+                        + "the original C# is preserved whole."
+                }, ConversionTrigger.Timeout, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException
+            and not IOException and not UnauthorizedAccessException and not InvalidDataException
+            && CanPreserveWhole(direction, entry))
+        {
+            // #1609: an internal error in conversion or its checks drops to the last rung.
+            // I/O errors and the destination-safety checks (including a corrupt receipt)
+            // stay failures.
+            return await PreserveWholeAfterFailureAsync(entry, dryRun, startTime, generations, validationGate,
+                new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Warning,
+                    Feature = "conversion-internal-error",
+                    Message = $"Native conversion stopped with an internal error ({ex.GetType().Name}: {ex.Message}); "
+                        + "the original C# is preserved whole. This is a converter bug; please report it."
+                }, ConversionTrigger.UnsupportedConstruct, cancellationToken);
+        }
+        catch (OperationCanceledException)
             when (!cancellationToken.IsCancellationRequested)
         {
             return new FileMigrationResult
@@ -573,13 +603,75 @@ public sealed class ProjectMigrator
         }
     }
 
+    /// <summary>
+    /// #1609: whole-file preservation is the last rung of the fallback ladder. It is
+    /// available for every default (lossless, all-branches) C# → Calor unit except one
+    /// part of an opt-in namespace split, which has no whole file of its own.
+    /// </summary>
+    private bool CanPreserveWhole(MigrationDirection direction, MigrationPlanEntry entry)
+        => direction == MigrationDirection.CSharpToCalor
+           && _options.Fidelity == ConversionFidelity.Lossless
+           && _options.PreprocessorMode == PreprocessorConversionMode.PreserveAllBranches
+           && !entry.NamespaceIndex.HasValue;
+
+    private async Task<FileMigrationResult> PreserveWholeAfterFailureAsync(
+        MigrationPlanEntry entry,
+        bool dryRun,
+        DateTime startTime,
+        System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration> generations,
+        SemaphoreSlim validationGate,
+        ConversionIssue reason,
+        string trigger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // No per-file limit here: preservation does no conversion work.
+            var preserved = await ProcessCSharpToCalorAsync(entry, dryRun, startTime, generations, validationGate,
+                cancellationToken, (reason, trigger));
+            if (!preserved.Issues.Any(issue => issue.Feature == reason.Feature))
+                preserved.Issues.Insert(0, reason);
+            return preserved;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return new FileMigrationResult
+            {
+                SourcePath = entry.SourcePath,
+                OutputPath = null,
+                Status = FileMigrationStatus.Failed,
+                Duration = DateTime.UtcNow - startTime,
+                Issues =
+                [
+                    new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Error,
+                        Feature = reason.Feature,
+                        Message = reason.Message
+                    },
+                    new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Error,
+                        Feature = "whole-file-preservation",
+                        Message = ex.Message
+                    }
+                ]
+            };
+        }
+    }
+
     private async Task<FileMigrationResult> ProcessCSharpToCalorAsync(
         MigrationPlanEntry entry,
         bool dryRun,
         DateTime startTime,
         System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration> generations,
         SemaphoreSlim validationGate,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        (ConversionIssue Reason, string Trigger)? preserveWhole = null)
     {
         var conversionOptions = new ConversionOptions
         {
@@ -588,6 +680,9 @@ public sealed class ProjectMigrator
             Fidelity = _options.Fidelity,
             PreprocessorMode = _options.PreprocessorMode,
             ValidateRoundTripCSharp = false,
+            // #1609: every input that parses is written; an original that does not
+            // compile is preserved exactly and reported, not refused.
+            PreserveDespiteOriginalErrors = _options.Fidelity == ConversionFidelity.Lossless,
             PassthroughOnError = _options.PassthroughOnError,
             Configuration = _options.Configuration,
             TargetFramework = _options.TargetFramework
@@ -688,20 +783,31 @@ public sealed class ProjectMigrator
         ConversionGeneration? generation = null;
         if (_options.Fidelity == ConversionFidelity.Lossless)
         {
-            generation = converter.CreateGeneration(entry.SourcePath, entry.OutputPath, dryRun, entry.NamespaceIndex,
-                projectConversion: _options.SplitNamespaces);
-            if (!generations.TryAdd(Path.GetFullPath(entry.OutputPath), generation))
+            // #1609: the whole-file fallback after a timeout or crash reuses the generation
+            // (and writer lock) the native attempt registered.
+            if (preserveWhole != null
+                && generations.TryGetValue(Path.GetFullPath(entry.OutputPath), out var existing))
+                generation = existing;
+            else
             {
-                generation.Dispose();
-                throw new IOException($"Duplicate output generation: {entry.OutputPath}");
+                generation = converter.CreateGeneration(entry.SourcePath, entry.OutputPath, dryRun, entry.NamespaceIndex,
+                    projectConversion: _options.SplitNamespaces);
+                if (!generations.TryAdd(Path.GetFullPath(entry.OutputPath), generation))
+                {
+                    generation.Dispose();
+                    throw new IOException($"Duplicate output generation: {entry.OutputPath}");
+                }
             }
         }
-        var result = generation != null
-            ? await generation.ConvertAsync(cancellationToken)
-            : await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
+        var result = preserveWhole is { } fallback
+            ? await generation!.PreserveWithoutConversionAsync(cancellationToken, [fallback.Reason], fallback.Trigger)
+            : generation != null
+                ? await generation.ConvertAsync(cancellationToken)
+                : await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
         if (selectionError != null && entry.NamespaceIndex.HasValue)
             result.Context.AddError(selectionError, "namespace-split-project-selection");
-        if (selectionError != null && !entry.NamespaceIndex.HasValue && _options.Fidelity == ConversionFidelity.Lossless)
+        if (selectionError != null && !entry.NamespaceIndex.HasValue && _options.Fidelity == ConversionFidelity.Lossless
+            && preserveWhole == null)
             result = generation!.PreserveOriginal(cancellationToken,
                 [new ConversionIssue
                 {
@@ -927,21 +1033,45 @@ public sealed class ProjectMigrator
         catch (Exception ex) when (ex is IOException or InvalidOperationException
                                    or System.Text.Json.JsonException)
         {
-            MarkProjectValidationFailure(
-                converted,
-                $"Project references could not be resolved for generated C# validation: {ex.Message}");
+            if (converted.Any(result => result.NamespaceIndex.HasValue))
+            {
+                MarkProjectValidationFailure(
+                    converted,
+                    $"Project references could not be resolved for generated C# validation: {ex.Message}");
+                return;
+            }
+            // #1609: project validation is a check, not a gate. Without the project's
+            // references nothing can be checked, so every file is written and reported
+            // as unverified.
+            foreach (var result in converted)
+            {
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Warning,
+                    Feature = "project-csharp-validation",
+                    Message = "The project could not be evaluated, so the generated C# was not built against it "
+                        + $"(unverified): {ex.Message}"
+                });
+                if (result.ConversionPaths != null)
+                    result.ConversionPaths = (result.ConversionPaths with
+                    {
+                        RoundTrip = ConversionRoundTrip.Failed
+                    }).WithSuccess(true);
+            }
+            await WriteLosslessOutputsAsync(converted, dryRun, generations, cancellationToken);
             return;
         }
         var convertedSourcePaths = converted
             .Select(result => Path.GetFullPath(result.SourcePath))
             .ToHashSet(BuildStateCache.GetPathComparer());
-        var errors = projectInputs.SelectMany(inputs =>
+        List<Microsoft.CodeAnalysis.Diagnostic> ComputeErrors(Func<FileMigrationResult, string?> textOf)
+            => projectInputs.SelectMany(inputs =>
         {
             var targetSourcePaths = inputs.SourcePaths
                 .Select(Path.GetFullPath)
                 .ToHashSet(BuildStateCache.GetPathComparer());
             var targetResults = converted
-                .Where(result => !string.IsNullOrWhiteSpace(result.GeneratedCSharp))
+                .Where(result => !string.IsNullOrWhiteSpace(textOf(result)))
                 .Where(result => targetSourcePaths.Count == 0 ||
                     targetSourcePaths.Contains(Path.GetFullPath(result.SourcePath))
                     || Path.GetExtension(result.SourcePath).Equals(
@@ -952,7 +1082,7 @@ public sealed class ProjectMigrator
                 .Where(result => !Path.GetExtension(result.SourcePath)
                     .Equals(".csx", StringComparison.OrdinalIgnoreCase))
                 .Select(result => new CodeGen.GeneratedCSharpSource(
-                    result.GeneratedCSharp!,
+                    textOf(result)!,
                     Path.ChangeExtension(result.OutputPath ?? result.SourcePath, ".g.cs"),
                     result.OutputPath))
                 .ToArray();
@@ -1001,7 +1131,7 @@ public sealed class ProjectMigrator
             {
                 var validation = CodeGen.GeneratedCSharpCompiler.Validate(
                     [new CodeGen.GeneratedCSharpSource(
-                        script.GeneratedCSharp!,
+                        textOf(script)!,
                         script.SourcePath)],
                     context with
                     {
@@ -1035,6 +1165,7 @@ public sealed class ProjectMigrator
             }
             return diagnostics;
         }).ToList();
+        var errors = ComputeErrors(result => result.GeneratedCSharp);
         if (errors.Count > 0)
         {
             if (converted.Any(result => result.NamespaceIndex.HasValue))
@@ -1054,9 +1185,22 @@ public sealed class ProjectMigrator
                     && failingPaths.Contains(
                         Path.ChangeExtension(result.OutputPath ?? result.SourcePath, ".g.cs")))
                     .ToList();
-                if (candidates.Count == 0)
-                    candidates = converted.Where(result =>
-                        result.Losses.All(loss => loss.Feature != "whole-file-preservation")).ToList();
+                if (candidates.Count == 0
+                    && converted.Any(result => result.Losses.All(loss => loss.Feature != "whole-file-preservation")))
+                {
+                    // #1609: no error is in a native file. Before preserving every native
+                    // file, check whether the errors remain when every file is its exact
+                    // original. If they do, native output did not cause them, so no file
+                    // drops a rung for them; they are reported and every file is written.
+                    var preservedErrors = ComputeErrors(result =>
+                        generations.TryGetValue(Path.GetFullPath(result.OutputPath!), out var original)
+                            ? original.Result.Context.OriginalSource
+                            : result.GeneratedCSharp);
+                    var remaining = preservedErrors.Select(ErrorKey).ToHashSet();
+                    if (!errors.All(error => remaining.Contains(ErrorKey(error))))
+                        candidates = converted.Where(result =>
+                            result.Losses.All(loss => loss.Feature != "whole-file-preservation")).ToList();
+                }
                 foreach (var result in candidates)
                 {
                     var generation = generations[Path.GetFullPath(result.OutputPath!)];
@@ -1065,7 +1209,7 @@ public sealed class ProjectMigrator
                         {
                             Severity = ConversionIssueSeverity.Error,
                             Feature = "roundtrip-csharp-validation",
-                            Message = $"Project C# validation failed ({error.Id}): {error.GetMessage()}"
+                            Message = $"Project C# validation failed ({error.Id}){DescribeLocation(error)}: {error.GetMessage()}"
                         }));
                     if (!preserved.Success)
                     {
@@ -1101,7 +1245,10 @@ public sealed class ProjectMigrator
                         ? generations[Path.GetFullPath(result.OutputPath!)].Result.Context.OriginalSource
                         : await CSharpToCalorConverter.ReadSourceFileAsync(result.SourcePath, cancellationToken),
                     StringComparison.Ordinal);
-                if (!exact)
+                // #1609: in the default lossless mode project validation is a check, not
+                // a gate. Every file is written and the errors are reported (unverified).
+                // The internal lossy mode keeps refusing files that are not exact copies.
+                if (!exact && _options.Fidelity != ConversionFidelity.Lossless)
                 {
                     result.Status = FileMigrationStatus.Failed;
                     result.OutputPath = null;
@@ -1115,16 +1262,33 @@ public sealed class ProjectMigrator
                     {
                         RoundTrip = ConversionRoundTrip.Failed
                     }).WithSuccess(result.OutputPath != null);
-                foreach (var error in errors.Take(20))
+                // #1609: in lossless mode each file lists the errors located in it, and
+                // only a count of the rest, so a report shows where each error is.
+                var reported = _options.Fidelity == ConversionFidelity.Lossless
+                    ? errors.Where(error => BuildStateCache.GetPathComparer().Equals(
+                        error.Location.SourceTree?.FilePath ?? "",
+                        Path.ChangeExtension(result.OutputPath ?? result.SourcePath, ".g.cs"))).Take(20).ToList()
+                    : errors.Take(20).ToList();
+                foreach (var error in reported)
                 {
                     result.Issues.Add(new ConversionIssue
                     {
                         Severity = result.OutputPath == null
                             ? ConversionIssueSeverity.Error : ConversionIssueSeverity.Warning,
                         Feature = "roundtrip-csharp-validation",
-                        Message = $"Lossless project C# validation failed ({error.Id}): {error.GetMessage()}"
+                        Message = $"Lossless project C# validation failed ({error.Id}){DescribeLocation(error)}: {error.GetMessage()}"
                     });
                 }
+                if (_options.Fidelity == ConversionFidelity.Lossless && reported.Count < errors.Count)
+                    result.Issues.Add(new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Warning,
+                        Feature = "roundtrip-csharp-validation",
+                        Message = $"Lossless project C# validation failed: the project build has {errors.Count - reported.Count} "
+                            + "error(s) in other files, so this file is written but unverified. "
+                            + string.Join("; ", errors.Except(reported).Take(3).Select(error =>
+                                $"{error.Id}{DescribeLocation(error)}"))
+                    });
             }
 
         }
@@ -1137,96 +1301,7 @@ public sealed class ProjectMigrator
                 }).WithSuccess(true);
         }
 
-        if (dryRun)
-        {
-            return;
-        }
-
-        if (converted.Any(result => result.NamespaceIndex.HasValue)
-            && converted.Any(result => result.OutputPath != null && Directory.Exists(result.OutputPath)))
-        {
-            MarkProjectValidationFailure(converted, "Namespace-split destination is a directory; no outputs were written.");
-            return;
-        }
-        foreach (var result in converted.Where(result => result.OutputPath != null))
-            if (Directory.Exists(result.OutputPath))
-            {
-                result.Status = FileMigrationStatus.Failed;
-                result.Issues.Add(new ConversionIssue
-                {
-                    Severity = ConversionIssueSeverity.Error,
-                    Feature = "migration-write-failure",
-                    Message = $"Destination is a directory: {result.OutputPath}"
-                });
-                result.OutputPath = null;
-            }
-        var outputs = converted.Where(result => result.OutputPath != null && result.ConvertedSource != null).ToArray();
-        if (outputs.Length == 0) return;
-        var receipts = new Dictionary<FileMigrationResult, ConversionReceipt>();
-        try
-        {
-            if (_options.Fidelity == ConversionFidelity.Lossless)
-                foreach (var result in outputs)
-                {
-                    if (!generations.TryGetValue(Path.GetFullPath(result.OutputPath!), out var generation))
-                        throw new IOException($"Missing original generation context: {result.SourcePath}");
-                    receipts.Add(result, await generation.PrepareReceiptAsync(result.ConvertedSource, cancellationToken));
-                }
-            foreach (var result in outputs.Where(receipts.ContainsKey))
-                await generations[Path.GetFullPath(result.OutputPath!)]
-                    .VerifyPreparedAsync(receipts[result], cancellationToken);
-            var identityRoot = Incremental.BuildStateCache.ComputeCommonDirectory(
-                outputs.Select(result => new FileInfo(result.OutputPath!)).ToArray());
-            var identityStore = new Ids.DeclarationIdentityStore(identityRoot);
-            identityStore.Sync(outputs.Select(result => result.OutputPath!).Where(File.Exists));
-            var identityChanges = new List<Ids.DeclarationIdentityStore.SourceChange>();
-            foreach (var result in outputs)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var before = _options.Fidelity == ConversionFidelity.Lossless
-                    ? generations[Path.GetFullPath(result.OutputPath!)].Before
-                    : File.Exists(result.OutputPath!)
-                        ? await File.ReadAllTextAsync(result.OutputPath!, cancellationToken) : null;
-                identityChanges.Add(new(result.OutputPath!, before, result.ConvertedSource));
-            }
-            cancellationToken.ThrowIfCancellationRequested();
-            identityStore.Apply(identityChanges);
-            foreach (var result in outputs.Where(receipts.ContainsKey))
-                result.OutputWritten = true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            foreach (var result in outputs)
-            {
-                result.Status = FileMigrationStatus.Failed;
-                result.OutputPath = null;
-                result.Issues.Add(new ConversionIssue
-                {
-                    Severity = ConversionIssueSeverity.Error,
-                    Feature = "migration-write-failure",
-                    Message = $"Identity-managed output write failed: {ex.Message}"
-                });
-            }
-            return;
-        }
-
-        foreach (var result in outputs.Where(receipts.ContainsKey))
-        {
-            try
-            {
-                await generations[Path.GetFullPath(result.OutputPath!)].FinalizeReceiptAsync(receipts[result]);
-            }
-            catch (IOException ex)
-            {
-                result.Status = FileMigrationStatus.Failed;
-                result.Issues.Add(new ConversionIssue
-                {
-                    Severity = ConversionIssueSeverity.Error,
-                    Feature = "migration-receipt-failure",
-                    Message = ex.Message
-                });
-            }
-        }
+        await WriteLosslessOutputsAsync(converted, dryRun, generations, cancellationToken);
 
         static ProjectCompilationInputs
             CreateLooseDirectoryInputs(
@@ -1257,6 +1332,137 @@ public sealed class ProjectMigrator
                         .NullableContextOptions.Disable,
                 TreatWarningsAsErrors: false,
                 AnalyzerConfigPath: null);
+    }
+
+    /// <summary>
+    /// Writes the C# → Calor outputs that passed (or were exempted from) project
+    /// validation. #1609: each file's destination check and write is isolated.
+    /// </summary>
+    private async Task WriteLosslessOutputsAsync(
+        List<FileMigrationResult> converted,
+        bool dryRun,
+        IReadOnlyDictionary<string, ConversionGeneration> generations,
+        CancellationToken cancellationToken)
+    {
+        if (dryRun)
+        {
+            return;
+        }
+
+        if (converted.Any(result => result.NamespaceIndex.HasValue)
+            && converted.Any(result => result.OutputPath != null && Directory.Exists(result.OutputPath)))
+        {
+            MarkProjectValidationFailure(converted, "Namespace-split destination is a directory; no outputs were written.");
+            return;
+        }
+        foreach (var result in converted.Where(result => result.OutputPath != null))
+            if (Directory.Exists(result.OutputPath))
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "migration-write-failure",
+                    Message = $"Destination is a directory: {result.OutputPath}"
+                });
+                result.OutputPath = null;
+            }
+        var outputs = converted.Where(result => result.OutputPath != null && result.ConvertedSource != null).ToArray();
+        if (outputs.Length == 0) return;
+        // #1609: write failures are isolated per file. A file whose destination check or
+        // write fails is reported alone; it never stops the other files being written.
+        var receipts = new Dictionary<FileMigrationResult, ConversionReceipt>();
+        var writable = new List<FileMigrationResult>();
+        foreach (var result in outputs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (_options.Fidelity == ConversionFidelity.Lossless)
+                {
+                    if (!generations.TryGetValue(Path.GetFullPath(result.OutputPath!), out var generation))
+                        throw new IOException($"Missing original generation context: {result.SourcePath}");
+                    var receipt = await generation.PrepareReceiptAsync(result.ConvertedSource, cancellationToken);
+                    await generation.VerifyPreparedAsync(receipt, cancellationToken);
+                    receipts.Add(result, receipt);
+                }
+                writable.Add(result);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                MarkWriteFailure(result, $"Identity-managed output write failed: {ex.Message}");
+            }
+        }
+        if (writable.Count == 0) return;
+
+        var identityChanges = new Dictionary<FileMigrationResult, Ids.DeclarationIdentityStore.SourceChange>();
+        foreach (var result in writable)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var before = _options.Fidelity == ConversionFidelity.Lossless
+                ? generations[Path.GetFullPath(result.OutputPath!)].Before
+                : File.Exists(result.OutputPath!)
+                    ? await File.ReadAllTextAsync(result.OutputPath!, cancellationToken) : null;
+            identityChanges.Add(result, new(result.OutputPath!, before, result.ConvertedSource));
+        }
+        var identityRoot = Incremental.BuildStateCache.ComputeCommonDirectory(
+            writable.Select(result => new FileInfo(result.OutputPath!)).ToArray());
+        try
+        {
+            var identityStore = new Ids.DeclarationIdentityStore(identityRoot);
+            identityStore.Sync(writable.Select(result => result.OutputPath!).Where(File.Exists));
+            cancellationToken.ThrowIfCancellationRequested();
+            identityStore.Apply(writable.Select(result => identityChanges[result]).ToList());
+            foreach (var result in writable.Where(receipts.ContainsKey))
+                result.OutputWritten = true;
+        }
+        catch (Exception batchError) when (batchError is IOException or UnauthorizedAccessException)
+        {
+            // The one-transaction write failed. Retry one file at a time, so only the
+            // files that really cannot be written fail.
+            foreach (var result in writable)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    if (File.Exists(result.OutputPath!)
+                        && string.Equals(await File.ReadAllTextAsync(result.OutputPath!, cancellationToken),
+                            result.ConvertedSource, StringComparison.Ordinal))
+                    {
+                        // The journaled batch already committed this file.
+                        if (receipts.ContainsKey(result)) result.OutputWritten = true;
+                        continue;
+                    }
+                    var identityStore = new Ids.DeclarationIdentityStore(identityRoot);
+                    identityStore.Sync(new[] { result.OutputPath! }.Where(File.Exists));
+                    identityStore.Apply([identityChanges[result]]);
+                    if (receipts.ContainsKey(result)) result.OutputWritten = true;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    receipts.Remove(result);
+                    MarkWriteFailure(result, $"Identity-managed output write failed: {ex.Message}");
+                }
+            }
+        }
+
+        foreach (var result in outputs.Where(receipts.ContainsKey))
+        {
+            try
+            {
+                await generations[Path.GetFullPath(result.OutputPath!)].FinalizeReceiptAsync(receipts[result]);
+            }
+            catch (IOException ex)
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "migration-receipt-failure",
+                    Message = ex.Message
+                });
+            }
+        }
     }
 
     private async Task FinalizeCalorToCSharpProjectAsync(
@@ -1362,6 +1568,33 @@ public sealed class ProjectMigrator
                 result.GeneratedCSharp!,
                 cancellationToken: cancellationToken);
         }
+    }
+
+    private static (string Id, string Path, int Line, string Message) ErrorKey(Microsoft.CodeAnalysis.Diagnostic error)
+    {
+        var span = error.Location.GetLineSpan();
+        return (error.Id, span.Path ?? "", span.StartLinePosition.Line, error.GetMessage());
+    }
+
+    /// <summary>" at File.g.cs:12" for a project-validation error, so a report names where it is.</summary>
+    private static string DescribeLocation(Microsoft.CodeAnalysis.Diagnostic error)
+    {
+        var span = error.Location.GetLineSpan();
+        return string.IsNullOrEmpty(span.Path)
+            ? ""
+            : $" at {Path.GetFileName(span.Path)}:{span.StartLinePosition.Line + 1}";
+    }
+
+    private static void MarkWriteFailure(FileMigrationResult result, string message)
+    {
+        result.Status = FileMigrationStatus.Failed;
+        result.OutputPath = null;
+        result.Issues.Add(new ConversionIssue
+        {
+            Severity = ConversionIssueSeverity.Error,
+            Feature = "migration-write-failure",
+            Message = message
+        });
     }
 
     private static void MarkProjectValidationFailure(

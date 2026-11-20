@@ -792,8 +792,10 @@ public sealed class LosslessConversionContractTests
             Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "Missing.cs").ExitCode);
             Assert.Equal(1, CliTestHarness.RunCli(directory, "migrate", "missing").ExitCode);
             Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "Malformed.cs").ExitCode);
-            Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "InvalidType.cs").ExitCode);
-            Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "InvalidWithMissingContext.cs").ExitCode);
+            // #1609: C# that parses but does not compile is written, preserved exactly, and
+            // reported unverified (exit 2). This test used to pin a refusal (exit 1).
+            Assert.Equal(2, CliTestHarness.RunCli(directory, "convert", "InvalidType.cs").ExitCode);
+            Assert.Equal(2, CliTestHarness.RunCli(directory, "convert", "InvalidWithMissingContext.cs").ExitCode);
             Assert.Equal(1, CliTestHarness.RunCli(directory, "convert", "Unreadable.cs").ExitCode);
             var reportPath = Path.Combine(directory, "report.json");
             var migration = CliTestHarness.RunCli(directory, "migrate", directory, "--report", reportPath);
@@ -802,11 +804,14 @@ public sealed class LosslessConversionContractTests
                 migration.StdOut + migration.StdErr
                     + (File.Exists(reportPath) ? File.ReadAllText(reportPath) : ""));
             Assert.False(File.Exists(Path.Combine(directory, "Malformed.calr")));
+            Assert.True(File.Exists(Path.Combine(directory, "InvalidType.calr")));
+            Assert.True(File.Exists(Path.Combine(directory, "InvalidWithMissingContext.calr")));
             Assert.True(Directory.Exists(Path.Combine(directory, "Unwritable.calr")));
             var report = System.Text.Json.JsonDocument.Parse(File.ReadAllText(reportPath))
                 .RootElement.GetProperty("data");
             Assert.Equal(6, report.GetProperty("summary").GetProperty("totalFiles").GetInt32());
-            Assert.Equal(5, report.GetProperty("summary").GetProperty("failedFiles").GetInt32());
+            // Malformed (does not parse), Unreadable (not valid text) and Unwritable (write failure).
+            Assert.Equal(3, report.GetProperty("summary").GetProperty("failedFiles").GetInt32());
             Assert.Contains(report.GetProperty("fileResults").EnumerateArray(), file =>
                 file.GetProperty("issues").EnumerateArray().Any(issue =>
                     issue.GetProperty("feature").GetString() == "migration-write-failure"));
@@ -1288,10 +1293,19 @@ public sealed class LosslessConversionContractTests
             Assert.All(report.FileResults, result =>
             {
                 Assert.Equal(FileMigrationStatus.Partial, result.Status);
-                Assert.Equal("unverified", result.ConversionPaths!.Outcome);
-                Assert.Equal("failed", result.ConversionPaths.RoundTrip);
-                Assert.Equal(File.ReadAllText(result.SourcePath), result.GeneratedCSharp);
+                Assert.Equal("failed", result.ConversionPaths!.RoundTrip);
+                Assert.True(result.OutputWritten);
             });
+            // #1609: the missing reference fails Invalid.cs even when every file is its
+            // exact original, so Valid.cs's native output did not cause it. Valid.cs stays
+            // native (this test used to pin the old cascade that preserved it whole too);
+            // Invalid.cs is preserved exactly. Both are written and unverified.
+            var invalid = Assert.Single(report.FileResults, result => result.SourcePath == invalidPath);
+            Assert.Equal("unverified", invalid.ConversionPaths!.Outcome);
+            Assert.Equal(File.ReadAllText(invalidPath), invalid.GeneratedCSharp);
+            var valid = Assert.Single(report.FileResults, result => result.SourcePath == validPath);
+            Assert.DoesNotContain(valid.Losses, loss => loss.Feature == "whole-file-preservation");
+            Assert.NotEqual(File.ReadAllText(validPath), valid.GeneratedCSharp);
             Assert.Equal(0, report.Summary.SuccessfulFiles);
             Assert.Equal(0, report.Summary.FailedFiles);
             Assert.True(report.Summary.TotalWarnings > 0);

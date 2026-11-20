@@ -118,7 +118,7 @@ public class MigrateWorkflowTests : IDisposable
     [InlineData("source")]
     [InlineData("output")]
     [InlineData("receipt")]
-    public async Task ProjectReceipt_StalePreparationRefusesTheEntireOutputBatch(string changed)
+    public async Task ProjectReceipt_StalePreparationRefusesOnlyTheChangedFile(string changed)
     {
         WriteTestCSharpFile("A.cs", "public class A { }");
         WriteTestCSharpFile("B.cs", "public class B { }");
@@ -135,14 +135,20 @@ public class MigrateWorkflowTests : IDisposable
                 "output" => plan.Entries[0].OutputPath,
                 _ => plan.Entries[0].OutputPath + ".conversion.json"
             }, "// external edit\r\n");
-            expected = ReceiptArtifacts(plan);
+            // Only the changed file's artifacts; the other file is written.
+            expected = ReceiptArtifacts(plan)
+                .Where(pair => pair.Key == plan.Entries[0].OutputPath
+                    || pair.Key == plan.Entries[0].OutputPath + ".conversion.json")
+                .ToDictionary(pair => pair.Key, pair => pair.Value);
         }));
-        Assert.Equal(2, report.Summary.FailedFiles);
-        Assert.All(report.FileResults, file =>
-        {
-            Assert.False(file.OutputWritten);
-            Assert.Equal("refused", file.ConversionPaths!.Outcome);
-        });
+        // #1609: write failures are isolated per file (this test used to pin the old
+        // contract, where one stale file refused the whole batch). The changed file
+        // is refused and untouched; the other file is still written.
+        Assert.Equal(1, report.Summary.FailedFiles);
+        var changedResult = Assert.Single(report.FileResults, file => file.SourcePath == plan.Entries[0].SourcePath);
+        Assert.False(changedResult.OutputWritten);
+        Assert.Equal("refused", changedResult.ConversionPaths!.Outcome);
+        Assert.True(Assert.Single(report.FileResults, file => file.SourcePath == plan.Entries[1].SourcePath).OutputWritten);
         Assert.NotNull(expected);
         AssertReceiptArtifacts(expected);
     }
@@ -188,17 +194,22 @@ public class MigrateWorkflowTests : IDisposable
     }
 
     [Fact]
-    public async Task ProjectReceipt_PerFileTimeoutDoesNotWrite()
+    public async Task ProjectReceipt_PerFileTimeoutPreservesTheWholeFile()
     {
+        // #1609: this test used to pin "a timeout writes nothing". A timeout now drops
+        // to whole-file preservation, which needs no conversion, and the file is written.
         WriteTestCSharpFile("A.cs", "public class A { }");
         var plan = ReceiptPlan("A.cs");
-        var before = ReceiptArtifacts(plan);
         var report = await new ProjectMigrator(new()
         {
             Parallel = false, PerFileTimeoutSeconds = 0
         }).ExecuteAsync(plan);
-        Assert.Equal(FileMigrationStatus.TimedOut, Assert.Single(report.FileResults).Status);
-        AssertReceiptArtifacts(before);
+        var file = Assert.Single(report.FileResults);
+        Assert.Equal(FileMigrationStatus.Partial, file.Status);
+        Assert.True(file.OutputWritten);
+        Assert.Contains(file.Losses, loss => loss.Feature == "whole-file-preservation"
+            && loss.Trigger == ConversionTrigger.Timeout);
+        Assert.Equal(File.ReadAllText(file.OutputPath!), ReadReceipt(file.OutputPath!).GeneratedCalor);
     }
 
     [Theory]
@@ -218,18 +229,23 @@ public class MigrateWorkflowTests : IDisposable
     }
 
     [Fact]
-    public async Task ProjectReceipt_ProjectValidationRefusalDoesNotWrite()
+    public async Task ProjectReceipt_UnevaluableProjectStillWritesUnverified()
     {
+        // #1609: this test used to pin "a project that cannot be evaluated writes
+        // nothing". Project validation is now a check, not a gate: the file is written
+        // and reported unverified.
         WriteTestCSharpFile("A.cs", "public class A { }");
         var project = await CreateReceiptProjectAsync();
         var migrator = ReceiptMigrator();
         var plan = await migrator.CreatePlanAsync(project, MigrationDirection.CSharpToCalor);
-        var before = ReceiptArtifacts(plan);
         var report = await migrator.ExecuteAsync(plan, progress: new ReceiptProgress(_ =>
             File.WriteAllText(project, "<Project invalid")));
-        Assert.Equal(FileMigrationStatus.Failed, Assert.Single(report.FileResults).Status);
-        Assert.Contains(report.FileResults[0].Issues, issue => issue.Feature == "project-csharp-validation");
-        AssertReceiptArtifacts(before);
+        var file = Assert.Single(report.FileResults);
+        Assert.NotEqual(FileMigrationStatus.Failed, file.Status);
+        Assert.True(file.OutputWritten);
+        Assert.Contains(file.Issues, issue => issue.Feature == "project-csharp-validation"
+            && issue.Severity == ConversionIssueSeverity.Warning);
+        Assert.Equal(ConversionRoundTrip.Failed, file.ConversionPaths!.RoundTrip);
     }
 
     [Fact]
