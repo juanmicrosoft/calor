@@ -37,29 +37,32 @@ public class EditPrecisionCalculator : IMetricCalculator
             details));
     }
 
+    /// <summary>
+    /// Calculates Calor's edit precision from the presence of declaration IDs. Same rule as
+    /// Calor.Evaluation's copy of this metric: a 0.5 base, plus presence bonuses for a module ID,
+    /// a callable ID, and indented body lines. Local bindings, returns and call sites have no IDs
+    /// in native Calor, so they earn nothing.
+    /// </summary>
     private static double CalculateCalorEditPrecision(EvaluationContext context)
     {
-        var declarations = ReadDeclarations(context.CalorSource);
-        var score = 0.0;
+        var score = 0.5; // Base score
 
-        // Count explicit IDs that enable precise targeting. Native source carries no inline IDs;
-        // every declaration (module, type, callable, member) gets one from the identity store.
-        var idCount = declarations.Count;
-        score += Math.Min(1.0, idCount * 0.15);
+        var source = context.CalorSource;
+        var declarations = ReadDeclarations(source);
 
-        // Functions with IDs
-        var functionIds = declarations.Count(d => IsCallable(d.Kind));
-        score += Math.Min(0.3, functionIds * 0.1);
+        // Sidecar IDs enable precise targeting.
+        if (declarations.Any(d => d.Kind == IdKind.Module)) score += 0.15;
+        if (declarations.Any(d => IsCallable(d.Kind))) score += 0.20;
 
-        // Modules with IDs
-        var moduleIds = declarations.Count(d => d.Kind == IdKind.Module);
-        score += Math.Min(0.2, moduleIds * 0.1);
+        // Each opener paired with an indented body marks a safe-modification scope.
+        if (IndentedBodyLine.IsMatch(source)) score += 0.10;
 
-        // Local bindings, returns and call sites have no IDs in native Calor, so the legacy
-        // variable, return and call marker terms earn nothing (as in Calor.Evaluation's copy).
-
-        return Math.Min(1.0, score);
+        return Math.Min(score, 1.0);
     }
+
+    private static readonly System.Text.RegularExpressions.Regex IndentedBodyLine = new(
+        @"^[ \t]+\S",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.Multiline);
 
     private static double CalculateCSharpEditPrecision(EvaluationContext context)
     {

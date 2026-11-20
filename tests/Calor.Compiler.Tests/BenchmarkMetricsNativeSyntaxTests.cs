@@ -116,8 +116,11 @@ public class BenchmarkMetricsNativeSyntaxTests
         // The module and its two functions each get an ID; local bindings do not.
         Assert.Equal(3, (int)result.Details["calorUniqueIds"]);
         Assert.Equal(3, (int)result.Details["calorAddressableElements"]);
-        // min(1.0, 3 * 0.15) + min(0.3, 2 * 0.1) + min(0.2, 1 * 0.1)
-        Assert.Equal(0.75, result.CalorScore, 6);
+        // 0.5 base + 0.15 (module ID) + 0.20 (callable ID) + 0.10 (indented body lines),
+        // the same rule as Calor.Evaluation's copy of this metric.
+        Assert.Equal(0.95, result.CalorScore, 6);
+        // The C# arm is unchanged by the port: 2 named elements (0.04) + 4 brackets (0.08).
+        Assert.Equal(0.12, result.CSharpScore, 6);
     }
 
     [Fact]
@@ -126,7 +129,8 @@ public class BenchmarkMetricsNativeSyntaxTests
         var result = await new EditPrecisionCalculator().CalculateAsync(Context("module (((("));
 
         Assert.Equal(0, (int)result.Details["calorUniqueIds"]);
-        Assert.Equal(0.0, result.CalorScore);
+        // Only the base remains: no IDs and no indented body lines.
+        Assert.Equal(0.5, result.CalorScore, 6);
     }
 
     [Fact]
