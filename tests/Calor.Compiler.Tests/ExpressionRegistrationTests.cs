@@ -29,7 +29,6 @@ public class ExpressionRegistrationTests
             [TokenKind.Identifier] = ("value", nameof(ReferenceNode)),
             [TokenKind.OpenParen] = ("(+ 1 2)", nameof(BinaryOperationNode)),
             [TokenKind.OpenBrace] = ("{1, 2}", nameof(ArrayCreationNode)),
-            [TokenKind.If] = ("§IF true → 1 §EL → 2 §/I", nameof(ConditionalExpressionNode)),
             [TokenKind.Match] = ("§W value §K _ → 1 §/W", nameof(MatchExpressionNode)),
             [TokenKind.Array] = ("§ARR{a:i32} §/ARR", nameof(ArrayCreationNode)),
             [TokenKind.Index] = ("§IDX values 0", nameof(ArrayAccessNode)),
@@ -76,7 +75,6 @@ public class ExpressionRegistrationTests
             [TokenKind.Identifier] = ("value", TokenKind.Identifier, nameof(ReferenceNode)),
             [TokenKind.OpenParen] = ("(1 + 2)", TokenKind.OpenParen, nameof(BinaryOperationNode)),
             [TokenKind.OpenBrace] = ("{1, 2}", TokenKind.OpenBrace, nameof(ArrayCreationNode)),
-            [TokenKind.If] = ("if true → 1 else → 2", TokenKind.If, nameof(ConditionalExpressionNode)),
             [TokenKind.Match] = ("match value\n  case _ → 1\n", TokenKind.Match, nameof(MatchExpressionNode)),
             [TokenKind.Array] = ("new int[] {}", TokenKind.New, nameof(ArrayCreationNode)),
             [TokenKind.Index] = ("values[0]", TokenKind.Identifier, nameof(ArrayAccessNode)),
@@ -116,8 +114,6 @@ public class ExpressionRegistrationTests
     private static readonly IReadOnlyDictionary<TokenKind, (string Tail, TokenKind? End, object? Value)> InternalCases =
         new Dictionary<TokenKind, (string, TokenKind?, object?)>
         {
-            [TokenKind.NullCoalesce] = ("value 0", null, null),
-            [TokenKind.NullConditional] = ("value Length", null, null),
             [TokenKind.RangeOp] = ("2", null, null),
             [TokenKind.At] = ("value", null, null),
         };

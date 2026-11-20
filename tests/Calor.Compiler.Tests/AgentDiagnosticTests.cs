@@ -403,41 +403,6 @@ public sealed class AgentDiagnosticTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_directory, ".calor")));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CliArchivedElision_ReportsValidationFailureInsteadOfSuccessfulSkippedMigration(bool preserveLog)
-    {
-        var path = Path.Combine(_directory, "archived.calr");
-        const string archived = "§M{Old}\r\n  §F{Main:pub} () -> void\r\n    §C{Run} §/C\r\n";
-        File.WriteAllText(path, archived, new UTF8Encoding(true));
-        var original = File.ReadAllBytes(path);
-        var logPath = Path.Combine(_directory, "migration.log.json");
-        var originalLog = new UTF8Encoding(true).GetBytes("{ \"entries\": [] }\r\n");
-        var args = new List<string> { "fix", _directory, "--elide-call-closers", "--format", "json" };
-        if (preserveLog)
-        {
-            File.WriteAllBytes(logPath, originalLog);
-            args.AddRange(["--log", logPath]);
-        }
-
-        var (exit, stdout, stderr) = CliTestHarness.RunCli(_directory, args.ToArray());
-
-        Assert.NotEqual(0, exit);
-        var result = JsonDocument.Parse(stdout).RootElement;
-        Assert.Equal(1, result.GetProperty("summary").GetProperty("errors").GetInt32());
-        Assert.Equal(1, result.GetProperty("data").GetProperty("filesSkipped").GetInt32());
-        Assert.Equal(0, result.GetProperty("data").GetProperty("fixedFiles").GetInt32());
-        Assert.Equal(0, result.GetProperty("data").GetProperty("totalFixes").GetInt32());
-        Assert.False(result.GetProperty("data").TryGetProperty("log", out _));
-        Assert.Contains("lexer errors", stderr);
-        Assert.Contains("could not validate", result.GetProperty("diagnostics")[0].GetProperty("message").GetString());
-        Assert.Equal(original, File.ReadAllBytes(path));
-        Assert.Equal(preserveLog ? 2 : 1, Directory.GetFiles(_directory).Length);
-        if (preserveLog)
-            Assert.Equal(originalLog, File.ReadAllBytes(logPath));
-    }
-
     [Fact]
     public void CliApply_PreservesEncodingAndLeavesNoTemporaryFiles()
     {
@@ -499,20 +464,6 @@ public sealed class AgentDiagnosticTests : IDisposable
         Assert.NotEqual(0, exit);
         Assert.Equal(source, File.ReadAllText(path));
         Assert.True(JsonDocument.Parse(stdout).RootElement.GetProperty("summary").GetProperty("errors").GetInt32() > 0);
-    }
-
-    [Theory]
-    [InlineData("--heal-closers")]
-    [InlineData("--elide-call-closers")]
-    [InlineData("--revert")]
-    public void CliApply_RejectsIncompatibleMigrationFlags(string flag)
-    {
-        var (exit, stdout, stderr) = CliTestHarness.RunCli(_directory, "fix", _directory, "--apply", flag, "--format", "json");
-        Assert.Equal(2, exit);
-        Assert.Contains("cannot be combined", stderr);
-        var document = JsonDocument.Parse(stdout).RootElement;
-        Assert.Equal(DiagnosticCode.CliUsageError,
-            Assert.Single(document.GetProperty("diagnostics").EnumerateArray()).GetProperty("code").GetString());
     }
 
     [Fact]

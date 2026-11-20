@@ -15,6 +15,9 @@ public class EnvelopeEarlyExitTests : IDisposable
     [Theory]
     [InlineData("--compact-ids")]
     [InlineData("--drop-structural-ids")]
+    [InlineData("--elide-call-closers")]
+    [InlineData("--heal-closers")]
+    [InlineData("--revert")]
     public void Fix_RemovedMigrationOption_IsRejected(string option)
     {
         var (exitCode, _, stderr) = CliTestHarness.RunCli(_tempDir, "fix", _tempDir, option);
@@ -184,14 +187,6 @@ public class EnvelopeEarlyExitTests : IDisposable
         var missing = Path.Combine(_tempDir, "no-such-dir");
         AssertErrorEnvelope(2, "assess", DiagnosticCode.CliInputNotFound,
             "assess", missing, "--format", "json");
-    }
-
-    [Fact]
-    public void Fix_Json_MissingRoot_Exits2_AndEmitsEnvelope()
-    {
-        var missing = Path.Combine(_tempDir, "no-such-root");
-        AssertErrorEnvelope(2, "fix", DiagnosticCode.CliInputNotFound,
-            "fix", missing, "--heal-closers", "--format", "json");
     }
 
     [Fact]

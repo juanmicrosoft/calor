@@ -229,18 +229,6 @@ public class AgentDocsSyntaxGuardTests
 
     [Theory]
     [MemberData(nameof(AllSurfaces))]
-    public void Surface_TeachesNoStructuralClosers(string name, string positiveText)
-    {
-        var findings = LegacyCloserFormLint.Scan(positiveText, name);
-        Assert.True(
-            findings.Count == 0,
-            $"Agent-doc surface '{name}' teaches {findings.Count} legacy structural closer(s) that " +
-            $"hard-error (Calor0830). Calor is indent-only; delete the closer(s):\n" +
-            string.Join("\n", findings.Select(f => $"  §/{f.Keyword} at L{f.Line}:{f.Column}")));
-    }
-
-    [Theory]
-    [MemberData(nameof(AllSurfaces))]
     public void Surface_TeachesNoFourFieldFunctionHeaders(string name, string positiveText)
     {
         var matches = FourFieldHeader.Matches(positiveText);

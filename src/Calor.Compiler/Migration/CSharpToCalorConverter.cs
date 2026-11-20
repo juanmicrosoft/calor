@@ -1479,7 +1479,7 @@ public sealed class CSharpToCalorConverter
                 {
                     context.AddWarning(
                         "Emitted Calor does not parse (or does not survive the C# round trip) " +
-                        "and could not be fully preserved as §CSHARP interop blocks; the output " +
+                        "and could not be fully preserved as raw C# passthrough; the output " +
                         "may be invalid.",
                         feature: "post-validation-fallback");
 
@@ -1880,7 +1880,7 @@ public sealed class CSharpToCalorConverter
             {
                 context.AddWarning(
                     "Effect-row synthesis did not converge within "
-                    + $"{EffectEnforcementPass.DefaultRowSynthesisRounds} rounds; the emitted §E rows "
+                    + $"{EffectEnforcementPass.DefaultRowSynthesisRounds} rounds; the emitted effect rows "
                     + "cover the bodies they were computed from but may still be narrower than the "
                     + "effects those bodies perform.",
                     feature: "effect-row-synthesis");
@@ -1893,7 +1893,7 @@ public sealed class CSharpToCalorConverter
         catch (Exception ex)
         {
             context.AddWarning(
-                $"Effect-row synthesis failed ({ex.GetType().Name}: {ex.Message}); the emitted §E rows "
+                $"Effect-row synthesis failed ({ex.GetType().Name}: {ex.Message}); the emitted effect rows "
                 + "may be narrower than the effects the converted bodies perform.",
                 feature: "effect-row-synthesis");
         }
@@ -2052,7 +2052,7 @@ public sealed class CSharpToCalorConverter
         foreach (var line in markerLines.Skip(ledgered))
         {
             context.RecordLoss(ConversionLossKind.EmitterFallback, "emitter-fallback",
-                "Raw C# fallback (§CS{…}/§RAW/§CSHARP) present in the emitted Calor without a ledger entry — " +
+                "Raw C# passthrough present in the emitted Calor without a ledger entry — " +
                 "produced by an emitter-internal fallback path; location is in the generated Calor",
                 line);
         }
@@ -2313,7 +2313,7 @@ public sealed class CSharpToCalorConverter
         {
             var (path, enabledBy) = RescueProvenance(triggers[i], context);
             context.RecordLoss(ConversionLossKind.InteropPreserved, "post-validation-fallback",
-                interops[i].Reason ?? "Member re-preserved as §CSHARP after emitted Calor failed to parse (#717)",
+                interops[i].Reason ?? "Member re-preserved as raw C# after emitted Calor failed to parse (#717)",
                 line: null, path, triggers[i], enabledBy);
         }
         var items = module.Items

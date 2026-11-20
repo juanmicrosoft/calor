@@ -51,7 +51,7 @@ public sealed class UnspacedMemberAccessEquivalenceTests
               class Holder
                 field int:Value public static = 7
 
-                ctor stat ()
+                ctor static ()
                   ! cw
                   Console.WriteLine("init")
 

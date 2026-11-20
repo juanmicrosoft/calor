@@ -301,7 +301,7 @@ module Test
 
         Assert.Contains(diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnexpectedToken
-            && diagnostic.Message.Contains("Expected operator token in §OP", StringComparison.Ordinal));
+            && diagnostic.Message.Contains("Expected an operator token after 'op'", StringComparison.Ordinal));
         var type = Assert.Single(module.Classes);
         Assert.Empty(type.OperatorOverloads);
         Assert.Equal("Later", Assert.Single(type.Methods).Name);

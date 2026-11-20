@@ -12,7 +12,7 @@ public static class AttributeHelper
     /// Visibility tokens recognised by the parser.
     /// </summary>
     public static bool IsVisibilityToken(string value) => value is
-        "pub" or "int" or "prot" or "priv" or "prot-int" or "priv-prot";
+        "public" or "internal" or "protected" or "private" or "protected-internal" or "private-protected";
 
     /// <summary>
     /// Interprets attributes for IN/§I: {type:name:semantic}

@@ -262,21 +262,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return _builder.ToString();
     }
 
-    private void EmitNamespaceScope(
-        ModuleNode module,
-        NamespaceScopeInfo scope,
-        HashSet<string> emittedScopeIds)
-    {
-        emittedScopeIds.Add(scope.Id);
-        AppendLine(
-            $"§NS{{{scope.Name}{GetNamespaceScopeMarkers(scope)}}}");
-        Indent();
-        EmitModuleItems(module, scope.Id, includeUsings: true);
-        foreach (var child in module.NamespaceScopes.Where(item => item.ParentScopeId == scope.Id))
-            EmitNamespaceScope(module, child, emittedScopeIds);
-        Dedent();
-        AppendLine();
-    }
 
     private void EmitModuleItems(
         ModuleNode node,
@@ -403,18 +388,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private static bool IsCompilerDirectiveCode(string code)
         => code.TrimStart().StartsWith("#", StringComparison.Ordinal);
-
-    private static string GetNamespaceScopeMarkers(NamespaceScopeInfo scope)
-    {
-        var markers = new List<string>();
-        if (scope.IsGlobal)
-            markers.Add("global");
-        else if (scope.Name == "_global")
-            markers.Add("named");
-        if (scope.IsFileScoped)
-            markers.Add("file");
-        return markers.Count == 0 ? "" : ":" + string.Join(":", markers);
-    }
 
     private void EmitModuleItem(AstNode item)
     {
@@ -1017,7 +990,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ConstructorNode node)
     {
         EmitDocComment(node);
-        var visibility = node.IsStatic ? " stat"
+        var visibility = node.IsStatic ? " static"
             : node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -1210,7 +1183,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(LocalFunctionStatementNode node)
-        => throw new InvalidOperationException("Local functions must be lowered to §B lambda bindings before Calor emission");
+        => throw new InvalidOperationException("Local functions must be lowered to let-bound lambdas before Calor emission");
 
     private void EmitCallableDocumentation(AstNode node, SinceNode? since, DeprecatedNode? deprecated,
         IReadOnlyList<BreakingChangeNode> breakingChanges)
@@ -1324,8 +1297,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(OutputNode node)
-        => $"§O{{{TypeMapper.ToSurfaceType(node.TypeName)}}}{FormatEffectRow(node.Row)}";
+        => throw new InvalidOperationException("OutputNode has no 0.30 source form.");
 
     public string Visit(EffectsNode node)
     {
@@ -1335,29 +1309,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return FormatEffectsTag(node);
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(ParameterNode node)
-    {
-        var typeName = TypeMapper.ToSurfaceType(node.TypeName);
-        var modifiers = new List<string>();
-        if (node.Modifier.HasFlag(ParameterModifier.This)) modifiers.Add("this");
-        if (node.Modifier.HasFlag(ParameterModifier.Ref)) modifiers.Add("ref");
-        if (node.Modifier.HasFlag(ParameterModifier.Out)) modifiers.Add("out");
-        if (node.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
-        if (node.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-        var attrs = EmitCSharpAttributes(node.CSharpAttributes);
-        var result = $"§I{{{typeName}:{EscapeCalorIdentifier(node.Name)}{modStr}}}{attrs}{FormatEffectRow(node.Row)}";
-        if (node.InlineRefinement != null)
-        {
-            var predicate = node.InlineRefinement.Predicate.Accept(this);
-            result += $" | {predicate}";
-        }
-        if (node.DefaultValue != null)
-        {
-            result += $" = {node.DefaultValue.Accept(this)}";
-        }
-        return result;
-    }
+        => throw new InvalidOperationException("ParameterNode has no 0.30 source form.");
 
     public string Visit(RequiresNode node)
     {
@@ -1897,15 +1851,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 new CallExpressionNode(entry.Span, "Add", [entry.Key, entry.Value])).ToArray()));
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(KeyValuePairNode node)
-    {
-        // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C
-        // so the parser doesn't absorb the value as the call's inline argument.
-        var key = AcceptInInlineSibling(node.Key);
-        var value = AcceptInInlineSibling(node.Value);
-        AppendLine($"§KV {key} {value}");
-        return "";
-    }
+        => throw new InvalidOperationException("KeyValuePairNode has no 0.30 source form.");
 
     public string Visit(SetCreationNode node)
     {
@@ -2245,18 +2193,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return expr.Contains('§');
     }
 
-    private string EmitSizeAttribute(ExpressionNode expression)
-    {
-        // #1132: an expression-position size is never hoisted (that ran it before the
-        // earlier parts of its statement); a complex one is quoted and re-parsed in place.
-        var size = AcceptInConditionalRegion(expression);
-        if (!ContainsSectionMarker(size) && !size.Contains('(') && !size.Contains(',')
-            && !size.Contains(':') && !size.Contains("0x"))
-            return size;
-
-        return new StringLiteralNode(expression.Span, size).Accept(this);
-    }
-
     private string AcceptInConditionalRegion(ExpressionNode expression)
     {
         _conditionalExpressionDepth++;
@@ -2389,7 +2325,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         if (node.Operator is UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
             or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
-            throw new InvalidOperationException("Increment/decrement expressions must be lowered to §ASSIGN before Calor emission");
+            throw new InvalidOperationException("Increment/decrement expressions must be lowered to set statements before Calor emission");
         var operand = node.Operand.Accept(this);
         var opSymbol = node.Operator switch
         {
@@ -2892,13 +2828,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     // Type system nodes
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(RecordDefinitionNode node)
-    {
-        var fields = string.Join(", ", node.Fields.Select(f =>
-            $"{TypeMapper.ToSurfaceType(f.TypeName)}:{f.Name}"));
-        AppendLine($"§D{{{node.Name}}} ({fields})");
-        return "";
-    }
+        => throw new InvalidOperationException("RecordDefinitionNode has no 0.30 source form.");
 
     public string Visit(FieldDefinitionNode node)
     {
@@ -2906,30 +2838,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"{TypeMapper.ToSurfaceType(node.TypeName)}:{node.Name}{defaultValue}";
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(UnionTypeDefinitionNode node)
-    {
-        // Emit union types using the type/variant syntax
-        AppendLine($"§T{{{node.Name}}}");
-        Indent();
-        foreach (var variant in node.Variants)
-        {
-            var fields = variant.Fields.Count > 0
-                ? $"({string.Join(", ", variant.Fields.Select(f => $"{TypeMapper.ToSurfaceType(f.TypeName)}:{f.Name}"))})"
-                : "";
-            AppendLine($"§V{{{variant.Name}}}{fields}");
-        }
-        Dedent();
-        AppendLine("§/T");
-        return "";
-    }
+        => throw new InvalidOperationException("UnionTypeDefinitionNode has no 0.30 source form.");
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(VariantDefinitionNode node)
-    {
-        var fields = node.Fields.Count == 0
-            ? ""
-            : $"({string.Join(", ", node.Fields.Select(Visit))})";
-        return $"§V{{{node.Name}}}{fields}";
-    }
+        => throw new InvalidOperationException("VariantDefinitionNode has no 0.30 source form.");
 
     public string Visit(TypeReferenceNode node)
     {
@@ -3055,8 +2970,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             argumentNames: node.Fields.Select(field => (string?)field.FieldName).ToArray()));
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(FieldAssignmentNode node)
-        => $"§A[{node.FieldName}] {node.Value.Accept(this)}";
+        => throw new InvalidOperationException("FieldAssignmentNode has no 0.30 source form.");
 
     // Generic type nodes
     public string Visit(TypeParameterNode node)
@@ -3174,21 +3090,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(EventSubscribeNode node)
-    {
-        var evt = AcceptInInlineSibling(node.Event);
-        var handler = AcceptInInlineSibling(node.Handler);
-        AppendLine($"§SUB {evt} {handler}");
-        return "";
-    }
+        => throw new InvalidOperationException("EventSubscribeNode has no 0.30 source form.");
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(EventUnsubscribeNode node)
-    {
-        var evt = AcceptInInlineSibling(node.Event);
-        var handler = AcceptInInlineSibling(node.Handler);
-        AppendLine($"§UNSUB {evt} {handler}");
-        return "";
-    }
+        => throw new InvalidOperationException("EventUnsubscribeNode has no 0.30 source form.");
 
     // Modern operator nodes
     public string Visit(RangeExpressionNode node)
@@ -3218,17 +3126,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     // Retained semantic metadata keeps its current syntax until its replacement is measured.
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(ExampleNode node)
-    {
-        var expr = node.Expression.Accept(this);
-        var expected = node.Expected.Accept(this);
-        var message = node.Message != null ? $":{Visit(new StringLiteralNode(node.Span, node.Message))}" : "";
-        var attributes = node.Id != null || node.Message != null
-            ? $"{{{Visit(new StringLiteralNode(node.Span, node.Id ?? ""))}{message}}}"
-            : "";
-        AppendLine($"§EX{attributes} {expr} -> {expected}");
-        return "";
-    }
+        => throw new InvalidOperationException("ExampleNode has no 0.30 source form.");
 
     public string Visit(IssueNode node)
     {
@@ -3259,10 +3159,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    // Mirrors ParseAssume: `assume` with an optional {category} header and a description.
     public string Visit(AssumeNode node)
     {
         var category = node.Category.HasValue ? $"{{{node.Category.Value.ToString().ToLowerInvariant()}}}" : "";
-        AppendLine($"§AS{category} {Visit(new StringLiteralNode(node.Span, node.Description))}");
+        AppendLine($"assume{category} {Visit(new StringLiteralNode(node.Span, node.Description))}");
         return "";
     }
 
@@ -3346,13 +3247,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"{node.FilePath}{desc}";
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(PropertyTestNode node)
-    {
-        var quantifiers = node.Quantifiers.Count > 0 ? $"forall {string.Join(",", node.Quantifiers)}: " : "";
-        var predicate = node.Predicate.Accept(this);
-        AppendLine($"§PT {quantifiers}{predicate}");
-        return "";
-    }
+        => throw new InvalidOperationException("PropertyTestNode has no 0.30 source form.");
 
     public string Visit(LockNode node)
     {
@@ -4077,21 +3974,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(StackAllocNode node)
-    {
-        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
-        if (node.Size != null)
-        {
-            var size = EmitSizeAttribute(node.Size);
-            return $"§SALLOC{{{elementType}:{size}}}";
-        }
-        else if (node.Initializer.Count > 0)
-        {
-            var elements = string.Join(" ", node.Initializer.Select(e => AcceptInInlineSibling(e)));
-            return $"§SALLOC{{{elementType}}} {elements} §/SALLOC";
-        }
-        return $"§SALLOC{{{elementType}:0}}";
-    }
+        => throw new InvalidOperationException("StackAllocNode has no 0.30 source form.");
 
     public string Visit(UnsafeBlockNode node)
     {
@@ -4126,17 +4011,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(AddressOfNode node)
-    {
-        var operand = node.Operand.Accept(this);
-        return $"§ADDR {operand}";
-    }
+        => throw new InvalidOperationException("AddressOfNode has no 0.30 source form.");
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(PointerDereferenceNode node)
-    {
-        var operand = node.Operand.Accept(this);
-        return $"§DEREF {operand}";
-    }
+        => throw new InvalidOperationException("PointerDereferenceNode has no 0.30 source form.");
 
     public string Visit(SizeOfNode node)
     {
@@ -4156,12 +4037,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     // Dependent Types: Refinement Types and Proof Obligations
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(RefinementTypeNode node)
-    {
-        var predicate = node.Predicate.Accept(this);
-        AppendLine($"§RTYPE{{{node.Name}:{TypeMapper.ToSurfaceType(node.BaseTypeName)}}} {predicate}");
-        return "";
-    }
+        => throw new InvalidOperationException("RefinementTypeNode has no 0.30 source form.");
 
     public string Visit(SelfRefNode node)
     {
@@ -4178,16 +4056,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    // 0.30: no native source form; nothing that reaches the emitter produces this node.
     public string Visit(IndexedTypeNode node)
-    {
-        var sb = new System.Text.StringBuilder();
-        sb.Append($"§ITYPE{{{node.Name}:{TypeMapper.ToSurfaceType(node.BaseTypeName)}:{node.SizeParam}}}");
-        if (node.Constraint != null)
-        {
-            var constraint = node.Constraint.Accept(this);
-            sb.Append($" {constraint}");
-        }
-        AppendLine(sb.ToString());
-        return "";
-    }
+        => throw new InvalidOperationException("IndexedTypeNode has no 0.30 source form.");
 }

@@ -2174,7 +2174,7 @@ public sealed class NativeMetadataClosureTests
             module StaticInitializationDependency
               class Seed
                 field int:Value public static = Initialize()
-                ctor stat ()
+                ctor static ()
                   ! cw
                 func Initialize private static () → int
                   System.Console.WriteLine("static initialization")

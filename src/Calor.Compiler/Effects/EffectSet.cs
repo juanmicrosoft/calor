@@ -25,7 +25,7 @@ public sealed class EffectSet : IEquatable<EffectSet>
     }
 
     /// <summary>
-    /// Creates an EffectSet from surface codes (e.g., "cw", "fr", "rand").
+    /// Creates an EffectSet from surface codes (e.g., "cw", "fs:r", "rand").
     /// </summary>
     public static EffectSet From(params string[] surfaceCodes)
     {

@@ -37,53 +37,28 @@ as a directory-wide transaction. A dry run leaves files unchanged and returns
 their original diagnostics, including fix payloads, with proposed change counts.
 `editsApplied` counts individual text edits, not diagnostics.
 
-The explicit migration modes below instead perform byte-reversible rewrites.
-Select exactly one operation; they cannot be combined with `--apply`:
-
-| Flag | Operation |
-|:-----|:----------|
-| `--heal-closers` | Remove legacy structural closers so blocks end by dedenting. |
-| `--elide-call-closers` | Archived call-closer elision; retired source is rejected by today's compiler. |
-
-These modes describe archived section-tag syntax, not native-source conversion.
-`--heal-closers` removes only structural closing tags; the remaining archived
-headers and expressions still fail today's lexer. Call elision needs a compiler
-that accepts the archive: today's `--elide-call-closers` rejects retired syntax,
-returns a nonzero exit code, and leaves the source and any existing recovery log
-unchanged.
-
-The original 23 elision/healing tests run unchanged with their recorded compiler:
+The archived section-tag migrations (`--heal-closers`, `--elide-call-closers`,
+`--revert`, `--log`) were removed in 0.30 with the `§` syntax, as were
+`--drop-structural-ids` and `--compact-ids`. They are not compatibility options:
+passing one is a usage error. The original 23 elision and healing tests still run
+with their recorded compiler as a historical replay:
 
 ```bash
 python3 scripts/registered_ledger_historical_replay.py archived-closers
 ```
 
 This replay builds compiler `d82f3ae95175ecd09581c6922701706be72b0ca9` from Git
-history, requires .NET 10 and verified Z3 assets, and fails on missing history,
-failed tests, or skipped/empty results. It does not enable legacy syntax in the
-current compiler. The compiler test suite marks this replay `HistoricalReplay`;
-current byte-preservation and retired-syntax rejection tests run separately.
-
-`--drop-structural-ids` and `--compact-ids` have been removed. They are not
-compatibility options.
-
-```bash
-calor fix src/ --heal-closers --dry-run
-calor fix src/ --heal-closers --log migration.log.json
-calor fix src/ --heal-closers --revert --log migration.log.json
-```
+history and requires .NET 10 and verified Z3 assets. It does not enable legacy
+syntax in the current compiler.
 
 | Option | Meaning |
 |:-------|:--------|
-| `--log <file>` | Write a migration log, or read it with `--revert`. |
-| `--revert` | Restore the removed byte ranges from an existing log. |
+| `--apply` | Apply the safe patches (required). |
 | `--dry-run`, `-n` | Report changes without rewriting source files. |
 | `--format`, `-f` | `text` (default) or `json` (envelope schema 2.0). |
 
-The log records exact removed bytes. Reversion restores those bytes, not a
-reformatted approximation. JSON mode emits one envelope with operation counts
-and diagnostics. Exit codes are `0` for success, `1` for remaining errors or
-failed diagnostic writes, and `2` for incompatible operation options.
+Exit codes are `0` for success, `1` for remaining errors or failed writes, and
+`2` when `--apply` is missing.
 
 See [`calor format`](/calor/cli/format/) for canonical formatting and
 [`calor ids`](/calor/cli/ids/) for declaration ID management.

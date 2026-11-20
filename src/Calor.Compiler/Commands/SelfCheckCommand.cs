@@ -44,8 +44,8 @@ public static class SelfCheckCommand
         var docsCommand = new Command("docs",
             "Check agent-facing docs against the compiler implementation. " +
             "Covered files: CLAUDE.md, docs/syntax-reference/*.md, docs/cli/*.md, and undated docs/semantics/*.md " +
-            "(plus docs/**/*.md for the version scan). Checks: (1) every documented §-keyword " +
-            "exists in the lexer; (2) every cited CalorNNNN diagnostic code exists (and cited " +
+            "(plus docs/**/*.md for the version scan). Checks: (1) docs contain no retired section " +
+            "markers; (2) every cited CalorNNNN diagnostic code exists (and cited " +
             "bands are non-empty); (3) effect codes in docs/syntax-reference/effects.md match " +
             "the effect registry in both directions; (4) the Calor13xx table in " +
             "docs/cli/structured-output.md is complete; (5) no doc hardcodes the current version; " +

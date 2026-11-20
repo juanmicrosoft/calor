@@ -377,7 +377,7 @@ public sealed class Issue785ClosureTests
               class Derived internal
                 extends Base
 
-                ctor stat ()
+                ctor static ()
             """);
 
         Assert.DoesNotContain(diagnostics.Errors,

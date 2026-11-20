@@ -337,7 +337,7 @@ Whatever triggers the initialization (below) is charged the initializers' effect
 plus the row, so `Show` must declare `fs:r`. Calor does not synthesize a static
 constructor for this row. Adding one would drop the C# `beforefieldinit` flag and
 change when the initializers run. A type that has an explicit static constructor
-(`ctor stat`) declares the row on that constructor instead; a type row next to it
+(`ctor static`) declares the row on that constructor instead; a type row next to it
 is `Calor0405`. A type declared in several parts carries the row on each part.
 
 **What triggers initialization.** The rules follow the C# specification

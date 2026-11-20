@@ -431,7 +431,7 @@ public sealed class LosslessConversionContractTests
         // not omitted, and the caller is charged its effect rather than Item<T>'s.
         Assert.True(result.IsSplit);
         var alpha = result.Outputs[0].Conversion.CalorSource!.Replace("\r\n", "\n", StringComparison.Ordinal);
-        Assert.Contains("ctor stat ()\n      ! cw\n", alpha);
+        Assert.Contains("ctor static ()\n      ! cw\n", alpha);
         Assert.Contains("func Run () → Item\n      ! cw, alloc\n", alpha);
         Assert.All(result.Outputs, output => Assert.Equal(0, output.Conversion.InteropPreservationCount));
     }

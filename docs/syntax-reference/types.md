@@ -65,7 +65,7 @@ arguments evaluate in source order even when their names reorder the
 parameters. Records use the same construction syntax. The selected constructor
 must actually exist in the source or referenced assembly.
 
-Inside a class, `ctor stat ()` declares its static constructor. It has no
+Inside a class, `ctor static ()` declares its static constructor. It has no
 visibility or parameters. Conversion preserves the constructor and leaves
 its initialization order and exception behavior to the CLR.
 

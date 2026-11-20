@@ -635,7 +635,7 @@ public class ArrayExpressionConversionTests
         const string expected = "11:10|1:2|5:0:11|5:0:11|3:f";
         Assert.Equal(expected, Run(source));
         var calor = await ConvertNativeWithRealCliAsync(source, surface);
-        Assert.Equal(3, Regex.Matches(calor, @"(?m)^\s*ctor stat \(\)").Count);
+        Assert.Equal(3, Regex.Matches(calor, @"(?m)^\s*ctor static \(\)").Count);
         Assert.DoesNotContain("§CS", calor);
         RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
         var compilation = Program.Compile(calor, "eager-binary-order.calr",
@@ -2738,7 +2738,7 @@ public class ArrayExpressionConversionTests
         // 0.30 (R1): the static constructor now declares its own row, so the converter writes
         // `! cw` on it instead of failing Calor0422. Enforcement is retained: a static-field
         // read still runs the constructor, so the reader must declare cw too.
-        Assert.Matches(@"(?m)^\s*ctor stat \(\)\r?\n\s*! cw\r?$", conversion.CalorSource!);
+        Assert.Matches(@"(?m)^\s*ctor static \(\)\r?\n\s*! cw\r?$", conversion.CalorSource!);
         var result = Program.Compile(conversion.CalorSource!, "static-constructor-field.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
@@ -2759,7 +2759,7 @@ public class ArrayExpressionConversionTests
         const string holder = """
             class Holder
               field int:Value public static
-              ctor stat ()
+              ctor static ()
                 set Value 1
             """;
         const string read = """
