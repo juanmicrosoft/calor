@@ -44,6 +44,19 @@ bash scripts/runner-resource-sampler.sh 10 &
 sampler_pid=$!
 trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
 if [ "$name" = "compiler" ]; then
+  # 0.30 (#1730): five hosts (four parts and the replay host, which rebuilds archived
+  # compilers) peak above the runner's 16 GB of RAM plus its 3 GB of swap: two runs on
+  # 2026-11-20 filled the swap, and the second was killed (exit 143, memAvail 47M). On a
+  # Linux runner with passwordless sudo, add an 8 GB swap file before the hosts start.
+  # Elsewhere (no sudo, not Linux) this is skipped and the step runs as before.
+  if [ "$(uname -s)" = "Linux" ] && sudo -n true 2>/dev/null && [ ! -e /calor-extra.swap ]; then
+    if sudo fallocate -l 8G /calor-extra.swap && sudo chmod 600 /calor-extra.swap \
+        && sudo mkswap /calor-extra.swap > /dev/null && sudo swapon /calor-extra.swap; then
+      echo "Added 8 GB swap: $(swapon --show=NAME,SIZE --noheadings | tr '\n' ' ')"
+    else
+      echo "Could not add swap; continuing with the runner's own." >&2
+    fi
+  fi
   bash scripts/compiler-shard-filter.sh --self-test
   # The invocations pass --no-build, so build once up front.
   dotnet build "$project" -c Release
