@@ -71,83 +71,49 @@ public class InformationDensityCalculator : IMetricCalculator
 
     private static Dictionary<string, int> CountCalorSemanticElements(string source)
     {
+        // Native (0.30) spellings of the constructs the legacy counter found by section marker.
         var elements = new Dictionary<string, int>
         {
-            // Structural elements (using correct curly brace syntax)
-            ["modules"] = CountOccurrences(source, "§M{"),
-            ["functions"] = CountOccurrences(source, "§F{") + CountOccurrences(source, "§AF{") +
-                           CountOccurrences(source, "§MT{") + CountOccurrences(source, "§AMT{"),
-            ["variables"] = CountOccurrences(source, "§B{"),
-            ["parameters"] = CountOccurrences(source, "§I{") + CountOccurrences(source, "§O{"),
+            // Structural elements
+            ["modules"] = NativeCalorSyntax.Module.Matches(source).Count,
+            ["functions"] = NativeCalorSyntax.Function.Matches(source).Count,
+            ["variables"] = NativeCalorSyntax.Binding.Matches(source).Count,
+            ["parameters"] = NativeCalorSyntax.CountTypedParameters(source) +
+                             NativeCalorSyntax.TypedOutput.Matches(source).Count,
 
             // Contract elements (high semantic value - weight 2x)
-            // Using correct syntax: §Q and §S followed by space
-            ["requires"] = CountOccurrences(source, "§Q ") * 2,
-            ["ensures"] = CountOccurrences(source, "§S ") * 2,
-            ["invariants"] = CountOccurrences(source, "§INV{") * 2,
+            ["requires"] = NativeCalorSyntax.Requires.Matches(source).Count * 2,
+            ["ensures"] = NativeCalorSyntax.Ensures.Matches(source).Count * 2,
+            ["invariants"] = NativeCalorSyntax.Invariant.Matches(source).Count * 2,
 
             // Effect declarations (high semantic value - weight 2x)
-            ["effects"] = CountOccurrences(source, "§E{") * 2,
+            ["effects"] = NativeCalorSyntax.EffectRow.Matches(source).Count * 2,
 
             // Control flow
-            ["conditionals"] = CountOccurrences(source, "§IF") + CountOccurrences(source, "§EL ") +
-                              CountOccurrences(source, "§EI{"),
-            ["loops"] = CountOccurrences(source, "§L{") + CountOccurrences(source, "§WH{") +
-                       CountOccurrences(source, "§W{"),
-            ["matches"] = CountOccurrences(source, "§MA{") * 2, // Pattern matching is semantic-rich
+            ["conditionals"] = NativeCalorSyntax.If.Matches(source).Count +
+                               NativeCalorSyntax.Else.Matches(source).Count +
+                               NativeCalorSyntax.ElseIf.Matches(source).Count,
+            ["loops"] = NativeCalorSyntax.Loop.Matches(source).Count,
+            ["matches"] = NativeCalorSyntax.Match.Matches(source).Count * 2, // Pattern matching is semantic-rich
 
             // Returns
-            ["returns"] = CountOccurrences(source, "§R "),
+            ["returns"] = NativeCalorSyntax.Return.Matches(source).Count,
 
             // Calls
-            ["calls"] = CountOccurrences(source, "§C{"),
+            ["calls"] = NativeCalorSyntax.Call.Matches(source).Count,
 
-            // Type annotations - count actual type names for parity with C# TypeSyntax counting
-            ["types"] = CountTypeNames(source),
+            // Type annotations - built-in type names. Typed parameters and return types are
+            // already counted once under "parameters" and are not added again here.
+            ["types"] = NativeCalorSyntax.TypeName.Matches(source).Count,
 
-            // Closing tags as scope markers
-            ["closingTags"] = CountOccurrences(source, "§/"),
+            // Native source has no closing tags: blocks end by indentation.
+            ["closingTags"] = 0,
 
-            // Mutability markers (unique to Calor)
-            ["mutability"] = CountOccurrences(source, "§B{~")
+            // Mutability markers (unique to Calor): `var` bindings
+            ["mutability"] = NativeCalorSyntax.MutableBinding.Matches(source).Count
         };
 
         return elements;
-    }
-
-    private static int CountTypeNames(string source)
-    {
-        // Count input/output markers
-        var count = CountOccurrences(source, "§I{") + CountOccurrences(source, "§O{");
-
-        // Count actual type name occurrences
-        var typePatterns = new[] { "i32", "i64", "f32", "f64", "str", "bool", "unit" };
-        foreach (var pattern in typePatterns)
-        {
-            count += CountWordOccurrences(source, pattern);
-        }
-
-        return count;
-    }
-
-    private static int CountWordOccurrences(string source, string word)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = source.IndexOf(word, index, StringComparison.Ordinal)) != -1)
-        {
-            // Check word boundaries
-            var before = index > 0 ? source[index - 1] : ' ';
-            var after = index + word.Length < source.Length ? source[index + word.Length] : ' ';
-
-            if (!char.IsLetterOrDigit(before) && before != '_' &&
-                !char.IsLetterOrDigit(after) && after != '_')
-            {
-                count++;
-            }
-            index += word.Length;
-        }
-        return count;
     }
 
     private static Dictionary<string, int> CountCSharpSemanticElements(string source)
@@ -233,24 +199,13 @@ public class InformationDensityCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Counts tokens in source code using simple tokenization.
-    /// For Calor, treats section markers (§M{, §F{, §/F{, etc.) as single tokens
-    /// rather than counting each character separately.
+    /// Counts tokens in source code using simple tokenization: words, and each punctuation
+    /// or symbol character. Native Calor keywords are ordinary words, so both languages
+    /// use the same rule.
     /// </summary>
     private static int CountTokens(string source)
     {
-        // Pre-process Calor: Replace section markers with single-token placeholders
-        // This prevents §M{ from being counted as 3 tokens (§, M, {)
-        var processed = System.Text.RegularExpressions.Regex.Replace(
-            source,
-            @"§/?[A-Z]+\{",
-            " _MARKER_ ");
-
-        // Also handle markers without braces (§Q, §S, §R, §EL followed by space)
-        processed = System.Text.RegularExpressions.Regex.Replace(
-            processed,
-            @"§[A-Z]+\s",
-            " _MARKER_ ");
+        var processed = source;
 
         var tokens = new List<string>();
         var currentToken = "";

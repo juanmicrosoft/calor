@@ -1,11 +1,13 @@
 using Calor.Compiler.Evaluation.Core;
+using Calor.Compiler.Ids;
 
 namespace Calor.Compiler.Evaluation.Metrics;
 
 /// <summary>
 /// Category 4: Edit Precision Calculator
 /// Measures the ability to make targeted edits via unique IDs.
-/// Calor's §F[id:name] enables precise edits without context ambiguity.
+/// Calor gives every declaration a stable ID (kept in the <c>.calor/ids.json</c> sidecar in native
+/// source), which enables precise edits without context ambiguity.
 /// </summary>
 public class EditPrecisionCalculator : IMetricCalculator
 {
@@ -35,104 +37,87 @@ public class EditPrecisionCalculator : IMetricCalculator
             details));
     }
 
+    /// <summary>
+    /// Calculates Calor's edit precision from the presence of declaration IDs. Same rule as
+    /// Calor.Evaluation's copy of this metric: a 0.5 base, plus presence bonuses for a module ID,
+    /// a callable ID, and indented body lines. Local bindings, returns and call sites have no IDs
+    /// in native Calor, so they earn nothing.
+    /// </summary>
     private static double CalculateCalorEditPrecision(EvaluationContext context)
     {
+        var score = 0.5; // Base score
+
         var source = context.CalorSource;
-        var score = 0.0;
+        var declarations = ReadDeclarations(source);
 
-        // Count explicit IDs that enable precise targeting
-        var idCount = CountUniqueIds(source);
-        score += Math.Min(1.0, idCount * 0.15);
+        // Sidecar IDs enable precise targeting.
+        if (declarations.Any(d => d.Kind == IdKind.Module)) score += 0.15;
+        if (declarations.Any(d => IsCallable(d.Kind))) score += 0.20;
 
-        // Function markers with IDs
-        var functionIds = CountOccurrences(source, "§F[id:");
-        score += Math.Min(0.3, functionIds * 0.1);
+        // Each opener paired with an indented body marks a safe-modification scope.
+        if (IndentedBodyLine.IsMatch(source)) score += 0.10;
 
-        // Variable markers
-        var varMarkers = CountOccurrences(source, "§V[");
-        score += Math.Min(0.2, varMarkers * 0.05);
-
-        // Module markers
-        var moduleMarkers = CountOccurrences(source, "§M[");
-        score += Math.Min(0.2, moduleMarkers * 0.1);
-
-        // Return markers (enable precise return targeting)
-        var returnMarkers = CountOccurrences(source, "§RET");
-        score += Math.Min(0.1, returnMarkers * 0.05);
-
-        // Call markers (enable precise call site targeting)
-        var callMarkers = CountOccurrences(source, "§C[");
-        score += Math.Min(0.2, callMarkers * 0.05);
-
-        return Math.Min(1.0, score);
+        return Math.Min(score, 1.0);
     }
 
+    private static readonly System.Text.RegularExpressions.Regex IndentedBodyLine = new(
+        @"^[ \t]+\S",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.Multiline);
+
+    /// <summary>
+    /// Calculates C#'s edit precision from its structural patterns. Same rule as
+    /// Calor.Evaluation's copy of this metric: a 0.5 base, plus presence bonuses for a namespace,
+    /// a class and method declarations, less 0.05 for heavy brace nesting, clamped to 0.3-0.85.
+    /// </summary>
     private static double CalculateCSharpEditPrecision(EvaluationContext context)
     {
+        var score = 0.5; // Base score
+
         var source = context.CSharpSource;
-        var score = 0.0;
 
-        // Named elements in C# require context to target
-        var namedElements = CountNamedElements(source);
+        // C# relies on names and line numbers for targeting
+        var hasNamespace = source.Contains("namespace");
+        var hasClass = source.Contains("class");
+        var hasMethods = MethodDeclaration.Matches(source).Count;
 
-        // Base score from having named elements
-        score += Math.Min(0.3, namedElements * 0.02);
+        if (hasNamespace) score += 0.10;
+        if (hasClass) score += 0.10;
+        if (hasMethods > 0) score += 0.15;
 
-        // Attributes can help with targeting
-        var attributeCount = CountOccurrences(source, "[");
-        score += Math.Min(0.1, attributeCount * 0.02);
+        // Braces can cause edit ambiguity
+        var braceCount = source.Count(c => c == '{');
+        if (braceCount > 5) score -= 0.05; // Nested braces reduce precision
 
-        // XML comments with references can help
-        var xmlRefs = CountOccurrences(source, "<see cref=");
-        score += Math.Min(0.1, xmlRefs * 0.05);
-
-        // Regions help organize for targeting
-        var regions = CountOccurrences(source, "#region");
-        score += Math.Min(0.1, regions * 0.05);
-
-        // Partial classes enable splitting
-        if (source.Contains("partial class") || source.Contains("partial struct"))
-        {
-            score += 0.1;
-        }
-
-        // Method overloads require more context to target correctly (penalty)
-        var methodMatches = CountMethodDeclarations(source);
-        var duplicateNames = FindDuplicateMethodNames(source);
-        if (duplicateNames > 0)
-        {
-            score -= duplicateNames * 0.05;
-        }
-
-        return Math.Max(0, Math.Min(1.0, score));
+        return Math.Max(0.3, Math.Min(score, 0.85)); // Cap at 0.85 for C#
     }
 
-    private static int CountUniqueIds(string source)
-    {
-        var count = 0;
-        var index = 0;
-        var pattern = "id:";
+    private static readonly System.Text.RegularExpressions.Regex MethodDeclaration = new(
+        @"\b(public|private|protected|internal)\s+(static\s+)?\w+\s+\w+\s*\(",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
 
-        while ((index = source.IndexOf(pattern, index, StringComparison.Ordinal)) != -1)
+    private static int CountUniqueIds(string source) => ReadDeclarations(source).Count;
+
+    private static int CountAddressableElements(string source) =>
+        ReadDeclarations(source).Count(d => d.Kind == IdKind.Module || IsCallable(d.Kind));
+
+    private static bool IsCallable(IdKind kind) =>
+        kind is IdKind.Function or IdKind.Method or IdKind.Constructor or IdKind.OperatorOverload;
+
+    /// <summary>
+    /// The declarations the identity store gives IDs to (what <c>calor ids sync</c> would record
+    /// for this source). Source that does not parse and bind has none, as the store cannot
+    /// assign IDs to it.
+    /// </summary>
+    private static IReadOnlyList<DeclarationIdentity> ReadDeclarations(string source)
+    {
+        try
         {
-            count++;
-            index += pattern.Length;
+            return DeclarationIdentityStore.Describe("input.calr", source);
         }
-
-        return count;
-    }
-
-    private static int CountAddressableElements(string source)
-    {
-        var count = 0;
-
-        // Count all major addressable markers
-        count += CountOccurrences(source, "§M[");
-        count += CountOccurrences(source, "§F[");
-        count += CountOccurrences(source, "§V[");
-        count += CountOccurrences(source, "§C[");
-
-        return count;
+        catch (DeclarationIdentityParseException)
+        {
+            return [];
+        }
     }
 
     private static int CountNamedElements(string source)
@@ -174,36 +159,6 @@ public class EditPrecisionCalculator : IMetricCalculator
         }
 
         return count;
-    }
-
-    private static int FindDuplicateMethodNames(string source)
-    {
-        var methodNames = new List<string>();
-        var lines = source.Split('\n');
-
-        foreach (var line in lines)
-        {
-            var trimmed = line.Trim();
-            if ((trimmed.Contains("public ") || trimmed.Contains("private ") ||
-                 trimmed.Contains("protected ") || trimmed.Contains("internal ")) &&
-                trimmed.Contains("("))
-            {
-                // Extract method name (simplified)
-                var parenIndex = trimmed.IndexOf('(');
-                if (parenIndex > 0)
-                {
-                    var beforeParen = trimmed.Substring(0, parenIndex);
-                    var parts = beforeParen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 0)
-                    {
-                        var methodName = parts[^1];
-                        methodNames.Add(methodName);
-                    }
-                }
-            }
-        }
-
-        return methodNames.Count - methodNames.Distinct().Count();
     }
 
     private static int CountOccurrences(string source, string pattern)
