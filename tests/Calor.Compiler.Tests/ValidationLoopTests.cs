@@ -322,10 +322,18 @@ public sealed class ValidationLoopTests : IDisposable
                 start.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
                 start.ArgumentList.Add("child");
                 using var child = Process.Start(start)!;
-                File.WriteAllText(args[1], child.Id.ToString());
-                File.WriteAllText(args[2], Environment.ProcessId.ToString());
+                // Publish each pid atomically: the test polls for the file and must
+                // never observe it created but still empty.
+                Publish(args[1], child.Id);
+                Publish(args[2], Environment.ProcessId);
                 if (args[0] == "live")
                     Thread.Sleep(30000);
+
+                static void Publish(string path, int pid)
+                {
+                    File.WriteAllText(path + ".tmp", pid.ToString());
+                    File.Move(path + ".tmp", path, overwrite: true);
+                }
                 """)
         ]);
         var dotnet = ExecutionWorkspace.FindDotnet()!;
