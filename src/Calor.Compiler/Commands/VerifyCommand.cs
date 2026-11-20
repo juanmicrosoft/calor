@@ -766,7 +766,8 @@ public static class VerifyCommand
             => module?.Functions.SingleOrDefault(f => f.ToolingId == id);
 
         static List<Ast.ExpressionNode> Preconditions(Ast.FunctionNode fn)
-            => fn.Preconditions.Select(p => p.Condition).ToList();
+            // #1618: parameter refinements are the preconditions.
+            => Ast.RefinementPreconditions.Effective(fn.Parameters, fn.Preconditions).Select(p => p.Condition).ToList();
 
         static List<Ast.ExpressionNode> Postconditions(Ast.FunctionNode fn)
             => fn.Postconditions.Select(p => p.Condition).ToList();

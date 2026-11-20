@@ -1364,8 +1364,8 @@ public sealed class Binder
 
         foreach (var (owner, declaration) in _interfacesBySymbolId.Values)
         {
-            foreach (var method in declaration.Methods.Where(method =>
-                         method.Preconditions.Count > 0 || method.Postconditions.Count > 0))
+            // #1618: HasContracts counts parameter refinements, which are preconditions.
+            foreach (var method in declaration.Methods.Where(method => method.HasContracts))
             {
                 functions.Add(BindInterfaceContracts(owner, declaration, method));
             }
@@ -1404,7 +1404,7 @@ public sealed class Binder
             return new BoundFunction(method.Span, symbol, [], functionScope,
                 ExtractMethodEffects(method.Effects), BoundMemberKind.Method, owner.QualifiedName)
             {
-                ContractConditions = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions),
+                ContractConditions = BindContracts(RefinementPreconditions.Effective(method.Parameters, method.Preconditions),
                     method.Postconditions, symbol.BodyReturnType)
             };
         }
@@ -2613,7 +2613,7 @@ public sealed class Binder
                 using var _identity = PushDeclarationContext(symbol.Id);
                 using var _returnCtx = PushReturnTypeContext(symbol.BodyReturnType);
                 DeclareParameters(symbol.Parameters, function.Parameters);
-                var contracts = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions),
+                var contracts = BindContracts(RefinementPreconditions.Effective(function.Parameters, function.Preconditions),
                     function.Postconditions, symbol.BodyReturnType);
                 var body = BindStatements(function.Body);
                 _boundLocalFunctions.Add(new BoundFunction(function.Span, symbol, body, bodyScope,
@@ -2670,7 +2670,7 @@ public sealed class Binder
         try
         {
             DeclareParameters(functionSymbol.Parameters, func.Parameters);
-            var contracts = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions),
+            var contracts = BindContracts(RefinementPreconditions.Effective(func.Parameters, func.Preconditions),
                 func.Postconditions, functionSymbol.BodyReturnType);
 
             // Bind body
@@ -11769,8 +11769,11 @@ public sealed class Binder
             // Constructors
             foreach (var ctor in EnumerateConstructors(cls))
             {
+                // #1618: a parameter refinement is a precondition, so a bodiless constructor
+                // with one must still bind its contracts (as methods already do).
                 if (ctor.Body.Count == 0 && ctor.Initializer == null && !cls.IsRecord
-                    && ctor.Preconditions.Count == 0)
+                    && ctor.Preconditions.Count == 0
+                    && !ctor.Parameters.Any(parameter => parameter.InlineRefinement != null))
                     continue;
                 var memberName = ctor.IsStatic ? ".cctor" : ".ctor";
                 var bound = TryBindMember(
@@ -11984,7 +11987,7 @@ public sealed class Binder
         var inherited = !method.HasContracts
             ? _contractInheritance?.RuntimeContracts.GetValueOrDefault(method) : null;
         // Inherited runtime contracts already include refinement preconditions.
-        var contracts = BindContracts(inherited?.Preconditions ?? Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions),
+        var contracts = BindContracts(inherited?.Preconditions ?? RefinementPreconditions.Effective(method.Parameters, method.Preconditions),
             inherited?.Postconditions ?? method.Postconditions, functionSymbol.BodyReturnType);
         var boundBody = BindStatements(method.Body);
         BindLocalFunctions(localFunctions, localFunctionScope, functionSymbol.Id);
@@ -12006,7 +12009,7 @@ public sealed class Binder
         using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
 
         DeclareParameters(functionSymbol.Parameters, ctor.Parameters);
-        var contracts = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(ctor.Parameters, ctor.Preconditions), [], "VOID");
+        var contracts = BindContracts(RefinementPreconditions.Effective(ctor.Parameters, ctor.Preconditions), [], "VOID");
 
         // Bind constructor initializer (: base(...) / : this(...)) as a call prepended to body.
         // This makes initializer arguments visible to bug pattern checkers (e.g., div-by-zero in base(x / y)).
@@ -12133,7 +12136,7 @@ public sealed class Binder
         TrackSymbol(functionSymbol);
         // v0.14 §S4 — operator overloads with a declared return type.
         using var _returnCtx = PushReturnTypeContext(returnType);
-        var contracts = BindContracts(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(op.Parameters, op.Preconditions), op.Postconditions, returnType);
+        var contracts = BindContracts(RefinementPreconditions.Effective(op.Parameters, op.Preconditions), op.Postconditions, returnType);
         var boundBody = BindStatements(op.Body);
         var declaredEffects = op.Effects is null
             ? new[] { "*:*" }

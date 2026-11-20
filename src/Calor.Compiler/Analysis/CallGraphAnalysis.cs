@@ -4280,7 +4280,8 @@ public sealed class CallGraphAnalysis
     private static List<(string Callee, TextSpan Span)> CollectCalls(FunctionNode function)
     {
         var calls = new List<(string, TextSpan)>();
-        foreach (var contract in function.Preconditions.Select(precondition => precondition.Condition)
+        foreach (var contract in RefinementPreconditions.Effective(function.Parameters, function.Preconditions)
+                     .Select(precondition => precondition.Condition)
                      .Concat(function.Postconditions.Select(postcondition => postcondition.Condition)))
             CollectCallsFromNode(contract, calls);
         foreach (var statement in function.Body)

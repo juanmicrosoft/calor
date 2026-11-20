@@ -18,7 +18,7 @@ public sealed class DiscoveredGuard
     /// <summary>The guard condition as a Calor expression string.</summary>
     public required string CalorExpression { get; init; }
 
-    /// <summary>Where to insert the guard: "precondition", "if_guard", "assert".</summary>
+    /// <summary>Where to insert the guard: "refinement", "if_guard", "assert".</summary>
     public required string InsertionKind { get; init; }
 
     /// <summary>Confidence: "high", "medium", "low".</summary>
@@ -228,8 +228,9 @@ public sealed class GuardDiscovery
 
         foreach (var guard in guards)
         {
-            // Only validate precondition-type guards (they have the same condition as the obligation)
-            if (guard.InsertionKind != "precondition")
+            // Only validate refinement guards (they have the same condition as the obligation).
+            // #1618 renamed this kind from "precondition"; the check must follow it.
+            if (guard.InsertionKind != "refinement")
             {
                 guard.Validated = null; // Not applicable
                 continue;

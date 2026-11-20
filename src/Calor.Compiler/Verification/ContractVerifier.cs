@@ -23,25 +23,7 @@ public sealed class ContractVerifier
     internal static IReadOnlyList<RequiresNode> EffectivePreconditions(
         IReadOnlyList<ParameterNode> parameters,
         IReadOnlyList<RequiresNode> preconditions)
-        => parameters
-            .Where(parameter => !parameter.Modifier.HasFlag(ParameterModifier.Out)
-                && parameter.InlineRefinement != null)
-            .Select(RefinementPrecondition)
-            .Concat(preconditions)
-            .ToArray();
-
-    // #1618: one node per refined parameter. The binder binds these nodes and the verifier
-    // and translator look the bound calls up by node identity, so every pass must see the
-    // same instance rather than a fresh substitution.
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ParameterNode, RequiresNode>
-        RefinementPreconditions = new();
-
-    private static RequiresNode RefinementPrecondition(ParameterNode parameter)
-        => RefinementPreconditions.GetValue(parameter, refined => new RequiresNode(
-            refined.InlineRefinement!.Predicate.Span,
-            FactCollector.SubstituteContractSelf(refined.InlineRefinement.Predicate, refined.Name),
-            null,
-            new AttributeCollection()));
+        => RefinementPreconditions.Effective(parameters, preconditions);
 
     private readonly DiagnosticBag _diagnostics;
     private readonly Binder _contractBinder;
@@ -199,36 +181,29 @@ public sealed class ContractVerifier
         {
             if (node is FunctionNode local && !module.Functions.Contains(local))
                 VerifyFunction(local);
+            // #1618: a member's parameter refinements are its preconditions. They are checked
+            // the way member `requires` clauses were: through the binder (which binds these
+            // exact projected nodes), so source predicates, `is` patterns and members of the
+            // declaring type resolve, rather than through the module-function parameter-only
+            // check.
             else if (node is MethodNode method)
             {
                 var inherited = !method.HasContracts
                     ? _contractBinder.ContractInheritance?.RuntimeContracts.GetValueOrDefault(method) : null;
-                VerifyMemberContracts(inherited?.Preconditions ?? method.Preconditions,
+                VerifyMemberContracts(
+                    inherited?.Preconditions ?? EffectivePreconditions(method.Parameters, method.Preconditions),
                     inherited?.Postconditions ?? method.Postconditions);
             }
             else if (node is MethodSignatureNode signature)
-                VerifyMemberContracts(signature.Preconditions, signature.Postconditions);
+                VerifyMemberContracts(EffectivePreconditions(signature.Parameters, signature.Preconditions),
+                    signature.Postconditions);
             else if (node is ConstructorNode constructor)
-                VerifyMemberContracts(constructor.Preconditions, []);
+                VerifyMemberContracts(EffectivePreconditions(constructor.Parameters, constructor.Preconditions), []);
             else if (node is PropertyAccessorNode accessor)
                 VerifyMemberContracts(accessor.Preconditions, []);
             else if (node is OperatorOverloadNode op)
-                VerifyMemberContracts(op.Preconditions, op.Postconditions);
+                VerifyMemberContracts(EffectivePreconditions(op.Parameters, op.Preconditions), op.Postconditions);
 
-            IReadOnlyList<ParameterNode>? parameters = node switch
-            {
-                MethodNode method => method.Parameters,
-                MethodSignatureNode signature => signature.Parameters,
-                ConstructorNode constructor => constructor.Parameters,
-                OperatorOverloadNode op => op.Parameters,
-                _ => null
-            };
-            if (parameters?.Any(parameter => parameter.InlineRefinement != null) == true)
-            {
-                _contractVariables = parameters.Select(parameter => (parameter.Name, parameter.TypeName)).ToArray();
-                foreach (var precondition in EffectivePreconditions(parameters, []))
-                    VerifyPrecondition(precondition, parameters);
-            }
             foreach (var child in RecursiveAstWalker.GetAllChildren(node))
                 VerifyNestedContracts(child);
         }

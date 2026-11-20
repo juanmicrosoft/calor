@@ -165,7 +165,8 @@ public sealed class ExternalCallCollector
 
         foreach (var function in callGraph.Functions.Values)
         {
-            collector.CollectContracts(function.Preconditions, function.Postconditions);
+            collector.CollectContracts(
+                RefinementPreconditions.Effective(function.Parameters, function.Preconditions), function.Postconditions);
             collector.CollectFromFunctionBody(function.Body);
         }
 
@@ -200,7 +201,8 @@ public sealed class ExternalCallCollector
         {
             collector._currentCallerId = function.Id;
             collector._currentCaller = methodNames[function.Id].FirstOrDefault() ?? function.Name;
-            collector.CollectContracts(function.Preconditions, function.Postconditions);
+            collector.CollectContracts(
+                RefinementPreconditions.Effective(function.Parameters, function.Preconditions), function.Postconditions);
             collector.CollectFromFunctionBody(function.Body);
         }
 

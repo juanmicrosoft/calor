@@ -3075,7 +3075,11 @@ public sealed class Parser
         // undefined name, a type error) points at the hole instead of line 1, column 1.
         var holeSpan = new TextSpan(part.Start, source.Length, part.Line, part.Column);
         var lexer = new Lexer(source, _diagnostics, part.Start, part.Line, part.Column);
-        var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics);
+        // #1618: a hole inside a refinement predicate may name the refined value as `#`.
+        var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics)
+        {
+            _insideRefinementPredicate = _insideRefinementPredicate
+        };
         var expression = parser.ParseExpression();
         var intent = part.Intent;
 
@@ -7701,6 +7705,11 @@ public sealed class Parser
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
         TryParseInlineSignature(startToken.Span, parameters, ref output, brackets: true);
+        // #1618: an indexer parameter refinement would be parsed but never checked (no entry
+        // guard, type check or effect charge), so it is rejected instead of silently ignored.
+        foreach (var refined in parameters.Where(parameter => parameter.InlineRefinement != null))
+            _diagnostics.ReportError(refined.InlineRefinement!.Predicate.Span, DiagnosticCode.UnexpectedToken,
+                $"Indexer parameter '{refined.Name}' cannot carry a refinement; validate it in the accessor body.");
         if (parameters.Count == 0)
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
                 "An indexer requires at least one parameter.");

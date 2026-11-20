@@ -211,7 +211,8 @@ public static class ProjectIndexBuilder
                     continue;
 
                 AddContracts(index, document, relative, symbol.Id.Value,
-                    "precondition", function.Preconditions.Select(node => node.Span));
+                    "precondition", RefinementPreconditions.Effective(function.Parameters, function.Preconditions)
+                        .Select(node => node.Span));
                 AddContracts(index, document, relative, symbol.Id.Value,
                     "postcondition", function.Postconditions.Select(node => node.Span));
 

@@ -216,10 +216,12 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
             sb.AppendLine("*Async function*\n");
         }
 
-        if (func.Preconditions.Count > 0)
+        // #1618: parameter refinements are the preconditions.
+        var preconditions = RefinementPreconditions.Effective(func.Parameters, func.Preconditions);
+        if (preconditions.Count > 0)
         {
             sb.AppendLine("**Preconditions:**");
-            foreach (var pre in func.Preconditions)
+            foreach (var pre in preconditions)
             {
                 sb.AppendLine("- Contract condition");
             }
