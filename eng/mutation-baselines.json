@@ -60,8 +60,8 @@
       "id": "migration-sidecar-id-isolation",
       "component": "migration",
       "file": "src/Calor.Compiler/Migration/CalorEmitter.cs",
-      "before": "AppendLine($\"§M{{{moduleName}{overflow}}}\");",
-      "after": "AppendLine($\"§M{{{node.Id}:{moduleName}{overflow}}}\");",
+      "before": "AppendLine($\"module {EscapeCalorIdentifier(moduleName)}{namespaceHeader}{origin}{overflow}{nullable}\");",
+      "after": "AppendLine($\"module {EscapeCalorIdentifier(moduleName)}{node.ToolingId}{namespaceHeader}{origin}{overflow}{nullable}\");",
       "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "filter": "FullyQualifiedName~IdentityFreeSyntaxTests.ConversionAndReemissionNeverSerializeDeclarationOrBlockIdentity"
     },
@@ -88,8 +88,8 @@
       "id": "effects-subset-enforcement",
       "component": "effects",
       "file": "src/Calor.Compiler/Effects/EffectEnforcementPass.cs",
-      "before": "if (!computedEffects.IsSubsetOf(declaredEffects))",
-      "after": "if (computedEffects.IsSubsetOf(declaredEffects))",
+      "before": "if (!UsesInferredEffects(function) && !computedEffects.IsSubsetOf(declaredEffects))",
+      "after": "if (!UsesInferredEffects(function) && computedEffects.IsSubsetOf(declaredEffects))",
       "project": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj",
       "filter": "FullyQualifiedName~EffectEnforcementTests.SelfRecursiveFunction_WithUndeclaredEffect_StillFails"
     }
