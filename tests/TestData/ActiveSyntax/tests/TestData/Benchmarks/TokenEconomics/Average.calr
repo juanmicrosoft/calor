@@ -1,8 +1,7 @@
 module Average Average
   module AverageModule
-    func Average public (int:count, int:total) → float
+    func Average public (int:count | (# > 0), int:total) → float
       !
-      requires count > 0
       return (double)total / (double)count
 
     func Sum public (int:a, int:b) → int

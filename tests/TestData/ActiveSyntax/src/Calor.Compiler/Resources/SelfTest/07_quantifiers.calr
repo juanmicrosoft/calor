@@ -1,22 +1,18 @@
 module QuantifierDemo QuantifierDemo block
   module QuantifierDemoModule
-    func AllNonNegative (int:n) → bool
+    func AllNonNegative (int:n | (forall int:i in 0..# : i >= 0)) → bool
       !
-      requires forall int:i in 0..n : i >= 0
       return true
 
-    func ExistsTarget (int:target) → bool
+    func ExistsTarget (int:target | (exists int:i in 0..10 : i == #)) → bool
       !
-      requires exists int:i in 0..10 : i == target
       => result == true
       return true
 
-    func ImplicationTest (int:x) → bool
+    func ImplicationTest (int:x | (!(# > 0) || # >= 0)) → bool
       !
-      requires !(x > 0) || x >= 0
       return true
 
-    func MatrixSymmetry (int:n, int:m) → bool
+    func MatrixSymmetry (int:n, int:m | (forall int:i in 0..n, int:j in 0..# : i >= 0)) → bool
       !
-      requires forall int:i in 0..n, int:j in 0..m : i >= 0
       return true

@@ -14,9 +14,8 @@ public class ContractEnforcementTests
     // declarations, checked arithmetic, and Test.TestModule CLR owner.
     private const string RequiresCurrentNativeProgram = """
         module Test Test
-          func Divide public (int:a, int:b) → int
+          func Divide public (int:a, int:b | (# != 0)) → int
             !
-            requires b != 0
             return a / b
         """;
 
@@ -30,9 +29,8 @@ public class ContractEnforcementTests
 
     private const string ModeOffCurrentNativeProgram = """
         module Test Test
-          func Divide public (int:a, int:b) → int
+          func Divide public (int:a, int:b | (# != 0)) → int
             !
-            requires b != 0
             return a / b
         """;
 
@@ -46,19 +44,20 @@ public class ContractEnforcementTests
             return n
         """;
 
+    // #1618: a refinement entry check throws ArgumentOutOfRangeException and carries no
+    // function id, so the id is observed through a postcondition violation.
     private const string FunctionIdCurrentNativeProgram = """
         module Test Test
           func RequirePositive public (int:n) → int
             !
-            requires n > 0
+            => result > 0
             return n
         """;
 
     private const string NoEffectsCurrentNativeProgram = """
         module Test Test
-          func SafeAdd public (int:a, int:b) → int
+          func SafeAdd public (int:a | (# >= 0), int:b) → int
             !
-            requires a >= 0
             => result >= a
             return a + b
         """;
@@ -69,15 +68,13 @@ public class ContractEnforcementTests
         var source = TestHarness.LoadScenario("Contracts/C1_requires_throws.calr");
         source = RequiresCurrentNativeProgram;
 
-        // Call Divide with b=0, should throw ContractViolationException
+        // Call Divide with b=0. #1618: the precondition is the refinement on b, whose entry
+        // check throws ArgumentOutOfRangeException naming the parameter.
         var result = TestHarness.Execute(source, "Divide", new object[] { 10, 0 });
 
         Assert.NotNull(result.Exception);
-        Assert.IsType<ContractViolationException>(result.Exception);
-
-        var ex = (ContractViolationException)result.Exception;
-        Assert.Equal(ContractKind.Requires, ex.Kind);
-        Assert.Equal(Assert.Single(TestHarness.Compile(source).Ast!.Functions).Id, ex.FunctionId);
+        var ex = Assert.IsType<ArgumentOutOfRangeException>(result.Exception);
+        Assert.Equal("b", ex.ParamName);
     }
 
     [Fact]
@@ -123,7 +120,7 @@ public class ContractEnforcementTests
     }
 
     [Fact]
-    public void C3_ModeOff_NoExceptionEvenOnViolation()
+    public void C3_ModeOff_RefinementEntryCheckStillRuns()
     {
         var source = TestHarness.LoadScenario("Contracts/C3_mode_off.calr");
         source = ModeOffCurrentNativeProgram;
@@ -133,17 +130,14 @@ public class ContractEnforcementTests
             ContractMode = ContractMode.Off
         };
 
-        // Call Divide with b=0, but contract checks are off
-        // This will throw DivideByZeroException, not ContractViolationException
+        // Call Divide with b=0 with contract checks off. #1618: the precondition is the
+        // refinement on b, and refinement entry checks are emitted in every contract mode,
+        // so the call fails at entry instead of reaching the division.
         var result = TestHarness.Execute(source, "Divide", new object[] { 10, 0 }, options);
 
-        // Should not throw ContractViolationException
-        if (result.Exception != null)
-        {
-            Assert.IsNotType<ContractViolationException>(result.Exception);
-            // Should be DivideByZeroException instead
-            Assert.IsType<DivideByZeroException>(result.Exception);
-        }
+        Assert.NotNull(result.Exception);
+        Assert.IsNotType<ContractViolationException>(result.Exception);
+        Assert.Equal("b", Assert.IsType<ArgumentOutOfRangeException>(result.Exception).ParamName);
     }
 
     [Fact]
@@ -187,15 +181,17 @@ public class ContractEnforcementTests
     [Fact]
     public void DebugMode_IncludesDetailedInfo()
     {
-        var source = TestHarness.LoadScenario("Contracts/C1_requires_throws.calr");
-        source = RequiresCurrentNativeProgram;
+        // #1618: a precondition is a refinement whose entry check does not vary by mode, so
+        // the Debug/Release detail difference is observed on a postcondition.
+        var source = TestHarness.LoadScenario("Contracts/C2_ensures_throws.calr");
+        source = EnsuresCurrentNativeProgram;
         var options = new CompilationOptions
         {
             EnforceEffects = false,
             ContractMode = ContractMode.Debug
         };
 
-        var result = TestHarness.Execute(source, "Divide", new object[] { 10, 0 }, options);
+        var result = TestHarness.Execute(source, "GetPositive", new object[] { -5 }, options);
 
         Assert.NotNull(result.Exception);
         Assert.IsType<ContractViolationException>(result.Exception);
@@ -203,21 +199,22 @@ public class ContractEnforcementTests
         var ex = (ContractViolationException)result.Exception;
         // Debug mode should have condition
         Assert.NotNull(ex.Condition);
-        Assert.Contains("!=", ex.Condition);  // The condition b != 0
+        Assert.Contains(">", ex.Condition);  // The condition result > 0
     }
 
     [Fact]
     public void ReleaseMode_HasMinimalInfo()
     {
-        var source = TestHarness.LoadScenario("Contracts/C1_requires_throws.calr");
-        source = RequiresCurrentNativeProgram;
+        // #1618: observed on a postcondition (see DebugMode_IncludesDetailedInfo).
+        var source = TestHarness.LoadScenario("Contracts/C2_ensures_throws.calr");
+        source = EnsuresCurrentNativeProgram;
         var options = new CompilationOptions
         {
             EnforceEffects = false,
             ContractMode = ContractMode.Release
         };
 
-        var result = TestHarness.Execute(source, "Divide", new object[] { 10, 0 }, options);
+        var result = TestHarness.Execute(source, "GetPositive", new object[] { -5 }, options);
 
         Assert.NotNull(result.Exception);
         Assert.IsType<ContractViolationException>(result.Exception);
@@ -225,7 +222,7 @@ public class ContractEnforcementTests
         var ex = (ContractViolationException)result.Exception;
         // Release mode has minimal info
         Assert.Equal(Assert.Single(TestHarness.Compile(source, options).Ast!.Functions).Id, ex.FunctionId);
-        Assert.Equal(ContractKind.Requires, ex.Kind);
+        Assert.Equal(ContractKind.Ensures, ex.Kind);
         // Release mode may not have condition
         Assert.Null(ex.Condition);
     }
@@ -236,9 +233,8 @@ public class ContractEnforcementTests
         // B1 scenario: Function with contracts but no effects is valid
         var source = @"
 module Test Test block
-  func SafeAdd (int:a, int:b) → int
+  func SafeAdd (int:a | (# >= 0), int:b) → int
     !
-    requires (a >= 0)
     => (result >= a)
     return (a + b)
 ";

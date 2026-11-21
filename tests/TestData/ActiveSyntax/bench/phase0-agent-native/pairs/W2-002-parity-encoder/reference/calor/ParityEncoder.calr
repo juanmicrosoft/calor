@@ -12,9 +12,8 @@ module ParityEncoder ParityEncoder block
       let int:n = values.Length
       return ((odd * 65536) + n)
 
-    func IsValidLength (int[]:values, int:expectedLength) → bool
+    func IsValidLength (int[]:values, int:expectedLength | (# >= 0)) → bool
       !
-      requires (expectedLength >= 0)
       let int:n = values.Length
       return (n == expectedLength)
 

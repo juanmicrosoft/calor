@@ -24,7 +24,7 @@ Runtime contract checking is a separate choice:
 |:--------------|:----------------------------------------|
 | `--contract-mode debug` (default) | Checks include detailed failure information |
 | `--contract-mode release` | Checks throw leaner exceptions |
-| `--contract-mode off` | No runtime contract checks |
+| `--contract-mode off` | No postcondition or invariant checks; parameter refinements are still checked |
 
 These compiler modes are not the .NET Debug/Release build configuration.
 Both `debug` and `release` modes can emit checks. Unsupported body shapes,

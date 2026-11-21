@@ -285,7 +285,11 @@ public sealed class CodeExecutor : IDisposable
                     exception.Message.Contains("Postcondition failed") ||
                     exception.Message.Contains("Contract") ||
                     exception.Message.Contains("Precondition") ||
-                    exception.Message.Contains("Postcondition");
+                    exception.Message.Contains("Postcondition") ||
+                    // #1618: Calor preconditions are parameter refinements; their guard throws
+                    // ArgumentOutOfRangeException("Violation of inline refinement ..."). A message
+                    // match, like the ones above, so it applies to either language alike.
+                    exception.Message.Contains("inline refinement");
 
                 // Extract meaningful error details
                 var errorMessage = exception.Message;

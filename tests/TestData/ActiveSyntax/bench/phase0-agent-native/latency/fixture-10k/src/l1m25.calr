@@ -1,10 +1,8 @@
 module L1M25 L1M25 block
   module L1M25Module public
 
-    func l1m25_fn01 public (int:x, int:y) → int
+    func l1m25_fn01 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 21281)
       let int:total = ((x * 3) + y)
       if (total < 21281)
@@ -12,9 +10,8 @@ module L1M25 L1M25 block
       else
         return total
 
-    func l1m25_fn02 public (int:x, int:y) → int
+    func l1m25_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21288)
       if (x >= 21288)
@@ -33,9 +30,8 @@ module L1M25 L1M25 block
       let int:v2 = L2M23.L2M23Module.l2m23_fn11(x, 13)
       return ((v1 + v2) + y)
 
-    func l1m25_fn05 public (int:x, int:y) → int
+    func l1m25_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21295)
       if (x >= 21295)
@@ -49,9 +45,8 @@ module L1M25 L1M25 block
       let int:v2 = L2M15.L2M15Module.l2m15_fn13(x, 6)
       return ((v1 + v2) + y)
 
-    func l1m25_fn07 public (int:x, int:y) → int
+    func l1m25_fn07 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 5) + y)
       if (acc > 21302)
@@ -59,10 +54,8 @@ module L1M25 L1M25 block
       else
         return ((acc * 2) + 21302)
 
-    func l1m25_fn08 public (int:x, int:y) → int
+    func l1m25_fn08 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 21309)
       let int:total = ((x * 2) + y)
       if (total < 21309)
@@ -81,9 +74,8 @@ module L1M25 L1M25 block
       let int:v2 = L2M30.L2M30Module.l2m30_fn02(x, 86)
       return ((v1 + v2) + y)
 
-    func l1m25_fn11 public (int:x, int:y) → int
+    func l1m25_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21316)
       if (x >= 21316)
@@ -91,9 +83,8 @@ module L1M25 L1M25 block
       else
         return 21316
 
-    func l1m25_fn12 public (int:x, int:y) → int
+    func l1m25_fn12 public (int:x | (# > 2), int:y) → int
       !
-      requires (x > 2)
       => (x >= 3)
       let int:acc = ((x * 5) + y)
       if (acc > 21323)
@@ -101,10 +92,8 @@ module L1M25 L1M25 block
       else
         return ((acc * 2) + 21323)
 
-    func l1m25_fn13 public (int:x, int:y) → int
+    func l1m25_fn13 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 21330)
       let int:total = ((x * 3) + y)
       if (total < 21330)

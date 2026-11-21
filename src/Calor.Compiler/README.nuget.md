@@ -13,7 +13,7 @@ Calor makes these things explicit:
 | Feature | Calor Syntax | Benefit |
 |---------|--------------|---------|
 | Side effects | `! cw, fs:r` | Know effects without reading implementation |
-| Contracts | `requires condition`, `=> condition` | Generate tests, verify correctness |
+| Contracts | `int:x \| (# >= 0)` refinements, `=> condition` | Generate tests, verify correctness |
 | Stable declaration identity | Tooling-owned `.calor/ids.json` | Precise references that survive refactoring |
 | Clear structure | Indentation-based nesting (no closing tags) | Unambiguous scope boundaries |
 

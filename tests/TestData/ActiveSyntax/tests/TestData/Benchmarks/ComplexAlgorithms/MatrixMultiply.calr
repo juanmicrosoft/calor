@@ -8,8 +8,6 @@ module MatrixMultiply MatrixMultiply
       !
       return aCols == bRows
 
-    func ResultSize public (int:aRows, int:bCols) → int
+    func ResultSize public (int:aRows | (# > 0), int:bCols | (# > 0)) → int
       !
-      requires aRows > 0
-      requires bCols > 0
       return aRows * bCols

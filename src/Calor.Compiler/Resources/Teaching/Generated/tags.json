@@ -1,13 +1,6 @@
 {
   "tags": [
     {
-      "open": "requires condition",
-      "close": "(none)",
-      "tag": "requires",
-      "description": "Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.",
-      "csharpEquivalent": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)"
-    },
-    {
       "open": "/// since 1.0.0",
       "close": "(none)",
       "tag": "/// since",
@@ -109,7 +102,7 @@
       "open": "for i from start to end step stepValue; for i = start; condition; i = next",
       "close": "(none)",
       "tag": "for",
-      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.",
+      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other. Count with from/to when the bound cannot change in the body; use while otherwise. while also leaves its counter in scope after the loop.",
       "csharpEquivalent": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }"
     },
     {
@@ -256,7 +249,7 @@
       "open": "match expression with indented case pattern → result arms",
       "close": "(none)",
       "tag": "match",
-      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.",
+      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression. Branching on one value against 3 or more constants uses match; otherwise use if. Calor1306 reports such if chains without a patch: a statement match lowers to a C# switch.",
       "csharpEquivalent": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }"
     },
     {

@@ -1,44 +1,33 @@
 module ArrayContracts ArrayContracts
   module ArrayContractsModule
-    func ValidIndex public (int:length, int:index) → bool
+    func ValidIndex public (int:length | (# > 0), int:index) → bool
       !
-      requires length > 0
       => result == (index >= 0 && index < length)
       return index >= 0 && index < length
 
-    func LastValidIndex public (int:length) → int
+    func LastValidIndex public (int:length | (# > 0)) → int
       !
-      requires length > 0
       => result >= 0
       => result < length
       return length - 1
 
-    func LengthNonNegative public (int:length) → bool
+    func LengthNonNegative public (int:length | (# >= 0)) → bool
       !
-      requires length >= 0
       => result == true
       return length >= 0
 
-    func SafeIndexRange public (int:length, int:start, int:count) → bool
+    func SafeIndexRange public (int:length | (# > 0), int:start | (# >= 0), int:count | (# > 0)) → bool
       !
-      requires length > 0
-      requires start >= 0
-      requires count > 0
       => result == ((start + count) <= length)
       return (start + count) <= length
 
-    func MidpointIndex public (int:low, int:high) → int
+    func MidpointIndex public (int:low | (# >= 0), int:high | (# > low)) → int
       !
-      requires low >= 0
-      requires high > low
       => result >= low
       => result < high
       return low + ((high - low) / 2)
 
-    func BinarySearchBounds public (int:length, int:low, int:high) → bool
+    func BinarySearchBounds public (int:length | (# > 0), int:low | (# >= 0), int:high | (# <= length)) → bool
       !
-      requires length > 0
-      requires low >= 0
-      requires high <= length
       => result == (low <= high)
       return low <= high

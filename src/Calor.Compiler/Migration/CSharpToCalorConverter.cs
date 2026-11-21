@@ -265,6 +265,16 @@ public sealed class ConversionOptions
     public bool RescueUnusableMembers { get; set; } = false;
 
     /// <summary>
+    /// #1609: whole-file preservation keeps the exact original even when that original
+    /// parses but does not compile (a real error, not just missing project context).
+    /// The compile errors are recorded as warnings and the round trip is reported as
+    /// failed, so the output is written but never called verified. <c>calor convert</c>
+    /// and <c>calor migrate</c> set it, because they must write every input that parses.
+    /// Library callers keep the refusal by default.
+    /// </summary>
+    public bool PreserveDespiteOriginalErrors { get; set; } = false;
+
+    /// <summary>
     /// Whether lossless conversion validates generated C# as a standalone unit.
     /// Project migration disables this per file and validates all generated files together.
     /// </summary>
@@ -919,7 +929,8 @@ public sealed class CSharpToCalorConverter
         string? sourceFile,
         ConversionResult attempted,
         CancellationToken cancellationToken,
-        IEnumerable<ConversionIssue>? validationIssues = null)
+        IEnumerable<ConversionIssue>? validationIssues = null,
+        string? trigger = null)
     {
         var preservationStart = DateTime.UtcNow;
         cancellationToken.ThrowIfCancellationRequested();
@@ -963,7 +974,7 @@ public sealed class CSharpToCalorConverter
             context.AddWarning(
                 $"Before whole-file preservation ({loss.Kind}): {loss.Description}",
                 loss.Feature, loss.Line);
-        var trigger = validationIssues != null || attempted.Context.RoundTrip == ConversionRoundTrip.Failed
+        trigger ??= validationIssues != null || attempted.Context.RoundTrip == ConversionRoundTrip.Failed
             ? ConversionTrigger.RoundTripFailure
             : attempted.Issues.Any(issue => issue.Feature is "generated-calor-validation" or "post-validation-fallback")
                 ? ConversionTrigger.ParseFailure : ConversionTrigger.UnsupportedConstruct;
@@ -1026,9 +1037,19 @@ public sealed class CSharpToCalorConverter
                     || HasIntrinsicConversionError(error))
                 || (originalErrors.Count > 0 && !incompleteContext))
                 foreach (var error in originalErrors)
-                    context.AddError($"Original C# failed validation ({error.Id}): {error.GetMessage()}",
-                        "original-csharp-validation",
-                        error.Location.GetLineSpan().StartLinePosition.Line + 1);
+                {
+                    var line = error.Location.GetLineSpan().StartLinePosition.Line + 1;
+                    // #1609: the exact text is still a faithful copy of the input, so the
+                    // CLI writes it and reports the error instead of refusing the file.
+                    if (_options.PreserveDespiteOriginalErrors)
+                        context.AddWarning(
+                            $"Original C# failed validation ({error.Id}): {error.GetMessage()} "
+                            + "The original was preserved exactly; it builds only once that error is fixed.",
+                            "original-csharp-validation", line);
+                    else
+                        context.AddError($"Original C# failed validation ({error.Id}): {error.GetMessage()}",
+                            "original-csharp-validation", line);
+                }
             // Exact source is faithful even when a standalone file lacks its project
             // references. Keep that compile failure visible, never label it verified.
             ValidateLosslessRoundTrip(
@@ -1068,6 +1089,59 @@ public sealed class CSharpToCalorConverter
             && types.ConvertedType is { SpecialType: not SpecialType.None, TypeKind: not TypeKind.Error };
     }
 
+    private ConversionMetadata CreateMetadata(CSharpParseOptions parseOptions) => new()
+    {
+        PreprocessorMode = _options.PreprocessorMode,
+        IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+        Configuration = _options.Configuration,
+        TargetFramework = _options.TargetFramework,
+        LanguageVersion = parseOptions.LanguageVersion.ToString(),
+        DocumentationMode = parseOptions.DocumentationMode.ToString(),
+        SourceCodeKind = parseOptions.Kind.ToString(),
+        NullableContextOptions =
+            _options.NullableContextOptions?.ToString() ?? "Unspecified",
+        ReferencesAreComplete = _options.ReferencesAreComplete,
+        DefinedSymbols = parseOptions.PreprocessorSymbolNames
+            .OrderBy(symbol => symbol, StringComparer.Ordinal)
+            .ToArray(),
+        Features = parseOptions.Features
+            .OrderBy(feature => feature.Key, StringComparer.Ordinal)
+            .ToDictionary(
+                feature => feature.Key,
+                feature => feature.Value,
+                StringComparer.Ordinal),
+        References = _options.References
+            .Select(reference => reference with
+            {
+                Path = Path.GetFullPath(reference.Path)
+            })
+            .ToArray(),
+        OutputKind = _options.OutputKind.ToString()
+    };
+
+    /// <summary>
+    /// #1609: the starting point for whole-file preservation when native conversion
+    /// never finished (it timed out). It carries the original text and the metadata a
+    /// conversion would have recorded, and no conversion result.
+    /// </summary>
+    internal ConversionResult CreateUnconvertedResult(
+        string source, string? sourceFile, CancellationToken cancellationToken)
+    {
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        var root = CSharpSyntaxTree.ParseText(source, parseOptions, sourceFile ?? "",
+            cancellationToken: cancellationToken).GetCompilationUnitRoot(cancellationToken);
+        var outputKind = parseOptions.Kind == SourceCodeKind.Script
+            ? OutputKind.DynamicallyLinkedLibrary
+            : root.Members.OfType<GlobalStatementSyntax>().Any()
+                ? OutputKind.ConsoleApplication
+                : _options.OutputKind;
+        var context = CreateContext(sourceFile);
+        context.CapturePreservationContext = true;
+        context.OriginalSource = source;
+        context.Metadata = CreateMetadata(parseOptions) with { OutputKind = outputKind.ToString() };
+        return new ConversionResult { Success = false, Context = context };
+    }
+
     private ConversionResult ConvertCore(
         string csharpSource,
         string? sourceFile,
@@ -1090,35 +1164,7 @@ public sealed class CSharpToCalorConverter
             cancellationToken.ThrowIfCancellationRequested();
             var parseOptions = GetEffectiveParseOptions(sourceFile);
             var effectiveOutputKind = _options.OutputKind;
-            context.Metadata = new ConversionMetadata
-            {
-                PreprocessorMode = _options.PreprocessorMode,
-                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
-                Configuration = _options.Configuration,
-                TargetFramework = _options.TargetFramework,
-                LanguageVersion = parseOptions.LanguageVersion.ToString(),
-                DocumentationMode = parseOptions.DocumentationMode.ToString(),
-                SourceCodeKind = parseOptions.Kind.ToString(),
-                NullableContextOptions =
-                    _options.NullableContextOptions?.ToString() ?? "Unspecified",
-                ReferencesAreComplete = _options.ReferencesAreComplete,
-                DefinedSymbols = parseOptions.PreprocessorSymbolNames
-                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
-                    .ToArray(),
-                Features = parseOptions.Features
-                    .OrderBy(feature => feature.Key, StringComparer.Ordinal)
-                    .ToDictionary(
-                        feature => feature.Key,
-                        feature => feature.Value,
-                        StringComparer.Ordinal),
-                References = _options.References
-                    .Select(reference => reference with
-                    {
-                        Path = Path.GetFullPath(reference.Path)
-                    })
-                    .ToArray(),
-                OutputKind = _options.OutputKind.ToString()
-            };
+            context.Metadata = CreateMetadata(parseOptions);
 
             if (_options.PreprocessorMode == PreprocessorConversionMode.SelectActiveBranchLossy
                 && _options.Fidelity != ConversionFidelity.Lossy)
@@ -1479,7 +1525,7 @@ public sealed class CSharpToCalorConverter
                 {
                     context.AddWarning(
                         "Emitted Calor does not parse (or does not survive the C# round trip) " +
-                        "and could not be fully preserved as §CSHARP interop blocks; the output " +
+                        "and could not be fully preserved as raw C# passthrough; the output " +
                         "may be invalid.",
                         feature: "post-validation-fallback");
 
@@ -1880,7 +1926,7 @@ public sealed class CSharpToCalorConverter
             {
                 context.AddWarning(
                     "Effect-row synthesis did not converge within "
-                    + $"{EffectEnforcementPass.DefaultRowSynthesisRounds} rounds; the emitted §E rows "
+                    + $"{EffectEnforcementPass.DefaultRowSynthesisRounds} rounds; the emitted effect rows "
                     + "cover the bodies they were computed from but may still be narrower than the "
                     + "effects those bodies perform.",
                     feature: "effect-row-synthesis");
@@ -1893,7 +1939,7 @@ public sealed class CSharpToCalorConverter
         catch (Exception ex)
         {
             context.AddWarning(
-                $"Effect-row synthesis failed ({ex.GetType().Name}: {ex.Message}); the emitted §E rows "
+                $"Effect-row synthesis failed ({ex.GetType().Name}: {ex.Message}); the emitted effect rows "
                 + "may be narrower than the effects the converted bodies perform.",
                 feature: "effect-row-synthesis");
         }
@@ -2016,8 +2062,8 @@ public sealed class CSharpToCalorConverter
                 yield return (method, method.Effects, row => method.Effects = row);
             foreach (var op in CallGraphAnalysis.EnumerateOperators(cls))
                 yield return (op, op.Effects, row => op.Effects = row);
-            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
-                yield return (ctor, ctor.Effects, row => ctor.Effects = row);
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
+                yield return (ctor, ctor.Effects, row => ctor.Effects = row);
             // 0.30 (D1): accessor rows and the type's static-initialization row.
             foreach (var property in CallGraphAnalysis.EnumerateProperties(cls))
                 foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer }.OfType<PropertyAccessorNode>())
@@ -2052,7 +2098,7 @@ public sealed class CSharpToCalorConverter
         foreach (var line in markerLines.Skip(ledgered))
         {
             context.RecordLoss(ConversionLossKind.EmitterFallback, "emitter-fallback",
-                "Raw C# fallback (§CS{…}/§RAW/§CSHARP) present in the emitted Calor without a ledger entry — " +
+                "Raw C# passthrough present in the emitted Calor without a ledger entry — " +
                 "produced by an emitter-internal fallback path; location is in the generated Calor",
                 line);
         }
@@ -3011,27 +3057,31 @@ internal sealed class ConversionGeneration(
     private IReadOnlyList<ConversionInputSnapshot> _inputs = [];
     private ConversionResult? _result;
     private bool _started;
+    private bool _prepared;
     private bool _writeAttempted;
 
     internal string? Before => _before;
     internal ConversionResult Result => _result
         ?? throw new InvalidOperationException("No original conversion result has been captured.");
 
-    internal async Task<ConversionResult> ConvertAsync(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Takes the writer lock and runs the destination-safety checks (an existing output
+    /// must be one this tool wrote, unedited, for this source). Idempotent. Callers that
+    /// time the conversion run this first, so a time limit bounds conversion only and
+    /// a timed-out conversion can still fall back to whole-file preservation.
+    /// </summary>
+    internal async Task PrepareAsync(CancellationToken cancellationToken = default)
     {
-        if (_started) throw new InvalidOperationException("A generation can execute conversion only once.");
-        _started = true;
+        if (_prepared || !File.Exists(_sourcePath))
+            return;
         cancellationToken.ThrowIfCancellationRequested();
-        if (!File.Exists(_sourcePath))
-            return _result = await converter.ConvertFileAsync(_sourcePath, cancellationToken);
-
         var receiptPath = _outputPath + ".conversion.json";
         var artifacts = new[] { _outputPath, receiptPath, _outputPath + ".conversion.lock" };
         var sourceIdentity = CanonicalPath.Resolve(_sourcePath);
         if (artifacts.Any(path => Incremental.BuildStateCache.GetPathComparer()
                 .Equals(CanonicalPath.Resolve(path), sourceIdentity)))
             throw new IOException("Conversion artifacts must not overwrite the original C# source.");
-        if (!dryRun)
+        if (!dryRun && _generationLock == null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_outputPath)!);
             _generationLock = new FileStream(
@@ -3043,18 +3093,61 @@ internal sealed class ConversionGeneration(
             ? await CSharpToCalorConverter.ReadSourceFileAsync(receiptPath, cancellationToken) : null;
         if (_before != null || _beforeReceipt != null)
         {
-            if (_before == null || _beforeReceipt == null)
-                throw new IOException("Existing output has no matching conversion generation context. Keep it and convert the original C# to a new destination.");
+            if (_before == null)
+                throw new IOException(
+                    $"'{receiptPath}' has no matching output '{_outputPath}', so this tool cannot tell what it would replace. "
+                    + $"If you do not need it, delete '{receiptPath}' and run again; otherwise convert to a new destination.");
+            if (_beforeReceipt == null)
+                throw new IOException(
+                    $"'{_outputPath}' already exists with no matching conversion receipt ('{receiptPath}') to show this tool wrote it, "
+                    + "so it is not overwritten. If it is an old output you do not need, delete it and run again; "
+                    + "if it holds your edits, keep it and convert to a new destination.");
             var previous = ConversionReceipt.Deserialize(_beforeReceipt);
             if (!string.Equals(_before, previous.GeneratedCalor, StringComparison.Ordinal)
-                || !string.Equals(previous.Original.Path, _sourcePath, StringComparison.Ordinal))
-                throw new IOException("Generated Calor was edited or belongs to another original source. Keep those edits; automatic refresh is refused.");
+                // #1609: compare real locations, so one file reached through a symlinked
+                // directory (/var and /private/var on macOS) is not "another source".
+                || !Incremental.BuildStateCache.GetPathComparer().Equals(
+                    CanonicalPath.Resolve(previous.Original.Path), CanonicalPath.Resolve(_sourcePath)))
+                throw new IOException(
+                    $"'{_outputPath}' was edited after it was generated, or was generated from another source, so it is not overwritten. "
+                    + "Keep your edits and convert to a new destination, or delete the file and its receipt "
+                    + $"('{receiptPath}') to regenerate it.");
         }
         _inputs = ConversionReceipt.CaptureInputs(
             _sourcePath, converter.GetSemanticMetadataReferences(), options, cancellationToken);
         if (_inputs.Any(input => artifacts.Any(path => Incremental.BuildStateCache.GetPathComparer()
                 .Equals(CanonicalPath.Resolve(path), CanonicalPath.Resolve(input.Path)))))
             throw new IOException("Conversion artifacts must not overwrite original source or reference inputs.");
+        _prepared = true;
+    }
+
+    /// <summary>
+    /// #1609: preserves the original compilation unit whole without converting it
+    /// (used when native conversion ran past its time limit). Destination-safety
+    /// checks still apply.
+    /// </summary>
+    internal async Task<ConversionResult> PreserveWithoutConversionAsync(
+        CancellationToken cancellationToken, IEnumerable<ConversionIssue> reasons, string trigger)
+    {
+        if (_writeAttempted)
+            throw new InvalidOperationException("Whole-file rescue must happen before commit.");
+        _started = true;
+        await PrepareAsync(cancellationToken);
+        var original = await CSharpToCalorConverter.ReadSourceFileAsync(_sourcePath, cancellationToken);
+        var attempted = converter.CreateUnconvertedResult(original, _sourcePath, cancellationToken);
+        return _result = converter.PreserveOriginal(original, _sourcePath, attempted, cancellationToken,
+            reasons, trigger);
+    }
+
+    internal async Task<ConversionResult> ConvertAsync(CancellationToken cancellationToken = default)
+    {
+        if (_started) throw new InvalidOperationException("A generation can execute conversion only once.");
+        _started = true;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!File.Exists(_sourcePath))
+            return _result = await converter.ConvertFileAsync(_sourcePath, cancellationToken);
+
+        await PrepareAsync(cancellationToken);
         var original = await CSharpToCalorConverter.ReadSourceFileAsync(_sourcePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         ConversionResult result;

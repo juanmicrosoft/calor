@@ -1,8 +1,7 @@
 module SumRange SumRange
   module SumRangeModule
-    func SumRange public (int:n) → int
+    func SumRange public (int:n | (# > 0)) → int
       !
-      requires n > 0
       let sum = 0
       for i from 1 to n step 1
         set sum sum + i

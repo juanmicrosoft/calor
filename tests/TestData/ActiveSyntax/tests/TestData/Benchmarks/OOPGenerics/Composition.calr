@@ -1,12 +1,9 @@
 module Composition Composition
   module CompositionModule
-    func EngineHorsepower public (int:hp) → int
+    func EngineHorsepower public (int:hp | (# > 0)) → int
       !
-      requires hp > 0
       return hp
 
-    func CarSpeed public (int:hp, float:weight) → float
+    func CarSpeed public (int:hp | (# > 0), float:weight | (# > 0)) → float
       !
-      requires hp > 0
-      requires weight > 0
       return (double)hp / weight

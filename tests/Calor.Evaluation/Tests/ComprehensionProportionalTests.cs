@@ -24,15 +24,13 @@ public class ComprehensionProportionalTests
         // Complex program: multiple functions, contracts, effects
         var complexContext = CreateContext(
             calor: @"module Complex Complex block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     ! cw
-    requires (b != 0)
     => (result == (a / b))
     return (a / b)
 
-  func Abs (int:x) → int
+  func Abs (int:x | (# >= -2147483648)) → int
     !
-    requires (x >= -2147483648)
     => (result >= 0)
     return x
 
@@ -109,12 +107,12 @@ public class ComprehensionProportionalTests
 
         // Pre-only
         var preOnlyContext = CreateContext(
-            calor: "module T T block\n  func F (int:x) → int\n    !\n    requires (x > 0)\n    return x",
+            calor: "module T T block\n  func F (int:x | (# > 0)) → int\n    !\n    return x",
             csharp: "class T { int F(int x) { return x; } }");
 
         // Pre + Post (contract completeness bonus)
         var bothContext = CreateContext(
-            calor: "module T T block\n  func F (int:x) → int\n    !\n    requires (x > 0)\n    => (result >= 0)\n    return x",
+            calor: "module T T block\n  func F (int:x | (# > 0)) → int\n    !\n    => (result >= 0)\n    return x",
             csharp: "class T { int F(int x) { return x; } }");
 
         var preOnly = await calculator.CalculateAsync(preOnlyContext);
@@ -153,20 +151,16 @@ public class ComprehensionProportionalTests
         // Maximally rich Calor program
         var richContext = CreateContext(
             calor: @"module T T block
-  func A public (int:x, int:y) → int
+  func A public (int:x | (# > 0), int:y | (# > 0)) → int
     ! cw,db:rw
-    requires x > 0
-    requires y > 0
     => result > 0
     return x + y
-  func B public (int:x) → int
+  func B public (int:x | (# >= 0)) → int
     ! fs:rw
-    requires x >= 0
     => result >= 0
     return x
-  func C public (int:a, int:b) → int
+  func C public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     => result == a / b
     return a / b",
             csharp: @"namespace T {
@@ -197,14 +191,12 @@ public class ComprehensionProportionalTests
 
         var context = CreateContext(
             calor: @"module T T block
-  func A public (int:x) → int
+  func A public (int:x | (# > 0)) → int
     !
-    requires x > 0
     => result >= 0
     return x
-  func B public (int:y) → int
+  func B public (int:y | (# > 0)) → int
     !
-    requires y > 0
     return y",
             csharp: "namespace T { public class M { public int A(int x) { return x; } public int B(int y) { return y; } } }");
 

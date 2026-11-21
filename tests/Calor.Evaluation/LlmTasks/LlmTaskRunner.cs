@@ -395,7 +395,7 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
     private static ContractVerificationResults AnalyzeContracts(string calorSource)
     {
         // Count contracts using simple pattern matching
-        var preconditionCount = Calor.Evaluation.Metrics.CalorSyntax.Requires.Matches(calorSource).Count;
+        var preconditionCount = Calor.Evaluation.Metrics.CalorSyntax.Precondition.Matches(calorSource).Count;
         var postconditionCount = Calor.Evaluation.Metrics.CalorSyntax.Ensures.Matches(calorSource).Count;
 
         var totalContracts = preconditionCount + postconditionCount;

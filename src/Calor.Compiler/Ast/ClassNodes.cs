@@ -195,7 +195,8 @@ public sealed class MethodSignatureNode : AstNode
     /// <summary>
     /// True if this method signature has any contracts (preconditions or postconditions).
     /// </summary>
-    public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
+    public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0
+        || Parameters.Any(parameter => parameter.InlineRefinement != null);
 
     public MethodSignatureNode(
         TextSpan span,
@@ -867,7 +868,8 @@ public sealed class MethodNode : AstNode
     public bool IsPartial => (Modifiers & MethodModifiers.Partial) != 0;
     public bool IsExtern => (Modifiers & MethodModifiers.Extern) != 0;
     public bool IsUnsafe => (Modifiers & MethodModifiers.Unsafe) != 0;
-    public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
+    public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0
+        || Parameters.Any(parameter => parameter.InlineRefinement != null);
 
 
 }

@@ -78,6 +78,8 @@ public sealed class TokenEconomicsActiveMirrorTests
 
         var current = Tree(new CSharpEmitter(ContractMode.Debug).Emit(module));
         AssertContractsEquivalent(baseline, current);
+        foreach (var (frozenMethod, nativeMethod) in Methods(baseline).Zip(Methods(current)))
+            AssertPreconditionsBecameRefinements(frozenMethod, nativeMethod);
         var owners = module.Functions.SelectMany(function =>
                 ParsedContracts(function.Id, function.Preconditions, function.Postconditions))
             .Concat(module.Classes.SelectMany(type => type.Methods).SelectMany(method =>
@@ -100,9 +102,36 @@ public sealed class TokenEconomicsActiveMirrorTests
         }
     }
 
+    private static bool IsRefinementGuard(IfStatementSyntax statement) =>
+        statement.Statement is ThrowStatementSyntax { Expression: ObjectCreationExpressionSyntax creation }
+        && creation.Type.ToString() == "ArgumentOutOfRangeException"
+        && creation.ArgumentList?.Arguments.Count == 2
+        && creation.ArgumentList.Arguments[1].ToString().Contains("inline refinement", StringComparison.Ordinal);
+
+    private static bool IsRequires(ObjectCreationExpressionSyntax creation) =>
+        creation.ArgumentList!.Arguments[2].Expression.ToString() == "Calor.Runtime.ContractKind.Requires";
+
+    private static string Flat(string expression) =>
+        new(expression.Where(character => character is not ('(' or ')') && !char.IsWhiteSpace(character)).ToArray());
+
+    // #1618: every frozen precondition reappears inside one of the method's refinement entry checks.
+    private static void AssertPreconditionsBecameRefinements(MethodDeclarationSyntax frozen, MethodDeclarationSyntax native)
+    {
+        var guards = native.DescendantNodes().OfType<IfStatementSyntax>().Where(IsRefinementGuard)
+            .Select(guard => Flat(Assert.IsType<PrefixUnaryExpressionSyntax>(guard.Condition).Operand.ToString()))
+            .ToArray();
+        foreach (var requires in Contracts(frozen).Where(IsRequires))
+        {
+            var condition = Flat(ArgumentText(requires, "condition"));
+            Assert.True(guards.Any(guard => guard.Contains(condition, StringComparison.Ordinal)),
+                $"{frozen.Identifier.ValueText}: precondition {condition} is in no refinement check [{string.Join(", ", guards)}]");
+        }
+    }
+
     private static void AssertContractsEquivalent(SyntaxNode baseline, SyntaxNode actual)
     {
-        var expectedContracts = Contracts(baseline);
+        // #1618: Requires guards became refinement entry checks (AssertPreconditionsBecameRefinements).
+        var expectedContracts = Contracts(baseline).Where(contract => !IsRequires(contract)).ToArray();
         var currentContracts = Contracts(actual);
         Assert.Equal(expectedContracts.Length, currentContracts.Length);
         foreach (var (expected, observed) in expectedContracts.Zip(currentContracts))
@@ -134,16 +163,9 @@ public sealed class TokenEconomicsActiveMirrorTests
     [MemberData(nameof(Inputs))]
     public void NativeMirror_RoundTripsOrRetainsTheExplicitCustomMessageBoundary(string original)
     {
+        // #1618: custom precondition messages are gone, so ContractedDivide round-trips like the rest.
         var module = Parse(ActiveSource(original));
         var emitter = new CalorEmitter();
-        if (original == Prefix + "ContractedDivide.calr")
-        {
-            Assert.Contains("requires{\"divisor must not be zero\"}", ActiveSource(original));
-            Assert.Equal("Canonical precondition message syntax has not been selected.",
-                Assert.Throws<InvalidOperationException>(() => emitter.Emit(module)).Message);
-            return;
-        }
-
         var reemitted = Parse(emitter.Emit(module));
         var normalizer = new ProgramBodyNormalizer();
         Assert.True(SyntaxFactory.AreEquivalent(
@@ -177,6 +199,13 @@ public sealed class TokenEconomicsActiveMirrorTests
                 {
                     var baseline = Observe(method, arguments, ResultStorage(oldMethods[method.Name]));
                     var observed = Observe(current, arguments, ResultStorage(newMethods[method.Name]));
+                    // #1618: a frozen precondition failure is now the refinement's entry check.
+                    if (baseline.Kind == ContractKind.Requires)
+                    {
+                        Assert.True(observed.ExceptionType == typeof(ArgumentOutOfRangeException).FullName,
+                            $"{original}/{method.Name}: frozen {baseline}, native {observed}");
+                        continue;
+                    }
                     Assert.True(baseline == observed,
                         $"{original}/{method.Name}({string.Join(", ", arguments.Select(value => value ?? "null"))})\n"
                         + $"Frozen: {baseline}\nNative: {observed}");
@@ -441,6 +470,10 @@ public sealed class TokenEconomicsActiveMirrorTests
         {
             if (node.Statement is ThrowStatementSyntax { Expression: ObjectCreationExpressionSyntax creation }
                 && creation.Type.ToString() == "Calor.Runtime.ContractViolationException")
+                return null;
+            // #1618: a precondition is a parameter refinement whose entry check is emitted in every
+            // contract mode; its condition is compared against the frozen Requires separately.
+            if (IsRefinementGuard(node))
                 return null;
             // Current policy (f81638a7a): `if c return L1 else return L2` with two literals of
             // one type is emitted as the single conditional return `return c ? L1 : L2`.

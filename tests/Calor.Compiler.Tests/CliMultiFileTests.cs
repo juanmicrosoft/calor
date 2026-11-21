@@ -336,9 +336,8 @@ public class CliMultiFileTests : IDisposable
         var appPath = Path.Combine(_tempDir, "app.calr");
         File.WriteAllText(mathPath, """
             module MathMod MathMod block
-              func Clamp (int:x) → int
+              func Clamp (int:x | (# >= (0 - 1000))) → int
                 !
-                requires (x >= (0 - 1000))
                 => (result >= 0)
                 if (x < 0)
                   return 0

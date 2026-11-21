@@ -6,9 +6,8 @@ module L3M21 L3M21 block
       let int:@base = ((x * 4) - y)
       return (@base + 54)
 
-    func l3m21_fn02 public (int:x, int:y) → int
+    func l3m21_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24753)
       if (x >= 24753)
@@ -21,18 +20,16 @@ module L3M21 L3M21 block
       let int:@base = ((x * 4) - y)
       return (@base + 63)
 
-    func l3m21_fn04 public (int:x, int:y) → int
+    func l3m21_fn04 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 24760)
       let int:total = ((x * 5) + y)
       if (total > 24760)
         return 24760
       return total
 
-    func l3m21_fn05 public (int:x, int:y) → int
+    func l3m21_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24767)
       if (x >= 24767)
@@ -40,9 +37,8 @@ module L3M21 L3M21 block
       else
         return 24767
 
-    func l3m21_fn06 public (int:x, int:y) → int
+    func l3m21_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24774)
       if (x >= 24774)
@@ -65,9 +61,8 @@ module L3M21 L3M21 block
       let int:@base = ((x * 4) - y)
       return (@base + 11)
 
-    func l3m21_fn10 public (int:x, int:y) → int
+    func l3m21_fn10 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 24781)
@@ -80,18 +75,16 @@ module L3M21 L3M21 block
       let int:@base = ((x * 4) - y)
       return (@base + 77)
 
-    func l3m21_fn12 public (int:x, int:y) → int
+    func l3m21_fn12 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 24788)
       let int:total = ((x * 2) + y)
       if (total > 24788)
         return 24788
       return total
 
-    func l3m21_fn13 public (int:x, int:y) → int
+    func l3m21_fn13 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 2) + y)
       if (acc > 24795)

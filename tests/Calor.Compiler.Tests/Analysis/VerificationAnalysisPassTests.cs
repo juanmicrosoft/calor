@@ -84,9 +84,8 @@ public class VerificationAnalysisPassTests
     {
         var source = """
             module Test Test block
-              func Divide (int:x, int:y) → int
+              func Divide (int:x, int:y | (# != 0)) → int
                 !
-                requires (y != 0)
                 return (x / y)
 
               func Divide (long:x, long:y) → long
@@ -395,9 +394,8 @@ module Test Test block
 
         var source = @"
 module Test Test block
-  func SafeDivide (int:x, int:y) → int
+  func SafeDivide (int:x, int:y | (# != 0)) → int
     !
-    requires (y != 0)
     return (x / y)";
 
         var module = Parse(source, out var parseDiag);
@@ -428,9 +426,8 @@ module Test Test block
 
         var source = @"
 module Test Test block
-  func Sum (int:n) → int
+  func Sum (int:n | (# >= 0)) → int
     !
-    requires (n >= 0)
     let int:sum = 0
     for i from 0 to 10 step 1
       Console.WriteLine(i)
@@ -448,19 +445,18 @@ module Test Test block
     }
 
     [Theory]
-    [InlineData("(divisor >= 0)", true)]
-    [InlineData("(divisor != 0)", false)]
-    [InlineData("(divisor > 0)", false)]
-    [InlineData("(divisor < 0)", false)]
+    [InlineData("(# >= 0)", true)]
+    [InlineData("(# != 0)", false)]
+    [InlineData("(# > 0)", false)]
+    [InlineData("(# < 0)", false)]
     public void PreconditionGuardMap_SeedsOnlyProvenNonZero(
         string precondition,
         bool expectedDivisionWarning)
     {
         var source = $@"
 module Test Test block
-  func Divide (int:divisor) → int
+  func Divide (int:divisor | {precondition}) → int
     !
-    requires {precondition}
     return (10 / divisor)";
 
         var module = Parse(source, out var parseDiagnostics);

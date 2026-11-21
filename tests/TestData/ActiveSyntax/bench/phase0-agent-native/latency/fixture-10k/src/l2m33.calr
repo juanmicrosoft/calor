@@ -1,9 +1,8 @@
 module L2M33 L2M33 block
   module L2M33Module public
 
-    func l2m33_fn01 public (int:x, int:y) → int
+    func l2m33_fn01 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 23472)
@@ -11,9 +10,8 @@ module L2M33 L2M33 block
       else
         return ((acc * 2) + 23472)
 
-    func l2m33_fn02 public (int:x, int:y) → int
+    func l2m33_fn02 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 5) + y)
       if (acc > 23479)
@@ -21,9 +19,8 @@ module L2M33 L2M33 block
       else
         return ((acc * 2) + 23479)
 
-    func l2m33_fn03 public (int:x, int:y) → int
+    func l2m33_fn03 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 23486)
@@ -37,9 +34,8 @@ module L2M33 L2M33 block
       let int:v2 = L3M13.L3M13Module.l3m13_fn05(x, 39)
       return ((v1 + v2) + y)
 
-    func l2m33_fn05 public (int:x, int:y) → int
+    func l2m33_fn05 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 23493)
@@ -53,10 +49,8 @@ module L2M33 L2M33 block
       let int:v2 = L3M21.L3M21Module.l3m21_fn07(x, 33)
       return ((v1 + v2) + y)
 
-    func l2m33_fn07 public (int:x, int:y) → int
+    func l2m33_fn07 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 23500)
       let int:total = ((x * 5) + y)
       if (total < 23500)
@@ -69,9 +63,8 @@ module L2M33 L2M33 block
       let int:v1 = L3M30.L3M30Module.l3m30_fn11(x, 24)
       return (v1 + y)
 
-    func l2m33_fn09 public (int:x, int:y) → int
+    func l2m33_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23507)
       if (x >= 23507)

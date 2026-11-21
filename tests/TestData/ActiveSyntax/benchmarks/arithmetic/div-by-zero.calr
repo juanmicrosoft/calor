@@ -54,9 +54,8 @@ module DivByZeroBenchmark DivByZeroBenchmark
     let int:divisor = y - 1
     return x / divisor
 
-  func SafeDivisionWithContract public (int:x, int:y) → int
+  func SafeDivisionWithContract public (int:x, int:y | (# > 0)) → int
     !
     // SAFE: Precondition guarantees non-zero
     // EXPECTED: No warnings
-    requires y > 0
     return x / y

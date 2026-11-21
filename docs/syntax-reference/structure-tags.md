@@ -176,9 +176,8 @@ module FunctionHeaders
     !
     return a + b
 
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     => result == a / b
     return a / b
 
@@ -192,7 +191,7 @@ module FunctionHeaders
 ```
 
 `Main()` returns `10`. `PrintSum(2, 3)` writes `5` followed by a newline.
-`requires` has no native custom-message clause; use an explicit condition
+A parameter refinement has no custom-message clause; use an explicit condition
 and exception when an API needs a specific failure message.
 See [contracts](https://calor.dev/docs/syntax-reference/contracts/) and
 [effects](https://calor.dev/docs/syntax-reference/effects/) for their enforcement boundaries.

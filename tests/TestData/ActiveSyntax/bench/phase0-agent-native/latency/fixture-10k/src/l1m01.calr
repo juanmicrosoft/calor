@@ -6,10 +6,8 @@ module L1M01 L1M01 block
       let int:v1 = L2M25.L2M25Module.l2m25_fn05(x, 71)
       return (v1 + y)
 
-    func l1m01_fn02 public (int:x, int:y) → int
+    func l1m01_fn02 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 20000)
       let int:total = ((x * 3) + y)
       if (total < 20000)
@@ -22,9 +20,8 @@ module L1M01 L1M01 block
       let int:v1 = L2M24.L2M24Module.l2m24_fn04(x, 6)
       return (v1 + y)
 
-    func l1m01_fn04 public (int:x, int:y) → int
+    func l1m01_fn04 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 3) + y)
       if (acc > 20007)
@@ -43,9 +40,8 @@ module L1M01 L1M01 block
       let int:v2 = L2M20.L2M20Module.l2m20_fn06(x, 51)
       return ((v1 + v2) + y)
 
-    func l1m01_fn07 public (int:x, int:y) → int
+    func l1m01_fn07 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20014)
       let int:total = ((x * 3) + y)
       if (total > 20014)

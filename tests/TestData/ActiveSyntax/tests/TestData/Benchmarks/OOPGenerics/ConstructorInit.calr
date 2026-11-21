@@ -1,18 +1,14 @@
 module ConstructorInit ConstructorInit
   module ConstructorInitModule
-    func ValidateWidth public (float:width) → float
+    func ValidateWidth public (float:width | (# > 0)) → float
       !
-      requires width > 0
       return width
 
-    func ValidateHeight public (float:height) → float
+    func ValidateHeight public (float:height | (# > 0)) → float
       !
-      requires height > 0
       return height
 
-    func Area public (float:width, float:height) → float
+    func Area public (float:width | (# > 0), float:height | (# > 0)) → float
       !
-      requires width > 0
-      requires height > 0
       => result > 0
       return width * height

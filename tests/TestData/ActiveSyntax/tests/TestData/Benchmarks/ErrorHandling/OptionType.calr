@@ -4,9 +4,8 @@ module OptionType OptionType
       !
       return isSome
 
-    func Unwrap public (int:value, bool:isSome) → int
+    func Unwrap public (int:value, bool:isSome | (# == true)) → int
       !
-      requires isSome == true
       return value
 
     func GetOrElse public (int:value, int:fallback, bool:isSome) → int

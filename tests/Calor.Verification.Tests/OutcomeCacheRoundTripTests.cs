@@ -80,7 +80,7 @@ public class OutcomeCacheRoundTripTests
         Directory.CreateDirectory(tempDir);
         try
         {
-            var source = "module Demo Demo block\n  func Dec (int:x) → int\n    !\n    requires (x > 0)\n    => (result > 10)\n    return (x - 1)\n";
+            var source = "module Demo Demo block\n  func Dec (int:x | (# > 0)) → int\n    !\n    => (result > 10)\n    return (x - 1)\n";
             var path = Path.Combine(tempDir, "demo.calr");
             File.WriteAllText(path, source);
 

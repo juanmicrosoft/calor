@@ -31,7 +31,7 @@ Traditional languages make agents *infer* these answers through complex analysis
 | Principle | How Calor Implements It | Agent Benefit |
 |-----------|------------------------|---------------|
 | **Explicit over implicit** | Effect rows such as `! cw, fs:r, net:rw` (`!` alone means pure) | Know side effects without reading implementation |
-| **Contracts are code** | First-class `requires` preconditions and `=>` postconditions | Generate tests from specs, verify correctness |
+| **Contracts are code** | Parameter refinements (`int:x | (# >= 0)`) as preconditions and `=>` postconditions | Generate tests from specs, verify correctness |
 | **Tooling-owned identity** | `.calor/ids.json`; no declaration IDs in source | Precise references preserved by supported refactoring tools |
 | **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | Lower edit cost (~16% fewer tokens in our studies) |
 | **Familiar expressions** | Ordinary C# operators and calls (`x * x`, `items.Count`) | No separate expression language to learn |
@@ -41,9 +41,8 @@ Traditional languages make agents *infer* these answers through complex analysis
 **Calor** — Everything explicit:
 ```calor
 module Squares
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x
 ```
@@ -53,7 +52,7 @@ module Squares
 public static int Square(int x)
 {
     if (!(x >= 0))
-        throw new ArgumentException("Precondition failed");
+        throw new ArgumentOutOfRangeException(nameof(x));
     var result = x * x;
     if (!(result >= 0))
         throw new InvalidOperationException("Postcondition failed");
@@ -62,7 +61,7 @@ public static int Square(int x)
 ```
 
 **What Calor tells the agent directly:**
-- Precondition (`requires`): `x >= 0`
+- Precondition (refinement on `x`): `x >= 0`
 - Postcondition (`=>`): `result >= 0`
 - No side effects (the `!` row is empty, which means pure)
 - Block ends at dedent — no closer tag to forget

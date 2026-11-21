@@ -12,9 +12,8 @@ module PropertyAccess PropertyAccess
       !
       return name
 
-    func GetAge public (int:age) → int
+    func GetAge public (int:age | (# >= 0)) → int
       !
-      requires age >= 0
       return age
 
     func GetEmail public (string:email) → string

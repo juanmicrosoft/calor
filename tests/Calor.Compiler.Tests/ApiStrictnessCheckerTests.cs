@@ -204,9 +204,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -447,6 +446,35 @@ module Test Test block
 
         Assert.True(report.HasBreakingChanges);
         Assert.Contains(report.BreakingChanges, c => c.Contains("Return type"));
+    }
+
+    [Fact]
+    public void Compare_AddedParameterRefinement_ReportsNewPrecondition()
+    {
+        // #1618: a parameter refinement is a precondition, so adding one narrows what
+        // callers may pass, which is a breaking change.
+        var oldModule = Parse(@"
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    return a / b
+", out var oldDiagnostics);
+        var newModule = Parse(@"
+module Test Test block
+  func Divide (int:a, int:b | (# != 0)) → int
+    !
+    return a / b
+", out var newDiagnostics);
+        Assert.False(oldDiagnostics.HasErrors, string.Join("\n", oldDiagnostics));
+        Assert.False(newDiagnostics.HasErrors, string.Join("\n", newDiagnostics));
+
+        var report = new BreakingChangeDetector(new DiagnosticBag()).Compare(oldModule, newModule);
+        Assert.True(report.HasBreakingChanges);
+        Assert.Contains(report.BreakingChanges, c => c.Contains("New preconditions added (1 new)"));
+
+        // Removing the refinement weakens the precondition: not breaking.
+        var reverse = new BreakingChangeDetector(new DiagnosticBag()).Compare(newModule, oldModule);
+        Assert.False(reverse.HasBreakingChanges);
     }
 
     #endregion

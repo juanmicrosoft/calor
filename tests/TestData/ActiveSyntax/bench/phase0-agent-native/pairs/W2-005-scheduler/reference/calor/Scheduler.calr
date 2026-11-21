@@ -8,12 +8,8 @@ module Scheduler Scheduler block
       !
       return ((s1 < e2) && (s2 < e1))
 
-    func ConflictIndex (int[]:starts, int[]:ends, int[]:active, int:count, int:s, int:e) → int
+    func ConflictIndex (int[]:starts, int[]:ends, int[]:active, int:count | ((((# >= 0) && (# <= starts.Length)) && (# <= ends.Length)) && (# <= active.Length)), int:s, int:e) → int
       !
-      requires (count >= 0)
-      requires (count <= starts.Length)
-      requires (count <= ends.Length)
-      requires (count <= active.Length)
       => (result >= -1)
       var int:i = 0
       while (i < count)
@@ -26,22 +22,13 @@ module Scheduler Scheduler block
         set i (i + 1)
       return -1
 
-    func HasConflict (int[]:starts, int[]:ends, int[]:active, int:count, int:s, int:e) → bool
+    func HasConflict (int[]:starts, int[]:ends, int[]:active, int:count | ((((# >= 0) && (# <= starts.Length)) && (# <= ends.Length)) && (# <= active.Length)), int:s, int:e) → bool
       !
-      requires (count >= 0)
-      requires (count <= starts.Length)
-      requires (count <= ends.Length)
-      requires (count <= active.Length)
       let int:idx = ConflictIndex(starts, ends, active, count, s, e)
       return (idx >= 0)
 
-    func AddBooking (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:s, int:e, int:prio) → int
+    func AddBooking (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count | (((((# >= 0) && (# < starts.Length)) && (# < ends.Length)) && (# < prios.Length)) && (# < active.Length)), int:s, int:e, int:prio) → int
       ! mut
-      requires (count >= 0)
-      requires (count < starts.Length)
-      requires (count < ends.Length)
-      requires (count < prios.Length)
-      requires (count < active.Length)
       => (result >= -1)
       let bool:valid = IsValidInterval(s, e)
       if (!valid)
@@ -55,24 +42,15 @@ module Scheduler Scheduler block
       set active[count] 1
       return (count + 1)
 
-    func Cancel (int[]:active, int:count, int:index) → bool
+    func Cancel (int[]:active, int:count | ((# >= 0) && (# <= active.Length)), int:index | ((# >= 0) && (# < count))) → bool
       ! mut
-      requires (count >= 0)
-      requires (index >= 0)
-      requires (index < count)
-      requires (count <= active.Length)
       if (active[index] == 1)
         set active[index] 0
         return true
       return false
 
-    func NextFreeStart (int[]:starts, int[]:ends, int[]:active, int:count, int:duration, int:earliest, int:horizon) → int
+    func NextFreeStart (int[]:starts, int[]:ends, int[]:active, int:count | ((((# >= 0) && (# <= starts.Length)) && (# <= ends.Length)) && (# <= active.Length)), int:duration, int:earliest | (# >= 0), int:horizon) → int
       !
-      requires (count >= 0)
-      requires (earliest >= 0)
-      requires (count <= starts.Length)
-      requires (count <= ends.Length)
-      requires (count <= active.Length)
       => (result >= -1)
       var int:t = earliest
       while ((t + duration) <= horizon)
@@ -83,10 +61,8 @@ module Scheduler Scheduler block
         set t ends[idx]
       return -1
 
-    func ActiveCount (int[]:active, int:count) → int
+    func ActiveCount (int[]:active, int:count | ((# >= 0) && (# <= active.Length))) → int
       !
-      requires (count >= 0)
-      requires (count <= active.Length)
       => (result >= 0)
       var int:n = 0
       var int:i = 0
@@ -109,12 +85,8 @@ module Scheduler Scheduler block
         return 0
       return (hi - lo)
 
-    func BusyTime (int[]:starts, int[]:ends, int[]:active, int:count, int:winFrom, int:winTo) → int
+    func BusyTime (int[]:starts, int[]:ends, int[]:active, int:count | ((((# >= 0) && (# <= starts.Length)) && (# <= ends.Length)) && (# <= active.Length)), int:winFrom, int:winTo) → int
       !
-      requires (count >= 0)
-      requires (count <= starts.Length)
-      requires (count <= ends.Length)
-      requires (count <= active.Length)
       var int:total = 0
       var int:i = 0
       while (i < count)
@@ -126,24 +98,13 @@ module Scheduler Scheduler block
         set i (i + 1)
       return total
 
-    func UtilizationPercent (int[]:starts, int[]:ends, int[]:active, int:count, int:winFrom, int:winTo) → int
+    func UtilizationPercent (int[]:starts, int[]:ends, int[]:active, int:count | ((((# >= 0) && (# <= starts.Length)) && (# <= ends.Length)) && (# <= active.Length)), int:winFrom | (# >= 0), int:winTo | (winFrom < #)) → int
       !
-      requires (count >= 0)
-      requires (winFrom >= 0)
-      requires (winFrom < winTo)
-      requires (count <= starts.Length)
-      requires (count <= ends.Length)
-      requires (count <= active.Length)
       let int:busy = BusyTime(starts, ends, active, count, winFrom, winTo)
       return ((busy * 100) / (winTo - winFrom))
 
-    func PriorityAt (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:t) → int
+    func PriorityAt (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count | (((((# >= 0) && (# <= starts.Length)) && (# <= ends.Length)) && (# <= prios.Length)) && (# <= active.Length)), int:t) → int
       !
-      requires (count >= 0)
-      requires (count <= starts.Length)
-      requires (count <= ends.Length)
-      requires (count <= prios.Length)
-      requires (count <= active.Length)
       var int:i = 0
       while (i < count)
         if (active[i] == 1)
@@ -154,13 +115,8 @@ module Scheduler Scheduler block
         set i (i + 1)
       return -1
 
-    func AddWithPreemption (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:s, int:e, int:prio, int:horizon) → int
+    func AddWithPreemption (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count | (((((# >= 0) && (# < starts.Length)) && (# < ends.Length)) && (# < prios.Length)) && (# < active.Length)), int:s, int:e, int:prio, int:horizon) → int
       ! mut
-      requires (count >= 0)
-      requires (count < starts.Length)
-      requires (count < ends.Length)
-      requires (count < prios.Length)
-      requires (count < active.Length)
       => (result >= -1)
       let bool:valid = IsValidInterval(s, e)
       if (!valid)

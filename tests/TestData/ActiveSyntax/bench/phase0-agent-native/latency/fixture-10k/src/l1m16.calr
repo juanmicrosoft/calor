@@ -1,9 +1,8 @@
 module L1M16 L1M16 block
   module L1M16Module public
 
-    func l1m16_fn01 public (int:x, int:y) → int
+    func l1m16_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20833)
       if (x >= 20833)
@@ -11,9 +10,8 @@ module L1M16 L1M16 block
       else
         return 20833
 
-    func l1m16_fn02 public (int:x, int:y) → int
+    func l1m16_fn02 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20840)
       let int:total = ((x * 2) + y)
       if (total > 20840)
@@ -25,10 +23,8 @@ module L1M16 L1M16 block
       let int:v1 = L2M25.L2M25Module.l2m25_fn03(x, 40)
       return (v1 + y)
 
-    func l1m16_fn04 public (int:x, int:y) → int
+    func l1m16_fn04 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 20847)
       let int:total = ((x * 5) + y)
       if (total < 20847)
@@ -41,9 +37,8 @@ module L1M16 L1M16 block
       let int:v1 = L2M07.L2M07Module.l2m07_fn03(x, 10)
       return (v1 + y)
 
-    func l1m16_fn06 public (int:x, int:y) → int
+    func l1m16_fn06 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 20854)
@@ -51,10 +46,8 @@ module L1M16 L1M16 block
       else
         return ((acc * 2) + 20854)
 
-    func l1m16_fn07 public (int:x, int:y) → int
+    func l1m16_fn07 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 20861)
       let int:total = ((x * 2) + y)
       if (total < 20861)
@@ -62,10 +55,8 @@ module L1M16 L1M16 block
       else
         return total
 
-    func l1m16_fn08 public (int:x, int:y) → int
+    func l1m16_fn08 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 20868)
       let int:total = ((x * 5) + y)
       if (total < 20868)
@@ -73,9 +64,8 @@ module L1M16 L1M16 block
       else
         return total
 
-    func l1m16_fn09 public (int:x, int:y) → int
+    func l1m16_fn09 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 5) + y)
       if (acc > 20875)
@@ -83,9 +73,8 @@ module L1M16 L1M16 block
       else
         return ((acc * 2) + 20875)
 
-    func l1m16_fn10 public (int:x, int:y) → int
+    func l1m16_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20882)
       let int:total = ((x * 3) + y)
       if (total > 20882)

@@ -204,30 +204,27 @@ int i = checked((int)f);
 
 ### Preconditions
 
-**Schematic C# implementation** (the ID and spans are placeholders; the emitter
-supplies the actual declaration identity and source location):
-```csharp
-public int MyFunction(int x)
-{
-    // REQUIRES: x > 0
-    if (!(x > 0))
-    {
-        throw new Calor.Runtime.ContractViolationException(
-            "Precondition failed", "f001", Calor.Runtime.ContractKind.Requires,
-            startOffset: 0, length: 0,
-            condition: "x > 0");
-    }
+A precondition is an inline refinement on the parameter it constrains:
+`func MyFunction (int:x | (# > 0)) → int`. The emitter turns it into an entry
+guard. The guard throws `System.ArgumentOutOfRangeException`, and the
+exception's `ParamName` is the parameter name. The guard is emitted in every
+contract mode, including `off`.
 
-    // Body
+**C# output** (what the emitter produces for that signature, with `#line`
+directives removed; the file starts with `using System;`):
+```csharp
+public static int MyFunction(int x)
+{
+    if (!(x > 0)) throw new ArgumentOutOfRangeException(nameof(x), "Violation of inline refinement for parameter 'x'");
     return checked(x * 2);
 }
 ```
 
 ### Postconditions
 
-**Schematic C# implementation:**
+**Schematic C# implementation** (the ID and spans are placeholders):
 ```csharp
-public int MyFunction(int x)
+public static int MyFunction(int x)
 {
     // Body
     var __result = checked(x * 2);
@@ -249,9 +246,11 @@ public int MyFunction(int x)
 
 | Mode | Behavior |
 |:-----|:---------|
-| `debug` | Detailed supported runtime checks |
-| `release` | The same supported checks, with leaner exceptions |
-| `off` | No precondition or postcondition guards |
+| `debug` | Precondition guards, plus postcondition and invariant checks with detailed `ContractViolationException` messages |
+| `release` | The same guards and checks; postcondition and invariant failures carry leaner messages |
+| `off` | Precondition guards only; no postcondition or invariant checks |
+
+A precondition is a parameter refinement, so `off` does not remove it.
 
 With optional verification, only eligible clean proven postcondition guards
 may be removed; use `--keep-proven-guards` to retain them. Unsupported runtime

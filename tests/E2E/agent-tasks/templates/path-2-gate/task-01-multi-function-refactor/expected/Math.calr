@@ -1,16 +1,14 @@
 module MathOps MathOps block
-  func Calculate (int:val, int:prior) → int
+  func Calculate (int:val | (# >= 0), int:prior) → int
     !
-    requires (val >= 0)
     => (result >= prior)
     let validated = ValidateInput(val)
     let scaled = ScaleInput(validated)
     let total = RunningTotal(scaled, prior)
     return total
 
-  func ValidateInput (int:val) → int
+  func ValidateInput (int:val | (# >= 0)) → int
     !
-    requires (val >= 0)
     return val
 
   func ScaleInput (int:val) → int

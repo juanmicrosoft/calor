@@ -49,11 +49,7 @@ internal static class DiagnosticText
         [DiagnosticCode.LegacyCloserForm] = new(
             "^Legacy structural closing tag '([^']+)' was removed in Phase 4d and is no longer accepted\\. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends\\.$",
             "Remove legacy closer '$1'; blocks end at dedent",
-            "Structural closing tags are not accepted. Blocks end when their bodies dedent. Remove the closer, not its surrounding code or comments. The diagnostic carries a safe deletion patch; call and block-lambda closers remain valid."),
-        [DiagnosticCode.MalformedFunctionHeader] = new(
-            "^'([^']+)' header has three fields \\(([^)]+)\\), but §F/§AF headers take at most \\{name:visibility\\}\\. The second field '([^']+)' is a return type -- declare it in the signature as '\\(\\.\\.\\.\\) -> [^']+', not in the header\\. A return type belongs in the inline signature, not the header\\.$",
-            "'$1' header $2: move return type '$3' to the signature",
-            "Function headers have at most {name:visibility}. The return type belongs in the inline signature, for example §F{Add:pub} () -> i32. A structured patch moves the return type out of a malformed three-field header."),
+            "Structural closing tags are not accepted. Blocks end when their bodies dedent. Remove the closer, not its surrounding code or comments. The diagnostic carries a safe deletion patch."),
         [DiagnosticCode.TabIndentation] = new(
             "^Leading whitespace uses tabs on ([0-9]+) line\\(s\\)\\. Calor indentation is canonically 2 spaces per level\\.$",
             "Tab indentation on $1 line(s); use 2 spaces per level",
@@ -67,17 +63,13 @@ internal static class DiagnosticText
             "$1 row $2 vs $3 row $4: compatibility unknown",
             "An effect row states what a function value may do. An unknown row cannot be checked against another row; an assumed row is not a proof. State rows on both sides or resolve the unavailable declaration. --permissive-effects explicitly waives unknown-row checking, not known effect violations; --strict-effects promotes the warning to an error. Choosing an effect policy is not a deterministic fix."),
         [DiagnosticCode.UnknownExternalCall] = new(
-            "^Unknown (?:external call to|call target) '([^']+)'(?:\\. Add effect declaration in a \\.calor-effects\\.json manifest\\.| - assuming worst-case effects\\. Consider adding to manifest\\.|: not an internal function, parameter, binding, or field visible to the effect pass\\. If this is a delegate-typed member, declare it where this module can see it with an effect row \\(§E\\{…\\} on the same line as its type\\); otherwise add the callee to a \\.calor-effects\\.json manifest\\.)$",
+            "^Unknown (?:external call to|call target) '([^']+)'(?:\\. Add effect declaration in a \\.calor-effects\\.json manifest\\.| - assuming worst-case effects\\. Consider adding to manifest\\.|: not an internal function, parameter, binding, or field visible to the effect pass\\. If this is a delegate-typed member, declare it where this module can see it with an effect row \\('! codes' after its type\\); otherwise add the callee to a \\.calor-effects\\.json manifest\\.)$",
             "Unknown effects for call '$1'; declare its effect contract",
             "The effect pass cannot resolve this call's effects. It charges worst-case effects rather than assuming purity. Supply a .calor-effects.json manifest for an external member, or make a function-valued declaration and its effect row visible to the module. Selecting effects is a policy decision, not a safe automatic fix."),
         [DiagnosticCode.UndeclaredPublicFunction] = new(
             "^Public (?:function|method) '([^']+)' in module '([^']+)' has no effect declaration\\. Cross-module callers cannot verify effect safety\\. Add an indented ! row to declare effects\\.$",
             "Public function '$2.$1' has no effect declaration",
-            "Public functions need an indented ! effect row so cross-module callers can verify their effects. A bare ! declares purity; nonempty rows must include the effects the function can perform. The compiler does not choose this API contract automatically."),
-        [DiagnosticCode.AmbiguousCallContinuation] = new(
-            "^Closer-less call '([^']+)' already took one inline argument; a second positional argument is ambiguous\\. Use the explicit form '([^']+)' instead\\.$",
-            "Ambiguous second argument to '$1'; use '$2'",
-            "A closer-less call accepts at most one inline argument. Multiple arguments require explicit §A markers and §/C. The intended argument boundaries are ambiguous, so no automatic patch is applied.")
+            "Public functions need an indented ! effect row so cross-module callers can verify their effects. A bare ! declares purity; nonempty rows must include the effects the function can perform. The compiler does not choose this API contract automatically.")
     };
 }
 

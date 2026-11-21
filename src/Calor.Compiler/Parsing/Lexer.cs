@@ -752,7 +752,7 @@ public sealed class Lexer
             "§F" or "§MT" or "§AF" or "§AMT" => "Use 'func Name' with a '→' signature.",
             "§B" => "Use 'let' or 'var' with a type:name binding.",
             "§E" => "Use an '! effects' header.",
-            "§Q" => "Use a 'requires expression' header.",
+            "§Q" => "State the precondition as a parameter refinement, for example 'int:x | (# > 0)'.",
             "§S" => "Use an '=> expression' postcondition header.",
             "§SN" or "§DP" or "§BR" => "Use constrained '/// since', '/// deprecated' or '/// breaking' documentation.",
             "§RAW" or "§CS" or "§CSHARP" => "Use 'raw reason N' with the exact UTF-8 payload length.",

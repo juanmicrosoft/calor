@@ -1,9 +1,7 @@
 module QuickSort QuickSort
   module QuickSortModule
-    func ChoosePivot public (int:low, int:high) → int
+    func ChoosePivot public (int:low | (# >= 0), int:high | (low <= #)) → int
       !
-      requires low >= 0
-      requires low <= high
       return high
 
     func ShouldSwap public (int:value, int:pivot) → bool

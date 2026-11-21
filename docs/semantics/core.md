@@ -292,20 +292,26 @@ Contracts are semantic constructs that specify behavioral requirements.
 
 ```calor
 module CoreRequires
-  func Positive (int:x) → int
+  func Positive (int:x | (# > 0)) → int
     !
-    requires x > 0
     return x
 ```
 
-**Semantics with runtime checks enabled:**
-1. Evaluated **before** function body execution
-2. Has access to all function parameters
-3. If condition is `false`, throws `ContractViolationException`
-4. Debug mode carries source and condition metadata; release mode uses a
-   leaner exception. The function identifier is maintained by project tools.
+A precondition is an inline refinement on a parameter: `#` names the
+parameter's value. A condition over several parameters goes on the last
+parameter it mentions and names the others, as in
+`(int:lo, int:hi | (# > lo))`.
 
-**Test Reference:** `S10: RequiresFails_ThrowsContractViolation`
+**Semantics (every contract mode, including `off`):**
+1. Evaluated **before** function body execution, in parameter order
+2. Has access to the constrained parameter (`#`) and all other parameters
+3. If condition is `false`, throws `System.ArgumentOutOfRangeException` whose
+   `ParamName` is the constrained parameter and whose message is
+   `Violation of inline refinement for parameter '<name>'`
+4. Precondition failures do not throw `ContractViolationException`, and
+   `--contract-mode off` does not remove the check
+
+**Test Reference:** `S10` in `tests/Calor.Semantics.Tests/ContractTests.cs`
 
 ### 5.2 Postconditions (ENSURES)
 
@@ -334,14 +340,15 @@ does not claim complete class-invariant enforcement.
 
 ### 5.4 Contract Evaluation Order
 
-1. All REQUIRES clauses (in declaration order)
+1. All parameter-refinement preconditions (in parameter order)
 2. Function body
 3. All ENSURES clauses (in declaration order)
 
-Both `debug` and `release` emit supported precondition and postcondition checks;
-`off` emits no precondition or postcondition guards. An explicit `proof`
-statement retains its separate runtime check unless eligible verification
-discharges it.
+Precondition guards are emitted in every contract mode. Both `debug` and
+`release` emit supported postcondition checks, which throw
+`ContractViolationException` (`release` with a leaner message); `off` emits no
+postcondition or invariant guards. An explicit `proof` statement retains its
+separate runtime check unless eligible verification discharges it.
 Optional verification may remove only eligible clean proven postcondition
 guards. It does not remove preconditions based on satisfiability. Unsupported
 requested runtime lowering must fail rather than silently omit checks.

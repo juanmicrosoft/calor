@@ -96,7 +96,7 @@ public class HoverHandlerTests
     [InlineData("var int:value = 1", "var")]
     [InlineData("for i from 0 to 2 step 1", "for")]
     [InlineData("each item in items", "each")]
-    [InlineData("requires value > 0", "requires")]
+
     [InlineData("=> result > 0", "=>")]
     [InlineData("! cw", "!")]
     [InlineData("func Add () → int", "→")]
@@ -174,6 +174,30 @@ public class HoverHandlerTests
         Assert.Contains(expectedHeader, content);
         Assert.DoesNotContain("§", content);
         Assert.DoesNotContain("return value", content);
+    }
+
+    [Fact]
+    public void BuildHover_Function_CountsParameterRefinementsAsPreconditions()
+    {
+        // #1618: a parameter refinement is the precondition; the hover counts it.
+        const string source = """
+            module TestModule
+              func Divide (int:a, int:b | (# != 0), int:c | (# > 0)) → int
+                => (result >= 0)
+                return a / b
+            """;
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(
+            "file:///refined-hover.calr");
+        var state = _workspace.GetOrCreate(uri, source, version: 1);
+        var (line, column) = LspTestHarness.GetLineColumn(
+            source, source.IndexOf("Divide", StringComparison.Ordinal));
+
+        var hover = HoverHandler.BuildHover(state.Snapshot, new Position(line - 1, column - 1));
+
+        Assert.NotNull(hover);
+        var markup = Assert.IsType<MarkupContent>(hover.Contents.MarkupContent);
+        Assert.Contains("**Preconditions:** 2", markup.Value, StringComparison.Ordinal);
+        Assert.Contains("**Postconditions:** 1", markup.Value, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -590,11 +614,14 @@ public class HoverHandlerTests
     }
 
     [Fact]
-    public async Task Handle_TagHover_Q_ReturnsDocumentationAsync()
+    public async Task Handle_TagHover_RetiredRequires_HasNoPreconditionDocumentationAsync()
     {
         if (!TagDocumentationProvider.Instance.IsLoaded) return;
 
+        // #1618: `requires` is retired (a parse error); a precondition is a parameter refinement,
+        // so the keyword has no hover documentation of its own.
         var source = "requires x > 0";
+        Assert.Null(TagDocumentationProvider.ExtractTagAtPosition(source, 1));
         var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
         _workspace.GetOrCreate(uri, source);
 
@@ -606,9 +633,7 @@ public class HoverHandlerTests
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
-        Assert.NotNull(result);
-        var content = result.Contents.MarkupContent?.Value ?? "";
-        Assert.Contains("Precondition", content);
+        Assert.DoesNotContain("Precondition", result?.Contents.MarkupContent?.Value ?? "");
     }
 
     [Fact]

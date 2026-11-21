@@ -20,32 +20,28 @@ public sealed class S2ImplicationDefinednessTests
     private const string StringSourceTemplate = """
         module R1Case R1Case block
           interface IProbe
-            func Run (int:x, string:s) → int
+            func Run (int:x | (# >= 0), string:s) → int
               !
-              requires (x >= 0)
 
           class Impl
             implements IProbe
 
-            func Run (int:x, string:s) → int
+            func Run (int:x, string:s | IMPLPRE) → int
               !
-              requires IMPLPRE
               return 0
         """;
 
     private const string DivisionSource = """
         module R1Case R1Case block
           interface IProbe
-            func Run (int:x, int:y) → int
+            func Run (int:x | (# == 3), int:y) → int
               !
-              requires (x == 3)
 
           class Impl
             implements IProbe
 
-            func Run (int:x, int:y) → int
+            func Run (int:x, int:y | ((x % #) > -2)) → int
               !
-              requires ((x % y) > -2)
               return 0
         """;
 
@@ -161,16 +157,14 @@ public sealed class S2ImplicationDefinednessTests
     private const string IntegerTemplate = """
         module M M block
           interface IProbe
-            func Run (int:x, int:y) → int
+            func Run (int:x, int:y | IFACEPRE) → int
               !
-              requires IFACEPRE
 
           class Impl
             implements IProbe
 
-            func Run (int:x, int:y) → int
+            func Run (int:x, int:y | IMPLPRE) → int
               !
-              requires IMPLPRE
               return 0
         """;
 
@@ -267,17 +261,15 @@ public sealed class S2ImplicationDefinednessTests
         const string source = """
             module M M block
               interface IProbe
-                func Run (int:x) → int
+                func Run (int:x | ((# + 1) > 0)) → int
                   !
-                  requires ((x + 1) > 0)
                   => (result == 0)
 
               class Impl
                 implements IProbe
 
-                func Run (int:x) → int
+                func Run (int:x | ((# + 1) > 0)) → int
                   !
-                  requires ((x + 1) > 0)
                   => (result == 0)
                   return 0
             """;
@@ -338,16 +330,14 @@ public sealed class S2ImplicationDefinednessTests
         const string source = """
             module M M block
               interface IProbe
-                func Run (int:x, string:s) → int
+                func Run (int:x | (# >= 1), string:s) → int
                   !
-                  requires (x >= 1)
 
               class Impl
                 implements IProbe
 
-                func Run (int:x, string:s) → int
+                func Run (int:x | (# >= 0), string:s) → int
                   !
-                  requires (x >= 0)
                   return 0
             """;
         var diagnostics = Compile(source);
@@ -396,17 +386,15 @@ public sealed class S2ImplicationDefinednessTests
         var source = $$"""
             module M M block
               interface IProbe
-                func Run (int:x) → int
+                func Run (int:x | {{pre}}) → int
                   !
-                  requires {{pre}}
                   => {{post}}
 
               class Impl
                 implements IProbe
 
-                func Run (int:x) → int
+                func Run (int:x | {{pre}}) → int
                   !
-                  requires {{pre}}
                   => {{post}}
                   return 0
             """;
@@ -453,9 +441,8 @@ public sealed class S2ImplicationDefinednessTests
     {
         const string frozen = """
             module M M block
-              func Run (int:x) → int
+              func Run (int:x | ((# * 2) > 0)) → int
                 !
-                requires ((x * 2) > 0)
                 return x
             """;
         var dir = Path.Combine(Path.GetTempPath(), "calor-s2-overflow-" + Guid.NewGuid().ToString("N")[..8]);

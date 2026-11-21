@@ -1,10 +1,8 @@
 module L2M20 L2M20 block
   module L2M20Module public
 
-    func l2m20_fn01 public (int:x, int:y) → int
+    func l2m20_fn01 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 22737)
       let int:total = ((x * 5) + y)
       if (total < 22737)
@@ -12,9 +10,8 @@ module L2M20 L2M20 block
       else
         return total
 
-    func l2m20_fn02 public (int:x, int:y) → int
+    func l2m20_fn02 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 2) + y)
       if (acc > 22744)
@@ -22,9 +19,8 @@ module L2M20 L2M20 block
       else
         return ((acc * 2) + 22744)
 
-    func l2m20_fn03 public (int:x, int:y) → int
+    func l2m20_fn03 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22751)
       if (x >= 22751)
@@ -38,9 +34,8 @@ module L2M20 L2M20 block
       let int:v2 = L3M07.L3M07Module.l3m07_fn07(x, 71)
       return ((v1 + v2) + y)
 
-    func l2m20_fn05 public (int:x, int:y) → int
+    func l2m20_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22758)
       if (x >= 22758)
@@ -53,9 +48,8 @@ module L2M20 L2M20 block
       let int:v1 = L3M27.L3M27Module.l3m27_fn02(x, 36)
       return (v1 + y)
 
-    func l2m20_fn07 public (int:x, int:y) → int
+    func l2m20_fn07 public (int:x | (# > 2), int:y) → int
       !
-      requires (x > 2)
       => (x >= 3)
       let int:acc = ((x * 5) + y)
       if (acc > 22765)
@@ -63,9 +57,8 @@ module L2M20 L2M20 block
       else
         return ((acc * 2) + 22765)
 
-    func l2m20_fn08 public (int:x, int:y) → int
+    func l2m20_fn08 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22772)
       if (x >= 22772)
@@ -89,18 +82,16 @@ module L2M20 L2M20 block
       let int:v1 = L3M33.L3M33Module.l3m33_fn05(x, 55)
       return (v1 + y)
 
-    func l2m20_fn12 public (int:x, int:y) → int
+    func l2m20_fn12 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22779)
       let int:total = ((x * 3) + y)
       if (total > 22779)
         return 22779
       return total
 
-    func l2m20_fn13 public (int:x, int:y) → int
+    func l2m20_fn13 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 5) + y)
       if (acc > 22786)

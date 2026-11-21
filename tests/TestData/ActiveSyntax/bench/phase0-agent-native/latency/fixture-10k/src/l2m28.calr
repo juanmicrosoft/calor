@@ -1,18 +1,16 @@
 module L2M28 L2M28 block
   module L2M28Module public
 
-    func l2m28_fn01 public (int:x, int:y) → int
+    func l2m28_fn01 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23143)
       let int:total = ((x * 3) + y)
       if (total > 23143)
         return 23143
       return total
 
-    func l2m28_fn02 public (int:x, int:y) → int
+    func l2m28_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23150)
       if (x >= 23150)
@@ -20,10 +18,8 @@ module L2M28 L2M28 block
       else
         return 23150
 
-    func l2m28_fn03 public (int:x, int:y) → int
+    func l2m28_fn03 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 23157)
       let int:total = ((x * 2) + y)
       if (total < 23157)
@@ -31,9 +27,8 @@ module L2M28 L2M28 block
       else
         return total
 
-    func l2m28_fn04 public (int:x, int:y) → int
+    func l2m28_fn04 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 5) + y)
       if (acc > 23164)
@@ -41,9 +36,8 @@ module L2M28 L2M28 block
       else
         return ((acc * 2) + 23164)
 
-    func l2m28_fn05 public (int:x, int:y) → int
+    func l2m28_fn05 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 23171)
@@ -68,10 +62,8 @@ module L2M28 L2M28 block
       let int:v2 = L3M07.L3M07Module.l3m07_fn05(x, 54)
       return ((v1 + v2) + y)
 
-    func l2m28_fn09 public (int:x, int:y) → int
+    func l2m28_fn09 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 23178)
       let int:total = ((x * 2) + y)
       if (total < 23178)
@@ -79,9 +71,8 @@ module L2M28 L2M28 block
       else
         return total
 
-    func l2m28_fn10 public (int:x, int:y) → int
+    func l2m28_fn10 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 23185)
@@ -89,9 +80,8 @@ module L2M28 L2M28 block
       else
         return ((acc * 2) + 23185)
 
-    func l2m28_fn11 public (int:x, int:y) → int
+    func l2m28_fn11 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 23192)
@@ -104,9 +94,8 @@ module L2M28 L2M28 block
       let int:v1 = L3M24.L3M24Module.l3m24_fn09(x, 49)
       return (v1 + y)
 
-    func l2m28_fn13 public (int:x, int:y) → int
+    func l2m28_fn13 public (int:x | (# > 6), int:y) → int
       !
-      requires (x > 6)
       => (x >= 7)
       let int:acc = ((x * 2) + y)
       if (acc > 23199)

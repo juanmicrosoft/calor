@@ -4,9 +4,8 @@ module GuardClause GuardClause
       !
       return value > 0
 
-    func ValidateRange public (int:value, int:min, int:max) → bool
+    func ValidateRange public (int:value, int:min, int:max | (min <= #)) → bool
       !
-      requires min <= max
       return value >= min && value <= max
 
     func ValidateNotEmpty public (int:length) → bool

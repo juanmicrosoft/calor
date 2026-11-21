@@ -1,3 +1,4 @@
-§M{Bad}
-  §F{Main:pub} () -> void
-    §INVALID_TAG
+module Bad
+  func Main () → int
+    !
+    return 1 + * 2

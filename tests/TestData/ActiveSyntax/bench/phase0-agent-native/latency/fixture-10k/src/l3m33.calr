@@ -6,9 +6,8 @@ module L3M33 L3M33 block
       let int:@base = ((x * 4) - y)
       return (@base + 9)
 
-    func l3m33_fn02 public (int:x, int:y) → int
+    func l3m33_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25411)
       if (x >= 25411)
@@ -21,10 +20,8 @@ module L3M33 L3M33 block
       let int:@base = ((x * 4) - y)
       return (@base + 83)
 
-    func l3m33_fn04 public (int:x, int:y) → int
+    func l3m33_fn04 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 25418)
       let int:total = ((x * 2) + y)
       if (total < 25418)
@@ -42,9 +39,8 @@ module L3M33 L3M33 block
       let int:@base = ((x * 4) - y)
       return (@base + 74)
 
-    func l3m33_fn07 public (int:x, int:y) → int
+    func l3m33_fn07 public (int:x | (# > 6), int:y) → int
       !
-      requires (x > 6)
       => (x >= 7)
       let int:acc = ((x * 3) + y)
       if (acc > 25425)
@@ -52,9 +48,8 @@ module L3M33 L3M33 block
       else
         return ((acc * 2) + 25425)
 
-    func l3m33_fn08 public (int:x, int:y) → int
+    func l3m33_fn08 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25432)
       if (x >= 25432)
@@ -62,9 +57,8 @@ module L3M33 L3M33 block
       else
         return 25432
 
-    func l3m33_fn09 public (int:x, int:y) → int
+    func l3m33_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25439)
       if (x >= 25439)
@@ -82,18 +76,16 @@ module L3M33 L3M33 block
       let int:@base = ((x * 4) - y)
       return (@base + 48)
 
-    func l3m33_fn12 public (int:x, int:y) → int
+    func l3m33_fn12 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25446)
       let int:total = ((x * 3) + y)
       if (total > 25446)
         return 25446
       return total
 
-    func l3m33_fn13 public (int:x, int:y) → int
+    func l3m33_fn13 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 2) + y)
       if (acc > 25453)

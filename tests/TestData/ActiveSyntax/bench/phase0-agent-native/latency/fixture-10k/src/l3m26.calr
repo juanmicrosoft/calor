@@ -1,9 +1,8 @@
 module L3M26 L3M26 block
   module L3M26Module public
 
-    func l3m26_fn01 public (int:x, int:y) → int
+    func l3m26_fn01 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25040)
       let int:total = ((x * 3) + y)
       if (total > 25040)
@@ -15,9 +14,8 @@ module L3M26 L3M26 block
       let int:@base = ((x * 4) - y)
       return (@base + 40)
 
-    func l3m26_fn03 public (int:x, int:y) → int
+    func l3m26_fn03 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25047)
       if (x >= 25047)
@@ -35,10 +33,8 @@ module L3M26 L3M26 block
       let int:@base = ((x * 4) - y)
       return (@base + 7)
 
-    func l3m26_fn06 public (int:x, int:y) → int
+    func l3m26_fn06 public (int:x | (# >= 7), int:y | (# >= 0)) → int
       !
-      requires (x >= 7)
-      requires (y >= 0)
       => (result >= 25054)
       let int:total = ((x * 3) + y)
       if (total < 25054)
@@ -46,9 +42,8 @@ module L3M26 L3M26 block
       else
         return total
 
-    func l3m26_fn07 public (int:x, int:y) → int
+    func l3m26_fn07 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25061)
       let int:total = ((x * 3) + y)
       if (total > 25061)
@@ -60,10 +55,8 @@ module L3M26 L3M26 block
       let int:@base = ((x * 4) - y)
       return (@base + 45)
 
-    func l3m26_fn09 public (int:x, int:y) → int
+    func l3m26_fn09 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 25068)
       let int:total = ((x * 3) + y)
       if (total < 25068)
@@ -71,18 +64,16 @@ module L3M26 L3M26 block
       else
         return total
 
-    func l3m26_fn10 public (int:x, int:y) → int
+    func l3m26_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25075)
       let int:total = ((x * 2) + y)
       if (total > 25075)
         return 25075
       return total
 
-    func l3m26_fn11 public (int:x, int:y) → int
+    func l3m26_fn11 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25082)
       let int:total = ((x * 2) + y)
       if (total > 25082)
@@ -94,10 +85,8 @@ module L3M26 L3M26 block
       let int:@base = ((x * 4) - y)
       return (@base + 68)
 
-    func l3m26_fn13 public (int:x, int:y) → int
+    func l3m26_fn13 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 25089)
       let int:total = ((x * 3) + y)
       if (total < 25089)

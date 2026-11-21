@@ -1,29 +1,20 @@
-§M{m001:DocumentStore}
+module DocumentStore
+  class DbContext
+    func SaveChanges static () → int
+      ! db:w
+      return 1
 
-§F{f001:Save:pub}
-  §I{str:key}
-  §I{str:content}
-  §O{bool}
-  §E{db:w}
-  §C{DbContext.SaveChanges} §/C
-  §R BOOL:true
-§/F{f001}
+  func Save (string:key, string:content) → bool
+    ! db:w
+    DbContext.SaveChanges()
+    return true
 
-§F{f002:Load:pub}
-  §I{str:key}
-  §O{str}
-  §E{db:r}
-  §R STR:""
-§/F{f002}
+  func Load (string:key) → string
+    ! db:r
+    return ""
 
-§F{f003:SaveAndLog:pub}
-  §I{str:key}
-  §I{str:content}
-  §O{bool}
-  §E{db:w,cw}
-  §B{success:bool} §C{Save} §A key §A content §/C
-  §C{Console.WriteLine} §A (+ STR:"Saved document: " key) §/C
-  §R success
-§/F{f003}
-
-§/M{m001}
+  func SaveAndLog (string:key, string:content) → bool
+    ! db:w,cw
+    let bool:success = Save(key, content)
+    Console.WriteLine("Saved document: " + key)
+    return success

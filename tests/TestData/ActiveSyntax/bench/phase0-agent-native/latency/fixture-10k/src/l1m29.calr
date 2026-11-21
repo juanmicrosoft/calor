@@ -1,9 +1,8 @@
 module L1M29 L1M29 block
   module L1M29Module public
 
-    func l1m29_fn01 public (int:x, int:y) → int
+    func l1m29_fn01 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 5) + y)
       if (acc > 21519)
@@ -11,10 +10,8 @@ module L1M29 L1M29 block
       else
         return ((acc * 2) + 21519)
 
-    func l1m29_fn02 public (int:x, int:y) → int
+    func l1m29_fn02 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 21526)
       let int:total = ((x * 2) + y)
       if (total < 21526)
@@ -27,10 +24,8 @@ module L1M29 L1M29 block
       let int:v1 = L2M22.L2M22Module.l2m22_fn13(x, 60)
       return (v1 + y)
 
-    func l1m29_fn04 public (int:x, int:y) → int
+    func l1m29_fn04 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 21533)
       let int:total = ((x * 5) + y)
       if (total < 21533)
@@ -55,10 +50,8 @@ module L1M29 L1M29 block
       let int:v2 = L2M31.L2M31Module.l2m31_fn04(x, 64)
       return ((v1 + v2) + y)
 
-    func l1m29_fn08 public (int:x, int:y) → int
+    func l1m29_fn08 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 21540)
       let int:total = ((x * 3) + y)
       if (total < 21540)
@@ -66,10 +59,8 @@ module L1M29 L1M29 block
       else
         return total
 
-    func l1m29_fn09 public (int:x, int:y) → int
+    func l1m29_fn09 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 21547)
       let int:total = ((x * 3) + y)
       if (total < 21547)
@@ -77,9 +68,8 @@ module L1M29 L1M29 block
       else
         return total
 
-    func l1m29_fn10 public (int:x, int:y) → int
+    func l1m29_fn10 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 2) + y)
       if (acc > 21554)

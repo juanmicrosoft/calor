@@ -121,10 +121,8 @@ public class RunTestCommandTests : IDisposable
         var file = Path.Combine(_tempDir, "square.calr");
         File.WriteAllText(file, """
             module SquareApp SquareApp block
-              func Square (int:x) → int
+              func Square (int:x | ((# >= 0) && (# <= 46340))) → int
                 !
-                requires (x >= 0)
-                requires (x <= 46340)
                 => (result >= 0)
                 return (x * x)
 
@@ -169,8 +167,8 @@ public class RunTestCommandTests : IDisposable
         Assert.NotEmpty(generated);
         Assert.Contains("// PROVEN: Postcondition", generated);
         Assert.DoesNotContain("ContractKind.Ensures", generated);
-        // Preconditions never elide.
-        Assert.Contains("ContractKind.Requires", generated);
+        // Preconditions never elide (#1618: the refinement's entry check on x).
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(x)", generated);
     }
 
     [SkippableFact]

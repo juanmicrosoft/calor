@@ -1,6 +1,6 @@
 module MultiEffect MultiEffect block
   func ProcessFile (string:path) → void
-    ! fr, fw, cw
+    ! fs:r, fs:w, cw
     Console.WriteLine(path)
 
   func NetworkOp () → void

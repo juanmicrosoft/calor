@@ -207,10 +207,8 @@ public sealed class ValidationLoopTests : IDisposable
                 => (result >= 0.0)
                 return x
 
-              func Vacuous (int:x) → int
+              func Vacuous (int:x | ((# > 0) && (# < 0))) → int
                 !
-                requires (x > 0)
-                requires (x < 0)
                 => (result == x)
                 return x
             """);

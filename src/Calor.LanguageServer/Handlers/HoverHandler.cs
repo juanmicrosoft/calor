@@ -63,7 +63,8 @@ public sealed class HoverHandler : HoverHandlerBase
         if (snapshot.GetTokenAtOffset(offset) is not { } syntaxToken || syntaxToken.Kind == TokenKind.Error)
             return null;
 
-        var tagHover = TryGetTagHover(snapshot.Source, syntaxToken);
+        var tagHover = TryGetTagHover(snapshot.Source, syntaxToken,
+            syntaxToken.Span.Start > 0 ? snapshot.GetTokenAtOffset(syntaxToken.Span.Start - 1) : null);
         if (tagHover != null)
         {
             return tagHover;
@@ -104,9 +105,9 @@ public sealed class HoverHandler : HoverHandlerBase
     /// <summary>
     /// Attempts to provide hover documentation for a Calor syntax tag.
     /// </summary>
-    private static Hover? TryGetTagHover(string source, Token token)
+    private static Hover? TryGetTagHover(string source, Token token, Token? previous)
     {
-        var tag = TagDocumentationProvider.GetSyntaxTag(token, source);
+        var tag = TagDocumentationProvider.GetSyntaxTag(token, previous);
         if (tag == null)
             return null;
         var doc = TagDocumentationProvider.Instance.GetTagDocumentation(tag);
@@ -136,8 +137,10 @@ public sealed class HoverHandler : HoverHandlerBase
                     AppendDeclarationHeader(sb, func, snapshot);
                     if (func.Effects != null)
                         sb.AppendLine($"**Effects:** `! {string.Join(",", func.Effects.Effects.Values)}`");
-                    if (func.Preconditions.Count > 0)
-                        sb.AppendLine($"**Preconditions:** {func.Preconditions.Count}");
+                    // #1618: parameter refinements are the preconditions.
+                    var preconditionCount = RefinementPreconditions.Effective(func.Parameters, func.Preconditions).Count;
+                    if (preconditionCount > 0)
+                        sb.AppendLine($"**Preconditions:** {preconditionCount}");
                     if (func.Postconditions.Count > 0)
                         sb.AppendLine($"**Postconditions:** {func.Postconditions.Count}");
 

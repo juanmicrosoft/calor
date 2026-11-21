@@ -1,9 +1,8 @@
 module L3M28 L3M28 block
   module L3M28Module public
 
-    func l3m28_fn01 public (int:x, int:y) → int
+    func l3m28_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25152)
       if (x >= 25152)
@@ -26,9 +25,8 @@ module L3M28 L3M28 block
       let int:@base = ((x * 4) - y)
       return (@base + 22)
 
-    func l3m28_fn05 public (int:x, int:y) → int
+    func l3m28_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25159)
       if (x >= 25159)
@@ -36,9 +34,8 @@ module L3M28 L3M28 block
       else
         return 25159
 
-    func l3m28_fn06 public (int:x, int:y) → int
+    func l3m28_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25166)
       if (x >= 25166)
@@ -51,10 +48,8 @@ module L3M28 L3M28 block
       let int:@base = ((x * 4) - y)
       return (@base + 72)
 
-    func l3m28_fn08 public (int:x, int:y) → int
+    func l3m28_fn08 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 25173)
       let int:total = ((x * 3) + y)
       if (total < 25173)
@@ -67,9 +62,8 @@ module L3M28 L3M28 block
       let int:@base = ((x * 4) - y)
       return (@base + 74)
 
-    func l3m28_fn10 public (int:x, int:y) → int
+    func l3m28_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25180)
       let int:total = ((x * 3) + y)
       if (total > 25180)

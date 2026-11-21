@@ -22,9 +22,8 @@ module PureMath PureMath
       else
         return b
 
-    func Power public (int:@base, int:exp) → int
+    func Power public (int:@base, int:exp | (# >= 0)) → int
       !
-      requires exp >= 0
       var result = 1
       var i = 0
       while i < exp

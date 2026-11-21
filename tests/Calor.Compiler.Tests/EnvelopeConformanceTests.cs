@@ -172,7 +172,7 @@ public class EnvelopeConformanceTests
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        var source = "module Demo Demo block\n  func Dec (int:x) → int\n    !\n    requires (x > 0)\n    => (result > 10)\n    return (x - 1)\n";
+        var source = "module Demo Demo block\n  func Dec (int:x | (# > 0)) → int\n    !\n    => (result > 10)\n    return (x - 1)\n";
         var options = new CompilationOptions
         {
             VerifyContracts = true,

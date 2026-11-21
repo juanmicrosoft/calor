@@ -1,26 +1,21 @@
 module UnitConverter UnitConverter
   module UnitConverterModule
-    func InchesToCm public (float:inches) → float
+    func InchesToCm public (float:inches | (# >= 0)) → float
       !
-      requires inches >= 0
       return inches * 2.54
 
-    func CmToInches public (float:cm) → float
+    func CmToInches public (float:cm | (# >= 0)) → float
       !
-      requires cm >= 0
       return cm / 2.54
 
-    func PoundsToKg public (float:pounds) → float
+    func PoundsToKg public (float:pounds | (# >= 0)) → float
       !
-      requires pounds >= 0
       return pounds * 0.453592
 
-    func KgToPounds public (float:kg) → float
+    func KgToPounds public (float:kg | (# >= 0)) → float
       !
-      requires kg >= 0
       return kg / 0.453592
 
-    func GallonsToLiters public (float:gallons) → float
+    func GallonsToLiters public (float:gallons | (# >= 0)) → float
       !
-      requires gallons >= 0
       return gallons * 3.78541

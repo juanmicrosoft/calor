@@ -1,10 +1,7 @@
 module WindowStats WindowStats block
   module WindowStatsModule partial
-    func WindowSum (int[]:values, int:start, int:count) → int
+    func WindowSum (int[]:values, int:start | (# >= 0), int:count | ((# > 0) && ((start + #) <= values.Length))) → int
       !
-      requires (start >= 0)
-      requires (count > 0)
-      requires ((start + count) <= values.Length)
       var int:total = 0
       var int:i = start
       while (i < (start + count))
@@ -12,11 +9,8 @@ module WindowStats WindowStats block
         set i (i + 1)
       return total
 
-    func WindowMin (int[]:values, int:start, int:count) → int
+    func WindowMin (int[]:values, int:start | (# >= 0), int:count | ((# > 0) && ((start + #) <= values.Length))) → int
       !
-      requires (start >= 0)
-      requires (count > 0)
-      requires ((start + count) <= values.Length)
       var int:best = values[start]
       var int:i = (start + 1)
       while (i < (start + count))
@@ -26,10 +20,8 @@ module WindowStats WindowStats block
         set i (i + 1)
       return best
 
-    func MaxWindowSum (int[]:values, int:count) → int
+    func MaxWindowSum (int[]:values, int:count | ((# > 0) && (# <= values.Length))) → int
       !
-      requires (count > 0)
-      requires (count <= values.Length)
       var int:best = WindowSum(values, 0, count)
       var int:s = 1
       while (s <= (values.Length - count))
@@ -39,9 +31,8 @@ module WindowStats WindowStats block
         set s (s + 1)
       return best
 
-    func CountAbove (int[]:values, int:count, int:threshold) → int
+    func CountAbove (int[]:values, int:count | (# > 0), int:threshold) → int
       !
-      requires (count > 0)
       => (result >= 0)
       if (count > values.Length)
         return 0

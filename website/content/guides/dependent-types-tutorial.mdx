@@ -36,11 +36,8 @@ Write the requirements before the body:
 
 ```calor
 module ServerContracts
-  func ConfigureServer (int:port, string:hostname, int:maxConnections) → int
+  func ConfigureServer (int:port | (# >= 1 && # <= 65535), string:hostname | (# != null && #.Length > 0), int:maxConnections | (# > 0)) → int
     !
-    requires port >= 1 && port <= 65535
-    requires hostname != null && hostname.Length > 0
-    requires maxConnections > 0
     => result == maxConnections
     return maxConnections
 
@@ -50,28 +47,29 @@ module ServerContracts
 ```
 
 `Main()` returns `10`. The short-circuiting null check precedes the length
-read. With runtime contracts enabled, invalid ports, null or empty hostnames,
-and nonpositive connection limits fail at entry.
+read. Invalid ports, null or empty hostnames, and nonpositive connection limits
+fail at entry. They fail in every contract mode, including `--contract-mode off`.
 
 This is a contract example, not a server implementation or an exact conversion
 of the C# function. Its ordinary parameter types remain `int` and `string`.
 
 ### Reusing Constraints
 
-Another API can repeat the relevant `requires` clauses. That does not introduce
+Another API can repeat the relevant parameter refinements. That does not introduce
 named `Port`, `NonEmpty` or `Positive` types. If distinct domain types matter,
 design ordinary classes or records with explicit construction and mutation
 rules.
 
 ### What Happens in the Emitted C#
 
-With runtime contract checks enabled, failed requirements throw
-`ContractViolationException`. They do not reproduce the original C# example's
-`ArgumentException` subclasses or parameter-name payloads.
+A failed parameter refinement throws `ArgumentOutOfRangeException`. Its
+`ParamName` is the parameter, and its message is
+`Violation of inline refinement for parameter '<name>'`. It does not reproduce
+the original C# example's other `ArgumentException` subclasses or messages.
 
-Turning runtime contracts off removes these checks. It does not make invalid
-inputs valid. A precondition also does not constrain every subsequent assignment
-to an ordinary local variable.
+`--contract-mode off` does not remove these checks. It removes only
+postcondition (`=>`) and invariant checks. A refinement is rechecked when the body assigns that parameter,
+but it does not constrain assignments to ordinary local variables.
 
 ## Part 2 — Financial Calculations with Input and Output Contracts
 
@@ -82,11 +80,8 @@ Describe the successful result with a postcondition:
 
 ```calor
 module BankingContracts
-  func Transfer (int:balance, int:amount) → int
+  func Transfer (int:balance | (# >= 0), int:amount | ((# > 0) && (balance >= #))) → int
     !
-    requires balance >= 0
-    requires amount > 0
-    requires balance >= amount
     => result >= 0
     return balance - amount
 
@@ -95,8 +90,9 @@ module BankingContracts
     return Transfer(100, 30)
 ```
 
-`Main()` returns `70`. With runtime contracts enabled, `Transfer(3, 5)` fails
-the sufficient-funds precondition before subtraction.
+`Main()` returns `70`. `Transfer(3, 5)` fails the sufficient-funds
+precondition before subtraction. It throws `ArgumentOutOfRangeException` naming
+`amount`, in every contract mode.
 
 ### Requesting Verification
 
@@ -115,10 +111,8 @@ This variant deliberately omits sufficient funds:
 
 ```calor
 module MissingFundsContract
-  func Transfer (int:balance, int:amount) → int
+  func Transfer (int:balance | (# >= 0), int:amount | (# > 0)) → int
     !
-    requires balance >= 0
-    requires amount > 0
     => result >= 0
     return balance - amount
 
@@ -134,7 +128,7 @@ entry requirement.
 
 ### The Fix Cycle
 
-Add `requires balance >= amount` when insufficient funds should be rejected at
+Add `int:amount | (# <= balance)` when insufficient funds should be rejected at
 entry. Recompile the exact changed program and rerun both valid and invalid
 calls. This is a behavioral contract change; do not silently replace a frozen
 benchmark input or its expected behavior to obtain a better result.
@@ -151,10 +145,8 @@ Integer division needs more than a nonzero divisor: checked
 
 ```calor
 module DivisionContracts
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | ((# != 0) && (a != -2147483648 || # != -1))) → int
     !
-    requires b != 0
-    requires a != -2147483648 || b != -1
     return a / b
 
   func Main () → int
@@ -162,10 +154,11 @@ module DivisionContracts
     return Divide(-7, 3)
 ```
 
-`Main()` returns `-2`, truncating toward zero. With runtime contracts enabled,
-`Divide(1, 0)` and `Divide(-2147483648, -1)` fail their entry requirements.
-With checks off, the body throws `DivideByZeroException` and
-`OverflowException`, respectively.
+`Main()` returns `-2`, truncating toward zero. `Divide(1, 0)` and
+`Divide(-2147483648, -1)` fail the entry requirement on `b` and throw
+`ArgumentOutOfRangeException`. With `--contract-mode off` they throw the same
+exception, because preconditions are parameter refinements. The body never
+reaches `DivideByZeroException` or `OverflowException`.
 
 ### Step 1: Inspect the Exact Program
 
@@ -181,7 +174,7 @@ different questions.
 
 ### Step 3: Review a Candidate Repair
 
-Use current `requires` clauses when an input restriction matches the API's
+Use parameter refinements when an input restriction matches the API's
 intended behavior. Read suggested edits before applying them. A suggested patch,
 an agent's confidence score or a successful tool transport is not proof that
 the repair is correct.

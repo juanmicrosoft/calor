@@ -1,5 +1,5 @@
 {
-  "note": "Frozen bound-type subjects (BoundTypeArchitectureTests historical replay, producer a728e0e2a985d5dd11a092f2d463f24e30f4c66c) that were rewritten in place as public native-syntax samples. The replay still runs the producer's frozen bytes. A subject's current file may differ from them only when it is listed here: rewriteCommit is the commit that changed it away from its frozen bytes (its parent holds them), and sha256 pins the current bytes, so any later edit fails until it is registered. 90839fb6d rewrote 8 samples with the legacy-syntax rewriter; 78ba1a37a hand-rewrote Contracts, Generics and TypeSystem. The 8 rewriter outputs were then made byte-identical to their tests/TestData/ActiveSyntax mirrors (the sample sync), which is what sha256 pins.",
+  "note": "Frozen bound-type subjects (BoundTypeArchitectureTests historical replay, producer a728e0e2a985d5dd11a092f2d463f24e30f4c66c) that were rewritten in place as public native-syntax samples. The replay still runs the producer's frozen bytes. A subject's current file may differ from them only when it is listed here: rewriteCommit is the commit that changed it away from its frozen bytes (its parent holds them), and sha256 pins the current bytes, so any later edit fails until it is registered. 90839fb6d rewrote 8 samples with the legacy-syntax rewriter; 78ba1a37a hand-rewrote Contracts, Generics and TypeSystem. The 8 rewriter outputs were then made byte-identical to their tests/TestData/ActiveSyntax mirrors (the sample sync), which is what sha256 pins. 1449f3027 (#1618) moved the requires clauses of Contracts/contracts.calr and Verification/{mixed,proven}-contracts.calr and violation-detected.calr onto parameter refinements, in the samples and their mirrors alike; their sha256 pins were updated (rewriteCommit, the first change away from the frozen bytes, is unchanged).",
   "rewrites": [
     {
       "path": "samples/Collections/collections.calr",
@@ -9,7 +9,7 @@
     {
       "path": "samples/Contracts/contracts.calr",
       "rewriteCommit": "78ba1a37a64ffa6ce1ebc14e8b2b9031ee7a67c1",
-      "sha256": "622b0eb6af68e12fc70fd157f072f838824b1c929e16dd39df6769b52426bd2c"
+      "sha256": "96d18da7c57f0043a941a91f6cb91e960dac2a18e8d01783e7144a75e8ba0e84"
     },
     {
       "path": "samples/FizzBuzz/fizzbuzz.calr",
@@ -44,17 +44,17 @@
     {
       "path": "samples/Verification/mixed-contracts.calr",
       "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
-      "sha256": "ea20b8639b624bc6a363e9be7b7c19b9b3c656283e04e4d2919a064455805324"
+      "sha256": "23263f686745dd21c12c829e38ef7f00b08ba4da9eeb67f217fadbfbf1b17fcd"
     },
     {
       "path": "samples/Verification/proven-contracts.calr",
       "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
-      "sha256": "0ef499494fb8756854cd493cd294e4028e957cfe3d63e4506c9d3e2a96719723"
+      "sha256": "907f68ef76a956026e8a6c2b3b09d4ce3ff7562849e59c9871d989c1daa5c0a7"
     },
     {
       "path": "samples/Verification/violation-detected.calr",
       "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
-      "sha256": "5979abd75c68e2d49e57143c610f2aba22d6c29f67de34cded98524fcb6bfd36"
+      "sha256": "5d883a3be2ce9ec741e505928f363150f3ce8bece33790666cf0287aef9a9fac"
     }
   ]
 }

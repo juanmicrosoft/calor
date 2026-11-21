@@ -150,9 +150,8 @@ public sealed class S2Z3TextEncodingTests
         Assert.True(string.IsNullOrEmpty(s) && s != "");
         const string source = """
             module M
-              func Probe public (string:s) → int
+              func Probe public (string:s | ("\u00e9".Length != 1 || (string.IsNullOrEmpty(#) && # != ""))) → int
                 !
-                requires "\u00e9".Length != 1 || (string.IsNullOrEmpty(s) && s != "")
                 => result == 1
                 return 0
             """;
@@ -209,9 +208,8 @@ public sealed class S2Z3TextEncodingTests
     {
         const string source = """
             module M M block
-              func Probe (string:s) → int
+              func Probe (string:s | (# == "ab")) → int
                 !
-                requires (s == "ab")
                 => (result == 1)
                 let int:i = 1
                 return ((s).Substring(i, 1)).Length
@@ -231,10 +229,8 @@ public sealed class S2Z3TextEncodingTests
         Assert.Throws<ArgumentOutOfRangeException>(() => "".Substring(1, 0));
         const string source = """
             module M M block
-              func Probe (uint:x, string:s) → int
+              func Probe (uint:x | (# == 4294967295U), string:s | (# == "")) → int
                 !
-                requires (x == 4294967295U)
-                requires (s == "")
                 => (result == 1)
                 let int:i = 1
                 return ((s).Substring((((x + i) > 4294967295L) ? 1 : 0), 0)).Length
@@ -248,9 +244,8 @@ public sealed class S2Z3TextEncodingTests
         // Review round 3 witness: the substring runs once, at the binding, not in the arms.
         const string source = """
             module M M block
-              func Probe (string:s, bool:c) → int
+              func Probe (string:s | (# == "ab"), bool:c) → int
                 !
-                requires (s == "ab")
                 => (result == 1)
                 let string:t = (s).Substring(1, 1)
                 return (c ? t.Length : t.Length)
@@ -265,9 +260,8 @@ public sealed class S2Z3TextEncodingTests
         // precondition is unsatisfiable at runtime too.
         const string source = """
             module M
-              func Probe public (bool:c) → int
+              func Probe public (bool:c | ((# ? "a" : "b") == "c")) → int
                 !
-                requires (c ? "a" : "b") == "c"
                 => result == 1
                 return 0
             """;
@@ -339,9 +333,8 @@ public sealed class S2Z3TextEncodingTests
         // the precondition on ж would "prove" the postcondition on щ.
         const string source = """
             module M
-              func Probe public (int:ж, int:щ) → int
+              func Probe public (int:ж | (# == 0), int:щ) → int
                 !
-                requires ж == 0
                 => щ == 0
                 return 0
             """;

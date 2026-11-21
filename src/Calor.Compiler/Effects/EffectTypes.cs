@@ -71,10 +71,6 @@ public static class EffectCodes
         new("io", "filesystem_write", "fs:w"),
         new("io", "filesystem_read", "fs:r"),
         new("io", "filesystem_readwrite", "fs:rw"),
-        // File I/O (legacy formatter values)
-        new("io", "file_write", "fw", Legacy: true),
-        new("io", "file_read", "fr", Legacy: true),
-        new("io", "file_delete", "fd", Legacy: true),
         // Network
         new("io", "network", "net"),
         new("io", "network_read", "net:r"),
@@ -114,11 +110,12 @@ public static class EffectCodes
 
     private static readonly Dictionary<string, EffectCodeEntry> EntryByCompact =
         Registry
-            .GroupBy(e => e.Compact, StringComparer.OrdinalIgnoreCase)
+            // 0.30 (#1596): effect codes are case-sensitive, like every other word.
+            .GroupBy(e => e.Compact, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
                 group => group.OrderBy(e => e.Legacy).First(),
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.Ordinal);
 
     /// <summary>
     /// All compact surface codes the compiler knows, including legacy forms.

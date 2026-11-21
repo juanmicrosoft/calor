@@ -1,9 +1,7 @@
 module CurrencyConverter CurrencyConverter
   module CurrencyConverterModule
-    func Convert public (float:amount, float:rate) → float
+    func Convert public (float:amount | (# >= 0), float:rate | (# > 0)) → float
       !
-      requires amount >= 0
-      requires rate > 0
       => result >= 0
       return amount * rate
 
@@ -12,7 +10,6 @@ module CurrencyConverter CurrencyConverter
       let shifted = value * 100
       return (double)(int)(shifted + 0.5) / 100
 
-    func InverseRate public (float:rate) → float
+    func InverseRate public (float:rate | (# > 0)) → float
       !
-      requires rate > 0
       return 1 / rate

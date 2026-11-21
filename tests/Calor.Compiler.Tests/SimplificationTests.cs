@@ -678,7 +678,7 @@ public class SimplificationTests
 module Test Test block
   func TestFunc (int:x) → bool
     !
-    requires (true && (x >= 0))
+    => (true && (x >= 0))
     return true
 ";
 
@@ -688,11 +688,12 @@ module Test Test block
         var simplificationPass = new ContractSimplificationPass(diagnostics);
         var simplified = simplificationPass.Simplify(module);
 
+        // #1618: the simplification pass rewrites postconditions, not parameter refinements.
         var func = simplified.Functions[0];
-        Assert.Single(func.Preconditions);
+        Assert.Single(func.Postconditions);
 
         // Without a typed/effect model, the complete predicate is retained.
-        var condition = func.Preconditions[0].Condition;
+        var condition = func.Postconditions[0].Condition;
         Assert.IsType<BinaryOperationNode>(condition);
         var binOp = (BinaryOperationNode)condition;
         Assert.Equal(BinaryOperator.And, binOp.Operator);
@@ -705,7 +706,7 @@ module Test Test block
 module Test Test block
   func TestFunc (int:x) → bool
     !
-    requires (!(x >= 0) || (x >= 0))
+    => (!(x >= 0) || (x >= 0))
     return true
 ";
 
@@ -716,9 +717,9 @@ module Test Test block
         var simplified = simplificationPass.Simplify(module);
 
         var func = simplified.Functions[0];
-        Assert.Single(func.Preconditions);
+        Assert.Single(func.Postconditions);
 
-        Assert.Same(module.Functions[0].Preconditions[0].Condition, func.Preconditions[0].Condition);
+        Assert.Same(module.Functions[0].Postconditions[0].Condition, func.Postconditions[0].Condition);
     }
 
     [Fact]
@@ -726,9 +727,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func TestFunc (int:x) → bool
+  func TestFunc (int:x | (# >= 0)) → bool
     !
-    requires (x >= 0)
     return true
 ";
 
@@ -749,7 +749,7 @@ module Test Test block
 module Test Test block
   func TestFunc (int:n) → bool
     !
-    requires (forall int:i where true : true)
+    => (forall int:i where true : true)
     return true
 ";
 
@@ -760,10 +760,10 @@ module Test Test block
         var simplified = simplificationPass.Simplify(module);
 
         var func = simplified.Functions[0];
-        Assert.Single(func.Preconditions);
+        Assert.Single(func.Postconditions);
 
         // (forall (...) true) should simplify to true
-        var condition = func.Preconditions[0].Condition;
+        var condition = func.Postconditions[0].Condition;
         var lit = Assert.IsType<BoolLiteralNode>(condition);
         Assert.True(lit.Value);
     }

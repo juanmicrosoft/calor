@@ -717,9 +717,8 @@ public class CompactSyntaxTests
     {
         var source = """
             module Test Test block
-              func Divide (int:a, int:b) → int
+              func Divide (int:a, int:b | (# != 0)) → int
                 !
-                requires (b != 0)
                 => (result >= 0)
                 return (a / b)
             """;
@@ -730,7 +729,7 @@ public class CompactSyntaxTests
         var func = Assert.Single(module.Functions);
         Assert.Equal(2, func.Parameters.Count);
         Assert.NotNull(func.Output);
-        Assert.Single(func.Preconditions);
+        Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions));
         Assert.Single(func.Postconditions);
     }
 

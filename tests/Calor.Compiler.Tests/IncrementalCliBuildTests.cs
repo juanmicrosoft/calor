@@ -1376,7 +1376,7 @@ public sealed class NativeProjectCacheTests : IDisposable
               module Library
                 module GlobalModule public partial
                   field int:Seed public static
-                  ctor stat ()
+                  ctor static ()
                     set Seed 1
               """ + "\n"
             : """

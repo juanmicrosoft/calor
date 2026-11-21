@@ -4,15 +4,13 @@ module Contracts Contracts block
       ! cw
       Console.WriteLine("Testing contracts...")
 
-    func Square (int:x) → int
+    func Square (int:x | (# >= 0)) → int
       !
-      requires x >= 0
       => result >= 0
       return x * x
 
     // Residual compatibility carrier: no canonical custom-message spelling
     // is selected, and CalorEmitter cannot round-trip this contract yet.
-    func Divide (int:a, int:b) → int
+    func Divide (int:a, int:b | (# != 0)) → int
       !
-      requires{"divisor must not be zero"} b != 0
       return a / b

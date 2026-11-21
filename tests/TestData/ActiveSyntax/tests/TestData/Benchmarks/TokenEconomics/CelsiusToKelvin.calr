@@ -1,7 +1,6 @@
 module CelsiusToKelvin CelsiusToKelvin
   module CelsiusToKelvinModule
-    func ToKelvin public (float:celsius) → float
+    func ToKelvin public (float:celsius | (# >= -273.15)) → float
       !
-      requires celsius >= -273.15
       => result >= 0
       return celsius + 273.15

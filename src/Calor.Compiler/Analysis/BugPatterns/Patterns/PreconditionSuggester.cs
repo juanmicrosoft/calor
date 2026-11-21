@@ -178,15 +178,16 @@ public sealed class PreconditionSuggester : IBugPatternChecker
                 if (_options.ReportOnlyVerified)
                     return;
 
-                var clause = $"requires {paramName} != 0";
+                // #1618: a parameter precondition is an inline refinement on that parameter.
+                var clause = $"{paramName} | (# != 0)";
                 var fix = new SuggestedFix(
-                    $"Add precondition: {clause}",
-                    ContractFixEdit.Insert(function, clause));
+                    $"Add refinement: {clause}",
+                    ContractFixEdit.Refine(varExpr.Variable, "# != 0"));
 
                 diagnostics.ReportWarningWithFix(
                     divisionExpr.Span,
                     DiagnosticCode.MissingPrecondition,
-                    $"Division by '{paramName}' without precondition; consider adding {clause}",
+                    $"Division by '{paramName}' without precondition; consider the refinement {clause}",
                     fix);
             }
         }

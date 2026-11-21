@@ -15,10 +15,20 @@ public class SafetyBenchmarkTests
 {
     private const string SafeDivideCalor = @"
 module Test Test block
-  func SafeDivide (int:a, int:b) → int
+  func SafeDivide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
+";
+
+    // #1618: a precondition is a parameter refinement and fails with ArgumentOutOfRangeException;
+    // the location/condition/function-id diagnostics of ContractViolationException now come from
+    // postconditions, so this sample covers them.
+    private const string NonNegativeHalfCalor = @"
+module Test Test block
+  func Half (int:a) → int
+    !
+    => result >= 0
+    return (a / 2)
 ";
 
     [Fact]
@@ -29,8 +39,12 @@ module Test Test block
         var compileResult = executor.CompileCalor(SafeDivideCalor);
 
         Assert.True(compileResult.Success);
-        Assert.Contains("ContractViolationException", compileResult.GeneratedCSharp);
-        Assert.Contains("Precondition failed", compileResult.GeneratedCSharp);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(b)", compileResult.GeneratedCSharp);
+
+        var postcondition = executor.CompileCalor(NonNegativeHalfCalor);
+        Assert.True(postcondition.Success);
+        Assert.Contains("ContractViolationException", postcondition.GeneratedCSharp);
+        Assert.Contains("Postcondition failed", postcondition.GeneratedCSharp);
     }
 
     [Fact]
@@ -42,6 +56,8 @@ module Test Test block
 
         Assert.True(compileResult.Success);
         Assert.DoesNotContain("ContractViolationException", compileResult.GeneratedCSharp);
+        // Refinement entry checks run in every contract mode (#1618).
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(b)", compileResult.GeneratedCSharp);
     }
 
     [Fact]
@@ -77,9 +93,9 @@ module Test Test block
 
         Assert.False(execResult.Success);
         Assert.True(execResult.ContractViolation);
-        Assert.Equal("ContractViolationException", execResult.ExceptionType);
-        Assert.NotNull(execResult.Exception);
-        Assert.IsType<ContractViolationException>(execResult.Exception);
+        Assert.Equal("ArgumentOutOfRangeException", execResult.ExceptionType);
+        var exception = Assert.IsType<ArgumentOutOfRangeException>(execResult.Exception);
+        Assert.Equal("b", exception.ParamName);
     }
 
     [Fact]
@@ -87,22 +103,22 @@ module Test Test block
     {
         using var executor = new CodeExecutor(timeoutMs: 5000, contractMode: EmitContractMode.Debug);
         var diagnostics = new DiagnosticBag();
-        var ast = new Parser(new Lexer(SafeDivideCalor, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var ast = new Parser(new Lexer(NonNegativeHalfCalor, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
         var declaration = Assert.Single(ast.Functions);
-        Assert.Equal("SafeDivide", declaration.Name);
+        Assert.Equal("Half", declaration.Name);
 
-        var compileResult = executor.CompileCalor(SafeDivideCalor);
+        var compileResult = executor.CompileCalor(NonNegativeHalfCalor);
         Assert.True(compileResult.Success);
         var csharpResult = executor.CompileCSharp(compileResult.GeneratedCSharp!);
         Assert.True(csharpResult.Success);
-        var execResult = executor.Execute(csharpResult.AssemblyBytes!, "SafeDivide", new object[] { 10, 0 });
+        var execResult = executor.Execute(csharpResult.AssemblyBytes!, "Half", new object[] { -4 });
 
         Assert.NotNull(execResult.SafetyAnalysis);
         Assert.True(execResult.SafetyAnalysis.ExceptionDetected);
         Assert.True(execResult.SafetyAnalysis.HasLocation);
         Assert.True(execResult.SafetyAnalysis.HasCondition);
-        Assert.Equal("b != 0", execResult.SafetyAnalysis.Condition);
+        Assert.EndsWith(">= 0", execResult.SafetyAnalysis.Condition);
         Assert.Equal(declaration.Id, execResult.SafetyAnalysis.FunctionId);
         Assert.True(execResult.SafetyAnalysis.Line > 0);
     }

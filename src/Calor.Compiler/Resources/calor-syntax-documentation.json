@@ -107,7 +107,7 @@
       "examples": [
         {
           "csharp": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }",
-          "calor": "module Contracts\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    !\n    requires b != 0\n    return a / b"
+          "calor": "module Contracts\n  func Square (int:x | (# >= 0)) → int\n    !\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b | (# != 0)) → int\n    !\n    return a / b"
         }
       ]
     },
@@ -243,7 +243,7 @@
         "for loop"
       ],
       "calorSyntax": "for i from start to end step stepValue; for i = start; condition; i = next",
-      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.",
+      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other. Count with from/to when the bound cannot change in the body; use while otherwise. while also leaves its counter in scope after the loop.",
       "programs": [
         "primer_loops",
         "complete_reevaluated_for",
@@ -570,8 +570,8 @@
         "assert",
         "precondition"
       ],
-      "calorSyntax": "requires condition",
-      "description": "Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.",
+      "calorSyntax": "type:name | (condition on #)",
+      "description": "Constrains a parameter at the call: an inline refinement after the parameter, with # standing for its value, checked on entry and on every reassignment. A condition on several parameters refines the last one and names the earlier ones (int:lo, int:hi | (# > lo)). There is no separate precondition clause. Use a refinement, not an if-throw guard. A failed refinement throws ArgumentOutOfRangeException with a generated message, so keep a guard only when callers need another exception type or a custom message.",
       "programs": [
         "primer_contracts"
       ],
@@ -579,7 +579,7 @@
       "examples": [
         {
           "csharp": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)",
-          "calor": "module Contracts\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    !\n    requires b != 0\n    return a / b"
+          "calor": "module Contracts\n  func Square (int:x | (# >= 0)) → int\n    !\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b | (# != 0)) → int\n    !\n    return a / b"
         }
       ]
     },
@@ -605,7 +605,7 @@
       "examples": [
         {
           "csharp": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result",
-          "calor": "module Contracts\n  func Square (int:x) → int\n    !\n    requires x >= 0\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b) → int\n    !\n    requires b != 0\n    return a / b"
+          "calor": "module Contracts\n  func Square (int:x | (# >= 0)) → int\n    !\n    => result >= 0\n    return x * x\n\n  func Divide (int:a, int:b | (# != 0)) → int\n    !\n    return a / b"
         }
       ]
     },
@@ -768,7 +768,7 @@
         "switch expression"
       ],
       "calorSyntax": "match expression with indented case pattern → result arms",
-      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.",
+      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression. Branching on one value against 3 or more constants uses match; otherwise use if. Calor1306 reports such if chains without a patch: a statement match lowers to a C# switch.",
       "programs": [
         "complex_enum"
       ],
@@ -884,7 +884,7 @@
         "linq query"
       ],
       "calorSyntax": "System.Linq.Enumerable.Where(collection, predicate)",
-      "description": "LINQ calls use ordinary postfix syntax, but syntax and metadata resolution do not prove their effects. Enumerable.Where and Enumerable.ToArray currently remain unknown under strict checking, even with a pure typed predicate and fully qualified IEnumerable<T> result. The complete example instead traverses the input once into a private buffer, then copies the matched prefix into an exact-sized result. It preserves encounter order and duplicates without rereading caller-owned entries; it is not LINQ support or deferred enumeration. Its alloc and mut row covers constructing and filling both arrays. Do not relax effect policy or use casts to hide the LINQ boundary.",
+      "description": "LINQ calls use ordinary postfix syntax, but syntax and metadata resolution do not prove their effects. Enumerable.Where and Enumerable.ToArray currently remain unknown under strict checking, even with a pure typed predicate and fully qualified IEnumerable<T> result. The complete example instead traverses the input once into a private buffer, then copies the matched prefix into an exact-sized result. It preserves encounter order and duplicates without rereading caller-owned entries; it is not LINQ support or deferred enumeration. Its alloc and mut row covers constructing and filling both arrays. Do not relax effect policy or use casts to hide the LINQ boundary. Default to a loop for transformations and queries: it measured fewer tokens. It is not identical: the loop runs eagerly, not deferred, its row is alloc,mut where LINQ's is alloc, and a null source throws a different exception type.",
       "programs": [
         "complete_linq"
       ],
@@ -1359,7 +1359,7 @@
       "examples": [
         {
           "csharp": "char c = 'A';",
-          "calor": "module AgentReference41\n  func DigitValue (char:c) → int\n    !\n    requires char.IsDigit(c)\n    return c - '0'"
+          "calor": "module AgentReference41\n  func DigitValue (char:c | (char.IsDigit(#))) → int\n    !\n    return c - '0'"
         }
       ]
     },
@@ -1870,11 +1870,11 @@
       "examples": [
         {
           "csharp": "text[index]; (int)value; char.IsDigit(value);",
-          "calor": "module AgentReference36\n  func GetFirstChar (string:s) → char\n    !\n    requires s.Length > 0\n    return s[0]"
+          "calor": "module AgentReference36\n  func GetFirstChar (string:s | (#.Length > 0)) → char\n    !\n    return s[0]"
         },
         {
           "csharp": "text[index]; (int)value; char.IsDigit(value);",
-          "calor": "module AgentReference41\n  func DigitValue (char:c) → int\n    !\n    requires char.IsDigit(c)\n    return c - '0'"
+          "calor": "module AgentReference41\n  func DigitValue (char:c | (char.IsDigit(#))) → int\n    !\n    return c - '0'"
         },
         {
           "csharp": "text[index]; (int)value; char.IsDigit(value);",
@@ -2038,11 +2038,11 @@
       "examples": [
         {
           "csharp": "// Universal/existential contracts with bounded ranges.",
-          "calor": "module AgentReference39\n  func AllPositive (int[]:arr, int:n) → bool\n    !\n    requires n == arr.Length\n    => !result || !(exists int:i in 0..n : arr[i] <= 0)\n    var bool:allPos = true\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] <= 0\n        set allPos false\n    return allPos"
+          "calor": "module AgentReference39\n  func AllPositive (int[]:arr, int:n | (# == arr.Length)) → bool\n    !\n    => !result || !(exists int:i in 0..n : arr[i] <= 0)\n    var bool:allPos = true\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] <= 0\n        set allPos false\n    return allPos"
         },
         {
           "csharp": "// Universal/existential contracts with bounded ranges.",
-          "calor": "module AgentReference40\n  func HasNegative (int[]:arr, int:n) → bool\n    !\n    requires n == arr.Length\n    => result == (exists int:i in 0..n : arr[i] < 0)\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] < 0\n        return true\n    return false"
+          "calor": "module AgentReference40\n  func HasNegative (int[]:arr, int:n | (# == arr.Length)) → bool\n    !\n    => result == (exists int:i in 0..n : arr[i] < 0)\n    for i from 0 to arr.Length - 1 step 1\n      if arr[i] < 0\n        return true\n    return false"
         }
       ]
     },
@@ -2076,7 +2076,7 @@
         },
         {
           "csharp": "list.Add(value); dictionary[key] = value;",
-          "calor": "module AgentReference15\n  func GetListLength (int:n) → int\n    ! alloc,mut\n    requires n >= 0\n    let List<int>:nums = new List<int>()\n    for i from 1 to n step 1\n      nums.Add(i)\n    return nums.Count"
+          "calor": "module AgentReference15\n  func GetListLength (int:n | (# >= 0)) → int\n    ! alloc,mut\n    let List<int>:nums = new List<int>()\n    for i from 1 to n step 1\n      nums.Add(i)\n    return nums.Count"
         },
         {
           "csharp": "list.Add(value); dictionary[key] = value;",
@@ -2204,12 +2204,6 @@
     }
   ],
   "tags": {
-    "requires": {
-      "name": "Precondition",
-      "syntax": "requires condition",
-      "description": "Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.",
-      "csharpEquivalent": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)"
-    },
     "/// since": {
       "name": "Since",
       "syntax": "/// since 1.0.0",
@@ -2336,7 +2330,7 @@
     "for": {
       "name": "Counted Loop",
       "syntax": "for i from start to end step stepValue; for i = start; condition; i = next",
-      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.",
+      "description": "One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other. Count with from/to when the bound cannot change in the body; use while otherwise. while also leaves its counter in scope after the loop.",
       "csharpEquivalent": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }"
     },
     "each": {
@@ -2491,7 +2485,7 @@
     "match": {
       "name": "Match",
       "syntax": "match expression with indented case pattern → result arms",
-      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.",
+      "description": "Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression. Branching on one value against 3 or more constants uses match; otherwise use if. Calor1306 reports such if chains without a patch: a statement match lowers to a C# switch.",
       "csharpEquivalent": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }"
     },
     "lock": {

@@ -160,7 +160,7 @@ public class AccessorAndStaticInitializationRowTests
                 ! cw
                 field int:Count static
 
-                ctor stat ()
+                ctor static ()
                   set Count 1
             """;
         Assert.Contains(DiagnosticCode.EffectRowMisplaced, ErrorCodes(withStaticConstructor));
@@ -234,7 +234,7 @@ public class AccessorAndStaticInitializationRowTests
     }
 
     private static string StaticConstructorProbe(string valueRow, string useRow, string constructor = """
-            ctor stat ()
+            ctor static ()
               ! cw
               Console.WriteLine("init")
         """) => $$"""

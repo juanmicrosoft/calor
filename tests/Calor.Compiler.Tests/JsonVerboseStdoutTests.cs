@@ -31,9 +31,8 @@ public class JsonVerboseStdoutTests : IDisposable
 
     private const string CalorSource =
         "module Demo Demo block\n" +
-        "  func Add (int:a, int:b) → int\n" +
+        "  func Add (int:a | (# >= 0), int:b) → int\n" +
         "    !\n" +
-        "    requires (a >= 0)\n" +
         "    return (a + b)\n" +
         "\n" +
         "  func Main () → void\n" +

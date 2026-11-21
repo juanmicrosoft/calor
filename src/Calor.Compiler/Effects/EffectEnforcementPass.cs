@@ -734,7 +734,8 @@ public sealed class EffectEnforcementPass
         var declarationOnly = _declarationOnlyRows.TryGetValue(function.Id, out var row);
         if (declarationOnly && UsesInferredEffects(function))
             return EffectSet.Unknown;
-        if (declarationOnly && function.Preconditions.Count == 0 && function.Postconditions.Count == 0)
+        if (declarationOnly && RefinementPreconditions.Effective(function.Parameters, function.Preconditions).Count == 0
+            && function.Postconditions.Count == 0)
             return GetDeclaredEffects(row);
         var assumptions = new List<string>();
         var context = CreateInferenceContext(function.Id, sccMembers,
@@ -2694,7 +2695,9 @@ public sealed class EffectEnforcementPass
                 }
             }
 
-            foreach (var condition in _function.Preconditions.Select(precondition => precondition.Condition)
+            // #1618: refinement predicates are preconditions and are charged like them.
+            foreach (var condition in RefinementPreconditions.Effective(_function.Parameters, _function.Preconditions)
+                         .Select(precondition => precondition.Condition)
                          .Concat(_function.Postconditions.Select(postcondition => postcondition.Condition)))
                 Walk(condition);
             foreach (var statement in _function.Body)
@@ -3987,7 +3990,8 @@ public sealed class EffectEnforcementPass
             try
             {
                 var effects = InferFromStatements(function.Body);
-                foreach (var condition in function.Preconditions.Select(precondition => precondition.Condition)
+                foreach (var condition in RefinementPreconditions.Effective(function.Parameters, function.Preconditions)
+                             .Select(precondition => precondition.Condition)
                              .Concat(function.Postconditions.Select(postcondition => postcondition.Condition)))
                     effects = effects.Union(InferFromExpression(condition));
                 return effects;

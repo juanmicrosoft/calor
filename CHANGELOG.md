@@ -4,8 +4,63 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-21
+
+Calor 0.30 has one way to write each thing. The `§` section markers are gone: code is
+lowercase keywords, indentation and ordinary C# expressions. A precondition is a refinement
+on the parameter it constrains. Effect rows are required only at public boundaries. Default
+`calor migrate` and `calor convert` write every C# file that parses. This is a breaking
+release with no automatic rewriter for 0.29 source; see the first entry below.
+
+This release publishes no new benchmark results.
+
+### Release health
+
+- **Silent wrong-output reports since 0.29.0: 0 new reports** in the repository issue
+  inventory checked on 2026-11-21 (33 issues opened since 2026-10-29). This is a report
+  count, not proof that the package has no defects.
+- **Merge-to-publication lag: not measured** as a median. `main` received no compiler fix
+  between 0.29.0 and the 0.30 merge; the 0.30 work merges and publishes on the same day.
+  Package availability is checked separately after publication.
+
 ### Breaking changes
 
+- **Calor has one syntax, and `§` section markers are not part of it.** Calor 0.30
+  reads only the native syntax: lowercase keywords (`module`, `func`, `let`, `if`),
+  indentation for blocks, and ordinary C# expressions and calls (`x * x`,
+  `items.Count`, `Console.WriteLine(s)`). Every `§` marker is the lexer error
+  `Calor0006`, which names the native form to use. Closer tags, typed-literal
+  prefixes such as `INT:42`, prefix (Lisp-style) operators, Option/Result, statement
+  and declaration IDs in source (they live in `.calor/ids.json`), and the
+  synonym spellings are gone too. This was a deliberate no-compatibility change
+  (#1606): there are no deprecation warnings and no `§`-to-native rewriter, so a
+  0.29 `.calr` file does not compile with 0.30. Rewrite it by hand using the
+  syntax reference (`docs/syntax-reference/`), or regenerate it with
+  `calor convert` from C# you trust (conversion does not recover contracts that
+  exist only as `throw` guards).
+- **A precondition is a refinement on the parameter it constrains.** `requires`
+  is removed (#1618). Write `func Divide (int:a, int:b | (# != 0)) → int`, where
+  `#` stands for the parameter's value. A condition on several parameters goes on
+  the last one and names the others: `(int:lo, int:hi | (# > lo))`. Z3 verifies
+  refinements exactly as it verified `requires`: the same proofs, the same
+  counterexamples, and the same override rule (an implementation may only weaken
+  an interface's precondition). Two things change at run time. A violated
+  precondition now throws `ArgumentOutOfRangeException` with `ParamName` set, not
+  `ContractViolationException`; catch blocks that expect the old type need
+  updating. Custom precondition messages (`requires{"..."}`) have no replacement.
+  Postconditions (`=>`) and their `ContractViolationException` are unchanged.
+- **Visibility and modifiers use the C# words.** Write `public`, `private`,
+  `internal`, `protected`, `static`, `abstract` and so on. The short forms
+  (`pub`, `priv`, `prot`, `int`, `stat`) are errors that suggest the C# word, and
+  so are case variants such as `Public`. A static constructor is
+  `ctor static`.
+- **Effect codes are case-sensitive, and the legacy `fw`, `fr` and `fd` codes are
+  removed.** Use `fs:w` (writes and deletes), `fs:r` and `fs:rw`. `CW` is no longer
+  `cw`.
+- **`calor fix` only applies safe patches.** `calor fix --apply` is the whole
+  command. The section-tag migrations `--heal-closers`, `--elide-call-closers`,
+  `--revert`, `--log`, `--drop-structural-ids` and `--compact-ids` are removed;
+  passing one is a usage error.
 - **Framework manifests no longer treat code they cannot see as harmless.** A framework member that runs your code is charged `unknown`. Examples: resolving a DI service (`GetService`, `GetRequiredService`), reading `IOptions<T>.Value`, building or starting a host, MediatR `Send`, AutoMapper `IMapper.Map`, FluentValidation `Validate` and Polly `Execute`. The framework and ecosystem manifests have no namespace-wide defaults any more, so a member they do not list is `unknown`. `DbContext.Add`, `Attach` and `Update` are now `mut, db:rw`, because tracking an entity can run a key generator that reads a database sequence. Declare `! unknown`, or move the call behind a function whose row you state.
 - **Indexing anything but an array runs its indexer's effects.** Before 0.30 every element access was free. Now `config["key"]` is `env:r`, and a source class's indexer is charged its getter's or setter's row. `List`, `Dictionary` and `string` indexers (including `s[^1]` and `s[a..b]`) stay pure. An indexer the compiler cannot select, or one with no effect contract (for example on `IReadOnlyList<T>`, `Span<T>` or a generic `T`), is `unknown`.
 - **Assemblies passed with `-r` now reach name binding.** Their types resolve in the binder, so the Tier B framework manifests (effect contracts for ASP.NET Core, EF Core, logging and similar libraries) apply to calls on them, from the CLI and from MSBuild alike. Before, those calls were `unknown` even with the reference.
@@ -26,10 +81,6 @@ All notable changes to this project will be documented in this file.
   siblings, and project validation failures do not discard exact original output.
   The destructive `--lossy` and `--select-active-preprocessor-branch-lossy` options
   are removed. Invalid input and write failures remain errors.
-- **Section markers have one spelling.** Use `§W`, `§EN`, `§WHERE`, `§PUSH`
-  and `§WHEN`. The aliases `§SW`, `§ENUM`, `§WR`, `§ADD` and lowercase `§when`
-  now produce errors that name the canonical marker. `§/SW` and `§/ENUM` are
-  also rejected; end these blocks by dedenting.
 - **Text diagnostics use `file:line:col code message`.** Each diagnostic stays
   on one line. Warnings and informational messages keep their severity labels.
   Common verbose messages have short summaries; MCP `calor_help` explains them
@@ -45,13 +96,32 @@ All notable changes to this project will be documented in this file.
 - **Static members are charged their type's initialization.** C# runs a static
   constructor before any static member of its type is used. Calor now checks that:
   a static method, operator or static property of a class with a static constructor
-  (`ctor stat`) must cover that constructor's effects in its own row. The check
+  (`ctor static`) must cover that constructor's effects in its own row. The check
   sits on the member, not on each call, because method groups and delegates have
   no call site to charge. Three more reads are charged the type's static
   initialization: a static field read by its bare name inside its own class (as
   `Type.Field` already was), a static auto-property, and a static field declared in
   preserved raw C# (charged `unknown` when its initializer cannot be analyzed).
   Programs that left these effects out now fail with `Calor0410`.
+
+- **`calor migrate` and `calor convert` write every C# file that parses (#1609).**
+  This reverses the all-or-nothing contract of #770 and #932, where one failing
+  file or a failed project build left every file unwritten. A file that fails
+  native conversion, crashes the converter, fails an output check, or runs past
+  the time limit now drops to exact whole-file preservation (the original C#
+  kept byte for byte), and the report records why. C# that parses but does not
+  compile is written and marked `unverified`. The project build is a check, not
+  a gate, and a write error affects only its own file. Only six cases leave a
+  file unwritten: input that does not parse, a destination safety check (for
+  example an output you edited), a disk write error, a whole-file preservation
+  that cannot reproduce the original (a converter bug), a compile item outside
+  the project folder (such as a NuGet `contentFiles` item, now skipped instead
+  of written into the package cache), and `--dry-run` or Ctrl+C. `convert
+  --timeout` now writes the preserved file instead of exiting `1`. Known gap: in
+  a project with `<Nullable>enable</Nullable>` and `TreatWarningsAsErrors`, a
+  whole-file preserved original that uses `?` reports CS8669, because the build
+  treats `*.g.cs` files as generated code. Those files are written and marked
+  `unverified`.
 
 ### Added
 

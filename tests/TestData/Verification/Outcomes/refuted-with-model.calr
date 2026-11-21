@@ -1,6 +1,5 @@
 module OutcomeRefuted OutcomeRefuted block
-  func Dec (int:x) → int
+  func Dec (int:x | (# > 0)) → int
     !
-    requires (x > 0)
     => (result > 10)
     return (x - 1)

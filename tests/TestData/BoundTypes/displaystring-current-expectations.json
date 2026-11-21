@@ -10,7 +10,7 @@
   },
   "benchmarks/arithmetic/overflow.calr": {
     "histogram": {
-      "BoundBinaryExpression|BOOL": 4,
+      "BoundBinaryExpression|BOOL": 6,
       "BoundBinaryExpression|INT": 7,
       "BoundIntLiteral|INT": 14,
       "BoundVariableExpression|int": 22
@@ -216,7 +216,7 @@
   },
   "samples/Verification/proven-contracts.calr": {
     "histogram": {
-      "BoundBinaryExpression|BOOL": 16,
+      "BoundBinaryExpression|BOOL": 19,
       "BoundBinaryExpression|INT": 4,
       "BoundIntLiteral|INT": 12,
       "BoundVariableExpression|int": 31

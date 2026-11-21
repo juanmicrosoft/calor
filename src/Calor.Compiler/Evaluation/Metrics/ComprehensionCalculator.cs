@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Calor.Compiler.Evaluation.Core;
 
 namespace Calor.Compiler.Evaluation.Metrics;
@@ -5,7 +6,7 @@ namespace Calor.Compiler.Evaluation.Metrics;
 /// <summary>
 /// Category 3: Comprehension Calculator
 /// Measures structural clarity and explicit markers visibility.
-/// Calor's explicit structure markers (§M, §F, §REQ) should aid comprehension.
+/// Calor's explicit declarations (<c>module</c>, <c>func</c>, <c>requires</c>) should aid comprehension.
 /// </summary>
 public class ComprehensionCalculator : IMetricCalculator
 {
@@ -39,33 +40,35 @@ public class ComprehensionCalculator : IMetricCalculator
         var source = context.CalorSource;
         var score = 0.0;
 
-        // Explicit structure markers contribute to clarity
-        var markers = new[]
+        // Explicit structure contributes to clarity. Each entry is the native (0.30) spelling of
+        // a construct the legacy scorer found by its section marker. Inline IDs (`id:`) are gone:
+        // native source keeps declaration IDs in the .calor/ids.json sidecar, so a reader of the
+        // source no longer sees them, and the term is dropped (as in Calor.Evaluation's copy).
+        foreach (var (_, count, weight) in ExplicitMarkers)
         {
-            ("§M[", 1.0),   // Module marker
-            ("§F[", 1.0),   // Function marker
-            ("§V[", 0.5),   // Variable marker
-            ("§I[", 0.5),   // Input parameter
-            ("§O[", 0.5),   // Output/return type
-            ("§REQ", 1.0),  // Requires (precondition)
-            ("§ENS", 1.0),  // Ensures (postcondition)
-            ("§INV", 1.0),  // Invariant
-            ("§E[", 0.8),   // Effects
-            ("id:", 0.5)    // Explicit IDs for targeting
-        };
-
-        foreach (var (marker, weight) in markers)
-        {
-            if (source.Contains(marker))
+            if (count(source) > 0)
             {
                 score += weight;
             }
         }
 
         // Normalize to 0-1 range
-        var maxPossible = markers.Sum(m => m.Item2);
+        var maxPossible = ExplicitMarkers.Sum(m => m.Weight);
         return Math.Min(1.0, score / maxPossible);
     }
+
+    private static readonly (string Name, Func<string, int> Count, double Weight)[] ExplicitMarkers =
+    [
+        ("module", s => NativeCalorSyntax.Module.Matches(s).Count, 1.0),          // Module declaration
+        ("function", s => NativeCalorSyntax.Function.Matches(s).Count, 1.0),      // Function declaration
+        ("variable", s => NativeCalorSyntax.Binding.Matches(s).Count, 0.5),       // let/var binding
+        ("input", NativeCalorSyntax.CountTypedParameters, 0.5),                   // Typed parameter (T:x)
+        ("output", s => NativeCalorSyntax.TypedOutput.Matches(s).Count, 0.5),     // Return type (→ T)
+        ("requires", s => NativeCalorSyntax.Precondition.Matches(s).Count, 1.0),      // Precondition
+        ("ensures", s => NativeCalorSyntax.Ensures.Matches(s).Count, 1.0),        // Postcondition (=> expr)
+        ("invariant", s => NativeCalorSyntax.Invariant.Matches(s).Count, 1.0),    // Invariant
+        ("effects", s => NativeCalorSyntax.EffectRow.Matches(s).Count, 0.8),      // Effect row (! ...)
+    ];
 
     private static double CalculateCSharpComprehensionScore(EvaluationContext context)
     {
@@ -111,18 +114,9 @@ public class ComprehensionCalculator : IMetricCalculator
 
     private static Dictionary<string, int> CountExplicitMarkers(string source)
     {
-        var markers = new Dictionary<string, int>
-        {
-            ["module"] = CountOccurrences(source, "§M["),
-            ["function"] = CountOccurrences(source, "§F["),
-            ["variable"] = CountOccurrences(source, "§V["),
-            ["requires"] = CountOccurrences(source, "§REQ"),
-            ["ensures"] = CountOccurrences(source, "§ENS"),
-            ["invariant"] = CountOccurrences(source, "§INV"),
-            ["effects"] = CountOccurrences(source, "§E["),
-            ["ids"] = CountOccurrences(source, "id:")
-        };
-        return markers;
+        return ExplicitMarkers
+            .Where(m => m.Name is not ("input" or "output"))
+            .ToDictionary(m => m.Name, m => m.Count(source));
     }
 
     private static double CalculateCommentDensity(string source)
@@ -157,16 +151,57 @@ public class ComprehensionCalculator : IMetricCalculator
 
         return maxDepth;
     }
+}
 
-    private static int CountOccurrences(string source, string pattern)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = source.IndexOf(pattern, index, StringComparison.Ordinal)) != -1)
-        {
-            count++;
-            index += pattern.Length;
-        }
-        return count;
-    }
+/// <summary>
+/// Source patterns for native (0.30) Calor constructs, shared by the metric calculators in this
+/// folder. Each pattern is the native spelling of a construct the calculators used to find by its
+/// retired section marker: <c>module</c>, <c>func</c>, a parameter refinement for a precondition, a
+/// line-head <c>=&gt;</c> for a postcondition, a line-head <c>!</c> for an effect row, and so on.
+/// Mirrors <c>tests/Calor.Evaluation/Metrics/CalorSyntax.cs</c>, so both copies of the metrics
+/// count the same things.
+/// </summary>
+internal static class NativeCalorSyntax
+{
+    private const RegexOptions Line = RegexOptions.Compiled | RegexOptions.Multiline;
+
+    public static readonly Regex Module = new(@"^[ \t]*module[ \t]+\S", Line);
+    public static readonly Regex Function = new(@"^[ \t]*func[ \t]+\S", Line);
+    /// <summary>A function header that declares a return type (<c>→ T</c>).</summary>
+    public static readonly Regex TypedOutput = new(@"^[ \t]*func[ \t][^\n]*→", Line);
+    public static readonly Regex Return = new(@"^[ \t]*return\b", Line);
+    /// <summary>
+    /// A precondition: one parameter refinement (<c>int:x | (# &gt;= 0)</c>) on a
+    /// <c>func</c>, <c>ctor</c>, <c>op</c> or <c>delegate</c> declaration line. Since #1618 a
+    /// refinement is the only precondition form; one refined parameter counts once.
+    /// </summary>
+    public static readonly Regex Precondition = new(
+        @"(?<=^[ \t]*(?:\[@[^\]\n]*\][ \t]*)*(?:func|ctor|op|delegate)\b[^\n]*):@?[A-Za-z_]\w*[ \t]*\|(?!\|)[ \t]*\(",
+        Line);
+    public static readonly Regex Ensures = new(@"^[ \t]*=>[ \t]", Line);
+    public static readonly Regex Invariant = new(@"^[ \t]*invariant\b", Line);
+    /// <summary>An effect row; a bare <c>!</c> is the pure row.</summary>
+    public static readonly Regex EffectRow = new(@"^[ \t]*!(?=[ \t]|\r?$)", Line);
+    public static readonly Regex Binding = new(@"^[ \t]*(?:let|var)[ \t]", Line);
+    public static readonly Regex MutableBinding = new(@"^[ \t]*var[ \t]", Line);
+    public static readonly Regex If = new(@"^[ \t]*if\b", Line);
+    public static readonly Regex ElseIf = new(@"^[ \t]*else[ \t]+if\b", Line);
+    public static readonly Regex Else = new(@"^[ \t]*else[ \t]*\r?$", Line);
+    public static readonly Regex Loop = new(@"^[ \t]*(?:for|each|while|do)\b", Line);
+    public static readonly Regex Match = new(@"^[ \t]*match\b", Line);
+    /// <summary>A call: a (possibly dotted) name followed by <c>(</c>, excluding keywords.</summary>
+    public static readonly Regex Call = new(
+        @"(?<![\w.])(?!(?:if|while|for|each|do|match|requires|return|func|module|invariant|let|var|set)\b)[A-Za-z_][\w.]*\(",
+        RegexOptions.Compiled);
+    /// <summary>Built-in type names, counted as type annotations.</summary>
+    public static readonly Regex TypeName = new(@"\b(int|long|float|double|string|bool|void)\b", RegexOptions.Compiled);
+
+    private static readonly Regex FunctionParameters = new(@"^[ \t]*func[ \t][^\n(]*\(([^\n]*)\)", Line);
+    private static readonly Regex TypedParameter = new(@"(?<=[\w>\]?)]):~?[A-Za-z_]\w*", RegexOptions.Compiled);
+
+    /// <summary>Typed parameters (<c>T:name</c>) across every function header.</summary>
+    public static int CountTypedParameters(string source) =>
+        FunctionParameters.Matches(source).Sum(header => TypedParameter.Matches(header.Groups[1].Value).Count);
+
+    public static bool HasTypedParameters(string source) => CountTypedParameters(source) > 0;
 }

@@ -35,9 +35,8 @@ public class ContractTests
     {
         var source = @"
 module Test Test block
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     return (x * x)
 ";
 
@@ -47,10 +46,9 @@ module Test Test block
         Assert.Single(module.Functions);
 
         var func = module.Functions[0];
-        Assert.Single(func.Preconditions);
+        // #1618: the refinement on x is the function's precondition
+        var requires = Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions));
         Assert.Empty(func.Postconditions);
-
-        var requires = func.Preconditions[0];
         Assert.IsType<BinaryOperationNode>(requires.Condition);
     }
 
@@ -83,10 +81,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a | (# >= 0), int:b | (# != 0)) → int
     !
-    requires (b != 0)
-    requires (a >= 0)
     => (result >= 0)
     return (a / b)
 ";
@@ -96,7 +92,8 @@ module Test Test block
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var func = module.Functions[0];
-        Assert.Equal(2, func.Preconditions.Count);
+        // #1618: one refinement per parameter, which the verifier sees as preconditions
+        Assert.Equal(2, Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions).Count);
         Assert.Single(func.Postconditions);
     }
 
@@ -170,9 +167,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     return (x * x)
 ";
 
@@ -182,9 +178,9 @@ module Test Test block
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
 
-        // The emitter wraps the binary expression in parentheses
+        // #1618: the refinement is emitted as a parameter entry check
         Assert.Contains("(x >= 0)", code);
-        Assert.Contains("throw new Calor.Runtime.ContractViolationException", code);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(x)", code);
     }
 
     [Fact]
@@ -218,9 +214,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     return (x * x)
 ";
 

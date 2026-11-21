@@ -4,9 +4,8 @@ module Capitalize Capitalize
       !
       return charCode >= 97 && charCode <= 122
 
-    func ToUpper public (int:charCode) → int
+    func ToUpper public (int:charCode | (# >= 97 && # <= 122)) → int
       !
-      requires charCode >= 97 && charCode <= 122
       return charCode - 32
 
     func IsEmpty public (int:length) → bool

@@ -1,15 +1,12 @@
 module Inventory Inventory
   module InventoryModule
-    func Restock public (int:current, int:quantity) → int
+    func Restock public (int:current, int:quantity | (# > 0)) → int
       !
-      requires quantity > 0
       => result > current
       return current + quantity
 
-    func Sell public (int:current, int:quantity) → int
+    func Sell public (int:current, int:quantity | ((# > 0) && (current >= #))) → int
       !
-      requires quantity > 0
-      requires current >= quantity
       => result >= 0
       return current - quantity
 

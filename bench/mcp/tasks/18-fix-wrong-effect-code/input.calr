@@ -1,10 +1,9 @@
-§M{m001:DataService}
+module DataService
+  class DbContext
+    func SaveChanges static () → int
+      ! db:w
+      return 1
 
-§F{f001:Save:pub}
-  §I{str:data}
-  §O{void}
-  §E{database:write}
-  §C{DbContext.SaveChanges} §/C
-§/F{f001}
-
-§/M{m001}
+  func Save (string:data) → void
+    ! database:write
+    DbContext.SaveChanges()

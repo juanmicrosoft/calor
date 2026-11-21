@@ -777,7 +777,7 @@ public sealed class CanonicalControlFlowTests
               class Holder
                 field int:Calls public static = 0
                 field object:Gate public static = new object()
-                ctor stat ()
+                ctor static ()
                   set Calls Calls + 1
               func Probe () → int
                 ! alloc,mut

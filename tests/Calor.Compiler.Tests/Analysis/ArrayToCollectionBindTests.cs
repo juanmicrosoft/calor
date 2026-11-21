@@ -1074,7 +1074,7 @@ public class ArrayToCollectionBindTests
         {
             var doc = new DocFile(
                 Calor.Compiler.SelfCheck.ExemplarCompileChecker.RelativePath,
-                $"```\n§B{{x:List<str>}} §C{{{api}}} §A a §/C\n```\n");
+                $"```\nlet List<string>:x = {api}(a)\n```\n");
             var findings = new List<Diagnostic>();
             Calor.Compiler.SelfCheck.ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);
             Assert.Contains(findings, f => f.Code == DiagnosticCode.DocDriftArrayBindingTrap);

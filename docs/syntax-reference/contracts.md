@@ -10,15 +10,14 @@ nav_order: 5
 <!-- Generated from website/content/syntax-reference/contracts.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Contracts state what a function requires from its caller and what it guarantees
-on a normal return. Write preconditions with `requires` and postconditions with
-`=>`, before the first body statement.
+on a normal return. A precondition is a refinement on the parameter it
+constrains, written `| (condition)` after the parameter with `#` standing for its
+value. Postconditions use `=>` lines before the first body statement.
 
 ```calor
 module ContractDivide
-  func Divide (int:dividend, int:divisor) → int
+  func Divide (int:dividend | (# >= 0), int:divisor | (# > 0)) → int
     !
-    requires divisor > 0
-    requires dividend >= 0
     => result >= 0
     => result <= dividend
     return dividend / divisor
@@ -29,11 +28,17 @@ divisor would contradict the promised non-negative result.
 
 ## Preconditions
 
-Each `requires` line is an ordinary Boolean expression over the function's
-inputs. Multiple lines must all hold. With runtime checks enabled, a failed
-precondition throws `Calor.Runtime.ContractViolationException` before the body
-runs. For example, `Divide(9, 0)` fails its precondition rather than reaching
-integer division.
+A refinement is an ordinary Boolean expression in which `#` is the parameter's
+value. A condition on several parameters goes on the last one it mentions and
+names the earlier ones: `int:lo, int:hi | (# > lo)`. Two conditions on one
+parameter are joined with `&&`. There is no separate precondition clause; the
+`requires` keyword from earlier versions is an error.
+
+In every contract mode, including `--contract-mode off`, a failed refinement
+throws `ArgumentOutOfRangeException` naming the parameter before the body runs.
+The check runs again whenever the body assigns the parameter. For example,
+`Divide(9, 0)` fails the refinement on `divisor` rather than reaching integer
+division.
 
 Contracts do not replace the implementation or automatically prove every call
 safe. A runtime test that exercises a guard is not a verifier proof.
@@ -65,9 +70,8 @@ Separate a valid input range from the promised result range.
 
 ```calor
 module ContractClamp
-  func Clamp (int:value, int:min, int:max) → int
+  func Clamp (int:value, int:min, int:max | (min <= #)) → int
     !
-    requires min <= max
     => result >= min
     => result <= max
     if value < min
@@ -90,15 +94,14 @@ Use the actual collection type and its members in the contract.
 
 ```calor
 module NonEmptyCollection
-  func First (int[]:items) → int
+  func First (int[]:items | (#.Length > 0)) → int
     !
-    requires items.Length > 0
     => result == items[0]
     return items[0]
 ```
 
-`First(new int[] { 42 })` returns `42`. With checks enabled, an empty array
-fails the precondition before indexing. The declared input is non-null; a
+`First(new int[] { 42 })` returns `42`. An empty array fails the precondition
+before indexing, in every contract mode. The declared input is non-null; a
 nullable input would need its own null guard before reading `Length`.
 
 <a id="runtime-contract-enforcement"></a>
@@ -108,7 +111,9 @@ nullable input would need its own null guard before reading `Length`.
 ## Runtime modes and verification
 
 `--contract-mode debug` emits detailed runtime checks. `--contract-mode release`
-emits leaner checks; `--contract-mode off` emits none.
+emits leaner checks; `--contract-mode off` removes postcondition and invariant
+checks. Parameter refinements, the precondition form, are always checked: their
+`ArgumentOutOfRangeException` guard is emitted in every mode.
 Turning checks off does not make invalid inputs valid,
 prove a contract or prevent exceptions from the body.
 
@@ -134,16 +139,16 @@ module FunctionCallBoundary
     !
     return value > 0
 
-  func Identity (int:x) → int
+  func Identity (int:x | (Positive(#))) → int
     !
-    requires Positive(x)
     => Positive(result)
     return x
 ```
 
-`Identity(1)` returns `1`. With checks enabled, `Identity(0)` fails its
-precondition. Predicate receiver and argument expressions run once, in source
-order. Turning contracts off removes their runtime evaluation, not the body.
+`Identity(1)` returns `1`. `Identity(0)` fails its precondition in every
+contract mode. Predicate receiver and argument expressions run once, in source
+order. Turning contracts off removes the postcondition's runtime evaluation, not
+the refinement's or the body's.
 Their effects must still fit the enclosing function even when runtime guards
 are off; an effectful predicate cannot hide behind an omitted guard.
 Inherited contracts contribute the calls that will actually execute.
@@ -194,11 +199,8 @@ effect contract.
 
 ```calor
 module MatrixSymmetry
-  func CheckSymmetric (int[,]:matrix, int:n) → bool
+  func CheckSymmetric (int[,]:matrix, int:n | (((# >= 0) && (matrix.GetLength(0) == # && matrix.GetLength(1) == #)) && (forall int:i in 0..#, int:j in 0..# : matrix[i,j] == matrix[j,i]))) → bool
     !
-    requires n >= 0
-    requires matrix.GetLength(0) == n && matrix.GetLength(1) == n
-    requires forall int:i in 0..n, int:j in 0..n : matrix[i,j] == matrix[j,i]
     return true
 ```
 
@@ -213,23 +215,20 @@ quantifier's quadratic runtime cost.
 
 ```calor
 module NonNegativeArray
-  func ProcessArray (int[]:arr, int:n) → bool
+  func ProcessArray (int[]:arr, int:n | ((# >= 0 && # == arr.Length) && (forall int:i in 0..# : arr[i] >= 0))) → bool
     !
-    requires n >= 0 && n == arr.Length
-    requires forall int:i in 0..n : arr[i] >= 0
     return true
 ```
 
 `ProcessArray(new int[] { 0, 3 }, 2)` returns `true`. A negative element
-fails the second precondition with checks enabled, before the body runs.
+fails the second precondition before the body runs, in every contract mode.
 
 ### Search precondition
 
 ```calor
 module ArraySearch
-  func Find (int[]:arr, int:target) → int
+  func Find (int[]:arr, int:target | (exists int:i in 0..arr.Length : arr[i] == #)) → int
     !
-    requires exists int:i in 0..arr.Length : arr[i] == target
     => result >= 0 && result < arr.Length
     => arr[result] == target
     for i from 0 to arr.Length - 1 step 1
@@ -239,9 +238,9 @@ module ArraySearch
 ```
 
 `Find(new int[] { 4, 9 }, 9)` returns `1`. This is a linear search, not a
-claim that an unsorted input supports binary search. With checks enabled,
-an absent target fails the precondition; with guards off, the body returns
-`-1`.
+claim that an unsorted input supports binary search. An absent target fails
+the precondition and throws `ArgumentOutOfRangeException`, also with
+`--contract-mode off`, so the body's `return -1` is not reached for it.
 
 ### Runtime and static limits
 
@@ -297,9 +296,9 @@ Put the signature first, followed by effect and contract lines, then the body.
 Keep contracts above the first statement; they are declaration clauses, not
 statements to execute in the middle of a function.
 
-The native `requires` form does not have a custom-message clause. When an API
-needs a particular exception type and message, use an explicit condition and
-exception in the body rather than inventing a contract attribute.
+A refinement has no custom-message clause. When an API needs a particular
+exception type and message, use an explicit condition and exception in the body
+rather than inventing a contract attribute.
 
 ## Related references
 

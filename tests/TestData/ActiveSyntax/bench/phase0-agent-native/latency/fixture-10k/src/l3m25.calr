@@ -6,9 +6,8 @@ module L3M25 L3M25 block
       let int:@base = ((x * 4) - y)
       return (@base + 48)
 
-    func l3m25_fn02 public (int:x, int:y) → int
+    func l3m25_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24991)
       if (x >= 24991)
@@ -16,19 +15,16 @@ module L3M25 L3M25 block
       else
         return 24991
 
-    func l3m25_fn03 public (int:x, int:y) → int
+    func l3m25_fn03 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 24998)
       let int:total = ((x * 2) + y)
       if (total > 24998)
         return 24998
       return total
 
-    func l3m25_fn04 public (int:x, int:y) → int
+    func l3m25_fn04 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 25005)
       let int:total = ((x * 5) + y)
       if (total < 25005)
@@ -36,9 +32,8 @@ module L3M25 L3M25 block
       else
         return total
 
-    func l3m25_fn05 public (int:x, int:y) → int
+    func l3m25_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25012)
       let int:total = ((x * 2) + y)
       if (total > 25012)
@@ -50,10 +45,8 @@ module L3M25 L3M25 block
       let int:@base = ((x * 4) - y)
       return (@base + 78)
 
-    func l3m25_fn07 public (int:x, int:y) → int
+    func l3m25_fn07 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 25019)
       let int:total = ((x * 5) + y)
       if (total < 25019)
@@ -61,10 +54,8 @@ module L3M25 L3M25 block
       else
         return total
 
-    func l3m25_fn08 public (int:x, int:y) → int
+    func l3m25_fn08 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 25026)
       let int:total = ((x * 3) + y)
       if (total < 25026)
@@ -77,9 +68,8 @@ module L3M25 L3M25 block
       let int:@base = ((x * 4) - y)
       return (@base + 62)
 
-    func l3m25_fn10 public (int:x, int:y) → int
+    func l3m25_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 25033)
       let int:total = ((x * 5) + y)
       if (total > 25033)

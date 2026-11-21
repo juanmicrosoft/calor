@@ -1,8 +1,7 @@
 module ApiHandler ApiHandler block
   module ApiHandlerModule
-    func HandleRequest (int:statusCode) → int
+    func HandleRequest (int:statusCode | (# >= 100)) → int
       ! cw
-      requires statusCode >= 100
       => result >= 0
       Console.WriteLine("Handling request...")
       return statusCode + 1

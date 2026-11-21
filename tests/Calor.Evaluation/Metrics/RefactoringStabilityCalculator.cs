@@ -231,7 +231,7 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var score = 0.3;
 
         // Contracts preserve semantic intent during refactoring
-        if (CalorSyntax.Requires.IsMatch(source)) score += 0.2;
+        if (CalorSyntax.Precondition.IsMatch(source)) score += 0.2;
         if (CalorSyntax.Ensures.IsMatch(source)) score += 0.2;
         if (CalorSyntax.Invariant.IsMatch(source)) score += 0.1;
 

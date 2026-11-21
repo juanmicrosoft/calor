@@ -278,9 +278,8 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             module Test Test block
-              func Foo (int:x) → int
+              func Foo (int:x | (forall int:n in 0..# : n >= 0)) → int
                 !
-                requires forall int:n in 0..x : n >= 0
                 return x
             """;
         var result = FormatModule(source);
@@ -293,9 +292,8 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             module Test Test block
-              func Foo (int:x) → int
+              func Foo (int:x | (exists int:n in 0..# : n > 0)) → int
                 !
-                requires exists int:n in 0..x : n > 0
                 return x
             """;
         var result = FormatModule(source);

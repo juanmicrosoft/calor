@@ -272,7 +272,7 @@ public class LlmEvaluationCalculator : IMetricCalculator
         };
 
         // Add contract-specific questions if contracts are present
-        if (System.Text.RegularExpressions.Regex.IsMatch(context.CalorSource, @"^\s*(requires|=>)\s", System.Text.RegularExpressions.RegexOptions.Multiline))
+        if (CalorSyntax.Precondition.IsMatch(context.CalorSource) || CalorSyntax.Ensures.IsMatch(context.CalorSource))
         {
             questions.Add(new LlmComprehensionQuestion
             {

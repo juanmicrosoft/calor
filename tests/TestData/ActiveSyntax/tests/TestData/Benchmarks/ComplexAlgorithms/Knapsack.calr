@@ -7,14 +7,11 @@ module Knapsack Knapsack
       else
         return withoutItem
 
-    func Fits public (int:weight, int:capacity) → bool
+    func Fits public (int:weight | (# > 0), int:capacity | (# >= 0)) → bool
       !
-      requires weight > 0
-      requires capacity >= 0
       return weight <= capacity
 
-    func RemainingCapacity public (int:capacity, int:weight) → int
+    func RemainingCapacity public (int:capacity, int:weight | (capacity >= #)) → int
       !
-      requires capacity >= weight
       => result >= 0
       return capacity - weight

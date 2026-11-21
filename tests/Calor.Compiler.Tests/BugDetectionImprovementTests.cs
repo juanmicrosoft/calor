@@ -60,9 +60,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var ctx = new EvaluationContext
@@ -137,9 +136,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     => result == a / b
     return a / b
 ";
@@ -163,9 +161,8 @@ module Test Test block
         // Source with a native precondition
         var source = @"
 module Test Test block
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ";
         var ctx = new EvaluationContext
@@ -200,9 +197,8 @@ module Test Test block
 ";
         var fixedSource = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var calc = new ErrorDetectionCalculator();
@@ -262,9 +258,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
@@ -357,7 +352,7 @@ module Test Test block
         // Check that we have a fix with native contract text, placed so the result parses
         Assert.True(diagnostics.DiagnosticsWithFixes.Count > 0);
         var fix = diagnostics.DiagnosticsWithFixes[0].Fix;
-        Assert.Contains("requires b != 0", fix.Description);
+        Assert.Contains("b | (# != 0)", fix.Description);
         AssertFixAddsContract(source, fix, preconditions: 1, postconditions: 0);
     }
 
@@ -501,9 +496,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
@@ -537,7 +531,7 @@ module Test Test block
 
         Assert.True(diagnostics.DiagnosticsWithFixes.Count > 0);
         var fix = diagnostics.DiagnosticsWithFixes[0].Fix;
-        Assert.Contains("requires b != 0", fix.Description);
+        Assert.Contains("b | (# != 0)", fix.Description);
         AssertFixAddsContract(source, fix, preconditions: 1, postconditions: 0);
     }
 
@@ -579,7 +573,9 @@ module Test Test block
         var module = Parse(patched, out var parseDiag);
         Assert.False(parseDiag.HasErrors, patched + "\n" + string.Join("\n", parseDiag.Select(d => d.Message)));
         var function = Assert.Single(module.Functions);
-        Assert.Equal(preconditions, function.Preconditions.Count);
+        // #1618: a precondition is a parameter refinement; count what the verifier sees.
+        Assert.Equal(preconditions, Calor.Compiler.Verification.ContractVerifier
+            .EffectivePreconditions(function.Parameters, function.Preconditions).Count);
         Assert.Equal(postconditions, function.Postconditions.Count);
     }
 
@@ -697,9 +693,8 @@ module UnsafeDivide UnsafeDivide block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     return (a / b)
 ";
         var module = Parse(source, out var parseDiag);
@@ -896,9 +891,8 @@ namespace MathOps {
         // It should succeed after the fix.
         var source = @"
 module PrimeCheck PrimeCheck block
-  func IsPrime (int:n) → bool
+  func IsPrime (int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     if (n <= 1)
       return false
     if (n <= 3)
@@ -975,6 +969,32 @@ module PrimeCheck PrimeCheck block
     #region EdgeCaseCoverageAnalyzer
 
     [Fact]
+    public void EdgeCaseCoverage_ParameterRefinement_CountsAsContract()
+    {
+        // #1618: a parameter refinement is the precondition, for functions and methods alike.
+        var source = @"
+module Test Test block
+  func Divide (int:a, int:b | (# != 0)) → int
+    !
+    return a / b
+  func Plain (int:a) → int
+    !
+    return a
+  class Calc
+    func Half (int:n | (# >= 0)) → int
+      !
+      return n / 2
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.Equal(3, result.TotalFunctions);
+        Assert.Equal(2, result.FunctionsWithContracts);
+    }
+
+    [Fact]
     public void EdgeCaseCoverage_ProgramWithEarlyReturnGuards_DetectsGuards()
     {
         var source = @"
@@ -1047,9 +1067,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     => (result >= 0)
     return (a / b)
 
@@ -1138,9 +1157,8 @@ module Test Test block
         // A Calor program with → §R conditional returns should score higher than base
         var source = @"
 module Test Test block
-  func Factorial (int:n) → int
+  func Factorial (int:n | (# >= 0)) → int
     !
-    requires (n >= 0)
     if (n <= 1)
       return 1
     return (n * Factorial((n - 1)))
@@ -1167,9 +1185,8 @@ module Test Test block
         // but a minimal program without them should not
         var defensiveSource = @"
 module Test Test block
-  func SafeDiv (int:a, int:b) → int
+  func SafeDiv (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     if (b <= 1)
       return 0
     return (a / b)
@@ -1221,9 +1238,8 @@ class C {
         // Calor with all patterns
         var calorSource = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     => (result >= 0)
     if (b <= 1)
       return 0

@@ -10,8 +10,8 @@ result is one of seven statuses. With optional `--verify`, the compiler
 removes an eligible runtime guard only for a clean, non-vacuous,
 assumption-free `proven` result. Other results never authorize proof-based
 removal. Runtime checks depend separately on contract mode and supported lowering;
-`--contract-mode off` emits no contract guards; it does not disable checked
-arithmetic. See
+`--contract-mode off` removes postcondition and invariant guards; it keeps
+parameter-refinement guards and does not disable checked arithmetic. See
 [verification modes and limits](/docs/guides/verification-guarantees/).
 
 ---
@@ -22,9 +22,8 @@ When you write contracts in Calor:
 
 ```calor
 module SquareBoundaries
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x
 ```
@@ -36,7 +35,8 @@ The postcondition constrains normal returns; it does not promise that every
 allowed input returns successfully.
 
 Restricting `x` to `0..46340` avoids this multiplication overflow.
-`--contract-mode off` disables contract checks, not checked arithmetic.
+`--contract-mode off` disables postcondition and invariant checks, not
+parameter refinements or checked arithmetic.
 Optional `--verify` does not make this example return successfully for `46341`.
 See [integer overflow policy](/docs/guides/verification-guarantees/#integer-overflow-policy)
 for the distinction between native Calor and imported C#.
@@ -146,9 +146,8 @@ module FunctionCallBoundary
   func Positive (int:value) → bool
     !
     return value > 0
-  func Identity (int:x) → int
+  func Identity (int:x | (# > 0)) → int
     !
-    requires x > 0
     => Positive(result)
     return x
 ```
@@ -198,7 +197,7 @@ there is no silent static-only fallback. See the
 Simple arithmetic and comparison contracts verify quickly:
 
 ```calor-fragment
-requires x >= 0
+int:x | (# >= 0)
 => result >= 0
 ```
 
@@ -244,7 +243,7 @@ Calor is **not** a proof assistant like LEAN, Isabelle, or Rocq. The distinction
 
 | Aspect | Proof Assistants | Calor |
 |:-------|:-----------------|:------|
-| You write | Proofs (tactics, lemmas) | Contracts (`requires`, `=>`) |
+| You write | Proofs (tactics, lemmas) | Contracts (refinements, `=>`) |
 | Verification | Must complete to compile | Optional; reports seven verdicts and removes only eligible clean proven guards |
 | Scope | Arbitrary mathematical properties | Practical software contracts |
 | Expertise | Type theory, proof tactics | Software engineering |
@@ -264,15 +263,15 @@ This example squares its input; it does not calculate a square root.
 
 ```calor
 module FloatingProofBoundary
-  func Square (double:x) → double
+  func Square (double:x | (# >= 0.0)) → double
     !
-    requires x >= 0.0
     => result >= 0.0
     return x * x
 ```
 
-An inconclusive proof does not authorize guard removal. Runtime checks still
-require an enabled contract mode and supported lowering; review `Calor1001`
+An inconclusive proof does not authorize guard removal. The parameter
+refinement is checked in every contract mode. The postcondition check still
+requires an enabled contract mode and supported lowering; review `Calor1001`
 and `Calor1004` rather than treating these errors as successful enforcement.
 
 ### Lightweight by Design
@@ -281,7 +280,7 @@ Calor's verification is deliberately bounded:
 
 - **5-second timeout** per contract (configurable via `--verification-timeout` on compile or `--timeout` on `calor verify`)
 - **A positive modeled-forms whitelist** rather than arbitrary math
-- **Retained runtime checks** when the contract mode enables them and lowering is supported
+- **Retained runtime checks**: parameter refinements in every contract mode; postconditions when the contract mode enables them and lowering is supported
 
 The solver budget bounds each attempt, not the total duration of every build.
 Review the supported model and inconclusive results rather than treating an
@@ -328,7 +327,7 @@ instead attach a predicate to a type. Retired named refinements, inline
 refinement predicates, and proof-statement tags are not current native source
 forms; do not copy them from historical examples.
 
-Use ordinary .NET types and native `requires` clauses for current input
+Use ordinary .NET types and parameter refinements for current input
 constraints. This does not create a new nominal type, validate every assignment,
 or prove every caller safe. The retained internal refinement obligation engine
 is compile-time analysis, not a native runtime-guard guarantee.

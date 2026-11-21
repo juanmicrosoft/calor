@@ -1,9 +1,7 @@
 module Hypotenuse Hypotenuse
   module HypotenuseModule
-    func HypotenuseSquared public (float:a, float:b) → float
+    func HypotenuseSquared public (float:a | (# > 0), float:b | (# > 0)) → float
       !
-      requires a > 0
-      requires b > 0
       => result > 0
       return a * a + b * b
 

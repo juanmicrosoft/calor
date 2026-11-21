@@ -23,7 +23,7 @@ Functions use func, type:name parameters and → returnType; public visibility i
 Types and members include class, record, interface, property and this[...] indexer declarations.
 Use let for immutable bindings, var for mutable bindings and set for updates.
 Control flow includes if/else if/else, while, each collection iteration and two distinct for modes.
-Contracts and authoritative effects describe obligations and side effects with requires, => and !.
+Contracts and authoritative effects describe obligations and side effects with parameter refinements (| (# > 0)), => and !.
 Async functions distinguish their body result from the callable Task or ValueTask carrier.
 Expressions use C# precedence, postfix calls and indexing. Collections use ordinary .NET types.
 Types use C# names, T[] arrays and T? nullability. Literals include 42, true, "hello" and 18.00m.
@@ -168,7 +168,7 @@ Complete example: [objects](#example-complete_objects).
 
 ## for loop
 
-One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.
+One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other. Count with from/to when the bound cannot change in the body; use while otherwise. while also leaves its counter in scope after the loop.
 
 Syntax: `for i from start to end step stepValue; for i = start; condition; i = next`
 
@@ -377,9 +377,9 @@ Complete example: [Effects](#example-primer_effects).
 
 ## precondition
 
-Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.
+Constrains a parameter at the call: an inline refinement after the parameter, with # standing for its value, checked on entry and on every reassignment. A condition on several parameters refines the last one and names the earlier ones (int:lo, int:hi | (# > lo)). There is no separate precondition clause. Use a refinement, not an if-throw guard. A failed refinement throws ArgumentOutOfRangeException with a generated message, so keep a guard only when callers need another exception type or a custom message.
 
-Syntax: `requires condition`
+Syntax: `type:name | (condition on #)`
 
 C# equivalents (fragments):
 
@@ -498,7 +498,7 @@ Complete example: [Person](#example-task_33).
 
 ## switch expression
 
-Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.
+Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression. Branching on one value against 3 or more constants uses match; otherwise use if. Calor1306 reports such if chains without a patch: a statement match lowers to a C# switch.
 
 Syntax: `match expression with indented case pattern → result arms`
 
@@ -569,7 +569,7 @@ Complete example: [Container](#example-task_29).
 
 ## LINQ query
 
-LINQ calls use ordinary postfix syntax, but syntax and metadata resolution do not prove their effects. Enumerable.Where and Enumerable.ToArray currently remain unknown under strict checking, even with a pure typed predicate and fully qualified IEnumerable<T> result. The complete example instead traverses the input once into a private buffer, then copies the matched prefix into an exact-sized result. It preserves encounter order and duplicates without rereading caller-owned entries; it is not LINQ support or deferred enumeration. Its alloc and mut row covers constructing and filling both arrays. Do not relax effect policy or use casts to hide the LINQ boundary.
+LINQ calls use ordinary postfix syntax, but syntax and metadata resolution do not prove their effects. Enumerable.Where and Enumerable.ToArray currently remain unknown under strict checking, even with a pure typed predicate and fully qualified IEnumerable<T> result. The complete example instead traverses the input once into a private buffer, then copies the matched prefix into an exact-sized result. It preserves encounter order and duplicates without rereading caller-owned entries; it is not LINQ support or deferred enumeration. Its alloc and mut row covers constructing and filling both arrays. Do not relax effect policy or use casts to hide the LINQ boundary. Default to a loop for transformations and queries: it measured fewer tokens. It is not identical: the loop runs eagerly, not deferred, its row is alloc,mut where LINQ's is alloc, and a null source throws a different exception type.
 
 Syntax: `System.Linq.Enumerable.Where(collection, predicate)`
 
@@ -1437,9 +1437,8 @@ SquareRoot
 
 ```calor
 module AgentReference3
-  func SquareRoot (int:x) → int
+  func SquareRoot (int:x | (# >= 0)) → int
     !
-    requires (x >= 0)
     return x
 ```
 
@@ -1611,9 +1610,8 @@ GetListLength
 
 ```calor
 module AgentReference15
-  func GetListLength (int:n) → int
+  func GetListLength (int:n | (# >= 0)) → int
     ! alloc,mut
-    requires n >= 0
     let List<int>:nums = new List<int>()
     for i from 1 to n step 1
       nums.Add(i)
@@ -1908,9 +1906,8 @@ GetFirstChar
 
 ```calor
 module AgentReference36
-  func GetFirstChar (string:s) → char
+  func GetFirstChar (string:s | (#.Length > 0)) → char
     !
-    requires s.Length > 0
     return s[0]
 ```
 
@@ -1956,9 +1953,8 @@ AllPositive
 
 ```calor
 module AgentReference39
-  func AllPositive (int[]:arr, int:n) → bool
+  func AllPositive (int[]:arr, int:n | (# == arr.Length)) → bool
     !
-    requires n == arr.Length
     => !result || !(exists int:i in 0..n : arr[i] <= 0)
     var bool:allPos = true
     for i from 0 to arr.Length - 1 step 1
@@ -1973,9 +1969,8 @@ HasNegative
 
 ```calor
 module AgentReference40
-  func HasNegative (int[]:arr, int:n) → bool
+  func HasNegative (int[]:arr, int:n | (# == arr.Length)) → bool
     !
-    requires n == arr.Length
     => result == (exists int:i in 0..n : arr[i] < 0)
     for i from 0 to arr.Length - 1 step 1
       if arr[i] < 0
@@ -1989,9 +1984,8 @@ DigitValue
 
 ```calor
 module AgentReference41
-  func DigitValue (char:c) → int
+  func DigitValue (char:c | (char.IsDigit(#))) → int
     !
-    requires char.IsDigit(c)
     return c - '0'
 ```
 
@@ -2012,15 +2006,13 @@ Contracts
 
 ```calor
 module Contracts
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x
 
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 

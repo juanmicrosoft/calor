@@ -23,18 +23,16 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
 {
     private const string IntSource = """
         module R1Case R1Case block overflow unchecked
-          func Probe (int:x) → int
+          func Probe (int:x | (# == 2147483647)) → int
             !
-            requires (x == 2147483647)
             => ((x + 1) > 0)
             return 0
         """;
 
     private const string LongSource = """
         module R1Case R1Case block overflow unchecked
-          func Probe (int:x) → int
+          func Probe (int:x | (# == 2147483647)) → int
             !
-            requires (x == 2147483647)
             => ((x + 1L) > 0)
             return 0
         """;

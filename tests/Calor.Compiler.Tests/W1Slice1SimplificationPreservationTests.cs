@@ -19,12 +19,12 @@ public class W1Slice1SimplificationPreservationTests
     [Fact]
     public void ModuleInteropBlocks_SurviveContractSimplification()
     {
-        // requires (2 > 1) constant-folds → the pass reconstructs the module. The
+        // => (2 > 1) constant-folds → the pass reconstructs the module. The
         // interop block must survive the reconstruction.
         var source = @"module T T block
   func F (int:x) → int
     !
-    requires (2 > 1)
+    => (2 > 1)
     return x
   raw member:class:Other:keep%20class 28
 public static class Keep { }

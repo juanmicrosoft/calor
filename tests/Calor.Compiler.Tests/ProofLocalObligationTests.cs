@@ -65,9 +65,8 @@ public sealed class ProofLocalObligationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
             module Banking Banking block
-              func Transfer (int:balance, int:amount | (# > 0)) → int
+              func Transfer (int:balance, int:amount | ((# > 0) && (balance >= #))) → int
                 !
-                requires (balance >= amount)
                 let int:newBalance = (balance - amount)
                 proof{"non-negative"} (newBalance >= 0)
                 return newBalance
@@ -90,20 +89,17 @@ public sealed class ProofLocalObligationTests
     [SkippableFact]
     public void ChainedLocals_Discharge()
         => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
-            requires (x >= 0)
-            requires (x < 1000)
             let int:a = (x + 1)
             let int:b = (a * 2)
             proof (b > x)
-            """).Status);
+            """, "int:x | ((# >= 0) && (# < 1000))").Status);
 
     [SkippableFact]
     public void UntypedBoolLocal_Discharges()
         => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
-            requires (x > 0)
             let positive = (x > 0)
             proof positive
-            """).Status);
+            """, "int:x | (# > 0)").Status);
 
     [SkippableFact]
     public void LocalBoundBeforeBranch_ProvesInsideIt()
@@ -181,10 +177,9 @@ public sealed class ProofLocalObligationTests
     [SkippableFact]
     public void LocalShadowingParameter_IsRefused()
         => AssertNotDischarged(SolveProof("""
-            requires (x > 0)
             let int:x = -1
             proof (x > 0)
-            """), "shares its name with a parameter");
+            """, "int:x | (# > 0)"), "shares its name with a parameter");
 
     // Review round 3: an `in` argument exposes the local's storage to the callee.
     [SkippableFact]
@@ -242,11 +237,9 @@ public sealed class ProofLocalObligationTests
     [SkippableFact]
     public void FalseClaimAboutArithmeticLocal_IsNotDischarged()
         => AssertNotDischarged(SolveProof("""
-            requires (x >= 0)
-            requires (x < 100)
             let int:k = (x + 1)
             proof (k < x)
-            """));
+            """, "int:x | ((# >= 0) && (# < 100))"));
 
     [SkippableFact]
     public void LocalDefinitionThatMayOverflow_IsNotDischarged()

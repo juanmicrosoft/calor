@@ -6,9 +6,8 @@ module L3M05 L3M05 block
       let int:@base = ((x * 4) - y)
       return (@base + 88)
 
-    func l3m05_fn02 public (int:x, int:y) → int
+    func l3m05_fn02 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 23850)
@@ -16,10 +15,8 @@ module L3M05 L3M05 block
       else
         return ((acc * 2) + 23850)
 
-    func l3m05_fn03 public (int:x, int:y) → int
+    func l3m05_fn03 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 23857)
       let int:total = ((x * 2) + y)
       if (total < 23857)
@@ -32,10 +29,8 @@ module L3M05 L3M05 block
       let int:@base = ((x * 4) - y)
       return (@base + 51)
 
-    func l3m05_fn05 public (int:x, int:y) → int
+    func l3m05_fn05 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 23864)
       let int:total = ((x * 5) + y)
       if (total < 23864)
@@ -43,9 +38,8 @@ module L3M05 L3M05 block
       else
         return total
 
-    func l3m05_fn06 public (int:x, int:y) → int
+    func l3m05_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23871)
       if (x >= 23871)
@@ -53,18 +47,16 @@ module L3M05 L3M05 block
       else
         return 23871
 
-    func l3m05_fn07 public (int:x, int:y) → int
+    func l3m05_fn07 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23878)
       let int:total = ((x * 5) + y)
       if (total > 23878)
         return 23878
       return total
 
-    func l3m05_fn08 public (int:x, int:y) → int
+    func l3m05_fn08 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 3) + y)
       if (acc > 23885)
@@ -72,18 +64,16 @@ module L3M05 L3M05 block
       else
         return ((acc * 2) + 23885)
 
-    func l3m05_fn09 public (int:x, int:y) → int
+    func l3m05_fn09 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23892)
       let int:total = ((x * 3) + y)
       if (total > 23892)
         return 23892
       return total
 
-    func l3m05_fn10 public (int:x, int:y) → int
+    func l3m05_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23899)
       if (x >= 23899)
@@ -91,9 +81,8 @@ module L3M05 L3M05 block
       else
         return 23899
 
-    func l3m05_fn11 public (int:x, int:y) → int
+    func l3m05_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 23906)
       if (x >= 23906)
@@ -101,18 +90,16 @@ module L3M05 L3M05 block
       else
         return 23906
 
-    func l3m05_fn12 public (int:x, int:y) → int
+    func l3m05_fn12 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23913)
       let int:total = ((x * 3) + y)
       if (total > 23913)
         return 23913
       return total
 
-    func l3m05_fn13 public (int:x, int:y) → int
+    func l3m05_fn13 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 23920)
       let int:total = ((x * 3) + y)
       if (total > 23920)

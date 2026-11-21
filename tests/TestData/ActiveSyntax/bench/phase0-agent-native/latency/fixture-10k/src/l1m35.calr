@@ -7,9 +7,8 @@ module L1M35 L1M35 block
       let int:v2 = L2M16.L2M16Module.l2m16_fn02(x, 26)
       return ((v1 + v2) + y)
 
-    func l1m35_fn02 public (int:x, int:y) → int
+    func l1m35_fn02 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 2) + y)
       if (acc > 21834)
@@ -54,9 +53,8 @@ module L1M35 L1M35 block
       let int:v2 = L2M15.L2M15Module.l2m15_fn12(x, 23)
       return ((v1 + v2) + y)
 
-    func l1m35_fn10 public (int:x, int:y) → int
+    func l1m35_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21841)
       if (x >= 21841)
@@ -70,10 +68,8 @@ module L1M35 L1M35 block
       let int:v2 = L2M23.L2M23Module.l2m23_fn11(x, 59)
       return ((v1 + v2) + y)
 
-    func l1m35_fn12 public (int:x, int:y) → int
+    func l1m35_fn12 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 21848)
       let int:total = ((x * 5) + y)
       if (total < 21848)
@@ -81,9 +77,8 @@ module L1M35 L1M35 block
       else
         return total
 
-    func l1m35_fn13 public (int:x, int:y) → int
+    func l1m35_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21855)
       if (x >= 21855)

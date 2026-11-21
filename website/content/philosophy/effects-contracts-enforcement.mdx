@@ -193,8 +193,8 @@ public static int Divide(int a, int b)
 // In production: DivideByZeroException with no context
 ```
 
-Calor preconditions are emitted as runtime checks unless contract checks are
-explicitly disabled with `--contract-mode off`. For supported body shapes,
+Calor preconditions (parameter refinements) are always emitted as runtime
+checks, in every contract mode. For supported body shapes,
 postconditions are emitted unless optional `--verify` produces an eligible,
 clean, non-vacuous `proven` result. Inconclusive results do not authorize
 proof-based removal; they do not guarantee that runtime lowering is supported.
@@ -202,21 +202,22 @@ See [verification modes and limits](/docs/guides/verification-guarantees/).
 
 ```calor
 module EnforcedDivide
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 
-`Divide(9, 2)` returns `4`. With checks enabled, `Divide(9, 0)` fails the
-precondition before division. Native `requires` has no custom-message clause.
+`Divide(9, 2)` returns `4`. `Divide(9, 0)` fails the precondition before
+division, in every contract mode. A parameter refinement has no custom-message clause.
 The condition does not prevent every arithmetic exception:
 `Divide(int.MinValue, -1)` still overflows.
 
-The generated check throws `Calor.Runtime.ContractViolationException`.
-`debug` includes source details; `release` uses a leaner exception but does
-not remove the precondition. An explicit body check is the alternative when
-an API needs its own exception type or message.
+The generated check throws `System.ArgumentOutOfRangeException` with
+`ParamName` `b` and the message
+`Violation of inline refinement for parameter 'b'`. The guard is the same in
+`debug`, `release`, and `off` modes. Postconditions and invariants still throw
+`Calor.Runtime.ContractViolationException`. An explicit body check is the
+alternative when an API needs its own exception type or message.
 
 ---
 
@@ -311,7 +312,7 @@ diagram is not a measured productivity result.
 | Possibly-null value crossing a supported receiving boundary | Runtime null-reference exception | Calor 0.22 binding Error at initialization, native return, or method input |
 | Invalid state transition | Integration test (if lucky) | Contract violation when the contract covers it |
 | Effect leaking through a resolved supported call | Review or runtime observation | Compile error; call-chain detail depends on analysis coverage |
-| False contract on a supported runtime path | Tests or explicit validation | Contract exception when checks are enabled |
+| False contract on a supported runtime path | Tests or explicit validation | `ArgumentOutOfRangeException` for a failed precondition (every contract mode); `ContractViolationException` for a failed postcondition when checks are enabled |
 
 The [nullability guide](/docs/guides/nullability-and-dotnet-interop/) defines
 Calor 0.22's bounded support. It does not promise whole-program

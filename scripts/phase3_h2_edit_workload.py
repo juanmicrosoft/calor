@@ -52,7 +52,7 @@ from calor_indent_xform import from_indent, load_openers, to_indent  # type: ign
 
 REPO = Path(__file__).resolve().parent.parent
 CALOR_EXE = REPO / 'src/Calor.Compiler/bin/Debug/net10.0/calor.exe'
-FIXTURE = REPO / 'scripts/h2_edit_fixture.calr'
+FIXTURE = REPO / 'scripts/historical/h2_edit_fixture.calr.txt'
 MODEL = 'claude-haiku-4-5'
 BUDGET_USD = 5.0
 TRIALS_PER_CELL = 5

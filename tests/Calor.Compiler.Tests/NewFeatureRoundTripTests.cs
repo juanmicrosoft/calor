@@ -172,14 +172,13 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires (b != 0)
     => (result >= 0)
     return (a / b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("requires ", formatted);
+        Assert.Contains(" | (# ", formatted);
         Assert.Contains("=> ", formatted);
         Assert.Single(reparsed.Functions);
     }
@@ -378,9 +377,8 @@ module MathLib MathLib block
     {
         var source = @"
 module ComplexTest ComplexTest block
-  func Process (int:input) → int
+  func Process (int:input | (# > 0)) → int
     ! cw
-    requires (input > 0)
     => (result >= 0)
     if (input > 10)
       Console.WriteLine(""big"")
@@ -390,7 +388,7 @@ module ComplexTest ComplexTest block
       return input
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("requires ", formatted);
+        Assert.Contains(" | (# ", formatted);
         Assert.Contains("=> ", formatted);
         Assert.Contains("if ", formatted);
         Assert.Single(reparsed.Functions);

@@ -273,8 +273,7 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             module TestModule TestModule block
-              func Divide private (int:a, int:b) → int
-                requires (b != 0)
+              func Divide private (int:a, int:b | (# != 0)) → int
                 return (a / b)
             """;
 
@@ -284,7 +283,9 @@ public class SignatureHelpHandlerTests
         var func = SymbolFinder.FindFunction(ast, "Divide");
 
         Assert.NotNull(func);
-        Assert.NotEmpty(func.Preconditions);
+        // #1618: the precondition is the refinement on b
+        Assert.NotEmpty(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(
+            func.Parameters, func.Preconditions));
     }
 
     [Fact]

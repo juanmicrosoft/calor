@@ -204,6 +204,133 @@ public sealed class IfStatementNode : StatementNode
         return result;
     }
 
+    /// <summary>
+    /// #1622: if/else-if chains whose every condition compares one parameter or local
+    /// (a plain name, no member access or call) with <c>==</c> against a distinct constant
+    /// of that name's declared integral, char, string or module enum type, with at least
+    /// three conditions. A <c>match</c> states the same choice in fewer tokens. This is
+    /// report-only: a statement match lowers to a C# <c>switch</c>, so generated C# differs,
+    /// and chains whose bodies contain a loop <c>break</c> (which would bind to the switch)
+    /// are skipped.
+    /// </summary>
+    internal static IReadOnlyList<(IfStatementNode Chain, string Name)> GetMatchCandidateChains(ModuleNode module)
+    {
+        var enums = new HashSet<string>(StringComparer.Ordinal);
+        var all = new Stack<AstNode>();
+        all.Push(module);
+        while (all.TryPop(out var node))
+        {
+            if (node is EnumDefinitionNode enumNode)
+                enums.Add(enumNode.Name);
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+                all.Push(child);
+        }
+
+        var result = new List<(IfStatementNode, string)>();
+        var pending = new Stack<(AstNode Node, IReadOnlyDictionary<string, string?> Locals)>();
+        pending.Push((module, new Dictionary<string, string?>()));
+        while (pending.TryPop(out var frame))
+        {
+            var locals = frame.Node is FunctionNode or MethodNode or ConstructorNode
+                or OperatorOverloadNode or IndexerNode
+                ? CollectDeclaredTypes(frame.Node)
+                : frame.Locals;
+            if (frame.Node is IfStatementNode chain
+                && chain.GetMatchScrutinee(locals, enums) is { } name)
+                result.Add((chain, name));
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(frame.Node))
+                pending.Push((child, locals));
+        }
+        return result;
+    }
+
+    private string? GetMatchScrutinee(IReadOnlyDictionary<string, string?> locals, IReadOnlySet<string> enums)
+    {
+        if (ElseIfClauses.Count < 2)
+            return null;
+        string? name = null;
+        string? family = null;
+        var constants = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var condition in ElseIfClauses.Select(clause => clause.Condition).Prepend(Condition))
+        {
+            if (condition is not BinaryOperationNode { Operator: BinaryOperator.Equal } comparison)
+                return null;
+            var (reference, constant) = comparison.Left is ReferenceNode left
+                ? (left, comparison.Right)
+                : (comparison.Right as ReferenceNode, comparison.Left);
+            if (reference is null || reference.IsVerbatim || reference.IsNullLiteral
+                || reference.Name.Contains('.') || (name != null && reference.Name != name)
+                || !locals.TryGetValue(reference.Name, out var declared) || declared == null)
+                return null;
+            var type = Migration.TypeMapper.ToSurfaceType(declared).TrimEnd('?');
+            var (kind, key) = constant switch
+            {
+                IntLiteralNode literal => ("integral", literal.IsUnsigned
+                    ? literal.UnsignedValue.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : literal.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                CharOperationNode { Operation: CharOp.CharLiteral, Arguments: [StringLiteralNode text] } =>
+                    ("char", text.Value),
+                StringLiteralNode { IsUtf8: false } text => ("string", text.Value),
+                ReferenceNode { IsVerbatim: false } member when member.Name.LastIndexOf('.') is var dot and > 0
+                    && enums.Contains(member.Name[..dot]) => (member.Name[..dot], member.Name[(dot + 1)..]),
+                FieldAccessNode { Target: ReferenceNode { IsVerbatim: false } owner } member
+                    when enums.Contains(owner.Name) => (owner.Name, member.FieldName),
+                _ => (null, null)
+            };
+            var typeFamily = type switch
+            {
+                "sbyte" or "byte" or "short" or "ushort" or "int" or "uint" or "long" or "ulong" => "integral",
+                "char" or "string" => type,
+                _ => enums.Contains(type) ? type : null
+            };
+            if (kind == null || kind != typeFamily || (family != null && family != kind)
+                || !constants.Add(key!))
+                return null;
+            name = reference.Name;
+            family = kind;
+        }
+
+        var bodies = ElseIfClauses.Select(clause => clause.Body).Prepend(ThenBody);
+        if (ElseBody != null)
+            bodies = bodies.Append(ElseBody);
+        return bodies.SelectMany(body => body).Any(ContainsLoopBreak) ? null : name;
+    }
+
+    private static bool ContainsLoopBreak(AstNode node) => node switch
+    {
+        BreakStatementNode => true,
+        WhileStatementNode or DoWhileStatementNode or ForStatementNode or ForeachStatementNode
+            or DictionaryForeachNode or LambdaExpressionNode => false,
+        _ => Analysis.RecursiveAstWalker.GetAllChildren(node).Any(ContainsLoopBreak)
+    };
+
+    private static Dictionary<string, string?> CollectDeclaredTypes(AstNode root)
+    {
+        // Any second declaration of a name, or one without a declared type, makes it unknown.
+        var types = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var pending = new Stack<AstNode>();
+        pending.Push(root);
+        while (pending.TryPop(out var node))
+        {
+            var (name, type) = node switch
+            {
+                ParameterNode parameter => (parameter.Name, parameter.TypeName),
+                BindStatementNode bind => (bind.Name, bind.TypeName),
+                LambdaParameterNode parameter => (parameter.Name, null),
+                ForeachStatementNode loop => (loop.VariableName, null),
+                ForStatementNode loop => (loop.VariableName, loop.VariableType),
+                _ => ((string?)null, (string?)null)
+            };
+            if (name != null)
+                types[name] = types.ContainsKey(name) ? null : type;
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+                if (node == root || child is not (FunctionNode or MethodNode or ConstructorNode
+                        or OperatorOverloadNode or IndexerNode))
+                    pending.Push(child);
+        }
+        return types;
+    }
+
 
 }
 

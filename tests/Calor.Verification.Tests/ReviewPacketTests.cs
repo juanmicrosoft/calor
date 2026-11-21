@@ -25,11 +25,9 @@ public class ReviewPacketTests : IDisposable
 
     private const string MixedModule = @"
 module Pricing
-  func Square public (int:x) → int
+  func Square public (int:x | ((# >= 0) && (# <= 46340))) → int
 
     !
-    requires x >= 0
-    requires x <= 46340
     => result >= 0
     return x * x
 
@@ -70,7 +68,9 @@ module Pricing
         var packet = result.Packet;
 
         Assert.False(result.HasCompileErrors);
-        Assert.True(packet.Summary.TotalContracts >= 4);
+        // #1618: Square's two preconditions are one conjoined refinement on x, so the module
+        // states three contracts (that refinement and the two postconditions).
+        Assert.True(packet.Summary.TotalContracts >= 3);
         Assert.True(packet.Summary.UnprovenRemainder >= 1);
 
         // BrokenCap's §S is refutable (amount unconstrained) — it must be in
@@ -171,10 +171,11 @@ module Pricing
     [Fact]
     public void Packet_ChangedLineRanges_MapToDeclarations()
     {
-        // Lines covering BrokenCap only.
+        // Lines covering BrokenCap only (#1618: two lines shorter since Square's preconditions
+        // moved into its parameter list).
         var ranges = new Dictionary<string, IReadOnlyList<(int, int)>>(StringComparer.Ordinal)
         {
-            [Path.Combine(_root, "pricing.calr")] = [(11, 16)]
+            [Path.Combine(_root, "pricing.calr")] = [(9, 14)]
         };
         var result = Build(MixedModule, new ReviewPacketBuilder.Options(
             ChangedLineRanges: ranges, BaselineRef: "HEAD"));
@@ -239,10 +240,8 @@ module App
         // let summary.proven read clean — proven counts non-vacuous only.
         const string vacuous = @"
 module Vac
-  func Weird public (int:x) → int
+  func Weird public (int:x | ((# >= 1) && (# <= 0))) → int
     !
-    requires x >= 1
-    requires x <= 0
     => result == 5
     return 7
 ";

@@ -1,7 +1,5 @@
 module OutcomeVacuous OutcomeVacuous block
-  func Impossible (int:x) → int
+  func Impossible (int:x | ((# > 10) && (# < 5))) → int
     !
-    requires (x > 10)
-    requires (x < 5)
     => (result == x)
     return x

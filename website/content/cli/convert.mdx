@@ -71,7 +71,7 @@ calor convert MyService.cs --benchmark
 | `--no-fallback` | — | `false` | Disable TODO substitution; default faithful C# preservation still applies |
 | `--validate` | — | `false` | Request validation reporting; generated Calor is always parse-validated before writing |
 | `--passthrough` | — | `false` | Widen the set of C# members preserved verbatim. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
-| `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
+| `--timeout` | `-t` | `0` | Time limit in seconds for native conversion; 0 disables it. When it expires, the original C# is written whole (trigger `timeout`) |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
 | `--define` | — | None | Conditional-compilation symbol; repeat for several symbols |
 | `--language-version` | — | Converter default | C# language version used by Roslyn |
@@ -252,9 +252,17 @@ and `enabledBy` when they apply. `data.conversionPaths` summarizes the file:
 }
 ```
 
-`outcome` is `native`, `preserved`, `lossy`, `unverified`, or `refused`. A refused
-conversion writes nothing, exits `1`, and prints
-`Conversion refused; no output written (automatic rescue: on, --passthrough: off).`
+`outcome` is `native`, `preserved`, `lossy`, `unverified`, or `refused`. Since 0.30
+a refusal has only two causes, and both write nothing and exit `1`:
+
+- The input does not parse: `Conversion refused; no output written: the input C# does not parse, so it cannot be preserved.`
+- Whole-file preservation could not reproduce the original exactly. This is a
+  converter bug, and the message asks you to report it.
+
+Every other failure drops to whole-file preservation and the file is written.
+That includes a conversion crash, a failed output check, and a `--timeout` that
+expires: the original C# is then kept whole, with trigger `timeout`. C# that
+parses but does not compile is written too, as `unverified` (exit `2`).
 
 `roundTrip` reports the converter's round-trip check: it compiles the generated
 Calor, then compiles the C# that Calor produces.
@@ -264,7 +272,7 @@ Calor, then compiles the C# that Calor produces.
 | `verified` | Both compiles succeeded. |
 | `failed` | The check failed. Exact preserved C# can still be written as `unverified`, for example when standalone references are missing. This is not a passed build. |
 | `deferred` | The caller compiles the C# itself. Project migration replaces this with the result of its combined check. |
-| `not-run` | Conversion stopped before the check, so the file is refused. |
+| `not-run` | Conversion stopped before the check: the input does not parse, so the file is refused. |
 
 Schema version 2 (0.26) added `roundTrip` and the `unverified` outcome. Before
 0.26, `--lossy` skipped the check entirely. A file whose output did not compile
@@ -291,8 +299,10 @@ So `nativeConversionCount > 0` does not mean the file is native. Read
 
 - **Preserved** (`outcome: "preserved"`, exit `0`): the file is written, and some
   members, statements, or holes are still C#.
-- **Refused** (`outcome: "refused"`, exit `1`): nothing is written. Missing,
-  malformed, unreadable inputs and write failures remain explicit errors.
+- **Refused** (`outcome: "refused"`, exit `1`): nothing is written. Only input
+  that does not parse is refused (plus a converter bug in whole-file preservation).
+  A missing input, a missing `--reference`, an unreadable file, a destination
+  safety check, and a write failure are command errors (exit `1`).
 - **Unverified** (`outcome: "unverified"`, exit `2`): exact original C# is written,
   but its standalone compile failed. The report retains the compiler diagnostics.
   Validate with the original project references and configuration. Writing is not
@@ -634,7 +644,7 @@ assuming it reproduces the website headline.
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Conversion completed; inspect the loss report to distinguish fully native from preserved interop |
-| `1` | Input, validation, timeout or write error. Refused conversions write nothing; a final receipt error can occur after output was written. Read the actual diagnostic and disposition. |
+| `1` | The input does not parse, a command error (missing input or `--reference`, a destination safety check), or a write error. Refused conversions write nothing; a final receipt error can occur after output was written. A timeout no longer exits `1`: the original C# is written whole. |
 | `2` | Exact original C# was preserved and written, but standalone compilation failed (`outcome: "unverified"`). Verify with the original project context. |
 
 ---

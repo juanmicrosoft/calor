@@ -79,7 +79,8 @@ public static class EdgeCaseCoverageAnalyzer
         {
             totalFunctions++;
 
-            if (function.Preconditions.Count > 0 || function.Postconditions.Count > 0)
+            // #1618: HasContracts counts parameter refinements, which are the preconditions.
+            if (function.HasContracts)
                 functionsWithContracts++;
 
             foreach (var stmt in function.Body)
@@ -94,7 +95,7 @@ public static class EdgeCaseCoverageAnalyzer
             {
                 totalFunctions++;
 
-                if (method.Preconditions.Count > 0 || method.Postconditions.Count > 0)
+                if (method.HasContracts)
                     functionsWithContracts++;
 
                 foreach (var stmt in method.Body)

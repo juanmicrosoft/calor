@@ -1,8 +1,7 @@
 module HashMap HashMap
   module HashMapModule
-    func BucketIndex public (int:hashCode, int:bucketCount) → int
+    func BucketIndex public (int:hashCode, int:bucketCount | (# > 0)) → int
       !
-      requires bucketCount > 0
       => result >= 0
       => result < bucketCount
       let absHash = hashCode
@@ -10,12 +9,10 @@ module HashMap HashMap
         set absHash 0 - absHash
       return absHash % bucketCount
 
-    func LoadFactor public (int:itemCount, int:bucketCount) → float
+    func LoadFactor public (int:itemCount, int:bucketCount | (# > 0)) → float
       !
-      requires bucketCount > 0
       return (double)itemCount / (double)bucketCount
 
-    func NeedsResize public (int:itemCount, int:bucketCount) → bool
+    func NeedsResize public (int:itemCount, int:bucketCount | (# > 0)) → bool
       !
-      requires bucketCount > 0
       return (itemCount * 100) > (bucketCount * 75)

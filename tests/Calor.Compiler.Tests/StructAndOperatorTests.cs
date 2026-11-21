@@ -677,9 +677,8 @@ public class StructAndOperatorTests
               class Vector struct
                 field double:X public
                 field double:Y public
-                op + (int:a, int:b) → int
+                op + (int:a | (# >= 0), int:b) → int
                   ! unknown
-                  requires a >= 0
                   return a + b
             """;
 
@@ -699,7 +698,7 @@ public class StructAndOperatorTests
 
         // Should emit the precondition contract check
         Assert.Contains("(a >= 0)", code);
-        Assert.Contains("ContractViolationException", code);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(a)", code);
     }
 
     [Fact]

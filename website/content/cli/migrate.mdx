@@ -125,18 +125,53 @@ The console summary adds one line when any member was preserved:
   Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed)
 ```
 
-Default migration tries native conversion, then preserves C# at a member, type,
-or whole-file boundary. Generated-Calor and combined project C# checks still run;
-failures escalate preservation and trigger another check. Whole-file output
-reproduces the original C# without a generated preamble.
+## What Gets Written
 
-Every buildable discovered input is written without a lossy or passthrough flag.
-Malformed, missing, unreadable inputs and write failures remain errors; they do
-not discard unrelated valid files. Loose source copies may lack project references.
-Their exact preserved outputs are written with `outcome: "unverified"` and failed
-compilation diagnostics, not a passed build. Native fraction excludes passthrough
-and is reported separately from writing, compilation, and test execution.
-The destructive lossy and branch-selection options have been removed.
+Since 0.30, `calor migrate` writes a `.calr` file for every C# file that parses.
+This reverses the old all-or-nothing rule (#770, #932). Before, one failing file
+or a failed project build meant no file was written.
+
+Each file tries four rungs, in order:
+
+1. Native Calor.
+2. Native Calor with some members kept as C#.
+3. Native Calor with some types kept as C#.
+4. The whole file kept as C#, byte for byte (whole-file preservation).
+
+A file drops one rung when conversion fails, crashes, or takes longer than 60
+seconds, or when the generated Calor or C# fails a check. The report records the
+reason for every drop. Quality is the native fraction: the share of files written
+as native Calor. Writing is not the quality measure, because every file is written.
+
+Three rules keep one problem from blocking the rest:
+
+- **C# that parses but does not compile** is kept exactly and marked `unverified`.
+- **The project build is a check, not a gate.** Migration compiles all generated
+  C# with the project's references. Files whose own C# fails drop to rung 4. If
+  errors remain even when every file is its original C#, native files are not
+  blamed: every file is written and marked `unverified`.
+- **A write error affects only its file.**
+
+A file is not written in only six cases:
+
+| Case | What you see |
+|:-----|:-------------|
+| The C# does not parse (syntax errors, or an active `#error`) | The file fails |
+| A safety check on the destination: an output you edited, an output with no receipt (`.conversion.json`), or two inputs mapped to one output | The file fails; the message says what to delete or where to convert instead |
+| A disk error while writing | The file fails |
+| Whole-file preservation cannot reproduce the original exactly | The file fails; this is a converter bug |
+| The file is outside the project folder (a NuGet `contentFiles` item, a linked file) | The file is skipped; nothing is written outside the project |
+| `--dry-run` or Ctrl+C | Nothing is written |
+
+Native fraction excludes preserved C#. It is reported apart from writing,
+compiling, and running tests. The `--lossy` and branch-selection options were
+removed in 0.30.
+
+One known gap: the build names generated C# files `*.g.cs`, and the C# compiler
+treats such files as generated code with nullable annotations off. A whole-file
+preserved original that uses `?` annotations then reports CS8669 in a project with
+`<Nullable>enable</Nullable>`. If the project also sets `TreatWarningsAsErrors`,
+it does not build. Migration still writes those files and marks them `unverified`.
 
 ---
 

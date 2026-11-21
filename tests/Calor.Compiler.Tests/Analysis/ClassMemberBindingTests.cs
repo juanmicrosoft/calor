@@ -786,7 +786,7 @@ module Test
         var source = @"
 module Test
   class Widget
-    ctor stat ()
+    ctor static ()
       Console.WriteLine(""static"")
 
     ctor ()

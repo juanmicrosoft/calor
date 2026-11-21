@@ -1,8 +1,7 @@
 module MaxHeap MaxHeap
   module MaxHeapModule
-    func Parent public (int:index) → int
+    func Parent public (int:index | (# > 0)) → int
       !
-      requires index > 0
       return (index - 1) / 2
 
     func LeftChild public (int:index) → int

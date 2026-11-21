@@ -1,9 +1,8 @@
 module L1M22 L1M22 block
   module L1M22Module public
 
-    func l1m22_fn01 public (int:x, int:y) → int
+    func l1m22_fn01 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21113)
       let int:total = ((x * 3) + y)
       if (total > 21113)
@@ -22,19 +21,16 @@ module L1M22 L1M22 block
       let int:v2 = L2M35.L2M35Module.l2m35_fn02(x, 28)
       return ((v1 + v2) + y)
 
-    func l1m22_fn04 public (int:x, int:y) → int
+    func l1m22_fn04 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21120)
       let int:total = ((x * 2) + y)
       if (total > 21120)
         return 21120
       return total
 
-    func l1m22_fn05 public (int:x, int:y) → int
+    func l1m22_fn05 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 21127)
       let int:total = ((x * 2) + y)
       if (total < 21127)
@@ -42,9 +38,8 @@ module L1M22 L1M22 block
       else
         return total
 
-    func l1m22_fn06 public (int:x, int:y) → int
+    func l1m22_fn06 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21134)
       let int:total = ((x * 5) + y)
       if (total > 21134)
@@ -56,9 +51,8 @@ module L1M22 L1M22 block
       let int:v1 = L2M33.L2M33Module.l2m33_fn06(x, 38)
       return (v1 + y)
 
-    func l1m22_fn08 public (int:x, int:y) → int
+    func l1m22_fn08 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21141)
       if (x >= 21141)
@@ -66,10 +60,8 @@ module L1M22 L1M22 block
       else
         return 21141
 
-    func l1m22_fn09 public (int:x, int:y) → int
+    func l1m22_fn09 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 21148)
       let int:total = ((x * 3) + y)
       if (total < 21148)
@@ -83,9 +75,8 @@ module L1M22 L1M22 block
       let int:v2 = L2M13.L2M13Module.l2m13_fn02(x, 70)
       return ((v1 + v2) + y)
 
-    func l1m22_fn11 public (int:x, int:y) → int
+    func l1m22_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21155)
       if (x >= 21155)
@@ -93,10 +84,8 @@ module L1M22 L1M22 block
       else
         return 21155
 
-    func l1m22_fn12 public (int:x, int:y) → int
+    func l1m22_fn12 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 21162)
       let int:total = ((x * 2) + y)
       if (total < 21162)

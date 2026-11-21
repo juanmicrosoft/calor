@@ -2982,7 +2982,7 @@ public class CSharpToCalorConversionTests
         // Verify CalorEmitter uses "stat" modifier
         Assert.NotNull(result.CalorSource);
         Assert.Contains("ctor ", result.CalorSource);
-        Assert.Contains("ctor stat", result.CalorSource);
+        Assert.Contains("ctor static", result.CalorSource);
 
         // Verify CSharpEmitter outputs "static Foo()"
         var csharpOutput = new CSharpEmitter().Emit(result.Ast);

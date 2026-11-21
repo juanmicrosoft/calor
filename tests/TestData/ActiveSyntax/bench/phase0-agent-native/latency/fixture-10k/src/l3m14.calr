@@ -6,9 +6,8 @@ module L3M14 L3M14 block
       let int:@base = ((x * 4) - y)
       return (@base + 7)
 
-    func l3m14_fn02 public (int:x, int:y) → int
+    func l3m14_fn02 public (int:x | (# > 2), int:y) → int
       !
-      requires (x > 2)
       => (x >= 3)
       let int:acc = ((x * 5) + y)
       if (acc > 24340)
@@ -16,9 +15,8 @@ module L3M14 L3M14 block
       else
         return ((acc * 2) + 24340)
 
-    func l3m14_fn03 public (int:x, int:y) → int
+    func l3m14_fn03 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 3) + y)
       if (acc > 24347)
@@ -36,10 +34,8 @@ module L3M14 L3M14 block
       let int:@base = ((x * 4) - y)
       return (@base + 7)
 
-    func l3m14_fn06 public (int:x, int:y) → int
+    func l3m14_fn06 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 24354)
       let int:total = ((x * 3) + y)
       if (total < 24354)
@@ -62,9 +58,8 @@ module L3M14 L3M14 block
       let int:@base = ((x * 4) - y)
       return (@base + 58)
 
-    func l3m14_fn10 public (int:x, int:y) → int
+    func l3m14_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24361)
       if (x >= 24361)
@@ -72,9 +67,8 @@ module L3M14 L3M14 block
       else
         return 24361
 
-    func l3m14_fn11 public (int:x, int:y) → int
+    func l3m14_fn11 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 24368)
       let int:total = ((x * 5) + y)
       if (total > 24368)
@@ -86,9 +80,8 @@ module L3M14 L3M14 block
       let int:@base = ((x * 4) - y)
       return (@base + 66)
 
-    func l3m14_fn13 public (int:x, int:y) → int
+    func l3m14_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24375)
       if (x >= 24375)

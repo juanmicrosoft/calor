@@ -1,9 +1,8 @@
 module L2M08 L2M08 block
   module L2M08Module public
 
-    func l2m08_fn01 public (int:x, int:y) → int
+    func l2m08_fn01 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22191)
       let int:total = ((x * 5) + y)
       if (total > 22191)
@@ -16,9 +15,8 @@ module L2M08 L2M08 block
       let int:v2 = L3M33.L3M33Module.l3m33_fn01(x, 48)
       return ((v1 + v2) + y)
 
-    func l2m08_fn03 public (int:x, int:y) → int
+    func l2m08_fn03 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22198)
       if (x >= 22198)
@@ -26,18 +24,16 @@ module L2M08 L2M08 block
       else
         return 22198
 
-    func l2m08_fn04 public (int:x, int:y) → int
+    func l2m08_fn04 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22205)
       let int:total = ((x * 5) + y)
       if (total > 22205)
         return 22205
       return total
 
-    func l2m08_fn05 public (int:x, int:y) → int
+    func l2m08_fn05 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 3) + y)
       if (acc > 22212)
@@ -62,10 +58,8 @@ module L2M08 L2M08 block
       let int:v2 = L3M14.L3M14Module.l3m14_fn07(x, 74)
       return ((v1 + v2) + y)
 
-    func l2m08_fn09 public (int:x, int:y) → int
+    func l2m08_fn09 public (int:x | (# >= 2), int:y | (# >= 0)) → int
       !
-      requires (x >= 2)
-      requires (y >= 0)
       => (result >= 22219)
       let int:total = ((x * 2) + y)
       if (total < 22219)
@@ -85,9 +79,8 @@ module L2M08 L2M08 block
       let int:v2 = L3M03.L3M03Module.l3m03_fn11(x, 75)
       return ((v1 + v2) + y)
 
-    func l2m08_fn12 public (int:x, int:y) → int
+    func l2m08_fn12 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22226)
       if (x >= 22226)

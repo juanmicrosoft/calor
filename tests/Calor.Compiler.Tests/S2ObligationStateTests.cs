@@ -54,8 +54,7 @@ public sealed class S2ObligationStateTests
     // The opaque writes are converter-owned raw frames (a raw payload's line starts at
     // column 0, so those cases are concatenated rather than raw string literals).
     [InlineData("module M M block\n"
-        + "  func Probe private (int:x) \u2192 int\n"
-        + "    requires (x > 0)\n"
+        + "  func Probe private (int:x | (# > 0)) \u2192 int\n"
         + "    raw member:checked-block:Other:checked%20overflow%20block%20preserved%20verbatim 19\n"
         + "checked { x = -5; }\n"
         + "    proof{\"claim\"} (x > 0)\n"
@@ -71,8 +70,7 @@ public sealed class S2ObligationStateTests
             return x
         """)]
     [InlineData("module M M block\n"
-        + "  func Probe private (int:x) \u2192 int\n"
-        + "    requires (x > 0)\n"
+        + "  func Probe private (int:x | (# > 0)) \u2192 int\n"
         + "    unsafe\n"
         + "      raw member:pointer:Other:Statement%20preserved%20as%20raw%20C%23%3A%20int%2A%20ptr%20%3D%20%26x%3B 15\n"
         + "int* ptr = &x; \n"
@@ -101,9 +99,8 @@ public sealed class S2ObligationStateTests
         module M M block
           class Box
             field int:Value
-            func Probe (ref int:x) → int
+            func Probe (ref int:x | (# > 0)) → int
               ! mut
-              requires (x > 0)
               set this.Value -5
               proof{"claim"} (x > 0)
               return x
@@ -138,9 +135,8 @@ public sealed class S2ObligationStateTests
         // precondition) make the claim hold; a model y = z = 0 is unreachable.
         const string source = """
             module M M block
-              func Probe (int:x | ((# > 0) && (y > 0)), int:y, int:z) → void
+              func Probe (int:x | ((# > 0) && (y > 0)), int:y, int:z | (y == #)) → void
                 !
-                requires (y == z)
                 set x 1
                 proof{"claim"} (z > 0)
             """;
@@ -161,9 +157,8 @@ public sealed class S2ObligationStateTests
                   get
                     set this.Value -5
                     return 0
-                func Probe (ref int:x) → int
+                func Probe (ref int:x | (# > 0)) → int
                   ! mut
-                  requires (x > 0)
                   let int:sink = this.Trigger
                   proof{"claim"} (x > 0)
                   return x
@@ -185,9 +180,8 @@ public sealed class S2ObligationStateTests
                   get
                     set this.Value -5
                     return 0
-                func Probe (ref int:x) → int
+                func Probe (ref int:x | (# > 0)) → int
                   ! mut
-                  requires (x > 0)
                   proof{"trigger"} (this.Trigger == 0)
                   proof{"claim"} (x > 0)
                   return x

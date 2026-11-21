@@ -1,8 +1,7 @@
 module SimpleClass SimpleClass
   module SimpleClassModule
-    func CreateAge public (int:birthYear, int:currentYear) → int
+    func CreateAge public (int:birthYear, int:currentYear | (# > birthYear)) → int
       !
-      requires currentYear > birthYear
       => result > 0
       return currentYear - birthYear
 

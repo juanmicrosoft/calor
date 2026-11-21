@@ -50,7 +50,7 @@ calculator looks for.
 
 | Factor | Points | Rationale |
 |:-------|:-------|:----------|
-| Precondition: `requires expression` | 0.25 | States a caller obligation |
+| Precondition: `| (expression)` refinement | 0.25 | States a caller obligation |
 | Postcondition: `=> expression` | 0.20 | States a result obligation |
 | Invariant: `invariant expression` | 0.15 | States a state constraint |
 | Effect row: `! effects` | 0.10 | Declares permitted effects |
@@ -86,17 +86,17 @@ Base score: 0.30, cap at 0.90
 
 ```calor
 module DivisionSignals
-  func Divide public (int:a, int:b) → int
+  func Divide public (int:a | (# >= 0), int:b | (# != 0)) → int
     !
-    requires b != 0
-    requires a >= 0
     => result >= 0
     return a / b
 ```
 
-With runtime contract checks enabled, `Divide(9, 2)` returns `4`, while a zero
-divisor or negative `a` fails a precondition. This is not a guarantee of
-compile-time diagnosis at every call.
+`Divide(9, 2)` returns `4`. A zero divisor or a negative `a` fails a
+precondition and throws `ArgumentOutOfRangeException`. Preconditions are
+parameter refinements, so this check runs in every contract mode, including
+`--contract-mode off`. This is not a guarantee of compile-time diagnosis at
+every call.
 
 The postcondition is **incorrect for the declared input domain**:
 `Divide(9, -2)` satisfies both preconditions but produces `-4`, failing the
@@ -125,9 +125,11 @@ public static int Divide(int a, int b)
 - Less structured, more inference required
 
 This C# fragment has the same negative-divisor mistake. It is not
-exception-equivalent: its guards throw `ArgumentException`, while enabled Calor
-contracts throw `ContractViolationException`. `Debug.Assert` also depends on the
-C# build configuration and is not Calor's runtime postcondition mechanism.
+exception-equivalent: its guards throw `ArgumentException`. A failed Calor
+precondition throws `ArgumentOutOfRangeException`, and a failed Calor
+postcondition throws `ContractViolationException` when contract checks are
+enabled. `Debug.Assert` also depends on the C# build configuration and is not
+Calor's runtime postcondition mechanism.
 
 ---
 
@@ -138,15 +140,14 @@ C# build configuration and is not Calor's runtime postcondition mechanism.
 **Calor contract:**
 ```calor
 module NullSignals
-  func Length public (string:input) → int
+  func Length public (string:input | (# != null)) → int
     !
-    requires input != null
     return input.Length
 ```
 
 `Length("abc")` returns `3`. Passing null through the CLR boundary fails the
-precondition when checks are enabled; disabling checks exposes the ordinary
-null dereference instead.
+precondition and throws `ArgumentOutOfRangeException` in every contract mode,
+so the body never dereferences null.
 
 **C# detection:**
 ```csharp
@@ -160,16 +161,15 @@ input ?? throw new ArgumentNullException();
 **Calor contracts:**
 ```calor
 module BoundsSignals
-  func At public (int[]:array, int:index) → int
+  func At public (int[]:array, int:index | ((# >= 0) && (# < array.Length))) → int
     !
-    requires index >= 0
-    requires index < array.Length
     return array[index]
 ```
 
-`At([42], 0)` returns `42`. Index `-1` or `1` fails a precondition with checks
-enabled and throws `IndexOutOfRangeException` with checks off. These contracts
-do not guard a null array: evaluating `array.Length` can itself throw.
+`At([42], 0)` returns `42`. Index `-1` or `1` fails the precondition and
+throws `ArgumentOutOfRangeException` in every contract mode, including
+`--contract-mode off`. The body's array access never runs. These contracts do
+not guard a null array: evaluating `array.Length` can itself throw.
 
 **C# detection:**
 ```csharp
@@ -194,10 +194,8 @@ Given this buggy call:
 
 ```calor
 module BuggyCaller
-  func Divide (int:a, int:b) → int
+  func Divide (int:a | (# >= 0), int:b | (# != 0)) → int
     !
-    requires b != 0
-    requires a >= 0
     => result >= 0
     return a / b
 
@@ -209,13 +207,14 @@ module BuggyCaller
 
 **Possible agent reasoning, not an observed agent run:**
 1. See `Divide(x, y - y)`.
-2. Read its `requires b != 0` obligation.
+2. Read its `int:b | (# != 0)` obligation.
 3. Evaluate `y - y` as zero.
 4. Report that this call violates the precondition.
 
-`Trigger(9, 5)` actually fails a runtime precondition with checks enabled.
-With checks off, it reaches integer division by zero. Compilation of the example
-does not by itself establish an interprocedural static diagnosis.
+`Trigger(9, 5)` fails the runtime precondition on `b` and throws
+`ArgumentOutOfRangeException`. The check also runs with `--contract-mode off`,
+so the division by zero is never reached. Compilation of the example does not
+by itself establish an interprocedural static diagnosis.
 
 **C# agent detection:**
 1. See `Divide(x, y - y)`
@@ -230,15 +229,14 @@ does not by itself establish an interprocedural static diagnosis.
 ## Scoring Example
 
 This is an explanatory example, not a measured corpus input. Its nullable return
-type does not make the enabled precondition optional.
+type does not make the precondition optional.
 
 ### Calor Code
 
 ```calor
 module NullableSignals
-  func SafeDivide public (int:a, int:b) → int?
+  func SafeDivide public (int:a, int:b | (# != 0)) → int?
     !
-    requires b != 0
     => result == a / b
     if b == 0
       return null
@@ -281,9 +279,10 @@ An earlier version of this page showed an illustrative 0.85 / 0.45 = 1.89x that
 the calculator never produced.
 
 For valid input `(6, 2)`, both implementations return `3`. For `(6, 0)`, the
-C# version returns null, but the Calor version fails `requires b != 0` when
-checks are enabled; only checks-off execution takes its null branch. The two
-versions do not have the same API behavior.
+C# version returns null, but the Calor version fails `int:b | (# != 0)` and
+throws `ArgumentOutOfRangeException`. This happens in every contract mode, so
+the Calor null branch is unreachable. The two versions do not have the same API
+behavior.
 
 ---
 

@@ -9,9 +9,8 @@ module PhoneBook PhoneBook
       !
       return count + 1
 
-    func RemoveEntry public (int:count) → int
+    func RemoveEntry public (int:count | (# > 0)) → int
       !
-      requires count > 0
       => result >= 0
       return count - 1
 

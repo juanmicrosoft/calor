@@ -51,9 +51,8 @@ actions. A configured server is not evidence that a call succeeded.
 
 ```calor
 module ContractReview
-  func Next (int:value) → int
+  func Next (int:value | (# < 2147483647)) → int
     !
-    requires value < 2147483647
     => result == value + 1
     return value + 1
 
@@ -114,9 +113,8 @@ or verifier result.
 
 ```calor
 module LoopReview
-  func Sum (int:count) → int
+  func Sum (int:count | (# >= 0 && # <= 100)) → int
     !
-    requires count >= 0 && count <= 100
     var int:total = 0
     for i from 1 to count step 1
       set total total + i
@@ -172,9 +170,8 @@ One native implementation is:
 
 ```calor
 module BoundedFactorial
-  func Factorial (int:n) → int
+  func Factorial (int:n | (# >= 0 && # <= 12)) → int
     !
-    requires n >= 0 && n <= 12
     => result >= 1
     if n <= 1
       return 1

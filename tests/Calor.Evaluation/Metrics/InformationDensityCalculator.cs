@@ -118,7 +118,7 @@ public class InformationDensityCalculator : IMetricCalculator
         counts.TypeAnnotations += CountPattern(source, @"\b(int|long|float|double|string|bool|void)\b");
 
         // Contracts (weight higher - unique to Calor)
-        counts.Contracts = (CalorSyntax.Requires.Matches(source).Count + CalorSyntax.Ensures.Matches(source).Count) * 2;
+        counts.Contracts = (CalorSyntax.Precondition.Matches(source).Count + CalorSyntax.Ensures.Matches(source).Count) * 2;
 
         // Effects (weight higher - unique to Calor)
         counts.Effects = CalorSyntax.EffectRow.Matches(source).Count * 2;

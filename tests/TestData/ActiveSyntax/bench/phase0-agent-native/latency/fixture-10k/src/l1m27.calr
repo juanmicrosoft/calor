@@ -1,9 +1,8 @@
 module L1M27 L1M27 block
   module L1M27Module public
 
-    func l1m27_fn01 public (int:x, int:y) → int
+    func l1m27_fn01 public (int:x | (# > 0), int:y) → int
       !
-      requires (x > 0)
       => (x >= 1)
       let int:acc = ((x * 2) + y)
       if (acc > 21407)
@@ -11,9 +10,8 @@ module L1M27 L1M27 block
       else
         return ((acc * 2) + 21407)
 
-    func l1m27_fn02 public (int:x, int:y) → int
+    func l1m27_fn02 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 5) + y)
       if (acc > 21414)
@@ -26,9 +24,8 @@ module L1M27 L1M27 block
       let int:v1 = L2M02.L2M02Module.l2m02_fn08(x, 10)
       return (v1 + y)
 
-    func l1m27_fn04 public (int:x, int:y) → int
+    func l1m27_fn04 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21421)
       if (x >= 21421)
@@ -42,9 +39,8 @@ module L1M27 L1M27 block
       let int:v2 = L2M23.L2M23Module.l2m23_fn08(x, 71)
       return ((v1 + v2) + y)
 
-    func l1m27_fn06 public (int:x, int:y) → int
+    func l1m27_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21428)
       if (x >= 21428)
@@ -52,10 +48,8 @@ module L1M27 L1M27 block
       else
         return 21428
 
-    func l1m27_fn07 public (int:x, int:y) → int
+    func l1m27_fn07 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 21435)
       let int:total = ((x * 5) + y)
       if (total < 21435)
@@ -63,18 +57,16 @@ module L1M27 L1M27 block
       else
         return total
 
-    func l1m27_fn08 public (int:x, int:y) → int
+    func l1m27_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21442)
       let int:total = ((x * 3) + y)
       if (total > 21442)
         return 21442
       return total
 
-    func l1m27_fn09 public (int:x, int:y) → int
+    func l1m27_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21449)
       if (x >= 21449)
@@ -82,9 +74,8 @@ module L1M27 L1M27 block
       else
         return 21449
 
-    func l1m27_fn10 public (int:x, int:y) → int
+    func l1m27_fn10 public (int:x | (# > 6), int:y) → int
       !
-      requires (x > 6)
       => (x >= 7)
       let int:acc = ((x * 5) + y)
       if (acc > 21456)
@@ -103,10 +94,8 @@ module L1M27 L1M27 block
       let int:v2 = L2M11.L2M11Module.l2m11_fn13(x, 19)
       return ((v1 + v2) + y)
 
-    func l1m27_fn13 public (int:x, int:y) → int
+    func l1m27_fn13 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 21463)
       let int:total = ((x * 3) + y)
       if (total < 21463)

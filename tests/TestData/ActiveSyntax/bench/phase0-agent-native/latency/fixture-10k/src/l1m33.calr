@@ -6,9 +6,8 @@ module L1M33 L1M33 block
       let int:v1 = L2M29.L2M29Module.l2m29_fn12(x, 23)
       return (v1 + y)
 
-    func l1m33_fn02 public (int:x, int:y) → int
+    func l1m33_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21722)
       if (x >= 21722)
@@ -27,9 +26,8 @@ module L1M33 L1M33 block
       let int:v2 = L2M09.L2M09Module.l2m09_fn10(x, 48)
       return ((v1 + v2) + y)
 
-    func l1m33_fn05 public (int:x, int:y) → int
+    func l1m33_fn05 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 2) + y)
       if (acc > 21729)
@@ -37,10 +35,8 @@ module L1M33 L1M33 block
       else
         return ((acc * 2) + 21729)
 
-    func l1m33_fn06 public (int:x, int:y) → int
+    func l1m33_fn06 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 21736)
       let int:total = ((x * 3) + y)
       if (total < 21736)
@@ -48,27 +44,24 @@ module L1M33 L1M33 block
       else
         return total
 
-    func l1m33_fn07 public (int:x, int:y) → int
+    func l1m33_fn07 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21743)
       let int:total = ((x * 3) + y)
       if (total > 21743)
         return 21743
       return total
 
-    func l1m33_fn08 public (int:x, int:y) → int
+    func l1m33_fn08 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21750)
       let int:total = ((x * 3) + y)
       if (total > 21750)
         return 21750
       return total
 
-    func l1m33_fn09 public (int:x, int:y) → int
+    func l1m33_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21757)
       if (x >= 21757)
@@ -86,10 +79,8 @@ module L1M33 L1M33 block
       let int:v1 = L2M19.L2M19Module.l2m19_fn12(x, 34)
       return (v1 + y)
 
-    func l1m33_fn12 public (int:x, int:y) → int
+    func l1m33_fn12 public (int:x | (# >= 1), int:y | (# >= 0)) → int
       !
-      requires (x >= 1)
-      requires (y >= 0)
       => (result >= 21764)
       let int:total = ((x * 5) + y)
       if (total < 21764)
@@ -97,10 +88,8 @@ module L1M33 L1M33 block
       else
         return total
 
-    func l1m33_fn13 public (int:x, int:y) → int
+    func l1m33_fn13 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 21771)
       let int:total = ((x * 5) + y)
       if (total < 21771)

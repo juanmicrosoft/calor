@@ -6,9 +6,8 @@ module L3M29 L3M29 block
       let int:@base = ((x * 4) - y)
       return (@base + 65)
 
-    func l3m29_fn02 public (int:x, int:y) → int
+    func l3m29_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25187)
       if (x >= 25187)
@@ -16,10 +15,8 @@ module L3M29 L3M29 block
       else
         return 25187
 
-    func l3m29_fn03 public (int:x, int:y) → int
+    func l3m29_fn03 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 25194)
       let int:total = ((x * 3) + y)
       if (total < 25194)
@@ -27,9 +24,8 @@ module L3M29 L3M29 block
       else
         return total
 
-    func l3m29_fn04 public (int:x, int:y) → int
+    func l3m29_fn04 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 2) + y)
       if (acc > 25201)
@@ -37,9 +33,8 @@ module L3M29 L3M29 block
       else
         return ((acc * 2) + 25201)
 
-    func l3m29_fn05 public (int:x, int:y) → int
+    func l3m29_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25208)
       if (x >= 25208)
@@ -57,9 +52,8 @@ module L3M29 L3M29 block
       let int:@base = ((x * 4) - y)
       return (@base + 85)
 
-    func l3m29_fn08 public (int:x, int:y) → int
+    func l3m29_fn08 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 5) + y)
       if (acc > 25215)
@@ -72,10 +66,8 @@ module L3M29 L3M29 block
       let int:@base = ((x * 4) - y)
       return (@base + 77)
 
-    func l3m29_fn10 public (int:x, int:y) → int
+    func l3m29_fn10 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 25222)
       let int:total = ((x * 3) + y)
       if (total < 25222)
@@ -83,9 +75,8 @@ module L3M29 L3M29 block
       else
         return total
 
-    func l3m29_fn11 public (int:x, int:y) → int
+    func l3m29_fn11 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 2) + y)
       if (acc > 25229)
@@ -98,9 +89,8 @@ module L3M29 L3M29 block
       let int:@base = ((x * 4) - y)
       return (@base + 67)
 
-    func l3m29_fn13 public (int:x, int:y) → int
+    func l3m29_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 25236)
       if (x >= 25236)

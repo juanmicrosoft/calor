@@ -1,4 +1,4 @@
-§M{Unterminated}
-  §F{Main:pub} () -> void
-    §E{cw}
-    §P "this string never ends
+module Unterminated
+  func Main () → void
+    ! cw
+    Console.WriteLine("this string never ends

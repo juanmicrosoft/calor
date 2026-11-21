@@ -270,9 +270,8 @@ public sealed class S2ObligationResidualTests
         // addition throws before the body; only x = 0 enters, and it satisfies the claim.
         const string source = """
             module M M block
-              func Probe (int:x) → int
+              func Probe (int:x | ((# == 0) || ((# + 1) == -2147483648))) → int
                 !
-                requires ((x == 0) || ((x + 1) == -2147483648))
                 proof{"claim"} (x < 2147483647)
                 return x
             """;
@@ -285,8 +284,7 @@ public sealed class S2ObligationResidualTests
         // Review round 3: the precondition runs before the parameter guard; only x = 0 completes it.
         const string source = """
             module M M block
-              func Probe private (int:x | (# < 2147483647)) → void
-                requires ((x == 0) || ((x + 1) == -2147483648))
+              func Probe private (int:x | ((# < 2147483647) && ((# == 0) || ((# + 1) == -2147483648)))) → void
                 return
             """;
         var entry = Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry);

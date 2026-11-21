@@ -1,9 +1,8 @@
 module L1M18 L1M18 block
   module L1M18Module public
 
-    func l1m18_fn01 public (int:x, int:y) → int
+    func l1m18_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20917)
       if (x >= 20917)
@@ -11,9 +10,8 @@ module L1M18 L1M18 block
       else
         return 20917
 
-    func l1m18_fn02 public (int:x, int:y) → int
+    func l1m18_fn02 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20924)
       if (x >= 20924)
@@ -21,37 +19,32 @@ module L1M18 L1M18 block
       else
         return 20924
 
-    func l1m18_fn03 public (int:x, int:y) → int
+    func l1m18_fn03 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20931)
       let int:total = ((x * 3) + y)
       if (total > 20931)
         return 20931
       return total
 
-    func l1m18_fn04 public (int:x, int:y) → int
+    func l1m18_fn04 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20938)
       let int:total = ((x * 3) + y)
       if (total > 20938)
         return 20938
       return total
 
-    func l1m18_fn05 public (int:x, int:y) → int
+    func l1m18_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20945)
       let int:total = ((x * 2) + y)
       if (total > 20945)
         return 20945
       return total
 
-    func l1m18_fn06 public (int:x, int:y) → int
+    func l1m18_fn06 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 20952)
       let int:total = ((x * 2) + y)
       if (total < 20952)
@@ -69,9 +62,8 @@ module L1M18 L1M18 block
       let int:v1 = L2M18.L2M18Module.l2m18_fn13(x, 8)
       return (v1 + y)
 
-    func l1m18_fn09 public (int:x, int:y) → int
+    func l1m18_fn09 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 2) + y)
       if (acc > 20959)
@@ -97,9 +89,8 @@ module L1M18 L1M18 block
       let int:v2 = L2M09.L2M09Module.l2m09_fn12(x, 19)
       return ((v1 + v2) + y)
 
-    func l1m18_fn13 public (int:x, int:y) → int
+    func l1m18_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20966)
       if (x >= 20966)

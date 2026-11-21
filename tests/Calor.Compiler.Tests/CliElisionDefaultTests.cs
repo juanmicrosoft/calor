@@ -33,10 +33,8 @@ public class CliElisionDefaultTests : IDisposable
         File.WriteAllText(path, """
             module Test Test block
               class Calc
-                func Square (int:x) → int
+                func Square (int:x | ((# >= 0) && (# <= 46340))) → int
                   !
-                  requires (x >= 0)
-                  requires (x <= 46340)
                   => (result >= 0)
                   return (x * x)
             """);
@@ -63,9 +61,10 @@ public class CliElisionDefaultTests : IDisposable
 
         Assert.Equal(0, exit);
         Assert.Contains("// PROVEN: Postcondition", generated);
-        // Only the postcondition guard (ContractKind.Ensures) goes; §Q guards stay by design.
+        // Only the postcondition guard (ContractKind.Ensures) goes; the precondition (#1618: the
+        // refinement on x, an ArgumentOutOfRangeException entry check) stays by design.
         Assert.DoesNotContain("ContractKind.Ensures", generated);
-        Assert.Contains("ContractKind.Requires", generated);
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(x)", generated);
         // No flag was written, so no "has no effect" warning may fire either.
         Assert.DoesNotContain("has no effect without --verify", stdErr);
     }

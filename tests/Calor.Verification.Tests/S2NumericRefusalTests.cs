@@ -108,9 +108,8 @@ public sealed class S2NumericRefusalTests
     {
         var source = $$"""
             module R1Case
-              func Probe public ({{TypeMapper.ToSurfaceType(type)}}:x) → int
+              func Probe public ({{TypeMapper.ToSurfaceType(type)}}:x | (# >= {{NativeIntegralInput(lower)}})) → int
                 !
-                requires x >= {{NativeIntegralInput(lower)}}
                 => {{NativeArithmeticInput(claim)}}
                 return 0
             """;
@@ -231,9 +230,8 @@ public sealed class S2NumericRefusalTests
         // overflow-sensitive shape that is now Assumed.
         const string source = """
             module R1Case
-              func Probe public (uint:x) → int
+              func Probe public (uint:x | (# >= 1702287129U)) → int
                 !
-                requires x >= 1702287129U
                 => x - 1 < x
                 return 0
             """;
@@ -312,9 +310,8 @@ public sealed class S2NumericRefusalTests
     {
         const string source = """
             module R1Case
-              func Probe public (uint:x) → int
+              func Probe public (uint:x | (# >= 1702287129U)) → int
                 !
-                requires x >= 1702287129U
                 => x - 1 < x
                 return 0
             """;

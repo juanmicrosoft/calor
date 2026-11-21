@@ -196,8 +196,7 @@ public class ConstructorOverloadingTests
               class PositiveValue public
                 field int:value private
 
-                ctor (int:value)
-                  requires value > 0
+                ctor (int:value | (# > 0))
                   set this.value value
 
                 ctor ()
@@ -213,8 +212,8 @@ public class ConstructorOverloadingTests
         Assert.False(result.HasErrors, FormatDiagnostics(result));
         var code = result.GeneratedCode;
 
-        // First constructor should have precondition
-        Assert.Contains("Precondition failed", code);
+        // First constructor should have precondition (#1618: the refinement's entry check)
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(value)", code);
         // Second constructor should work without precondition
         Assert.Contains("public PositiveValue()", code);
     }

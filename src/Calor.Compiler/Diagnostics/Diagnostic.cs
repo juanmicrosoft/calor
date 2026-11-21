@@ -1227,6 +1227,13 @@ public static class DiagnosticCode
     /// </summary>
     public const string LintConditionalReturn = "Calor1305";
 
+    /// <summary>
+    /// Warning (lint): an if/else-if chain compares one parameter or local with
+    /// <c>==</c> against three or more distinct constants; a <c>match</c> is shorter.
+    /// Report-only: no patch, because the match lowers to a C# switch.
+    /// </summary>
+    public const string LintPreferMatch = "Calor1306";
+
     // Root compile command (Calor1310-1319)
 
     /// <summary>

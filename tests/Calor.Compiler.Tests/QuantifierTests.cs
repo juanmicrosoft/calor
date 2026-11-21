@@ -41,6 +41,11 @@ public class QuantifierTests
         return parser.Parse();
     }
 
+    // #1618: a precondition is a parameter refinement; this is the list the verifier sees.
+    private static IReadOnlyList<RequiresNode> Pre(FunctionNode function)
+        => Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(
+            function.Parameters, function.Preconditions);
+
     #region Parser Tests
 
     [Fact]
@@ -48,9 +53,8 @@ public class QuantifierTests
     {
         var source = @"
 module Test Test block
-  func TestFunc (int:x) → bool
+  func TestFunc (int:x | (forall int:i where true : (i >= 0))) → bool
     !
-    requires (forall int:i where true : (i >= 0))
     return true
 ";
 
@@ -60,9 +64,9 @@ module Test Test block
         Assert.Single(module.Functions);
 
         var func = module.Functions[0];
-        Assert.Single(func.Preconditions);
+        Assert.Single(Pre(func));
 
-        var requires = func.Preconditions[0];
+        var requires = Pre(func)[0];
         Assert.IsType<ForallExpressionNode>(requires.Condition);
 
         var forall = (ForallExpressionNode)requires.Condition;
@@ -76,9 +80,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func TestFunc (int:x) → bool
+  func TestFunc (int:x | (exists int:i where true : (i == #))) → bool
     !
-    requires (exists int:i where true : (i == x))
     return true
 ";
 
@@ -87,7 +90,7 @@ module Test Test block
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var func = module.Functions[0];
-        var requires = func.Preconditions[0];
+        var requires = Pre(func)[0];
         Assert.IsType<ExistsExpressionNode>(requires.Condition);
 
         var exists = (ExistsExpressionNode)requires.Condition;
@@ -100,9 +103,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func TestFunc (int:n) → bool
+  func TestFunc (int:n | (forall int:i, int:j where true : (i == j))) → bool
     !
-    requires (forall int:i, int:j where true : (i == j))
     return true
 ";
 
@@ -111,7 +113,7 @@ module Test Test block
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var func = module.Functions[0];
-        var requires = func.Preconditions[0];
+        var requires = Pre(func)[0];
         Assert.IsType<ForallExpressionNode>(requires.Condition);
 
         var forall = (ForallExpressionNode)requires.Condition;
@@ -125,9 +127,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func ArrayAllNonNeg (int:n) → bool
+  func ArrayAllNonNeg (int:n | (forall int:i in 0..# : (i >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (i >= 0))
     return true
 ";
 
@@ -136,7 +137,7 @@ module Test Test block
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var func = module.Functions[0];
-        var requires = func.Preconditions[0];
+        var requires = Pre(func)[0];
         Assert.IsType<ForallExpressionNode>(requires.Condition);
 
         var forall = (ForallExpressionNode)requires.Condition;
@@ -609,9 +610,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func CheckAllPositive (int:n) → bool
+  func CheckAllPositive (int:n | (forall int:i in 0..# : (i >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (i >= 0))
     return true
 ";
 
@@ -636,9 +636,8 @@ module Test Test block
     {
         var source = @"
 module Test Test block
-  func CheckImplication (int:x) → bool
+  func CheckImplication (int:x | (!(# > 0) || (# >= 0))) → bool
     !
-    requires (!(x > 0) || (x >= 0))
     return true
 ";
 
@@ -662,9 +661,8 @@ module Test Test block
         // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
 module Test Test block
-  func AllNonNegative (int[]:arr, int:n) → bool
+  func AllNonNegative (int[]:arr, int:n | (forall int:i in 0..# : (arr[i] >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (arr[i] >= 0))
     return true
 ";
 
@@ -690,9 +688,8 @@ module Test Test block
         // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
 module Test Test block
-  func ContainsTarget (int[]:arr, int:n, int:target) → bool
+  func ContainsTarget (int[]:arr, int:n, int:target | (exists int:i in 0..n : (arr[i] == #))) → bool
     !
-    requires (exists int:i in 0..n : (arr[i] == target))
     return true
 ";
 
@@ -794,23 +791,22 @@ module Test Test block
         // Parse source with quantifiers
         var source = @"
 module Test Test block
-  func TestFunc (int:n) → bool
+  func TestFunc (int:n | (forall int:i in 0..# : (i >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (i >= 0))
     return true
 ";
 
         var module1 = Parse(source, out var diag1);
         Assert.False(diag1.HasErrors, string.Join("\n", diag1.Select(d => d.Message)));
 
-        // Get the precondition expression and emit it as Calor syntax
-        var forall = (ForallExpressionNode)module1.Functions[0].Preconditions[0].Condition;
+        // Get the refinement predicate (#1618: the precondition) and emit it as Calor syntax
+        var forall = (ForallExpressionNode)module1.Functions[0].Parameters[0].InlineRefinement!.Predicate;
         var emitter = new CalorEmitter();
         var emittedContract = forall.Accept(emitter);
 
         // Verify the emitted string contains expected elements
         Assert.Contains("forall", emittedContract);
-        Assert.Contains("in 0..n", emittedContract);
+        Assert.Contains("in 0..#", emittedContract);
         Assert.Contains("int:i", emittedContract);
     }
 
@@ -824,9 +820,8 @@ module Test Test block
         // Test that integer types are accepted without warnings
         var source = @"
 module Test Test block
-  func TestFunc (int:n) → bool
+  func TestFunc (int:n | (forall int:i in 0..# : (i >= 0))) → bool
     !
-    requires (forall int:i in 0..n : (i >= 0))
     return true
 ";
 
@@ -844,9 +839,8 @@ module Test Test block
         // Test that float types generate a warning
         var source = @"
 module Test Test block
-  func TestFunc (int:n) → bool
+  func TestFunc (int:n | (forall float:x where true : (x >= 0))) → bool
     !
-    requires (forall float:x where true : (x >= 0))
     return true
 ";
 
@@ -999,9 +993,8 @@ module Test Test block
     {
         var source = @"
 module Sorting Sorting block
-  func IsSorted (int:arr, int:n) → bool
+  func IsSorted (int:arr, int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     => (forall int:i where ((i >= 0) && (i < (n - 1))) : (arr[i] <= arr[(i + 1)]))
     return true
 ";
@@ -1026,10 +1019,8 @@ module Sorting Sorting block
     {
         var source = @"
 module Search Search block
-  func BinarySearch (int:arr, int:n, int:target) → int
+  func BinarySearch (int:arr, int:n | ((# > 0) && (forall int:i where ((i >= 0) && (i < (# - 1))) : (arr[i] <= arr[(i + 1)]))), int:target) → int
     !
-    requires (n > 0)
-    requires (forall int:i where ((i >= 0) && (i < (n - 1))) : (arr[i] <= arr[(i + 1)]))
     => (!(result >= 0) || (arr[result] == target))
     return 0
 ";
@@ -1038,8 +1029,10 @@ module Search Search block
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var func = module.Functions[0];
-        // Should have 2 preconditions: n > 0 and array is sorted
-        Assert.Equal(2, func.Preconditions.Count);
+        // One refinement on n conjoins both conditions: n > 0 and array is sorted
+        var sorted = Assert.IsType<BinaryOperationNode>(Assert.Single(Pre(func)).Condition);
+        Assert.Equal(BinaryOperator.And, sorted.Operator);
+        Assert.IsType<ForallExpressionNode>(sorted.Right);
         // Should have 1 postcondition: if result >= 0, arr[result] == target
         Assert.Single(func.Postconditions);
     }
@@ -1053,9 +1046,8 @@ module Search Search block
     {
         var source = @"
 module QuickSort QuickSort block
-  func Partition (int:arr, int:low, int:high, int:pivot) → int
+  func Partition (int:arr, int:low, int:high | (low <= #), int:pivot) → int
     !
-    requires (low <= high)
     => (forall int:i where ((i >= low) && (i < result)) : (arr[i] <= pivot))
     => (forall int:j where ((j > result) && (j <= high)) : (arr[j] > pivot))
     return low
@@ -1084,10 +1076,8 @@ module QuickSort QuickSort block
     {
         var source = @"
 module Validation Validation block
-  func ValidateGrades (int:grades, int:n) → bool
+  func ValidateGrades (int:grades, int:n | ((# > 0) && (forall int:i where ((i >= 0) && (i < #)) : ((grades[i] >= 0) && (grades[i] <= 100))))) → bool
     !
-    requires (n > 0)
-    requires (forall int:i where ((i >= 0) && (i < n)) : ((grades[i] >= 0) && (grades[i] <= 100)))
     return true
 ";
 
@@ -1095,12 +1085,12 @@ module Validation Validation block
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var func = module.Functions[0];
-        // Should have 2 preconditions: n > 0 and all grades in [0, 100]
-        Assert.Equal(2, func.Preconditions.Count);
+        // One refinement on n conjoins n > 0 and all grades in [0, 100]
+        var conjunction = Assert.IsType<BinaryOperationNode>(Assert.Single(Pre(func)).Condition);
+        Assert.Equal(BinaryOperator.And, conjunction.Operator);
 
-        // Second precondition should be a forall
-        var boundsContract = func.Preconditions[1];
-        Assert.IsType<ForallExpressionNode>(boundsContract.Condition);
+        // Second conjunct should be a forall
+        Assert.IsType<ForallExpressionNode>(conjunction.Right);
     }
 
     /// <summary>
@@ -1112,13 +1102,8 @@ module Validation Validation block
     {
         var source = @"
 module Matrix Matrix block
-  func MultiplyDimCheck (int:rowsA, int:colsA, int:rowsB, int:colsB) → bool
+  func MultiplyDimCheck (int:rowsA | (# > 0), int:colsA | (# > 0), int:rowsB | ((# > 0) && (colsA == #)), int:colsB | (# > 0)) → bool
     !
-    requires (rowsA > 0)
-    requires (colsA > 0)
-    requires (rowsB > 0)
-    requires (colsB > 0)
-    requires (colsA == rowsB)
     return true
 ";
 
@@ -1126,8 +1111,8 @@ module Matrix Matrix block
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var func = module.Functions[0];
-        // Should have 5 preconditions including dimension compatibility
-        Assert.Equal(5, func.Preconditions.Count);
+        // Four refinements (one per parameter); rowsB's conjoins the dimension compatibility check
+        Assert.Equal(4, Pre(func).Count);
     }
 
     /// <summary>
@@ -1139,9 +1124,8 @@ module Matrix Matrix block
     {
         var source = @"
 module Heap Heap block
-  func IsMaxHeap (int:heap, int:n) → bool
+  func IsMaxHeap (int:heap, int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     => (!(result == true) || (forall int:i where ((i >= 0) && ((2 * (i + 1)) < n)) : (heap[i] >= heap[(2 * (i + 1))])))
     return false
 ";
@@ -1162,9 +1146,8 @@ module Heap Heap block
     {
         var source = @"
 module Sorting Sorting block
-  func Sort (int[]:arr, int:n) → bool
+  func Sort (int[]:arr, int:n | (# > 0)) → bool
     !
-    requires (n > 0)
     => (forall int:i in 0..(n - 1) : (arr[i] <= arr[(i + 1)]))
     return true
 ";

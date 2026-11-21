@@ -3,10 +3,8 @@ module ExtractExamples ExtractExamples block
     !
     return ((x * x) + (y * y))
 
-  func ProcessArray (int:index, int:length) → int
+  func ProcessArray (int:index | (# >= 0), int:length | (index < #)) → int
     !
-    requires (index >= 0)
-    requires (index < length)
     => (result >= 0)
     return (((index >= 0) && (index < length)) ? index : (0 - 1))
 

@@ -7,9 +7,8 @@ module L2M21 L2M21 block
       let int:v2 = L3M34.L3M34Module.l3m34_fn07(x, 69)
       return ((v1 + v2) + y)
 
-    func l2m21_fn02 public (int:x, int:y) → int
+    func l2m21_fn02 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 2) + y)
       if (acc > 22793)
@@ -28,10 +27,8 @@ module L2M21 L2M21 block
       let int:v1 = L3M26.L3M26Module.l3m26_fn08(x, 7)
       return (v1 + y)
 
-    func l2m21_fn05 public (int:x, int:y) → int
+    func l2m21_fn05 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 22800)
       let int:total = ((x * 2) + y)
       if (total < 22800)
@@ -39,10 +36,8 @@ module L2M21 L2M21 block
       else
         return total
 
-    func l2m21_fn06 public (int:x, int:y) → int
+    func l2m21_fn06 public (int:x | (# >= 8), int:y | (# >= 0)) → int
       !
-      requires (x >= 8)
-      requires (y >= 0)
       => (result >= 22807)
       let int:total = ((x * 2) + y)
       if (total < 22807)
@@ -56,9 +51,8 @@ module L2M21 L2M21 block
       let int:v2 = L3M06.L3M06Module.l3m06_fn03(x, 37)
       return ((v1 + v2) + y)
 
-    func l2m21_fn08 public (int:x, int:y) → int
+    func l2m21_fn08 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22814)
       if (x >= 22814)
@@ -66,10 +60,8 @@ module L2M21 L2M21 block
       else
         return 22814
 
-    func l2m21_fn09 public (int:x, int:y) → int
+    func l2m21_fn09 public (int:x | (# >= 7), int:y | (# >= 0)) → int
       !
-      requires (x >= 7)
-      requires (y >= 0)
       => (result >= 22821)
       let int:total = ((x * 2) + y)
       if (total < 22821)
@@ -83,9 +75,8 @@ module L2M21 L2M21 block
       let int:v2 = L3M02.L3M02Module.l3m02_fn13(x, 44)
       return ((v1 + v2) + y)
 
-    func l2m21_fn11 public (int:x, int:y) → int
+    func l2m21_fn11 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22828)
       if (x >= 22828)
@@ -93,9 +84,8 @@ module L2M21 L2M21 block
       else
         return 22828
 
-    func l2m21_fn12 public (int:x, int:y) → int
+    func l2m21_fn12 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 2) + y)
       if (acc > 22835)
@@ -103,9 +93,8 @@ module L2M21 L2M21 block
       else
         return ((acc * 2) + 22835)
 
-    func l2m21_fn13 public (int:x, int:y) → int
+    func l2m21_fn13 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22842)
       let int:total = ((x * 5) + y)
       if (total > 22842)

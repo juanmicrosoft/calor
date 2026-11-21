@@ -1,23 +1,19 @@
 module SearchContracts SearchContracts
   module SearchContractsModule
-    func MidIndex public (int:low, int:high) → int
+    func MidIndex public (int:low | (# >= 0), int:high | (low <= #)) → int
       !
-      requires low <= high
-      requires low >= 0
       => result >= low
       => result <= high
       return low + ((high - low) / 2)
 
-    func NarrowLeft public (int:mid, int:high) → int
+    func NarrowLeft public (int:mid, int:high | (mid < #)) → int
       !
-      requires mid < high
       => result > mid
       => result <= high
       return mid + 1
 
-    func NarrowRight public (int:low, int:mid) → int
+    func NarrowRight public (int:low, int:mid | (low < #)) → int
       !
-      requires low < mid
       => result >= low
       => result < mid
       return mid - 1

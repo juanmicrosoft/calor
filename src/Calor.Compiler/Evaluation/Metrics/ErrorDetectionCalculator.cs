@@ -5,7 +5,8 @@ namespace Calor.Compiler.Evaluation.Metrics;
 /// <summary>
 /// Category 5: Error Detection Calculator
 /// Measures the presence of contracts, assertions, and error detection mechanisms.
-/// Calor's built-in §REQ/§ENS/§INV provides explicit error detection.
+/// Calor's built-in <c>requires</c>, postconditions (<c>=&gt;</c>) and <c>invariant</c> provide
+/// explicit error detection.
 /// </summary>
 public class ErrorDetectionCalculator : IMetricCalculator
 {
@@ -22,9 +23,9 @@ public class ErrorDetectionCalculator : IMetricCalculator
         {
             ["calorContracts"] = CountCalorContracts(context.CalorSource),
             ["csharpGuards"] = CountCSharpGuards(context.CSharpSource),
-            ["calorPreconditions"] = CountOccurrences(context.CalorSource, "§REQ"),
-            ["calorPostconditions"] = CountOccurrences(context.CalorSource, "§ENS"),
-            ["calorInvariants"] = CountOccurrences(context.CalorSource, "§INV"),
+            ["calorPreconditions"] = NativeCalorSyntax.Precondition.Matches(context.CalorSource).Count,
+            ["calorPostconditions"] = NativeCalorSyntax.Ensures.Matches(context.CalorSource).Count,
+            ["calorInvariants"] = NativeCalorSyntax.Invariant.Matches(context.CalorSource).Count,
             ["csharpExceptions"] = CountOccurrences(context.CSharpSource, "throw ")
         };
 
@@ -41,28 +42,28 @@ public class ErrorDetectionCalculator : IMetricCalculator
         var source = context.CalorSource;
         var score = 0.0;
 
-        // Preconditions (§REQ)
-        var reqCount = CountOccurrences(source, "§REQ");
+        // Preconditions (`requires expr`)
+        var reqCount = NativeCalorSyntax.Precondition.Matches(source).Count;
         score += Math.Min(0.3, reqCount * 0.1);
 
-        // Postconditions (§ENS)
-        var ensCount = CountOccurrences(source, "§ENS");
+        // Postconditions (line-head `=> expr`)
+        var ensCount = NativeCalorSyntax.Ensures.Matches(source).Count;
         score += Math.Min(0.3, ensCount * 0.1);
 
-        // Invariants (§INV)
-        var invCount = CountOccurrences(source, "§INV");
+        // Invariants (`invariant expr`)
+        var invCount = NativeCalorSyntax.Invariant.Matches(source).Count;
         score += Math.Min(0.2, invCount * 0.1);
 
-        // Effect declarations (explicit side effect documentation)
-        var effectCount = CountOccurrences(source, "§E[");
+        // Effect declarations (explicit side effect documentation): one `! ...` row per function
+        var effectCount = NativeCalorSyntax.EffectRow.Matches(source).Count;
         score += Math.Min(0.1, effectCount * 0.05);
 
-        // Assert statements
-        var assertCount = CountOccurrences(source, "§ASSERT");
-        score += Math.Min(0.1, assertCount * 0.05);
+        // Native Calor has no assert statement (the legacy term counted a retired marker), so
+        // there is no assert term; Calor.Evaluation's copy of this metric counts none either.
 
-        // Null checks - Calor uses prefix notation: (!= var null) or (== var null)
-        var nullChecks = CountOccurrences(source, " null)") + CountOccurrences(source, " null]");
+        // Null checks. Native Calor writes comparisons infix, like C#, so both languages are
+        // counted with the same patterns.
+        var nullChecks = CountNullChecks(source);
         score += Math.Min(0.15, nullChecks * 0.03);
 
         return Math.Min(1.0, score);
@@ -74,7 +75,7 @@ public class ErrorDetectionCalculator : IMetricCalculator
         var score = 0.0;
 
         // Null checks
-        var nullChecks = CountOccurrences(source, "!= null") + CountOccurrences(source, "is not null");
+        var nullChecks = CountNullChecks(source);
         score += Math.Min(0.15, nullChecks * 0.03);
 
         // ArgumentNullException
@@ -123,11 +124,10 @@ public class ErrorDetectionCalculator : IMetricCalculator
     {
         return new Dictionary<string, int>
         {
-            ["requires"] = CountOccurrences(source, "§REQ"),
-            ["ensures"] = CountOccurrences(source, "§ENS"),
-            ["invariants"] = CountOccurrences(source, "§INV"),
-            ["effects"] = CountOccurrences(source, "§E["),
-            ["asserts"] = CountOccurrences(source, "§ASSERT")
+            ["requires"] = NativeCalorSyntax.Precondition.Matches(source).Count,
+            ["ensures"] = NativeCalorSyntax.Ensures.Matches(source).Count,
+            ["invariants"] = NativeCalorSyntax.Invariant.Matches(source).Count,
+            ["effects"] = NativeCalorSyntax.EffectRow.Matches(source).Count
         };
     }
 
@@ -135,7 +135,7 @@ public class ErrorDetectionCalculator : IMetricCalculator
     {
         return new Dictionary<string, int>
         {
-            ["nullChecks"] = CountOccurrences(source, "!= null") + CountOccurrences(source, "is not null"),
+            ["nullChecks"] = CountNullChecks(source),
             ["argumentExceptions"] = CountOccurrences(source, "ArgumentException") +
                                      CountOccurrences(source, "ArgumentNullException"),
             ["throws"] = CountOccurrences(source, "throw "),
@@ -144,6 +144,9 @@ public class ErrorDetectionCalculator : IMetricCalculator
                            CountOccurrences(source, "Contract.Ensures")
         };
     }
+
+    private static int CountNullChecks(string source) =>
+        CountOccurrences(source, "!= null") + CountOccurrences(source, "is not null");
 
     private static int CountOccurrences(string source, string pattern)
     {

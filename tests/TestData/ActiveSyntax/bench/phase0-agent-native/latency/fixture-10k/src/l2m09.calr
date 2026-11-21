@@ -1,9 +1,8 @@
 module L2M09 L2M09 block
   module L2M09Module public
 
-    func l2m09_fn01 public (int:x, int:y) → int
+    func l2m09_fn01 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 5) + y)
       if (acc > 22233)
@@ -28,9 +27,8 @@ module L2M09 L2M09 block
       let int:v2 = L3M21.L3M21Module.l3m21_fn08(x, 40)
       return ((v1 + v2) + y)
 
-    func l2m09_fn05 public (int:x, int:y) → int
+    func l2m09_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22240)
       if (x >= 22240)
@@ -44,9 +42,8 @@ module L2M09 L2M09 block
       let int:v2 = L3M17.L3M17Module.l3m17_fn08(x, 13)
       return ((v1 + v2) + y)
 
-    func l2m09_fn07 public (int:x, int:y) → int
+    func l2m09_fn07 public (int:x | (# > 4), int:y) → int
       !
-      requires (x > 4)
       => (x >= 5)
       let int:acc = ((x * 5) + y)
       if (acc > 22247)
@@ -54,10 +51,8 @@ module L2M09 L2M09 block
       else
         return ((acc * 2) + 22247)
 
-    func l2m09_fn08 public (int:x, int:y) → int
+    func l2m09_fn08 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 22254)
       let int:total = ((x * 5) + y)
       if (total < 22254)
@@ -65,9 +60,8 @@ module L2M09 L2M09 block
       else
         return total
 
-    func l2m09_fn09 public (int:x, int:y) → int
+    func l2m09_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22261)
       if (x >= 22261)

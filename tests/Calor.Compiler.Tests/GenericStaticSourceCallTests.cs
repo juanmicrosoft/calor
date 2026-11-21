@@ -106,7 +106,7 @@ public sealed class GenericStaticSourceCallTests
     {
         var initialization = effectSite switch
         {
-            "constructor" => "    ctor stat ()\n      set Probe . log \"C\"\n",
+            "constructor" => "    ctor static ()\n      set Probe . log \"C\"\n",
             "field" => """
                     field int:seed static = Initialize()
                     func Initialize private () → int

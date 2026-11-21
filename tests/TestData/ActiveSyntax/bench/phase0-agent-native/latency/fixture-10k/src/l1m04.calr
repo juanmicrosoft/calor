@@ -11,9 +11,8 @@ module L1M04 L1M04 block
       let int:v1 = L2M33.L2M33Module.l2m33_fn12(x, 61)
       return (v1 + y)
 
-    func l1m04_fn03 public (int:x, int:y) → int
+    func l1m04_fn03 public (int:x | (# > 2), int:y) → int
       !
-      requires (x > 2)
       => (x >= 3)
       let int:acc = ((x * 2) + y)
       if (acc > 20161)
@@ -26,9 +25,8 @@ module L1M04 L1M04 block
       let int:v1 = L2M33.L2M33Module.l2m33_fn04(x, 31)
       return (v1 + y)
 
-    func l1m04_fn05 public (int:x, int:y) → int
+    func l1m04_fn05 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20168)
       if (x >= 20168)
@@ -36,9 +34,8 @@ module L1M04 L1M04 block
       else
         return 20168
 
-    func l1m04_fn06 public (int:x, int:y) → int
+    func l1m04_fn06 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 20175)
       if (x >= 20175)
@@ -46,10 +43,8 @@ module L1M04 L1M04 block
       else
         return 20175
 
-    func l1m04_fn07 public (int:x, int:y) → int
+    func l1m04_fn07 public (int:x | (# >= 5), int:y | (# >= 0)) → int
       !
-      requires (x >= 5)
-      requires (y >= 0)
       => (result >= 20182)
       let int:total = ((x * 3) + y)
       if (total < 20182)
@@ -63,18 +58,16 @@ module L1M04 L1M04 block
       let int:v2 = L2M18.L2M18Module.l2m18_fn06(x, 51)
       return ((v1 + v2) + y)
 
-    func l1m04_fn09 public (int:x, int:y) → int
+    func l1m04_fn09 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20189)
       let int:total = ((x * 2) + y)
       if (total > 20189)
         return 20189
       return total
 
-    func l1m04_fn10 public (int:x, int:y) → int
+    func l1m04_fn10 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 20196)
       let int:total = ((x * 2) + y)
       if (total > 20196)

@@ -167,6 +167,14 @@ keeps later source-line mappings, and does not introduce a wider conditional
 type into a narrow return. The converter emits the same bounded canonical form.
 This rule does not rewrite calls, assignments, lambdas, or mixed-type branches.
 
+Branch on one value against three or more constants with `match`; use `if`
+otherwise. `calor lint` reports `Calor1306` for an `if`/`else if` chain whose
+every condition compares the same parameter or local with `==` against a
+distinct integer, char, string or enum constant. It offers no patch: a statement
+match lowers to a C# `switch`, so generated C# changes, and a `break` inside a
+case exits the switch rather than the loop. Chains containing a loop `break` are
+not reported.
+
 ```calor
 if x > 0
   Console.WriteLine("positive")
@@ -217,16 +225,14 @@ counts the same values; `CountEvens(6)` returns `3`.
 
 ```calor
 module Example
-  func PrintEvens (int:n) → void
+  func PrintEvens (int:n | (# > 0)) → void
     ! cw
-    requires n > 0
     for i from 1 to n step 1
       if i % 2 == 0
         Console.WriteLine(i)
 
-  func CountEvens (int:n) → int
+  func CountEvens (int:n | (# > 0)) → int
     !
-    requires n > 0
     var int:count = 0
     for i from 1 to n step 1
       if i % 2 == 0
@@ -241,9 +247,8 @@ factorial example returns immediately for zero or one; `Main` returns `120`.
 
 ```calor
 module EarlyReturn
-  func Factorial (int:n) → int
+  func Factorial (int:n | (# >= 0)) → int
     !
-    requires n >= 0
     if n <= 1
       return 1
     return n * Factorial(n - 1)

@@ -760,9 +760,8 @@ public class AsyncAwaitTests
         // Correct syntax: §Q{"message"} (s-expression)
         var calorSource = """
             module ContractTests ContractTests block
-              func GetUserAsync async (int:userId) → string
+              func GetUserAsync async (int:userId | (# > 0)) → string
                 !
-                requires userId > 0
                 return "user"
             """;
 
@@ -774,7 +773,7 @@ public class AsyncAwaitTests
         Assert.Empty(diagnostics.Errors);
         var func = Assert.Single(ast.Functions);
         Assert.True(func.IsAsync);
-        Assert.Single(func.Preconditions);
+        Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions));
     }
 
     [Fact]
@@ -804,9 +803,8 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             module ContractEmitTests ContractEmitTests block
-              func ValidateAsync async (int:value) → bool
+              func ValidateAsync async (int:value | (# >= 0)) → bool
                 !
-                requires value >= 0
                 return true
             """;
 
@@ -830,9 +828,8 @@ public class AsyncAwaitTests
         var calorSource = """
             module MethodContractTests MethodContractTests block
               class Service
-                func ProcessAsync async (string:input) → string
+                func ProcessAsync async (string:input | (# != null)) → string
                   !
-                  requires input != null
                   return "processed"
             """;
 
@@ -845,7 +842,7 @@ public class AsyncAwaitTests
         var classNode = Assert.Single(ast.Classes);
         var method = Assert.Single(classNode.Methods);
         Assert.True(method.IsAsync);
-        Assert.Single(method.Preconditions);
+        Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions));
     }
 
     #endregion

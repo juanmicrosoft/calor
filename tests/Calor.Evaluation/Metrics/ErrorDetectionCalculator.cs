@@ -83,7 +83,7 @@ public class ErrorDetectionCalculator : IMetricCalculator
         };
     }
 
-    private static bool ContainsRequires(string source) => CalorSyntax.Requires.IsMatch(source);
+    private static bool ContainsRequires(string source) => CalorSyntax.Precondition.IsMatch(source);
 
     /// <summary>
     /// Checks if source contains a Calor postcondition (a line-head <c>=&gt;</c>).

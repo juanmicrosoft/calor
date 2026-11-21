@@ -1,6 +1,5 @@
 module OutcomeAssumed OutcomeAssumed block
-  func Ratio (int:a, int:b) → int
+  func Ratio (int:a | (# >= 0), int:b) → int
     !
-    requires (a >= 0)
     => (result >= (0 - a))
     return (a / b)

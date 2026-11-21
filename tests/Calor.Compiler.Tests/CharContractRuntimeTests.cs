@@ -15,16 +15,15 @@ public class CharContractRuntimeTests
     [Theory]
     // The retired Lisp char operators are ordinary System.Char calls in native syntax.
     // `! unknown` keeps unrelated effect findings out of the contract checks under test.
-    [InlineData("char.GetNumericValue(input)", DiagnosticCode.TypeMismatch)]
-    [InlineData("char.ToUpper(input)", DiagnosticCode.TypeMismatch)]
+    [InlineData("char.GetNumericValue(#)", DiagnosticCode.TypeMismatch)]
+    [InlineData("char.ToUpper(#)", DiagnosticCode.TypeMismatch)]
     [InlineData("char.IsDigit(missing)", DiagnosticCode.UndefinedReference)]
     public void CharacterContracts_StillRejectNonBooleanAndUnknownReferences(string expression, string code)
     {
         var result = Program.Compile($$"""
             module CharContracts CharContracts block
-              func Probe (char:input) → char
+              func Probe (char:input | ({{expression}})) → char
                 ! unknown
-                requires {{expression}}
                 return input
             """, "char-contracts.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.True(result.HasErrors);

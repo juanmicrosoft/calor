@@ -185,9 +185,8 @@ for (int i = 1; i <= 100; i++)
 **Calor:**
 ```calor
 module TokenContracts
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     => result >= 0
     return a / b
 ```
@@ -269,7 +268,7 @@ also affects character and line counts, so fix formatting rules before comparing
 
 ### 4. Contract Syntax
 
-Contracts add information and source text: `requires x >= 0` is an entry
+Contracts add information and source text: `int:x | (# >= 0)` is an entry
 condition; `=> result >= 0` is a postcondition.
 
 Though C# contracts can be verbose too:

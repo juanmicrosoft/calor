@@ -7,9 +7,8 @@ module L2M07 L2M07 block
       let int:v2 = L3M16.L3M16Module.l3m16_fn11(x, 29)
       return ((v1 + v2) + y)
 
-    func l2m07_fn02 public (int:x, int:y) → int
+    func l2m07_fn02 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 2) + y)
       if (acc > 22163)
@@ -45,9 +44,8 @@ module L2M07 L2M07 block
       let int:v2 = L3M33.L3M33Module.l3m33_fn01(x, 62)
       return ((v1 + v2) + y)
 
-    func l2m07_fn08 public (int:x, int:y) → int
+    func l2m07_fn08 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22170)
       if (x >= 22170)
@@ -55,9 +53,8 @@ module L2M07 L2M07 block
       else
         return 22170
 
-    func l2m07_fn09 public (int:x, int:y) → int
+    func l2m07_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22177)
       if (x >= 22177)
@@ -65,9 +62,8 @@ module L2M07 L2M07 block
       else
         return 22177
 
-    func l2m07_fn10 public (int:x, int:y) → int
+    func l2m07_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22184)
       if (x >= 22184)

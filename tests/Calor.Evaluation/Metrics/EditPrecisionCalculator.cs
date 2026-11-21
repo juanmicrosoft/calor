@@ -271,7 +271,7 @@ public class EditPrecisionCalculator : IMetricCalculator
             if (!hasId) return 0.3;
 
             // Already has contracts = easier to add more
-            return CalorSyntax.Requires.IsMatch(source) || CalorSyntax.Ensures.IsMatch(source) ? 0.95 : 0.85;
+            return CalorSyntax.Precondition.IsMatch(source) || CalorSyntax.Ensures.IsMatch(source) ? 0.95 : 0.85;
         }
         else
         {

@@ -109,6 +109,16 @@ public sealed class ProjectDiscovery
 
         var csFileList = csFiles.ToList();
 
+        // #1609: migrate writes next to each source, so it converts only sources inside
+        // the project directory. A compile item from elsewhere (a NuGet contentFiles item
+        // in the package cache, a file linked from another folder) is reported as skipped
+        // and left untouched; the project keeps compiling the original.
+        var outsideProject = projectFilePath == null
+            ? []
+            : csFileList.Where(path => !IsUnderDirectory(CanonicalPath.Resolve(path), CanonicalPath.Resolve(searchPath)))
+                .ToList();
+        csFileList = csFileList.Except(outsideProject, BuildStateCache.GetPathComparer()).ToList();
+
         // Apply offset/limit pagination
         if (_options.Offset > 0)
         {
@@ -125,6 +135,17 @@ public sealed class ProjectDiscovery
             entries.Add(entry);
         }
         ResolveOutputPathCollisions(entries);
+        foreach (var outside in outsideProject)
+        {
+            entries.Add(new MigrationPlanEntry
+            {
+                SourcePath = outside,
+                OutputPath = Path.ChangeExtension(outside, direction == MigrationDirection.CSharpToCalor ? ".calr" : ".g.cs"),
+                Convertibility = FileConvertibility.Skip,
+                SkipReason = $"Outside the project directory '{Path.GetFullPath(searchPath)}' "
+                    + "(for example a NuGet contentFiles item or a linked file); not converted, and nothing is written there."
+            });
+        }
 
         return new MigrationPlan
         {
@@ -187,20 +208,8 @@ public sealed class ProjectDiscovery
             }
         }
 
-        // Check file size
-        try
-        {
-            var fileInfo = new FileInfo(filePath);
-            if (fileInfo.Length > _options.MaxFileSizeBytes)
-            {
-                return true;
-            }
-        }
-        catch
-        {
-            // If we can't check file size, include it
-        }
-
+        // #1609: size no longer excludes a file. A file over MaxFileSizeBytes skips the
+        // advisory feature analysis (see AnalyzeFileAsync) but is still migrated.
         return false;
     }
 
@@ -245,6 +254,14 @@ public sealed class ProjectDiscovery
         var declaredNamespaceIdentities = new List<string>();
         string? primarySymbolIdentity = null;
 
+        if (fileInfo.Length > _options.MaxFileSizeBytes)
+        {
+            convertibility = FileConvertibility.Partial;
+            potentialIssues.Add(
+                $"Larger than {_options.MaxFileSizeBytes:N0} bytes: feature analysis skipped. The file is still migrated; "
+                + "if native conversion runs past the per-file time limit, the original C# is preserved whole.");
+        }
+        else
         try
         {
             // Parse the file to detect features
@@ -329,8 +346,9 @@ public sealed class ProjectDiscovery
         }
         catch (Exception ex)
         {
-            convertibility = FileConvertibility.Skip;
-            skipReason = $"Analysis failed: {ex.Message}";
+            // #1609: analysis is advisory. Its failure never keeps a file from migrating.
+            convertibility = FileConvertibility.Partial;
+            potentialIssues.Add($"Feature analysis failed ({ex.GetType().Name}: {ex.Message}); the file is still migrated.");
             estimatedIssues = 1;
         }
 

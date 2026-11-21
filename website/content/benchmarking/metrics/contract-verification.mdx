@@ -53,8 +53,8 @@ Contracts use the schema 2.0 seven-status vocabulary:
 
 The metric tracks the distribution across these categories. Runtime checks
 separately require supported lowering and an enabled contract mode.
-`--contract-mode off` emits no contract guards; it does not disable checked
-arithmetic. See
+`--contract-mode off` removes postcondition and invariant guards; it keeps
+parameter-refinement guards and does not disable checked arithmetic. See
 [verification modes and limits](/docs/guides/verification-guarantees/).
 
 This page describes current semantics, not a new measurement of historical
@@ -69,9 +69,8 @@ The repository includes a deliberately refutable postcondition fixture:
 
 ```calor
 module OutcomeRefuted
-  func Dec (int:x) → int
+  func Dec (int:x | (# > 0)) → int
     !
-    requires x > 0
     => result > 10
     return x - 1
 ```
@@ -99,9 +98,9 @@ claim that verification proves arbitrary preconditions at every call site.
 
 | Bug Category | Contract | Detection |
 |:-------------|:---------|:----------|
-| Division by zero | `requires divisor != 0` | `proven`/`refuted` when modeled; otherwise a non-proven status |
-| Negative index | `requires index >= 0` | `proven`/`refuted` when modeled; otherwise a non-proven status |
-| Out of bounds | `requires index < len` | Array facts are conservatively `assumed` where models diverge |
+| Division by zero | `int:divisor \| (# != 0)` | `proven`/`refuted` when modeled; otherwise a non-proven status |
+| Negative index | `int:index \| (# >= 0)` | `proven`/`refuted` when modeled; otherwise a non-proven status |
+| Out of bounds | `int:index \| (# < len)` | Array facts are conservatively `assumed` where models diverge |
 | Invalid range | `=> result >= 0` | Postcondition receives one of the seven statuses |
 | Integer overflow | Bounds on operands | Checked arithmetic may throw; a postcondition alone does not establish exception-free execution |
 
@@ -110,9 +109,8 @@ claim that verification proves arbitrary preconditions at every call site.
 A postcondition constrains normal returns, not whether every input returns successfully:
 
 ```calor
-func Square (int:x) → int
+func Square (int:x | (# >= 0)) → int
   !
-  requires x >= 0
   => result >= 0
   return x * x
 ```

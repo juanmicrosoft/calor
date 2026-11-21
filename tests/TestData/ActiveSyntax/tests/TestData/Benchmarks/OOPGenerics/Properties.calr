@@ -4,10 +4,8 @@ module Properties Properties
       !
       return name
 
-    func ValidateAge public (int:age) → int
+    func ValidateAge public (int:age | ((# >= 0) && (# <= 150))) → int
       !
-      requires age >= 0
-      requires age <= 150
       return age
 
     func ValidateEmail public (string:email, int:length) → bool

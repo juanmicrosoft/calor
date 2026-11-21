@@ -1,33 +1,26 @@
 module ShapeFactory ShapeFactory
   module ShapeFactoryModule
-    func CircleArea public (float:radius) → float
+    func CircleArea public (float:radius | (# > 0)) → float
       !
-      requires radius > 0
       => result >= 0
       return 3.14159 * (radius * radius)
 
-    func RectangleArea public (float:width, float:height) → float
+    func RectangleArea public (float:width | (# > 0), float:height | (# > 0)) → float
       !
-      requires width > 0
-      requires height > 0
       => result >= 0
       return width * height
 
-    func SquareArea public (float:side) → float
+    func SquareArea public (float:side | (# > 0)) → float
       !
-      requires side > 0
       => result >= 0
       return side * side
 
-    func CirclePerimeter public (float:radius) → float
+    func CirclePerimeter public (float:radius | (# > 0)) → float
       !
-      requires radius > 0
       => result >= 0
       return 2 * (3.14159 * radius)
 
-    func RectanglePerimeter public (float:width, float:height) → float
+    func RectanglePerimeter public (float:width | (# > 0), float:height | (# > 0)) → float
       !
-      requires width > 0
-      requires height > 0
       => result >= 0
       return 2 * (width + height)

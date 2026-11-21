@@ -33,7 +33,7 @@ from multi_model_runner import run_model  # type: ignore
 
 REPO = Path(__file__).resolve().parent.parent
 CALOR_EXE = REPO / 'src/Calor.Compiler/bin/Debug/net10.0/calor.exe'
-FIXTURE = REPO / 'scripts/h2_edit_fixture.calr'
+FIXTURE = REPO / 'scripts/historical/h2_edit_fixture.calr.txt'
 BUDGET_USD = 8.0
 TRIALS_PER_CELL = 3
 

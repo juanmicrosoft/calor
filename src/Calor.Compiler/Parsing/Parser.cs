@@ -31,14 +31,11 @@ public sealed class Parser
             [TokenKind.Identifier] = static parser => parser.ParseReference(),
             [TokenKind.OpenParen] = static parser => parser.ParseParenExpressionOrInlineLambda(),
             [TokenKind.OpenBrace] = static parser => parser.ParseCollectionInitializer(),
-            [TokenKind.If] = static parser => parser.ParseIfExpression(),
             [TokenKind.Match] = static parser => parser.ParseMatchExpression(),
             [TokenKind.New] = static parser => parser.ParseNewExpression(),
             [TokenKind.This] = static parser => parser.ParseThisExpression(),
             [TokenKind.Base] = static parser => parser.ParseBaseExpression(),
             [TokenKind.Await] = static parser => parser.ParseAwaitExpression(),
-            [TokenKind.NullCoalesce] = static parser => parser.ParseNullCoalesce(),
-            [TokenKind.NullConditional] = static parser => parser.ParseNullConditional(),
             [TokenKind.RangeOp] = static parser => parser.ParseRangeExpression(),
             [TokenKind.Throw] = static parser => parser.ParseThrowExpression(),
             [TokenKind.Hash] = static parser => parser.ParseSelfRef(),
@@ -622,78 +619,6 @@ public sealed class Parser
             $"Remove the legacy closer '{closerToken.Text}' (indentation already ends the block)",
             TextEdit.Replace(filePath, span.Line, span.Column, endLine, endColumn, string.Empty),
             isSafeToApply: true);
-    }
-
-    /// <summary>
-    /// Repairs a misplaced return type in a three-field function header.
-    /// Methods may legitimately carry a third modifier field. An ID-shaped
-    /// leading field is ambiguous with retired source syntax and is never
-    /// auto-rewritten into a declaration name.
-    /// </summary>
-    private void CheckMalformedFunctionHeader(Token startToken, AttributeCollection attrs, Token headerOpen, Token headerClose)
-    {
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount != 3)
-        {
-            return;
-        }
-
-        var visRaw = attrs["_pos2"] ?? string.Empty;
-        if (!AttributeHelper.IsVisibilityToken(visRaw))
-        {
-            return;
-        }
-
-        // The header block must be a well-formed {...} we can rewrite.
-        if (headerOpen.Kind != TokenKind.OpenBrace || headerClose.Kind != TokenKind.CloseBrace)
-        {
-            return;
-        }
-
-        var name = attrs["_pos0"] ?? string.Empty;
-        var type = attrs["_pos1"] ?? string.Empty;
-        if (name.StartsWith("f_", StringComparison.Ordinal) ||
-            (name.Length > 1 && name[0] == 'f' &&
-             name.AsSpan(1).IndexOfAnyExceptInRange('0', '9') < 0))
-        {
-            return;
-        }
-
-        var filePath = _diagnostics.CurrentFilePath ?? string.Empty;
-        var headerEndLine = headerClose.Span.Line;
-        var headerEndColumn = headerClose.Span.Column + headerClose.Span.Length;
-
-        var edits = new List<TextEdit>
-        {
-            TextEdit.Replace(
-                filePath,
-                headerOpen.Span.Line,
-                headerOpen.Span.Column,
-                headerEndLine,
-                headerEndColumn,
-                $"{{{name}:{visRaw}}}"),
-        };
-
-        // Only inject a signature when nothing already follows the header on
-        // this line -- an inline signature `(...)` or a type-parameter list
-        // `<...>` means we must not append a second one.
-        var followsSignatureOrTypeParams = Check(TokenKind.OpenParen) || Check(TokenKind.Less);
-        if (!followsSignatureOrTypeParams)
-        {
-            edits.Add(TextEdit.Insert(filePath, headerEndLine, headerEndColumn, $" () -> {type}"));
-        }
-
-        var fix = new SuggestedFix(
-            $"Move the return type '{type}' out of the header: use {{{name}:{visRaw}}} and declare the return type in the signature",
-            edits, isSafeToApply: true);
-
-        _diagnostics.ReportErrorWithFix(
-            startToken.Span.Union(headerClose.Span),
-            DiagnosticCode.MalformedFunctionHeader,
-            $"'{startToken.Text}' header has three fields ({{{name}:{type}:{visRaw}}}), but §F/§AF headers take at most {{name:visibility}}. " +
-            $"The second field '{type}' is a return type -- declare it in the signature as '(...) -> {type}', not in the header. " +
-            "A return type belongs in the inline signature, not the header.",
-            fix);
     }
 
     public ModuleNode Parse()
@@ -1366,10 +1291,8 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Func);
         _lastIfToken = null; // scope Calor0117 fixes to this function's §IFs
-        var headerOpen = Current;
         var attrs = ParseDeclarationAttributes(startToken);
         ValidateIdentityFreeHeader(startToken, attrs, 2);
-        CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
 
         var id = GenerateParserAutoId("f");
         var funcName = attrs["_pos0"] ?? "";
@@ -1872,6 +1795,11 @@ public sealed class Parser
     private RequiresNode ParseRequires()
     {
         var startToken = Expect(TokenKind.Requires);
+        // #1618: one precondition form. The clause is still parsed for recovery.
+        _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+            "'requires' is removed. State a precondition as a refinement on the parameter it "
+            + "constrains, for example 'int:divisor | (# != 0)'; for a condition on several "
+            + "parameters, refine the last one and name the earlier ones, e.g. 'int:hi | (# > lo)'.");
         var attrs = ParseAttributes();
         // v2 syntax: message is first positional §Q{"message"} (condition)
         var message = attrs["_pos0"];
@@ -3147,7 +3075,11 @@ public sealed class Parser
         // undefined name, a type error) points at the hole instead of line 1, column 1.
         var holeSpan = new TextSpan(part.Start, source.Length, part.Line, part.Column);
         var lexer = new Lexer(source, _diagnostics, part.Start, part.Line, part.Column);
-        var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics);
+        // #1618: a hole inside a refinement predicate may name the refined value as `#`.
+        var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics)
+        {
+            _insideRefinementPredicate = _insideRefinementPredicate
+        };
         var expression = parser.ParseExpression();
         var intent = part.Intent;
 
@@ -3475,11 +3407,11 @@ public sealed class Parser
         if (attrs["_pos0"] == "expr")
         {
             var fix = new SuggestedFix(
-                "Return the match expression explicitly with §R",
+                "Return the match expression explicitly with 'return'",
                 TextEdit.Replace(_diagnostics.CurrentFilePath ?? "", startToken.Span.Line, startToken.Span.Column,
-                    startToken.Span.Line, startToken.Span.Column, "§R "));
+                    startToken.Span.Line, startToken.Span.Column, "return "));
             _diagnostics.ReportErrorWithFix(startToken.Span, DiagnosticCode.UnexpectedToken,
-                "Statement-position §W{...:expr} is removed. Use §R §W{...} for a returned match expression.", fix);
+                "A statement-position match marked 'expr' is removed. Write 'return match ...' for a returned match expression.", fix);
         }
 
         var target = ParseExpression();
@@ -4050,56 +3982,6 @@ public sealed class Parser
         return new DoWhileStatementNode(span, id, body, condition, attrs);
     }
 
-    /// <summary>
-    /// Parses IF as a conditional expression (ternary).
-    /// §IF{id} condition → thenExpr §EL → elseExpr §/I{id}
-    /// Returns a ConditionalExpressionNode for use in expression contexts.
-    /// </summary>
-    private ExpressionNode ParseIfExpression()
-    {
-        var startToken = Expect(TokenKind.If);
-        var attrs = ParseAttributes();
-
-        // Parse the condition
-        var condition = ParseExpression();
-
-        // Expect arrow and then expression
-        if (!Check(TokenKind.Arrow))
-        {
-            _diagnostics.ReportError(Current.Span, DiagnosticCode.ExpectedExpression, "Expected '→' after IF condition in expression context");
-            return new IntLiteralNode(startToken.Span, 0);
-        }
-        Advance(); // consume →
-
-        // Parse then expression
-        var thenExpr = ParseExpression();
-
-        // Expect §EL (else)
-        if (!Check(TokenKind.Else))
-        {
-            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "An if expression requires an else clause (else → value)");
-            return thenExpr;
-        }
-        Expect(TokenKind.Else);
-
-        // Expect arrow and else expression
-        if (!Check(TokenKind.Arrow))
-        {
-            _diagnostics.ReportError(Current.Span, "Calor0102", "Expected '→' after else in an if expression");
-            return thenExpr;
-        }
-        Advance(); // consume →
-
-        // Parse else expression
-        var elseExpr = ParseExpression();
-
-        // An inline conditional owns no Dedent; that token belongs to its enclosing body.
-        var endSpan = elseExpr.Span;
-
-        var span = startToken.Span.Union(endSpan);
-        return new ConditionalExpressionNode(span, condition, thenExpr, elseExpr);
-    }
-
     private IfStatementNode ParseIfStatement()
     {
         var startToken = Expect(TokenKind.If);
@@ -4483,7 +4365,7 @@ public sealed class Parser
             TokenKind.Func or TokenKind.AsyncFunc or TokenKind.Method or TokenKind.AsyncMethod => InvalidVisibility(1),
             TokenKind.Property => InvalidVisibility(2),
             TokenKind.Indexer => InvalidVisibility(1),
-            TokenKind.Constructor => attrs["_pos0"] != "stat" && InvalidVisibility(0),
+            TokenKind.Constructor => attrs["_pos0"] != "static" && InvalidVisibility(0),
             TokenKind.Event => InvalidVisibility(1),
             TokenKind.Enum => attrs["_pos2"] is { } underlying
                 ? InvalidVisibility(1) || !IntegralType(underlying)
@@ -4509,7 +4391,7 @@ public sealed class Parser
                 TokenKind.Constructor => "a visibility or stat",
                 TokenKind.Enum when position == 2 => "an integral enum underlying type",
                 TokenKind.Enum when attrs["_pos2"] == null => "a visibility or integral enum underlying type",
-                _ => "a visibility (pub, priv, prot, int, prot-int, or priv-prot)"
+                _ => "a visibility (public, private, protected, internal, protected internal, or private protected)"
             };
             var key = $"_pos{position}";
             var span = attrs.TryGetSpan(key, out var fieldSpan) ? fieldSpan : token.Span;
@@ -5692,7 +5574,7 @@ public sealed class Parser
     /// <see cref="DiagnosticCode.UnknownVisibility"/> message lists them.
     /// </summary>
     internal const string ValidVisibilityWords =
-        "pub, int, prot, priv, prot-int, priv-prot";
+        "public, internal, protected, private, protected internal, private protected";
 
     /// <summary>
     /// Maps a visibility word to its <see cref="Visibility"/>. Returns false for a
@@ -5709,12 +5591,6 @@ public sealed class Parser
             "internal" => Visibility.Internal,
             "protected" => Visibility.Protected,
             "private" => Visibility.Private,
-            "pub" => Visibility.Public,
-            "prot-int" => Visibility.ProtectedInternal,
-            "priv-prot" => Visibility.PrivateProtected,
-            "int" => Visibility.Internal,
-            "prot" => Visibility.Protected,
-            "priv" => Visibility.Private,
             _ => null
         };
         visibility = parsed ?? Visibility.Public;
@@ -5734,21 +5610,23 @@ public sealed class Parser
         var hint = replacement != null
             ? $" Use '{replacement}' instead."
             : ParseMethodModifiers(value) != MethodModifiers.None
-            ? $" '{value}' is a modifier: modifiers go in the field after the visibility, e.g. ':pub:{value}'."
+            ? $" '{value}' is a modifier: it follows the visibility, e.g. 'public {value}'."
             : "";
         _diagnostics.ReportError(span, DiagnosticCode.UnknownVisibility,
             $"Unknown visibility '{value}'. Valid visibility words: {ValidVisibilityWords}.{hint}");
         return visibility;
     }
 
+    // 0.30 (#1596): visibility is spelled as in C#; the old short words are errors
+    // that name their replacement.
     private static string? RemovedVisibilityReplacement(string? value) => value switch
     {
-        "public" => "pub",
-        "internal" => "int",
-        "protected" or "pro" => "prot",
-        "private" or "pri" => "priv",
-        "protected-internal" => "prot-int",
-        "private-protected" => "priv-prot",
+        "pub" => "public",
+        "int" => "internal",
+        "prot" or "pro" => "protected",
+        "priv" or "pri" => "private",
+        "prot-int" => "protected internal",
+        "priv-prot" => "private protected",
         _ => null
     };
 
@@ -6603,20 +6481,20 @@ public sealed class Parser
             if (!ClassModifierKeywords.Contains(token))
             {
                 var lower = token.ToLowerInvariant();
-                var hint = ClassModifierKeywords.Contains(lower)
+                var hint = (RetiredModifierReplacement(token) ?? RetiredModifierReplacement(lower)) is { } replacement
+                    ? $"Use '{replacement}' instead."
+                    : RemovedVisibilityReplacement(token) is { } visibilityWord
+                    ? $"Use '{visibilityWord}' instead."
+                    : ClassModifierKeywords.Contains(lower)
                     ? $"Use '{lower}' instead."
-                    : "Use a supported class modifier such as 'abs' or 'struct'; static containers use a named module.";
+                    : "Use a supported class modifier such as 'abstract' or 'struct'; static containers use a named module.";
                 _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
                     $"Unknown class modifier '{token}'. Modifiers are case-sensitive. {hint}");
             }
         }
-        var isAbstract = modifierTokens.Any(t => t.Equals("abs", StringComparison.Ordinal)
-            || t.Equals("abstract", StringComparison.Ordinal));
-        var isSealed = modifierTokens.Any(t => t.Equals("seal", StringComparison.Ordinal)
-            || t.Equals("sealed", StringComparison.Ordinal));
-        var isStatic = isModule || modifierTokens.Any(t => t.Equals("st", StringComparison.Ordinal)
-            || t.Equals("stat", StringComparison.Ordinal)
-            || t.Equals("static", StringComparison.Ordinal));
+        var isAbstract = modifierTokens.Any(t => t.Equals("abstract", StringComparison.Ordinal));
+        var isSealed = modifierTokens.Any(t => t.Equals("sealed", StringComparison.Ordinal));
+        var isStatic = isModule || modifierTokens.Any(t => t.Equals("static", StringComparison.Ordinal));
         if (!isModule && isStatic)
         {
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
@@ -6638,7 +6516,7 @@ public sealed class Parser
         if (isStruct && isAbstract)
         {
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
-                "Structs cannot be abstract. The 'abs' modifier will be ignored.");
+                "Structs cannot be abstract. The 'abstract' modifier will be ignored.");
             isAbstract = false;
         }
         var implementedInterfaces = new List<string>();
@@ -6883,7 +6761,7 @@ public sealed class Parser
         // 0.30 (D1): an explicit static constructor carries the type's initialization row.
         if (staticInitializerEffects != null && constructors.Any(constructor => constructor.IsStatic))
             _diagnostics.ReportError(staticInitializerEffects.Span, DiagnosticCode.EffectRowMisplaced,
-                "This type has an explicit static constructor; declare the static-initialization row on 'ctor stat' instead.");
+                "This type has an explicit static constructor; declare the static-initialization row on 'ctor static' instead.");
         var span = startToken.Span.Union(endToken.Span);
         var identifierSpan = GetIdentifierSpan(attrs, classNameKey, name);
         return WithDocumentation(new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
@@ -7032,7 +6910,7 @@ public sealed class Parser
         var id = GenerateParserAutoId("mt");
         var name = attrs["_pos0"] ?? "";
         var methodNameKey = "_pos0";
-        var visStr = attrs["_pos1"] ?? "priv";
+        var visStr = attrs["_pos1"] ?? "private";
         var modStr = attrs["_pos2"] ?? "";
 
 
@@ -7185,54 +7063,62 @@ public sealed class Parser
         var tokens = modStr.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var token in tokens)
         {
-            if (token.Equals("vr", StringComparison.Ordinal)
-                || token.Equals("virt", StringComparison.Ordinal)
-                || token.Equals("virtual", StringComparison.Ordinal))
+            if (token.Equals("virtual", StringComparison.Ordinal))
                 mods |= MethodModifiers.Virtual;
-            else if (token.Equals("ov", StringComparison.Ordinal)
-                || token.Equals("over", StringComparison.Ordinal)
-                || token.Equals("override", StringComparison.Ordinal))
+            else if (token.Equals("override", StringComparison.Ordinal))
                 mods |= MethodModifiers.Override;
-            else if (token.Equals("abs", StringComparison.Ordinal)
-                || token.Equals("abstract", StringComparison.Ordinal))
+            else if (token.Equals("abstract", StringComparison.Ordinal))
                 mods |= MethodModifiers.Abstract;
-            else if (token.Equals("seal", StringComparison.Ordinal)
-                || token.Equals("sealed", StringComparison.Ordinal))
+            else if (token.Equals("sealed", StringComparison.Ordinal))
                 mods |= MethodModifiers.Sealed;
-            else if (token.Equals("st", StringComparison.Ordinal)
-                || token.Equals("stat", StringComparison.Ordinal)
-                || token.Equals("static", StringComparison.Ordinal))
+            else if (token.Equals("static", StringComparison.Ordinal))
                 mods |= MethodModifiers.Static;
             else if (token.Equals("const", StringComparison.Ordinal))
                 mods |= MethodModifiers.Const;
             else if (token.Equals("readonly", StringComparison.Ordinal))
                 mods |= MethodModifiers.Readonly;
-            else if (token.Equals("req", StringComparison.Ordinal)
-                || token.Equals("required", StringComparison.Ordinal))
+            else if (token.Equals("required", StringComparison.Ordinal))
                 mods |= MethodModifiers.Required;
-            else if (token.Equals("part", StringComparison.Ordinal)
-                || token.Equals("partial", StringComparison.Ordinal))
+            else if (token.Equals("partial", StringComparison.Ordinal))
                 mods |= MethodModifiers.Partial;
-            else if (token.Equals("ext", StringComparison.Ordinal)
-                || token.Equals("extern", StringComparison.Ordinal))
+            else if (token.Equals("extern", StringComparison.Ordinal))
                 mods |= MethodModifiers.Extern;
             else if (token.Equals("unsafe", StringComparison.Ordinal))
                 mods |= MethodModifiers.Unsafe;
-            else if (token.Equals("volatile", StringComparison.Ordinal)
-                || token.Equals("vol", StringComparison.Ordinal))
+            else if (token.Equals("volatile", StringComparison.Ordinal))
                 mods |= MethodModifiers.Volatile;
             else if (span is { } location)
             {
                 var lower = token.ToLowerInvariant();
-                var hint = token != lower && ParseMethodModifiers(lower) != MethodModifiers.None
+                var hint = (RetiredModifierReplacement(token) ?? RetiredModifierReplacement(lower)) is { } replacement
+                    ? $"Use '{replacement}' instead."
+                    : token != lower && ParseMethodModifiers(lower) != MethodModifiers.None
                     ? $"Use '{lower}' instead."
-                    : "Use a supported member modifier such as 'stat', 'vr', or 'ov'.";
+                    : "Use a C# member modifier such as 'static', 'virtual' or 'override'.";
                 _diagnostics.ReportError(location, DiagnosticCode.InvalidModifier,
                     $"Unknown member modifier '{token}'. Modifiers are case-sensitive. {hint}");
             }
         }
         return mods;
     }
+
+    /// <summary>
+    /// 0.30 (#1596): modifiers are spelled as in C#. The old abbreviations are
+    /// errors that name their replacement.
+    /// </summary>
+    private static string? RetiredModifierReplacement(string word) => word switch
+    {
+        "vr" or "virt" => "virtual",
+        "ov" or "over" => "override",
+        "abs" => "abstract",
+        "seal" => "sealed",
+        "st" or "stat" => "static",
+        "req" => "required",
+        "part" => "partial",
+        "ext" => "extern",
+        "vol" => "volatile",
+        _ => null,
+    };
 
     /// <summary>
     /// Parses native constructor and array creation.
@@ -7683,7 +7569,7 @@ public sealed class Parser
         var propertyNameKey = "_pos0";
         var propertyTypeKey = "_pos1";
         var typeName = attrs["_pos1"] ?? "object";
-        var visStr = attrs["_pos2"] ?? "pub";
+        var visStr = attrs["_pos2"] ?? "public";
         var modStr = attrs["_pos3"] ?? "";
         var accessorStr = attrs["_pos4"] ?? "";  // 6th positional for accessor shorthand
 
@@ -7819,6 +7705,11 @@ public sealed class Parser
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
         TryParseInlineSignature(startToken.Span, parameters, ref output, brackets: true);
+        // #1618: an indexer parameter refinement would be parsed but never checked (no entry
+        // guard, type check or effect charge), so it is rejected instead of silently ignored.
+        foreach (var refined in parameters.Where(parameter => parameter.InlineRefinement != null))
+            _diagnostics.ReportError(refined.InlineRefinement!.Predicate.Span, DiagnosticCode.UnexpectedToken,
+                $"Indexer parameter '{refined.Name}' cannot carry a refinement; validate it in the accessor body.");
         if (parameters.Count == 0)
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
                 "An indexer requires at least one parameter.");
@@ -7830,7 +7721,7 @@ public sealed class Parser
                 "Indexer return effect rows are not supported.");
         var attrs = new AttributeCollection();
         ConsumeCanonicalDeclarationModifiers(startToken, attrs);
-        var visibility = ParseVisibility(attrs["_pos1"] ?? "pub", startToken.Span);
+        var visibility = ParseVisibility(attrs["_pos1"] ?? "public", startToken.Span);
         var modifiers = ParseMethodModifiers(attrs["_pos2"] ?? "", startToken.Span);
         var csharpAttrs = ParseCSharpAttributes();
         PropertyAccessorNode? getter = null;
@@ -7998,20 +7889,23 @@ public sealed class Parser
         var temporary = new AttributeCollection();
         ConsumeCanonicalDeclarationModifiers(startToken, temporary);
         var modifiers = temporary["_pos2"];
-        if ((modifiers != null && modifiers != "stat")
-            || (modifiers == "stat" && temporary["_pos1"] != null))
+        if (modifiers == "stat")
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
-                "A constructor accepts a visibility or the stat modifier, not both.");
-        attrs.Add("_pos0", modifiers == "stat" ? "stat" : temporary["_pos1"] ?? "public");
+                "A static constructor is 'ctor static'.");
+        else if ((modifiers != null && modifiers != "static")
+            || (modifiers == "static" && temporary["_pos1"] != null))
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                "A constructor accepts a visibility or the static modifier, not both.");
+        attrs.Add("_pos0", modifiers is "static" or "stat" ? "static" : temporary["_pos1"] ?? "public");
         ValidateIdentityFreeHeader(startToken, attrs, 1);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:visibility?]
         var id = GenerateParserAutoId("ctor");
-        var visStr = attrs["_pos0"] ?? "pub";
+        var visStr = attrs["_pos0"] ?? "public";
 
 
-        var isStatic = visStr is "stat" or "static";
+        var isStatic = visStr == "static";
         var visibility = isStatic ? Visibility.Private : ParseVisibility(visStr, startToken.Span);
 
         // --- Compact syntax: inline signature (consume but parameters already parsed via §I) ---
@@ -8103,7 +7997,7 @@ public sealed class Parser
         var id = GenerateParserAutoId("op");
         var operatorToken = ParseOperatorToken();
 
-        var visStr = "pub";
+        var visStr = "public";
 
         var csharpAttrs = ParseCSharpAttributes();
         var visibility = ParseVisibility(visStr, startToken.Span);
@@ -8259,7 +8153,7 @@ public sealed class Parser
                 return convText;
             default:
                 _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
-                    $"Expected operator token in §OP, found '{token.Text}'");
+                    $"Expected an operator token after 'op', found '{token.Text}'");
                 Advance();
                 return null;
         }
@@ -9152,39 +9046,6 @@ public sealed class Parser
         return new AwaitExpressionNode(span, awaited);
     }
 
-    /// <summary>
-    /// Parses a null-coalescing expression.
-    /// §?? §REF[name=value] "default"
-    /// </summary>
-    private NullCoalesceNode ParseNullCoalesce()
-    {
-        var startToken = Expect(TokenKind.NullCoalesce);
-
-        var left = ParsePositionalExpression();
-        var right = ParseExpression();
-
-        var span = startToken.Span.Union(right.Span);
-        return new NullCoalesceNode(span, left, right);
-    }
-
-    /// <summary>
-    /// Parses a null-conditional access expression.
-    /// §?. §REF[name=person] Name
-    /// </summary>
-    private NullConditionalNode ParseNullConditional()
-    {
-        var startToken = Expect(TokenKind.NullConditional);
-
-        var target = ParseExpression();
-
-        // Parse the member name (identifier)
-        var memberToken = Expect(TokenKind.Identifier);
-        var memberName = memberToken.Text;
-
-        var span = startToken.Span.Union(memberToken.Span);
-        return new NullConditionalNode(span, target, memberName);
-    }
-
     private int FindQuantifierRangeDelimiter()
     {
         var depth = 0;
@@ -9561,14 +9422,14 @@ public sealed class Parser
 
     private static readonly HashSet<string> VisibilityKeywords = new(StringComparer.Ordinal)
     {
-        "pub", "prot", "priv", "int", "priv-prot", "prot-int"
+        "public", "protected", "private", "internal", "private-protected", "protected-internal"
     };
 
     private static readonly HashSet<string> ClassModifierKeywords = new(StringComparer.Ordinal)
     {
-        "abs", "abstract", "seal", "sealed", "st", "stat", "static",
+        "abstract", "sealed", "static",
         "partial", "struct", "readonly",
-        "pub", "prot", "priv", "int", "priv-prot", "prot-int"
+        "public", "protected", "private", "internal", "private-protected", "protected-internal"
     };
 
     #endregion

@@ -1,9 +1,8 @@
 module L1M28 L1M28 block
   module L1M28Module public
 
-    func l1m28_fn01 public (int:x, int:y) → int
+    func l1m28_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21470)
       if (x >= 21470)
@@ -21,9 +20,8 @@ module L1M28 L1M28 block
       let int:v1 = L2M05.L2M05Module.l2m05_fn05(x, 79)
       return (v1 + y)
 
-    func l1m28_fn04 public (int:x, int:y) → int
+    func l1m28_fn04 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 2) + y)
       if (acc > 21477)
@@ -31,9 +29,8 @@ module L1M28 L1M28 block
       else
         return ((acc * 2) + 21477)
 
-    func l1m28_fn05 public (int:x, int:y) → int
+    func l1m28_fn05 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 21484)
       let int:total = ((x * 3) + y)
       if (total > 21484)
@@ -52,10 +49,8 @@ module L1M28 L1M28 block
       let int:v2 = L2M06.L2M06Module.l2m06_fn06(x, 43)
       return ((v1 + v2) + y)
 
-    func l1m28_fn08 public (int:x, int:y) → int
+    func l1m28_fn08 public (int:x | (# >= 3), int:y | (# >= 0)) → int
       !
-      requires (x >= 3)
-      requires (y >= 0)
       => (result >= 21491)
       let int:total = ((x * 2) + y)
       if (total < 21491)
@@ -63,9 +58,8 @@ module L1M28 L1M28 block
       else
         return total
 
-    func l1m28_fn09 public (int:x, int:y) → int
+    func l1m28_fn09 public (int:x | (# > 6), int:y) → int
       !
-      requires (x > 6)
       => (x >= 7)
       let int:acc = ((x * 2) + y)
       if (acc > 21498)
@@ -84,10 +78,8 @@ module L1M28 L1M28 block
       let int:v2 = L2M05.L2M05Module.l2m05_fn03(x, 86)
       return ((v1 + v2) + y)
 
-    func l1m28_fn12 public (int:x, int:y) → int
+    func l1m28_fn12 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 21505)
       let int:total = ((x * 2) + y)
       if (total < 21505)
@@ -95,9 +87,8 @@ module L1M28 L1M28 block
       else
         return total
 
-    func l1m28_fn13 public (int:x, int:y) → int
+    func l1m28_fn13 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 21512)
       if (x >= 21512)

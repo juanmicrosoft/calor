@@ -27,9 +27,8 @@ module Billing Billing block
       let int:tier2 = (((u - 1000) * 8) / 10)
       return ((tier1 + tier2) + 300)
 
-    func BillCapped (int:units, int:cap) → int
+    func BillCapped (int:units, int:cap | (# >= 0)) → int
       !
-      requires (cap >= 0)
       => (result >= 0)
       => (result <= cap)
       let int:price = BillPro(units)

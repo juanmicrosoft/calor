@@ -1,15 +1,12 @@
 module BMICalculator BMICalculator
   module BMICalculatorModule
-    func CalculateBMI public (float:weightKg, float:heightM) → float
+    func CalculateBMI public (float:weightKg | (# > 0), float:heightM | (# > 0)) → float
       !
-      requires weightKg > 0
-      requires heightM > 0
       => result > 0
       return weightKg / (heightM * heightM)
 
-    func Category public (float:bmi) → int
+    func Category public (float:bmi | (# > 0)) → int
       !
-      requires bmi > 0
       if bmi < 18.5
         return 0
       else if bmi < 25

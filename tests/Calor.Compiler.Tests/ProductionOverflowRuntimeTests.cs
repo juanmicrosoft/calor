@@ -511,9 +511,8 @@ public class ProductionOverflowRuntimeTests
     {
         const string source = """
             module Overflow Overflow block
-              func Probe (int:value) → int
+              func Probe (int:value | (# >= 0)) → int
                 !
-                requires (value >= 0)
                 => (result >= 0)
                 return (value * value)
             """;

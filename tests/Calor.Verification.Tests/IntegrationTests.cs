@@ -88,10 +88,8 @@ public class IntegrationTests
         // and lives in the outcome corpus as refuted-overflow.calr.)
         var source = @"
 module Test
-  func Square public (int:x) → int
+  func Square public (int:x | ((# >= 0) && (# <= 46340))) → int
     !
-    requires x >= 0
-    requires x <= 46340
     => result >= 0
     return x * x";
 
@@ -129,9 +127,8 @@ module Test
 
         const string source = @"
 module Test Test block
-  func Chk (string:s) → string
+  func Chk (string:s | (# == ""abc"")) → string
     !
-    requires (s == ""abc"")
     => (!(result).StartsWith(""‍abc""))
     return s";
 
@@ -147,7 +144,7 @@ module Test Test block
         // check, so the emitted-overload assertion is what pins that the fix is precise: a blanket
         // refusal of these three operations would fail here.
         var ordinal = Program.Compile(
-            source.Replace(@"""))", @""", StringComparison.Ordinal))"), "test.calr", NoCache());
+            source.Replace(@"StartsWith(""‍abc""))", @"StartsWith(""‍abc"", StringComparison.Ordinal))"), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
         Assert.Contains("StringComparison.Ordinal", ordinal.GeneratedCode);
@@ -225,9 +222,8 @@ module Test
         // can still violate it, so the emitted C# must always carry the guard.
         var source = @"
 module Test
-  func Half public (int:x) → int
+  func Half public (int:x | (# > 0)) → int
     !
-    requires x > 0
     return x / 2";
 
         var options = new CompilationOptions
@@ -239,7 +235,8 @@ module Test
         var result = Program.Compile(source, "test.calr", options);
 
         Assert.False(result.HasErrors);
-        Assert.Contains("ContractKind.Requires", result.GeneratedCode);
+        // #1618: the precondition is the refinement on x, emitted as an entry check
+        Assert.Contains("throw new ArgumentOutOfRangeException(nameof(x)", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Precondition", result.GeneratedCode);
     }
 
@@ -252,10 +249,8 @@ module Test
         // must not elide the postcondition check and must warn loudly.
         var source = @"
 module Test
-  func Impossible public (int:x) → int
+  func Impossible public (int:x | ((# > 10) && (# < 5))) → int
     !
-    requires x > 10
-    requires x < 5
     => result == x
     return x";
 
@@ -306,9 +301,8 @@ module Test
     {
         var source = @"
 module Test
-  func Square public (int:x) → int
+  func Square public (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x";
 
@@ -332,9 +326,8 @@ module Test
 
         var source = @"
 module Test
-  func Square public (int:x) → int
+  func Square public (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x";
 
@@ -378,9 +371,8 @@ module Test
     {
         var source = @"
 module Test
-  func Square public (int:x) → int
+  func Square public (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x";
 
@@ -411,10 +403,8 @@ module Test
         // LONG:/UINT: literals appear in the pre/postconditions and the body.
         var source = @"
 module Test
-  func Clamp public (long:x) → long
+  func Clamp public (long:x | ((# >= 0L) && (# <= 1000000000000L))) → long
     !
-    requires x >= 0L
-    requires x <= 1000000000000L
     => result >= 0L
     return x";
 

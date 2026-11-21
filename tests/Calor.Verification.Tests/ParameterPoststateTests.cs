@@ -32,7 +32,8 @@ public class ParameterPoststateTests
             if (verify)
                 Assert.Contains(result.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
             var exception = Assert.Throws<TargetInvocationException>(() => Invoke(result));
-            Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
+            // #1618: x is refined, so the write that breaks x >= 0 fails its refinement check.
+            Assert.Equal("ArgumentOutOfRangeException", exception.InnerException!.GetType().Name);
         }
     }
 
@@ -67,7 +68,8 @@ public class ParameterPoststateTests
             var edited = Compile(Source(isVoid, "set x -1"), true, directory);
             Assert.Contains(edited.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
             var exception = Assert.Throws<TargetInvocationException>(() => Invoke(edited));
-            Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
+            // #1618: x is refined, so the write that breaks x >= 0 fails its refinement check.
+            Assert.Equal("ArgumentOutOfRangeException", exception.InnerException!.GetType().Name);
         }
         finally
         {
@@ -86,9 +88,8 @@ public class ParameterPoststateTests
                   get
                     set Value -1
                     return Value
-                func Change (ref int:x) → int
+                func Change (ref int:x | (# >= 0)) → int
                   !
-                  requires (x >= 0)
                   => (x >= 0)
                   let int:ignored = Mutate
                   return x
@@ -123,9 +124,8 @@ public class ParameterPoststateTests
     private static string Source(bool isVoid, string mutation) => $$"""
         module ParameterPoststate
           module ParameterPoststateModule
-            func Change public (int:x) → {{(isVoid ? "void" : "int")}}
+            func Change public (int:x | (# >= 0)) → {{(isVoid ? "void" : "int")}}
               !
-              requires x >= 0
               => x >= 0
               {{mutation.Replace("\n", "\n  ")}}
               return{{(isVoid ? "" : " x")}}

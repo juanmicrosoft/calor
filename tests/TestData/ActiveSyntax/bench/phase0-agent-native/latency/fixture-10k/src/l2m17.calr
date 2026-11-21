@@ -1,9 +1,8 @@
 module L2M17 L2M17 block
   module L2M17Module public
 
-    func l2m17_fn01 public (int:x, int:y) → int
+    func l2m17_fn01 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22597)
       if (x >= 22597)
@@ -21,9 +20,8 @@ module L2M17 L2M17 block
       let int:v1 = L3M30.L3M30Module.l3m30_fn09(x, 88)
       return (v1 + y)
 
-    func l2m17_fn04 public (int:x, int:y) → int
+    func l2m17_fn04 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22604)
       if (x >= 22604)
@@ -42,18 +40,16 @@ module L2M17 L2M17 block
       let int:v1 = L3M20.L3M20Module.l3m20_fn01(x, 48)
       return (v1 + y)
 
-    func l2m17_fn07 public (int:x, int:y) → int
+    func l2m17_fn07 public (int:x | (# >= 0), int:y) → int
       !
-      requires (x >= 0)
       => (result <= 22611)
       let int:total = ((x * 2) + y)
       if (total > 22611)
         return 22611
       return total
 
-    func l2m17_fn08 public (int:x, int:y) → int
+    func l2m17_fn08 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22618)
       if (x >= 22618)
@@ -61,9 +57,8 @@ module L2M17 L2M17 block
       else
         return 22618
 
-    func l2m17_fn09 public (int:x, int:y) → int
+    func l2m17_fn09 public (int:x | (# > 7), int:y) → int
       !
-      requires (x > 7)
       => (x >= 8)
       let int:acc = ((x * 2) + y)
       if (acc > 22625)
@@ -71,9 +66,8 @@ module L2M17 L2M17 block
       else
         return ((acc * 2) + 22625)
 
-    func l2m17_fn10 public (int:x, int:y) → int
+    func l2m17_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 22632)
       if (x >= 22632)
@@ -81,9 +75,8 @@ module L2M17 L2M17 block
       else
         return 22632
 
-    func l2m17_fn11 public (int:x, int:y) → int
+    func l2m17_fn11 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 5) + y)
       if (acc > 22639)

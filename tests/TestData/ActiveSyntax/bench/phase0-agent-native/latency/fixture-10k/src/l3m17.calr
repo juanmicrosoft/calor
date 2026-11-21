@@ -1,10 +1,8 @@
 module L3M17 L3M17 block
   module L3M17Module public
 
-    func l3m17_fn01 public (int:x, int:y) → int
+    func l3m17_fn01 public (int:x | (# >= 4), int:y | (# >= 0)) → int
       !
-      requires (x >= 4)
-      requires (y >= 0)
       => (result >= 24501)
       let int:total = ((x * 2) + y)
       if (total < 24501)
@@ -12,9 +10,8 @@ module L3M17 L3M17 block
       else
         return total
 
-    func l3m17_fn02 public (int:x, int:y) → int
+    func l3m17_fn02 public (int:x | (# > 1), int:y) → int
       !
-      requires (x > 1)
       => (x >= 2)
       let int:acc = ((x * 3) + y)
       if (acc > 24508)
@@ -22,9 +19,8 @@ module L3M17 L3M17 block
       else
         return ((acc * 2) + 24508)
 
-    func l3m17_fn03 public (int:x, int:y) → int
+    func l3m17_fn03 public (int:x | (# > 5), int:y) → int
       !
-      requires (x > 5)
       => (x >= 6)
       let int:acc = ((x * 5) + y)
       if (acc > 24515)
@@ -42,10 +38,8 @@ module L3M17 L3M17 block
       let int:@base = ((x * 4) - y)
       return (@base + 27)
 
-    func l3m17_fn06 public (int:x, int:y) → int
+    func l3m17_fn06 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 24522)
       let int:total = ((x * 2) + y)
       if (total < 24522)
@@ -63,9 +57,8 @@ module L3M17 L3M17 block
       let int:@base = ((x * 4) - y)
       return (@base + 72)
 
-    func l3m17_fn09 public (int:x, int:y) → int
+    func l3m17_fn09 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24529)
       if (x >= 24529)
@@ -73,9 +66,8 @@ module L3M17 L3M17 block
       else
         return 24529
 
-    func l3m17_fn10 public (int:x, int:y) → int
+    func l3m17_fn10 public (int:x, int:y | (# >= 0)) → int
       !
-      requires (y >= 0)
       => (result >= x)
       => (result >= 24536)
       if (x >= 24536)
@@ -83,9 +75,8 @@ module L3M17 L3M17 block
       else
         return 24536
 
-    func l3m17_fn11 public (int:x, int:y) → int
+    func l3m17_fn11 public (int:x | (# > 3), int:y) → int
       !
-      requires (x > 3)
       => (x >= 4)
       let int:acc = ((x * 3) + y)
       if (acc > 24543)
@@ -98,10 +89,8 @@ module L3M17 L3M17 block
       let int:@base = ((x * 4) - y)
       return (@base + 41)
 
-    func l3m17_fn13 public (int:x, int:y) → int
+    func l3m17_fn13 public (int:x | (# >= 6), int:y | (# >= 0)) → int
       !
-      requires (x >= 6)
-      requires (y >= 0)
       => (result >= 24550)
       let int:total = ((x * 5) + y)
       if (total < 24550)

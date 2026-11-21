@@ -1,11 +1,7 @@
 module GradeCalculator GradeCalculator
   module GradeCalculatorModule
-    func WeightedScore public (float:score, float:weight) → float
+    func WeightedScore public (float:score | ((# >= 0) && (# <= 100)), float:weight | ((# > 0) && (# <= 1))) → float
       !
-      requires score >= 0
-      requires score <= 100
-      requires weight > 0
-      requires weight <= 1
       return score * weight
 
     func LetterGrade public (float:score) → int

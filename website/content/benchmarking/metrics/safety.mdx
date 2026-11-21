@@ -114,11 +114,14 @@ Tests boundary conditions and overflow scenarios:
 
 ## Example: Error Quality Comparison
 
-### Calor ContractViolationException
+### Calor ContractViolationException (archived)
 
 This is the archived error illustration and score, not a transcript from the
 native example below. Its old function identity and condition spelling are not
-current source syntax.
+current source syntax. Current Calor no longer throws this exception for a
+precondition. A failed precondition now throws `ArgumentOutOfRangeException`
+with the parameter name. `ContractViolationException` remains the exception for
+postconditions and invariants.
 
 ```text illustrative
 ContractViolationException: Precondition failed
@@ -220,9 +223,8 @@ centralize them, subject to contract mode and supported lowering:
 **Calor:**
 ```calor
 module Math
-  func SafeDivide public (int:a, int:b) → int
+  func SafeDivide public (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 
@@ -236,15 +238,17 @@ public static int SafeDivide(int a, int b)
 }
 ```
 
-If these examples are compiled with runtime contracts enabled and called as
-`SafeDivide(10, 0)`:
-- **Calor**: `ContractViolationException` for the `b != 0` precondition
+If these examples are compiled and called as `SafeDivide(10, 0)`:
+- **Calor**: `ArgumentOutOfRangeException` for the `b != 0` precondition, with
+  `ParamName` `b` and the message
+  `Violation of inline refinement for parameter 'b'`
 - **C#**: `ArgumentException` with message and parameter name
 
-Both are written to catch the error. With contract mode off, the Calor
-precondition is not checked and integer division by zero throws
-`DivideByZeroException` instead. Neither example adds an overflow precondition:
-`int.MinValue / -1` still throws `OverflowException`. These bounded behaviors
+Both are written to catch the error. The Calor precondition is a parameter
+refinement, so it is checked in every contract mode, including
+`--contract-mode off`; the division never runs with `b = 0`. Neither example
+adds an overflow precondition: `int.MinValue / -1` still throws
+`OverflowException`. These bounded behaviors
 are not a new safety score or evidence for the historical 1.59x estimate.
 
 ---

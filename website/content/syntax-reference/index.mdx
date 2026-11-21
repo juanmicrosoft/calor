@@ -32,7 +32,7 @@ inside its function, before the first body statement.
 | Mutable binding | `var int:count = 3` or `var count = 3` |
 | Assignment | `set count count + 1` |
 | Effects | `! cw, fs:w`; a bare `!` declares no effects |
-| Precondition | `requires divisor != 0` |
+| Precondition | `int:divisor \| (# != 0)` |
 | Postcondition | `=> result >= 0` |
 | Branch | `if condition`, `else if condition`, `else` |
 | Counted loop, snapshot bounds | `for i from 1 to 10 step 1` |
@@ -134,7 +134,7 @@ include `cw` and `cr` for console output and input, `fs:r` and `fs:w` for
 filesystem access, and `alloc`, `mut` and `throw` for allocation, mutation and
 exceptions. A call to an unresolved operation is not silently treated as pure.
 
-Preconditions use `requires`; postconditions use `=>` and can refer to `result`.
+Preconditions are parameter refinements (`| (# > 0)`); postconditions use `=>` and can refer to `result`.
 Runtime checks, effect enforcement and verifier proofs are separate mechanisms.
 See [effects](/docs/syntax-reference/effects/) and
 [contracts](/docs/syntax-reference/contracts/) for their exact boundaries.

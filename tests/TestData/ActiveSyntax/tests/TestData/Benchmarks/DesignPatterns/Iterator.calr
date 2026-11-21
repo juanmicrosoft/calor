@@ -4,9 +4,8 @@ module Iterator Iterator
       !
       return current < end
 
-    func Next public (int:current, int:@step) → int
+    func Next public (int:current, int:@step | (# > 0)) → int
       !
-      requires @step > 0
       return current + @step
 
     func Current public (int:value) → int

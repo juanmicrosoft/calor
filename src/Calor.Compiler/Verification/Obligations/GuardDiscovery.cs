@@ -18,7 +18,7 @@ public sealed class DiscoveredGuard
     /// <summary>The guard condition as a Calor expression string.</summary>
     public required string CalorExpression { get; init; }
 
-    /// <summary>Where to insert the guard: "precondition", "if_guard", "assert".</summary>
+    /// <summary>Where to insert the guard: "refinement", "if_guard", "assert".</summary>
     public required string InsertionKind { get; init; }
 
     /// <summary>Confidence: "high", "medium", "low".</summary>
@@ -86,13 +86,14 @@ public sealed class GuardDiscovery
         var paramName = obligation.ParameterName ?? "param";
         var condStr = FormatCondition(obligation.Condition, paramName);
 
-        // Option 1: Add a precondition (highest confidence)
+        // Option 1: refine the parameter (highest confidence). #1618: a parameter
+        // precondition is written as an inline refinement on that parameter.
         guards.Add(new DiscoveredGuard
         {
             ObligationId = obligation.Id,
-            Description = $"Add precondition requiring '{paramName}' satisfies the refinement",
-            CalorExpression = $"requires {condStr}",
-            InsertionKind = "precondition",
+            Description = $"Refine '{paramName}' so callers must satisfy the condition",
+            CalorExpression = $"{paramName} | ({FormatCondition(obligation.Condition, "#")})",
+            InsertionKind = "refinement",
             Confidence = "high"
         });
 
@@ -114,13 +115,14 @@ public sealed class GuardDiscovery
         var guards = new List<DiscoveredGuard>();
         var condStr = FormatCondition(obligation.Condition, null);
 
-        // Option 1: Strengthen preconditions
+        // Option 1: strengthen the entry condition (#1618: as a refinement on the last
+        // parameter the condition mentions, with that parameter written as #).
         guards.Add(new DiscoveredGuard
         {
             ObligationId = obligation.Id,
-            Description = "Add precondition that implies the proof obligation",
-            CalorExpression = $"requires {condStr}",
-            InsertionKind = "precondition",
+            Description = "Refine the last parameter this condition mentions (write it as #) so the obligation holds",
+            CalorExpression = $"| ({condStr})",
+            InsertionKind = "refinement",
             Confidence = "high"
         });
 
@@ -226,8 +228,9 @@ public sealed class GuardDiscovery
 
         foreach (var guard in guards)
         {
-            // Only validate precondition-type guards (they have the same condition as the obligation)
-            if (guard.InsertionKind != "precondition")
+            // Only validate refinement guards (they have the same condition as the obligation).
+            // #1618 renamed this kind from "precondition"; the check must follow it.
+            if (guard.InsertionKind != "refinement")
             {
                 guard.Validated = null; // Not applicable
                 continue;

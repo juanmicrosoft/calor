@@ -411,9 +411,8 @@ public class InfixOperatorTests
     {
         const string source = """
             module Infix Infix
-              func Probe (int:x = 1 + 2 * 3) → int
+              func Probe (int:x | (# >= 0 && # < 10) = 1 + 2 * 3) → int
                 !
-                requires x >= 0 && x < 10
                 => result > x
                 let int:n = x + 1
                 Sink(n * 2, x - 1)
@@ -425,7 +424,7 @@ public class InfixOperatorTests
         var module = Parse(source);
         Assert.Equal(2, module.Functions.Count);
         var function = module.Functions[0];
-        Assert.Single(function.Preconditions);
+        Assert.Single(Calor.Compiler.Verification.ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions));
         Assert.Single(function.Postconditions);
         Assert.Equal(3, function.Body.Count);
         var call = Assert.IsType<CallExpressionNode>(

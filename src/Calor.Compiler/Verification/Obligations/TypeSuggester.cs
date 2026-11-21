@@ -69,9 +69,10 @@ public sealed class TypeSuggester
         var refinedParams = new HashSet<string>(
             func.Parameters.Where(p => p.InlineRefinement != null).Select(p => p.Name));
 
-        // Skip parameters that already have preconditions
+        // Skip parameters that already have preconditions. #1618: a refinement on one parameter
+        // can read another, which then counts as guarded, as it did in a `requires` clause.
         var guardedParams = new HashSet<string>();
-        foreach (var pre in func.Preconditions)
+        foreach (var pre in RefinementPreconditions.Effective(func.Parameters, func.Preconditions))
         {
             CollectGuardedParams(pre.Condition, guardedParams);
         }
@@ -107,7 +108,7 @@ public sealed class TypeSuggester
             method.Parameters.Where(p => p.InlineRefinement != null).Select(p => p.Name));
 
         var guardedParams = new HashSet<string>();
-        foreach (var pre in method.Preconditions)
+        foreach (var pre in RefinementPreconditions.Effective(method.Parameters, method.Preconditions))
         {
             CollectGuardedParams(pre.Condition, guardedParams);
         }
@@ -225,7 +226,7 @@ public sealed class TypeSuggester
                 SuggestedPredicate = $"{paramName} != 0",
                 Reason = $"'{paramName}' is used as a divisor without a non-zero constraint",
                 Confidence = "high",
-                CalorSyntax = $"requires {paramName} != 0"
+                CalorSyntax = $"{typeName}:{paramName} | (# != 0)"
             });
         }
 
@@ -239,7 +240,7 @@ public sealed class TypeSuggester
                 SuggestedPredicate = $"{paramName} >= 0",
                 Reason = $"'{paramName}' is used as an array index without a non-negative constraint",
                 Confidence = "high",
-                CalorSyntax = $"requires {paramName} >= 0"
+                CalorSyntax = $"{typeName}:{paramName} | (# >= 0)"
             });
         }
 
@@ -253,7 +254,7 @@ public sealed class TypeSuggester
                 SuggestedPredicate = $"{paramName} >= 0",
                 Reason = $"'{paramName}' is compared with >= 0, suggesting a non-negative constraint",
                 Confidence = "medium",
-                CalorSyntax = $"requires {paramName} >= 0"
+                CalorSyntax = $"{typeName}:{paramName} | (# >= 0)"
             });
         }
 
@@ -267,7 +268,7 @@ public sealed class TypeSuggester
                 SuggestedPredicate = $"{paramName} > 0",
                 Reason = $"'{paramName}' is compared with > 0, suggesting a positive constraint",
                 Confidence = "medium",
-                CalorSyntax = $"requires {paramName} > 0"
+                CalorSyntax = $"{typeName}:{paramName} | (# > 0)"
             });
         }
 

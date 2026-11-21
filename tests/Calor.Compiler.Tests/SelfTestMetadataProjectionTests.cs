@@ -12,10 +12,13 @@ namespace Calor.Compiler.Tests;
 
 public class SelfTestMetadataProjectionTests
 {
+    // #1618: the self-tests state preconditions as parameter refinements, whose entry checks
+    // are ArgumentOutOfRangeException guards, so only postconditions remain contract
+    // creations; the frozen baselines were re-frozen from the rewritten embedded goldens.
     [Theory]
-    [InlineData("03_contracts", 3)]
-    [InlineData("07_quantifiers", 5)]
-    [InlineData("08_contract_inheritance_z3", 4)]
+    [InlineData("03_contracts", 1)]
+    [InlineData("07_quantifiers", 1)]
+    [InlineData("08_contract_inheritance_z3", 2)]
     public void EmbeddedContractGolden_ChangesOnlyParsedOwnerAndLocation(string name, int count)
     {
         var root = CliTestHarness.FindRepoRoot();

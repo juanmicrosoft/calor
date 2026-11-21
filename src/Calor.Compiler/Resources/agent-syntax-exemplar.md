@@ -3,11 +3,8 @@
 # Calor syntax exemplar (reference sheet)
 
 Calor compiles to C# on .NET 10. Indent bodies two spaces; structural blocks end at dedent.
-Declarations use lowercase, space-separated headers without source IDs. Tooling maintains identity.
-Ordinary calls use parentheses; lambdas use => with an expression or indented statement body.
-
-Every complete module in the "Complete programs" section below must compile under the same
-strict policy used by calor_compile. The fragments summarize supported forms; they are not programs.
+Headers are lowercase and space-separated, without source IDs; tooling maintains identity.
+Calls use parentheses; lambdas use => with an expression or an indented statement body.
 
 ## Core syntax
 
@@ -18,58 +15,52 @@ func Name (string:x) → string        Public by default; private is explicit
                                      mut collection/heap mutation; alloc allocation
 let string:name = expression         Immutable (type optional)
 var int:name = 0                     Mutable (type optional)
-set name expression                 Updates, including increments expressed as addition
-requires condition / => condition   Precondition / postcondition (result = body return value)
-return expression                   Return (bare return for void)
+set name expression                  Update; increment with set i i + 1
+int:x | (# > 0)                      Precondition: refine the parameter (# is its value)
+=> condition                         Postcondition (result = return value)
+return expression                    Return (bare return for void)
 Console.WriteLine(expression)        Print line [needs cw]
-if condition / else if condition / else
-                                     Indented branches
-while condition                     Condition checked before each iteration
-for i from 0 to 9 step 1             Inclusive snapshot range; bounds evaluated once
-for i = 0; i < Bound(); i = i + 1    Condition reevaluated on every test
-each item in collection             Collection iteration (optional type:item)
-each key, value in dictionary        Synchronous two-name deconstruction
+if c / else if c / else              Indented branches
+while condition                      Checked before each iteration
+for i from 0 to 9 step 1             Inclusive range; bounds evaluated once
+for i = 0; i < Bound(); i = i + 1    Condition re-evaluated on every test
+each item in collection              Iteration (optional type:item)
+each key, value in dictionary        Two-name deconstruction
 ```
 
-Expressions use infix operators with C# precedence: a + b, a == b, p && q,
-!p, i < n, n % 3, value ?? fallback and condition ? yes : no.
-Binary operators associate left; ?? and ?: associate right. Boolean operators short circuit.
-Use !condition || consequence for implication, not a special operator. Newlines end expressions.
+Infix operators use C# precedence: a + b, a == b, p && q, !p, n % 3, value ?? fallback and
+condition ? yes : no. && and || short circuit; write implication as !p || q. Newlines end expressions.
 Use C# type names, T[] arrays, T? nullability and literals such as 42, true, "hi", 18.00m and 1.5f.
-Escapes include \", \n and \r. Plain strings interpolate "Hello ${name}";
-"\${0}" keeps literal placeholder text. Use nullability and exceptions for absence/failure,
-not dedicated Option/Result forms.
+Escapes include \", \n and \r. Strings interpolate "Hello ${name}"; "\${0}" keeps placeholder text.
+Use nullability and exceptions for absence and failure, not Option/Result forms.
 
 ## Calls
 
 ```
-Obj.Method(arg1, arg2)                     Postfix call; comma-separated arguments
+Obj.Method(arg1, arg2)                     Comma-separated arguments
 let string[]:lines = File.ReadAllLines(path)
 File.AppendAllText(path, key + "=" + value + "\n")
 let bool:ok = File.Exists(path)
-let int:n = LocalFunc(x)                   User functions use the same call syntax
+let int:n = LocalFunc(x)                   User functions use the same syntax
 let Func<int,int>:twice = (int:x) => x * 2
 ```
 
-Callees may be expressions; calls, member access and indexing can chain.
-Only methods use parentheses; property/field reads use obj.Property.
-Do not write structural closers or brace bodies for indented lambdas.
+Calls, member access and indexing chain. Properties take no parentheses: obj.Property.
+Never write structural closers or brace bodies, including for indented lambdas.
 
 ## Strings
 
 ```
 s.Length                              UTF-16 code-unit count
-s.Contains('x')   s.IndexOf('x')        Contracted char overloads, not substring search
+s.Contains('x')   s.IndexOf('x')        char overloads, not substring search
 s.ToUpperInvariant()   s.ToLowerInvariant()
-System.String.Equals(a, b)             Contracted ordinal equality
+System.String.Equals(a, b)             Ordinal equality
 let char:character = line[i]           A UTF-16 code unit, not a string
 let string:copy = new string(chars)    char[] buffer [needs alloc]
 ```
 
-Contracts apply to the selected overload. Contains(string), Substring, trimming and
-comparison-mode searches currently remain unknown under strict checking. The complete
-FirstField program uses an ordinal scan and a buffer, declaring alloc and mut honestly.
-Do not invent overloads or replace ordinal comparison with culture-dependent behavior.
+Contains(string), Substring, trimming and comparison-mode searches are unknown under strict
+checking; scan ordinally into a buffer as FirstField does. Do not invent overloads.
 
 ## Lists and dictionaries
 
@@ -82,24 +73,21 @@ let Dictionary<string,int>:ages = new Dictionary<string,int>()
 set ages[key] value                         Upsert, not Add [needs mut]
 ```
 
-Collection mutation needs mut; allocation needs alloc; file I/O needs fs:r, fs:w or fs:rw.
-Callers declare at least the union of their callees' effects. Unknown effects are not purity proofs.
-Source-generic receiver metadata must resolve honestly; do not add casts or fake types to obtain
-an effect charge. Arrays and lists differ: File.ReadAllLines returns string[], not List<string>.
+Mutation needs mut, allocation alloc, file I/O fs:r, fs:w or fs:rw. A caller declares at least
+its callees' effects; unknown effects prove nothing, and casts or fake types never earn a charge.
+File.ReadAllLines returns string[], not List<string>.
 
 ## Complete programs (the compiler's tests prove every one compiles)
 
 ```calor
 module Contracts
-  func Square (int:x) → int
+  func Square (int:x | (# >= 0)) → int
     !
-    requires x >= 0
     => result >= 0
     return x * x
 
-  func Divide (int:a, int:b) → int
+  func Divide (int:a, int:b | (# != 0)) → int
     !
-    requires b != 0
     return a / b
 ```
 
@@ -198,10 +186,6 @@ if                   wrong; if needs a condition, such as if x > 0
 if {x > 0}           wrong; braces do not surround conditions
 ```
 
-Blocks end at dedent; structural closing tags and section headers are retired.
-Write `else` or `else if` for a branch. Declaration IDs belong in the project
-`.calor/ids.json` sidecar, never in the source signature. Use an ordinary header:
-`func Add (int:a, int:b) → int`.
-
-Effects: `! cw` declares console write. Declare effects on functions that perform I/O.
-See `calor://effects` for the full effect catalog.
+Closing tags and section headers are retired; write `else` or `else if` for a branch.
+Declaration IDs live in `.calor/ids.json`, never in a header: `func Add (int:a, int:b) → int`.
+Functions that perform I/O declare effects (`! cw` is console write); see `calor://effects`.

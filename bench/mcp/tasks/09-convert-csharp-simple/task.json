@@ -6,5 +6,5 @@
   "input": "input.cs",
   "expected": "expected.calr",
   "expectedDiagnostics": [],
-  "successCriteria": "Generated Calor compiles and faithfully represents the C# source with correct module, function IDs, inputs, outputs, and return expressions"
+  "successCriteria": "Generated Calor compiles and faithfully represents the C# source with correct module, function signatures, pure effect rows, and return expressions"
 }

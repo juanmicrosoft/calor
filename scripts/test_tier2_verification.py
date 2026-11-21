@@ -631,10 +631,9 @@ class RepositoryGuards(unittest.TestCase):
 
     def test_proven_current_defect_resolutions_require_compilation(self):
         groups = {g["id"]: g for g in self.manifest["groups"]}
+        # 0.30 retired the stale 08-03 snapshot (retired syntax, no active mirror);
+        # SnapshotConversionTests compiles and runs its current output instead.
         for identifier, files, options in [
-            ("conversion-snapshots:08-03.approved",
-             ["tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"],
-             ["--permissive-effects"]),
             ("benchmarks:unregistered:NullDeref_buggy",
              ["tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"],
              ["--no-enforce-effects"]),
@@ -647,11 +646,9 @@ class RepositoryGuards(unittest.TestCase):
                 self.assertEqual(current["options"], options)
                 self.assertNotIn("errors", current)
                 self.assertNotIn("defect", current)
-        malformed = groups["lint-scenarios:mismatched_ids"]
-        self.assertEqual(malformed["expect"], "reject")
-        self.assertEqual(len(malformed["errors"]), 2)
-        self.assertTrue(all(error.split("|", 3)[1:3] == ["Calor0830", "-"]
-                            for error in malformed["errors"]))
+        # 0.30: mismatched_ids tested closing-tag IDs, a form the language no longer
+        # has, so the fixture and its group were deleted.
+        self.assertNotIn("lint-scenarios:mismatched_ids", groups)
 
     def test_current_gold_references_require_default_compilation(self):
         mapping = fcc.current_input_paths(REPO_ROOT, self.manifest)

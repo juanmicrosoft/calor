@@ -1,16 +1,13 @@
 module ErrorPropagation ErrorPropagation
   module ErrorPropagationModule
-    func Layer1 public (int:input) → int
+    func Layer1 public (int:input | (# > 0)) → int
       !
-      requires input > 0
       return input * 2
 
-    func Layer2 public (int:input) → int
+    func Layer2 public (int:input | (# > 0)) → int
       !
-      requires input > 0
       return input + 10
 
-    func Pipeline public (int:input) → int
+    func Pipeline public (int:input | (# > 0)) → int
       !
-      requires input > 0
       return (input * 2) + 10

@@ -139,7 +139,7 @@ public class LocalFunctionLanguageTests
     [InlineData("if n > 0\n      func L (int:x) → int\n        return x\n      return L(n)\n    return 0", "conditional placement", 1)]
     [InlineData("func L (int:x) → int\n      func N (int:y) → int\n        return y\n      return N(x)\n    return L(n)", "nested placement", 2)]
     [InlineData("func L (int:x) → int\n      !\n      return x\n    return L(n)", "effect row", 1)]
-    [InlineData("func L (int:x) → int\n      requires x > 0\n      return x\n    return L(n)", "contracts", 1)]
+    [InlineData("func L (int:x | (# > 0)) → int\n      return x\n    return L(n)", "contracts", 1)]
     [InlineData("func L <T> (T:x) → T\n      return x\n    return L(n)", "generic", 1)]
     [InlineData("func L (int:x) → System.Collections.Generic.IEnumerable<int>\n      yield x\n    return 0", "iterator", 1)]
     public void RetiredLocal_OutsideTheShape_IsRejectedWithLambdaGuidance(string body, string message, int expectedCount)

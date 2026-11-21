@@ -47,9 +47,8 @@ public sealed class NestedContractInheritanceRuntimeTests
             module NestedContracts NestedContracts block
               class Outer public
                 interface IPositive
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
                     => result > 0
                 interface IChild
                   extends IPositive
@@ -76,9 +75,8 @@ public sealed class NestedContractInheritanceRuntimeTests
         var positive = """
             class Positive public
               interface IValue
-                func Get (int:x) → int
+                func Get (int:x | (# > 0)) → int
                   !
-                  requires x > 0
                   => result > 0
               class Inner public
                 implements IValue
@@ -122,16 +120,14 @@ public sealed class NestedContractInheritanceRuntimeTests
         const string source = """
             module NestedContracts NestedContracts block
               interface IValue
-                func Get (int:x) → int
+                func Get (int:x | (# > 0)) → int
                   !
-                  requires x > 0
               class Outer public
                 class Inner public
                   implements IValue
                   interface IValue
-                    func Get (int:x) → int
+                    func Get (int:x | (# < 0)) → int
                       !
-                      requires x < 0
                   func Get public (int:value) → int
                     !
                     return value
@@ -151,9 +147,8 @@ public sealed class NestedContractInheritanceRuntimeTests
             module NestedContracts NestedContracts block
               class Base public
                 interface IPositive
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
                     => result > 0
               class Outer public
                 extends Base
@@ -178,14 +173,12 @@ public sealed class NestedContractInheritanceRuntimeTests
             module NestedContracts NestedContracts block
               class Outer<T> public
                 interface IPositive
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
                     => result > 0
                 interface IValue
-                  func Check (object:x) → object
+                  func Check (object:x | (# is T)) → object
                     !
-                    requires x is T
                     => result is T
               class Inner public
                 implements Outer<int>.IPositive
@@ -216,9 +209,8 @@ public sealed class NestedContractInheritanceRuntimeTests
         const string positive = """
             class Outer public
               interface IValue
-                func Get (int:x) → int
+                func Get (int:x | (# > 0)) → int
                   !
-                  requires x > 0
                   => result > 0
               class Inner public
                 implements IValue
@@ -241,14 +233,15 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void QualifiedGenericArguments_StayInTheCallersLexicalScope(bool verify)
     {
-        foreach (var contracts in new[] { "requires x is U", "=> result is U", "requires x is U\n=> result is U" })
+        // #1618: a precondition is the refinement on x; the rest are postcondition lines.
+        foreach (var (refinement, contracts) in new[] { (" | (# is U)", ""), ("", "=> result is U"), (" | (# is U)", "=> result is U") })
         foreach (var outerParameter in new[] { "T", "V" })
         {
             var source = $$"""
                 module NestedContracts NestedContracts block
                   class Outer<{{outerParameter}}> public
                     interface IValue<U>
-                      func Check (object:x) → object
+                      func Check (object:x{{refinement}}) → object
                         !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
                   class Impl<T> public
@@ -273,7 +266,7 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void InheritedPredicateTypes_KeepTheDeclaringScope(bool verify)
     {
-        foreach (var contracts in new[] { "requires x is Marker", "=> result is Marker", "requires x is Marker\n=> result is Marker" })
+        foreach (var (refinement, contracts) in new[] { (" | (# is Marker)", ""), ("", "=> result is Marker"), (" | (# is Marker)", "=> result is Marker") })
         foreach (var generic in new[] { false, true })
         {
             var source = $$"""
@@ -284,7 +277,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                         !
                         return 1
                     interface IValue
-                      func Check (object:x) → object
+                      func Check (object:x{{refinement}}) → object
                         !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
                   class Marker public
@@ -324,7 +317,7 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void ConstructedPredicateArguments_PreserveNamedTypeScope(bool verify)
     {
-        foreach (var contracts in new[] { "requires x is Box<Marker>", "=> result is Box<Marker>", "requires x is Box<Marker>\n=> result is Box<Marker>" })
+        foreach (var (refinement, contracts) in new[] { (" | (# is Box<Marker>)", ""), ("", "=> result is Box<Marker>"), (" | (# is Box<Marker>)", "=> result is Box<Marker>") })
         {
             var source = $$"""
                 module NestedContracts NestedContracts block
@@ -338,7 +331,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                         !
                         return 2
                     interface IValue
-                      func Check (object:x) → object
+                      func Check (object:x{{refinement}}) → object
                         !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
                   class Marker public
@@ -375,7 +368,7 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void ConstructedPredicateArguments_RespectMethodGenericRenaming(bool verify)
     {
-        foreach (var contracts in new[] { "requires x is Box<T>", "=> result is Box<T>", "requires x is Box<T>\n=> result is Box<T>" })
+        foreach (var (refinement, contracts) in new[] { (" | (# is Box<T>)", ""), ("", "=> result is Box<T>"), (" | (# is Box<T>)", "=> result is Box<T>") })
         foreach (var parameter in new[] { "T", "W" })
         {
             var source = $$"""
@@ -386,7 +379,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                         !
                         return 1
                     interface IValue
-                      func Check<{{parameter}}> (object:x) → object
+                      func Check<{{parameter}}> (object:x{{refinement.Replace("Box<T>", $"Box<{parameter}>")}}) → object
                         !
                 {{Indent(Indent(Indent(Indent(contracts.Replace("Box<T>", $"Box<{parameter}>")))))}}
                   class Impl public
@@ -424,7 +417,7 @@ public sealed class NestedContractInheritanceRuntimeTests
     {
         foreach (var depth in new[] { 0, 1, 2 })
         foreach (var path in new[] { "interface", "base", "interface-base" })
-        foreach (var contracts in new[] { "requires x != null", "=> result != null", "requires x != null\n=> result != null" })
+        foreach (var (refinement, contracts) in new[] { (" | (# != null)", ""), ("", "=> result != null"), (" | (# != null)", "=> result != null") })
         foreach (var parameterType in new[] { "Marker", "object" })
         {
             var declarations = """
@@ -435,9 +428,9 @@ public sealed class NestedContractInheritanceRuntimeTests
                 """;
             if (path != "base")
             {
-                declarations += "\n" + """
+                declarations += "\n" + $$"""
                     interface IValue<T>
-                      func Check (T:x) → T
+                      func Check (T:x{{refinement}}) → T
                         !
                     """ + "\n" + Indent(Indent(contracts));
             }
@@ -445,7 +438,7 @@ public sealed class NestedContractInheritanceRuntimeTests
             {
                 declarations += "\n" + "class Base<T> public abstract\n"
                     + (path == "interface-base" ? "  implements IValue<T>\n" : "")
-                    + "  func Check public abstract (T:x) → T\n    !"
+                    + "  func Check public abstract (T:x" + (path == "base" ? refinement : "") + ") → T\n    !"
                     + (path == "base" ? "\n" + Indent(Indent(contracts)) : "");
             }
             declarations += "\n" + $$"""
@@ -473,9 +466,8 @@ public sealed class NestedContractInheritanceRuntimeTests
         const string source = """
             module NestedContracts NestedContracts block
               interface IValue<U>
-                func Check<T> (U:x) → U
+                func Check<T> (U:x | (# != null)) → U
                   !
-                  requires x != null
                   => result != null
               class Impl<T> public
                 implements IValue<T>
@@ -504,23 +496,21 @@ public sealed class NestedContractInheritanceRuntimeTests
                      "List<T[]>[,]", "List<T>[,]", "List<T[]>[]" })
         {
             var predicate = shape.StartsWith('(') ? "x.Item1 != null" : "x != null";
-            var contracts = string.Join("\n", new[]
-            {
-                mode != "post" ? "requires " + predicate : null,
-                mode != "pre" ? "=> " + predicate.Replace("x", "result") : null
-            }.Where(line => line != null));
+            // #1618: the precondition is a refinement on x, written with #.
+            var refinement = mode != "post" ? " | (" + predicate.Replace("x", "#") + ")" : "";
+            var contracts = mode != "pre" ? "=> " + predicate.Replace("x", "result") : "";
             var surfaceShape = TypeMapper.ToSurfaceType(shape);
             var declarations = "";
             if (path != "base")
             {
-                declarations = $"interface IValue\n  func Check<T> ({surfaceShape}:x) → {surfaceShape}\n    !\n    where T : class\n"
+                declarations = $"interface IValue\n  func Check<T> ({surfaceShape}:x{refinement}) → {surfaceShape}\n    !\n    where T : class\n"
                     + Indent(Indent(contracts));
             }
             if (path != "interface")
             {
                 declarations += "\nclass Base public abstract\n"
                     + (path == "interface-base" ? "  implements IValue\n" : "")
-                    + $"  func Check<T> public abstract ({surfaceShape}:x) → {surfaceShape}\n    where T : class\n    !"
+                    + $"  func Check<T> public abstract ({surfaceShape}:x{(path == "base" ? refinement : "")}) → {surfaceShape}\n    where T : class\n    !"
                     + (path == "base" ? "\n" + Indent(Indent(contracts)) : "");
             }
             var implementationShape = surfaceShape.Replace("T", "U");
@@ -575,9 +565,8 @@ public sealed class NestedContractInheritanceRuntimeTests
                 module NestedContracts {{(moduleName == "_global" ? "" : moduleName + " block")}}
                   class Outer public
                     interface IValue
-                      func Check (object:x) → object
+                      func Check (object:x | (# != null)) → object
                         !
-                        requires x != null
                         => result != null
                     class Impl public
                       implements {{(global ? "global::" : "")}}{{namespacePrefix}}Outer.IValue
@@ -593,16 +582,14 @@ public sealed class NestedContractInheritanceRuntimeTests
             module Scope Scope block
               class Outer public
                 interface IValue
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
               class Container public
                 class Scope public
                   class Outer public
                     interface IValue
-                      func Get (int:x) → int
+                      func Get (int:x | (# < 0)) → int
                         !
-                        requires x < 0
                 class Relative public
                   implements Scope.Outer.IValue
                   func Get public (int:x) → int
@@ -627,13 +614,13 @@ public sealed class NestedContractInheritanceRuntimeTests
         foreach (var reference in new[] { "Outer.IValue", "Leaf.Outer.IValue",
                      "Deep.Leaf.Outer.IValue", "N.Deep.Leaf.Outer.IValue",
                      "global::N.Deep.Leaf.Outer.IValue" })
-        foreach (var contract in new[] { "requires x > 0", "=> result > 0" })
+        foreach (var (refinement, contract) in new[] { (" | (# > 0)", ""), ("", "=> result > 0") })
         {
             var source = $$"""
                 module NestedContracts N.Deep.Leaf block
                   class Outer public
                     interface IValue
-                      func Get (int:x) → int
+                      func Get (int:x{{refinement}}) → int
                         !
                         {{contract}}
                     class Impl public
@@ -652,7 +639,9 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void InheritedStaticMemberPredicates_KeepSourceScope(bool verify)
     {
         foreach (var depth in new[] { 0, 1, 2 })
-        foreach (var contract in new[] { "requires x > Limits.Min", "=> result > Limits.Min" })
+        // #1618: the `requires x > Limits.Min` variant is gone: a refinement may name only
+        // parameters (Calor0200), so a static-member precondition has no current form.
+        foreach (var contract in new[] { "=> result > Limits.Min" })
         {
             var implementation = """
                 class Impl public
@@ -691,9 +680,8 @@ public sealed class NestedContractInheritanceRuntimeTests
                     class Limits public
                       field int:Min public static = -10
                     interface IValue
-                      func Check (Payload:Limits) → int
+                      func Check (Payload:Limits | (#.Min > 0)) → int
                         !
-                        requires Limits.Min > 0
                   class Payload public
                     field int:Min public = 0
                   class Impl public
@@ -728,14 +716,16 @@ public sealed class NestedContractInheritanceRuntimeTests
                  })
         foreach (var post in new[] { false, true })
         {
-            var contract = post ? "=> " + predicate.Replace("x is", "result is") : "requires " + predicate;
+            // #1618: the precondition is a refinement on x, written with #.
+            var refinement = post ? "" : " | (" + predicate.Replace("x is", "# is") + ")";
+            var contract = post ? "=> " + predicate.Replace("x is", "result is") : "";
             var source = $$"""
                 module Scope Scope block
                   class Outer public
                     class Limits public
                       field int:Min public static = 10
                     interface IValue
-                      func Check (object:x) → object
+                      func Check (object:x{{refinement}}) → object
                         !
                         {{contract}}
                   class Payload public
@@ -762,7 +752,9 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void SourceFieldReceivers_RemainValuesInInheritedGuards(bool verify)
     {
         foreach (var inheritedField in new[] { false, true })
-        foreach (var contract in new[] { "requires Limits.Min > 0", "=> Limits.Min > 0" })
+        // #1618: the `requires Limits.Min > 0` variant is gone: a refinement may name only
+        // parameters (Calor0200), so a field-reading precondition has no current form.
+        foreach (var contract in new[] { "=> Limits.Min > 0" })
         {
             var source = $$"""
                 module Scope Scope block
@@ -809,7 +801,9 @@ public sealed class NestedContractInheritanceRuntimeTests
     {
         foreach (var outerField in new[] { false, true })
         foreach (var inheritedType in new[] { false, true })
-        foreach (var contract in new[] { "requires x > Limits.Min", "=> result > Limits.Min" })
+        // #1618: the `requires x > Limits.Min` variant is gone: a refinement may name only
+        // parameters (Calor0200), so a static-member precondition has no current form.
+        foreach (var contract in new[] { "=> result > Limits.Min" })
         {
             const string limits = """
                 class Limits public
@@ -850,7 +844,9 @@ public sealed class NestedContractInheritanceRuntimeTests
     {
         foreach (var inheritedShadow in new[] { "none", "parameter", "private-type" })
         foreach (var nestedName in new[] { "Limits", "Other" })
-        foreach (var contract in new[] { "requires x > Limits.Min", "=> result > Limits.Min" })
+        // #1618: the `requires x > Limits.Min` variant is gone: a refinement may name only
+        // parameters (Calor0200), so a static-member precondition has no current form.
+        foreach (var contract in new[] { "=> result > Limits.Min" })
         {
             var source = $$"""
                 module Scope Scope block
@@ -902,7 +898,9 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void InaccessibleInheritedTypes_DoNotHideLexicalTypes(bool verify)
     {
         foreach (var privateName in new[] { "Limits", "Other" })
-        foreach (var contract in new[] { "requires x > Limits.Min", "=> result > Limits.Min" })
+        // #1618: the `requires x > Limits.Min` variant is gone: a refinement may name only
+        // parameters (Calor0200), so a static-member precondition has no current form.
+        foreach (var contract in new[] { "=> result > Limits.Min" })
         {
             var source = $$"""
                 module Scope Scope block
@@ -942,9 +940,8 @@ public sealed class NestedContractInheritanceRuntimeTests
             module Wrapper{{(ns.Length == 0 ? "" : " " + ns + " block")}}
               class Outer public
                 interface IValue
-                  func Get (int:x) → int
+                  func Get (int:x | (# > 0)) → int
                     !
-                    requires x > 0
                     => result > 0
                 class Impl public
                   implements global::{{prefix}}Outer.IValue
@@ -1011,9 +1008,8 @@ public sealed class NestedContractInheritanceRuntimeTests
 
     private const string NativePositiveInterface = """
         interface IPositive
-          func Get (int:x) → int
+          func Get (int:x | (# > 0)) → int
             !
-            requires x > 0
             => result > 0
         """;
 }

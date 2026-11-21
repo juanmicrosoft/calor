@@ -13,9 +13,8 @@ module SumDigits SumDigits
       !
       return n / 10
 
-    func SumDigitsPositive public (int:n) → int
+    func SumDigitsPositive public (int:n | (# >= 0)) → int
       !
-      requires n >= 0
       => result >= 0
       if n == 0
         return 0

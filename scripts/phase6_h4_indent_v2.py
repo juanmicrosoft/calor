@@ -33,7 +33,7 @@ sys.path.insert(0, str(REPO / 'scripts'))
 from multi_model_runner import run_model  # noqa: E402
 
 CALOR_EXE = REPO / 'src/Calor.Compiler/bin/Debug/net10.0/calor.exe'
-FIXTURE = REPO / 'scripts/h2_edit_fixture.calr'  # already in indent form post Phase 4
+FIXTURE = REPO / 'scripts/historical/h2_edit_fixture.calr.txt'  # already in indent form post Phase 4
 
 MODELS = [
     'claude-haiku-4-5',

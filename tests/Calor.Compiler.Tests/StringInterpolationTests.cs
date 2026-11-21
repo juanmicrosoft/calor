@@ -650,11 +650,11 @@ public static class NumberFormat
         Assert.Empty(conversion.Losses);
         var normalized = conversion.CalorSource!.ReplaceLineEndings("\n");
         var checkedSource = unknown
-            ? normalized.Replace("ctor stat ()\n      ! unknown\n", "ctor stat ()\n", StringComparison.Ordinal)
+            ? normalized.Replace("ctor static ()\n      ! unknown\n", "ctor static ()\n", StringComparison.Ordinal)
             : conversion.CalorSource!;
         if (unknown)
         {
-            Assert.Contains("ctor stat ()\n      ! unknown\n", normalized, StringComparison.Ordinal);
+            Assert.Contains("ctor static ()\n      ! unknown\n", normalized, StringComparison.Ordinal);
             // 0.30 (gap A): Render may run the static constructor, so it is charged too.
             Assert.Contains("func Render static (double:unused) → string\n      ! unknown\n", normalized,
                 StringComparison.Ordinal);
